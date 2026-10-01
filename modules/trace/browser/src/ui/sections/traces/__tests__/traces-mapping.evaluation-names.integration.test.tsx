@@ -1,11 +1,11 @@
+import type { MappingState } from "@langwatch/dataset-contract";
 /**
  * Integration tests for the "evaluations" field mapping dropdown in TracesMapping.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { MappingState } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -77,14 +77,12 @@ function renderEvaluationsMapping() {
     },
     expansions: [],
   };
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TracesMapping
-        traces={[traceWithoutEvaluations]}
-        traceMapping={traceMapping}
-        targetFields={["eval_col"]}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TracesMapping
+      traces={[traceWithoutEvaluations]}
+      traceMapping={traceMapping}
+      targetFields={["eval_col"]}
+    />,
   );
 }
 

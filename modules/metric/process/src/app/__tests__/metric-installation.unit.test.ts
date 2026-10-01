@@ -1,17 +1,17 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp } from "@langwatch/kernel";
 import { MetricApi } from "@langwatch/metric-contract";
+import { createApp } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { metricServer } from "../../metric.server.ts";
+import { metricProcessModule } from "../../metric.module.ts";
 
 /**
- * The one member `MetricApp` declares reading (`reads: ["clickhouse"]`). This
+ * The one member `MetricModule` declares reading (`reads: ["clickhouse"]`). This
  * suite prepares only, so the pipeline's own append repository is never reached.
  */
 function unreachableClickHouse() {
@@ -38,7 +38,7 @@ const GAUGE_REQUEST = {
 
 function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"]) {
   return createApp({ role: "api" })
-    .withModules([metricServer])
+    .withModules([metricProcessModule])
     .withAnalytical(unreachableClickHouse())
     .withConfig({ metric: { processingShards: void 0 } })
     .provide({
@@ -89,7 +89,7 @@ describe("metric app installation", () => {
       try {
         const app = runtime.service(MetricApi);
 
-        expect(runtime.module(metricServer).provided).toBe(app);
+        expect(runtime.module(metricProcessModule).provided).toBe(app);
 
         const preparation = await app.prepareMetricDataPoints({
           tenantId: "project-1",

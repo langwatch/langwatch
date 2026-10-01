@@ -43,8 +43,8 @@ import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { type SpanDetail, TraceApi } from "@langwatch/trace-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -147,7 +147,7 @@ type CodingAgentSetup = FeatureSetup<
   CodingAgentRepositories
 >;
 
-export class CodingAgentApp implements CodingAgentApi {
+export class CodingAgentModule implements CodingAgentApi {
   static readonly contract = CodingAgentApiToken;
   static readonly dependencies: CodingAgentDependencies = {
     projects: ProjectApi,
@@ -167,7 +167,7 @@ export class CodingAgentApp implements CodingAgentApi {
     governance: GovernanceRestApi,
   };
 
-  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentApp {
+  static create({ dependencies, repositories }: CodingAgentSetup): CodingAgentModule {
     const service = CodingAgentFeatureService.create({
       sessions: repositories.sessions,
       traceSessions: repositories.traceSessions,
@@ -217,7 +217,7 @@ export class CodingAgentApp implements CodingAgentApi {
         commands,
       }),
     }).build();
-    return new CodingAgentApp({
+    return new CodingAgentModule({
       codingAgents: service,
       github: dependencies.github,
       traces: dependencies.traces,

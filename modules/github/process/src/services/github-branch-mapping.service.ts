@@ -7,12 +7,12 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, nowInstant, toEpochMs, type Instant } from "@langwatch/time";
 
 import { type GithubAppTokenCache, type GithubPullRequestSummary } from "../app/github.app.ts";
-import type { GithubHost } from "../app/github.members.ts";
 import { GithubRateLimitedError } from "../channels/github-api.channel.ts";
 import type {
   GithubPullRequestsRepository,
   UpsertGithubPullRequestInput,
 } from "../repositories/github-pull-requests.repository.ts";
+import type { GithubHost } from "./github-host.service.ts";
 import type { GithubInstallationLookup } from "./github-installation-access.service.ts";
 
 const logger = createLogger("langwatch:github:branch-mapping");

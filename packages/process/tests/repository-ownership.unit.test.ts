@@ -1,0 +1,115 @@
+import { moduleApi } from "@langwatch/module";
+import { describe, expect, it, vi } from "vitest";
+
+import { createApp } from "../src/application.ts";
+import { defineProcessModule, type FeatureSetup } from "../src/index.ts";
+import {
+  assertRepositoryOwnership,
+  RepositoryOwnershipConflictError,
+} from "../src/repository-ownership.ts";
+import { memberSourceOf } from "./member-source.ts";
+
+const userTables = { store: "prisma", tables: ["User"] };
+const created = vi.fn();
+
+class UserModule {
+  static readonly contract = moduleApi<UserModule>()("user");
+  static readonly dependencies = {};
+  static readonly repositories = { users: { tables: userTables } };
+  private constructor() {}
+  static create(_setup: FeatureSetup<typeof UserModule.dependencies, object, undefined>) {
+    created();
+    return new UserModule();
+  }
+  ping() {
+    return "user";
+  }
+}
+
+class AnnotationModule {
+  static readonly contract = moduleApi<AnnotationModule>()("annotation");
+  static readonly dependencies = {};
+  static readonly repositories = { foreign: { tables: userTables } };
+  private constructor() {}
+  static create(_setup: FeatureSetup<typeof AnnotationModule.dependencies, object, undefined>) {
+    created();
+    return new AnnotationModule();
+  }
+  ping() {
+    return "annotation";
+  }
+}
+
+describe("repository ownership", () => {
+  it.each(["api", "worker", "tasks"] as const)(
+    "rejects conflicting ownership before any %s factory runs",
+    async (role) => {
+      created.mockClear();
+      const runtime = createApp({ role, members: memberSourceOf({}) }).withModules([
+        defineProcessModule("user").withApi(UserModule).build(),
+        defineProcessModule("annotation").withApi(AnnotationModule).build(),
+      ]);
+      await expect(runtime.boot()).rejects.toThrow(RepositoryOwnershipConflictError);
+      expect(created).not.toHaveBeenCalled();
+    },
+  );
+
+  it("allows two repositories belonging to the same owner", () => {
+    expect(() =>
+      assertRepositoryOwnership([
+        {
+          name: "user",
+          repositories: {
+            profiles: { tables: userTables },
+            preferences: { tables: userTables },
+          },
+        },
+      ]),
+    ).not.toThrow();
+  });
+
+  it("keeps independent storage namespaces separate", () => {
+    expect(() =>
+      assertRepositoryOwnership([
+        { name: "user", repositories: { rows: { tables: userTables } } },
+        {
+          name: "annotation",
+          repositories: { rows: { tables: { store: "clickhouse", tables: ["User"] } } },
+        },
+      ]),
+    ).not.toThrow();
+  });
+
+  it("freezes a declaration independently of later metadata mutation", () => {
+    const tables = ["AuditLog"];
+    const app = {
+      contract: UserModule.contract,
+      dependencies: {},
+      repositories: { rows: { tables: { store: "prisma", tables } } },
+      create: (...args: Parameters<typeof UserModule.create>) => UserModule.create(...args),
+    };
+    const declaration = defineProcessModule("user").withApi(app).build();
+    tables.push("User");
+    expect(declaration.repositories?.rows?.tables.tables).toEqual(["AuditLog"]);
+    expect(Object.isFrozen(declaration.repositories?.rows?.tables.tables)).toBe(true);
+  });
+
+  it("reports the physical table and both owners", () => {
+    expect(() =>
+      assertRepositoryOwnership([
+        { name: "user", repositories: { rows: { tables: userTables } } },
+        { name: "annotation", repositories: { rows: { tables: userTables } } },
+      ]),
+    ).toThrow("Table postgres/User is claimed by both user and annotation");
+  });
+
+  it.each([
+    { store: "", tables: ["User"] },
+    { store: "prisma", tables: [] },
+    { store: "prisma", tables: [""] },
+  ])("rejects an empty claim %j", (tables) => {
+    expect(() =>
+      assertRepositoryOwnership([{ name: "user", repositories: { rows: { tables } } }]),
+    ).toThrow(Error);
+  });
+});

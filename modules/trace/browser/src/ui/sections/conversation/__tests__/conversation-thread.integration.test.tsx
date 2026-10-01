@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Conversation renderer output: flattenMessages → ConversationThread drawing.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type FlattenableMessage, flattenMessages } from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { type FlattenableMessage, flattenMessages } from "@langwatch/trace-contract/conversation";
+import { cleanup, type render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -45,7 +45,7 @@ function renderConversation({
       )}
     />
   );
-  return render(<ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>);
+  return renderWithDesignSystem(ui);
 }
 
 describe("<ConversationThread />", () => {

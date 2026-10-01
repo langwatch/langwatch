@@ -1,20 +1,20 @@
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 
 import { MemoryNotificationRepositories } from "../../repositories/memory/memory.notification.repositories.ts";
 import type { NotificationRepositories } from "../../repositories/notification.repositories.ts";
-import { NotificationApp } from "../notification.app.ts";
+import { NotificationModule } from "../notification.app.ts";
 
 /** The notification app over memory repositories, for tests that need no database. */
 export function createNotificationTestApp(
   input: Readonly<{ repositories?: NotificationRepositories }> = {},
-): Promise<NotificationApp> {
+): Promise<NotificationModule> {
   const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} })).scopeTo(
     "notification",
-    Object.values(NotificationApp.secrets),
+    Object.values(NotificationModule.secrets),
   );
 
-  return NotificationApp.create({
+  return NotificationModule.create({
     repositories: input.repositories ?? MemoryNotificationRepositories.create(),
     dependencies: {},
     members: { publicBaseUrl: undefined, outboundProxy: {} },

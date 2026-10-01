@@ -10,13 +10,9 @@ import {
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type EvaluationLangevals,
-  type EvaluationExecutionTelemetry,
-  type LangevalsEvaluateParams,
-} from "../app/evaluation.members.ts";
 import { type LangevalsChannel, PayloadTooLargeError } from "../channels/langevals.channel.ts";
 import { toLangevalsContexts } from "../rules/langevals-contexts.rules.ts";
+import type { EvaluationExecutionMetricsService } from "./evaluation-execution-metrics.service.ts";
 
 const logger = createLogger("langwatch:langevals-http-client");
 
@@ -69,11 +65,11 @@ export type LangevalsRuntimeConfig = Readonly<{
 }>;
 
 /** Runs one installed evaluator over the langevals channel: retry, timeout and result mapping. */
-export class LangevalsEvaluatorService implements EvaluationLangevals {
+export class LangevalsEvaluatorService {
   static create(input: {
     config: LangevalsRuntimeConfig;
     langevals: LangevalsChannel;
-    telemetry?: EvaluationExecutionTelemetry;
+    telemetry?: Pick<EvaluationExecutionMetricsService, "record">;
   }): LangevalsEvaluatorService {
     return new LangevalsEvaluatorService(input.config, input.langevals, input.telemetry);
   }
@@ -81,7 +77,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
   private constructor(
     private readonly config: LangevalsRuntimeConfig,
     private readonly langevals: LangevalsChannel,
-    private readonly telemetry: EvaluationExecutionTelemetry | undefined,
+    private readonly telemetry: Pick<EvaluationExecutionMetricsService, "record"> | undefined,
   ) {}
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -92,7 +88,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
     params: LangevalsEvaluateParams,
     retriesLeft: number,
   ): Promise<SingleEvaluationResult> {
-    const { evaluatorType, data, settings, env, idempotencyKey } = params;
+    const { evaluatorType, data, settings, env, idempotencyKey, signal } = params;
     const url = `${this.config.endpoint}/${evaluatorType}/evaluate`;
     const startTime = performance.now();
     const controller = new AbortController();
@@ -104,7 +100,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
         url,
         kind: "evaluation",
         headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
-        signal: controller.signal,
+        signal: withCallerSignal({ own: controller.signal, caller: signal }),
         body: {
           data: [
             {
@@ -138,7 +134,7 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
     }
 
     if (!response.ok) {
-      if (response.status >= 500 && retriesLeft > 0) {
+      if (response.status >= 500 && retriesLeft > 0 && !signal?.aborted) {
         await new Promise((resolve) => setTimeout(resolve, 100));
         return this.evaluateWithRetry(params, retriesLeft - 1);
       }
@@ -188,3 +184,23 @@ export class LangevalsEvaluatorService implements EvaluationLangevals {
     return result;
   }
 }
+
+function withCallerSignal({
+  own,
+  caller,
+}: {
+  own: AbortSignal;
+  caller: AbortSignal | undefined;
+}): AbortSignal {
+  return caller ? AbortSignal.any([own, caller]) : own;
+}
+
+export type LangevalsEvaluateParams = Readonly<{
+  evaluatorType: string;
+  data: Record<string, unknown>;
+  settings: Record<string, unknown>;
+  env: Record<string, string>;
+  idempotencyKey?: string;
+  /** The caller's cancellation, combined with this client's own timeout. */
+  signal?: AbortSignal | undefined;
+}>;

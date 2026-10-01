@@ -7,7 +7,7 @@ import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
  * Guards ADR-132: a browser-reachable package (contract, browser,
- * browser-kit, Design System) whose value-import graph reaches a Node
+ * Design System) whose value-import graph reaches a Node
  * builtin, however deep — a per-file rule cannot see that graph shape.
  */
 
@@ -15,11 +15,11 @@ const NODE_BUILTIN_SPECIFIERS = new Set(
   builtinModules.flatMap((specifier) => [specifier, `node:${specifier.replace(/^node:/, "")}`]),
 );
 
-/** A `*-contract`, `*-browser` or `*-browser-kit` package name: what a browser bundle can reach. */
-const BROWSER_REACHABLE_PACKAGE = /-(?:contract|browser|browser-kit)$/;
+/** A `*-contract` or `*-browser` package name: what a browser bundle can reach. */
+const BROWSER_REACHABLE_PACKAGE = /-(?:contract|browser)$/;
 
 /** Trusted portable by construction (React, browser-host only) — still walked here to prove it. */
-const ALWAYS_CHECKED_PACKAGES = new Set(["@langwatch/design-system", "@langwatch/browser-host"]);
+const ALWAYS_CHECKED_PACKAGES = new Set(["@langwatch/design-system", "@langwatch/browser-host", "@langwatch/browser"]);
 
 function browserReachableRoots(
   resolver: WorkspaceModuleResolver,
@@ -73,8 +73,8 @@ export function lintBrowserNodeLeaks(snapshot: WorkspaceSnapshot): ArchitectureV
     file: finding.file,
     line: finding.line,
     specifier: finding.specifier,
-    message: `\`${finding.specifier}\` is a Node.js builtin, imported here in a file a browser-reachable package (a *-contract, *-browser or *-browser-kit package, or the Design System) can reach.`,
+    message: `\`${finding.specifier}\` is a Node.js builtin, imported here in a file a browser-reachable package (a *-contract or *-browser package, or the Design System) can reach.`,
     allowed:
-      "Move the Node-only code behind a leaf subpath export the browser never resolves — the pattern @langwatch/secrets and @langwatch/kernel use (ADR-132) — so the package's default entry stays portable.",
+      "Move the Node-only code behind a leaf subpath export the browser never resolves — the pattern @langwatch/secrets and @langwatch/eventing use (ADR-132) — so the package's default entry stays portable.",
   }));
 }

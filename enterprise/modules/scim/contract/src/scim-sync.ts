@@ -1,8 +1,8 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory sync aggregate: one per SSO connection, recording pushes and lifecycle. Audit history
  * only; membership consequences dispatch to the grants ledger. See D08.
  */
-import { identityActorSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 export const SCIM_SYNC_EVENT_VERSION_LATEST = "2026-08-24" as const;
@@ -71,7 +71,7 @@ export const scimTokenIssuedPayloadSchema = z.object({
   /** The token ROW's id. Never the token, never its hash: this history is
    *  read by support surfaces, and a credential has no business in it. */
   tokenId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const scimUserPushedPayloadSchema = z.object({
@@ -136,7 +136,7 @@ export const scimApplyRedrivenPayloadSchema = z.object({
   /** Business time of the retirement this re-drive answers. */
   retiredAtMs: z.number().int().nonnegative(),
   /** The platform operator who sent it through again. */
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const scimTokenRevokedPayloadSchema = z.object({

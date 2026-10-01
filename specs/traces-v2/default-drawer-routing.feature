@@ -1,14 +1,13 @@
 # Trace Explorer default routing — Gherkin Spec
-# Implementation: packages/browser-host/src/drawer/behavior/use-drawer.ts (routeTraceDrawerForV2 +
-# the openDrawer interception), the legacy path redirects under
-# [gone] src/pages/[project]/messages/, and the legacy drawer redirect
-# in [gone] src/components/LegacyTraceDrawerRedirect.tsx
+# Implementation: the `traceDetails` drawer registered in modules/trace/browser/src/trace.web.ts,
+# which renders modules/trace/browser/src/ui/sections/legacy-trace-drawer-redirect.tsx, and the
+# legacy path redirects under [gone] src/pages/[project]/messages/
 #
 # The Trace Explorer is the default trace experience. The former per-device
 # opt-in is gone: every request to open a trace's details (no matter which
 # screen triggered it — evaluation results, a workflow run panel, the command
-# bar, a feedback row) goes through the same open-drawer call, which routes to
-# the Trace Explorer drawer.
+# bar, a feedback row) goes through the same open-drawer call, and the legacy drawer name
+# redirects to the Trace Explorer drawer.
 #
 # Both legacy surfaces are gone. The legacy Traces page path survives as a
 # redirect to the Trace Explorer, and the legacy trace drawer name survives as
@@ -30,7 +29,8 @@ Feature: Trace Explorer is the default trace experience from every entry point
 
   Rule: All trace views open the Trace Explorer drawer by default
 
-    @integration
+    # Results views call openDrawer("traceV2Details") inline (batch-evaluation-results.tsx); no render test yet.
+    @unimplemented
     Scenario: A trace opened from a results view uses the Trace Explorer
       When I open a trace's details from a results view
       Then the Trace Explorer drawer opens for that trace
@@ -123,7 +123,8 @@ Feature: Trace Explorer is the default trace experience from every entry point
 
   Rule: Non-trace drawers and incomplete requests are never rerouted
 
-    @integration
+    # Nothing reroutes drawer opens since the host's open rewrite was deleted; nothing left to pin.
+    @unimplemented
     Scenario: Opening a non-trace drawer is unaffected
       When a screen opens a drawer that is not a trace drawer
       Then that drawer opens unchanged

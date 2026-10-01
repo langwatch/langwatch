@@ -34,7 +34,7 @@
       "path": "../../instant-eval/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/otlp/tsconfig.build.json"

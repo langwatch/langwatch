@@ -1,11 +1,11 @@
 import type { Evaluation } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useTraceViewer } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import type { EvalSummary } from "../types/trace.ts";
 
 export type RichEval = EvalSummary & {
@@ -94,10 +94,10 @@ export function mapScore(ev: Evaluation): number | boolean | null {
 }
 
 export function useTraceEvaluations(): TraceEvaluationsResult {
-  const shared = useSharedTrace();
+  const viewer = useTraceViewer();
   const { project } = useOrganizationTeamProject();
-  const storeTraceId = useDrawerStore((s) => s.traceId);
-  const traceId = shared?.header.traceId ?? storeTraceId;
+  const storeTraceId = useTraceDrawer((s) => s.traceId);
+  const traceId = viewer.traceId ?? storeTraceId;
 
   // TODO(traces-v2): migrate to `traces.evals` once the v2 schema carries `spanId`,
   // `errorStacktrace`, and `retries` — the rich evaluations panel surfaces all three.
@@ -105,14 +105,10 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
   const query = api.traces.getEvaluations.useQuery(
     { projectId: project?.id ?? "", traceId: traceId ?? "" },
     {
-      enabled: !!project?.id && !!traceId && !isPreview && !shared,
-      staleTime: 30_000,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
+      enabled: !!project?.id && !!traceId && !isPreview && !viewer.isReadOnly,    },
   );
 
-  const rawEvaluations = shared?.evaluations ?? query.data;
+  const rawEvaluations = query.data;
 
   return useMemo(() => {
     const all = rawEvaluations ?? [];
@@ -158,8 +154,8 @@ export function useTraceEvaluations(): TraceEvaluationsResult {
     return {
       rich,
       pendingCount,
-      isLoading: shared ? false : query.isLoading,
-      isError: shared ? false : query.isError,
+      isLoading: query.isLoading,
+      isError: query.isError,
     };
-  }, [rawEvaluations, query.isLoading, query.isError, shared]);
+  }, [rawEvaluations, query.isLoading, query.isError]);
 }

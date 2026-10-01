@@ -3,22 +3,16 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/page-structure.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AgentTestingHeader } from "../agent-testing-header.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderHeader = (props: Partial<React.ComponentProps<typeof AgentTestingHeader>> = {}) =>
-  render(<AgentTestingHeader tab="cases" onTabChange={vi.fn()} {...props} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(<AgentTestingHeader tab="cases" onTabChange={vi.fn()} {...props} />);
 
 /** True when `first` stands before `second` in the page. */
 const comesBefore = (first: Element, second: Element) =>
@@ -154,11 +148,7 @@ describe("<AgentTestingHeader/>", () => {
         openPlan: { name: "Checkout", note: "Run plan" },
       });
 
-      view.rerender(
-        <ChakraProvider value={defaultSystem}>
-          <AgentTestingHeader tab="results" onTabChange={vi.fn()} openPlan={null} />
-        </ChakraProvider>,
-      );
+      view.rerender(<AgentTestingHeader tab="results" onTabChange={vi.fn()} openPlan={null} />);
 
       expect(screen.getByRole("heading", { name: "Agent Testing" })).toBeInTheDocument();
       expect(screen.queryByTestId("agent-testing-title-note")).not.toBeInTheDocument();

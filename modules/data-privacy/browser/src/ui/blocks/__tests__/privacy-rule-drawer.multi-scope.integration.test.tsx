@@ -1,12 +1,12 @@
-/**
- * @vitest-environment jsdom
- * Spec: specs/data-privacy/policy-configuration.feature
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   type DataPrivacyScopeAvailable,
   PLATFORM_DEFAULT_DATA_PRIVACY,
 } from "@langwatch/data-privacy-contract";
+/**
+ * @vitest-environment jsdom
+ * Spec: specs/data-privacy/policy-configuration.feature
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
@@ -16,7 +16,7 @@ import { PrivacyRuleDrawer } from "../privacy-rule-drawer.tsx";
 import type { PrivacyScopeEntry } from "../privacy-rule-drawer.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 const PROJECT_ID = "web-app";

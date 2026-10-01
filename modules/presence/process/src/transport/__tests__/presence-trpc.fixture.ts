@@ -14,7 +14,7 @@ import type { AuthzPermission } from "@langwatch/authorization";
  * what the test told them to, an audit port that records rather than writes,
  * and a factory that records what each procedure declared without building one.
  */
-import type { TrpcContract } from "@langwatch/kernel/contract";
+import type { TrpcContract } from "@langwatch/module";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { initTRPC } from "@trpc/server";
 

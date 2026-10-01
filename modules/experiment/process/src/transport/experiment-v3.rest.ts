@@ -36,12 +36,12 @@ import {
   type EvaluationV3Event,
   type SavedRunAnswer,
 } from "@langwatch/experiment-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import type { ExperimentApp } from "#app/experiment.app";
+import type { ExperimentModule } from "#app/experiment.app";
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
@@ -55,16 +55,16 @@ const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPR
  * Composed by the process's `experiment-v3-rest.mount.ts` (not a module).
  */
 export interface ExperimentV3RestApi {
-  abortWorkbenchRun: ExperimentApp["abortWorkbenchRun"];
-  startSavedRun: ExperimentApp["startSavedRun"];
-  restoreWorkbenchVersionBySlug: ExperimentApp["restoreWorkbenchVersionBySlug"];
-  readWorkbenchStateBySlug: ExperimentApp["readWorkbenchStateBySlug"];
-  saveWorkbenchStateBySlug: ExperimentApp["saveWorkbenchStateBySlug"];
-  listWorkbenchVersionsBySlug: ExperimentApp["listWorkbenchVersionsBySlug"];
-  executeWorkbenchRun: ExperimentApp["executeWorkbenchRun"];
-  listRunsPage: ExperimentApp["listRunsPage"];
-  pollRun: ExperimentApp["pollRun"];
-  readRunResults: ExperimentApp["readRunResults"];
+  abortWorkbenchRun: ExperimentModule["abortWorkbenchRun"];
+  startSavedRun: ExperimentModule["startSavedRun"];
+  restoreWorkbenchVersionBySlug: ExperimentModule["restoreWorkbenchVersionBySlug"];
+  readWorkbenchStateBySlug: ExperimentModule["readWorkbenchStateBySlug"];
+  saveWorkbenchStateBySlug: ExperimentModule["saveWorkbenchStateBySlug"];
+  listWorkbenchVersionsBySlug: ExperimentModule["listWorkbenchVersionsBySlug"];
+  executeWorkbenchRun: ExperimentModule["executeWorkbenchRun"];
+  listRunsPage: ExperimentModule["listRunsPage"];
+  pollRun: ExperimentModule["pollRun"];
+  readRunResults: ExperimentModule["readRunResults"];
 }
 
 export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
@@ -80,6 +80,7 @@ export const experimentWorkbenchCredential = defineRestMiddleware(
         isLangySessionKey: z.boolean().optional(),
       })
       .strict(),
+    z.object({ kind: z.literal("cliAccessToken"), userId: z.string() }).strict(),
     z.object({ kind: z.literal("legacyProjectKey") }).strict(),
   ]),
 );

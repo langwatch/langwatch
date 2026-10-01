@@ -1,8 +1,9 @@
-import { memo } from "react";
+import { PresenceAvatarStack } from "@langwatch/design-system/presence";
+import { presencePeerView } from "@langwatch/presence-contract";
+import { memo, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { selectPeersOnTrace, usePresenceStore } from "../../../behavior/presence/presence-store.ts";
-import { PresenceAvatarStack } from "./presence-avatar-stack.tsx";
 
 export interface TracePresenceAvatarsProps {
   traceId: string;
@@ -20,7 +21,8 @@ export const TracePresenceAvatars = memo(function TracePresenceAvatars({
   max = 3,
   size = "2xs",
 }: TracePresenceAvatarsProps) {
-  const peers = usePresenceStore(useShallow((s) => selectPeersOnTrace(s, traceId)));
+  const sessions = usePresenceStore(useShallow((s) => selectPeersOnTrace(s, traceId)));
+  const peers = useMemo(() => sessions.map(presencePeerView), [sessions]);
   if (peers.length === 0) return null;
-  return <PresenceAvatarStack sessions={peers} max={max} size={size} />;
+  return <PresenceAvatarStack peers={peers} max={max} size={size} />;
 });

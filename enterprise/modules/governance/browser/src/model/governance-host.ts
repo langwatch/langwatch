@@ -2,12 +2,6 @@
 
 import { createContext, useContext } from "react";
 
-/** The organization the governance section is about. */
-export type GovernanceScope = {
-  organizationId: string | null;
-  projectId: string | null;
-};
-
 /** One organization as the section reads it: its own row plus its teams. */
 export type GovernanceOrganization = {
   id: string;
@@ -49,13 +43,9 @@ export type GovernanceSuccessNotice = {
 export type GovernanceFailureNotice = {
   error: unknown;
   fallbackTitle: string;
+  /** A sentence for a refusal the screen made; the registry's words win over it. */
+  description?: string;
   id?: string;
-};
-
-/** The shape of the deployment, as the install instructions read it. */
-export type GovernanceDeployment = {
-  isSaas: boolean;
-  appBaseUrl: string;
 };
 
 /** Which plan the organization is on, for the surfaces that are gated on it. */
@@ -77,9 +67,6 @@ export type GovernanceActor = {
  * test double is an obvious object literal.
  */
 export abstract class GovernanceHostApi {
-  /** The organization and project this page is about. */
-  abstract scope(): GovernanceScope;
-
   /** Every organization the reader can reach, for the pages that name teams. */
   abstract organizations(): readonly GovernanceOrganization[];
 
@@ -106,9 +93,6 @@ export abstract class GovernanceHostApi {
   abstract isSettled(): boolean;
 
   abstract plan(): GovernancePlan;
-
-  /** What kind of deployment this is, for copy that differs on self-hosted. */
-  abstract deployment(): GovernanceDeployment;
 
   abstract route(): GovernanceRouteReading;
 

@@ -1,9 +1,8 @@
 // IO preview cell must NOT inherit sticky-first-column rule (horizontal
 // scroll fix).
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Row } from "@tanstack/react-table";
-import { render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceListItem } from "../../../../../types/trace.ts";
@@ -35,30 +34,28 @@ function fakeRow(): Row<TraceListItem> {
 
 function renderAddonRow() {
   const tanstackRow = fakeRow();
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <table>
-        <tbody>
-          {IOPreviewAddon.render({
-            row: tanstackRow.original,
-            density: {
-              ioFontSize: "11px",
-              ioPaddingTop: "6px",
-              ioPaddingBottom: "6px",
-            } as never,
-            densityMode: "compact",
-            colSpan: COLUMNS.length,
-            style: ROW_STYLES.default,
-            isExpanded: false,
-            isSelected: false,
-            tanstackRow,
-            actions: {},
-            // evals (index 4) rowSpans into this addon row.
-            rowSpanClaimedIndices: [4],
-          })}
-        </tbody>
-      </table>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <table>
+      <tbody>
+        {IOPreviewAddon.render({
+          row: tanstackRow.original,
+          density: {
+            ioFontSize: "11px",
+            ioPaddingTop: "6px",
+            ioPaddingBottom: "6px",
+          } as never,
+          densityMode: "compact",
+          colSpan: COLUMNS.length,
+          style: ROW_STYLES.default,
+          isExpanded: false,
+          isSelected: false,
+          tanstackRow,
+          actions: {},
+          // evals (index 4) rowSpans into this addon row.
+          rowSpanClaimedIndices: [4],
+        })}
+      </tbody>
+    </table>,
   );
 }
 

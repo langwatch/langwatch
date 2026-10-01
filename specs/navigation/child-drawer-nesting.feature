@@ -52,7 +52,7 @@ Feature: A drawer that needs another drawer
     target reaches for `closeDrawer` only when it was handed no ending at all —
     which is the case where there is no caller to return to.
 
-    @integration
+    @integration @unimplemented
     Scenario: A drawer the framework cannot let close itself is handed the close to call
       Given a drawer registered in the application's own registry
       When the address opens it
@@ -86,3 +86,34 @@ Feature: A drawer that needs another drawer
       Given a reader is in a sub-flow opened from another drawer
       When they press Escape
       Then they are back in the drawer that opened it, not on the page behind it
+
+  Rule: The drawer stack is the address and the browser history
+
+    The open drawer is `drawer.open` plus its parameters in the address, and the
+    drawers beneath it ride in the history entry's state, so the browser's back
+    button, a reload and the caller's own return all read the same stack.
+
+    @integration
+    Scenario: Back closes the drawer that was opened last
+      Given a reader who opened a drawer from a page
+      When they press the browser's back button
+      Then the drawer is off the screen and out of the address
+
+    @integration
+    Scenario: Back closes a stacked drawer and returns to the one beneath
+      Given a reader who walked from one drawer into another
+      When they press the browser's back button
+      Then the top drawer closes and the one beneath is shown with its parameters
+
+    @integration
+    Scenario: A reload restores the open drawer and the stack beneath it
+      Given a reader who walked from one drawer into another
+      When the page is reloaded
+      Then the same drawer is shown
+      And going back still reaches the one beneath
+
+    @integration
+    Scenario: Closing a drawer clears the stack beneath it
+      Given a reader who walked through two drawers
+      When they close the drawer
+      Then there is nothing to go back to, even after a reload

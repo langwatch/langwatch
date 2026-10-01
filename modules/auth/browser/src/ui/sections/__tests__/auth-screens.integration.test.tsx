@@ -4,11 +4,11 @@
  * The identifier-first screens are the screens (ADR-117 §7): reset follows the identifier, is
  * refused where the installation holds no passwords, and no journey reaches hosted pages.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -125,8 +125,7 @@ const federatedPicker: RoutingDecision = {
   reasonCode: "no_domain_match",
 };
 
-const renderPage = (page: ReactNode) =>
-  render(<ChakraProvider value={defaultSystem}>{page}</ChakraProvider>);
+const renderPage = (page: ReactElement) => renderWithDesignSystem(page);
 
 describe("given the identifier-first screens", () => {
   beforeEach(() => {
@@ -186,7 +185,7 @@ describe("given the identifier-first screens", () => {
     // never by rendering its page.
     /** @scenario No unauthenticated journey touches an Auth0-hosted page */
     it("renders no page, asset or link that resolves to a hosted provider page", async () => {
-      const journeys: ReactNode[] = [<SignIn key="in" />, <SignUp key="up" />];
+      const journeys: ReactElement[] = [<SignIn key="in" />, <SignUp key="up" />];
 
       for (const journey of journeys) {
         const { container, unmount } = renderPage(journey);

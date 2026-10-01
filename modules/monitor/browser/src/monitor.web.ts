@@ -3,9 +3,9 @@
  * screen a project runs over its live traces and threads.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const monitorWeb = defineWebModule("monitor")
+export const monitorWeb = defineBrowserModule("monitor")
   .withHosts({
     requires: ["MonitorHostApi"],
     mounts: { MonitorHostApi: { load: () => import("./behavior/monitor-host-mount.tsx") } },

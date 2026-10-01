@@ -11,6 +11,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createSupportContactOrganizations } from "../../__tests__/testing.ts";
 import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
 import type {
   CliAdminContactReader,
@@ -41,6 +42,7 @@ class PrismaContacts implements CliAdminContactReader {
   findAdminEmail(organizationId: string): Promise<string | null> {
     return OrganizationSupportContactService.create({
       repository: PrismaOrganizationSupportContactRepository.create({ prisma }),
+      organizations: createSupportContactOrganizations(null),
     }).findOrgAdminEmail({
       organizationId,
     });

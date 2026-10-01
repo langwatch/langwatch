@@ -36,9 +36,6 @@ export const isUserScopedApiKey = (token: string): boolean => {
   return false;
 };
 
-/** @deprecated Use `isUserScopedApiKey` instead. Kept for backward compat. */
-export const isPersonalAccessToken = isUserScopedApiKey;
-
 /**
  * Builds the HTTP headers required to authenticate against the LangWatch
  * API using either a legacy project key or a user-scoped API key.

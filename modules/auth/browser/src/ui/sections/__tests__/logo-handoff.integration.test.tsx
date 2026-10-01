@@ -4,8 +4,8 @@
  * itself: once per page load, nothing under reduced motion, and never in
  * front of a keystroke. Spec: specs/identity/signin-signup-screens.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { publicEnvRef } = vi.hoisted(() => ({
@@ -37,14 +37,12 @@ const setReducedMotion = (reduce: boolean) => {
 };
 
 const renderFrontDoor = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FrontDoorShell>
-        <AuthCard title="Log in to LangWatch">
-          <input aria-label="Email" />
-        </AuthCard>
-      </FrontDoorShell>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FrontDoorShell>
+      <AuthCard title="Log in to LangWatch">
+        <input aria-label="Email" />
+      </AuthCard>
+    </FrontDoorShell>,
   );
 
 describe("given the front door painting for the first time", () => {

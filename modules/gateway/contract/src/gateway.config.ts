@@ -16,7 +16,7 @@ import type { GatewayGuardrailBundleEntry } from "./gateway-guardrail.ts";
 
 /**
  * `internalSecret`, `jwtSecret` and `virtualKeyPepper` resolve through
- * `GatewayApp.secrets` (ADR-132), never this slice.
+ * `GatewayModule.secrets` (ADR-132), never this slice.
  * spendSettlementGraceMs carried as-is.
  */
 export const gatewayConfig = Config.define((c) => ({

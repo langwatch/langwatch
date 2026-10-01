@@ -1,4 +1,3 @@
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
 /**
  * Reading a failed tool frame into card copy.
  * @see specs/langy/langy-cli-tool-envelope.feature
@@ -10,6 +9,7 @@ import {
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";

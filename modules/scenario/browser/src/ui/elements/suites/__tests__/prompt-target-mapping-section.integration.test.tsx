@@ -4,20 +4,15 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SuiteTarget } from "@langwatch/suite-contract";
-import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   type MappablePrompt,
   PromptTargetMappingSection,
 } from "../prompt-target-mapping-section.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const prompts: MappablePrompt[] = [
   {
@@ -32,13 +27,12 @@ const prompts: MappablePrompt[] = [
 ];
 
 function renderSection(selectedTargets: SuiteTarget[]) {
-  return render(
+  return renderWithDesignSystem(
     <PromptTargetMappingSection
       selectedTargets={selectedTargets}
       prompts={prompts}
       onMappingChange={vi.fn()}
     />,
-    { wrapper: Wrapper },
   );
 }
 

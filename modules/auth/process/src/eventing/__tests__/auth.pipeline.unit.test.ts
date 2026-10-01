@@ -3,7 +3,7 @@ import { InMemoryProcessStore } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { authServer } from "../../auth.server.ts";
+import { authProcessModule } from "../../auth.module.ts";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
 import {
   SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME,
@@ -34,7 +34,9 @@ describe("given auth's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "Finished lock-out rows are cleared a day after they settle" */
     it("carries the hourly reap onto the installable module", () => {
-      expect(authServer.eventing?.pipeline).toContain(SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME);
+      expect(authProcessModule.eventing?.pipeline).toContain(
+        SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME,
+      );
       expect(authEventing.pipeline).toBe(SIGN_IN_LOCK_MAINTENANCE_PIPELINE_NAME);
       expect(SIGN_IN_LOCK_REAP_INTERVAL_MS).toBe(HOUR_MS);
     });

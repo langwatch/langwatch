@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
 import { applyOverlayToSpanTreeNodes } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import {
   mergeSpanTreeDelta,
   spanTreeDeltaSinceMs,
@@ -22,13 +20,9 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  * the difference view.
  */
 export function useSpanTreeCanonical() {
-  const shared = useSharedTrace();
   const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
-  // SSE health decides the delta poll's CADENCE, not whether it runs at all.
-  // While SSE is up, `useTraceFreshness` invalidates the delta on each
-  // `span.stored` event and the merge happens push-style, so a timer would be
-  // pure duplication; while SSE is down there is nothing to push, so it falls
-  // back to an interval.
+  // `useTraceFreshness` invalidates the delta on each `span.stored` event and the
+  // merge happens push-style; a reconnect asks for one catch-up delta.
   const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
   const utils = api.useUtils();
   const queryClient = useQueryClient();
@@ -43,11 +37,9 @@ export function useSpanTreeCanonical() {
     // Disable the real fetch when the traceId is a preview-mode synthetic —
     // `useOpenTraceDrawer` has already seeded the cache with hand-crafted span data;
     // firing a real request would just return empty and clobber the seed.
-    enabled: isReady && hintReady && !shared,
-    staleTime: 300_000,
+    enabled: isReady && hintReady,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,
-    refetchOnWindowFocus: true,
   });
 
   // Live updates arrive as deltas merged into the assembled tree, never as a re-walk:
@@ -62,10 +54,7 @@ export function useSpanTreeCanonical() {
     {
       // Gated on the walk finishing, not merely `tree` being defined — a mid-walk poll would take
       // its mark from a partial tree, causing the unbounded fetch paging exists to avoid.
-      enabled: isReady && isLive && !shared && tree !== undefined && !treeQuery.isFetching,
-      // Only when SSE can't push. With SSE up, `useTraceFreshness` invalidates
-      // this query per `span.stored` batch, which refetches it on the spot.
-      refetchInterval: sseConnected ? false : LIVE_REFETCH_MS,
+      enabled: isReady && isLive && tree !== undefined && !treeQuery.isFetching,
       // Deltas are throwaway transport into the spanTree cache entry —
       // don't retain per-poll entries of their own.
       gcTime: 0,
@@ -89,17 +78,14 @@ export function useSpanTreeCanonical() {
   useEffect(() => {
     const reconnected = sseConnected && !wasSseConnected.current;
     wasSseConnected.current = sseConnected;
-    const shouldRefetch = reconnected && isReady && isLive && !shared;
+    const shouldRefetch = reconnected && isReady && isLive;
     if (!shouldRefetch) return;
     void utils.traces.spanTreeDelta.invalidate({
       projectId: queryArgs.projectId,
       traceId: queryArgs.traceId,
     });
-  }, [sseConnected, isReady, isLive, shared, utils, queryArgs.projectId, queryArgs.traceId]);
+  }, [sseConnected, isReady, isLive, utils, queryArgs.projectId, queryArgs.traceId]);
 
-  if (shared) {
-    return asSharedQueryResult(shared.spanTree);
-  }
   return treeQuery;
 }
 

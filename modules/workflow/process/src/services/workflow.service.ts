@@ -5,6 +5,8 @@ import {
   archiveWorkflowCommandSchema,
   copyWorkflowCommandSchema,
   createWorkflowCommandSchema,
+  dslWithoutHttpAgentSecrets,
+  dslWithoutHttpCredentials,
   publishWorkflowCommandSchema,
   runWorkflowCommandSchema,
   saveWorkflowVersionCommandSchema,
@@ -333,7 +335,11 @@ export class WorkflowService {
     });
     const latest = versions[0];
     const major = Number.parseInt((latest?.version ?? "0.0").split(".")[0] ?? "0", 10);
-    const dsl = { ...command.dsl, workflow_id: command.workflowId, state: {} };
+    const dsl = dslWithoutHttpAgentSecrets({
+      ...command.dsl,
+      workflow_id: command.workflowId,
+      state: {},
+    });
     const persist: PersistWorkflowVersionInput = {
       id: this.id(WORKFLOW_VERSION_KSUID_RESOURCE),
       workflowId: command.workflowId,
@@ -412,7 +418,12 @@ export class WorkflowService {
     const sourceVersion =
       source.latestVersion ??
       (await this.latestVersion(command.sourceWorkflowId, command.sourceProjectId));
-    const sourceDsl = this.dsl.copy(sourceVersion.dsl);
+    const cloned = this.dsl.copy(sourceVersion.dsl);
+    // A copy into another project arrives with every HTTP credential blank.
+    const sourceDsl =
+      command.targetProjectId === command.sourceProjectId
+        ? cloned
+        : dslWithoutHttpCredentials(cloned);
     const dsl = command.copyDatasets
       ? await this.datasetCopies.copy({
           dsl: sourceDsl,
@@ -480,7 +491,8 @@ export class WorkflowService {
         (!input.allowedProjectIds || input.allowedProjectIds.includes(copy.projectId)),
     );
     for (const copy of selected) {
-      const dsl = this.dsl.copy(sourceVersion.dsl);
+      const cloned = this.dsl.copy(sourceVersion.dsl);
+      const dsl = copy.projectId === input.projectId ? cloned : dslWithoutHttpCredentials(cloned);
       await this.saveVersion({
         workflowId: copy.id,
         projectId: copy.projectId,

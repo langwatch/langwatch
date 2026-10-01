@@ -1,8 +1,8 @@
 import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authorization";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useCallback, useMemo } from "react";
 
 import { api } from "./scenario-api.ts";
-import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * The registry types are shared, so a typo'd permission string fails the
@@ -17,11 +17,7 @@ export function useCan() {
       projectId: project?.id,
       organizationId: project?.id ? undefined : organization?.id,
     },
-    {
-      enabled: !!project?.id || !!organization?.id,
-      staleTime: 30_000,
-      refetchOnWindowFocus: true,
-    },
+    { enabled: !!project?.id || !!organization?.id },
   );
 
   // Built once per fetched set rather than per `can()` call: a page asking

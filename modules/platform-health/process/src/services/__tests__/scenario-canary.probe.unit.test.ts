@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ScenarioApi,
   ScenarioRunStatus,
@@ -6,6 +5,7 @@ import {
   Verdict,
 } from "@langwatch/scenario-contract";
 import { type Suite, suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { SCENARIO_CANARY_TOTAL_BUDGET_MS } from "../../rules/scenario-canary.rules.ts";

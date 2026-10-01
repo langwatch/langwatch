@@ -3,10 +3,9 @@
  * the list.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab.tsx";
@@ -26,13 +25,7 @@ const mockResultAtoms = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-        getScenarioSetBatchHistory: { invalidate: vi.fn() },
-        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
-      },
-    }),
+    useUtils: () => ({}),
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -45,6 +38,28 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       // so there is one call and no test suite branch.
       archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+      },
+    }),
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
       getRunConfigurations: {
@@ -76,11 +91,6 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: {
-      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
-    },
-    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
   },
 }));
 
@@ -88,7 +98,7 @@ vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
@@ -109,10 +119,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("the Results tab loading gate", () => {
   beforeEach(() => {
@@ -185,7 +191,7 @@ describe("the Results tab loading gate", () => {
           isLoading: false,
         });
 
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         // The test suite is a group of scenarios, so it is no row of its own.
         expect(screen.getByTestId("run-plan-row-nightly-checkout")).toBeInTheDocument();
@@ -205,7 +211,7 @@ describe("the Results tab loading gate", () => {
       it("reads as a skeleton, not as the plans list nor its empty state", () => {
         mockSuitesGetAll.mockReturnValue({ data: undefined, isLoading: true });
 
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         expect(screen.getByTestId("agent-testing-run-plan-loading")).toBeInTheDocument();
         expect(screen.queryByTestId("agent-testing-run-plans-table")).not.toBeInTheDocument();
@@ -218,7 +224,7 @@ describe("the Results tab loading gate", () => {
       it("reads as the plans list empty state, never as the loading skeleton", () => {
         mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
 
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         expect(screen.queryByTestId("agent-testing-run-plan-loading")).not.toBeInTheDocument();
         expect(screen.getByText("No runs yet")).toBeInTheDocument();
@@ -264,7 +270,7 @@ describe("the Results tab loading gate", () => {
     describe("when the Results tab is opened", () => {
       /** @scenario "A window that holds runs of no plan still reads the whole tab" */
       it("reads the filter row and the count, never the empty state", () => {
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
         expect(screen.getByText("5 executions")).toBeInTheDocument();
@@ -273,7 +279,7 @@ describe("the Results tab loading gate", () => {
 
       /** @scenario "The plan table says when the runs of the window belong to no plan" */
       it("says the runs were started outside a run plan", () => {
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         expect(
           screen.getByText(
@@ -292,7 +298,7 @@ describe("the Results tab loading gate", () => {
         routerState.asPath = "/test-project/agent-testing/results";
         mockSuitesGetAll.mockReturnValue({ data: [], isLoading: false });
 
-        render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ResultsTab isSseConnected />);
 
         expect(screen.getByText("No runs yet")).toBeInTheDocument();
         const widen = screen.getByTestId("widen-period-button");

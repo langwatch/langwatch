@@ -38,7 +38,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { WEBHOOK_SPEND_DELIVERY_REQUESTED_EVENT_TYPE } from "@langwatch/webhook-contract";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { WebhookApp, type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
+import { WebhookModule, type WebhookId, type WebhookSecret } from "../../app/webhook.app.ts";
 import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookEndpointRepository } from "../../repositories/webhook-endpoint.repository.ts";
 import {
@@ -658,7 +658,7 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
   it("requeues an endpoint's dead batches with a fresh budget on enable", async () => {
     // Enabled through the app, over the process manager's own store, so the
     // revival reads the dead rows the ladder parked there.
-    const app = WebhookApp.fromDependencies({
+    const app = WebhookModule.fromDependencies({
       endpoints,
       events: undefined,
       assertEndpointsEntitled: async () => undefined,

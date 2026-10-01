@@ -1,3 +1,4 @@
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
 /**
  * What the guided tour paints: the lit rectangle over the step's target,
  * Langy's cursor travelling to it, and the caption. Presentational only —
@@ -7,7 +8,6 @@ import { Box, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { ThemedLogoIcon } from "../../../../ui/elements/icons/logo-icon.tsx";
 import type { TourHandoff } from "../../behavior/guided-tour-store.ts";
 import {
   EASING,
@@ -224,7 +224,7 @@ export function TourCaption({
           alignItems="center"
           justifyContent="center"
         >
-          <ThemedLogoIcon height={22} />
+          <LogoIcon height={22} />
         </Box>
         <Text fontSize="13px" lineHeight="1.6">
           {step.text}

@@ -2,7 +2,7 @@ Feature: A module reacts to a peer pipeline's events from its own side
 
   A peer subscriber is declared on the reacting module's own pipeline and names the owner's
   event by the owner contract's type and data schema, so the edge runs from the reacting module
-  to the owner and never closes a cycle (dev/docs/ARCHITECTURE.md section 9). It rides the global
+  to the owner and closes no construction or package-import cycle (dev/docs/ARCHITECTURE.md section 9). It rides the global
   registry: staged wherever the owner appends, delivered at least once, ordered per aggregate,
   re-driven through the hand-off outbox, never replayed.
 

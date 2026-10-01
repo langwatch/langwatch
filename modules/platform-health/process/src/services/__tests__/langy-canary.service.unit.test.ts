@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   LangyApi,
@@ -6,6 +5,7 @@ import type {
   LangyStartConversationTurnInput,
   LangyTurnSettlementWait,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyCanaryService } from "../langy-canary.service.ts";

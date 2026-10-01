@@ -29,7 +29,7 @@ export interface PromptTabSummary {
  */
 export function usePromptTabSummary(tabId: string): PromptTabSummary {
   const tab = useTabById(tabId);
-  const hasUnsavedChanges = useHasUnsavedChanges(tabId);
+  const hasUnsavedChanges = useHasUnsavedChanges({ tabId });
 
   const configId = tab?.data.form.currentValues?.configId;
   const versionNumber = tab?.data.meta.versionNumber;
@@ -37,9 +37,6 @@ export function usePromptTabSummary(tabId: string): PromptTabSummary {
   const { latestVersion, isOutdated } = useLatestPromptVersion({
     configId,
     currentVersion: versionNumber,
-    // One instance per open tab, all always mounted: keeping them focus-live
-    // is the N-tab query storm from #5585.
-    isLiveRefetchEnabled: false,
   });
 
   // Derived inside the selector so it returns a boolean. Returning the tab

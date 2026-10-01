@@ -80,7 +80,7 @@ export type OperatorSsoMigrationProgressInput = z.infer<
 
 /**
  * The organization is routing, not reach: it says whose connection history the
- * command is appended to. Who may issue it is the staff list, and nothing else.
+ * command is appended to. Who may issue it is the platform-operator grant, and nothing else.
  */
 export const ssoConnectionTargetSchema = z.object({
   organizationId: z.string().min(1),

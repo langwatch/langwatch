@@ -16,11 +16,11 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { readableDate } from "@langwatch/experiment-browser-kit";
 import { toEpochMs } from "@langwatch/time";
 import numeral from "numeral";
 import { Download } from "react-feather";
 
+import { readableDate } from "../../../model/display-formatters.ts";
 import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
 import { cellText, readKey } from "../../../model/experiments/BatchEvaluationV2/utils.ts";
 import type { BatchEvaluation } from "../../../model/prisma-types.ts";

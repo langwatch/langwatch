@@ -1,14 +1,13 @@
+import { ledgerActorSchema, type LedgerActor } from "@langwatch/authorization";
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,
   IDENTIFIER_DEAD_ENDED_EVENT_TYPE,
   IDENTIFIER_VERIFIED_EVENT_TYPE,
-  type IdentityActor,
   type IdentityHistoryEntry,
   LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
   LINK_REJECTED_EVENT_TYPE,
   type LinkProposalRecord,
-  identityActorSchema,
 } from "@langwatch/identity-contract";
 
 import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
@@ -81,8 +80,8 @@ function extractText(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function actorOf(value: unknown): IdentityActor {
-  const parsed = identityActorSchema.safeParse(value);
+function actorOf(value: unknown): LedgerActor {
+  const parsed = ledgerActorSchema.safeParse(value);
   return parsed.success ? parsed.data : { type: "system", id: null };
 }
 

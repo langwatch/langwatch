@@ -13,8 +13,12 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useQuery } from "@tanstack/react-query";
 
+import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-scope-queries.ts";
+
+/** Re-exported for the shell's `organizationFacts` declaration readers. */
+export { UI_ORGANIZATIONS_PROCEDURE };
+
 export const UI_ACTIVE_PLAN_PROCEDURE = "plan.getActivePlan";
-export const UI_ORGANIZATIONS_PROCEDURE = "organization.getAll";
 export const UI_PLATFORM_ADMIN_PROCEDURE = "user.isAdmin";
 
 /** The organization role that reads every settings page and writes none of them. */
@@ -59,7 +63,7 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
     staleTime: PLAN_STALE_TIME_MS,
   });
 
-  const organizationsInput = { isDemo: false };
+  const organizationsInput = {};
   const organizations = useQuery({
     queryKey: trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, {
       input: organizationsInput,
@@ -68,10 +72,9 @@ export function useUiOrganizationFacts(): UiOrganizationFacts {
     queryFn: () =>
       rpc.query(UI_ORGANIZATIONS_PROCEDURE, organizationsInput) as Promise<OrganizationsRead>,
     enabled: organizationId !== null,
-    staleTime: PLAN_STALE_TIME_MS,
   });
 
-  // `organization.getAll` narrows `members` to the caller's own row, so the
+  // `organization.getScopeGraph` narrows `members` to the caller's own row, so the
   // first member of the organization in scope IS the reader's membership.
   const role = (organizations.data ?? []).find((organization) => organization.id === organizationId)
     ?.members?.[0]?.role;

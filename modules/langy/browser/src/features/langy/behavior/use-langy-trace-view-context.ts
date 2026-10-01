@@ -1,10 +1,10 @@
-import type { LangyContextChip } from "@langwatch/langy-browser-kit";
-import { useTraceViewContext } from "@langwatch/trace-browser-kit";
+import type { LangyContextChip } from "../../../behavior/langy.store.ts";
+import { useTraceExplorerScope } from "../../../behavior/trace-explorer-scope.ts";
 
 /**
  * The Trace Explorer view as a composer chip. The scope itself is the
- * Explorer's to describe, so the chip is minted in its kit and only named here.
+ * Explorer's to describe, so trace publishes the chip and Langy only reads it.
  */
 export function useLangyTraceViewContext(): LangyContextChip {
-  return useTraceViewContext();
+  return useTraceExplorerScope((s) => s.viewChip);
 }

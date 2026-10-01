@@ -57,6 +57,7 @@ export default function GroupsScreen() {
     onSuccess: () => {
       toaster.create({ title: "Group deleted", type: "success" });
       void queryClient.group.listAll.invalidate();
+      void queryClient.organization.getDirectoryCounts.invalidate();
       setGroupToDelete(null);
     },
     onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't delete the group" }),

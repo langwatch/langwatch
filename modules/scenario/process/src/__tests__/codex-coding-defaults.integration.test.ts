@@ -4,13 +4,13 @@
  * resolve the codex default, which refuses direct execution as the real backstop does.
  */
 import type { Agent } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   CODEX_DEFAULT_MODEL,
   findFeatureByKey,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {

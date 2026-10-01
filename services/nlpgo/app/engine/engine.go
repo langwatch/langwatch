@@ -622,17 +622,21 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	if e.http == nil {
 		return nil, &NodeError{Type: "http_executor_unavailable", Message: "no http executor configured"}
 	}
+	rawURL := paramString(node.Data.Parameters, "url")
+	headers := paramStringMap(node.Data.Parameters, "headers")
+	auth := paramAuth(node.Data.Parameters)
+	url := resolveSecretRefs(rawURL, secrets)
 	// Resolve `{{ secrets.NAME }}` in the URL, headers, and auth at
 	// request-build time. BodyTemplate is deliberately left unresolved:
 	// it is rendered against inputs and surfaced in execution events, so
 	// substituting a secret there would leak the plaintext into logs.
 	req := httpblock.Request{
-		URL:          resolveSecretRefs(paramString(node.Data.Parameters, "url"), secrets),
+		URL:          url,
 		Method:       paramString(node.Data.Parameters, "method"),
 		BodyTemplate: paramString(node.Data.Parameters, "body_template"),
 		OutputPath:   paramString(node.Data.Parameters, "output_path"),
-		Headers:      resolveSecretsInMap(paramStringMap(node.Data.Parameters, "headers"), secrets),
-		Auth:         resolveAuthSecrets(paramAuth(node.Data.Parameters), secrets),
+		Headers:      resolveSecretsInMap(headers, secrets),
+		Auth:         resolveAuthSecrets(auth, secrets),
 		TimeoutMS:    paramInt(node.Data.Parameters, "timeout_ms"),
 		Inputs:       inputs,
 	}

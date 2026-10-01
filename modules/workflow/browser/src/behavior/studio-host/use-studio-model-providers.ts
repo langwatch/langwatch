@@ -1,5 +1,4 @@
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
-
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { workflowApi } from "../workflow-api.ts";
 
 export function useStudioModelProviders() {

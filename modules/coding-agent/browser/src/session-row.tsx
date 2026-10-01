@@ -1,4 +1,3 @@
-import { AgentLabel, MISSING_VALUE } from "@langwatch/coding-agent-browser-kit";
 import { Table } from "@langwatch/design-system/primitives";
 import type React from "react";
 
@@ -11,6 +10,8 @@ import { TokenCostCell } from "./cells/token-cost-cell.tsx";
 import { formatLastUpdate } from "./last-update.ts";
 import type { SessionListRow, SessionPullRequest } from "./session-list-row.ts";
 import { SessionRowActions } from "./session-row-actions.tsx";
+import { AgentLabel } from "./ui/elements/agent-label.tsx";
+import { MISSING_VALUE } from "./ui/elements/cells/missing-value.tsx";
 
 /**
  * One session, read left to right. The whole row is the target that opens the

@@ -5,7 +5,7 @@ import {
   type QueryRequest,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
-import { instantiateRepositories } from "@langwatch/kernel";
+import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { billingClickhouseRepositories } from "../billing-repositories.registry.ts";

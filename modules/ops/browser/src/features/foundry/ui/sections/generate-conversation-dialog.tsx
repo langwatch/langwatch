@@ -19,7 +19,7 @@ import { useState } from "react";
 
 import { useExecutionStore } from "../../behavior/execution.store.ts";
 import { getFoundryExecutor } from "../../behavior/trace-executor.ts";
-import { useTargetProject } from "../../behavior/use-target-project.ts";
+import { useTargetProjectKey } from "../../behavior/use-target-project-key.ts";
 import { generateConversation } from "../../model/generate-conversation.ts";
 
 const TURN_PRESETS = [10, 25, 50, 100] as const;
@@ -30,12 +30,13 @@ export function GenerateConversationDialog() {
   const [staggerMs, setStaggerMs] = useState(150);
   const [isSending, setIsSending] = useState(false);
 
-  const project = useTargetProject();
-  const apiKey = project?.apiKey;
+  const { project, mintApiKey } = useTargetProjectKey();
   const { addLogEntry, updateLogEntry } = useExecutionStore();
 
   async function handleSend() {
-    if (!apiKey || isSending) return;
+    if (!project || isSending) return;
+    const apiKey = await mintApiKey();
+    if (!apiKey) return;
     setIsSending(true);
     setIsOpen(false);
     try {
@@ -84,7 +85,7 @@ export function GenerateConversationDialog() {
           variant="outline"
           loading={isSending}
           loadingText="Sending…"
-          disabled={!apiKey}
+          disabled={!project}
         >
           <MessagesSquare size={14} />
           Fake conversation
@@ -161,12 +162,12 @@ export function GenerateConversationDialog() {
               colorPalette="orange"
               onClick={handleSend}
               w="full"
-              disabled={!apiKey}
+              disabled={!project}
             >
               <MessagesSquare size={14} />
               Send {turnCount} turns
             </Button>
-            {!apiKey && (
+            {!project && (
               <Text fontSize="xs" color="fg.muted">
                 Navigate to a project first.
               </Text>

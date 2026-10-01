@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
 
 import type {
-  EvaluationInputStorage,
+  EvaluationInputRepository,
   StoredEvaluationInput,
-} from "../../app/evaluation.members.ts";
+} from "../evaluation-input.repository.ts";
 
 /** The memory twin of the object-storage input repository: same ids, same unknown-id answer. */
-export class MemoryEvaluationInputRepository implements EvaluationInputStorage {
+export class MemoryEvaluationInputRepository implements EvaluationInputRepository {
   static create(): MemoryEvaluationInputRepository {
     return new MemoryEvaluationInputRepository();
   }

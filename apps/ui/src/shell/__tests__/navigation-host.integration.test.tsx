@@ -19,7 +19,7 @@ import {
   UiScope,
 } from "@langwatch/browser-host/capabilities";
 import type { UiSessionSnapshot } from "@langwatch/browser-host/session";
-import { UiDesignSystemShell } from "@langwatch/ui-kernel/design-system-shell";
+import { UiDesignSystemShell } from "@langwatch/browser/design-system-shell";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -63,7 +63,7 @@ const GRAPH = [
 
 class GraphRpc extends UiRpc {
   query(path: string): Promise<unknown> {
-    if (path === "organization.getAll") return Promise.resolve(GRAPH);
+    if (path === "organization.getScopeGraph") return Promise.resolve(GRAPH);
     return Promise.resolve(null);
   }
 
@@ -173,15 +173,23 @@ class SettlingSession extends SignedInSession {
   }
 }
 
-function renderChrome(capabilities: UiCapabilities = CAPABILITIES) {
+function renderChrome(
+  capabilities: UiCapabilities = CAPABILITIES,
+  address: { path: string; pattern: string } = {
+    path: "/my-project/traces",
+    pattern: "/:project/traces",
+  },
+) {
   return render(
-    <MemoryRouter initialEntries={["/my-project/traces"]}>
-      <QueryClientProvider client={new QueryClient()}>
+    <MemoryRouter initialEntries={[address.path]}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
         <UiCapabilityContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
               <Route element={<UiAppChrome capabilities={ROOT} />}>
-                <Route path="/:project/traces" element={<HostProbe />} />
+                <Route path={address.pattern} element={<HostProbe />} />
               </Route>
             </Routes>
           </UiDesignSystemShell>
@@ -266,6 +274,30 @@ describe("the application chrome", () => {
       await waitFor(() =>
         expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("false"),
       );
+    });
+  });
+
+  describe("when the graph refuses the read", () => {
+    class RefusingRpc extends GraphRpc {
+      override query(): Promise<unknown> {
+        return Promise.reject(new Error("refused"));
+      }
+    }
+
+    /** @scenario A graph that refused the read is not a graph still reading */
+    it("draws the refusal rather than a chrome still reading", async () => {
+      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.queryByTestId("probe")).toBeNull();
+    });
+
+    /** @scenario The landing address says a refused read failed rather than waiting on it */
+    it("says the workspace could not be opened on the landing address", async () => {
+      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() }, { path: "/", pattern: "/" });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
     });
   });
 

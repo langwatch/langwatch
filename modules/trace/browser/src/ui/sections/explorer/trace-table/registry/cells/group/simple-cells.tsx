@@ -1,5 +1,5 @@
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 import { HStack, Text } from "@langwatch/design-system/primitives";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { StatusDot } from "../../../status-row.tsx";

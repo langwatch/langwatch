@@ -22,7 +22,7 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
   return {
     api: {
       useUtils: () => ({
-        organization: { getAll: refresh },
+        organization: { getAll: refresh, getScopeGraph: refresh },
         team: { getTeamWithMembers: refresh },
       }),
       team: {

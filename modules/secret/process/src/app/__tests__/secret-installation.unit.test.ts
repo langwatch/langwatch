@@ -1,15 +1,15 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
-import { secretServer } from "../../secret.server.ts";
+import { secretProcessModule } from "../../secret.module.ts";
 import { ReversibleTestSecretEncryption, teamWithMembers } from "./secret.fixture.ts";
 
 function process(role: "api" | "worker") {
   const team = teamWithMembers(["user-first"]);
 
   return createApp({ role })
-    .withModules([withMemoryRepositories(secretServer)])
+    .withModules([withMemoryRepositories(secretProcessModule)])
     .withEncryption(new ReversibleTestSecretEncryption())
     .provide({ project: team.projects, authz: team.permissions });
 }
@@ -25,7 +25,7 @@ describe("secret app installation", () => {
       const app = runtime.service(SecretApi);
       const created = await app.create(input, caller);
 
-      expect(runtime.module(secretServer).provided).toBe(app);
+      expect(runtime.module(secretProcessModule).provided).toBe(app);
 
       await expect(app.get({ projectId: input.projectId, id: created.id })).resolves.toMatchObject({
         name: input.name,
@@ -62,6 +62,16 @@ describe("secret app installation", () => {
     } finally {
       await Promise.all([first.stop(), second.stop()]);
     }
+  });
+
+  /** @scenario "A process with no key composes no secret service" */
+  it("refuses at boot, naming the missing encryption, when the process has no key", async () => {
+    const team = teamWithMembers(["user-first"]);
+    const keyless = createApp({ role: "api" })
+      .withModules([withMemoryRepositories(secretProcessModule)])
+      .provide({ project: team.projects, authz: team.permissions });
+
+    await expect(keyless.boot()).rejects.toThrow(/encryption/i);
   });
 
   /** @scenario "The first read returns the secret and the second refuses" */

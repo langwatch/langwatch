@@ -13,7 +13,7 @@ import {
   originResolvedEventSchema,
 } from "@langwatch/trace-contract";
 
-import type { TraceApp } from "../app/trace.app.ts";
+import type { TraceModule } from "../app/trace.app.ts";
 import type { TraceProcessingPipelineDefinition } from "../app/trace.members.ts";
 import {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
@@ -166,7 +166,7 @@ export function buildTraceProcessingConsumer(
 /** trace_processing, built by the app in both roles; its senders carry every trace write. */
 export const traceProcessingEventing = defineEventingModule({
   pipeline: "trace_processing",
-  build: ({ app, participation }: EventingSetup<never, TraceApp>) =>
+  build: ({ app, participation }: EventingSetup<never, TraceModule>) =>
     app.traceProcessingPipeline({ participation }),
   connect: ({ app, commands }) => app.connectTraceProcessingCommands(commands),
 });

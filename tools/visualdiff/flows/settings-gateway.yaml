@@ -258,7 +258,10 @@ flows:
           text: /^\s*Create\s*$/
       - action: go
         with:
-          path: /settings/teams
+          path: /{isolatedSlug}
+      - action: click
+        with:
+          label: Switch project
       - action: expect
         with:
           text: vd-project-{uid}

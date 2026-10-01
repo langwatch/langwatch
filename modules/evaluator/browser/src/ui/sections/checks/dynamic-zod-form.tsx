@@ -18,7 +18,7 @@ import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 import React, { useMemo } from "react";
 import { Info, Plus, Trash2, X } from "react-feather";
 import {
@@ -33,8 +33,8 @@ import {
 } from "react-hook-form";
 import { type ZodType, z } from "zod";
 
-import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
+import { useEvaluatorDefaultModels } from "../../../behavior/use-evaluator-default-models.ts";
 import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
@@ -336,17 +336,9 @@ const DynamicZodForm = ({
   const { project } = useOrganizationTeamProject();
 
   // Cascade-resolved defaults for evaluator model + embeddings fields.
-  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
-    { enabled: !!project?.id },
-  );
-  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
-    {
-      projectId: project?.id ?? "",
-      featureKey: "analytics.topic_clustering_embeddings",
-    },
-    { enabled: !!project?.id },
-  );
+  const { resolvedDefaultModel, resolvedDefaultEmbeddings } = useEvaluatorDefaultModels({
+    projectId: project?.id,
+  });
 
   const ctx: ZodFieldContext = {
     register,

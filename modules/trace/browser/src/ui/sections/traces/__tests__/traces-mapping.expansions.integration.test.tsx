@@ -1,11 +1,11 @@
+import type { MappingState } from "@langwatch/dataset-contract";
 /**
  * The Expansions switches.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { MappingState } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import React from "react";
@@ -108,14 +108,12 @@ function ControlledMapping({
 }
 
 function renderMapping({ expansions }: { expansions: string[] }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ControlledMapping
-        mapping={BOTH_EXPANDABLE}
-        expansions={expansions}
-        targetFields={["spans_column", "annotations_column"]}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ControlledMapping
+      mapping={BOTH_EXPANDABLE}
+      expansions={expansions}
+      targetFields={["spans_column", "annotations_column"]}
+    />,
   );
 }
 
@@ -195,14 +193,12 @@ describe("given a mapping that offers both the annotation and the span expansion
     it("keeps them off rather than taking the stale answer", async () => {
       const user = userEvent.setup();
       const stored = ["spans.all.span_id", "annotations.id"];
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ControlledMapping
-            mapping={BOTH_EXPANDABLE}
-            expansions={stored}
-            targetFields={["spans_column", "annotations_column"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <ControlledMapping
+          mapping={BOTH_EXPANDABLE}
+          expansions={stored}
+          targetFields={["spans_column", "annotations_column"]}
+        />,
       );
 
       await user.click(labelOf("One row per span"));
@@ -227,14 +223,12 @@ describe("given a column that has not been mapped to anything yet", () => {
     /** @scenario "The span expansion starts off" */
     it("offers the span expansion without turning it on", async () => {
       const user = userEvent.setup();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ControlledMapping
-            mapping={{ spans_column: { source: "" } }}
-            expansions={[]}
-            targetFields={["spans_column"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <ControlledMapping
+          mapping={{ spans_column: { source: "" } }}
+          expansions={[]}
+          targetFields={["spans_column"]}
+        />,
       );
 
       await user.selectOptions(unmappedColumnSelect(), "spans");
@@ -248,14 +242,12 @@ describe("given a column that has not been mapped to anything yet", () => {
     /** @scenario "Mapping annotations turns their expansion on" */
     it("turns the annotation expansion on, which is what mapping them means", async () => {
       const user = userEvent.setup();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ControlledMapping
-            mapping={{ annotations_column: { source: "" } }}
-            expansions={[]}
-            targetFields={["annotations_column"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <ControlledMapping
+          mapping={{ annotations_column: { source: "" } }}
+          expansions={[]}
+          targetFields={["annotations_column"]}
+        />,
       );
 
       await user.selectOptions(unmappedColumnSelect(), "annotations");
@@ -270,14 +262,12 @@ describe("given a mapping whose span expansion the reader turned on", () => {
     /** @scenario "An expansion I turned on survives its column being remapped and mapped back" */
     it("comes back on rather than starting the choice over", async () => {
       const user = userEvent.setup();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ControlledMapping
-            mapping={{ spans_column: { source: "spans" } }}
-            expansions={["spans.all.span_id"]}
-            targetFields={["spans_column"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <ControlledMapping
+          mapping={{ spans_column: { source: "spans" } }}
+          expansions={["spans.all.span_id"]}
+          targetFields={["spans_column"]}
+        />,
       );
       expect(switchNamed("One row per span")).toBeChecked();
       const columnSource = columnSourceSelect("spans");

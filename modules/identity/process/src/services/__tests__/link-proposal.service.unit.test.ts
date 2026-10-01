@@ -1,12 +1,12 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
-  type IdentityActor,
   LINK_CONFIRMED_EVENT_TYPE,
   LINK_PROPOSED_EVENT_TYPE,
   LINK_REJECTED_EVENT_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityEventsFor } from "../../eventing/identity-events.intent.ts";
@@ -17,8 +17,8 @@ import { LinkProposalGuardsService } from "../link-proposal-guards.service.ts";
 import { LinkProposalService } from "../link-proposal.service.ts";
 
 const SAM = "user_sam";
-const OLIVE: IdentityActor = { type: "user", id: "user_olive" };
-const OSCAR: IdentityActor = { type: "user", id: "user_oscar" };
+const OLIVE: LedgerActor = { type: "user", id: "user_olive" };
+const OSCAR: LedgerActor = { type: "user", id: "user_oscar" };
 const T0 = 1_756_000_000_000;
 
 type LinkInput = Parameters<AuthApi["linkProviderAccount"]>[0];
@@ -89,7 +89,7 @@ function propose({ proposalId }: { proposalId: string }): void {
   );
 }
 
-function decision({ proposalId, actor }: { proposalId: string; actor: IdentityActor }) {
+function decision({ proposalId, actor }: { proposalId: string; actor: LedgerActor }) {
   return {
     tenantId: SAM,
     userId: SAM,

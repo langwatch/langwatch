@@ -49,6 +49,9 @@ export interface NlpLambdaStreamInvoke {
  */
 export const STAGED_PAYLOAD_HEADER = "X-Payload-S3-URL";
 
+/** The run's AES-256-GCM key (base64) for a body the engine fetches sealed; its reader is nlpgo. */
+export const STAGED_PAYLOAD_KEY_HEADER = "X-Payload-Key";
+
 export type NlpLambdaInvokeResult = Readonly<{
   statusCode: number;
   /** AWS reports a handler failure here rather than as a non-2xx status. */

@@ -5,7 +5,6 @@ import type {
   TopicModelRecordSource,
 } from "@langwatch/topic-contract";
 
-import { type TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringOutcomeCommands } from "../eventing/topic-clustering.intent.ts";
 
 type CommandSender<Input> = {
@@ -55,7 +54,7 @@ type RunFailedInput = RunStartedInput & {
  * objects, rather than application callbacks, so all delayed work continues
  * through the owning Eventing pipeline.
  */
-export class EventingTopicClusteringCommandsService implements TopicClusteringCommands {
+export class EventingTopicClusteringCommandsService {
   private constructor() {}
 
   static create(): EventingTopicClusteringCommandsService {

@@ -1,9 +1,9 @@
 import { Box, Button, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useViewStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { LuPlus } from "react-icons/lu";
 
+import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { LensNamePopover } from "../../../elements/explorer/toolbar/lens-name-popover.tsx";
 
 const BETA_TOOLTIP =

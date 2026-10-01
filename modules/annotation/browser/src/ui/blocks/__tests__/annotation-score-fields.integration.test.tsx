@@ -1,16 +1,16 @@
+import {
+  type ScoreOptions,
+  type AnnotationFormState,
+  type AnnotationScoreList,
+} from "@langwatch/annotation-contract";
 /**
  * @vitest-environment jsdom
  * Rating a turn on the project's score keys. The chip opens a small form:
  * picks and types stay local until confirmed, so the rating and reason land
  * together; leaving any other way costs nothing. See specs/traces-v2/annotations.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type ScoreOptions,
-  type AnnotationFormState,
-  type AnnotationScoreList,
-} from "@langwatch/annotation-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
@@ -106,11 +106,7 @@ function renderScores({
   scores?: AnnotationScoreList;
   initial?: ScoreOptions;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ScoreFieldsHost scores={scores} initial={initial} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ScoreFieldsHost scores={scores} initial={initial} />);
 }
 
 const chip = (name: string | RegExp) => screen.getByRole("button", { name });

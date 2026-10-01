@@ -45,7 +45,7 @@ import { userWeb } from "@langwatch/user-browser/declaration";
 import { workflowWeb } from "@langwatch/workflow-browser/declaration";
 
 /** Every installed module's web declaration, in name order. */
-export const webModules = [
+export const browserModules = [
   agentWeb satisfies { readonly name: "agent" },
   analyticsWeb satisfies { readonly name: "analytics" },
   annotationWeb satisfies { readonly name: "annotation" },
@@ -91,7 +91,7 @@ export const webModules = [
 ] as const;
 type PairedOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "auth" | "authz" | "automation" | "coding-agent" | "data-privacy" | "data-retention" | "dataset" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "langy" | "model-provider" | "monitor" | "notification" | "onboarding" | "ops" | "organization" | "presence" | "project" | "prompt" | "scenario" | "secret" | "share" | "slack" | "suite" | "topic" | "trace" | "user" | "workflow" | "billing" | "governance" | "licensing" | "scim" | "sso";
 type ServerHalfOnDisk = "agent" | "analytics" | "annotation" | "api-key" | "audit-log" | "auth" | "authz" | "automation" | "billing" | "coding-agent" | "dashboard" | "data-privacy" | "data-retention" | "dataset" | "demo-data" | "enterprise-gateway" | "enterprise-ops" | "entitlement" | "evaluation" | "evaluator" | "experiment" | "feature-flag" | "gateway" | "github" | "governance" | "hosted-mcp" | "identity" | "instant-eval" | "langy" | "licensing" | "log" | "managed-provider" | "metric" | "model-provider" | "monitor" | "notification" | "nurturing" | "onboarding" | "ops" | "organization" | "platform-health" | "presence" | "project" | "prompt" | "role" | "rum" | "saas" | "sample-agents" | "scenario" | "scim" | "secret" | "share" | "slack" | "sso" | "stored-object" | "suite" | "topic" | "trace" | "user" | "webhook" | "workflow";
-type MissingWeb = Exclude<PairedOnDisk, (typeof webModules)[number]["name"]>;
+type MissingWeb = Exclude<PairedOnDisk, (typeof browserModules)[number]["name"]>;
 type MissingServer = Exclude<PairedOnDisk, ServerHalfOnDisk>;
 export const webModulePairing = {} satisfies {
   [Id in `missing web half "${MissingWeb}"` | `missing server half "${MissingServer}"`]: never;

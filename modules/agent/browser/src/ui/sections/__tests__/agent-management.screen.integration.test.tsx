@@ -5,7 +5,6 @@
  * Spec: specs/agents/agent-management.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type {
   Agent,
   AgentCopy,
@@ -14,7 +13,8 @@ import type {
   AgentOverview,
   RelatedAgentEntities,
 } from "@langwatch/agent-contract";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -199,7 +199,7 @@ class TestHost implements AgentManagementHost {
 
   constructor(
     readonly browser: TestAgentBrowser,
-    private readonly query: Record<string, string | undefined> = {},
+    private query: Readonly<Record<string, string | undefined>> = {},
   ) {}
 
   project(): AgentHostProject | undefined {
@@ -216,6 +216,8 @@ class TestHost implements AgentManagementHost {
   }
   setQuery(next: Readonly<Record<string, string | undefined>>): void {
     this.setQueryCalls.push({ ...next });
+    // Like the real address: the next render reads what was set.
+    this.query = next;
   }
   navigate(to: string): void {
     this.navigated.push(to);
@@ -253,13 +255,11 @@ async function mountScreen(query: Record<string, string | undefined> = {}) {
   const browser = new TestAgentBrowser();
   const host = new TestHost(browser, query);
   const content = () => (
-    <ChakraProvider value={defaultSystem}>
-      <AgentManagementHostProvider value={host}>
-        <AgentManagementScreen />
-      </AgentManagementHostProvider>
-    </ChakraProvider>
+    <AgentManagementHostProvider value={host}>
+      <AgentManagementScreen />
+    </AgentManagementHostProvider>
   );
-  const view = render(content());
+  const view = renderWithDesignSystem(content());
   return { host, browser, rerender: () => view.rerender(content()) };
 }
 

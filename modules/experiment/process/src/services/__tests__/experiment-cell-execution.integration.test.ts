@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluatorConfig,
   EvaluationV3Event,
   ExecutionCell,
 } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * What actually reaches the engine when a cell runs.

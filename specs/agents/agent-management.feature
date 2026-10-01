@@ -249,3 +249,64 @@ Feature: Agent management
     When the backfill runs
     Then that record is skipped and counted
     And nothing is written, because a guessed id is worse than a missing one
+
+  @unit
+  Scenario: The HTTP agent editor never shows a stored credential
+    Given a saved HTTP agent with a bearer token
+    When I open its editor on the Auth tab
+    Then the token field is blank
+    And it says "Stored; enter a new value to replace it"
+
+  @integration
+  Scenario: A saved agent's credentials are read-only on the Studio node
+    Given a Studio node for a saved HTTP agent with a bearer token and a header value
+    When I open the node's properties on the Auth and Headers tabs
+    Then the token and the header value are blank, disabled and say "Stored on the agent"
+    And the headers cannot be added to or removed
+
+  @integration
+  Scenario: A credential kept as a project secret shows as a reference
+    Given an HTTP editor whose token and a header value are references to project secrets
+    When I open the Auth and Headers tabs
+    Then each says "Stored as project secret" with the secret's name
+    And each links to the project's Secrets page
+    And there is no input holding the credential
+
+  @integration
+  Scenario: Replacing a stored credential offers an empty input
+    Given an HTTP editor whose token is a reference to a project secret
+    When I choose "Replace"
+    Then the token field is an empty input
+    And typing a new value changes the token to that value, to be stored as a secret on save
+
+  @integration
+  Scenario: A saved agent's secret reference is read-only on the Studio node
+    Given a Studio node for a saved HTTP agent whose token is a reference to a project secret
+    When I open the node's properties on the Auth tab
+    Then it says "Stored as project secret" with the secret's name
+    And there is no "Replace" action
+
+  @integration
+  Scenario: Looking at a secret reference changes nothing on the node
+    Given an HTTP node whose token is a reference to a project secret
+    When I open the Auth tab and leave without choosing "Replace"
+    Then the node's credential is still the reference
+
+  @unit
+  Scenario: A credential's reference is read from its value
+    Given a credential value that is "{{ secrets.NAME }}", optionally after Bearer, Basic or Token
+    Then its secret name is NAME
+    And any other value, including a literal credential, has no reference
+
+  @unit
+  Scenario: A saved agent's secret reference survives a Studio node save
+    Given a Studio node for a saved HTTP agent whose token and a header value are references
+    When I save the node
+    Then the references travel unchanged and every other credential value is blank
+
+  @unit
+  Scenario: Saving a Studio node never sends credential values
+    Given a Studio node for a saved HTTP agent
+    When I save the node
+    Then the agent update carries the header names and the auth kind
+    And every credential value that is not a secret reference is blank, so the agent keeps what it stored

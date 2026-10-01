@@ -6,9 +6,9 @@
 // that receives it is what makes a reconnect work; rebuilding it only for the
 // project that owns the session is what keeps it safe.
 
+import type { Cluster, Redis } from "ioredis";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { HostedMcpRedis } from "../../index.ts";
 import {
   connectTestRedis,
   initializeBody,
@@ -20,7 +20,7 @@ const VALID_API_KEY = "lw_reconnect_key_a";
 const OTHER_API_KEY = "lw_reconnect_key_b";
 
 /** Opened in `beforeAll`, and closed by the matching `afterAll`. */
-let redis: HostedMcpRedis | null = null;
+let redis: Redis | Cluster | null = null;
 
 describe("Feature: MCP streamable transport across replicas", () => {
   let replicas: ReplicaPair;

@@ -3,9 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import type React from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResultsTab } from "../../../../sections/agent-testing/results/results-tab.tsx";
@@ -26,10 +25,13 @@ const emptyResults = vi.hoisted(() => ({
   externalSets: { data: [] as unknown[] },
   batchHistory: { data: { batches: [] as unknown[] } },
   runData: {
-    data: { runs: [], scenarioSetIds: {}, hasMore: false, changed: true },
+    data: { pages: [{ runs: [], scenarioSetIds: {}, hasMore: false, changed: true }] },
     isLoading: false,
     error: null,
     refetch: () => undefined,
+    hasNextPage: false,
+    fetchNextPage: () => undefined,
+    isFetchingNextPage: false,
   },
   freshness: { data: undefined },
   batchCount: { data: { count: 0 } },
@@ -53,13 +55,7 @@ const emptyResults = vi.hoisted(() => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      scenarios: {
-        getSuiteRunData: { invalidate: vi.fn() },
-        getScenarioSetBatchHistory: { invalidate: vi.fn() },
-        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
-      },
-    }),
+    useUtils: () => ({}),
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -77,6 +73,35 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         },
       },
     },
+    agents: { getAll: { useQuery: () => emptyResults.list } },
+    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+    // The settings row names whoever started a run from the organization
+    // roster, so the column reads this even when no run names a person.
+    organization: {
+      getOrganizationWithMembersAndTheirTeams: {
+        useQuery: () => ({ data: undefined }),
+      },
+    },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: { useQuery: () => emptyResults.list },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn() },
+      },
+    }),
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
       getRunConfigurations: {
@@ -95,7 +120,7 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       getScenarioSetBatchHistory: {
         useQuery: () => emptyResults.batchHistory,
       },
-      getSuiteRunData: { useQuery: () => emptyResults.runData },
+      getSuiteRunData: { useInfiniteQuery: () => emptyResults.runData },
       getSuiteRunFreshness: { useQuery: () => emptyResults.freshness },
       getScenarioSetBatchRunCount: {
         useQuery: () => emptyResults.batchCount,
@@ -107,18 +132,6 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    agents: { getAll: { useQuery: () => emptyResults.list } },
-    prompts: {
-      getAllPromptsForProject: { useQuery: () => emptyResults.list },
-    },
-    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
-    // The settings row names whoever started a run from the organization
-    // roster, so the column reads this even when no run names a person.
-    organization: {
-      getOrganizationWithMembersAndTheirTeams: {
-        useQuery: () => ({ data: undefined }),
-      },
-    },
   },
 }));
 
@@ -126,7 +139,7 @@ vi.mock("../../../../../behavior/use-can.ts", () => ({
   useCan: () => ({ can: () => true, isLoading: false, permissions: [] }),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
@@ -147,10 +160,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const DAY_MS = 86_400_000;
 
@@ -194,7 +203,7 @@ describe("the window the Results tab reads", () => {
       },
     });
 
-    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ResultsTab isSseConnected />);
 
     const push = mockRouterPush.mock.calls.find(
       (call) => (call[0] as { query?: Record<string, string> }).query?.startDate,
@@ -218,7 +227,7 @@ describe("the window the Results tab reads", () => {
       },
     });
 
-    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ResultsTab isSseConnected />);
 
     expect(
       mockRouterPush.mock.calls.filter(
@@ -232,7 +241,7 @@ describe("the window the Results tab reads", () => {
     routerState.asPath = "/test-project/agent-testing/results";
     mockSuiteSummaries.mockReturnValue({ data: {} });
 
-    render(<ResultsTab isSseConnected />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ResultsTab isSseConnected />);
 
     expect(screen.getByTestId("agent-testing-run-plans")).toBeInTheDocument();
     expect(screen.getByText("Test Runs")).toBeInTheDocument();

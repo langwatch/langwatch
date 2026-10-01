@@ -2,7 +2,6 @@ packages:
   - apps/*
   - packages/*
   - modules/*/*
-  - enterprise/packages/composition/*
   - enterprise/packages/*
   - enterprise/modules/*/*
   - mcp/typescript

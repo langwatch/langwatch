@@ -67,3 +67,5 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(function T
     </ChakraTooltip.Root>
   );
 });
+
+export { Tooltip as RawTooltip } from "@chakra-ui/react";

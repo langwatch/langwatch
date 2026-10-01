@@ -11,9 +11,7 @@ export function FeatureFlagsContent() {
   const { scope } = useOpsPermission();
   const host = useOpsHost();
   const canManage = scope?.kind === "platform";
-  const query = api.ops.listFeatureFlags.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
+  const query = api.ops.listFeatureFlags.useQuery(undefined, {});
   const utils = api.useUtils();
   const setFlag = api.ops.setFeatureFlag.useMutation({
     onSuccess: async () => utils.ops.listFeatureFlags.invalidate(),

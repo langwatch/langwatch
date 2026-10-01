@@ -44,7 +44,7 @@ async function codeOf(promise: Promise<unknown>): Promise<unknown> {
   return typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
 }
 
-describe("ModelProviderApp.getCustomKeys", () => {
+describe("ModelProviderModule.getCustomKeys", () => {
   describe("when the row stores custom keys", () => {
     it("answers them with the row's provider and organization", async () => {
       const app = await appHolding(providerRow({}));

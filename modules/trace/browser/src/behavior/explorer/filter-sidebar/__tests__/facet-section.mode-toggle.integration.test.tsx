@@ -3,8 +3,8 @@
  * that flips between the discrete value list and the range slider.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { Compass } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -17,9 +17,8 @@ vi.mock("../../../../ui/sections/explorer/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 afterEach(() => cleanup());
 
@@ -31,19 +30,17 @@ const ITEMS: FacetItem[] = [
 const setup = (mode: "discrete" | "range") => {
   const onToggleMode = vi.fn();
   const getValueState = (): FacetValueState => "neutral";
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetSection
-        title="VERSION"
-        icon={Compass}
-        field="version"
-        items={ITEMS}
-        getValueState={getValueState}
-        onToggle={vi.fn()}
-        onExclude={vi.fn()}
-        modeToggleProps={{ mode, onToggle: onToggleMode }}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <FacetSection
+      title="VERSION"
+      icon={Compass}
+      field="version"
+      items={ITEMS}
+      getValueState={getValueState}
+      onToggle={vi.fn()}
+      onExclude={vi.fn()}
+      modeToggleProps={{ mode, onToggle: onToggleMode }}
+    />,
   );
   return { ...utils, onToggleMode };
 };
@@ -89,18 +86,16 @@ describe("<FacetSection /> mode toggle", () => {
     /** @scenario "Non-eligible facets render no mode toggle at all" */
     it("renders no toggle button (slider-only facets stay slider-only)", () => {
       const getValueState = (): FacetValueState => "neutral";
-      const { queryByRole } = render(
-        <ChakraProvider value={defaultSystem}>
-          <FacetSection
-            title="DURATION"
-            icon={Compass}
-            field="duration_ms"
-            items={ITEMS}
-            getValueState={getValueState}
-            onToggle={vi.fn()}
-            onExclude={vi.fn()}
-          />
-        </ChakraProvider>,
+      const { queryByRole } = renderWithDesignSystem(
+        <FacetSection
+          title="DURATION"
+          icon={Compass}
+          field="duration_ms"
+          items={ITEMS}
+          getValueState={getValueState}
+          onToggle={vi.fn()}
+          onExclude={vi.fn()}
+        />,
       );
       expect(
         queryByRole("button", {

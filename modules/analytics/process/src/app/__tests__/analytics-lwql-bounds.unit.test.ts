@@ -1,6 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
- * `AnalyticsApp.executeLangWatchQL` — every execution is counted against the
+ * `AnalyticsModule.executeLangWatchQL` — every execution is counted against the
  * project's tier-effective window before it runs; an over-limit caller never
  * reaches the executor.
  * @vitest-environment node
@@ -14,12 +13,13 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { EVERY_CATALOGUE_PERMISSION } from "../../services/__tests__/lwql-catalogue-access.fixture.ts";
 import type { LwqlProvisioningDatabase } from "../../tasks/lwql-provision.task.ts";
-import { AnalyticsApp } from "../analytics.app.ts";
+import { AnalyticsModule } from "../analytics.app.ts";
 
 const TIER_PLAN_TYPE: Record<string, string> = {
   "org-free": "FREE",
@@ -48,7 +48,7 @@ function windowLimiter(): RateLimiter {
  * executor door — how a window refusal is told apart from one past it.
  */
 async function harness() {
-  const app = await AnalyticsApp.create({
+  const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>(),
       authz: createApiFixture<AuthzApi>(),
@@ -105,7 +105,7 @@ async function harness() {
 
 const FREE_QUERIES_PER_MINUTE = resolveRequestBound("lwqlPerMinute", "FREE");
 
-describe("AnalyticsApp.executeLangWatchQL", () => {
+describe("AnalyticsModule.executeLangWatchQL", () => {
   describe("given a free-tier project under its query ceiling", () => {
     it("reaches the executor for every query", async () => {
       const { execute } = await harness();

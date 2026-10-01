@@ -34,6 +34,7 @@ function createVirtualKeyServiceForTest(
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: NO_PLATFORM_PROVIDERS,
+      projects,
     }),
     projects,
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),

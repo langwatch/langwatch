@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-version-detail-visibility.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHost = { succeeded: vi.fn(), failed: vi.fn() };
@@ -17,7 +17,10 @@ vi.mock("../../../../../behavior/use-prompt-project.ts", () => ({
 
 const mockVersionsQuery = vi.fn();
 vi.mock("../../../../../behavior/prompt-api.ts", () => ({
-  promptApi: {
+  promptApi: {},
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
     prompts: {
       getAllVersionsForPrompt: { useQuery: () => mockVersionsQuery() },
       restoreVersion: { useMutation: () => ({ mutateAsync: vi.fn(), isLoading: false }) },
@@ -28,11 +31,7 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
 import { VersionHistoryListPopover } from "../version-history-list-popover.tsx";
 
 function renderPopover() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <VersionHistoryListPopover configId="config-1" initialOpen />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<VersionHistoryListPopover configId="config-1" initialOpen />);
 }
 
 beforeEach(() => {

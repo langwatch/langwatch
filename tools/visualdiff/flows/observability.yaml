@@ -100,7 +100,10 @@ flows:
           contains: vd-note-{uid}
       - action: go
         with:
-          path: /{slug}/annotations
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace {trace}"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: vd-note-{uid}
@@ -166,7 +169,10 @@ flows:
           contains: good
       - action: go
         with:
-          path: /{slug}/annotations
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace {trace}"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: vd-scored-{uid}
@@ -179,7 +185,8 @@ flows:
           path: /{slug}/traces/trace_visualdiff_turn_0
       - action: click
         with:
-          text: /^Conversation$/
+          selector: '[role="tab"]'
+          text: /^Conversation/
       - action: hover
         with:
           selector: '.group:has([aria-label="Annotate this message"])'
@@ -200,7 +207,10 @@ flows:
           contains: vd-note-{uid}
       - action: go
         with:
-          path: /{slug}/annotations
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace trace_visualdiff_turn_0"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: vd-note-{uid}
@@ -209,7 +219,8 @@ flows:
           path: /{slug}/traces/trace_visualdiff_turn_0
       - action: click
         with:
-          text: /^Conversation$/
+          selector: '[role="tab"]'
+          text: /^Conversation/
       - action: click
         with:
           label: Edit annotation
@@ -267,7 +278,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -276,7 +288,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -343,7 +355,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: button[aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -352,7 +365,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: button[aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -453,7 +466,7 @@ flows:
       - action: expect
         with:
           count: tbody:not([data-row-variant="error"])
-          equals: '"0"'
+          equals: "0"
       - action: expect
         with:
           count: tbody[data-trace-id="{errorTrace}"]
@@ -478,14 +491,14 @@ flows:
         with:
           label: Search filters or type what you are looking for
           text: status:error
-          submit: true
+          submit: "2"
       - action: expect
         with:
           count: tbody[data-trace-id="{errorTrace}"]
       - action: expect
         with:
           count: tbody:not([data-row-variant="error"])
-          equals: '"0"'
+          equals: "0"
 
   - id: trace-save-lens
     title: Save the current view as a lens and find its tab after a reload
@@ -509,6 +522,10 @@ flows:
       - action: go
         with:
           path: /{slug}/traces
+      - action: click
+        with:
+          label: /^Show \d+ more lenses$/
+          optional: "true"
       - action: expect
         with:
           text: vd-lens-{uid}

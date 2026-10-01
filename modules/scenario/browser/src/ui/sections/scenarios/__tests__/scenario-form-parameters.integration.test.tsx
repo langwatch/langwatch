@@ -3,10 +3,9 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../scenario-editor-sidebar.tsx", () => ({
@@ -33,6 +32,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    useUtils: () => ({}),
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       create: {
         useMutation: ({ onSuccess }: { onSuccess?: (data: unknown) => void }) => ({
@@ -58,12 +69,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useQuery: () => ({ data: mocks.mockGetByIdData, isLoading: false }),
       },
     },
-    useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
-      },
-    }),
   },
 }));
 
@@ -81,7 +86,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -122,10 +127,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 /** The scenario the drawer edits, with whatever parameters it declares. */
 function scenarioDeclaring(parameters: unknown[]) {
   return {
@@ -142,9 +143,9 @@ function renderDrawer() {
   // Being pointed at a scenario is what makes this an edit, so the id is what
   // decides that a save updates rather than creates. These scenarios are all about
   // a scenario that already exists, so they say so.
-  render(<ScenarioFormDrawer open={true} onClose={vi.fn()} scenarioId="scenario-1" />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(
+    <ScenarioFormDrawer open={true} onClose={vi.fn()} scenarioId="scenario-1" />,
+  );
   return userEvent.setup();
 }
 

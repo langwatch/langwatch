@@ -18,12 +18,13 @@ import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
 import type {
-  GithubHost,
-  GithubInstallResponse,
-  GithubInstallState,
-  GithubPullRequestEventParser,
-} from "../app/github.members.ts";
+  installErrorHtml,
+  installSuccessHtml,
+} from "../rules/github-install-response.rules.ts";
+import type { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.ts";
 import { GithubConnectionService } from "./github-connection.service.ts";
+import type { GithubHost } from "./github-host.service.ts";
+import type { GithubInstallState } from "./github-install-state.service.ts";
 import type { GithubInstallationsService } from "./github-installations.service.ts";
 import {
   type GithubPullRequestMappingService,
@@ -55,8 +56,8 @@ type GithubServiceDependencies = {
   };
   host: GithubHost;
   installState: GithubInstallState;
-  installResponse: GithubInstallResponse;
-  pullRequestEvents: GithubPullRequestEventParser;
+  installResponse: { successHtml: typeof installSuccessHtml; errorHtml: typeof installErrorHtml };
+  pullRequestEvents: { parse: typeof parsePullRequestEvent };
 };
 
 /**
@@ -86,8 +87,11 @@ export class GithubFeatureService implements GithubApi {
   private readonly config: GithubServiceDependencies["config"];
   private readonly host: GithubHost;
   private readonly installState: GithubInstallState;
-  private readonly installResponse: GithubInstallResponse;
-  private readonly pullRequestEvents: GithubPullRequestEventParser;
+  private readonly installResponse: {
+    successHtml: typeof installSuccessHtml;
+    errorHtml: typeof installErrorHtml;
+  };
+  private readonly pullRequestEvents: { parse: typeof parsePullRequestEvent };
 
   private constructor({
     installations,
@@ -105,8 +109,8 @@ export class GithubFeatureService implements GithubApi {
     config: GithubServiceDependencies["config"];
     host: GithubHost;
     installState: GithubInstallState;
-    installResponse: GithubInstallResponse;
-    pullRequestEvents: GithubPullRequestEventParser;
+    installResponse: { successHtml: typeof installSuccessHtml; errorHtml: typeof installErrorHtml };
+    pullRequestEvents: { parse: typeof parsePullRequestEvent };
   }) {
     this.installations = installations;
     this.mapping = mapping;

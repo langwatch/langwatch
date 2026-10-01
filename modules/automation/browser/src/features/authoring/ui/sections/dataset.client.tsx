@@ -8,8 +8,8 @@ import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 
-import { api } from "../../../../behavior/automation-api.ts";
 import { TracesMapping } from "../../../../behavior/lent-peers.tsx";
+import { useProjectDatasets } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import type {
   ClientDef,
@@ -20,8 +20,6 @@ import { keepDraftOnSubFlowReturn, announceSubFlowDeparture } from "../../behavi
 import { useMappingEditsOnly } from "../../behavior/use-mapping-edits-only.ts";
 import type { DatasetMapping, DatasetSlice, TraceMappingEntry } from "../../model/dataset-slice.ts";
 import { DatasetSelector } from "../blocks/dataset-selector.tsx";
-
-export type { DatasetSlice } from "../../model/dataset-slice.ts";
 
 const EMPTY_MAPPING: DatasetMapping = { mapping: {}, expansions: [] };
 
@@ -129,10 +127,7 @@ function toActionParams(slice: DatasetSlice): DatasetActionParams {
 }
 
 function DatasetConfigForm({ slice, onChange, ctx }: ConfigFormProps<DatasetSlice>) {
-  const datasets = api.dataset.getAll.useQuery(
-    { projectId: ctx.projectId },
-    { enabled: !!ctx.projectId, refetchOnWindowFocus: false },
-  );
+  const datasets = useProjectDatasets({ projectId: ctx.projectId });
   const host = useAutomationHost();
   // Picking a dataset derives a default column mapping from its columns, so
   // the saved trigger never writes blank rows; the editor below refines it.

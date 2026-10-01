@@ -19,7 +19,7 @@ import type { ScenarioExecutionPrefetchConfig } from "./scenario-execution-prefe
 
 /** The project fields the run reads, or why they could not be read. */
 export type ProjectRead =
-  | { success: true; data: { apiKey: string; organizationId: string | null } }
+  | { success: true; data: { organizationId: string | null } }
   | { success: false; error: string };
 
 /** The adapter data of the target, a named failure to build it, or nothing. */
@@ -37,6 +37,8 @@ export interface AgentTestReads {
   adapter: () => Promise<AdapterRead>;
   /** The agent's display name, or nothing when the row is gone. */
   agentName: () => Promise<string | null>;
+  /** The key the test's child calls LangWatch with, minted for the adapter it runs. */
+  runKey: (adapter: TargetAdapterData) => Promise<string>;
 }
 
 /** The label of the agent kind a target names, for the not-found message. */
@@ -113,7 +115,7 @@ export class AgentTestPrefetchService {
     });
     const telemetry = {
       endpoint: config.langwatchEndpoint,
-      apiKey: project.data.apiKey,
+      apiKey: await reads.runKey(adapterResult),
     };
     onChildEnvReady?.({ labels: scenario.labels, telemetry });
 

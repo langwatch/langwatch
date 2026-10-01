@@ -1,10 +1,13 @@
 /**
- * Who changed this evaluator, and when. THE ONE OVERLAY OF THIS FAMILY THAT TRAVELLED.
+ * Who changed this evaluator, and when: the `evaluatorHistory` drawer, opened
+ * with `drawer.evaluatorId` and `drawer.evaluatorName` like main's.
  */
 
+import { useDrawer } from "@langwatch/browser-host/drawer";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { toEpochMs } from "@langwatch/time";
 import {
   ArrowUp,
@@ -17,7 +20,6 @@ import {
   X,
 } from "lucide-react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 const ACTION_META = {
@@ -47,22 +49,21 @@ function actionMeta(action: string) {
 export function EvaluatorHistoryPanel({
   evaluatorId,
   evaluatorName,
-  onClose,
 }: {
   evaluatorId: string;
   evaluatorName: string;
-  onClose: () => void;
 }) {
+  const { closeDrawer } = useDrawer();
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
 
-  const { data, isLoading, isError } = evaluatorApi.evaluators.getHistory.useQuery(
+  const { data, isLoading, isError } = evaluatorClient.evaluators.getHistory.useQuery(
     { evaluatorId, projectId: projectId ?? "" },
     { enabled: !!projectId && !!evaluatorId },
   );
 
   return (
-    <Drawer.Root open placement="end" size="md" onOpenChange={() => onClose()}>
+    <Drawer.Root open placement="end" size="md" onOpenChange={() => closeDrawer()}>
       <Drawer.Content bg="bg">
         <Drawer.Header>
           <Drawer.Title>{`${evaluatorName} history`}</Drawer.Title>

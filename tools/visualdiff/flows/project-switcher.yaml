@@ -1,8 +1,8 @@
-# The project switcher opened from a page inside a project: its search field and New Project row
-# (main: ProjectSwitcherComboboxPopup). Creating and switching live in shell-navigation.yaml.
+# The project switcher opened from a page inside a project: its New Project row. Search appears
+# only above 8 projects (PROJECT_SEARCH_THRESHOLD), so a small stack gets the plain menu. Creating and switching live in shell-navigation.yaml.
 flows:
   - id: shell-project-switcher-opens-with-search-and-new-project
-    title: Open the project switcher on the experiments page and find its search field and New Project row
+    title: Open the project switcher on the experiments page and find its New Project row
     steps:
       - action: go
         with:
@@ -10,9 +10,6 @@ flows:
       - action: click
         with:
           label: Switch project
-      - action: expect
-        with:
-          label: Search projects
       - action: expect
         with:
           text: New Project

@@ -4,7 +4,7 @@ import { defineRule } from "../define-rule.mjs";
 // every keystroke of the whole form, because only the form's owner may watch.
 
 function isBrowserSource(file) {
-  return (file.role === "browser" || file.role === "browser-kit") && !file.isTest;
+  return file.role === "browser" && !file.isTest;
 }
 
 function isParameter(context, identifier) {

@@ -1,9 +1,3 @@
-/**
- * The doubles every stored-object test builds on: an in-process byte backend,
- * a token codec that remembers what it minted, a fixed delivery capability,
- * and the row-and-stream reads the byte surface performs.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
@@ -13,6 +7,12 @@ import {
   type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
+/**
+ * The doubles every stored-object test builds on: an in-process byte backend,
+ * a token codec that remembers what it minted, a fixed delivery capability,
+ * and the row-and-stream reads the byte surface performs.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { ExternalImageChannel } from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";
@@ -20,7 +20,7 @@ import { MemoryStoredObjectRepositories } from "../../repositories/memory/memory
 import type { StoredObjectRepositories } from "../../repositories/stored-object.repositories.ts";
 import { StoredObjectUploadSignerService } from "../../services/stored-object-upload-signer.service.ts";
 import type { StoredObjectPermissions } from "../../services/stored-object.service.ts";
-import { StoredObjectApp, type StoredObjectInfrastructure } from "../stored-object.app.ts";
+import { StoredObjectModule, type StoredObjectInfrastructure } from "../stored-object.app.ts";
 import {
   StoredObjectDelivery,
   StoredObjectStorage,
@@ -177,10 +177,10 @@ export function createStoredObjectTestApp(
     permissions?: StoredObjectPermissions;
     images?: ExternalImageChannel;
   }> = {},
-): StoredObjectApp {
+): StoredObjectModule {
   const permissions = input.permissions ?? new GrantedStoredObjectPermissions();
 
-  return StoredObjectApp.fromInfrastructure({
+  return StoredObjectModule.fromInfrastructure({
     permissions: createApiFixture<AuthzApi>({
       getDecision: (args) => permissions.getDecision(args),
     }),

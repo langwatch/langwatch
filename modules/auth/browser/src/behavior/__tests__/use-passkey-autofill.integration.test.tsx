@@ -1,9 +1,9 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  * Passkey autofill request starts on first gesture to address field, not page load
  */
 import { Input } from "@langwatch/design-system/primitives";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,11 +24,11 @@ function Door({ enabled, onError }: { enabled: boolean; onError?: (error: unknow
   usePasskeyAutofill({ enabled, onError });
   // Chakra's Input, as the identifier step renders the address field.
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Input aria-label="Email" autoComplete="username webauthn" />
       <Input aria-label="Name" autoComplete="name" />
       <button type="button">Continue</button>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

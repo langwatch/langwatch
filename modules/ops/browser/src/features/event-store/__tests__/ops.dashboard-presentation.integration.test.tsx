@@ -6,7 +6,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { HealthLine, LinkedStat } from "../../../index.ts";
+import { HealthLine } from "../ui/elements/dashboard-health-line.tsx";
+import { LinkedStat } from "../ui/elements/dashboard-linked-stat.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

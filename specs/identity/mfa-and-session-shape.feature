@@ -714,3 +714,10 @@ Feature: Two-step verification - one setup per person, and organizations that re
     When the session records are deleted
     Then cache invalidation follows the completed deletion
     And unrelated session rows remain live
+
+  @unit @regression
+  Scenario: Every browser session revocation deletes rows before clearing the cached sessions
+    Given a person ends one session, all sessions or every other session
+    When the session rows are deleted
+    Then the cached sessions are cleared only after the deletion
+    And a refresh racing the revoke cannot re-cache a deleted session

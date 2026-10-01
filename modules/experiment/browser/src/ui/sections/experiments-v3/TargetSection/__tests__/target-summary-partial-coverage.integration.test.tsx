@@ -3,10 +3,9 @@
  * A stopped run's column can have results for only part of the dataset.
  */
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { TargetAggregate } from "@langwatch/experiment-contract";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TargetSummary } from "../target-summary.tsx";
@@ -16,10 +15,6 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
 }));
 
 afterEach(() => cleanup());
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const createAggregate = (overrides: Partial<TargetAggregate> = {}): TargetAggregate => ({
   targetId: "target-1",
@@ -49,9 +44,7 @@ describe("TargetSummary", () => {
           overallPassRate: 93,
         });
 
-        render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<TargetSummary aggregates={aggregates} evaluators={[]} />);
 
         // The score alone reads as this column's result. The count is what
         // stops it being compared against a column that answered every row.
@@ -68,9 +61,7 @@ describe("TargetSummary", () => {
           overallPassRate: 92,
         });
 
-        render(<TargetSummary aggregates={aggregates} evaluators={[]} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<TargetSummary aggregates={aggregates} evaluators={[]} />);
 
         expect(screen.queryByText("40/40")).not.toBeInTheDocument();
       });

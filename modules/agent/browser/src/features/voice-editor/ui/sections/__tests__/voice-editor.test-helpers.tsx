@@ -1,7 +1,7 @@
 /** Renders the voice editor under a test host for agent's own port. */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import { vi } from "vitest";
 
 import type { AgentClient } from "../../../../../model/agent-client.ts";
@@ -90,12 +90,10 @@ export function resetVoiceState(): void {
 }
 
 export function renderVoiceDrawer(props: Partial<AgentVoiceEditorDrawerProps> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentManagementHostProvider value={new VoiceTestHost()}>
-        <AgentVoiceEditorDrawer open={true} {...props} />
-      </AgentManagementHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AgentManagementHostProvider value={new VoiceTestHost()}>
+      <AgentVoiceEditorDrawer open={true} {...props} />
+    </AgentManagementHostProvider>,
   );
 }
 

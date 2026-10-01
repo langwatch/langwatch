@@ -1,9 +1,4 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import {
-  datasetTableCss,
-  useTableKeyboardNavigation,
-  VirtualizedTableBody,
-} from "@langwatch/dataset-browser-kit";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import { Box } from "@langwatch/design-system/primitives";
 import { isRowEmpty, isCellInExecution, toComparisonConfig } from "@langwatch/experiment-contract";
@@ -11,6 +6,7 @@ import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/re
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { useTableKeyboardNavigation } from "../../../behavior/dataset/use-table-keyboard-navigation.ts";
 import {
   AddOrEditDatasetDrawer,
   DatasetRecordSync,
@@ -32,6 +28,7 @@ import {
   useWorkbenchEvaluatorAdd,
   useWorkbenchTargetSelection,
 } from "../../../behavior/experiments-v3/use-workbench-target-flow.ts";
+import { datasetTableCss } from "../../../model/dataset/dataset-table-styles.ts";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
 import type {
   EvaluationsV3State,
@@ -48,6 +45,7 @@ import {
   editedDatasetUpdate,
   savedDatasetUpdate,
 } from "../../../model/experiments-v3/workbench-dataset-edits.ts";
+import { VirtualizedTableBody } from "../../blocks/dataset/virtualized-table-body.tsx";
 import { SelectionToolbar } from "../../elements/experiments-v3/selection-toolbar.tsx";
 import { TargetSuperHeader } from "../../elements/experiments-v3/target-super-header.tsx";
 import { DatasetSuperHeader } from "./dataset-super-header.tsx";

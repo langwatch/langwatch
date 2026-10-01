@@ -165,7 +165,10 @@ export const select: Action = async (context) => {
   await context.side.page.getByRole("option", { name: option }).first().click({ timeout: 6000 });
 };
 
-/** type puts text into a box (placeholder, test id, label or selector), optionally submitting. */
+/**
+ * type puts text into a box (placeholder, test id, label or selector), then presses Enter
+ * `submit` times: "true" is once; "2" for a search bar whose first Enter accepts the suggestion.
+ */
 export const type: Action = async (context) => {
   const { side } = context;
   const box = isTargeted(context.args)
@@ -173,7 +176,8 @@ export const type: Action = async (context) => {
     : side.page.getByPlaceholder(asRegExp(argument({ context, name: "placeholder" }))).first();
   await box.click({ timeout: 6000 });
   await side.page.keyboard.type(argument({ context, name: "text" }), { delay: 12 });
-  if (context.args.submit === "true") await side.page.keyboard.press("Enter");
+  const enters = context.args.submit === "true" ? 1 : Number(context.args.submit ?? 0);
+  for (let press = 0; press < enters; press += 1) await side.page.keyboard.press("Enter");
 };
 
 export const wait: Action = async (context) => {

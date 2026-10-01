@@ -1,3 +1,4 @@
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { getConfig, runWithConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
 import { createLogger } from "@langwatch/observability";
@@ -6,12 +7,13 @@ import type { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js
 import type { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 
-import type { McpApiKeyCipher, McpSessionToolRegistrar } from "../app/hosted-mcp.members.ts";
 import type { McpSessionRelayChannel } from "../channels/mcp-session-relay.channel.ts";
 import type {
   McpSessionRepository,
   McpSessionTransport,
 } from "../repositories/mcp-session.repository.ts";
+import type { McpCallerLookup } from "./mcp-caller-auth.service.ts";
+import type { McpApiKeyCipher } from "./mcp-oauth-token.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
@@ -46,7 +48,7 @@ type McpSessionCollaborators = Readonly<{
   records: McpSessionRepository;
   relay: McpSessionRelayChannel;
   cipher: McpApiKeyCipher;
-  sessionTools: McpSessionToolRegistrar | undefined;
+  sessionTools: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
 }>;
 
 /**
@@ -90,15 +92,54 @@ export class McpSessionService {
   async connectServer(input: {
     transport: Transport;
     apiKey: string;
+    projectId: string;
     userId: string | undefined;
   }): Promise<void> {
     const server = createMcpServer();
-    this.#collaborators.sessionTools?.register({
+    this.#collaborators.sessionTools?.registerMcpTools({
       server,
-      apiKey: input.apiKey,
+      projectId: input.projectId,
       callerUserId: input.userId,
     });
     await this.runAs(input.apiKey, () => server.connect(input.transport));
+  }
+
+  /**
+   * Whether this caller may drive the session: its own bearer, or a refreshed access token for the
+   * same person and project, which the session adopts so a client's hourly refresh keeps it.
+   */
+  adoptsCaller<T>(input: {
+    transport: McpSessionTransport;
+    sessionId: string;
+    session: McpOpenSession<T>;
+    caller: McpCallerLookup;
+  }): boolean {
+    const { session, caller } = input;
+    if (caller.kind !== "resolved") return false;
+    if (caller.apiKey === session.apiKey) return true;
+    const projectId = session.projectId;
+    const samePersonAndProject =
+      caller.userId !== undefined &&
+      caller.userId === session.userId &&
+      projectId !== undefined &&
+      caller.projectId === projectId;
+    if (!samePersonAndProject) return false;
+
+    const previous = session.apiKey;
+    session.apiKey = caller.apiKey;
+    void this.removeRecord({ transport: input.transport, sessionId: input.sessionId, apiKey: previous })
+      .then(() =>
+        this.storeRecord({
+          transport: input.transport,
+          sessionId: input.sessionId,
+          apiKey: caller.apiKey,
+          projectId,
+        }),
+      )
+      .catch((err: unknown) => {
+        logger.error({ error: err }, "Failed to move an MCP session record to its refreshed token");
+      });
+    return true;
   }
 
   markActive(session: { lastActivityAt: number }): void {

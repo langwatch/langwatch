@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   BillingPriceCatalogue,
   PlanTypes,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";

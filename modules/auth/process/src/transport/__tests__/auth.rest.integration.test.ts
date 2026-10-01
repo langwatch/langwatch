@@ -16,6 +16,8 @@ const SIGNED_IN: AuthSessionPoll = {
   document: {
     session: { expiresAt: "2026-01-01T00:00:00.000Z" },
     user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
+    cacheKey: "this-epochs-key",
+    previousCacheKey: "last-epochs-key",
   },
 };
 
@@ -40,9 +42,9 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

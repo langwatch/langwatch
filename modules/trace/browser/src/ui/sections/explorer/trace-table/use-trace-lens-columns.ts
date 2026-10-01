@@ -1,4 +1,4 @@
-import { parseEvalColumnId } from "@langwatch/trace-browser-kit";
+import { parseEvalColumnId } from "@langwatch/trace-contract";
 import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 

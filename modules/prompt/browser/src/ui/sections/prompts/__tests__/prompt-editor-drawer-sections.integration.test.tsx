@@ -3,8 +3,8 @@
  * The two editing sections of the prompt editor, rendered headless with
  * only the host seams stubbed, so the composition under test is the real one.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -51,7 +51,7 @@ vi.mock("../../../../behavior/use-model-providers-settings.ts", () => ({
 
 vi.mock("../../../../behavior/use-prompt-project.ts", () => ({
   usePromptProject: () => ({
-    project: { id: "project-1", slug: "demo", apiKey: "" },
+    project: { id: "project-1", slug: "demo" },
     projectId: "project-1",
     organizationId: "organization-1",
     teamId: "team-1",
@@ -63,7 +63,7 @@ vi.mock("../../../../behavior/use-model-limits.ts", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../../elements/workflow/studio-drawer-footer.tsx", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useRegisterDrawerFooter: () => void 0,
 }));
@@ -75,7 +75,7 @@ vi.mock("../../../elements/prompts/forms/fields/model-select-field-mini.tsx", ()
   ModelSelectFieldMini: () => <button data-testid="model-select">gpt-5-mini</button>,
 }));
 
-vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
+vi.mock("../../../../behavior/use-latest-prompt-version.ts", () => ({
   useLatestPromptVersion: () => ({ data: void 0, isLoading: false }),
 }));
 
@@ -91,6 +91,11 @@ vi.mock("../../../../behavior/prompt-api.ts", () => ({
       listAllForProjectForFrontend: { useQuery: () => idleQuery },
     },
     llmModelCost: { getModelLimits: { useQuery: () => idleQuery } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     prompts: {
       getByIdOrHandle: { useQuery: () => idleQuery },
       create: { useMutation: idleMutation },
@@ -103,11 +108,7 @@ vi.mock("../../../../behavior/prompt-api.ts", () => ({
 const { PromptEditorDrawer } = await import("../prompt-editor-drawer.tsx");
 
 function renderEditor(props: Partial<ComponentProps<typeof PromptEditorDrawer>> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptEditorDrawer headless {...props} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<PromptEditorDrawer headless {...props} />);
 }
 
 afterEach(() => {

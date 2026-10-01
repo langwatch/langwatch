@@ -3,12 +3,17 @@
  * comment reads as once the part it was left on is gone.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
@@ -17,7 +22,8 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { useFocusSectionStore } from "../../../../../../behavior/focus-section.store.ts";
 import { TraceCommentList } from "../trace-comment-list.tsx";
 
@@ -71,20 +77,20 @@ const onADeletedSpan = comment({
 });
 
 function renderList(comments: AnnotationByTrace[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceCommentList
-        traceId={TRACE_ID}
-        comments={comments}
-        spanNames={new Map([[SEARCH_SPAN, "web_search"]])}
-        resolvable={new Set([TRACE_ID, SEARCH_SPAN])}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TraceCommentList
+      traceId={TRACE_ID}
+      comments={comments}
+      spanNames={new Map([[SEARCH_SPAN, "web_search"]])}
+      resolvable={new Set([TRACE_ID, SEARCH_SPAN])}
+    />,
   );
 }
 
 beforeEach(() => {
-  useDrawerStore.getState().clearSpan();
+  setWindowAddress({
+    url: "/my-project/traces?drawer.open=traceV2Details&drawer.traceId=trace-1&drawer.mode=conversation",
+  });
   useFocusSectionStore.getState().clear();
 });
 
@@ -118,8 +124,8 @@ describe("given comments on a span, on an attribute and on the trace itself", ()
 
     fireEvent.click(screen.getByRole("button", { name: "Go to Span web_search" }));
 
-    expect(useDrawerStore.getState().selectedSpanId).toBe(SEARCH_SPAN);
-    expect(useDrawerStore.getState().viewMode).toBe("trace");
+    expect(getTraceDrawer().selectedSpanId).toBe(SEARCH_SPAN);
+    expect(getTraceDrawer().viewMode).toBe("trace");
   });
 
   it("opens the section holding an attribute a comment is about", () => {

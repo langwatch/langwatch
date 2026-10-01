@@ -12,7 +12,7 @@ import {
 import { type ReactNode, useMemo, useRef } from "react";
 import { LuCalendarClock, LuFileText, LuFlaskConical } from "react-icons/lu";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useAutoOpenSections } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
@@ -57,7 +57,7 @@ export function TraceSummaryAccordions({
   spans: SpanTreeNode[];
   onSelectSpan?: (spanId: string) => void;
 }) {
-  const isEditing = useDrawerStore((s) => s.isEditing);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
   // The trace's own input, output and metadata are what a correction can
   // replace at trace level, so they are the fields that carry the corrected
   // treatment here.

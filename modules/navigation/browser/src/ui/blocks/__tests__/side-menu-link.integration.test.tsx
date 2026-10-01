@@ -3,8 +3,8 @@
  * Spec: specs/navigation/product-sidebars.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { LuSettings } from "react-icons/lu";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -34,12 +34,10 @@ describe("a sidebar entry", () => {
   describe("when the pointer rests on it", () => {
     /** @scenario A sidebar entry underlines under the pointer */
     it("underlines, as the link recipe's plain variant does", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WithStubNavigationHost>
-            <SideMenuLink icon={<LuSettings />} label="Members" href="/settings/members" />
-          </WithStubNavigationHost>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <WithStubNavigationHost>
+          <SideMenuLink icon={<LuSettings />} label="Members" href="/settings/members" />
+        </WithStubNavigationHost>,
       );
 
       const entry = screen.getByRole("link", { name: "Members" });

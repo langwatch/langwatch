@@ -1,12 +1,12 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * Tests sample panels visibility; fill empty screens, vanish when real data arrives.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,14 +70,12 @@ const costsHost = () =>
 const A_SAMPLE_FIGURE = "support-copilot";
 
 const screenTree = () => (
-  <ChakraProvider value={defaultSystem}>
-    <GovernanceHostProvider value={costsHost()}>
-      <CostsPage />
-    </GovernanceHostProvider>
-  </ChakraProvider>
+  <GovernanceHostProvider value={costsHost()}>
+    <CostsPage />
+  </GovernanceHostProvider>
 );
 
-const renderScreen = () => render(screenTree());
+const renderScreen = () => renderWithDesignSystem(screenTree());
 
 /**
  * Every activity read goes back to unanswered, which is what react-query hands

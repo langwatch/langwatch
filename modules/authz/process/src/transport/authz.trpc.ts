@@ -1,7 +1,7 @@
-// Frontend query for caller's permissions; declared here to avoid package cycle.
-import type { Actor } from "@langwatch/actor";
-import { toLedgerActor } from "@langwatch/actor";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+// Frontend query for caller's permissions; declared here to avoid package cycle.
+import type { Actor } from "@langwatch/authorization";
+import { toLedgerActor } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzApplyMemberBindingsInputSchema,
@@ -22,13 +22,13 @@ import {
   grantSchema,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 /** Whose permissions bound a grant is the session's, so the input never names it. */
 const IMPLIED_BY_SESSION = { caller: true, actor: true } as const;
 
 export const authzTrpc = defineTrpcContract("authz")
-  .query("effectivePermissions", { cache: { tier: "session" } })
+  .query("effectivePermissions")
   .withInput(authzOwnStandingInputSchema)
   .withOutput(authzOwnStandingSchema)
 

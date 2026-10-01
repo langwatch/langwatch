@@ -1,6 +1,5 @@
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzPermission, RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   LangyApiRequestInvalidError,
@@ -38,7 +37,7 @@ export class LangyUiActionDoorService {
   static create(deps: {
     callers: Pick<LangyRestCallerService, "getCaller">;
     catalog: LangyUiActionCatalogService;
-    authz: Pick<AuthzApi, "hasApiKeyPermission">;
+    authz: Pick<AuthzApi, "hasApiKeyPermission" | "can">;
     /** The channel, where this process has the Redis it runs on. */
     actions: LangyUiActionService | null;
   }): LangyUiActionDoorService {
@@ -49,7 +48,7 @@ export class LangyUiActionDoorService {
     private readonly deps: {
       callers: Pick<LangyRestCallerService, "getCaller">;
       catalog: LangyUiActionCatalogService;
-      authz: Pick<AuthzApi, "hasApiKeyPermission">;
+      authz: Pick<AuthzApi, "hasApiKeyPermission" | "can">;
       actions: LangyUiActionService | null;
     },
   ) {}
@@ -98,14 +97,31 @@ export class LangyUiActionDoorService {
     credential: RestResolvedProjectCredential;
     permission: AuthzPermission;
   }): Promise<void> {
-    if (credential.type !== "apiKey") return;
-    const allowed = await this.deps.authz.hasApiKeyPermission({
-      apiKeyId: credential.apiKeyId,
-      userId: credential.userId,
-      organizationId: credential.organizationId,
-      scope: { type: "project", id: credential.project.id, teamId: credential.project.teamId },
-      permission,
-    });
+    if (credential.type === "legacyProjectKey") return;
+    const { project } = credential;
+    const allowed =
+      credential.type === "cliAccessToken"
+        ? await this.deps.authz.can({
+            principal: { type: "user", id: credential.userId },
+            permission,
+            scope: {
+              type: "project",
+              id: project.id,
+              teamId: project.teamId,
+              organizationId: project.organizationId,
+            },
+          })
+        : await this.deps.authz.hasApiKeyPermission({
+            apiKeyId: credential.apiKeyId,
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+            scope: {
+              type: "project",
+              id: credential.project.id,
+              teamId: credential.project.teamId,
+            },
+            permission,
+          });
     if (!allowed) throw new ApiKeyPermissionDeniedError(permission);
   }
 }

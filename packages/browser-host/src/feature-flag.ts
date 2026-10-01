@@ -1,9 +1,12 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import {
+  type featureFlagTrpc,
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
+
+const api = createModuleApi<ContractApiMap<typeof featureFlagTrpc>>();
 
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the
@@ -64,12 +67,6 @@ export function useFeatureFlag(
       staleTime: CLIENT_FLAG_STALE_TIME_MS,
       refetchOnWindowFocus: false,
       enabled: queryEnabled,
-      // Flag checks are mounted at app shell (MainMenu, command bar) and fire
-      // alongside the page's data queries. Without splitting, an in-flight
-      // tracesV2.list (~1s) would block the menu from rendering its links —
-      // and the list's perceived latency would absorb the flag round-trip.
-      // Run on its own connection.
-      trpc: { context: { skipBatch: true } },
     },
   );
 

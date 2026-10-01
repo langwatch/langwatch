@@ -42,13 +42,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

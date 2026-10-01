@@ -110,11 +110,10 @@ describe("given the members built over one Redis connection", () => {
           calls.push("idempotency");
           return Promise.resolve("OK");
         },
-        incr: () => {
+        eval: () => {
           calls.push("rateLimiter");
           return Promise.resolve(1);
         },
-        expire: () => Promise.resolve(1),
       });
       const members = buildProcessStores({ config: config(), members: { redis } }).members;
 

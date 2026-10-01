@@ -1,9 +1,9 @@
+import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 /**
  * A key's grants are read off authz's grants head, never the retired
  * RoleBinding table (#7633). specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";

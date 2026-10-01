@@ -2,13 +2,14 @@
  * The refusals a save or a delete of a connection can carry, read off the handled error.
  * Spec: specs/automations/slack-connections.feature.
  */
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { usedByLabel } from "@langwatch/slack-browser-kit";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   type SlackConnectionClaimant,
   slackConnectionClaimantSchema,
 } from "@langwatch/slack-contract";
 import { z } from "zod";
+
+import { usedByLabel } from "./slack-connection-copy.ts";
 
 /** A refusal because automations still claim the connection (ARCHITECTURE.md §3). */
 export interface SlackConnectionInUse {

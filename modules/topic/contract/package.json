@@ -20,7 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

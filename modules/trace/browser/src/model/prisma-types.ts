@@ -33,7 +33,6 @@ export type Project = {
   id: string;
   name: string;
   slug: string;
-  apiKey: string;
   teamId: string;
   language: string;
   framework: string;

@@ -5,7 +5,7 @@
  */
 
 import { pinnedTraceSchema } from "@langwatch/data-retention-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 export const pinnedTraceScopeSchema = z.object({

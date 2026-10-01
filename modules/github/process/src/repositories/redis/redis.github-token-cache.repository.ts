@@ -9,6 +9,8 @@ import {
   type GithubLockAcquisition,
 } from "../github-token-cache.repository.ts";
 
+/** The authorising cache class (ARCHITECTURE §7): no token or verdict outlives a minute. */
+const GITHUB_TOKEN_CACHE_MAX_TTL_SEC = 60;
 const LOCK_TTL_SEC = 15;
 const LOCK_RETRY_MS = 100;
 const LOCK_MAX_WAIT_MS = 3_000;
@@ -73,7 +75,7 @@ export class GithubTokenCacheRedisRepository extends GithubTokenCacheRepository 
 
   private async write(key: string, value: string, ttlSec: number): Promise<void> {
     try {
-      await this.redis.set(key, value, "EX", ttlSec);
+      await this.redis.set(key, value, "EX", Math.min(ttlSec, GITHUB_TOKEN_CACHE_MAX_TTL_SEC));
     } catch {
       // Cache failure does not change the provider operation's result.
     }

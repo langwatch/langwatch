@@ -61,9 +61,9 @@ type BorrowedProcedures = {
     /**
      * Organization graph with pricingModel to decide seat pricing display.
      */
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;
@@ -74,7 +74,10 @@ type BorrowedProcedures = {
     };
 
     getOrganizationWithMembersAndTheirTeams: {
-      query: { input: OrganizationScope; output: { members: OrganizationMemberRead[] } };
+      query: {
+        input: OrganizationScope & { includeDeactivated: boolean };
+        output: { members: OrganizationMemberRead[] };
+      };
     };
   };
 

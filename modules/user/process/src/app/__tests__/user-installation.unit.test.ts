@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   EnterpriseGatewayApi,
@@ -7,7 +6,6 @@ import type {
 } from "@langwatch/enterprise-gateway-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type {
   OrganizationApi,
@@ -15,25 +13,23 @@ import type {
   PersonalWorkspace,
 } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
 import { describe, expect, it, vi } from "vitest";
 
-import { userServer } from "../../user.server.ts";
-import {
-  createUserTestAuth,
-  createUserTestOps,
-  createUserTestOrganizations,
-} from "./user.fixture.ts";
+import { userProcessModule } from "../../user.module.ts";
+import { createUserTestAuth, createUserTestOrganizations } from "./user.fixture.ts";
 
 /**
  * The narrow slice of a generated Prisma client the organization directory
- * reads, faked so the installation test can boot `UserApp` without a real
+ * reads, faked so the installation test can boot `UserModule` without a real
  * database; every read here answers "not found".
  */
 function fakeUserPrisma(): PrismaClient {
@@ -59,7 +55,7 @@ function process(
   }> = {},
 ) {
   return createApp({ role })
-    .withModules([withMemoryRepositories(userServer)])
+    .withModules([withMemoryRepositories(userProcessModule)])
     .withMembers({
       passkeysEnabled: false,
       publicBaseUrl: undefined,
@@ -74,7 +70,6 @@ function process(
       governance: createApiFixture<GovernanceRestApi>(),
       notification: createApiFixture<NotificationService>(),
       organization: peers.organization ?? createUserTestOrganizations(),
-      ops: createUserTestOps(),
       project: createApiFixture<ProjectApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
     });
@@ -86,7 +81,7 @@ describe("user app installation", () => {
 
     try {
       const app = runtime.service(UserApi);
-      expect(runtime.module(userServer).provided).toBe(app);
+      expect(runtime.module(userProcessModule).provided).toBe(app);
 
       const created = await app.createCredentialUser({
         name: "Ada",

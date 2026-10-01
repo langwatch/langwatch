@@ -10,7 +10,7 @@ import {
   rankByMatch,
   type SuggestionRow,
   type SuggestionState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 
 import type {
   DeclaredParameter,

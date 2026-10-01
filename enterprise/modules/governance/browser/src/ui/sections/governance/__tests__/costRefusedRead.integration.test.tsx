@@ -1,8 +1,8 @@
-/** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { builtinRolePermissions } from "@langwatch/authz-contract";
+/** @vitest-environment jsdom */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
@@ -73,12 +73,10 @@ const costsHost = () =>
   });
 
 function renderPage() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostProvider value={costsHost()}>
-        <CostsPage />
-      </GovernanceHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <GovernanceHostProvider value={costsHost()}>
+      <CostsPage />
+    </GovernanceHostProvider>,
   );
 }
 

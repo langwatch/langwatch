@@ -1,4 +1,3 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import {
   applyLangyTurnEvents,
   initialLangyTurnProjection,
@@ -11,6 +10,7 @@ import { nowInstant } from "@langwatch/time";
 import { create } from "zustand";
 
 import type { LangyStreamWireEntry } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 /**
  * The developer drawer's record of what actually crossed the wire — in BOTH directions,

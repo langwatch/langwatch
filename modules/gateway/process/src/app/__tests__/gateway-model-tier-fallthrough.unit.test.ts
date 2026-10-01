@@ -1,5 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/admin-routing-policies.feature
@@ -20,6 +21,7 @@ const noPlatformProviders = createApiFixture<ModelProviderApi>({
 const assembly = GatewayConfigAssemblyService.create({
   repository: PrismaGatewayScopeResolutionRepository.create({ database: {} as never }),
   platformProviders: noPlatformProviders,
+  projects: createApiFixture<ProjectApi>(),
 });
 
 describe("given a routing policy that names a target for a tier", () => {

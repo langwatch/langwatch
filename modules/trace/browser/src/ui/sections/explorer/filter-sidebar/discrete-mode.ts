@@ -1,5 +1,4 @@
-import type { RangeSectionData } from "@langwatch/trace-browser-kit";
-
+import type { RangeSectionData } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import type { NumericMode } from "../../../../behavior/numeric-mode.store.ts";
 
 /**

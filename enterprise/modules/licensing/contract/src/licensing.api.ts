@@ -1,5 +1,5 @@
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   ActivationCodePage,

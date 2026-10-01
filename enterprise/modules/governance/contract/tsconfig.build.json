@@ -40,10 +40,10 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
+      "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/otlp/tsconfig.build.json"

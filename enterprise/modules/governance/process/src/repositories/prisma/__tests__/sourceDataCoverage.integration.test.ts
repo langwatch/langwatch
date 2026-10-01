@@ -31,8 +31,7 @@ import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
-import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
+import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -116,16 +115,14 @@ describe("given a source that has been unhealthy since its last successful pull"
   describe("when a viewer looks at a day after that last successful pull", () => {
     /** @scenario "A day with no data is shown as unknown, never as zero" */
     it("reports the day as uncovered with no spend figure at all", async () => {
-      const service = ActivityMonitorService.create(
-        PrismaActivityMonitorRepository.create({
-          prisma,
-          clickhouse: {
-            getClient: async () => {
-              throw new Error("source coverage reads no ClickHouse");
-            },
+      const service = createActivityMonitorTestService({
+        prisma,
+        clickhouse: {
+          getClient: async () => {
+            throw new Error("source coverage reads no ClickHouse");
           },
-        }),
-      );
+        },
+      });
 
       const coverage = await service.sourceDataCoverage({
         organizationId: organization.id,
@@ -154,16 +151,14 @@ describe("given a source that has been unhealthy since its last successful pull"
     });
 
     it("still covers the days the last successful pull reached", async () => {
-      const service = ActivityMonitorService.create(
-        PrismaActivityMonitorRepository.create({
-          prisma,
-          clickhouse: {
-            getClient: async () => {
-              throw new Error("source coverage reads no ClickHouse");
-            },
+      const service = createActivityMonitorTestService({
+        prisma,
+        clickhouse: {
+          getClient: async () => {
+            throw new Error("source coverage reads no ClickHouse");
           },
-        }),
-      );
+        },
+      });
 
       const coverage = await service.sourceDataCoverage({
         organizationId: organization.id,
@@ -198,16 +193,14 @@ describe("given a source whose runs are succeeding", () => {
           status: "active",
         },
       });
-      const service = ActivityMonitorService.create(
-        PrismaActivityMonitorRepository.create({
-          prisma,
-          clickhouse: {
-            getClient: async () => {
-              throw new Error("source coverage reads no ClickHouse");
-            },
+      const service = createActivityMonitorTestService({
+        prisma,
+        clickhouse: {
+          getClient: async () => {
+            throw new Error("source coverage reads no ClickHouse");
           },
-        }),
-      );
+        },
+      });
 
       const coverage = await service.sourceDataCoverage({
         organizationId: organization.id,

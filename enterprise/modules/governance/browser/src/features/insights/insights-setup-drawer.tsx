@@ -14,8 +14,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
-import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
+import { allModelOptions, LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
 import { UserRoundCog } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 

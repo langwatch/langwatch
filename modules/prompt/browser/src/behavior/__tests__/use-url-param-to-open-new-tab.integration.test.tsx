@@ -35,6 +35,13 @@ vi.mock("../prompt-api.ts", () => ({
     }),
   },
 }));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      prompts: { getByIdOrHandle: { fetch: vi.fn() } },
+    }),
+  },
+}));
 
 function memoryStorage(): PromptBrowserStorage {
   const entries = new Map<string, string>();

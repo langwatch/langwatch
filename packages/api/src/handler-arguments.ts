@@ -1,5 +1,4 @@
-import type { Actor } from "@langwatch/actor";
-import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
+import type { Actor, AuthzDeclaredScopeId } from "@langwatch/authorization";
 
 /** Trusted arguments handed to a governed feature handler after policy runs. */
 export type ApiHandlerArguments<Input, App> = Readonly<{

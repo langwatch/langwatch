@@ -3,24 +3,25 @@ import type {
   EvaluationProcessingEvent,
 } from "@langwatch/evaluation-contract";
 import type { Command } from "@langwatch/eventing";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import type { TraceApi } from "@langwatch/trace-contract";
 
-import {
-  type EvaluationExecutionIntent,
-  type ExecuteEvaluationCommandDeps,
-} from "../app/evaluation.members.ts";
+import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
 import {
   EvaluationExecutionPreparationService,
   type EvaluationPreparationResult,
 } from "./evaluation-execution-preparation.service.ts";
+import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
+import type { EvaluationInputsOffload } from "./evaluation-inputs-offload.service.ts";
 import { EvaluationReportedEventService } from "./evaluation-reported-event.service.ts";
-export type { ExecuteEvaluationCommandDeps } from "../app/evaluation.members.ts";
+import type { EvaluationSettingsRecoverySwitchService } from "./evaluation-settings-recovery-switch.service.ts";
 
 const logger = createLogger("langwatch:evaluation-processing:execute-evaluation");
 
 /** Coordinates preparation, external evaluation, and the reported event. */
-export class EvaluationExecutionIntentService implements EvaluationExecutionIntent {
+export class EvaluationExecutionIntentService {
   static create(deps: ExecuteEvaluationCommandDeps): EvaluationExecutionIntentService {
     const reportedEvents = EvaluationReportedEventService.create(deps.inputsOffload);
 
@@ -84,3 +85,13 @@ export class EvaluationExecutionIntentService implements EvaluationExecutionInte
 }
 
 export { EvaluationExecutionIntentService as ExecuteEvaluationCommand };
+
+export interface ExecuteEvaluationCommandDeps {
+  /** Throws `MonitorNotFoundError` when the monitor was deleted after the command was queued. */
+  monitors: Pick<MonitorApi, "getById">;
+  traces: Pick<TraceApi, "getEvaluationSpans" | "getEvaluationEvents">;
+  executionReceipt: Pick<EvaluationExecutionReceiptService, "execute">;
+  azureSafetyCredentials: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+  settingsRecovery: Pick<EvaluationSettingsRecoverySwitchService, "isDisabled">;
+  inputsOffload: EvaluationInputsOffload;
+}

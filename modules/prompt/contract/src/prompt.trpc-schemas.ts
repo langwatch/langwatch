@@ -6,10 +6,11 @@ import {
   inputsSchema,
   messageSchema,
   outputsSchema,
+  promptingTechniqueSchema,
   responseFormatSchema,
   runtimeParametersSchema,
 } from "./prompt.field-schemas.ts";
-import { promptingTechniqueSchema, promptScopeSchema } from "./prompt.ts";
+import { promptScopeSchema } from "./prompt.ts";
 import type { PromptTagAssignment, VersionedPrompt } from "./prompt.ts";
 
 /** One project, named by the surface that is reading it. */

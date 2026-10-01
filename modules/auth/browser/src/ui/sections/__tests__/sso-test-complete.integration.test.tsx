@@ -3,9 +3,9 @@
  * The screen a single sign-on test sign-in lands on; only the session and the
  * test-arrival read are stubbed. Spec: specs/identity/sso-activation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SsoTestArrivalStanding } from "@langwatch/identity-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 type SessionAnswer = { data: { user: { email: string | null } } | null };
@@ -40,12 +40,7 @@ vi.mock("../../../behavior/auth-client.tsx", () => ({
 
 import SsoTestComplete from "../sso-test-complete-screen.tsx";
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SsoTestComplete />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<SsoTestComplete />);
 
 afterEach(() => {
   cleanup();

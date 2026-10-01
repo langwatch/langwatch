@@ -21,16 +21,21 @@
   "dependencies": {
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
-    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "emoji-picker-react": "^4.19.1",
     "lucide-react": "catalog:",
-    "react-hook-form": "catalog:"
+    "monaco-editor": "catalog:",
+    "monacopilot": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:"
   },
   "devDependencies": {
     "@chakra-ui/react": "catalog:",

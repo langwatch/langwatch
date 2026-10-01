@@ -1,7 +1,7 @@
+import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Main's cost breakdown reads over the memory twins. @see specs/governance/governance-cost-screen.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

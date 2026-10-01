@@ -1,10 +1,10 @@
-import type {
-  InstantEvalClickHouseMember,
-  InstantEvalClickHouseResolver,
-} from "../../app/instant-eval.members.ts";
 import type { InstantEvalRepositories } from "../instant-eval.repositories.ts";
 import { ClickHouseInstantEvalJudgmentsRepository } from "./clickhouse.instant-eval-judgments.repository.ts";
 import { ClickHouseInstantEvalRunRepository } from "./clickhouse.instant-eval-run.repository.ts";
+import type {
+  InstantEvalClickHouseMember,
+  InstantEvalClickHouseResolver,
+} from "./clickhouse.instant-eval-session.store.ts";
 import { ClickHouseInstantEvalSession } from "./clickhouse.instant-eval-session.store.ts";
 
 /**

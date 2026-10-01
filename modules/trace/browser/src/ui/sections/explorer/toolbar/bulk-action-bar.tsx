@@ -2,13 +2,15 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { SelectionActionBar } from "@langwatch/design-system/selection-action-bar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { traceContextChip, useLangyStore } from "@langwatch/langy-browser-kit";
-import { SELECT_ALL_MATCHING_CAP, useSelectionStore } from "@langwatch/trace-browser-kit";
 import { Database, Download, Pencil, Sparkles } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
 
+import { useSelectionStore } from "../../../../behavior/explorer.store.ts";
+import { traceContextChip } from "../../../../behavior/langy/langy-context-chips.ts";
+import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
+import { SELECT_ALL_MATCHING_CAP } from "../../../../behavior/selection.slice.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { PersonalFeatureGateDialog } from "../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../me/use-personal-feature-gate.ts";

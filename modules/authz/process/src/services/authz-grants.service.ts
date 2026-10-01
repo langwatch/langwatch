@@ -3,7 +3,7 @@
  * grants. Every mutation validates against the registry/tenancy and bumps the org's authz
  * epoch so caches and passports die on the caller's next request.
  */
-import { toLedgerActor, type Actor, type LedgerActor } from "@langwatch/actor";
+import { toLedgerActor, type Actor, type LedgerActor } from "@langwatch/authorization";
 import {
   AuthzGrantsService as AuthzGrantsServiceContract,
   DuplicateGrantError,

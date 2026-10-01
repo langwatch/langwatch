@@ -1,6 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import {
@@ -10,6 +9,7 @@ import {
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { UserApi } from "@langwatch/user-contract";
 import Redis, { type Redis as RedisClient } from "ioredis";
@@ -73,11 +73,10 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         user: { findUnique: async () => null },
         session: { update: async () => ({}) },
       }),
-      adminEmails: [],
+      authz: createApiFixture<AuthzApi>(),
       audit: { record: async () => undefined },
       auditLog: createApiFixture<AuditLogApi>(),
       users: {} as UserApi,
-      auth: createApiFixture<AuthApi>(),
       redis,
       queuePayloads: new NoopQueuePayloadDecoder(),
       scheduler: {

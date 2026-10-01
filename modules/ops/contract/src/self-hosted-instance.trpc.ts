@@ -1,6 +1,6 @@
 /** The registry of self-hosted installs (ADR-156 §10), as the Backoffice
  * reads it. Read only: an install reported every number here. */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   listSelfHostedInstancesInputSchema,

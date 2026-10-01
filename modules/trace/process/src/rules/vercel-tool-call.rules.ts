@@ -2,6 +2,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 import { type ExtractorContext, takeAttribute } from "./canonical-attributes.rules.ts";
 import { isNonEmptyString } from "./canonical-guard.rules.ts";
+import { stringifyToolPayload } from "./gemini-content.rules.ts";
 
 const VERCEL_RULE_PREFIX = "vercel";
 
@@ -48,19 +49,5 @@ export function canonicaliseVercelToolCall(ctx: ExtractorContext): void {
     ctx.setAttrIfAbsent(ATTR_KEYS.LANGWATCH_OUTPUT, result);
     ctx.setAttrIfAbsent(ATTR_KEYS.GEN_AI_TOOL_CALL_RESULT, result);
     ctx.recordRule(`${VERCEL_RULE_PREFIX}:ai.toolCall.result->output`);
-  }
-}
-
-export function stringifyToolPayload(raw: unknown): string | null {
-  if (raw === void 0 || raw === null) {
-    return null;
-  }
-  if (typeof raw === "string") {
-    return raw.length > 0 ? raw : null;
-  }
-  try {
-    return JSON.stringify(raw);
-  } catch {
-    return null;
   }
 }

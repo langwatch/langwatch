@@ -15,7 +15,7 @@ const free: Plan = {
   prices: { USD: 0, EUR: 0 },
 };
 
-describe("EntitlementApp.resolvePlanNextStep", () => {
+describe("EntitlementModule.resolvePlanNextStep", () => {
   /** @scenario "A peer asks the entitlement capability for the next step" */
   it("names the rung the self-serve catalogue sells above a paid tiered plan", async () => {
     const app = createEntitlementTestApp({

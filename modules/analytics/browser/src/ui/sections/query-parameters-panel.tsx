@@ -21,13 +21,14 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { FieldTypeSelect, VariableTypeIcon } from "@langwatch/prompt-browser-kit";
 import { Plus, Trash2 } from "lucide-react";
 
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "../../model/dashboard-widget-definition.ts";
+import { FieldTypeSelect } from "./prompt/variables/variable-type/field-type-select.tsx";
+import { VariableTypeIcon } from "./prompt/variables/variable-type/variable-type-icon.tsx";
 
 /** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
 type FieldTypeOption = { value: string; label: string };

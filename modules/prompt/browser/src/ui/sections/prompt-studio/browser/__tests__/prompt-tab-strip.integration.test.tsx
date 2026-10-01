@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type Tab, useIsOverflowing, useTabId } from "../../studio-internals.ts";
@@ -48,21 +48,19 @@ const TABS = [tabNamed("summarizer"), tabNamed("classifier")];
 function renderStrip({ isStripOverflowing }: { isStripOverflowing: boolean }) {
   overflowOf.mockReturnValue(isStripOverflowing);
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
-        <DraggableTabsBrowser.Window windowId="window-1" activeTabId="summarizer">
-          <DraggableTabsBrowser.TabBar tabIds={TABS.map((tab) => tab.id)}>
-            <PromptTabStrip
-              tabs={TABS}
-              activeTabId="summarizer"
-              isActiveWindow
-              onSelectTab={vi.fn()}
-            />
-          </DraggableTabsBrowser.TabBar>
-        </DraggableTabsBrowser.Window>
-      </DraggableTabsBrowser.Root>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <DraggableTabsBrowser.Root onTabMove={vi.fn()}>
+      <DraggableTabsBrowser.Window windowId="window-1" activeTabId="summarizer">
+        <DraggableTabsBrowser.TabBar tabIds={TABS.map((tab) => tab.id)}>
+          <PromptTabStrip
+            tabs={TABS}
+            activeTabId="summarizer"
+            isActiveWindow
+            onSelectTab={vi.fn()}
+          />
+        </DraggableTabsBrowser.TabBar>
+      </DraggableTabsBrowser.Window>
+    </DraggableTabsBrowser.Root>,
   );
 }
 

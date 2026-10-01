@@ -1,11 +1,12 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
-import { createRestRuntime, type RestIdentity } from "../runtime.ts";
+import { createRestRuntime } from "../runtime.ts";
+import type { RestIdentity } from "../../hosting/api-door.ts";
 
 interface WidgetApi {
   act(input: object): Promise<{ ok: boolean }>;

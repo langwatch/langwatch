@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { ContractTerms } from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
@@ -11,10 +11,11 @@ import type { SeatRetentionRules } from "../../services/billing-subscription-lif
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
 import { StripeWebhookSignatureService } from "../../services/stripe-webhook-signature.service.ts";
 import type { UsageWarningService } from "../../services/usage-warning.service.ts";
-import { type ConnectedBillingPeers, BillingApp } from "../billing.app.ts";
+import { type ConnectedBillingPeers, BillingModule } from "../billing.app.ts";
 
 const ACME = "org-acme";
 const STAFF = { id: "user-operator", email: "ops@langwatch.example" };
+const VIEWER = { id: "user-viewer", email: "view@langwatch.example" };
 const CUSTOMER_ADMIN = { id: "user-customer", email: "admin@acme.example" };
 
 /** The license registry as billing reads it: terms agreed at a fixed commit. */
@@ -51,7 +52,14 @@ function licensedAt(commitUsdCents: number) {
         },
       ],
     }),
-    operators: { isAdmin: ({ email }) => email === STAFF.email },
+    authorization: {
+      can: async ({ principal, permission, scope }) =>
+        principal.type === "user" &&
+        scope.type === "platform" &&
+        ((principal.id === STAFF.id &&
+          (permission === "ops:manage" || permission === "ops:view")) ||
+          (principal.id === VIEWER.id && permission === "ops:view")),
+    },
     auditLog: createApiFixture<ConnectedBillingPeers["auditLog"]>({
       record: async (command) => {
         audited.push(command);
@@ -79,7 +87,7 @@ function billingApp({
 }) {
   const registry = licensedAt(commitUsdCents);
   const repositories = MemoryBillingRepositories.create();
-  const app = BillingApp.assemble({
+  const app = BillingModule.assemble({
     usageWarnings: createApiFixture<UsageWarningService>({}),
     resourceLimitAlerts: createApiFixture<ResourceLimitAlertService>({}),
     members: { isSaas, nodeEnvironment: "test" },
@@ -170,7 +178,7 @@ describe("the installed billing application", () => {
   });
 
   describe("given the backoffice", () => {
-    it("answers a caller off the staff list not found, saying nothing about why", async () => {
+    it("answers a caller without the platform-operator grant not found, saying nothing about why", async () => {
       const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
 
       await expect(
@@ -208,6 +216,37 @@ describe("the installed billing application", () => {
           },
         ],
       });
+    });
+
+    /** @scenario "A view-only operator reads the billing overview but is refused on every billing write" */
+    it("lets a view-only operator read the overview and refuses every write", async () => {
+      const { app } = billingApp({ isSaas: true, stripeSecretKey: "sk_test_unused" });
+      const refused = { code: "not_found" };
+
+      await expect(
+        app.getConnectedBillingOverview({ organizationId: ACME }, VIEWER),
+      ).resolves.toMatchObject({ account: null });
+      await expect(
+        app.onboardConnectedCustomer(
+          {
+            ...renewal(100_00),
+            organizationName: "Acme",
+            billingEmail: "finance@acme.example",
+            bankTransfer: null,
+          },
+          VIEWER,
+        ),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        app.addConnectedCommit({ organizationId: ACME, amountUsdCents: 100 }, VIEWER),
+      ).rejects.toMatchObject(refused);
+      await expect(app.renewConnectedTerm(renewal(100_00), VIEWER)).rejects.toMatchObject(refused);
+      await expect(
+        app.completeConnectedRenewalIfDue({ organizationId: ACME }, VIEWER),
+      ).rejects.toMatchObject(refused);
+      await expect(
+        app.markConnectedInvoicePaidOutOfBand({ stripeInvoiceId: "in_1" }, VIEWER),
+      ).rejects.toMatchObject(refused);
     });
 
     it("records who read a customer's billing, as main's backoffice did", async () => {
@@ -268,16 +307,22 @@ describe("the subscription plan billing answers entitlement", () => {
     await expect(
       app.getActiveSubscriptionPlan({
         organizationId: ACME,
-        user: { ...CUSTOMER_ADMIN, impersonator: { email: STAFF.email } },
+        user: { ...CUSTOMER_ADMIN, impersonator: { id: STAFF.id, email: STAFF.email } },
       }),
     ).resolves.toMatchObject({ type: "LAUNCH", free: false, overrideAddingLimitations: true });
+    await expect(
+      app.getActiveSubscriptionPlan({
+        organizationId: ACME,
+        user: { ...CUSTOMER_ADMIN, impersonator: { id: VIEWER.id, email: VIEWER.email } },
+      }),
+    ).resolves.toMatchObject({ overrideAddingLimitations: true });
     await expect(
       app.getActiveSubscriptionPlan({ organizationId: ACME, user: CUSTOMER_ADMIN }),
     ).resolves.toMatchObject({ type: "LAUNCH", overrideAddingLimitations: false });
   });
 });
 
-describe("the Stripe callback BillingApp answers", () => {
+describe("the Stripe callback BillingModule answers", () => {
   const payload = JSON.stringify({
     id: "evt_1",
     object: "event",
@@ -332,7 +377,7 @@ describe("the Stripe callback BillingApp answers", () => {
   });
 });
 
-describe("the currency BillingApp detects", () => {
+describe("the currency BillingModule detects", () => {
   describe("given LangWatch Cloud", () => {
     /** @scenario "LangWatch Cloud detects the currency a reader's prices are shown in" */
     it("answers from the request, falling back when nothing names a country", () => {
@@ -354,7 +399,7 @@ describe("the currency BillingApp detects", () => {
   });
 });
 
-describe("the subscription door BillingApp serves", () => {
+describe("the subscription door BillingModule serves", () => {
   describe("given a deployment that composed no subscription door", () => {
     it("answers not found, as main mounted no subscription router there", async () => {
       const { app } = billingApp({ isSaas: false, stripeSecretKey: undefined });

@@ -1,8 +1,8 @@
-import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, type ModuleSecretsScope, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
 
-import { rumServer } from "../../rum.server.ts";
+import { rumProcessModule } from "../../rum.module.ts";
 
 export const COLLECTOR_ENDPOINT = "http://collector.test:4318";
 export const TELEMETRY_ENDPOINT = "http://telemetry-collector.test:4318";
@@ -42,7 +42,7 @@ export function rumInstallation({
   logger?: ReturnType<typeof createTestLogger>["logger"];
 }>) {
   return createApp({ role: "api", secrets: collectorSecrets(collectorHeaders) })
-    .withModules([withMemoryRepositories(rumServer)])
+    .withModules([withMemoryRepositories(rumProcessModule)])
     .withConfig({
       rum: { enabled: false, sampleRatio: 1, collectorEndpoint, telemetryEndpoint },
     })

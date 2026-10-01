@@ -256,6 +256,10 @@ export class TestAuthzApi implements AuthzApi {
   createGrant = unsupported<AuthzApi["createGrant"]>("createGrant");
   changeGrantRole = unsupported<AuthzApi["changeGrantRole"]>("changeGrantRole");
   revokeGrant = unsupported<AuthzApi["revokeGrant"]>("revokeGrant");
+  grantPlatformOperator = unsupported<AuthzApi["grantPlatformOperator"]>("grantPlatformOperator");
+  revokePlatformOperator =
+    unsupported<AuthzApi["revokePlatformOperator"]>("revokePlatformOperator");
+  listPlatformOperators = unsupported<AuthzApi["listPlatformOperators"]>("listPlatformOperators");
   findPermissionsBeyondCaller = unsupported<AuthzApi["findPermissionsBeyondCaller"]>(
     "findPermissionsBeyondCaller",
   );

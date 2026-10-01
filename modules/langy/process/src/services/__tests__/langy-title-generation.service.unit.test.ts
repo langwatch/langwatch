@@ -1,15 +1,15 @@
-/**
- * @vitest-environment node
- * A retry-fixable generation failure must reach the outbox, not vanish silently.
- * @see specs/langy/langy-conversation-title.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
   ModelNotConfiguredError,
   type ModelProviderApi,
   type ModelProviderResolution,
 } from "@langwatch/model-provider-contract";
+/**
+ * @vitest-environment node
+ * A retry-fixable generation failure must reach the outbox, not vanish silently.
+ * @see specs/langy/langy-conversation-title.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";

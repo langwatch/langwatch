@@ -1,8 +1,8 @@
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 
 import { useScenarioHost } from "../../model/scenario-host.ts";
-import { useFeatureFlag } from "../use-feature-flag.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 export const AGENT_TESTING_FLAG = "release_ui_agent_testing_v2_enabled";
 export const AGENT_TESTING_PERMISSION = "scenarios:view";

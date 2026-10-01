@@ -5,6 +5,7 @@ export * from "./api-key.api.ts";
 export * from "./api-key.tokens.ts";
 export * from "./api-key.visibility.ts";
 export * from "./api-key.names.ts";
+export * from "./api-key.run-key.ts";
 export * from "./api-key.responses.ts";
 export * from "./api-key.revocation-cause.ts";
 export * from "./api-key.permissions.ts";

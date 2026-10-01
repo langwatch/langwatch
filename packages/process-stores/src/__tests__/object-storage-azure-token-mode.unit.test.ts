@@ -5,7 +5,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { storesOwner, type StoresConfig } from "../config-owner.ts";
-import { openProcessStores } from "../open-stores.ts";
+import { openStores } from "../open-stores.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
 
 const baseConfig: StoresConfig = {
@@ -54,7 +54,7 @@ async function objectStorageFor(options: { production: boolean; azure?: Partial<
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: { DATABASE_URL: UNREACHED_DATABASE } }).withEnv(),
   );
-  const { members } = await openProcessStores({
+  const { members } = await openStores({
     name: "azure-token-mode-test",
     config,
     secrets: resolver.scopeTo(storesOwner.name, Object.values(storesOwner.secrets)),

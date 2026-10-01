@@ -1,5 +1,5 @@
-import { Tooltip } from "@chakra-ui/react";
 import { Icon } from "@langwatch/design-system/primitives";
+import { RawTooltip as Tooltip } from "@langwatch/design-system/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
 export function OrganizationBadge() {

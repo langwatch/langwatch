@@ -1,13 +1,13 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { TraceSummaryData, TraceProcessingEvent } from "@langwatch/trace-contract";
 
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 
 const logger = createLogger("langwatch:trace-processing:trace-update-broadcast");
 
 export interface TraceUpdateBroadcastSubscriberDeps {
-  broadcast: TraceTenantBroadcast;
+  broadcast: Pick<PresenceApi, "publishProjectEvent">;
 }
 
 /**
@@ -34,10 +34,10 @@ export function createTraceUpdateBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant({
-        tenantId,
+      await deps.broadcast.publishProjectEvent({
+        projectId: tenantId,
+        channel: "trace_updated",
         event: payload,
-        eventType: "trace_updated",
       });
 
       logger.debug({ tenantId, traceId }, "Broadcasted trace update");

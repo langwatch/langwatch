@@ -1,18 +1,16 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { type LedgerActor, SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AuthzApi,
   type AuthzListTeamMemberBindingsInput,
   type AuthzTeamMemberBinding,
   type AuthzAccessBreakdownOutput,
   type AuthzGrantCaller,
-  type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { IdentityApi } from "@langwatch/identity-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { NotificationService } from "@langwatch/notification-contract";
 import type {
   GuidedOnboardingRecord,
@@ -110,6 +108,7 @@ import {
   type GroupListItem,
   type GroupMembershipView,
   type TeamWithProjects,
+  type OrganizationDirectoryCounts,
   type OrganizationMemberProvenance,
   type OrganizationGroupService,
   type OrganizationFounding,
@@ -119,6 +118,7 @@ import {
   type ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
@@ -256,7 +256,7 @@ type OrganizationMembers = MembersRead<readonly ["prisma", "encryption", "logger
   }>;
 
 type OrganizationSetup = FeatureSetup<
-  typeof ServerOrganizationApp.dependencies,
+  typeof OrganizationModule.dependencies,
   OrganizationMembers,
   undefined,
   OrganizationRepositories
@@ -296,6 +296,11 @@ export type OrganizationInfrastructure = Readonly<{
 /** The page size the two project lookups read an organization at. */
 const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 
+/** What a team read says of one project: its name and address, never its keys. */
+function teamProjectOf({ id, name, slug }: { id: string; name: string; slug: string }) {
+  return { id, name, slug };
+}
+
 /** The page size the group list is read at. */
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
 
@@ -304,7 +309,7 @@ const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
  * and {@link TeamManagementApi} explicitly, so a `/api/teams` member this
  * class doesn't serve fails the build instead of throwing at request time.
  */
-export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi {
+export class OrganizationModule implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -340,9 +345,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   static readonly secrets = { internalSlackSignupsWebhook } as const;
   #dependencies: ServerOrganizationAppDependencies;
 
-  static async create(setup: OrganizationSetup): Promise<ServerOrganizationApp> {
+  static async create(setup: OrganizationSetup): Promise<OrganizationModule> {
     const signupAnnouncements = await setup.secrets.into(
-      ServerOrganizationApp.secrets.internalSlackSignupsWebhook,
+      OrganizationModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -408,7 +413,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       organizations,
       projects: setup.dependencies.projects,
     });
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       organizations,
       membership,
       groups,
@@ -490,9 +495,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     /** Defaults to a reader that finds no organizations. */
     scopeGraph?: OrganizationScopeGraphReader;
     memberProvenance: MemberProvenanceService;
-  }): ServerOrganizationApp {
+  }): OrganizationModule {
     const { groups, ...dependencies } = setup.dependencies;
-    const application = new ServerOrganizationApp({
+    const application = new OrganizationModule({
       ...dependencies,
       groups:
         groups ??
@@ -895,7 +900,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Readonly<{
       organizationId: string;
       userId: string;
-      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+      admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
   ): Promise<"created" | "already-present"> {
     return this.#dependencies.membership.createMembership(input);
@@ -1669,6 +1674,30 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.getAuditLogs(input);
   }
 
+  /** The Directory's tab badges: each a count, so no tab's list is read to number it. */
+  async getDirectoryCounts(
+    input: Readonly<{ organizationId: string }>,
+  ): Promise<OrganizationDirectoryCounts> {
+    const { organizationId } = input;
+    const [members, invites, requests, groups, teams] = await Promise.all([
+      this.listMembers({ organizationId, includeDisabled: true, limit: 1 }),
+      this.listPendingInvitations({ organizationId }),
+      this.listPendingJoinRequests({ organizationId }),
+      this.listGroups({ organizationId, page: 1, limit: 1 }),
+      this.listTeams({ organizationId, page: 1, limit: 1 }),
+    ]);
+
+    return {
+      members: members.totalCount,
+      openInvites: invites.filter(
+        ({ displayStatus }) => displayStatus === "PENDING" || displayStatus === "EXPIRED",
+      ).length,
+      joinRequests: requests.length,
+      groups: groups.pagination.total,
+      teams: teams.pagination.total,
+    };
+  }
+
   // -- the team doors --------------------------------------------------------
 
   /** Every team the caller can see, each with the projects that sit in it. */
@@ -1687,8 +1716,8 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
 
     return teams.map((team) => ({
       ...team,
-      projects: projects.data.filter((project) => project.teamId === team.id),
-    })) as TeamWithProjects[];
+      projects: projects.data.filter((project) => project.teamId === team.id).map(teamProjectOf),
+    }));
   }
 
   /** The access matrix an administrator edits: who holds what, and through what. */
@@ -1717,7 +1746,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
       teamId: team.id,
     });
 
-    return { ...team, projects } as TeamWithProjects;
+    return { ...team, projects: projects.map(teamProjectOf) };
   }
 
   async updateTeamMembers(

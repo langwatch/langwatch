@@ -142,7 +142,7 @@ type AutomationInfrastructureInput = Readonly<{
 export type AutomationComposedInfrastructure = AutomationInfrastructure &
   Readonly<{ delivery: AutomationNotificationDelivery; emailCaps: AutomationEmailCapService }>;
 
-/** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
+/** Builds the {@link AutomationInfrastructure} `AutomationModule.create` composes over. */
 export function buildAutomationInfrastructure(
   input: AutomationInfrastructureInput,
 ): AutomationComposedInfrastructure {

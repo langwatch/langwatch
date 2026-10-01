@@ -1,15 +1,17 @@
-// Annotation rail: existence, placement, init, typed content survives
-// virtualizer unmount.
-// @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type {
   UiAnnotateBodyProps,
   UiAnnotationFormFooterProps,
   UiSuggestBodyProps,
 } from "@langwatch/browser-host/declarations";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+// Annotation rail: existence, placement, init, typed content survives
+// virtualizer unmount.
+// @vitest-environment jsdom
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import { MemoryRouterWrapper } from "../../../hooks/__tests__/memory-router-wrapper.tsx";
 import "@testing-library/jest-dom/vitest";
 
 type MutationOptions = { onSuccess?: () => void; onError?: () => void };
@@ -179,9 +181,11 @@ vi.mock("../chat-turn-row.tsx", () => ({
   ),
 }));
 
-import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
-
 import { useAnnotationDraftStore } from "../../../../../../behavior/annotation-draft.store.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../../behavior/annotation-queue-session.store.ts";
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { AnnotatedTurnRow } from "../annotated-turn-row.tsx";
@@ -264,8 +268,8 @@ function renderRow({
   annotations = [] as AnnotationByTrace[],
   anchoredAnnotations = [] as AnnotationByTrace[],
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
+  return renderWithDesignSystem(
+    <MemoryRouterWrapper>
       <AnnotatedTurnRow
         parsed={parsedTurn()}
         index={1}
@@ -277,7 +281,7 @@ function renderRow({
         isRailActive={isRailActive}
         railLayout={railLayout}
       />
-    </ChakraProvider>,
+    </MemoryRouterWrapper>,
   );
 }
 

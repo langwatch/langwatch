@@ -33,9 +33,7 @@ export function ReplayProgressDrawer({ open, onClose }: { open: boolean; onClose
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
 
-  const statusQuery = useReplayStatus({
-    refetchInterval: open ? 1000 : false,
-  });
+  const statusQuery = useReplayStatus();
 
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => void statusQuery.refetch(),

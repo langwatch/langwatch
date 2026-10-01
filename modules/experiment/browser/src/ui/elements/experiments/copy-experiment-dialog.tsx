@@ -9,8 +9,9 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useState } from "react";
+
+import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 
 export const CopyExperimentDialog = ({
   open,

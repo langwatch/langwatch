@@ -15,8 +15,8 @@
  * Spec: specs/data-privacy/privacy-rule-drawer-url.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -119,12 +119,10 @@ class TestPrivacyHost extends DataPrivacyHostApi {
 }
 
 function renderScreen(host: TestPrivacyHost) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DataPrivacyHostProvider value={host}>
-        <DataPrivacyScreen />
-      </DataPrivacyHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <DataPrivacyHostProvider value={host}>
+      <DataPrivacyScreen />
+    </DataPrivacyHostProvider>,
   );
 }
 

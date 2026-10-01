@@ -8,19 +8,24 @@ import {
   type AuthzScopeLineageResult,
   type PermissionDecision,
 } from "@langwatch/authorization";
-import type {
-  FeatureTrpcHost,
-  FeatureTrpcMountOptions,
-  MountableTransport,
-} from "@langwatch/kernel";
-import type { TrpcContract, TrpcContractKind } from "@langwatch/kernel/contract";
+import {
+  SCHEMA_HASH_HEADER,
+  schemaHashOf,
+  type TrpcContract,
+  type TrpcContractKind,
+  type TrpcContractMember,
+} from "@langwatch/module";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
 import type { Authorize, Entitlements } from "../access/access.ts";
+import type {
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+} from "../hosting/transport-hosts.ts";
 import type { RateLimiter } from "../ports.ts";
-import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
 import {
   createTrpcRuntimePolicy,
@@ -41,14 +46,10 @@ import {
   type TrpcRouterDeclaration,
   type TrpcRuntimeMembers,
 } from "./runtime.ts";
-import {
-  contentEtag,
-  holdsEtag,
-  SESSION_VERSION_HEADER,
-  trpcRequestPaths,
-  type TrpcSessionVersions,
-} from "./session-version.ts";
+import { SESSION_VERSION_HEADER } from "./session-version.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
+import type { SessionCaller, SessionReader } from "../hosting/session-reader.ts";
+import type { TrpcAuditSink, TrpcSessionVersions } from "../hosting/api-door.ts";
 
 /** The signed-in person, as the procedures that render one read it. */
 export type TrpcSessionUser = Readonly<{
@@ -91,18 +92,6 @@ export type TrpcRequestContext = {
 /** Whatever this root made of one declared namespace. */
 export type TrpcNamespace = unknown;
 
-/** One mutation on the deployment's trail, as this transport leaves it. */
-export type TrpcAuditSink = Readonly<{
-  record(entry: {
-    userId: string;
-    organizationId?: string;
-    projectId?: string;
-    action: string;
-    args?: unknown;
-    error?: Error;
-  }): Promise<void> | void;
-}>;
-
 /** This transport's own refusal copy: the two answers the declared check gives. */
 const DENIALS: TrpcAuthorizationDenial = {
   membershipDisabled: () => new MembershipDisabledError(),
@@ -134,7 +123,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       | undefined;
     /** What the process knows about a caller on every namespace at once. */
     facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
-    /** The caller's session version (ADR-164). Absent, answers carry no version and no tag. */
+    /** The caller's session version (ADR-170). Absent, answers carry no version and no tag. */
     sessionVersions?: TrpcSessionVersions | undefined;
     /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
@@ -149,11 +138,13 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   readonly #namespaces: Record<string, TrpcNamespace> = {};
   /** Each mounted procedure's declared kind, by its dotted path. */
   readonly #procedureKinds = new Map<string, TrpcContractKind>();
-  /** The session and reference reads, which revalidate by a content ETag (ADR-164). */
-  readonly #revalidatedPaths = new Set<string>();
+  /** Each mounted query's declaration, by its dotted path; its schema hash is read from it. */
+  readonly #queries = new Map<string, TrpcContractMember>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
   /** One request's decisions, by the request itself: never shared with the next one. */
   readonly #decisions = new WeakMap<TrpcRequestLike, Authorize>();
+  /** One request's session version, by its context: read once however often it is asked. */
+  readonly #sessionVersionReads = new WeakMap<TrpcRequestContext, Promise<number>>();
   #composed: AnyTRPCRouter | undefined;
 
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
@@ -225,19 +216,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     this.#namespaces[namespace] = mounted;
     for (const [name, member] of Object.entries(trpcDeclaration.contract.members)) {
       this.#procedureKinds.set(`${namespace}.${name}`, member.kind);
-      const tier = member.cache?.tier;
-      if (member.kind === "query" && (tier === "session" || tier === "reference")) {
-        this.#revalidatedPaths.add(`${namespace}.${name}`);
-      }
+      if (member.kind === "query") this.#queries.set(`${namespace}.${name}`, member);
     }
 
     return mounted;
   }
 
   /**
-   * The root over every namespace, composed on first read. Composing then
-   * rather than at each mount is what makes a batched call spanning two
-   * namespaces work: every namespace has mounted by the time anything asks.
+   * The root over every namespace, composed on first read: every namespace
+   * has mounted by the time anything asks.
    */
   get router(): AnyTRPCRouter {
     this.#composed ??= this.#runtime.router(this.#namespaces) as AnyTRPCRouter;
@@ -254,17 +241,30 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     return this.#procedureKinds.get(path);
   }
 
+  /** The schema hash header of the query at a dotted path; none for anything else. */
+  schemaHashHeaders(input: { path: string }): Readonly<Record<string, string>> {
+    const query = this.#queries.get(input.path);
+
+    return query ? { [SCHEMA_HASH_HEADER]: schemaHashOf(query) } : {};
+  }
+
   /** The caller's session version header; none for an anonymous caller or an unreadable store. */
   async sessionVersionHeaders(input: {
     context: () => Promise<TrpcRequestContext>;
   }): Promise<Readonly<Record<string, string>>> {
     const versions = this.#options.sessionVersions;
     if (!versions) return {};
-    const userId = await this.#userOf(input.context);
-    if (!userId) return {};
+    // A context that fails is the procedure's failure to answer, never the stamp's.
+    const context = await input.context().catch(() => void 0);
+    const userId = context?.tryActor()?.id;
+    if (!context || !userId) return {};
     try {
-      const version = await versions.getSessionVersion({ userId });
-      return { [SESSION_VERSION_HEADER]: String(version) };
+      let read = this.#sessionVersionReads.get(context);
+      if (!read) {
+        read = versions.getSessionVersion({ userId });
+        this.#sessionVersionReads.set(context, read);
+      }
+      return { [SESSION_VERSION_HEADER]: String(await read) };
     } catch (error) {
       this.#logger.warn(
         { error },
@@ -272,54 +272,6 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       );
       return {};
     }
-  }
-
-  /**
-   * Tags a 200 of one unbatched session or reference GET with a hash of its body, and
-   * answers 304 with no body when the browser already holds that body. A 304 hides
-   * nothing by construction: the body it stands for is byte-identical.
-   */
-  async revalidate(input: {
-    request: Request;
-    response: Response;
-    context: () => Promise<TrpcRequestContext>;
-  }): Promise<Response> {
-    const { request, response } = input;
-    if (response.status !== 200 || !this.#isRevalidatedRead(request)) return response;
-    // A streamed answer (application/jsonl) is never buffered to be hashed.
-    const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim();
-    if (mediaType !== "application/json") return response;
-    const userId = await this.#userOf(input.context);
-    if (!userId) return response;
-
-    // ponytail: hashes the computed body, so it saves transfer, not compute; a cheap source
-    // version (the projection's last event, max updatedAt) could skip the heaviest reads first,
-    // such as modelProvider.listAllForProjectForFrontend.
-    const body = new Uint8Array(await response.arrayBuffer());
-    const etag = contentEtag({ userId, body });
-    const headers = new Headers(response.headers);
-    headers.set("ETag", etag);
-    headers.set("Cache-Control", "private, no-cache");
-    headers.set("Vary", "Cookie");
-    if (!holdsEtag({ ifNoneMatch: request.headers.get("if-none-match"), etag })) {
-      return new Response(body, { status: 200, headers });
-    }
-    headers.delete("content-type");
-    headers.delete("content-length");
-    return new Response(null, { status: 304, headers });
-  }
-
-  /** One path, unbatched: a batch's body answers several reads, so one tag would mean several. */
-  #isRevalidatedRead(request: Request): boolean {
-    if (request.method !== "GET") return false;
-    const paths = trpcRequestPaths({ request, endpoint: TrpcHost.path });
-    return paths.length === 1 && paths.every((path) => this.#revalidatedPaths.has(path));
-  }
-
-  /** A context that fails is the procedure's failure to answer, never the stamp's. */
-  async #userOf(context: () => Promise<TrpcRequestContext>): Promise<string | undefined> {
-    const resolved = await context().catch(() => void 0);
-    return resolved?.tryActor()?.id;
   }
 
   /** One request, resolved into the context every procedure reads. */

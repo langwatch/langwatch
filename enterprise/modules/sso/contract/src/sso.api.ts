@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { BetterAuthOptions } from "better-auth";
 import type { GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 
@@ -48,7 +48,7 @@ import type {
 /**
  * The operator a back-office read or command is attributed to, as the request
  * boundary knows them. An operator debugging a customer account is still the
- * operator, so the impersonator is who the staff list is checked against.
+ * operator, so the impersonator is who the platform-operator grant is checked against.
  */
 export type SsoOperator = Readonly<{
   id: string;

@@ -2,7 +2,7 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { expandDeletedSpanIds } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 import { changedSpanFields } from "../../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
 import { useTraceEditOverlay } from "../../hooks/use-trace-edit-overlay.ts";
@@ -22,7 +22,7 @@ export function useCorrectionMarks(spans: SpanTreeNode[]): {
   const overlay = useTraceEditOverlay();
   const overlayView = useTraceEditStore((s) => s.overlayView);
   const basePatch = useTraceEditStore((s) => s.basePatch);
-  const isEditing = useDrawerStore((s) => s.isEditing);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
   // While editing, the correction the session builds on is the one that counts:
   // a row it already changed still reads as edited, so a second pass never looks
   // like it lost the first one. It is adopted a beat after editing starts, and

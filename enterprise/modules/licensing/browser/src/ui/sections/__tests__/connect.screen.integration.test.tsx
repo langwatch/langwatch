@@ -3,9 +3,9 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ConnectStatus } from "@langwatch/enterprise-licensing-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -75,11 +75,13 @@ function connected(overrides: Partial<Extract<ConnectStatus, { deployment: "on" 
 function renderScreen({ status, admin = true }: { status: ConnectStatus; admin?: boolean }) {
   answer.status = status;
   const Wrapper = ({ children }: { children: ReactNode }) => (
-    <ChakraProvider value={defaultSystem}>
-      <LicensingHostProvider value={new TestHost(admin)}>{children}</LicensingHostProvider>
-    </ChakraProvider>
+    <LicensingHostProvider value={new TestHost(admin)}>{children}</LicensingHostProvider>
   );
-  render(<ConnectScreen />, { wrapper: Wrapper });
+  renderWithDesignSystem(
+    <Wrapper>
+      <ConnectScreen />
+    </Wrapper>,
+  );
 }
 
 function switchOf(service: string): HTMLInputElement {

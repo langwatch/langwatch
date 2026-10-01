@@ -4,9 +4,13 @@
  * Always installed, so nothing here gates itself by tier or flag.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const governanceWeb = defineWebModule("governance")
+import { writeSampleChoice } from "./ui/elements/governance-sample-mode.ts";
+
+export const governanceWeb = defineBrowserModule("governance")
+  /** The sample-data choice onboarding's guided tour shows and hides. */
+  .withCapabilities({ sampleChoice: { setSampleChoice: writeSampleChoice } })
   .withHosts({
     requires: ["GovernanceHostApi"],
     mounts: {
@@ -75,5 +79,13 @@ export const governanceWeb = defineWebModule("governance")
     "pages/governance/users/[id]": {
       path: "/governance/users/:id",
       load: () => import("./ui/sections/governance/governance-user.screen.tsx"),
+    },
+  })
+  /** The agents page opens it by address: `?drawer.open=addAgent`. */
+  .withDrawers({
+    addAgent: {
+      load: async () => ({
+        default: (await import("./features/agents/register-agent-drawer.tsx")).RegisterAgentDrawer,
+      }),
     },
   });

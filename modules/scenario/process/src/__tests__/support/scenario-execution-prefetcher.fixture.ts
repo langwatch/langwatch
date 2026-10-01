@@ -1,5 +1,4 @@
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   ModelProviderInvalidError,
@@ -16,6 +15,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import {
   workflowDslSchema,
@@ -24,12 +24,13 @@ import {
   WorkflowNotFoundError,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
+import { vi } from "vitest";
 
+import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
-  type ScenarioSecretCipher,
-} from "../../index.ts";
+} from "../../services/scenario-execution-prefetcher.service.ts";
 import type { VoiceTargetReader } from "../../services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
 
@@ -137,10 +138,10 @@ export interface ScenarioPrefetchFixture {
    */
   modelProviders?: ModelProviderApi;
   voiceTargets?: VoiceTargetReader;
-  /** The project's organization; absent, no sandbox key is minted, as main skipped it. */
+  /** The project's organization; absent, it is "organization_1". */
   organizationId?: string;
-  /** The sandbox-key mint; unconfigured, a call refuses by name. */
-  apiKeys?: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+  /** The run-key mint; unconfigured, every key is "run-key". */
+  apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey">>;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -335,7 +336,7 @@ function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
 
 function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
   return createApiFixture<ProjectApi>({
-    findOrganizationId: async () => deps.organizationId,
+    findOrganizationId: async () => deps.organizationId ?? "organization_1",
     findById: async (projectId) => {
       const value = await deps.projectFetcher.findUnique(projectId);
       if (!value) return null;
@@ -445,12 +446,16 @@ export function createTestScenarioExecutionPrefetcherService(
     secrets: fakeService<SecretApi>({
       getValues: ({ projectId }: { projectId: string }) =>
         deps.projectSecretsFetcher.getSecrets(projectId),
+      list: async () => [],
     }),
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),
-    apiKeys: deps.apiKeys ?? createApiFixture<ApiKeyApi>({}),
+    apiKeys: createApiFixture<ApiKeyApi>({
+      mintRunKey: vi.fn().mockResolvedValue("run-key"),
+      ...deps.apiKeys,
+    }),
     voiceTargets: deps.voiceTargets ?? {
       getVoiceTarget: async ({ agentId }) => ({
         type: "voice",

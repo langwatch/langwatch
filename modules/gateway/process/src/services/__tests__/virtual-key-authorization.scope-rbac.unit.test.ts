@@ -1,10 +1,14 @@
+import type { AuthzPermission } from "@langwatch/authorization";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * The per-scope permission contract for virtual keys: what each scope demands
  * to create, operate on and see a key, and that no scope reaches across
  * organizations.
  * @see specs/ai-gateway/governance/vk-scope-rbac.feature
  */
-import type { AuthzPermission } from "@langwatch/authorization";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";
@@ -64,15 +68,45 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
     super();
     this.membership = membership;
   }
-  async findProjectTeam({ projectId }: { projectId: string }) {
-    const teamId = TEAM_OF_PROJECT[projectId];
-    return teamId ? { id: projectId, teamId } : null;
+  /** The organization feature's answers for this fake directory's one member. */
+  organizations(): Pick<OrganizationApi, "getMember" | "findMemberTeamIds"> {
+    return createApiFixture<OrganizationApi>({
+      getMember: async ({ organizationId, userId }) => {
+        if (!this.membership.role) throw new MemberNotFoundError(userId);
+        return {
+          userId,
+          organizationId,
+          role: this.membership.role,
+          disabledAt: null,
+          createdAt: nowInstant(),
+          updatedAt: nowInstant(),
+          user: { id: userId, name: null, email: null },
+          teams: [],
+        };
+      },
+      findMemberTeamIds: async () => this.membership.teamIds,
+    });
   }
-  async findOrganizationRole() {
-    return this.membership.role ? { role: this.membership.role } : null;
-  }
-  async findMemberTeamIds() {
-    return this.membership.teamIds;
+  /** The project feature's answers for the projects "acme" owns. */
+  projects(): Pick<ProjectApi, "findIdentity" | "listIdsByOrganization"> {
+    return createApiFixture<ProjectApi>({
+      findIdentity: async (id) => {
+        const teamId = TEAM_OF_PROJECT[id];
+        return teamId
+          ? {
+              id,
+              name: id,
+              slug: id,
+              teamId,
+              organizationId: "acme",
+              isPersonal: false,
+              ownerUserId: null,
+            }
+          : null;
+      },
+      listIdsByOrganization: async ({ organizationId }) =>
+        organizationId === "acme" ? Object.keys(TEAM_OF_PROJECT) : [],
+    });
   }
   async findProjectIdsForTeams({ teamIds }: { teamIds: string[] }) {
     return Object.entries(TEAM_OF_PROJECT)
@@ -88,15 +122,6 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
   }) {
     return organizationId === "acme" ? teamIds.filter((id) => id in ALL_TEAMS) : [];
   }
-  async findProjectIdsInOrganization({
-    organizationId,
-    projectIds,
-  }: {
-    organizationId: string;
-    projectIds: string[];
-  }) {
-    return organizationId === "acme" ? projectIds.filter((id) => id in TEAM_OF_PROJECT) : [];
-  }
   async findVirtualKeyScopes() {
     return null;
   }
@@ -106,7 +131,11 @@ class AcmeDirectory extends VirtualKeyAuthorizationRepository {
 }
 
 const service = (directory = new AcmeDirectory()) =>
-  VirtualKeyAuthorizationService.create({ directory });
+  VirtualKeyAuthorizationService.create({
+    directory,
+    organizations: directory.organizations(),
+    projects: directory.projects(),
+  });
 
 const manage = (at: Grant["at"], id: string): Grant => ({
   permission: "virtualKeys:manage",
@@ -208,7 +237,7 @@ describe("creating a key", () => {
 });
 
 describe("operating on an existing key", () => {
-  /** @scenario Deleting a VK requires virtualKeys:delete at one of the VK's scopes */
+  /** @scenario Deleting a VK requires virtualKeys:delete at every one of the VK's scopes */
   it("refuses a delete to a holder of view only", async () => {
     const ctx = sessionWith([{ permission: "virtualKeys:view", at: "team", id: "platform" }]);
 
@@ -221,11 +250,39 @@ describe("operating on an existing key", () => {
     });
   });
 
-  it("passes a delete for the grant at any one of the key's scopes", async () => {
+  it("refuses a delete to a holder of the grant at only one of the key's scopes", async () => {
     const ctx = sessionWith([{ permission: "virtualKeys:delete", at: "team", id: "data-sci" }]);
 
     await expect(
       service().assertActorCanOperateOnAnyScope(ctx, [PLATFORM, DATA_SCI], "virtualKeys:delete"),
+    ).rejects.toMatchObject({
+      code: "permission_denied",
+      meta: { permission: "virtualKeys:delete" },
+    });
+  });
+
+  /** @scenario Changing a virtual key needs the permission at every scope it covers */
+  it("refuses a holder at the project alone and allows a holder at the project and the team", async () => {
+    const projectOnly = sessionWith([
+      { permission: "virtualKeys:update", at: "project", id: "demo" },
+    ]);
+    const both = sessionWith([
+      { permission: "virtualKeys:update", at: "project", id: "demo" },
+      { permission: "virtualKeys:update", at: "team", id: "platform" },
+    ]);
+
+    await expect(
+      service().assertActorCanOperateOnAnyScope(
+        projectOnly,
+        [DEMO, PLATFORM],
+        "virtualKeys:update",
+      ),
+    ).rejects.toMatchObject({
+      code: "permission_denied",
+      meta: { permission: "virtualKeys:update" },
+    });
+    await expect(
+      service().assertActorCanOperateOnAnyScope(both, [DEMO, PLATFORM], "virtualKeys:update"),
     ).resolves.toBeUndefined();
   });
 });

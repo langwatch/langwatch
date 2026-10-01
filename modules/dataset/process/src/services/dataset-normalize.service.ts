@@ -14,11 +14,12 @@ import {
   type DatasetConfirmColumns,
   type FileFormat,
   type DatasetNormalizePayload,
+  UploadNotPendingError,
 } from "@langwatch/dataset-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import Papa from "papaparse";
 
-import type { DatasetNormalize } from "../app/dataset.app.ts";
+import type { DatasetNormalize, DatasetNormalizeQueue } from "../app/dataset.app.ts";
 import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
@@ -462,12 +463,63 @@ const deriveColumnTypes = (headers: string[]): DatasetColumns =>
  * `ready` with PG-authoritative counters; on any failure it flips to `failed` (staging file
  * preserved for manual retry) and rethrows so the queue records the failure.
  */
-export class DatasetNormalizeService implements DatasetNormalize {
+export class DatasetNormalizeService implements DatasetNormalize, DatasetNormalizeQueue {
   static create(deps: DatasetNormalizeDeps): DatasetNormalizeService {
     return new DatasetNormalizeService(deps);
   }
 
+  private readonly inlineChains = new Map<string, Promise<void>>();
+  private send: ((payload: DatasetNormalizePayload) => Promise<void>) | undefined;
+
   private constructor(private readonly deps: DatasetNormalizeDeps) {}
+
+  /** The `datasetNormalize` command's sender, closed over once the pipeline is registered. */
+  connect(send: (payload: DatasetNormalizePayload) => Promise<void>): void {
+    this.send = send;
+  }
+
+  async enqueueNormalize(input: { datasetId: string; projectId: string }): Promise<void> {
+    const dataset = await this.deps.repository.getOne({
+      id: input.datasetId,
+      projectId: input.projectId,
+    });
+    if (!dataset.uploadFilename) {
+      throw new UploadNotPendingError("Dataset normalization requires an imported file");
+    }
+    const target = {
+      id: dataset.id,
+      tenantId: input.projectId,
+      projectId: input.projectId,
+      datasetId: dataset.id,
+      filename: dataset.uploadFilename,
+    };
+    // A row the previous release staged keeps its staging key until it is prepared (ADR-155).
+    let payload: DatasetNormalizePayload;
+    if (dataset.sourceStoredObjectId) {
+      payload = { ...target, sourceStoredObjectId: dataset.sourceStoredObjectId };
+    } else if (dataset.stagingKey) {
+      payload = { ...target, stagingKey: dataset.stagingKey };
+    } else {
+      throw new UploadNotPendingError("Dataset normalization requires an imported file");
+    }
+
+    await (this.send ? this.send(payload) : this.runInline(payload));
+  }
+
+  /** Main's no-queue fallback: one process, so a per-dataset chain serializes inline runs. */
+  private runInline(payload: DatasetNormalizePayload): Promise<void> {
+    const key = `${payload.projectId}:${payload.datasetId}`;
+    const prior = this.inlineChains.get(key) ?? Promise.resolve();
+    const next = prior.catch(() => undefined).then(() => this.normalize(payload));
+    this.inlineChains.set(key, next);
+    void next.finally(() => {
+      if (this.inlineChains.get(key) === next) {
+        this.inlineChains.delete(key);
+      }
+    });
+
+    return next;
+  }
 
   async normalize(payload: DatasetNormalizePayload): Promise<void> {
     const { projectId, datasetId, filename } = payload;

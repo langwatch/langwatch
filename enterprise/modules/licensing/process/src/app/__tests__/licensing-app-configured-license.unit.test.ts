@@ -1,21 +1,21 @@
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * Specs: specs/licensing/configured-license-forms.feature and
  * specs/licensing/sso-license-gating.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ENTERPRISE_LICENSE_KEY, TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { MemoryConnectLicenseChannel } from "../../channels/memory/memory.connect-license.channel.ts";
 import { MemoryConnectOrganizationRepository } from "../../repositories/memory/memory.connect-organization.repository.ts";
 import { MemoryInstanceIdentityRepository } from "../../repositories/memory/memory.instance-identity.repository.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 import type { LicenseStorage, StoredLicense } from "../licensing.members.ts";
 
 const CODE = "LW-A1B2-C3D4-E5F6-G7H8";
@@ -64,7 +64,7 @@ async function bootWithConfiguredValue(value: string) {
     },
   });
   const resources = new ResourceScope();
-  const app = await LicensingApp.create({
+  const app = await LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),
@@ -107,7 +107,7 @@ async function bootWithConfiguredValue(value: string) {
   return { app, host, storage, services: resources.sealServices() };
 }
 
-describe("LicensingApp with a configured license value", () => {
+describe("LicensingModule with a configured license value", () => {
   describe("given LANGWATCH_LICENSE_KEY holds an activation code", () => {
     /** @scenario "an activation code in the license variable is not read as a license" */
     it("never inspects the code as an instance license", async () => {

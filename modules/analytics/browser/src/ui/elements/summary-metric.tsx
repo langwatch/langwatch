@@ -1,3 +1,4 @@
+import { Delayed } from "@langwatch/design-system/delayed";
 import {
   Box,
   Heading,
@@ -9,8 +10,6 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import { HelpCircle } from "react-feather";
-
-import { Delayed } from "./delayed.tsx";
 
 function CurrentValue({
   current,

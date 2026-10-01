@@ -4,8 +4,8 @@
  * @vitest-environment jsdom
  */
 
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
-import { createUiRouteObjects } from "@langwatch/ui-kernel/route-objects";
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
+import { createUiRouteObjects } from "@langwatch/browser/route-objects";
 import { render, waitFor } from "@testing-library/react";
 import { createMemoryRouter, Outlet, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -35,6 +35,7 @@ const stubbedPages: UiPageLoaderRegistry = Object.fromEntries(
 const stubbedShellLayouts = {
   auth: async () => ({ default: () => <Outlet /> }),
   chrome: async () => ({ default: () => <Outlet /> }),
+  "full-screen": async () => ({ default: () => <Outlet /> }),
 };
 
 const realRoutes = createUiRouteObjects({

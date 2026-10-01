@@ -200,7 +200,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		env := append(domain.LaneDatabaseEnv(base, lane),
 			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane),
 			o.compileCacheEnv(st.Slug))
-		if lane == "ui" {
+		if lane == "ui" || lane == AppLane {
 			env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
 		}
 		return env
@@ -212,9 +212,13 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		Stack: st, Opts: opts, RepoDir: repoDir, Base: base,
 		NodeEnv: nodeEnv, LogPath: logPath, Port: port,
 	}
-	if st.Layout.IsMonolith() {
+	isOneProcess := !st.Layout.IsMonolith() && opts.ShouldRunOneProcess
+	switch {
+	case st.Layout.IsMonolith():
 		out = append(out, mono.appChild())
-	} else {
+	case isOneProcess:
+		out = append(out, oneProcessChild(repoDir, nodeEnv(AppLane), logPath(AppLane)))
+	default:
 		out = append(out, Child{
 			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
 			Shell: "pnpm --silent --filter " + UIPackage + " dev",
@@ -342,7 +346,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		langy.LogPath = logPath("langyagent")
 		out = append(out, langy)
 	}
-	if st.Layout.IsMonolith() {
+	if st.Layout.IsMonolith() || isOneProcess {
 		return out
 	}
 	out = append(out, Child{
@@ -362,6 +366,19 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		Env:   nodeEnv(APILane),
 	})
 	return out
+}
+
+// oneProcessChild is a modular checkout's ui and api lanes as one: the UI's
+// Vite server, the api and the worker in one Node process, the backend
+// reloaded in-process (ADR-168, B1). It still listens on the app port and the
+// API port, so `haven restart ui|api` bounces it and the rows stay truthful.
+// No readiness probe, as for the ui lane: the UI's boot-wait screen covers it.
+func oneProcessChild(repoDir string, env []string, logPath string) Child {
+	return Child{
+		Name: AppLane, Dir: repoDir, Color: palette[1], LogPath: logPath,
+		Shell: "pnpm --silent --filter " + BackendPackage + " dev:one",
+		Env:   env,
+	}
 }
 
 // The Node lanes a stack supervises, by workspace package name. planChildren
@@ -399,6 +416,9 @@ const (
 	// it has its own liveness, and a stack whose worker is down looks healthy
 	// from every other row.
 	WorkerLane = "worker"
+	// AppLane is the ui and api lanes run as one process (LANGWATCH_DEV_ONE_PROCESS=1).
+	// Same name as a monolith checkout's one lane, for the same reason.
+	AppLane = domain.MonolithAppLane
 	// GoLane is the process hosting the Go data-plane services.
 	GoLane = "go"
 	// SimsLane is the second Go process, hosting the simulators a stack

@@ -1,5 +1,4 @@
-import type { LedgerActor } from "@langwatch/actor";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { LedgerActor } from "@langwatch/authorization";
 /**
  * In-memory fakes for the ports the invite services are composed from. Each
  * stores real state (a Map, a Set) rather than counting calls, so a test
@@ -24,6 +23,7 @@ import {
   type OrganizationUserRole,
 } from "@langwatch/organization-contract";
 import type { RoleApi } from "@langwatch/role-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 import type {

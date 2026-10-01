@@ -20,6 +20,15 @@ export class RetentionPermissionsService {
     });
   }
 
+  /** The platform-operator grant: the one standing that may keep data indefinitely. */
+  isPlatformOperator(input: { userId: string }): Promise<boolean> {
+    return this.authz.can({
+      principal: { type: "user", id: input.userId },
+      permission: "ops:manage",
+      scope: { type: "platform" },
+    });
+  }
+
   /** `team:manage` per id, in a map keyed by the id asked for. */
   async canManageTeams(input: {
     userId: string;

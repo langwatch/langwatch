@@ -4,20 +4,23 @@
  * it, so this body carries no credentials of its own.
  */
 import { Box, Grid, VStack } from "@langwatch/design-system/primitives";
-import {
-  DocsLinks,
-  FrameworkGrid,
-  FrameworkIntegrationCode,
-  InstallPreview,
-  getRegistryEntry,
-  FRAMEWORKS_BY_PLATFORM,
-  PLATFORM_OPTIONS,
-  type FrameworkKey,
-  type PlatformKey,
-  PlatformGrid,
-} from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useMemo, useState } from "react";
+
+import {
+  type FrameworkKey,
+  type PlatformKey,
+} from "../../../../model/onboarding/observability/types.ts";
+import { DocsLinks } from "../../../blocks/onboarding/observability/docs-links.tsx";
+import { getRegistryEntry } from "../../../sections/onboarding/observability/codegen/registry.tsx";
+import { FrameworkGrid } from "../../../sections/onboarding/observability/framework-grid.tsx";
+import { FrameworkIntegrationCode } from "../../../sections/onboarding/observability/framework-integration-code.tsx";
+import { InstallPreview } from "../../../sections/onboarding/observability/install-preview.tsx";
+import { PlatformGrid } from "../../../sections/onboarding/observability/platform-grid.tsx";
+import {
+  FRAMEWORKS_BY_PLATFORM,
+  PLATFORM_OPTIONS,
+} from "../../../sections/onboarding/observability/ui-options.ts";
 
 export function SdkSetup(): React.ReactElement | null {
   const initialPlatform = PLATFORM_OPTIONS[0]?.key ?? null;

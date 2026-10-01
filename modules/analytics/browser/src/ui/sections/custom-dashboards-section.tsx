@@ -6,6 +6,7 @@ import { ArrowDown, ArrowUp, Edit2, MoreVertical, Plus, Trash2 } from "lucide-re
 import { useEffect, useRef, useState } from "react";
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
+import { useDashboards } from "../../behavior/use-dashboards.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { MenuLink } from "../elements/analytics-menu-link.tsx";
 import { DashboardNameDialog } from "./dashboard-name-dialog.tsx";
@@ -32,10 +33,7 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
   const [dashboardToDelete, setDashboardToDelete] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const dashboardsQuery = analyticsApi.dashboards.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  const dashboardsQuery = useDashboards({ projectId });
 
   const renameDashboard = analyticsApi.dashboards.rename.useMutation();
   const deleteDashboard = analyticsApi.dashboards.delete.useMutation();

@@ -1,18 +1,3 @@
-import {
-  analyticsGroups,
-  analyticsMetrics,
-  analyticsPipelines,
-  type FlattenAnalyticsGroupsEnum,
-  type FlattenAnalyticsMetricsEnum,
-  getGroup,
-  getMetric,
-  metricAggregations,
-  pipelineAggregations,
-  type AggregationTypes,
-  type PipelineAggregationTypes,
-  type PipelineFields,
-  type SharedFiltersInput,
-} from "@langwatch/analytics-browser-kit";
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -69,17 +54,32 @@ import {
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
-import {
-  analyticsApi,
-  type AnalyticsApiMap,
-  type AnalyticsFilterOption,
-} from "../../../behavior/analytics-api.ts";
+import { analyticsApi, type AnalyticsApiMap } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../../behavior/use-analytics-period.ts";
+import { useStoredGraph } from "../../../behavior/use-dashboards.ts";
+import { useFilterOptions } from "../../../behavior/use-filter-options.ts";
 import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import type { FilterField } from "../../../model/analytics-filter-definition.ts";
 import { filterOutEmptyFilters, type FilterParam } from "../../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
+import {
+  analyticsGroups,
+  analyticsMetrics,
+  analyticsPipelines,
+  type FlattenAnalyticsGroupsEnum,
+  type FlattenAnalyticsMetricsEnum,
+  getGroup,
+  getMetric,
+  metricAggregations,
+  pipelineAggregations,
+} from "../../../model/analytics-registry.ts";
+import {
+  type AggregationTypes,
+  type PipelineAggregationTypes,
+  type PipelineFields,
+  type SharedFiltersInput,
+} from "../../../model/analytics-vocabulary.ts";
 import {
   camelCaseToTitleCase,
   uppercaseFirstLetterLowerCaseRest,
@@ -1407,25 +1407,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
 }) {
   const [query, setQuery] = useState("");
 
-  const { filterParams, queryOpts } = useFilterParams();
-  const filterData = analyticsApi.analytics.dataForFilter.useQuery(
-    {
-      ...filterParams,
-      field: filter,
-      key: key_,
-      query: query,
-    },
-    {
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      // Keeps the previous answer on screen while the next one loads. The
-      // React Query sentinel would mean importing the query library, which a
-      // governed screen may not; the identity function is what that sentinel
-      // does.
-      placeholderData: (previous?: { options: AnalyticsFilterOption[] }) => previous,
-      enabled: queryOpts.enabled,
-    },
-  );
+  const filterData = useFilterOptions({ field: filter, key: key_, query });
 
   const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
 
@@ -1561,10 +1543,7 @@ export default function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMod
   const graphId = host.route().params.id;
   const projectId = host.project()?.id ?? "";
 
-  const stored = analyticsApi.graphs.getById.useQuery(
-    { projectId, id: graphId ?? "" },
-    { enabled: mode === "edit" && !!projectId && !!graphId, retry: false },
-  );
+  const stored = useStoredGraph({ projectId, graphId, enabled: mode === "edit" });
 
   if (mode === "new") {
     return <AnalyticsCustomGraphContent />;

@@ -1,14 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AnomalyAlertDispatchRecord,
   AnomalyRule,
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { createGovernanceProjectApi } from "../../__tests__/testing.ts";
 import type { GovernanceTraceSummary } from "../../app/governance.members.ts";
 import { MemoryAnomalySpendRepository } from "../../repositories/memory/memory.anomaly-spend.repository.ts";
 import { MemoryOcsfEventsRepository } from "../../repositories/memory/memory.ocsf-events.repository.ts";
@@ -59,10 +60,6 @@ class OneRuleRepository extends SpendSpikeAnomalyRepository {
     return [rule];
   }
 
-  async findGovernanceTenantId(): Promise<string | null> {
-    return "governance-project";
-  }
-
   async hasOpenAlert(): Promise<boolean> {
     return false;
   }
@@ -99,6 +96,7 @@ describe("given a spend_spike rule over the governance tenant", () => {
     const repository = new OneRuleRepository();
     const evaluator = SpendSpikeAnomalyEvaluatorService.create({
       repository,
+      projects: createGovernanceProjectApi(() => "governance-project"),
       spend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: { post: async () => ({ status: 200, ok: true, statusText: "OK" }) },

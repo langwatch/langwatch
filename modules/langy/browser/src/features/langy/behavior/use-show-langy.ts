@@ -21,10 +21,8 @@ export interface LangyVisibility {
 
 /** The gate, with its own uncertainty exposed. See {@link LangyVisibility}. */
 export function useLangyVisibility(): LangyVisibility {
-  const { data: session, status: sessionStatus } = useRequiredSession();
+  const { status: sessionStatus } = useRequiredSession();
   const {
-    team,
-    organizationRole,
     isDemoProject,
     hasPermission,
     isLoading: contextLoading,
@@ -33,15 +31,10 @@ export function useLangyVisibility(): LangyVisibility {
     redirectToProjectOnboarding: false,
   });
 
-  const user = session?.user;
-  const isOnOwnPersonalProject = !!team?.isPersonal && team.ownerUserId === user?.id;
-  const userIsPartOfTeam =
-    isOnOwnPersonalProject ||
-    (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
-    organizationRole === "ADMIN";
-  // The server refuses Langy on the demo project outright; rendering the
-  // panel there would only produce a chat where every send 403s.
-  const mayReadLangy = userIsPartOfTeam && !isDemoProject && hasPermission("langy:view");
+  // Team membership is not re-checked here: the scope carries no members, and a
+  // reader outside the team holds no `langy:view` on its project anyway. The
+  // server refuses the demo project outright, so the panel would only 403 there.
+  const mayReadLangy = !isDemoProject && hasPermission("langy:view");
 
   const { data: releaseLangy, isLoading: flagLoading } = useFeatureFlag(LANGY_RELEASE_FLAG);
 

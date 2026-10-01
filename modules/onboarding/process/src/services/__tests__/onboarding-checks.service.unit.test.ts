@@ -1,5 +1,3 @@
-/** @see modules/onboarding/specs/integrations-checks.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi, DatasetSummary } from "@langwatch/dataset-contract";
@@ -14,6 +12,8 @@ import {
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi, SimulationSetData } from "@langwatch/scenario-contract";
+/** @see modules/onboarding/specs/integrations-checks.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow, WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -6,6 +6,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { ledgerActorSchema } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzPrincipalRefSchema,
@@ -15,7 +16,6 @@ import {
   grantParamsSchema,
   grantRevokedSchema,
   grantSchema,
-  grantsLedgerActorSchema,
   grantUpdateSchema,
 } from "@langwatch/authz-contract";
 import { z } from "zod";
@@ -25,7 +25,7 @@ export const grantRestFacts = defineRestMiddleware(
   "grantRestFacts",
   z.object({
     organizationId: z.string(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     caller: authzPrincipalRefSchema,
   }),
 );

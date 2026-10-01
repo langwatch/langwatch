@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useOnboardingStore } from "../../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 
 let isTourDismissed = false;
+let isGuidedPathActive = false;
 let isTourPreferenceResolved = true;
 const mockPersistDismissal = vi.fn();
 
@@ -18,12 +19,21 @@ vi.mock("../use-trace-explorer-tour-preference.ts", () => ({
   }),
 }));
 
+vi.mock("@langwatch/browser-host/capabilities", () => ({
+  useUiDeclarations: () => ({
+    declared: () => [
+      { module: "onboarding", capability: { useIsActive: () => isGuidedPathActive } },
+    ],
+  }),
+}));
+
 import { useFirstTraceSpotlightTrigger } from "../use-first-trace-spotlight-trigger.ts";
 
 describe("useFirstTraceSpotlightTrigger", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     isTourDismissed = false;
+    isGuidedPathActive = false;
     isTourPreferenceResolved = true;
     mockPersistDismissal.mockReset();
     useOnboardingStore.setState({
@@ -50,6 +60,25 @@ describe("useFirstTraceSpotlightTrigger", () => {
             projectId: "another-project",
             hasAnyTraces: true,
           }),
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(2_000);
+        });
+
+        expect(useOnboardingStore.getState().spotlightsActive).toBe(false);
+        expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(false);
+      });
+    });
+  });
+
+  describe("given a guided onboarding path is active", () => {
+    describe("when the first traces arrive", () => {
+      it("stays quiet and leaves the auto-start for later", () => {
+        isGuidedPathActive = true;
+
+        renderHook(() =>
+          useFirstTraceSpotlightTrigger({ projectId: "current-project", hasAnyTraces: true }),
         );
 
         act(() => {

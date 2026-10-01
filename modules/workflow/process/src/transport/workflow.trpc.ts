@@ -4,7 +4,13 @@
  * Spec: modules/workflow/specs/workflow-service.feature.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { WorkflowApi, workflowTrpc } from "@langwatch/workflow-contract";
+import {
+  historyEntryWithoutHttpAgentSecrets,
+  versionWithoutHttpAgentSecrets,
+  WorkflowApi,
+  workflowTrpc,
+  workflowWithoutHttpAgentSecrets,
+} from "@langwatch/workflow-contract";
 
 /** How much of each version a history read carries back. */
 function historyModeFor(
@@ -65,22 +71,28 @@ export const workflowTrpcTransport: TrpcRouterDeclaration<WorkflowApi, typeof wo
 
     .procedure("getById")
     .withPermission("workflows:view")
-    .handle(({ app, input }) => app.getWithMigratedDsl(input))
+    .handle(async ({ app, input }) =>
+      workflowWithoutHttpAgentSecrets(await app.getWithMigratedDsl(input)),
+    )
 
     .procedure("getVersions")
     .withPermission("workflows:view")
-    .handle(({ app, input }) =>
-      app.getVersionHistory({
-        workflowId: input.workflowId,
-        projectId: input.projectId,
-        mode: historyModeFor(input.returnDSL),
-      }),
+    .handle(async ({ app, input }) =>
+      (
+        await app.getVersionHistory({
+          workflowId: input.workflowId,
+          projectId: input.projectId,
+          mode: historyModeFor(input.returnDSL),
+        })
+      ).map(historyEntryWithoutHttpAgentSecrets),
     )
 
     .procedure("restoreVersion")
     .withPermission("workflows:update")
-    .handle(({ app, input }) =>
-      app.restoreVersion({ versionId: input.versionId, projectId: input.projectId }),
+    .handle(async ({ app, input }) =>
+      versionWithoutHttpAgentSecrets(
+        await app.restoreVersion({ versionId: input.versionId, projectId: input.projectId }),
+      ),
     )
 
     .procedure("autosave")

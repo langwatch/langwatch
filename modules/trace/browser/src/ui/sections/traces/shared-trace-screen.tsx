@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import {
@@ -13,45 +14,52 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Link2Off } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { useDrawerStore } from "../../../behavior/drawer.store.ts";
-import { api } from "../../../behavior/trace-api.ts";
+import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
+import { useSharedTraceRead } from "../../../behavior/reads/use-project-reads.ts";
+import { api, type RouterOutputs } from "../../../behavior/trace-api.ts";
+import { TRACE_DRAWER_NAME } from "../../../model/trace-drawer-params.ts";
 import { TraceViewerProvider } from "../../elements/explorer/context/trace-viewer-context.tsx";
 import { HandledErrorState } from "../errors/index.ts";
-import { SharedTraceProvider, useSharedTrace } from "../explorer/context/shared-trace-context.tsx";
+import { useTraceQueryArgs } from "../explorer/hooks/use-trace-query-args.ts";
 import { TraceDrawerContent } from "../explorer/trace-drawer/trace-drawer-content.tsx";
+import { seedSharedTrace } from "./seed-shared-trace.ts";
 
 /** There is no drawer to close on a share page. */
 const noop = () => undefined;
 
 /**
- * The shared trace, rendered with the Trace Explorer surface. All per-trace data comes
- * from the one `sharedTrace.get` payload in context - the drawer's internal hooks read
- * their slice from there rather than firing their own (now protected) reads.
+ * The span, view and tabs the reader has chosen live in the address like the drawer's
+ * own, so a share page names the trace it shows; no drawer registers under that name.
  */
-function SharedTraceView() {
-  const shared = useSharedTrace();
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+function useSharedTraceAddress(traceId: string): void {
+  const { openDrawer } = useDrawer();
+  const isOpen = useTraceDrawer((s) => s.isOpen);
+  useEffect(() => {
+    if (!isOpen) openDrawer(TRACE_DRAWER_NAME, { traceId }, { replace: true });
+  }, [isOpen, openDrawer, traceId]);
+}
 
-  const trace = shared?.header ?? null;
-  const spanTree = useMemo(() => shared?.spanTree ?? [], [shared?.spanTree]);
+/**
+ * The shared trace, rendered with the Trace Explorer surface. The one `sharedTrace.get`
+ * payload is seeded into the query cache under the keys the drawer's hooks read, and
+ * read-only mode keeps those hooks from firing their own (now protected) reads.
+ */
+function SharedTraceView({ shared }: { shared: RouterOutputs["sharedTrace"]["get"] }) {
+  const utils = api.useUtils();
+  const { projectId } = useTraceQueryArgs();
+  useState(() => seedSharedTrace({ utils, projectId, shared }));
+  useSharedTraceAddress(shared.header.traceId);
+  const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
+
+  const trace = shared.header;
+  const spanTree = shared.spanTree;
 
   const selectedSpan = useMemo(
     () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),
     [selectedSpanId, spanTree],
   );
-
-  if (!trace) {
-    return (
-      <Center flex={1} padding={8}>
-        <Text color="fg.muted">
-          This shared trace didn&apos;t load. Refresh the page, or ask whoever shared it for a new
-          link.
-        </Text>
-      </Center>
-    );
-  }
 
   return (
     <Box
@@ -65,7 +73,7 @@ function SharedTraceView() {
       position="relative"
       data-testid="share-page-trace"
     >
-      {shared?.isSpanDetailTruncated && (
+      {shared.isSpanDetailTruncated && (
         <Box paddingX={4} paddingTop={3}>
           <Alert.Root status="info" size="sm" width="full">
             <Alert.Indicator />
@@ -172,17 +180,7 @@ export default function SharePage() {
    * One token-validated read returns the whole read-only payload and consumes exactly
    * one view.
    */
-  const shared = api.sharedTrace.get.useQuery(
-    { token },
-    {
-      enabled: !!token,
-      staleTime: Infinity,
-      retry: false,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-    },
-  );
+  const shared = useSharedTraceRead({ token });
 
   if (shared.isError) {
     // Share errors are safe for anonymous visitors and include remediation.
@@ -209,11 +207,9 @@ export default function SharePage() {
 
   return (
     <PublicPageFrame token={token}>
-      <SharedTraceProvider value={shared.data}>
-        <TraceViewerProvider traceId={shared.data.header.traceId} isReadOnly>
-          <SharedTraceView />
-        </TraceViewerProvider>
-      </SharedTraceProvider>
+      <TraceViewerProvider traceId={shared.data.header.traceId} isReadOnly>
+        <SharedTraceView shared={shared.data} />
+      </TraceViewerProvider>
     </PublicPageFrame>
   );
 }

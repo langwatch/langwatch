@@ -239,8 +239,8 @@ describe("the security requirement one credential publishes", () => {
 
   /** @scenario "A family behind a deployment secret publishes the secret's own scheme" */
   it("names the scheme for a credential held outside the deployment", () => {
-    expect(securityRequirement("scimToken")).toEqual([{ scim_bearer: [] }]);
-    expect(securityRequirement("internalSecret")).toEqual([{ internal_secret: [] }]);
+    expect(securityRequirement("scim_token")).toEqual([{ scim_bearer: [] }]);
+    expect(securityRequirement("internal_secret")).toEqual([{ internal_secret: [] }]);
   });
 
   it("refuses a credential no API client can present", () => {
@@ -273,6 +273,6 @@ describe("the two access kinds that answer for nobody in particular", () => {
 describe("the security requirement the instance administrator's key publishes", () => {
   /** @scenario "A family behind the instance administrator's own key names no tenant" */
   it("names the scheme the operator presents", () => {
-    expect(securityRequirement("instance-admin")).toEqual([{ instance_admin_key: [] }]);
+    expect(securityRequirement("instance_admin")).toEqual([{ instance_admin_key: [] }]);
   });
 });

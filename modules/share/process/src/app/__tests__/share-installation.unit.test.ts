@@ -1,9 +1,9 @@
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import type Redis from "ioredis";
 import { describe, expect, it } from "vitest";
 
-import { shareServer } from "../../share.server.ts";
+import { shareProcessModule } from "../../share.module.ts";
 import {
   createShareTestAuthz,
   createShareTestDataRetention,
@@ -17,7 +17,7 @@ function keyvalueWithoutStore(): Redis {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(shareServer)])
+    .withModules([withMemoryRepositories(shareProcessModule)])
     .withKeyvalue(keyvalueWithoutStore())
     .provide({
       authz: createShareTestAuthz(),
@@ -33,7 +33,7 @@ describe("share app installation", () => {
     try {
       const app = runtime.service(ShareApi);
 
-      expect(runtime.module(shareServer).provided).toBe(app);
+      expect(runtime.module(shareProcessModule).provided).toBe(app);
 
       await expect(
         app.resolveForViewer({ token: "tok_missing", viewer: { type: "anonymous" } }),

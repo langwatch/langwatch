@@ -40,8 +40,6 @@ export const convertHttpComponentConfig = (config: HttpComponentConfig): HttpCon
   return {
     url: config.url,
     method: config.method ?? "POST",
-    headers: config.headers,
-    auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
     timeoutMs: config.timeoutMs,

@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * Read the setup again, and keep reading, while a command the server accepted
- * has not reached the view yet. One observer of the read the page already
- * holds, so the whole page moves when it settles — and the moment nothing is
- * waiting it stops, rather than polling a settled page forever.
+ * Holds the setup read open while a command the server accepted has not reached
+ * the view yet. It is one more observer of the read the page already holds and
+ * fetches nothing itself: the page moves when the read hint says the projection
+ * caught up, and with nothing waiting the observer is disabled.
  */
 import { ssoApi } from "./sso-api.ts";
-
-/** How often a projection that has not caught up is asked again. */
-const SETTLING_POLL_MS = 1_000;
 
 export function useSettlingSetup({
   organizationId,
@@ -19,6 +16,7 @@ export function useSettlingSetup({
 }): void {
   ssoApi.ssoSetup.getSetup.useQuery(
     { organizationId },
-    { enabled: waiting, refetchInterval: waiting ? SETTLING_POLL_MS : false },
+    // needs a read hint: sso setup projection caught up (identity provider and admin role exist)
+    { enabled: waiting },
   );
 }

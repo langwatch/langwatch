@@ -4,21 +4,20 @@ import "@testing-library/jest-dom/vitest";
  * The row the judge ran and could not settle, end to end across every surface that
  * reads a verdict.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  type BatchComparisonColumn,
-  type BatchEvaluationData,
-  transformBatchEvaluationData,
-  ComparisonWinnerCell,
-  resolveWinner,
-} from "@langwatch/experiment-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildCsvData, buildCsvHeaders } from "../../batch-evaluation-results.csv.ts";
 import { buildPairwiseComparisons } from "../../batch-evaluation-results.pairwise.ts";
+import {
+  type BatchComparisonColumn,
+  type BatchEvaluationData,
+  transformBatchEvaluationData,
+} from "../../batch-evaluation-results.types.ts";
+import { ComparisonWinnerCell, resolveWinner } from "../comparison-winner-cell.tsx";
 import { WinRateChart } from "../win-rate-chart.tsx";
 
 /** What select_best_compare stores when its two passes disagree. */
@@ -75,10 +74,6 @@ const RUN_WITH_ONE_UNSETTLED_ROW = createRun([
     inputs: candidatesInput(["target-a", "target-b"]),
   },
 ]);
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 afterEach(() => {
   cleanup();
@@ -163,11 +158,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
 
     /** @scenario "A row the judge could not settle says so, and why" */
     it("says the judge reached no verdict and shows why", () => {
-      render(
-        <Wrapper>
-          <ComparisonWinnerCell column={column} verdict={unsettledVerdict} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<ComparisonWinnerCell column={column} verdict={unsettledVerdict} />);
 
       expect(screen.getByText("No verdict")).toBeDefined();
       expect(screen.getByTestId("comparison-winner-reasoning").textContent).toContain(
@@ -177,11 +168,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
 
     /** @scenario "A row the judge could not settle says so, and why" */
     it("does not label the row a tie", () => {
-      render(
-        <Wrapper>
-          <ComparisonWinnerCell column={column} verdict={unsettledVerdict} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<ComparisonWinnerCell column={column} verdict={unsettledVerdict} />);
 
       expect(screen.queryByText("Tie")).toBeNull();
       expect(screen.queryByTestId("comparison-winner-badge-tie")).toBeNull();
@@ -216,11 +203,7 @@ describe("given a comparison row the judge ran and could not settle", () => {
 
     /** @scenario "A row the judge could not settle says so, and why" */
     it("still shows a bare dash for a row the judge never ran", () => {
-      render(
-        <Wrapper>
-          <ComparisonWinnerCell column={column} verdict={undefined} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<ComparisonWinnerCell column={column} verdict={undefined} />);
 
       expect(screen.getByTestId("comparison-winner-none").textContent).toBe("-");
     });
@@ -232,11 +215,7 @@ describe("given a win-rate chart over decided and unsettled rows", () => {
   it("counts no ties from the unsettled rows", () => {
     const column = transformBatchEvaluationData(RUN_WITH_ONE_UNSETTLED_ROW).comparisonColumns![0]!;
 
-    render(
-      <Wrapper>
-        <WinRateChart column={column} chartHeight={160} />
-      </Wrapper>,
-    );
+    renderWithDesignSystem(<WinRateChart column={column} chartHeight={160} />);
 
     const chartData = JSON.parse(
       screen.getByTestId("bar-chart").getAttribute("data-chart") ?? "[]",

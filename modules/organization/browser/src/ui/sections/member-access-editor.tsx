@@ -523,6 +523,7 @@ function useMemberAccessEditor({
       queryClient.organization.getMemberById.invalidate(),
       queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
       queryClient.organization.getAll.invalidate(),
+      queryClient.organization.getScopeGraph.invalidate(),
       queryClient.limits.getUsage.invalidate(),
     ]);
 

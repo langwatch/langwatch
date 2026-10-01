@@ -1,14 +1,14 @@
-/**
- * Integration tests for the Dialog backdrop styling.
- * @vitest-environment jsdom
- * @see specs/features/dialog-backdrop-transparency-blur.feature
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+/**
+ * Integration tests for the Dialog backdrop styling.
+ * @vitest-environment jsdom
+ * @see specs/features/dialog-backdrop-transparency-blur.feature
+ */
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -33,9 +33,9 @@ const capabilities: UiCapabilities = {
 };
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <UiCapabilityContextProvider value={capabilities}>{children}</UiCapabilityContextProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 function renderOpenDialog(extra?: Parameters<typeof Dialog.Content>[0]) {

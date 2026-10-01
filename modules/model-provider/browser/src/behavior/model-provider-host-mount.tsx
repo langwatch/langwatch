@@ -1,7 +1,7 @@
 /**
  * Model Provider's answer to the port its screens declare: every method
  * projects a `@langwatch/browser-host` capability. `availableScopes` reads
- * only the current scope; no org-graph capability exists yet. §10.1.
+ * the caller's reach from `organization.getScopeGraph`, as main did. §10.1.
  */
 
 import {
@@ -24,6 +24,35 @@ import {
   type ModelProviderRouteReading,
   type ModelProviderSuccessNotice,
 } from "../model/model-provider-host.ts";
+import {
+  modelProviderApi,
+  type ModelProviderScopeGraphOrganization,
+} from "./model-provider-api.ts";
+
+const NO_ORGANIZATIONS: ModelProviderScopeGraphOrganization[] = [];
+
+/** The active organization's teams and projects; null when the graph has no such organization. */
+export function scopesFromGraph({
+  organizations,
+  organizationId,
+}: {
+  organizations: readonly ModelProviderScopeGraphOrganization[];
+  organizationId: string | undefined;
+}): ModelProviderAvailableScopes | null {
+  const organization = organizations.find((candidate) => candidate.id === organizationId);
+  if (!organization) return null;
+  return {
+    organization: { id: organization.id, name: organization.name },
+    teams: organization.teams.map((team) => ({ id: team.id, name: team.name })),
+    projects: organization.teams.flatMap((team) =>
+      team.projects.map((project) => ({
+        id: project.id,
+        name: `${project.name} · ${team.name}`,
+        teamId: team.id,
+      })),
+    ),
+  };
+}
 
 /** Writes a `platform/app` drawer's address, clearing stale `drawer.*` keys. */
 function openDrawerAddress({
@@ -50,6 +79,7 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
   private readonly session: UiSession;
   private readonly uiRoute: UiRoute;
   private readonly feedback: UiFeedback;
+  private readonly organizations: readonly ModelProviderScopeGraphOrganization[];
 
   constructor({
     hostScope,
@@ -57,14 +87,17 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
     session,
     uiRoute,
     feedback,
+    organizations,
   }: {
     hostScope: ModelProviderHostScope;
     scopeHost: UiScopeHost | undefined;
     session: UiSession;
     uiRoute: UiRoute;
     feedback: UiFeedback;
+    organizations: readonly ModelProviderScopeGraphOrganization[];
   }) {
     super();
+    this.organizations = organizations;
     this.hostScope = hostScope;
     this.scopeHost = scopeHost;
     this.session = session;
@@ -80,8 +113,13 @@ class CapabilityModelProviderHost extends ModelProviderHostApi {
     return this.session.hasPermission(permission);
   }
 
-  /** Only the current scope, not the reader's full reach: no org-graph capability exists yet. */
+  /** The caller's teams and projects; the current scope alone until the graph loads. */
   availableScopes(): ModelProviderAvailableScopes {
+    const reach = scopesFromGraph({
+      organizations: this.organizations,
+      organizationId: this.hostScope.organizationId,
+    });
+    if (reach) return reach;
     const organization = this.scopeHost?.organization();
     const team = this.scopeHost?.team();
     const project = this.scopeHost?.project();
@@ -145,10 +183,23 @@ export default function ModelProviderHostMount({ children }: { children?: ReactN
     [organizationId, projectId, scopeHost],
   );
 
+  const graph = modelProviderApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
+  const organizations = graph.data ?? NO_ORGANIZATIONS;
+
   const host = useMemo(
     () =>
-      new CapabilityModelProviderHost({ hostScope, scopeHost, session, uiRoute: route, feedback }),
-    [hostScope, scopeHost, session, route, feedback],
+      new CapabilityModelProviderHost({
+        hostScope,
+        scopeHost,
+        session,
+        uiRoute: route,
+        feedback,
+        organizations,
+      }),
+    [hostScope, scopeHost, session, route, feedback, organizations],
   );
 
   return <ModelProviderHostProvider value={host}>{children}</ModelProviderHostProvider>;

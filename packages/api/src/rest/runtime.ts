@@ -1,9 +1,4 @@
-import { actorSchema, type Actor } from "@langwatch/actor";
-import type {
-  AuthzDeclaredScopeId,
-  AuthzPermission,
-  PermissionDecision,
-} from "@langwatch/authorization";
+import { actorSchema, type Actor, type AuthzDeclaredScopeId } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
@@ -27,13 +22,14 @@ import {
   assertRouteScopePermission,
   decide,
   decideEntitlement,
+  refuseImpersonatedMint,
   routeScopeOf,
   type AccessDenial,
   type Authorize,
   type Credential,
   type Entitlements,
 } from "../access/access.ts";
-import { RateLimitedError } from "../errors.ts";
+import { RateLimitedError, SurfaceUnverifiedError } from "../errors.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import {
   addressesOf,
@@ -45,7 +41,6 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
-import type { RestResolvedInternalCredential } from "./credential.ts";
 import {
   DOOR_SCOPE_TIER,
   permissionOf,
@@ -100,7 +95,8 @@ import {
   REQUEST_FAMILY,
   withRetryAfter,
 } from "./response.ts";
-import { registerRoutePolicy } from "./security.ts";
+import { registerRoutePolicy } from "../route-registry.ts";
+import type { RestAuditSink, RestCaller, RestIdentity } from "../hosting/api-door.ts";
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
@@ -116,74 +112,6 @@ const ROUTE_HEADER_FACTS = "endpointHeaderFacts" as const;
 const ROUTE_RAW_BODY = "endpointRawBody" as const;
 const ROUTE_FORM_FIELDS = "endpointFormFields" as const;
 const ROUTE_FILES = "endpointFiles" as const;
-
-/** Who the family's own door authenticated, and what its credential resolved. */
-export type RestCaller = Readonly<{
-  actor: Actor | null;
-  /** Null exactly on a door whose credential names no tenant. */
-  scope: AuthzDeclaredScopeId | null;
-  /** What a deployment-secret door resolved; absent on every tenant door. */
-  internal?: RestResolvedInternalCredential;
-  /** Called only after the handler answered, for a credential that records use. */
-  markUsed?: () => void;
-}>;
-
-/**
- * What one door does: authenticate a caller behind a credential kind, identify
- * one with nothing asked of it, and answer a permission at a scope a route's
- * own path named.
- */
-export type RestIdentity = Readonly<{
-  authenticate(input: {
-    request: Request;
-    permission: AuthzPermission;
-  }): Promise<RestCaller> | RestCaller;
-  /**
-   * The door, opened with no permission asked of it. Only a declaration
-   * carrying an `anyAuthenticated` route needs it, and a mount that supplies
-   * none is refused by name.
-   */
-  identify?(input: {
-    request: Request;
-    rawBody?: string | Uint8Array;
-  }): Promise<RestCaller> | RestCaller;
-  /**
-   * The same door, opened for a caller who may have presented nothing: it
-   * answers `null` for a request carrying no credential at all, and refuses
-   * one carrying a credential it will not accept.
-   */
-  identifyOptional?(input: { request: Request }): Promise<RestCaller | null> | RestCaller | null;
-  /**
-   * Whether the caller holds `permission` at the scope a route's own path
-   * named. Only a declaration carrying such a route needs it, and a mount that
-   * supplies none is refused by name.
-   */
-  authorize?(input: {
-    caller: RestCaller;
-    permission: AuthzPermission;
-    target: AuthzDeclaredScopeId;
-  }): Promise<PermissionDecision> | PermissionDecision;
-}>;
-
-/**
- * What one finished route leaves on the trail. The runtime writes it; a route
- * that declared an action and reaches a runtime with no sink is refused at
- * mount, so a declared trail is never silently lost.
- */
-export type RestAuditSink = Readonly<{
-  record(row: RestAuditRow): Promise<void> | void;
-}>;
-
-/** One audit row: who, what, where, on which resource, and how it ended. */
-export type RestAuditRow = Readonly<{
-  actorId: string | null;
-  action: string;
-  scope: AuthzDeclaredScopeId | null;
-  params: Readonly<Record<string, unknown>>;
-  resultId: string | null;
-  /** The handled error's own code, on a refusal; absent on an answer. */
-  errorCode?: string;
-}>;
 
 /** Everything the process supplies for the path to run. */
 export type RestRuntimeMembers = Readonly<{
@@ -1060,6 +988,15 @@ function handlerMiddleware<Api>({
 
     const decision = await decideRouteCaller({ route, ports, options, context, caller, input });
 
+    if (route.mintsCredential) {
+      refuseImpersonatedMint({
+        permission: route.mintsCredential,
+        actor: decision.actor,
+        scope: decision.scope,
+        address: `REST ${family}.${route.operation}`,
+      });
+    }
+
     const target = await checkRouteScope({ route, caller, door, ports, input, context });
     const capabilities = { route, ports, context, family, version, caller, input } as const;
 
@@ -1097,6 +1034,7 @@ function handlerMiddleware<Api>({
               actor,
               scope: handlerScopeOf({ route, credential, caller }),
               target,
+              session: sessionOf({ route, credential, caller }),
             }),
             ...(await resolveFacts({ route, facts, context })),
           ),
@@ -1416,6 +1354,23 @@ async function keepAnswer({
   return answer;
 }
 
+/** The door's session as the route's schema reads it; one it refuses is no credential. */
+function sessionOf({
+  route,
+  credential,
+  caller,
+}: {
+  route: { session?: z.ZodType };
+  credential: Credential;
+  caller: RestCaller;
+}): unknown {
+  if (!route.session) return undefined;
+  const parsed = route.session.safeParse(caller.session);
+  if (!parsed.success) throw new SurfaceUnverifiedError(credential);
+
+  return parsed.data;
+}
+
 /** What every handler is called with, whichever door let the request in. */
 function handlerArguments<Api>({
   context,
@@ -1425,6 +1380,7 @@ function handlerArguments<Api>({
   actor,
   scope,
   target,
+  session,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1433,6 +1389,7 @@ function handlerArguments<Api>({
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  session?: unknown;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1440,6 +1397,7 @@ function handlerArguments<Api>({
     actor,
     scope,
     target,
+    session,
     signal: context.req.raw.signal,
     request: context.req.raw,
     raw: route.rawBody
@@ -1748,7 +1706,7 @@ function doorScopeOf({
   // resolved none - and, for the shared secret, to name which one let the
   // request in. The instance administrator's key names itself.
   if (tier === null) {
-    const named = credential === "internalSecret" ? caller.internal !== undefined : true;
+    const named = credential === "internal_secret" ? caller.internal !== undefined : true;
 
     if (scope !== null || !named) {
       throw new Error(
@@ -1810,7 +1768,9 @@ function respond({
       "REST handler response did not match its declared output schema",
     );
 
-    return context.json(result as never, route.status ?? 200);
+    throw new Error(
+      `REST ${context.req.method} ${context.req.path} answered a value its declared output schema refuses`,
+    );
   }
 
   // Reachable only for a `z.void()` output: a route that declared no answer
@@ -2006,10 +1966,6 @@ function respondDeclared({
 
   if (status === 204 || status === 304) return context.body(null, status);
 
-  // The declared status IS the answer, whatever its class, so the request
-  // record reads as one rather than as a server fault.
-  context.set(DECLARED_ANSWER, true);
-
   if (!validation.success) {
     outputLogger.error(
       {
@@ -2022,8 +1978,14 @@ function respondDeclared({
       "REST handler response did not match the answer its declaration named",
     );
 
-    return context.json(answer.body as never, status as ContentfulStatusCode);
+    throw new Error(
+      `REST ${route.operation} answered a body its declared ${String(status)} schema refuses`,
+    );
   }
+
+  // The declared status IS the answer, whatever its class, so the request
+  // record reads as one rather than as a server fault.
+  context.set(DECLARED_ANSWER, true);
 
   return context.json(validation.data as never, status as ContentfulStatusCode);
 }
@@ -2467,13 +2429,13 @@ function allowHeaderOf(methods: ReadonlySet<HttpMethod>): string {
 const HANDLER_CREDENTIAL = {
   project: "apiKey",
   organization: "apiKey",
-  apiKey: "apiKey",
-  scimToken: "apiKey",
-  "instance-admin": "apiKey",
-  sessionKey: "apiKey",
-  cliToken: "apiKey",
+  api_key: "apiKey",
+  scim_token: "apiKey",
+  instance_admin: "apiKey",
+  session_key: "apiKey",
+  cli_token: "apiKey",
   browser: "session",
-  internalSecret: "internal",
+  internal_secret: "internal",
 } as const satisfies Record<Exclude<Credential, "public">, HandlerCredential>;
 
 /**

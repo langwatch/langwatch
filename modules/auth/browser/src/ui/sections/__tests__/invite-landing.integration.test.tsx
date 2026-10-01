@@ -4,9 +4,9 @@
  * Specs: specs/identity/signin-signup-screens.feature,
  *        specs/identity/resilient-invitations.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -104,12 +104,7 @@ const handled = (code: string, httpStatus: number, meta: Record<string, unknown>
   data: { error: { code, httpStatus, fault: "customer", meta } },
 });
 
-const renderLanding = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <InviteLanding inviteCode={INVITE_CODE} />
-    </ChakraProvider>,
-  );
+const renderLanding = () => renderWithDesignSystem(<InviteLanding inviteCode={INVITE_CODE} />);
 
 describe("given an invitation link", () => {
   beforeEach(() => {

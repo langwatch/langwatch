@@ -215,7 +215,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
   }
 
   async checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
-    return { status: "evaluated", verdict: await this.#members.guardrails.check(input) } as const;
+    return this.#members.guardrails.check(input);
   }
 
   async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<
@@ -244,7 +244,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
       bucketScopeId,
     });
     const spentMicroUsd = await bucketSpentMicroUsd({
-      store: this.#members.store,
+      projects: this.#members.projects,
       budgetRepository: this.#members.budgetSpend,
       budget,
       bucketScopeId,
@@ -261,6 +261,7 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
     const { perCommand, rejected } = groupSpendCommands(records, pipeline.rating);
     await enrichAttributedCommands({
       store: this.#members.store,
+      projects: this.#members.projects,
       admits: perCommand.admitSpend,
       outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
     });
@@ -331,13 +332,15 @@ export class GatewayInternalProtocolService implements GatewayInternalProtocol {
  * not the whole template.
  */
 async function bucketSpentMicroUsd(params: {
-  store: GatewayInternalStoreRepository;
+  projects: Pick<ProjectApi, "listIdsByOrganization">;
   budgetRepository: GatewayBudgetSpend;
   budget: GatewayBudget;
   bucketScopeId: string;
   periodFloorMs: number | undefined;
 }): Promise<number> {
-  const projectIds = await params.store.findProjectIdsForOrganization(params.budget.organizationId);
+  const projectIds = await params.projects.listIdsByOrganization({
+    organizationId: params.budget.organizationId,
+  });
   if (projectIds.length === 0) return 0;
 
   const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(projectIds, [
@@ -633,10 +636,12 @@ function reportAttributionGaps({
 
 async function enrichAttributedCommands({
   store,
+  projects: projectDirectory,
   admits,
   outcomes,
 }: {
   store: GatewayInternalStoreRepository;
+  projects: Pick<ProjectApi, "listNamesByIds">;
   admits: Record<string, unknown>[];
   outcomes: Record<string, unknown>[];
 }): Promise<void> {
@@ -654,7 +659,9 @@ async function enrichAttributedCommands({
   const identities = commands.map(attributedIdentity);
   const [virtualKeys, projects] = await Promise.all([
     store.findVirtualKeysForAttribution([...new Set(identities.map((i) => i.virtualKeyId))]),
-    store.findProjectTeams([...new Set(identities.map((i) => i.projectId))]),
+    projectDirectory.listNamesByIds({
+      projectIds: [...new Set(identities.map((i) => i.projectId))],
+    }),
   ]);
   const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
   const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));

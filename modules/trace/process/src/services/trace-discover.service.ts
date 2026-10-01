@@ -5,6 +5,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import { nowInstant } from "@langwatch/time";
 import type {
   BatchedFacetResult,
@@ -22,7 +23,6 @@ import type {
   RangeFacetDef,
 } from "#rules/trace-facet-registry.rules";
 
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
@@ -205,13 +205,13 @@ export class TraceDiscoverService {
   private readonly repository: TraceListRead;
   private readonly descriptors: TraceFacetDescriptorService;
   private readonly facets: FacetCatalog;
-  private readonly updates: TraceTenantBroadcast;
+  private readonly updates: Pick<PresenceApi, "publishProjectEvent">;
 
   private constructor(deps: {
     repository: TraceListRead;
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
-    updates: TraceTenantBroadcast;
+    updates: Pick<PresenceApi, "publishProjectEvent">;
   }) {
     this.repository = deps.repository;
     this.descriptors = deps.descriptors;
@@ -229,7 +229,7 @@ export class TraceDiscoverService {
     topicNaming: TraceTopicNamingService;
     facets: FacetCatalog;
     /** Where a finished background refresh tells the tenant's tabs to refetch. */
-    updates: TraceTenantBroadcast;
+    updates: Pick<PresenceApi, "publishProjectEvent">;
   }): TraceDiscoverService {
     return new TraceDiscoverService({
       repository,
@@ -324,14 +324,14 @@ export class TraceDiscoverService {
         // SSE push to any browser subscribed for this tenant; the client refetches via tRPC and
         // hits the warm cache. Throws are swallowed: the cache write already succeeded.
         try {
-          await this.updates.broadcastToTenant({
-            tenantId: params.tenantId,
+          await this.updates.publishProjectEvent({
+            projectId: params.tenantId,
+            channel: "discover_updated",
             event: JSON.stringify({
               event: "discover_updated",
               tenantId: params.tenantId,
               timestamp: nowInstant().epochMilliseconds,
             }),
-            eventType: "discover_updated",
           });
         } catch (broadcastErr) {
           discoverLogger.warn(

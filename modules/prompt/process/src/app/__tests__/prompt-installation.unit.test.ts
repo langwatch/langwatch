@@ -1,23 +1,23 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
-import { promptServer } from "../../prompt.server.ts";
+import { promptProcessModule } from "../../prompt.module.ts";
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([promptServer])
+    .withModules([promptProcessModule])
     .withStores(memoryStores())
     .withMembers({
       logging: createTestLogger().logger,
@@ -43,7 +43,7 @@ describe("prompt app installation", () => {
       try {
         const app = runtime.service(PromptApi);
 
-        expect(runtime.module(promptServer).provided).toBe(app);
+        expect(runtime.module(promptProcessModule).provided).toBe(app);
         await app.seedTagsForOrganization({ organizationId: "organization-1" });
         await expect(app.listTags({ organizationId: "organization-1" })).resolves.toMatchObject([
           { name: "production" },

@@ -1,9 +1,11 @@
 /**
- * What a browser installs when it installs suite: nothing routed. Suite owns
- * no screens or drawers today; scenario's declaration routes every Suite-run
- * page and dialog, importing these components directly.
+ * Suite routes nothing in the browser: it only declares the `suite:run-history`
+ * slice at install. Scenario's declaration renders the Suite-run pages and dialogs.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const suiteWeb = defineWebModule("suite");
+// Declares the `suite:run-history` slice at install, so scenario reads it from first paint.
+import "./behavior/use-run-history-store.ts";
+
+export const suiteWeb = defineBrowserModule("suite");

@@ -5,7 +5,6 @@
  * @see specs/automations/worker-automation-settlement-conversion.feature
  */
 import { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
@@ -15,17 +14,17 @@ import {
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import { LocalFeatureApis } from "@langwatch/kernel";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { CLOUD_FREE_LICENSING_PLAN } from "@langwatch/plans";
+import { LocalFeatureApis } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type {
@@ -139,7 +138,7 @@ function compose({
       },
       cleanupTenantEmitter: () => undefined,
     },
-    tenantBroadcast: MemoryTraceTenantBroadcastChannel.create(),
+    tenantBroadcast: { publishProjectEvent: async () => {} },
     protections: {
       authz: apis.reference(AuthzApi),
       projects,

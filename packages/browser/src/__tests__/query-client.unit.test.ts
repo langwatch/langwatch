@@ -1,0 +1,243 @@
+import type { UiFailureNotice, UiSuccessNotice } from "@langwatch/browser-host/capabilities";
+import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { createUiQueryClient, resetUiQueries } from "../query-client.ts";
+
+function recordingHost() {
+  const failed: UiFailureNotice[] = [];
+  return {
+    failed,
+    host: {
+      succeeded: (_notice: UiSuccessNotice) => {},
+      failed: (failure: UiFailureNotice) => void failed.push(failure),
+    },
+  };
+}
+
+/** A handled error as tRPC carries it. */
+const handled = ({ code, httpStatus }: { code: string; httpStatus: number }) => ({
+  data: { httpStatus, error: { code, httpStatus, fault: "customer", meta: {} } },
+});
+
+/** Runs one mutation through the client's real cache until it settles, rejected. */
+async function failMutation(client: ReturnType<typeof createUiQueryClient>, error: unknown) {
+  const mutation = client.getMutationCache().build(client, {
+    mutationFn: () => Promise.reject(error),
+  });
+  await mutation.execute(undefined).catch(() => {});
+}
+
+afterEach(() => {
+  setUiFeedbackHost(void 0);
+  vi.restoreAllMocks();
+});
+
+describe("createUiQueryClient", () => {
+  describe("given a query", () => {
+    it("retries through shouldRetryQuery — the one policy, not a client default", () => {
+      const client = createUiQueryClient();
+
+      expect(client.getDefaultOptions().queries?.retry).toBe(shouldRetryQuery);
+    });
+
+    /** @scenario "Moving between pages does not ask for the offer again" */
+    /** @scenario "A read is trusted for five minutes and refetched on focus only when stale" */
+    it("keeps an answer fresh for five minutes; query-sync owns the one focus pass", () => {
+      const client = createUiQueryClient();
+      const queries = client.getDefaultOptions().queries;
+
+      expect(queries).toMatchObject({
+        staleTime: 5 * 60_000,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: true,
+      });
+      expect(queries?.refetchInterval).toBeUndefined();
+    });
+
+    it("never auto-reports a query failure", async () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+      const client = createUiQueryClient();
+
+      await client
+        .fetchQuery({
+          queryKey: ["x"],
+          queryFn: () => Promise.reject(new Error("boom")),
+          retry: false,
+        })
+        .catch(() => {});
+
+      expect(failed).toEqual([]);
+    });
+  });
+
+  describe("when a mutation fails, with no override", () => {
+    describe("when the failure carries a code the registry knows", () => {
+      it("reports it through showErrorToast, whole, to the mounted feedback host", async () => {
+        const { failed, host } = recordingHost();
+        setUiFeedbackHost(host);
+        const client = createUiQueryClient();
+        const error = handled({ code: "validation_error", httpStatus: 400 });
+
+        await failMutation(client, error);
+
+        expect(failed[0]?.error).toBe(error);
+      });
+    });
+
+    describe("when the failure is not a handled one", () => {
+      it("still reports it, without inventing a code", async () => {
+        const { failed, host } = recordingHost();
+        setUiFeedbackHost(host);
+        const client = createUiQueryClient();
+        const error = new Error("boom");
+
+        await failMutation(client, error);
+
+        expect(failed[0]?.error).toBe(error);
+        expect(failed[0]?.fallbackTitle).toBe("Something went wrong");
+      });
+    });
+
+    describe("when no feedback host is mounted", () => {
+      it("warns and drops the report rather than throwing", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const client = createUiQueryClient();
+
+        await failMutation(client, new Error("boom"));
+        expect(warn).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("when a mutation fails, with an override supplied", () => {
+    it("calls the caller's reporter instead of showErrorToast", async () => {
+      const { failed, host } = recordingHost();
+      setUiFeedbackHost(host);
+      const onMutationError = vi.fn();
+      const client = createUiQueryClient({ onMutationError });
+      const error = new Error("boom");
+
+      await failMutation(client, error);
+
+      // react-query hands a mutation reporter (error, variables, context, mutation);
+      // only the first is this seam's contract.
+      expect(onMutationError.mock.calls[0]?.[0]).toBe(error);
+      expect(failed).toHaveLength(0);
+    });
+  });
+
+  describe("given a session query key", () => {
+    const sessionKey = ["session"];
+
+    async function failRead({
+      client,
+      key,
+      error,
+    }: {
+      client: ReturnType<typeof createUiQueryClient>;
+      key: readonly unknown[];
+      error: unknown;
+    }) {
+      await client
+        .fetchQuery({ queryKey: key, queryFn: () => Promise.reject(error), retry: false })
+        .catch(() => {});
+    }
+
+    function clientWithSession() {
+      const client = createUiQueryClient({ sessionQueryKey: sessionKey });
+      // Slow enough that a second failure lands while the refetch is still in flight.
+      const sessionRead = vi.fn(
+        () => new Promise((resolve) => setTimeout(resolve, 20, { user: "u" })),
+      );
+      client.setQueryDefaults(sessionKey, { queryFn: sessionRead });
+      client.setQueryData(sessionKey, { user: "u" });
+      return { client, sessionRead };
+    }
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("refetches the session once when another read fails 403", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: ["other"],
+        error: handled({ code: "forbidden", httpStatus: 403 }),
+      });
+
+      expect(sessionRead).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("refetches the session once when two reads fail 403 together", async () => {
+      const { client, sessionRead } = clientWithSession();
+      const error = handled({ code: "forbidden", httpStatus: 403 });
+
+      await Promise.all([
+        failRead({ client, key: ["a"], error }),
+        failRead({ client, key: ["b"], error }),
+      ]);
+
+      expect(sessionRead).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("does nothing when the session read itself fails 403", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: sessionKey,
+        error: handled({ code: "forbidden", httpStatus: 403 }),
+      });
+
+      expect(sessionRead).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A forbidden read refetches the session once" */
+    it("does nothing when a read fails 500", async () => {
+      const { client, sessionRead } = clientWithSession();
+
+      await failRead({
+        client,
+        key: ["other"],
+        error: handled({ code: "internal", httpStatus: 500 }),
+      });
+
+      expect(sessionRead).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("resetUiQueries", () => {
+  it("cancels in-flight reads and clears every read but the session read", async () => {
+    const client = createUiQueryClient();
+    const sessionKey = ["session"];
+    client.setQueryData(sessionKey, { cacheKey: "k" });
+    client.setQueryData(["other"], ["held"]);
+    const inFlight = client
+      .fetchQuery({ queryKey: ["slow"], queryFn: () => new Promise(() => {}), retry: false })
+      .catch(() => "cancelled");
+
+    resetUiQueries({ queryClient: client, sessionQueryKey: sessionKey });
+
+    expect(await inFlight).toBe("cancelled");
+    expect(client.getQueryData(["other"])).toBeUndefined();
+    expect(client.getQueryData(["slow"])).toBeUndefined();
+    expect(client.getQueryData(sessionKey)).toEqual({ cacheKey: "k" });
+  });
+
+  it("drops every mutation answer, so a minted token does not outlive its actor", async () => {
+    const client = createUiQueryClient();
+    const mutation = client.getMutationCache().build(client, {
+      mutationFn: () => Promise.resolve({ token: "minted" }),
+    });
+    await mutation.execute(undefined);
+
+    resetUiQueries({ queryClient: client, sessionQueryKey: ["session"] });
+
+    expect(client.getMutationCache().getAll()).toEqual([]);
+  });
+});

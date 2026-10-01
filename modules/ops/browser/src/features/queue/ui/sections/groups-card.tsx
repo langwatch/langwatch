@@ -83,7 +83,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
   const primaryQueue = queueNames[0];
   const groupsQuery = api.ops.listGroups.useQuery(
     { queueName: primaryQueue ?? "", page: 1, pageSize: 200 },
-    { refetchInterval: 10000, enabled: !!primaryQueue },
+    { enabled: !!primaryQueue },
   );
 
   const allGroups = useMemo(() => {
@@ -145,7 +145,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
 
   const pausedTenantsQuery = api.ops.listPausedTenants.useQuery(
     { queueName: primaryQueue ?? "" },
-    { enabled: !!primaryQueue, refetchInterval: 10000 },
+    { enabled: !!primaryQueue },
   );
   const isTenantPaused = !!(tenantScope && pausedTenantsQuery.data?.includes(tenantScope));
 

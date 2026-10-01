@@ -6,15 +6,15 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";
 import { MemoryDashboardRepositories } from "../../repositories/memory/memory.dashboard.repositories.ts";
-import { DashboardApp } from "../dashboard.app.ts";
+import { DashboardModule } from "../dashboard.app.ts";
 
 /** Everything visible: the caller the gates are measured against. */
 export const FULLY_PERMITTED: LangWatchQLProtections = {
@@ -81,8 +81,8 @@ export function createDashboardTestApp(
       projects: ProjectApi;
     }>;
   }> = {},
-): DashboardApp {
-  return DashboardApp.create({
+): DashboardModule {
+  return DashboardModule.create({
     repositories: input.repositories ?? MemoryDashboardRepositories.create(),
     members: { publicBaseUrl: input.publicBaseUrl },
     dependencies: {

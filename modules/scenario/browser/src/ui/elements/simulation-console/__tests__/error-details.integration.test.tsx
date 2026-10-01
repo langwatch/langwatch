@@ -3,19 +3,15 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/scenario-infra-error-surfacing.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { classifyScenarioInfraError, encodeScenarioError } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ErrorDetails } from "../error-details.tsx";
 
 function renderError(error: string) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ErrorDetails error={error} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ErrorDetails error={error} />);
 }
 
 // The real serialized error the scenario SDK stores for a self-signed cert

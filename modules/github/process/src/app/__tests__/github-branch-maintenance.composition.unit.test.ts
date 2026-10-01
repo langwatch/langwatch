@@ -9,7 +9,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
-import { GithubApp } from "../../app/github.app.ts";
+import { GithubModule } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 
@@ -104,7 +104,7 @@ function githubApi() {
 }
 
 function sweep(client: PrismaClient) {
-  return GithubApp.composeBranchMaintenance({
+  return GithubModule.composeBranchMaintenance({
     repositories: {
       ...unansweredRedisRepositories(),
       installations: PrismaGithubInstallationsRepository.create(client),
@@ -159,7 +159,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     it("asks GitHub nothing and writes nothing, rather than failing", async () => {
       const { client, writes } = database();
       const paths = githubApi();
-      const uncredentialed = GithubApp.composeBranchMaintenance({
+      const uncredentialed = GithubModule.composeBranchMaintenance({
         repositories: {
           ...unansweredRedisRepositories(),
           installations: PrismaGithubInstallationsRepository.create(client),
@@ -177,7 +177,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     /** @scenario "The retention prune runs without App credentials" */
     it("still prunes bookkeeping past the activity horizon", async () => {
       const { client } = database();
-      const uncredentialed = GithubApp.composeBranchMaintenance({
+      const uncredentialed = GithubModule.composeBranchMaintenance({
         repositories: {
           ...unansweredRedisRepositories(),
           installations: PrismaGithubInstallationsRepository.create(client),

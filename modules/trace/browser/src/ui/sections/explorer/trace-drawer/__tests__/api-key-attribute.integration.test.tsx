@@ -1,8 +1,8 @@
 // `langwatch.api_key.id` row: label trimmed, value linked to key settings.
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/api-key-attribute.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -14,8 +14,8 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 
 const mockNameById = vi.fn();
 
-vi.mock("../../../../../behavior/trace-api.ts", () => ({
-  api: {
+vi.mock("@langwatch/api-key-client", () => ({
+  apiKeyClient: {
     apiKey: { nameById: { useQuery: () => mockNameById() } },
   },
 }));
@@ -23,13 +23,11 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 import { AttributeTable } from "../attribute-table.tsx";
 
 function renderWithApiKeyAttribute() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AttributeTable
-        attributes={{ "langwatch.api_key.id": "key_abc123" }}
-        title="Trace Attributes"
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AttributeTable
+      attributes={{ "langwatch.api_key.id": "key_abc123" }}
+      title="Trace Attributes"
+    />,
   );
 }
 

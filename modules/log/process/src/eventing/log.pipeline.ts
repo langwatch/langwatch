@@ -17,7 +17,7 @@ import {
   type RecordCanonicalLogCommandData,
 } from "@langwatch/log-contract";
 
-import type { LogApp } from "../app/log.app.ts";
+import type { LogModule } from "../app/log.app.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import { CanonicalLogService } from "../services/canonical-log.service.ts";
 import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
@@ -101,6 +101,6 @@ export class LogProcessingAdapter {
  */
 export const logEventing = defineEventingModule({
   pipeline: LOG_PROCESSING_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, LogApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<never, LogModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

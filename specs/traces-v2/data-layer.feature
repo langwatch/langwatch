@@ -111,7 +111,7 @@ Rule: Facet counts
     When the Observe page loads
     Then `useTraceFacets` calls `api.tracesV2.discover.useQuery` (not `tracesV2.facets`)
     And the discover payload returns categorical facets with `topValues` plus range facets
-    And the query opts out of tRPC batching via `trpc.context.skipBatch=true`
+    And the query travels on its own HTTP request
     And `staleTime` is 10 minutes (the schema shifts on the order of minutes)
 
   Scenario: Sidebar keeps previous facets across project switches
@@ -530,7 +530,7 @@ Rule: URL state synchronization
     Given the app is in a specific state with filters and drawer open
     When the user refreshes the page
     Then `useURLSync` rehydrates `filterStore` + `viewStore` from the fragment
-    And `useDrawerUrlSync` rehydrates `drawerStore` from `drawer.*` params
+    And the drawer reads its state again from the `drawer.*` params in the address
 
   Scenario: Filter changes use replaceState (no history spam)
     When the user types in the search bar
@@ -571,22 +571,21 @@ Rule: SSE freshness
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCHING (httpBatchLink)
+# REQUESTS (httpLink)
 # ─────────────────────────────────────────────────────────────────────────────
 
-Rule: Batched tRPC requests with skipBatch opt-out
-  The tRPC client uses `httpBatchLink` by default. Heavy or independent
-  queries opt out via `trpc: { context: { skipBatch: true } }`.
+Rule: One request per call
+  The tRPC client uses `httpLink`: every call is its own HTTP request and
+  there is no batch query parameter.
 
-  Scenario: Drawer open batches header and span tree by default
+  Scenario: Drawer open sends header and span tree as separate requests
     When the user clicks a trace row
-    Then `tracesV2.header` and the first `tracesV2.spanTreePaginated` page fire in the same tick
-    And they are batched into a single HTTP request unless one opts out
+    Then `tracesV2.header` and the first `tracesV2.spanTreePaginated` page each send their own request
 
-  Scenario: Heavy queries opt out of batching
-    Given `useTraceFacets` (`tracesV2.discover`) sets `context.skipBatch=true`
-    Then it issues its own HTTP request and never blocks behind the slow `tracesV2.list` query
-    And `useTraceEvaluations` does the same for `tracesV2.evals`
+  Scenario: A slow read never holds up a fast one
+    Given `useTraceFacets` (`tracesV2.discover`) and `tracesV2.list` are asked in the same tick
+    Then `tracesV2.discover` is answered without waiting for the slow `tracesV2.list` query
+    And `useTraceEvaluations` (`tracesV2.evals`) is answered the same way
 
 
 # ─────────────────────────────────────────────────────────────────────────────

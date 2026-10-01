@@ -6,9 +6,8 @@ import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -87,7 +86,6 @@ type ProjectDependencies = Readonly<{
   authorization: typeof AuthzApi;
   trace: typeof TraceApi;
   auditLog: typeof AuditLogApi;
-  langy: typeof LangyApi;
   /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
   dataPrivacy: typeof DataPrivacyApi;
 }>;
@@ -103,7 +101,7 @@ type ProjectSetup = FeatureSetup<
  * door each call, handed through the operations-only proxy — an unserved
  * member throws at first request, which `implements` turns into a build failure.
  */
-export class ProjectApp implements ProjectApiContract, ProjectManagementApi, ProjectBrowserApi {
+export class ProjectModule implements ProjectApiContract, ProjectManagementApi, ProjectBrowserApi {
   listPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
     return this.#projectService.listPaths(input);
   }
@@ -131,7 +129,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     authorization: AuthzApi,
     trace: TraceApi,
     auditLog: AuditLogApi,
-    langy: LangyApi,
     dataPrivacy: DataPrivacyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
@@ -143,7 +140,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
-  readonly #langy: LangyApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
@@ -160,7 +156,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     apiKeys,
     authorization,
     trace,
-    langy,
     dataPrivacy,
     encryption,
     logger,
@@ -171,7 +166,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     apiKeys: ApiKeyApi;
     authorization: AuthzApi;
     trace: TraceApi;
-    langy: LangyApi;
     dataPrivacy: DataPrivacyApi;
     encryption: ProjectProcessMembers["encryption"];
     logger: ProjectProcessMembers["logger"];
@@ -182,13 +176,12 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#apiKeys = apiKeys;
     this.#authorization = authorization;
     this.#trace = trace;
-    this.#langy = langy;
     this.#dataPrivacy = dataPrivacy;
     this.#encryption = encryption;
     this.#logger = logger;
   }
 
-  static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
+  static create({ members, dependencies, repositories }: ProjectSetup): ProjectModule {
     const lifecycle = ProjectCreatedNoticeService.create({
       logger: members.logger,
       projects: repositories.projects,
@@ -201,21 +194,20 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     });
     const operations = ProjectOperationsService.create({
       projects,
-      apiKeys: dependencies.apiKeys,
+      auditLog: dependencies.auditLog,
+      lifecycle,
+      logger: members.logger,
       share: dependencies.share,
       topics: dependencies.topics,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
-      auditLog: dependencies.auditLog,
-      logger: members.logger,
     });
-    return new ProjectApp({
+    return new ProjectModule({
       projectService: projects,
       operations,
       lifecycle,
       apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
       trace: dependencies.trace,
-      langy: dependencies.langy,
       dataPrivacy: dependencies.dataPrivacy,
       encryption: members.encryption,
       logger: members.logger,
@@ -294,18 +286,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     });
   }
 
-  provisionLangyVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void> {
-    return this.#langy.provisionVirtualKey(input);
-  }
-
-  recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void> {
-    return this.#operations.recordApiKeyRegenerated(entry);
-  }
-
   /**
    * A clustering request that did not land. Reported rather than raised: the
    * door has already decided this is best effort, and the topic module
@@ -315,16 +295,20 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
   }
 
-  getProject(input: { projectId: string }): Promise<Project> {
-    return this.#requests.getProject(input);
-  }
-
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }> {
     return this.#requests.archiveOtherProject(input);
+  }
+
+  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }> {
+    return this.#operations.getLegacyKeyStatus(input);
+  }
+
+  revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void> {
+    return this.#operations.revokeLegacyProjectKey({ projectId: input.projectId }, input.by);
   }
 
   triggerTopicClustering(input: {
@@ -545,16 +529,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#operations.archive(input);
   }
 
-  regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string> {
-    return this.#operations.regenerateLegacyProjectKey(input);
-  }
-
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null> {
     return this.#projectService.findIdByLegacyApiKey(input);
-  }
-
-  rotateLegacyApiKey(input: Readonly<{ projectId: string; token: string }>): Promise<boolean> {
-    return this.#projectService.rotateLegacyApiKey(input);
   }
 
   /** Both kill switches a trace share is minted under, read off this module's rows. */

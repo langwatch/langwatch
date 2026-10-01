@@ -349,9 +349,9 @@ export type GovernanceApiMap = ContractApiMap<typeof activityMonitorTrpc> &
     };
 
     organization: {
-      getAll: {
+      getScopeGraph: {
         query: {
-          input: { isDemo?: boolean };
+          input: Record<string, never>;
           output: GovernanceOrganizationGraph[];
         };
       };

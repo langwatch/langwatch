@@ -25,7 +25,7 @@ import {
   instantEvalFinishedEventSchema,
 } from "@langwatch/instant-eval-contract";
 
-import type { InstantEvalApp } from "../app/instant-eval.app.ts";
+import type { InstantEvalModule } from "../app/instant-eval.app.ts";
 import type { InstantEvalRepositories } from "../repositories/instant-eval.repositories.ts";
 import { INSTANT_EVAL_PROCESS_NAME } from "./instant-eval-processing-data.process.ts";
 import {
@@ -106,7 +106,7 @@ export const instantEvalEventing = defineEventingModule({
   pipeline: INSTANT_EVAL_PIPELINE_NAME,
   // The tier the process selected is handed in; this half reads the app's
   // already-built pipeline, which was composed over the same instances.
-  build: ({ app }: EventingSetup<InstantEvalRepositories, InstantEvalApp>) =>
+  build: ({ app }: EventingSetup<InstantEvalRepositories, InstantEvalModule>) =>
     app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

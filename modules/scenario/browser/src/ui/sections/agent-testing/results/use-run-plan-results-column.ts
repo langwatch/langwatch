@@ -6,6 +6,7 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
 import { format } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
@@ -20,7 +21,6 @@ import { api } from "../../../../behavior/scenario-api.ts";
 import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-scenario-runs.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { summarizeEvaluations } from "./evaluation-summaries.ts";
 import type { PeriodControls } from "./period-controls.ts";
 import type { RunPlanDetailRun } from "./run-plan-detail-header.tsx";
@@ -72,7 +72,7 @@ function useRunStartedByLabel(actor: RunActor | null): string | null {
   const needsMemberName = actor?.label === "user" && !!actor.id && actor.id !== viewerUserId;
 
   const members = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId: organization?.id ?? "" },
+    { organizationId: organization?.id ?? "", includeDeactivated: false },
     { enabled: !!organization?.id && needsMemberName },
   );
 

@@ -3,7 +3,7 @@
  * Integration tests for creating an experiment from the prompt playground.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
@@ -147,6 +147,15 @@ vi.mock("../../../../../behavior/prompt-api.ts", () => ({
         }),
       },
     },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      experiments: {
+        getAllForEvaluationsList: { invalidate: vi.fn() },
+      },
+    }),
     prompts: {
       getByIdOrHandle: {
         useQuery: () => ({
@@ -199,9 +208,9 @@ const createTabData = (
 });
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <PromptHostProvider value={testHost}>{children}</PromptHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 describe("ExperimentFromPlaygroundButton", () => {

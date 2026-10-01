@@ -1,11 +1,4 @@
-/**
- * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
- * @see specs/features/agent-testing/suites-rail.feature
- * @see specs/suites/test-suites.feature
- */
-import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import { VStack } from "@langwatch/design-system/primitives";
-import { SuiteArchiveDialog } from "@langwatch/suite-browser-kit";
 import type { Instant } from "@langwatch/time";
 import { useCallback, useState } from "react";
 
@@ -14,6 +7,17 @@ import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
+/**
+ * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
+ * @see specs/features/agent-testing/suites-rail.feature
+ * @see specs/suites/test-suites.feature
+ */
+import type {
+  Period,
+  PeriodMode,
+  RelativePresetKey,
+} from "../../../elements/analytics/period-selector.tsx";
+import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailSections } from "./suite-rail-sections.tsx";
 import type { SuiteLastRun } from "./use-test-cases-data.ts";

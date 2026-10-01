@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Identifier-first sign-in renders routing decisions; holds no routing logic.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -122,12 +122,7 @@ const unknownIdentifier: RoutingDecision = {
   reasonCode: "identifier_unknown",
 };
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <IdentifierFirstSignIn />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<IdentifierFirstSignIn />);
 
 /**
  * The rendered picker, with the two things that legitimately differ between

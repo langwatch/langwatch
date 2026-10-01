@@ -14,10 +14,10 @@ import {
 } from "@langwatch/redaction/pii";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
-import type { PIICheckOptions } from "../app/data-privacy.members.ts";
 import type {
   OtlpSpanPiiRedactionServiceDependencies,
   PiiAnalysisItem,
+  PIICheckOptions,
   PiiRedactionPolicyService,
 } from "./pii-redaction-policy.service.ts";
 

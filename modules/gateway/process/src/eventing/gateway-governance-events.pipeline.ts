@@ -9,7 +9,7 @@ import {
 } from "@langwatch/eventing";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
-import type { GatewayApp } from "../app/gateway.app.ts";
+import type { GatewayModule } from "../app/gateway.app.ts";
 import {
   GATEWAY_GOVERNANCE_EVENTS_AGGREGATE_TYPE,
   GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
@@ -56,7 +56,7 @@ export function buildGatewayGovernanceEventsPipeline(input: {
 /** Declared before gateway_spend, so the debit writer's crossing sender is bound first. */
 export const gatewayGovernanceEventsEventing = defineEventingModule({
   pipeline: GATEWAY_GOVERNANCE_EVENTS_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<undefined, GatewayApp>) =>
+  build: ({ app, participation }: EventingSetup<undefined, GatewayModule>) =>
     app.governanceEventsPipeline({ participation }),
   connect: ({ app, commands }) => app.connectGovernanceEvents(commands),
 });

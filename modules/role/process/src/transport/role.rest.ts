@@ -1,15 +1,15 @@
-/**
- * The custom-roles management REST family. Every write is a grants-ledger
- * command (ADR-092 §13), so no handler emits an audit row of its own, and the
- * organization arrives as a bound fact rather than off a project scope.
- */
-import type { Actor } from "@langwatch/actor";
 import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+/**
+ * The custom-roles management REST family. Every write is a grants-ledger
+ * command (ADR-092 §13), so no handler emits an audit row of its own, and the
+ * organization arrives as a bound fact rather than off a project scope.
+ */
+import type { Actor } from "@langwatch/authorization";
 import {
   ROLE_KIND,
   RoleApi,

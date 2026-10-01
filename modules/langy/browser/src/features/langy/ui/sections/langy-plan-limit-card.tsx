@@ -1,11 +1,12 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { useLangyStore, LangyCard } from "@langwatch/langy-browser-kit";
 import { ArrowUpRight, Crown } from "lucide-react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { usePlanManagementUrl } from "../../../../behavior/use-plan-management-url.ts";
 import { trackEvent } from "../../../../model/tracking.ts";
+import { LangyCard } from "../../../../ui/sections/langy-card.tsx";
 import type { LangyToolErrorPresentation } from "../../model/logic/langy-tool-failure.ts";
 
 /**

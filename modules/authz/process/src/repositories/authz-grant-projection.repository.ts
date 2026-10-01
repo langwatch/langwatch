@@ -19,6 +19,8 @@ export type GrantProjectionWrite =
     }
   | {
       kind: "grant.revoke";
+      /** The revoking event's tenant: a grant is ended only inside its own organization. */
+      organizationId: string;
       grantId: string;
       reason: string | null;
       occurredAt: Instant;

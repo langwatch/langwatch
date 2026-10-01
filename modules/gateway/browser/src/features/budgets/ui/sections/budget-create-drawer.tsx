@@ -1,3 +1,4 @@
+import { describeError } from "@langwatch/browser-host/errors";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
@@ -19,7 +20,6 @@ import { useMemo, useState } from "react";
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
-import { describeError } from "../../../../model/describe-error.ts";
 import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import type { GatewayTeam } from "../../../../model/gateway-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";

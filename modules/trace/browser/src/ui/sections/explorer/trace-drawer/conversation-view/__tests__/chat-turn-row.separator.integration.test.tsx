@@ -1,19 +1,21 @@
 // Per-turn separator decluttered: no model abbreviation, no token counts,
 // explicit time-ago label.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../scenario-roles.tsx", async () => {
-  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
+vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+  const actual = await vi.importActual<typeof scenarioRolesModule>(
+    "../../../../../../behavior/scenario-role.store.tsx",
+  );
   return { ...actual, useIsScenarioRole: () => false };
 });
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
+vi.mock("@langwatch/design-system/conversation-expand-context", async () => {
+  const actual = await vi.importActual<typeof actualModule>(
+    "@langwatch/design-system/conversation-expand-context",
   );
   return {
     ...actual,
@@ -57,11 +59,11 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule from "@langwatch/design-system/conversation-expand-context";
 
+import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
 import type { TraceListItem } from "../../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../../types/trace.ts";
-import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -106,29 +108,27 @@ function renderRow({
   gap?: { gapSecs: number; shouldShowGap: boolean };
   eventCount?: number;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ChatTurnRow
-        layout="thread"
-        turn={turn({
-          durationMs: 20900,
-          totalTokens: 5038,
-          inputTokens: 4500,
-          outputTokens: 538,
-          models: ["openai/gpt-5-mini"],
-          timestamp: Date.now() - ONE_HOUR_MS,
-          events: events(eventCount),
-        })}
-        userText="a question"
-        assistantText="an answer"
-        assistantReasoning=""
-        gapSecs={gap?.gapSecs ?? 0}
-        shouldShowGap={gap?.shouldShowGap ?? false}
-        index={3}
-        isCurrent={false}
-        onSelect={() => undefined}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ChatTurnRow
+      layout="thread"
+      turn={turn({
+        durationMs: 20900,
+        totalTokens: 5038,
+        inputTokens: 4500,
+        outputTokens: 538,
+        models: ["openai/gpt-5-mini"],
+        timestamp: Date.now() - ONE_HOUR_MS,
+        events: events(eventCount),
+      })}
+      userText="a question"
+      assistantText="an answer"
+      assistantReasoning=""
+      gapSecs={gap?.gapSecs ?? 0}
+      shouldShowGap={gap?.shouldShowGap ?? false}
+      index={3}
+      isCurrent={false}
+      onSelect={() => undefined}
+    />,
   );
 }
 

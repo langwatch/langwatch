@@ -6,16 +6,15 @@
  *
  * Spec: specs/governance/governance-cost-screen.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SampleMark, SampleSaidOnce } from "../ui/elements/sample-mark.tsx";
 
-const renderInChakra = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const renderInChakra = (element: ReactElement) => renderWithDesignSystem(element);
 
 afterEach(() => cleanup());
 

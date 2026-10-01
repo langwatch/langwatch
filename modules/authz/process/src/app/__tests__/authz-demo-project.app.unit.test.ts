@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { createAuthzTestApp } from "./authz.fixture.ts";
 
-describe("AuthzApp.isDemoProject", () => {
+describe("AuthzModule.isDemoProject", () => {
   it("answers only for the configured demo project", () => {
     const config: AuthzServerConfig = {
       epochCacheEnabled: true,

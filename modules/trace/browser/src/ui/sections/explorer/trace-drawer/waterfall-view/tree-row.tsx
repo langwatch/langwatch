@@ -1,6 +1,6 @@
+import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
 import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatCost, formatDuration } from "@langwatch/trace-browser-kit";
 import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { BookText, ScrollText } from "lucide-react";
 import { memo, useCallback } from "react";

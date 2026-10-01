@@ -2,7 +2,7 @@
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
-import { workflowServer } from "../../workflow.server.ts";
+import { workflowProcessModule } from "../../workflow.module.ts";
 import {
   NLP_LAMBDA_CLEANUP_PIPELINE_NAME,
   buildNlpLambdaCleanupPipeline,
@@ -59,7 +59,7 @@ describe("given workflow's Lambda cleanup declaration", () => {
   it("is installed with the module and wakes once a day", () => {
     const { definition, process } = built(async () => undefined);
 
-    expect(workflowServer.eventing?.pipeline.split(", ")).toContain(
+    expect(workflowProcessModule.eventing?.pipeline.split(", ")).toContain(
       NLP_LAMBDA_CLEANUP_PIPELINE_NAME,
     );
     expect(definition.metadata.name).toBe(NLP_LAMBDA_CLEANUP_PIPELINE_NAME);

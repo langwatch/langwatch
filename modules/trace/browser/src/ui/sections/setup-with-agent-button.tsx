@@ -3,12 +3,12 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, Button, chakra, HStack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useState } from "react";
 import { LuBookOpen, LuChevronDown, LuSparkles, LuTerminal } from "react-icons/lu";
 
+import { useLangyStore } from "../../behavior/langy/langy.store.ts";
 import { useCanAskLangy } from "../../behavior/langy/use-can-ask-langy.ts";
-import { api } from "../../behavior/trace-api.ts";
+import { useSetupSkillPrompt as useSetupSkillPromptQuery } from "../../behavior/reads/use-project-reads.ts";
 import { withCredentials } from "../../model/skills/setup-prompt.ts";
 import { showErrorToast } from "./errors/index.ts";
 
@@ -276,10 +276,7 @@ function useSetupSkillPrompt({
     redirectToProjectOnboarding: false,
   });
   const projectId = project?.id;
-  const { data } = api.setupSkills.getPrompt.useQuery(
-    { projectId: projectId!, skill: skill! },
-    { enabled: enabled && !!skill && !!projectId, staleTime: Infinity },
-  );
+  const { data } = useSetupSkillPromptQuery({ projectId, skill, enabled });
   if (!data || !projectId) return null;
   return withCredentials({
     body: data.body,

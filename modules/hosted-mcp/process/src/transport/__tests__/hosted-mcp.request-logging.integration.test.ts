@@ -36,21 +36,25 @@ vi.mock("@langwatch/observability", async (importOriginal) => {
   return { ...actual, createLogger: () => loggerStub };
 });
 
-import type { McpLiveProjectLookup } from "../../app/hosted-mcp.members.ts";
 import { MemoryMcpSessionRelayChannel } from "../../channels/memory/memory.mcp-session-relay.channel.ts";
-import {
-  McpApiKeyCipher,
-  McpClientAddress,
-  McpProjectLookup,
-  McpSessionGrant,
-  type McpHandler,
-} from "../../index.ts";
 import { MemoryMcpOAuthClientRepository } from "../../repositories/memory/memory.mcp-oauth-client.repository.ts";
 import { MemoryMcpSessionRepository } from "../../repositories/memory/memory.mcp-session.repository.ts";
 import { RedisMcpOAuthTokenRepository } from "../../repositories/redis/redis.mcp-oauth-token.repository.ts";
+import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
+import type { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
+import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import { McpEndpointService } from "../../services/mcp-endpoint.service.ts";
+import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
-class LoggingProjectLookup extends McpProjectLookup {
+class LoggingProjectLookup implements Pick<
+  ProjectMcpProjectLookupService,
+  "resolveLiveProjectByApiKey"
+> {
   resolveLiveProjectByApiKey({ apiKey }: { apiKey: string }): Promise<McpLiveProjectLookup> {
     return Promise.resolve(
       apiKey === VALID_API_KEY
@@ -60,13 +64,13 @@ class LoggingProjectLookup extends McpProjectLookup {
   }
 }
 
-class AlwaysGranted extends McpSessionGrant {
+class AlwaysGranted implements Pick<AuthzMcpSessionGrantService, "stillGranted"> {
   stillGranted(): Promise<boolean> {
     return Promise.resolve(true);
   }
 }
 
-class PassThroughCipher extends McpApiKeyCipher {
+class PassThroughCipher implements McpApiKeyCipher {
   encrypt(text: string): string {
     return text;
   }
@@ -75,7 +79,7 @@ class PassThroughCipher extends McpApiKeyCipher {
   }
 }
 
-class LoopbackAddress extends McpClientAddress {
+class LoopbackAddress implements Pick<HeaderMcpClientAddressService, "clientIp"> {
   clientIp(request: IncomingMessage): string {
     return request.socket.remoteAddress ?? "127.0.0.1";
   }
@@ -224,6 +228,7 @@ describe("Feature: MCP request logging", () => {
       oauthClients: MemoryMcpOAuthClientRepository.create(),
       projects,
       grants: new AlwaysGranted(),
+      cliSessions: new FakeCliSessions(),
       cipher: new PassThroughCipher(),
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",

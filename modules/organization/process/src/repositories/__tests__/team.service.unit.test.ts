@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   permissionsConferred,
   type AuthzAccessBinding,
@@ -13,6 +12,7 @@ import {
   type OrganizationGroupMember,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

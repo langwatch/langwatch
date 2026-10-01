@@ -11,8 +11,6 @@ import { lazy } from "react";
 import { lazyBoundary } from "../elements/lazy-boundary.tsx";
 import type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
 
-export type { LangWatchQLWidgetChartProps } from "./langwatch-ql-widget-chart.tsx";
-
 export const LazyLangWatchQLWidgetChart = lazyBoundary<LangWatchQLWidgetChartProps>(
   lazy(() => import("./langwatch-ql-widget-chart.tsx")),
   () => (

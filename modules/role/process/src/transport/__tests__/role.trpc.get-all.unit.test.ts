@@ -1,11 +1,11 @@
+import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
+import type { RoleApi } from "@langwatch/role-contract";
 /**
  * @vitest-environment node
  * `role.getAll` answers the custom roles only: the Roles tab and the grant
  * dialog draw the built-ins themselves. specs/rbac/grants-rest-api.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
-import type { RoleApi } from "@langwatch/role-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { roleTrpcTransport } from "../role.trpc.ts";

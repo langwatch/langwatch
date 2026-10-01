@@ -1,8 +1,9 @@
-import { type LensConfig, setLensSyncBridge, useViewStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useRef } from "react";
 
+import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { type LensConfig, setLensSyncBridge } from "../../../../behavior/view.slice.ts";
 
 /** Discriminator stored on each SavedView row so the traces v2 lens
  * persistence doesn't collide with the v1 filter views — rows left behind by
@@ -80,11 +81,6 @@ export function useLensSync(): void {
     { projectId: projectId ?? "", kind: KIND },
     {
       enabled: !!projectId,
-      // Lenses change rarely from the server's perspective and we mirror
-      // every local mutation through the bridge, so a long stale time
-      // avoids redundant refetches during a session.
-      staleTime: 5 * 60 * 1000,
-      refetchOnWindowFocus: false,
     },
   );
 

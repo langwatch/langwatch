@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/model-providers/custom-model-display-name-resolution.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
@@ -41,11 +41,7 @@ import { ModelSelector } from "../model-selector.tsx";
 afterEach(() => cleanup());
 
 function renderSelector() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ModelSelector model="" options={[]} onChange={() => undefined} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ModelSelector model="" options={[]} onChange={() => undefined} />);
 }
 
 function listbox() {

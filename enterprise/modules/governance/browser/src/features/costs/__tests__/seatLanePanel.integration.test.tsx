@@ -7,9 +7,9 @@
  * Spec: specs/governance/governance-cost-screen.feature and
  * specs/ai-governance/dashboard/governance-ui-controls.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/design-system/meter-bar", () => ({
@@ -28,11 +28,7 @@ import { SeatLanePanel } from "../ui/blocks/cost-lane-panel.tsx";
 type SeatLane = Parameters<typeof SeatLanePanel>[0]["seats"];
 
 const renderLane = (seats: SeatLane) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SeatLanePanel seats={seats} testId="seat-lane" />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<SeatLanePanel seats={seats} testId="seat-lane" />);
 
 const pool = ({ sku, bought, assigned }: { sku: string; bought: number; assigned: number }) => ({
   skuPartNumber: sku,

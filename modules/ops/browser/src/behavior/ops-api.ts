@@ -10,6 +10,7 @@ import type {
   licenseRegistryTrpc,
   opsDashboardTrpc,
   opsEventLogTrpc,
+  opsOperatorsTrpc,
   opsPlatformTrpc,
   opsProcessTrpc,
   opsQueueTrpc,
@@ -27,7 +28,7 @@ export type OpsOrganizationGraph = {
     id: string;
     name: string;
     slug: string;
-    projects: { id: string; name: string; slug: string; apiKey: string }[];
+    projects: { id: string; name: string; slug: string }[];
   }[];
 };
 
@@ -78,6 +79,7 @@ type BorrowedProcedures = {
 export type OpsApiMap = ContractApiMap<typeof opsDashboardTrpc> &
   ContractApiMap<typeof opsEventLogTrpc> &
   ContractApiMap<typeof opsPlatformTrpc> &
+  ContractApiMap<typeof opsOperatorsTrpc> &
   ContractApiMap<typeof opsProcessTrpc> &
   ContractApiMap<typeof opsQueueTrpc> &
   ContractApiMap<typeof licenseRegistryTrpc> &

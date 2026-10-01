@@ -5,13 +5,13 @@
  */
 // @vitest-environment node
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
   ForbiddenError,
 } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

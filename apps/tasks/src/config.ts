@@ -8,7 +8,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { storesOwner } from "@langwatch/process-stores/config";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { Secret } from "@langwatch/secrets";
+import { Secret, type SecretsChain } from "@langwatch/secrets";
 import { z } from "zod";
 
 import type { SystemMigrationsDataplane } from "./system-migrations-dataplane.ts";
@@ -19,6 +19,8 @@ export const tasksConfig = Config.define((c) => ({
   skipPrismaMigrate: c.env("SKIP_PRISMA_MIGRATE", environmentOneOrTrueSchema),
   skipLwqlProvision: c.env("SKIP_LWQL_PROVISION", environmentOneOrTrueSchema),
   nodeEnvironment: c.env("NODE_ENV", nodeEnvironmentSchema),
+  /** Routing, not a secret: which 1Password account the secrets chain asks. */
+  onePasswordAccount: c.env("LANGWATCH_OP_ACCOUNT", z.string().optional()),
 }));
 
 export type TasksConfig = ConfigOf<typeof tasksConfig>;
@@ -73,6 +75,8 @@ export interface TaskConnections {
 export interface TaskInput {
   config: TasksConfig;
   connections: TaskConnections;
+  /** The runner's one secrets chain, the same sources the api and worker boot with. */
+  chain: SecretsChain;
   environment: Readonly<Record<string, string | undefined>>;
   signal: AbortSignal;
 }

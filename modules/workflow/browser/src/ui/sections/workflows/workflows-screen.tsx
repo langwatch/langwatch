@@ -7,11 +7,11 @@
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Grid, Skeleton, Spacer, useDisclosure, VStack } from "@langwatch/design-system/primitives";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
 
 import { workflowApi } from "../../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../../model/workflow-host.ts";
 import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 import { WorkflowListCard } from "../workflow-list-card.tsx";
 

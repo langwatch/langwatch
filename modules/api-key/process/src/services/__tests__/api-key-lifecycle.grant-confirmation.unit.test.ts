@@ -118,6 +118,7 @@ function makeService(
   const service = ApiKeyLifecycleService.create(
     { ...(dependencies as object), repository } as never,
     policy,
+    { forget: async () => void 0 },
   );
   return { service, repository, grantCalls };
 }

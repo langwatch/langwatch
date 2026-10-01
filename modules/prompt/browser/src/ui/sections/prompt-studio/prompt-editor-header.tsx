@@ -87,7 +87,6 @@ export function PromptEditorHeader({
           )}
           <GeneratePromptApiSnippetDialog
             promptHandle={handle}
-            apiKey={project?.apiKey}
             variables={formMethods.watch("version.configData.inputs")}
           >
             <GeneratePromptApiSnippetDialog.Trigger>

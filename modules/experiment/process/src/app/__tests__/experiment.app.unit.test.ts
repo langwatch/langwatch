@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * The experiment application: the rules that moved off its two doors onto it.
@@ -8,7 +7,9 @@ import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
  */
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { Experiment, ExperimentPublishedMonitor } from "@langwatch/experiment-contract";
+import type { Experiment } from "@langwatch/experiment-contract";
+import type { Monitor } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,7 +17,7 @@ import { ExperimentFindOrCreateService } from "../../services/experiment-find-or
 import type { WorkflowEvaluationService } from "../../services/experiment-workflow-evaluation.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
-import { ExperimentApp } from "../experiment.app.ts";
+import { ExperimentModule } from "../experiment.app.ts";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -34,7 +35,7 @@ const experiment: Experiment = {
   workbenchVersion: 0,
 };
 
-const monitor: ExperimentPublishedMonitor = {
+const monitor: Monitor = {
   id: "monitor-1",
   projectId: "project-1",
   experimentId: "experiment-1",
@@ -162,7 +163,7 @@ function harness({
     })),
   };
   const runLookup = ExperimentFindOrCreateService.create(experimentService);
-  const permissions = { mayManageEvaluations: vi.fn(async () => true) };
+  const permissions = { hasPermission: vi.fn(async () => true) };
   const people = { namesOf: vi.fn(async () => []) };
   const modelCosts = { listFor: vi.fn(async () => []) };
   const broadcast = {
@@ -176,7 +177,7 @@ function harness({
     archiveWorkflow,
     monitors,
     workbenchObserver,
-    app: ExperimentApp.createForTesting({
+    app: ExperimentModule.createForTesting({
       experiments: experimentService,
       runLookup,
       workflows: workflowService,
@@ -201,7 +202,7 @@ function firstCall(method: unknown): Record<string, unknown> {
   return mock.mock.calls[0]?.[0] as Record<string, unknown>;
 }
 
-describe("ExperimentApp", () => {
+describe("ExperimentModule", () => {
   describe("when nobody has run an experiment", () => {
     it("aggregates it to no runs rather than to a hole the caller fills", async () => {
       const { app } = harness();

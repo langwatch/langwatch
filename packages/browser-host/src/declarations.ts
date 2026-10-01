@@ -11,8 +11,8 @@ import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
-import type { UiTokenIdentity } from "@langwatch/kernel/contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
+import type { UiTokenIdentity } from "@langwatch/module";
 import type {
   MediaAudioElement,
   MediaPartProps,
@@ -501,6 +501,8 @@ export type UiHttpConfigEditorProps = {
   onHeadersChange: (headers: HttpHeader[]) => void;
   onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
   paddingX?: number | string;
+  /** The saved agent's credentials are shown as "Stored on the agent" and cannot be edited. */
+  credentialsReadOnly?: boolean;
 };
 
 /** One declared output of a prompt, code or agent node. */
@@ -634,6 +636,19 @@ export type UiSuggestBodyProps = { state: AnnotationFormState; originalOutput: s
 /** Annotation's form footer: save, delete and cancel over the same state. */
 export type UiAnnotationFormFooterProps = { state: AnnotationFormState; padding: number };
 
+/** Navigation's sidebar groups: fold, unfold, restore each to its remembered preference. */
+export type UiNavigationSidebar = {
+  expandGroup(id: string): void;
+  collapseGroup(id: string): void;
+  restoreAll(): void;
+};
+
+/** Governance's sample-data choice, written by onboarding's guided tour. */
+export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void };
+
+/** Onboarding's guided path; `useIsActive` is a hook, call it during render. */
+export type UiGuidedPathActive = { useIsActive(): boolean };
+
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
@@ -654,6 +669,7 @@ export type UiDeclaredCapabilities = {
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   guidedOnboarding: UiLangyGuidedOnboarding;
   guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
+  guidedPathActive: UiGuidedPathActive;
   guidedTour: UiGuidedTour;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
@@ -682,7 +698,9 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
+  sampleChoice: UiGovernanceSampleChoice;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
+  sidebar: UiNavigationSidebar;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
   suggestBody: UiDeclaredComponent<UiSuggestBodyProps>;
   studioEvaluatorEditor: UiDeclaredComponent<UiStudioEvaluatorEditorProps>;
@@ -733,7 +751,7 @@ export type {
   UiHooksToken,
   UiOperationsToken,
   UiTokenIdentity,
-} from "@langwatch/kernel/contract";
+} from "@langwatch/module";
 
 /** The declarations above this screen. Nothing declared reads as an empty list. */
 export abstract class UiDeclarations {

@@ -40,12 +40,12 @@ export function browserOnlyPackage(specifier: string): string | undefined {
 }
 
 /**
- * §3.4's kit law, encoded (ARCHITECTURE.md, ruled 2026-09-18): the checks below read
- * `snapshot.resolver` directly, since `discoverClassifiedPackages` does not yet know the
- * `process`/`browser`/`browser-kit` directory names (§16).
+ * §3.4's closed browser package, encoded: the checks below read `snapshot.resolver`
+ * directly, since `discoverClassifiedPackages` does not yet know the
+ * `process`/`browser` directory names (§16).
  */
 
-type ModuleRole = "contract" | "process" | "browser" | "browser-kit";
+type ModuleRole = "contract" | "process" | "browser";
 
 type ModulePackage = {
   role: ModuleRole;
@@ -56,8 +56,7 @@ type ModulePackage = {
   manifestPath: string;
 };
 
-const MODULE_PACKAGE_DIRECTORY =
-  /^((?:enterprise\/)?modules\/[^/]+)\/(contract|process|browser|browser-kit)$/;
+const MODULE_PACKAGE_DIRECTORY = /^((?:enterprise\/)?modules\/[^/]+)\/(contract|process|browser)$/;
 
 function discoverModulePackages(
   resolver: WorkspaceModuleResolver,
@@ -155,6 +154,18 @@ function importTypeSpecifiers(file: string): { specifier: string; line: number }
   return found;
 }
 
+const SHARED_THING_HOME =
+  "Move the shared thing out: pure domain logic into the owner's contract, shared UI into the design system, framework hooks into browser-host.";
+
+/** Workspace-relative roots that install browser halves, with why each may reach them. */
+const BROWSER_INSTALLERS = [
+  { root: "apps/ui", reason: "the application installs browser halves" },
+  {
+    root: "packages/installed-web-modules",
+    reason: "the generated installer list imports each module's ./declaration",
+  },
+] as const;
+
 function closureViolation({
   policy,
   file,
@@ -173,8 +184,8 @@ function closureViolation({
     file,
     line,
     specifier,
-    message: `${JSON.stringify(target.name)} is a closed browser package (ARCHITECTURE.md §3.4 kit law 1); only apps/ui may reach it.`,
-    allowed: `Move the shared thing into ${target.moduleRoot.split("/").pop()}-browser-kit and depend on that instead.`,
+    message: `${JSON.stringify(target.name)} is a closed browser package (ARCHITECTURE.md §3.4); only the installers (apps/ui, installed-web-modules) may reach it.`,
+    allowed: SHARED_THING_HOME,
   };
 }
 
@@ -214,13 +225,13 @@ function specifierClosureViolations({
 function fileClosureViolations({
   file,
   browserPackages,
-  uiRoot,
+  installerRoots,
 }: {
   file: string;
   browserPackages: readonly ModulePackage[];
-  uiRoot: string;
+  installerRoots: readonly string[];
 }): ArchitectureViolation[] {
-  if (isWithin(uiRoot, file)) return [];
+  if (installerRoots.some((installer) => isWithin(installer, file))) return [];
 
   // Cheap reject before any parse: every browser package name contains this substring.
   if (!sourceText({ file }).includes("-browser")) return [];
@@ -244,9 +255,9 @@ function fileClosureViolations({
 }
 
 /**
- * Kit law 1: "Nothing else imports [a module's browser package], ever" — every static
+ * "Nothing else imports [a module's browser package], ever" (§3.4) — every static
  * form (`import`, side-effect `import`, `export ... from`, dynamic and type-position
- * `import()`), across the whole workspace. `apps/ui` is exempt: it installs browser halves.
+ * `import()`), across the whole workspace. The installers (BROWSER_INSTALLERS) are exempt.
  */
 export function lintBrowserPackageClosure(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, resolver, files } = snapshot;
@@ -254,14 +265,16 @@ export function lintBrowserPackageClosure(snapshot: WorkspaceSnapshot): Architec
   const browserPackages = modulePackages.filter((pkg) => pkg.role === "browser");
   if (browserPackages.length === 0) return [];
 
-  const uiRoot = join(root, "apps", "ui");
+  const installerRoots = BROWSER_INSTALLERS.map((installer) =>
+    join(root, ...installer.root.split("/")),
+  );
   const violations: ArchitectureViolation[] = [];
 
   for (const sourceRoot of SOURCE_ROOTS) {
     const directory = join(root, ...sourceRoot.split("/"));
 
     for (const file of files({ directory, accept: isSourceFile })) {
-      violations.push(...fileClosureViolations({ file, browserPackages, uiRoot }));
+      violations.push(...fileClosureViolations({ file, browserPackages, installerRoots }));
     }
   }
 
@@ -269,9 +282,9 @@ export function lintBrowserPackageClosure(snapshot: WorkspaceSnapshot): Architec
 }
 
 /**
- * The manifest half of kit law 1: a dependency edge onto another module's browser package
- * is a violation whether or not any source file uses it (§3.4 rule 4) — the manifest line
- * itself is cheaper and harder to evade than a source sweep.
+ * The manifest half of the closure: a runtime dependency edge onto another module's browser
+ * package is a violation, used or not (§3.4). A `devDependencies` edge is the type-only one
+ * (Q5, Alex 2026-10-01): value imports are still refused file by file above.
  */
 export function lintBrowserPackageManifestClosure(
   snapshot: WorkspaceSnapshot,
@@ -294,14 +307,15 @@ export function lintBrowserPackageManifestClosure(
       const target = browserPackages.get(name);
       if (!target || target.name === pkg.name) continue;
 
-      violations.push(
-        closureViolation({
+      violations.push({
+        ...closureViolation({
           policy: "browser-package-manifest-closure",
           file: pkg.manifestPath,
           specifier: name,
           target,
         }),
-      );
+        allowed: `Import only its types and declare ${target.name} under devDependencies, or move the shared thing out: ${SHARED_THING_HOME}`,
+      });
     }
   }
 
@@ -330,82 +344,7 @@ export function lintBrowserPackageExports(snapshot: WorkspaceSnapshot): Architec
         file: pkg.manifestPath,
         specifier: key,
         message: `A browser package's exports map declares only "./declaration" (ARCHITECTURE.md §3.4); ${JSON.stringify(key)} is a side door.`,
-        allowed:
-          "Delete the entry, or move the shared thing into this module's browser-kit and export it there.",
-      });
-    }
-  }
-
-  return violations;
-}
-
-/**
- * Kit law rule 4: "A kit is a package, not a subpath" — every export folds through the
- * package's own single `.` entry, so a cross-module edge always reads as a manifest line.
- */
-export function lintBrowserKitExports(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  const modulePackages = discoverModulePackages(snapshot.resolver, snapshot.root);
-  const violations: ArchitectureViolation[] = [];
-
-  for (const pkg of modulePackages) {
-    if (pkg.role !== "browser-kit") continue;
-
-    const manifest = readManifestFile(pkg.manifestPath);
-
-    for (const key of exportKeys(manifest.exports)) {
-      if (key === ".") continue;
-
-      violations.push({
-        policy: "browser-kit-exports",
-        file: pkg.manifestPath,
-        specifier: key,
-        message: `A kit's exports map declares only "." (ARCHITECTURE.md §3.4 kit law 4); ${JSON.stringify(key)} is a subpath a kit may not open.`,
-        allowed: 'Fold every export through the single "." entry.',
-      });
-    }
-  }
-
-  return violations;
-}
-
-/**
- * Kit law rule 2: a kit may depend on any module's contract or portable library, the Design
- * System and `browser-host`, nothing else in `@langwatch/*`. Vendor deps are not guarded.
- */
-export function lintBrowserKitDependencies(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
-  const modulePackages = discoverModulePackages(snapshot.resolver, snapshot.root);
-  const violations: ArchitectureViolation[] = [];
-  // An edge onto a browser package is the manifest closure's to report.
-  const browserPackageNames = new Set(
-    modulePackages.filter((pkg) => pkg.role === "browser").map((pkg) => pkg.name),
-  );
-  const libraryNames = new Set(
-    snapshot.packages.filter((pkg) => pkg.kind === "library").map((pkg) => pkg.name),
-  );
-
-  for (const pkg of modulePackages) {
-    if (pkg.role !== "browser-kit") continue;
-
-    const manifest = readManifestFile(pkg.manifestPath);
-    const dependencies = manifestDependencies(manifest);
-
-    for (const name of Object.keys(dependencies)) {
-      if (!name.startsWith("@langwatch/") || browserPackageNames.has(name)) continue;
-
-      const allowed =
-        name.endsWith("-contract") ||
-        libraryNames.has(name) ||
-        name === "@langwatch/design-system" ||
-        name === "@langwatch/browser-host";
-
-      if (allowed) continue;
-
-      violations.push({
-        policy: "browser-kit-dependencies",
-        file: pkg.manifestPath,
-        specifier: name,
-        message: `A kit may depend only on contracts, portable libraries, the Design System, and browser-host (ARCHITECTURE.md §3.4 kit law 2); ${JSON.stringify(name)} is none of those.`,
-        allowed: "Depend on the owning module's contract instead, or drop the dependency.",
+        allowed: `Delete the entry. ${SHARED_THING_HOME}`,
       });
     }
   }

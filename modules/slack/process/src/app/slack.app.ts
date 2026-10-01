@@ -1,6 +1,6 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
@@ -26,14 +26,14 @@ import { SlackConnectionService } from "../services/slack-connection.service.ts"
 const slackReads = ["encryption"] as const;
 
 type SlackSetup = FeatureSetup<
-  typeof SlackApp.dependencies,
+  typeof SlackModule.dependencies,
   MembersRead<typeof slackReads>,
   undefined,
   SlackRepositories
 >;
 
 /** A project's Slack connections and their claims; services carry the weight. */
-export class SlackApp implements SlackApiContract {
+export class SlackModule implements SlackApiContract {
   static readonly contract = SlackApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -64,10 +64,10 @@ export class SlackApp implements SlackApiContract {
     repositories,
     secrets,
     tier,
-  }: SlackSetup): Promise<SlackApp> {
+  }: SlackSetup): Promise<SlackModule> {
     const fingerprintKey =
-      (await secrets.into(SlackApp.secrets.fingerprintKey, (value) => value ?? "")) ||
-      (await secrets.into(SlackApp.secrets.fingerprintKeyFallback, (value) => value ?? ""));
+      (await secrets.into(SlackModule.secrets.fingerprintKey, (value) => value ?? "")) ||
+      (await secrets.into(SlackModule.secrets.fingerprintKeyFallback, (value) => value ?? ""));
     const connections = SlackConnectionService.create({
       connections: repositories.connections,
       claims: repositories.claims,
@@ -79,7 +79,7 @@ export class SlackApp implements SlackApiContract {
       cipher: members.encryption,
       fingerprintKey,
     });
-    return new SlackApp({
+    return new SlackModule({
       connections,
       claims: SlackConnectionClaimService.create({ claims: repositories.claims, connections }),
     });

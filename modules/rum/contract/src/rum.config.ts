@@ -6,9 +6,8 @@ import { z } from "zod";
 const blankIsUnset = (value: unknown) => (value === "" ? undefined : value);
 
 /**
- * rum owns the browser tracing switch (ADR-058). Where the proxied export goes:
- * its own collector, else observability's deprecated `OTEL_EXPORTER_OTLP_*`
- * (warned once at boot); with neither, the door refuses as not configured.
+ * Browser tracing (ADR-058) is on unless `RUM_ENABLED=false`. It exports to rum's collector, else
+ * the deprecated `OTEL_EXPORTER_OTLP_*` (warned at boot); with neither the door refuses.
  */
 export const rumConfig = Config.define((c) => ({
   enabled: c.env(
@@ -16,7 +15,7 @@ export const rumConfig = Config.define((c) => ({
     z
       .string()
       .optional()
-      .transform((value) => value === "true"),
+      .transform((value) => value !== "false"),
   ),
   sampleRatio: c.env(
     "RUM_SAMPLE_RATIO",
@@ -44,7 +43,7 @@ export const rumWebConfigSchema = z.strictObject({
 
 export type RumWebConfig = z.infer<typeof rumWebConfigSchema>;
 
-/** Tracing is on only when switched on AND some collector would receive what the browser sends. */
+/** Tracing is on unless switched off, and only while a collector would receive it. */
 export const rumBrowserConfig = defineBrowserConfig({
   schema: rumWebConfigSchema,
   project: (config: RumConfig) => ({

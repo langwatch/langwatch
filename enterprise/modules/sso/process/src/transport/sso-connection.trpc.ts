@@ -18,23 +18,21 @@ import {
 import { SsoApi, ssoConnectionTrpc, type SsoOperator } from "@langwatch/enterprise-sso-contract";
 
 /**
- * The written record of what decides the caller's reach: the ADMIN_EMAILS
- * staff list plus the application's own `isAdmin`, deliberately not `ops:*`.
- * `ops` is the registry's only platform-scope resource, and if it ever widens
- * to a broader operator population, who may attest a customer's domain must
- * not widen with it by accident.
+ * The written record of what decides the caller's reach: the platform-operator
+ * grant (ops:* at the platform tier), asked by the application, never an
+ * org-scoped permission, so no org role widens who may attest a domain.
  */
 const STAFF_LIST_REASON =
-  "back-office surface gated on the ADMIN_EMAILS staff list, not on an RBAC permission; cross-tenant by design";
+  "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design";
 
 /**
- * The id is NOT what decides the caller's reach. An operator on the staff list
+ * The id is NOT what decides the caller's reach. An operator holding the platform-operator grant
  * may act on any organization and one who is not may act on none, so
  * `organizationId` is routing.
  */
 const ORGANIZATION_IS_ROUTING = {
   organizationId:
-    "names the tenant whose connection history the command appends to; the caller's reach is the ADMIN_EMAILS staff list and is never derived from this id",
+    "names the tenant whose connection history the command appends to; the caller's reach is the platform-operator grant and is never derived from this id",
 } as const;
 
 /** The impersonator where there is one: debugging a customer stays operator work. */

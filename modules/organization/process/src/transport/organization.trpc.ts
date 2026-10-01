@@ -17,6 +17,9 @@ import {
   type Organization,
   type OrganizationAuditLogPage,
   type OrganizationCaller,
+  type OrganizationMemberDirectory,
+  type OrganizationMemberRecord,
+  type OrganizationMemberUser,
   type OrganizationUser,
   type OrganizationWithMembersAndTheirTeams,
   type ProjectRow,
@@ -138,14 +141,14 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .procedure("update")
   .withPermission("organization:manage")
   .handle(async ({ app, input }) => {
-    // The form round-trips every S3 field, so absent here means "clear it"  -
-    // though `updateSettings` treats absent as "leave alone" for `s3Bucket`.
+    // The stored secret is never sent to the form: a blank one beside an
+    // endpoint leaves it unchanged, and blank everywhere clears it.
     await app.updateSettings({
       organizationId: input.organizationId,
       name: input.name,
       s3Endpoint: input.s3Endpoint ?? null,
       s3AccessKeyId: input.s3AccessKeyId ?? null,
-      s3SecretAccessKey: input.s3SecretAccessKey ?? null,
+      s3SecretAccessKey: input.s3SecretAccessKey || (input.s3Endpoint ? void 0 : null),
       s3Bucket: input.s3Bucket,
       presenceEnabled: input.presenceEnabled,
       traceSharingEnabled: input.traceSharingEnabled,
@@ -173,8 +176,13 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
         },
         callerOf(actor, person),
       )
-      .then(organizationWithMembersOnWire),
+      .then(memberDirectoryOnWire),
   )
+
+  /** The Directory is an `organization:manage` page; so are its badges. */
+  .procedure("getDirectoryCounts")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.getDirectoryCounts(input))
 
   /**
    * `organization:manage`, not `view`: one member's full record - role
@@ -184,7 +192,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
   .handle(({ app, input, actor }, person) =>
-    app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberWithUserOnWire),
+    app.getMemberOrRefuse(input, callerOf(actor, person)).then(memberRecordOnWire),
   )
 
   /** Bounded by the organization's own membership, never a caller-supplied id list. */
@@ -212,7 +220,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) =>
     app
       .getAllMembers({ organizationId: input.organizationId })
-      .then((users) => users.map(userOnWire)),
+      .then((users) => users.map(memberUserOnWire)),
   )
 
   .procedure("updateMemberRole")
@@ -250,16 +258,12 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   )
   .build();
 
-function userOnWire(user: User) {
+function memberUserOnWire(user: User): OrganizationMemberUser {
   return {
-    ...user,
-    createdAt: toDate(user.createdAt),
-    updatedAt: toDate(user.updatedAt),
-    lastLoginAt: user.lastLoginAt && toDate(user.lastLoginAt),
+    id: user.id,
+    name: user.name,
+    email: user.email,
     deactivatedAt: user.deactivatedAt && toDate(user.deactivatedAt),
-    tracesExplorerTourDismissedAt:
-      user.tracesExplorerTourDismissedAt && toDate(user.tracesExplorerTourDismissedAt),
-    passkeyNudgeDismissedAt: user.passkeyNudgeDismissedAt && toDate(user.passkeyNudgeDismissedAt),
   };
 }
 
@@ -316,7 +320,7 @@ function teamUserOnWire(membership: TeamUser & { assignedRole?: CustomRole | nul
   };
 }
 
-function projectOnWire(project: ProjectRow) {
+function projectOnWire({ apiKey: _withheld, ...project }: ProjectRow) {
   return {
     ...project,
     createdAt: toDate(project.createdAt),
@@ -341,22 +345,49 @@ function fullyLoadedOrganizationOnWire(organization: FullyLoadedOrganization) {
   };
 }
 
-function memberWithUserOnWire(member: OrganizationWithMembersAndTheirTeams["members"][number]) {
+function memberRecordOnWire(
+  member: OrganizationWithMembersAndTheirTeams["members"][number],
+): OrganizationMemberRecord {
   return {
-    ...organizationUserOnWire(member),
+    userId: member.userId,
+    organizationId: member.organizationId,
+    role: member.role,
+    createdAt: toDate(member.createdAt),
+    updatedAt: toDate(member.updatedAt),
+    departmentId: member.departmentId,
+    disabledAt: member.disabledAt && toDate(member.disabledAt),
     user: {
-      ...userOnWire(member.user),
-      teamMemberships: member.user.teamMemberships.map((membership) => ({
-        ...teamUserOnWire(membership),
-        team: teamOnWire(membership.team),
-      })),
+      id: member.user.id,
+      name: member.user.name,
+      email: member.user.email,
+      image: member.user.image,
+      emailVerified: member.user.emailVerified,
+      deactivatedAt: member.user.deactivatedAt && toDate(member.user.deactivatedAt),
     },
   };
 }
 
-function organizationWithMembersOnWire(organization: OrganizationWithMembersAndTheirTeams) {
+function memberDirectoryOnWire(
+  organization: OrganizationWithMembersAndTheirTeams,
+): OrganizationMemberDirectory {
   return {
-    ...organizationOnWire(organization),
-    members: organization.members.map(memberWithUserOnWire),
+    id: organization.id,
+    name: organization.name,
+    members: organization.members.map((member) => ({
+      userId: member.userId,
+      organizationId: member.organizationId,
+      role: member.role,
+      createdAt: toDate(member.createdAt),
+      updatedAt: toDate(member.updatedAt),
+      departmentId: member.departmentId,
+      disabledAt: member.disabledAt && toDate(member.disabledAt),
+      user: {
+        id: member.user.id,
+        name: member.user.name,
+        email: member.user.email,
+        image: member.user.image,
+        deactivatedAt: member.user.deactivatedAt && toDate(member.user.deactivatedAt),
+      },
+    })),
   };
 }

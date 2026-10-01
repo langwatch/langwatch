@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LangyKeyCaller } from "@langwatch/langy-contract";
 import { type ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @see specs/langy/langy-api-key-turns.feature
  */

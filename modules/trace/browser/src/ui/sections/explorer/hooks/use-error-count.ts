@@ -1,10 +1,6 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-
-import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-
-const FALLBACK_INTERVAL_MS = 60_000;
 
 export function useErrorCount(): number {
   const { project } = useOrganizationTeamProject();
@@ -13,11 +9,7 @@ export function useErrorCount(): number {
   // reports the same window as every other panel on the page.
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
 
-  // SSE invalidates `traces.newCount` (all args) on trace_summary_updated,
-  // so this query is kept fresh without polling whenever SSE is healthy.
-  const sseConnectionState = useSseStatusStore((s) => s.sseConnectionState);
-  const sseConnected = sseConnectionState === "connected";
-
+  // SSE invalidates `traces.newCount` (all args) on trace_summary_updated.
   const query = api.traces.newCount.useQuery(
     {
       projectId: project?.id ?? "",
@@ -27,8 +19,6 @@ export function useErrorCount(): number {
     },
     {
       enabled: !!project?.id,
-      staleTime: 30_000,
-      refetchInterval: sseConnected ? false : FALLBACK_INTERVAL_MS,
     },
   );
 

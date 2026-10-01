@@ -6,11 +6,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { composeApiApplication } from "@langwatch/api/hosting";
-import { RestHost, type RestIdentity } from "@langwatch/api/rest";
-import { serverModules } from "@langwatch/installed-server-modules";
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { RestHost } from "@langwatch/api/rest";
+import { composeApiApplication } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
+import { processModules } from "../process-modules.generated.ts";
 import { bootApi } from "./api-installation.fixture.ts";
 
 const REPOSITORY_ROOT = join(import.meta.dirname, "../../../..");
@@ -118,7 +119,7 @@ async function composedRoutes() {
     authorize: refuse,
   };
   const facts = new Map<string, { middleware: { name: string }; resolve: () => never }>();
-  for (const module of serverModules) {
+  for (const module of processModules) {
     for (const transport of module.transports ?? []) {
       if (transport.protocol !== "rest") continue;
       const declaration = transport.router() as {
@@ -139,9 +140,9 @@ async function composedRoutes() {
         identities: {
           project: closed,
           organization: closed,
-          apiKey: closed,
-          scimToken: closed,
-          "instance-admin": closed,
+          api_key: closed,
+          scim_token: closed,
+          instance_admin: closed,
           browser: closed,
         },
         bearers: () => closed,

@@ -36,6 +36,7 @@ describe("attributed-user template resolution", () => {
           budgets: [template(), template({ id: "budget_tpl_openai", providerKey: "mp_openai" })],
         }),
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: "vk_anchor",
           endUserId: "end_user_42",
@@ -56,6 +57,7 @@ describe("attributed-user template resolution", () => {
       await PrismaGatewayBudgetResolutionRepository.create().resolveApplicableBudgets({
         client: prismaStub({ budgets: [template()] }),
         target: {
+          memberGroupIds: [],
           organizationId: "org_1",
           virtualKeyId: "vk_anchor",
         },

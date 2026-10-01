@@ -168,3 +168,10 @@ Feature: tRPC framework boundary
     When an entry is written to the stream
     Then the frame is plain JSON
     And the subscription input was encoded as plain JSON too
+
+  @unit
+  Scenario: A handled error that renders its own body carries it on data.cause
+    Given a procedure throws a handled error that renders its own cause body
+    When the client calls that procedure
+    Then the tRPC error's data.cause is that body
+    And the process names no module error to put it there

@@ -1,12 +1,12 @@
+import type { DatasetColumns } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * Row search in the dataset editor, transport mocked: pins the editor's
  * half of the contract — what it asks the server for, and what it does to
  * the grid while a search is in effect.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -36,6 +36,12 @@ const refetchSpy = vi.fn();
 // one mock.
 vi.mock("../dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     datasetRecord: {
       getAll: { useQuery: (...args: unknown[]) => listPaginatedQuery(...args) },
       listPaginated: {
@@ -51,7 +57,6 @@ vi.mock("../dataset-api.ts", () => ({
     dataset: {
       upsert: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
     },
-    useUtils: () => ({}),
   },
 }));
 
@@ -59,10 +64,6 @@ const columnTypes: DatasetColumns = [
   { name: "input", type: "string" },
   { name: "expected_output", type: "string" },
 ];
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /**
  * Serves whatever page the editor asks for. When the request carries a
@@ -217,7 +218,7 @@ describe("given a saved dataset", () => {
     it("asks the server for the matches and shows the row", async () => {
       const user = userEvent.setup();
       serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await typeSearch(user, "escalation");
 
@@ -229,7 +230,7 @@ describe("given a saved dataset", () => {
     it("returns to the first page of the matches", async () => {
       const user = userEvent.setup();
       const requests = serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await user.click(await screen.findByTestId("pagination-next"));
       await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
@@ -248,7 +249,7 @@ describe("given a saved dataset", () => {
       // is an empty page the user briefly sees.
       const user = userEvent.setup();
       const requests = serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await user.click(await screen.findByTestId("pagination-next"));
       await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
@@ -265,7 +266,7 @@ describe("given a saved dataset", () => {
     it("reports the matches alongside the dataset total", async () => {
       const user = userEvent.setup();
       serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await typeSearch(user, "escalation");
 
@@ -281,7 +282,7 @@ describe("given a saved dataset", () => {
       // search doing anything.
       const user = userEvent.setup();
       serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       expect(await screen.findByTestId("add-row")).toBeInTheDocument();
       expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
@@ -298,7 +299,7 @@ describe("given a saved dataset", () => {
     it("says nothing matched, and repeats what was searched for", async () => {
       const user = userEvent.setup();
       serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await typeSearch(user, "zzzznope");
 
@@ -324,7 +325,7 @@ describe("given a saved dataset", () => {
     it("pages the matches rather than the whole dataset", async () => {
       const user = userEvent.setup();
       const requests = serveDataset(twoPagesOfMatches);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       // Three pages before the search.
       expect(await screen.findByTestId("pagination-page-3")).toBeInTheDocument();
@@ -349,7 +350,7 @@ describe("given a saved dataset", () => {
     it("clears the selection, so a delete cannot hit rows I never picked", async () => {
       const user = userEvent.setup();
       serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       const firstRowCheckbox = (await screen.findAllByRole("checkbox")).at(1)!;
       await user.click(firstRowCheckbox);
@@ -371,7 +372,7 @@ describe("given a saved dataset", () => {
       updateMutate.mockImplementation(() => undefined);
       const user = userEvent.setup();
       serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await screen.findByText("billing question");
       await user.dblClick(screen.getByTestId("cell-0-input_0"));
@@ -396,7 +397,7 @@ describe("given a saved dataset", () => {
       );
       const user = userEvent.setup();
       const requests = serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await typeSearch(user, "escalation");
       await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
@@ -425,7 +426,7 @@ describe("given a saved dataset", () => {
     beforeEach(() => {
       user = userEvent.setup();
       requests = serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
     });
 
     /** @scenario Clearing the search restores the whole dataset */
@@ -499,7 +500,7 @@ describe("given the dataset's own total is not known yet", () => {
       listPaginatedQuery.mockImplementation((input: { search?: string } | undefined) =>
         input?.search ? matched : pending,
       );
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await typeSearch(user, "escalation");
 
@@ -541,7 +542,7 @@ describe("given the search's own read has not come back yet", () => {
         requests.push(input ?? {});
         return input?.search ? inFlight : unsearched;
       });
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await screen.findByText("question 0");
       await typeSearch(user, "escalation");
@@ -566,7 +567,7 @@ describe("given I have typed a search term that has not run yet", () => {
       // and the CSV import were all still offered. A row added in that window is
       // empty, so the search arriving a moment later removes it from the grid.
       const requests = serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       expect(await screen.findByTestId("add-row")).toBeInTheDocument();
       expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
@@ -596,7 +597,7 @@ describe("given I had opened the CSV import", () => {
       // it for an import the user started before they started searching.
       const user = userEvent.setup();
       serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await screen.findByText("billing question");
       await user.click(await screen.findByTestId("add-rows-from-csv"));
@@ -623,7 +624,7 @@ describe("given I had opened the CSV import", () => {
       // touched it, and empty of whatever file they had chosen in it.
       const user = userEvent.setup();
       serveDataset(singlePageRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await screen.findByText("billing question");
       await user.click(await screen.findByTestId("add-rows-from-csv"));
@@ -678,7 +679,7 @@ describe("given the server refuses the search", () => {
       listPaginatedQuery.mockImplementation((input: { search?: string } | undefined) =>
         input?.search ? refused : loaded,
       );
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+      renderWithDesignSystem(<DatasetEditorTable datasetId="ds" />);
 
       await screen.findByText("question 0");
       await typeSearch(user, "escalation");
@@ -704,9 +705,7 @@ describe("given I open another dataset without leaving the editor", () => {
       const requests = serveDatasetsById({
         byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
       });
-      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-        wrapper: Wrapper,
-      });
+      const { rerender } = renderWithDesignSystem(<DatasetEditorTable datasetId="ds-a" />);
 
       await typeSearch(user, "escalation");
       await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
@@ -727,9 +726,7 @@ describe("given I open another dataset without leaving the editor", () => {
       serveDatasetsById({
         byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
       });
-      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-        wrapper: Wrapper,
-      });
+      const { rerender } = renderWithDesignSystem(<DatasetEditorTable datasetId="ds-a" />);
 
       await typeSearch(user, "escalation");
       await waitFor(() =>
@@ -753,9 +750,7 @@ describe("given I open another dataset without leaving the editor", () => {
       const requests = serveDatasetsById({
         byId: { "ds-a": manyRecords, "ds-b": singlePageRecords },
       });
-      const { rerender } = render(<DatasetEditorTable datasetId="ds-a" />, {
-        wrapper: Wrapper,
-      });
+      const { rerender } = renderWithDesignSystem(<DatasetEditorTable datasetId="ds-a" />);
 
       await user.click(await screen.findByTestId("pagination-next"));
       await waitFor(() => expect(requests.at(-1)?.page).toBe(2));
@@ -772,7 +767,7 @@ describe("given a draft dataset that has not been saved", () => {
   describe("when the editor is rendered", () => {
     /** @scenario A draft dataset offers no search */
     it("offers no search, and still offers the ways to add a row", () => {
-      render(
+      renderWithDesignSystem(
         <DatasetEditorTable
           inMemoryDataset={{
             name: "My Draft",
@@ -781,7 +776,6 @@ describe("given a draft dataset that has not been saved", () => {
           }}
           onUpdateDataset={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("dataset-row-search")).not.toBeInTheDocument();

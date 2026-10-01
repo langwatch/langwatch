@@ -13,8 +13,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listGroups")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listQueueGroups(input);
     })
@@ -22,8 +22,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("getGroupDetail")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getQueueGroup(input);
     })
@@ -31,8 +31,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("getGrafanaLinkConfig")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.findGrafanaLinkConfig();
     })
@@ -40,8 +40,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("getBlockedSummary")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getBlockedQueueSummary();
     })
@@ -49,8 +49,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("getGroupJobs")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listQueueGroupJobs(input);
     })
@@ -58,8 +58,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("unblockGroup")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.unblockQueueGroup({ ...input, requestedBy: actor.id });
     })
@@ -67,8 +67,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("unblockAll")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.unblockAllQueueGroups({ ...input, requestedBy: actor.id });
     })
@@ -76,8 +76,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("drainGroup")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.drainQueueGroup({ ...input, requestedBy: actor.id });
     })
@@ -85,8 +85,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("pausePipeline")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.pauseQueuePipeline(input);
     })
@@ -94,8 +94,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("unpausePipeline")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.unpauseQueuePipeline(input);
     })
@@ -103,8 +103,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("pauseTenant")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.pauseQueueTenant(input);
     })
@@ -112,8 +112,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("unpauseTenant")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.unpauseQueueTenant(input);
     })
@@ -121,8 +121,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listPausedTenants")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listPausedQueueTenants(input);
     })
@@ -130,8 +130,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("drainTenant")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.drainQueueTenant({ ...input, requestedBy: actor.id });
     })
@@ -139,8 +139,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("retryBlocked")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.retryBlockedQueueJob(input);
     })
@@ -148,8 +148,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listProjections")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listPipelineRegistrations();
     })
@@ -157,8 +157,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listDlqGroups")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listQueueDlqGroups(input);
     })
@@ -166,8 +166,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listAllDlqGroups")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listAllQueueDlqGroups();
     })
@@ -175,8 +175,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("listPausedKeys")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listPausedQueueKeys(input);
     })
@@ -184,8 +184,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("drainAllBlockedPreview")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getQueueDrainPreview(input);
     })
@@ -193,8 +193,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("moveToDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.moveQueueGroupToDlq({ ...input, requestedBy: actor.id });
     })
@@ -202,8 +202,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("moveAllBlockedToDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.moveAllBlockedQueueGroupsToDlq({ ...input, requestedBy: actor.id });
     })
@@ -211,8 +211,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("replayFromDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.replayQueueGroupFromDlq(input);
     })
@@ -220,8 +220,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("replayAllFromDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.replayAllQueueGroupsFromDlq(input);
     })
@@ -229,8 +229,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("redriveManyFromDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.redriveQueueDlqGroups({ ...input, requestedBy: actor.id });
     })
@@ -238,8 +238,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("discardManyFromDlq")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.discardQueueDlqGroups({ ...input, requestedBy: actor.id });
     })
@@ -247,8 +247,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("canaryRedrive")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.canaryRedriveQueueDlq(input);
     })
@@ -256,8 +256,8 @@ export const opsQueueTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsQueu
     .procedure("canaryUnblock")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.canaryUnblockQueueGroups(input);
     })

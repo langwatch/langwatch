@@ -5,7 +5,7 @@
  * Spec: specs/features/drawer-flow-callbacks.feature
  */
 
-import { uiTokens } from "@langwatch/kernel/contract";
+import { uiTokens } from "@langwatch/module";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

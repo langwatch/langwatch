@@ -3,7 +3,7 @@
  * The memory audit log repository reads back what it writes through the same instances, proving the
  * in-memory backend is not a stub.
  */
-import { instantiateRepositories } from "@langwatch/kernel";
+import { instantiateRepositories } from "@langwatch/process";
 import { describe, expect, it } from "vitest";
 
 import { auditLogRepositories } from "../../audit-log-repositories.registry.ts";

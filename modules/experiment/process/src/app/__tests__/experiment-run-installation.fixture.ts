@@ -4,7 +4,6 @@
  * Design: modules/experiment/specs/experiment-run-execution.md section 11.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -27,10 +26,10 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
-import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -39,12 +38,14 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   memoryRedisDouble,
   memoryRedisStore,
@@ -56,7 +57,7 @@ import type {
   WorkflowApi,
 } from "@langwatch/workflow-contract";
 
-import { experimentServer } from "../../experiment.server.ts";
+import { experimentProcessModule } from "../../experiment.module.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 
 /** A ClickHouse that holds no rows: every read answers empty, every write lands nowhere. */
@@ -292,6 +293,7 @@ function peersOf(overrides: PeerOverrides) {
     evaluator: createApiFixture<EvaluatorApi>({}),
     prompt: createApiFixture<PromptApi>({}),
     authz: createApiFixture<AuthzApi>({}),
+    presence: createApiFixture<PresenceApi>({}),
     project: createApiFixture<ProjectApi>({
       getOrganizationId: async () => "organization_1",
       findOrganizationId: async () => "organization_1",
@@ -299,7 +301,8 @@ function peersOf(overrides: PeerOverrides) {
     entitlement: createApiFixture<EntitlementApi>({ requestBound: async () => 1_000 }),
     evaluation: createApiFixture<EvaluationApi>({ reportEvaluation: async () => {} }),
     "api-key": createApiFixture<ApiKeyApi>({
-      getOrMintAgentSandboxKey: async () => "sandbox-key",
+      mintRunKey: async ({ permissions }) =>
+        permissions.includes("agentCache:manage") ? "sandbox-key" : "run-key",
     }),
     suite: createApiFixture<SuiteApi>({ assertConnectedAgentsRunnable: async () => {} }),
     "stored-object": createApiFixture<StoredObjectApi>({}),
@@ -334,7 +337,7 @@ function boot({
   workflow: WorkflowApi;
 }) {
   const app = createApp({ role })
-    .withModules([experimentServer])
+    .withModules([experimentProcessModule])
     .withStores(memoryStores())
     .withEventing(eventing)
     .withRelational(database.client)
@@ -458,8 +461,8 @@ export async function bootRunPair(options: RunPairOptions) {
   });
 
   return {
-    api: installedExperimentOf(api.module(experimentServer).provided),
-    worker: installedExperimentOf(worker.module(experimentServer).provided),
+    api: installedExperimentOf(api.module(experimentProcessModule).provided),
+    worker: installedExperimentOf(worker.module(experimentProcessModule).provided),
     engine,
     queue,
     /** The jobs of one kind the queue was sent, in order. */

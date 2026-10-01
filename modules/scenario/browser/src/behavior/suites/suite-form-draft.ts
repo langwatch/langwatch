@@ -1,6 +1,8 @@
-import type { suiteFormSchema, useSuiteForm } from "@langwatch/suite-browser-kit";
 import { useEffect } from "react";
 import type { z } from "zod";
+
+import type { suiteFormSchema } from "../../model/suite/suite-form.types.ts";
+import type { useSuiteForm } from "../suite/use-suite-form.ts";
 
 type SuiteFormValues = z.input<typeof suiteFormSchema>;
 

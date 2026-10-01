@@ -1,3 +1,4 @@
+import { SecretsChain } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveTasksConfig } from "../config.ts";
@@ -51,7 +52,6 @@ vi.mock("@langwatch/authz-process", () => ({
     create: () => ({ connect: dependencies.connectDispatcher }),
     sendersFrom: (commands: unknown) => commands,
   },
-  AuthzGrantIdService: { create: () => ({ newBindingId: () => "binding" }) },
   PostgresAuthzAdapter: {
     create: () => ({ build: () => ({ pipeline: "authz", migration: "authz-migration" }) }),
   },
@@ -106,6 +106,7 @@ describe("given the system migration task", () => {
       await systemMigrationsPass({
         config: resolveTasksConfig({ IS_SAAS: "true", NODE_ENV: "test" }),
         connections: connections(),
+        chain: SecretsChain.start({ environment: {} }),
         environment: {},
         signal,
       });
@@ -146,6 +147,7 @@ describe("given the system migration task", () => {
         systemMigrationsPass({
           config: resolveTasksConfig({ NODE_ENV: "test" }),
           connections: connections(),
+          chain: SecretsChain.start({ environment: {} }),
           environment: {},
           signal: new AbortController().signal,
         }),
@@ -161,6 +163,7 @@ describe("given the system migration task", () => {
       await systemMigrationsPass({
         config: resolveTasksConfig({ NODE_ENV: "test" }),
         connections: connections(),
+        chain: SecretsChain.start({ environment: {} }),
         environment: {},
         signal: new AbortController().signal,
       });

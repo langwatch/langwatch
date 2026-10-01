@@ -3,11 +3,10 @@
  * @see specs/features/agent-testing/live-single-scenario-run.feature
  * @see specs/suites/run-plan-identity-by-name.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
@@ -51,48 +50,12 @@ vi.mock("../../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The run dialog reads the saved evaluators for the ones a run carries.
-    evaluators: {
-      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
-    },
     useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getRunState: { invalidate: vi.fn() },
-        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
       suites: {
         testSuites: { getAll: { invalidate: vi.fn() } },
         getById: { invalidate: vi.fn() },
       },
     }),
-    scenarios: {
-      // The run dialog reads the configurations its scope already ran with.
-      getRunConfigurations: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-      getAll: { useQuery: mockScenariosGetAll },
-      getRunState: { useQuery: mockGetRunState },
-      getById: { useQuery: mockGetScenario },
-      getByIdIncludingArchived: { useQuery: mockGetScenario },
-      getBatchRunData: { useQuery: mockGetBatchRunData },
-      getExternalSetSummaries: { useQuery: emptyQuery },
-      getLastResultSummaries: { useQuery: mockLastResults },
-      getScenarioSetRunData: { useQuery: emptyQuery },
-      getSuiteRunData: { useQuery: emptyQuery },
-      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
-      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      moveToTestSuite: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-      cancelJob: {
-        useMutation: () => ({ mutate: mockCancelJob, isPending: false }),
-      },
-      cancelBatchRun: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-    },
     suites: {
       testSuites: {
         getAll: { useQuery: mockTestSuitesGetAll },
@@ -141,8 +104,71 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         }),
       },
     },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
     storedObjects: { headById: { useQuery: () => ({ data: undefined }) } },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    evaluators: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn() },
+        getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
+      },
+    }),
+    scenarios: {
+      // The run dialog reads the configurations its scope already ran with.
+      getRunConfigurations: {
+        useQuery: () => ({ data: [], isLoading: false }),
+      },
+      getAll: { useQuery: mockScenariosGetAll },
+      getRunState: { useQuery: mockGetRunState },
+      getById: { useQuery: mockGetScenario },
+      getByIdIncludingArchived: { useQuery: mockGetScenario },
+      getBatchRunData: { useQuery: mockGetBatchRunData },
+      getExternalSetSummaries: { useQuery: emptyQuery },
+      getLastResultSummaries: { useQuery: mockLastResults },
+      getScenarioSetRunData: { useQuery: emptyQuery },
+      getSuiteRunData: { useQuery: emptyQuery },
+      getScenarioSetBatchRunCount: { useQuery: emptyQuery },
+      archive: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      duplicate: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      moveToTestSuite: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      cancelJob: {
+        useMutation: () => ({ mutate: mockCancelJob, isPending: false }),
+      },
+      cancelBatchRun: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+    },
   },
 }));
 
@@ -217,7 +243,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -239,10 +265,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** The run set of the plan a single-scenario run resolves onto. */
 const PLAN_SET_ID = "__internal__plan_angry__suite";
@@ -341,7 +363,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "Confirming a run from a scenario row does not change the address" */
   it("keeps the address and the table when a run is confirmed", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
 
@@ -364,7 +386,7 @@ describe("starting a run of one scenario from the scenario table", () => {
       data: [scenarioRow({ testSuiteId: REFUNDS.id })],
       isLoading: false,
     });
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
 
@@ -376,7 +398,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "A queued run draws the whole drawer" */
   it("opens the drawer at queue time, naming the scenario and the target", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
 
@@ -403,7 +425,7 @@ describe("starting a run of one scenario from the scenario table", () => {
       targetId: "agent_1",
     };
     mockGetBatchRunData.mockReturnValue({ data: { runs: [] } });
-    render(<AgentTestingRunDrawer open />, { wrapper: Wrapper });
+    renderWithDesignSystem(<AgentTestingRunDrawer open />);
 
     // The whole drawer is drawn, not a bare queued line: the queued read sits
     // where the messages will be, and the results column waits beside it.
@@ -418,7 +440,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "The run goes out under a plan named after the scenario and the agent" */
   it("queues one run plan named after the scenario and the agent, covering that scenario alone", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
 
@@ -434,7 +456,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "Running the same scenario against the same agent again joins the same plan" */
   it("sends the same name both times, so the second run joins the first plan", async () => {
     const user = userEvent.setup();
-    const view = render(<TestCasesTab />, { wrapper: Wrapper });
+    const view = renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
     // The second run resolves onto the plan the first one created, which is
@@ -446,11 +468,7 @@ describe("starting a run of one scenario from the scenario table", () => {
       planName: "Angry refund request prod-agent",
       created: false,
     });
-    view.rerender(
-      <Wrapper>
-        <TestCasesTab />
-      </Wrapper>,
-    );
+    view.rerender(<TestCasesTab />);
     await user.click(screen.getByRole("button", { name: "Run Angry refund request" }));
     const dialog = await screen.findByTestId("run-case-dialog");
     await user.click(within(dialog).getByTestId("run-dialog-run"));
@@ -474,7 +492,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "Running the same scenario against another agent is another plan" */
   it("names the other agent when the run goes against it", async () => {
     const user = userEvent.setup();
-    render(<TestCasesTab />, { wrapper: Wrapper });
+    renderWithDesignSystem(<TestCasesTab />);
 
     await user.click(screen.getByRole("button", { name: "Run Angry refund request" }));
     const dialog = await screen.findByTestId("run-case-dialog");
@@ -491,9 +509,7 @@ describe("starting a run of one scenario from the scenario table", () => {
   /** @scenario "Closing the drawer leaves the table where it was" */
   it("shows the same table with the fresh verdict once the drawer closes", async () => {
     const user = userEvent.setup();
-    const view = render(<TestCasesTab />, {
-      wrapper: Wrapper,
-    });
+    const view = renderWithDesignSystem(<TestCasesTab />);
 
     await confirmRowRun(user);
 
@@ -515,11 +531,7 @@ describe("starting a run of one scenario from the scenario table", () => {
       ],
       isLoading: false,
     });
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <TestCasesTab />
-      </ChakraProvider>,
-    );
+    view.rerender(<TestCasesTab />);
 
     expect(screen.getByTestId("agent-testing-cases-table")).toBeInTheDocument();
     expect(mockRouterPush).not.toHaveBeenCalled();
@@ -549,7 +561,7 @@ describe("the live run of one scenario in the drawer", () => {
 
   afterEach(cleanup);
 
-  const renderDrawer = () => render(<AgentTestingRunDrawer open />, { wrapper: Wrapper });
+  const renderDrawer = () => renderWithDesignSystem(<AgentTestingRunDrawer open />);
 
   /** @scenario "The conversation streams into the drawer while the run goes on" */
   it("shows each message as it arrives, without a reload", () => {
@@ -586,11 +598,7 @@ describe("the live run of one scenario in the drawer", () => {
       }),
       error: null,
     });
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <AgentTestingRunDrawer open />
-      </ChakraProvider>,
-    );
+    view.rerender(<AgentTestingRunDrawer open />);
 
     expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
     expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
@@ -617,11 +625,7 @@ describe("the live run of one scenario in the drawer", () => {
       data: makeRunState({ status: ScenarioRunStatus.CANCELLED }),
       error: null,
     });
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <AgentTestingRunDrawer open />
-      </ChakraProvider>,
-    );
+    view.rerender(<AgentTestingRunDrawer open />);
 
     expect(screen.getAllByText(/cancelled/i).length).toBeGreaterThan(0);
     expect(screen.queryByTestId("run-drawer-stop")).not.toBeInTheDocument();
@@ -667,7 +671,7 @@ describe("a run refused before it is queued", () => {
   it("keeps the dialog open, says what is missing, and opens no drawer", async () => {
     const user = userEvent.setup();
     const onRunStarted = vi.fn();
-    render(
+    renderWithDesignSystem(
       <RunDialog
         subject={{
           kind: "case",
@@ -678,7 +682,6 @@ describe("a run refused before it is queued", () => {
         onClose={vi.fn()}
         onRunStarted={onRunStarted}
       />,
-      { wrapper: Wrapper },
     );
 
     await user.click(screen.getByTestId("run-dialog-run"));

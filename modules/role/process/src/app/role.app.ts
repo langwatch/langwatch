@@ -3,8 +3,7 @@
  * this one object. Three operations name a ROLE rather than the organization
  * their check runs against, so those checks run here, where the row is.
  */
-import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ledgerActorFor, type LedgerActor, PermissionDeniedError } from "@langwatch/authorization";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,
@@ -16,13 +15,13 @@ import {
   type GrantScopeTier,
 } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationApi,
   PersonalWorkspaceNotManagedHereError,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,
@@ -53,15 +52,15 @@ import type { RoleRepositories } from "../repositories/role.repositories.ts";
 import { RoleService } from "../services/role.service.ts";
 
 type RoleSetup = FeatureSetup<
-  typeof RoleApp.dependencies,
-  MembersRead<typeof RoleApp.reads>,
+  typeof RoleModule.dependencies,
+  MembersRead<typeof RoleModule.reads>,
   undefined,
   RoleRepositories
 >;
 
 const WRITE_ACKNOWLEDGED: RoleWriteAcknowledged = { success: true };
 
-export class RoleApp implements RoleApi {
+export class RoleModule implements RoleApi {
   static readonly contract = RoleApi;
   static readonly dependencies = {
     permissions: AuthzApi,
@@ -89,8 +88,8 @@ export class RoleApp implements RoleApi {
     this.#prisma = members.prisma;
   }
 
-  static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, members);
+  static create({ repositories, dependencies, members }: RoleSetup): RoleModule {
+    return new RoleModule(repositories, dependencies, members);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────
@@ -239,8 +238,11 @@ export class RoleApp implements RoleApi {
     const role = await this.#roles.getById({ roleId: input.customRoleId });
     if (role.organizationId !== organizationId) throw new RoleNotAssignableError();
 
+    // A legacy `ops:*` entry is inert at every tier (the platform fence), so it refuses nothing.
     const exclusive = role.permissions.find(
-      (permission) => !bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }),
+      (permission) =>
+        bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
+        !bindingScopeCanGrantPermission({ scopeType: "TEAM", permission }),
     );
     if (exclusive) throw new OrgExclusivePermissionScopeError(exclusive, "TEAM");
 

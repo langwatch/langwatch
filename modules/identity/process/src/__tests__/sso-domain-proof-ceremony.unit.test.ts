@@ -81,7 +81,7 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(true),
     stranding: new StubStranding([]),
-    platformOperators: new StubPlatformOperators([OPS.id]),
+    authorization: new StubPlatformOperators([OPS.id]),
     // Licensed with one organization, so a licence ceremony reaches the checks below.
     licensing: licensingFixture({ authorizesDomainClaims: true }),
   });

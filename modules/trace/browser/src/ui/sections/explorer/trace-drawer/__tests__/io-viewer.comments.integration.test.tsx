@@ -3,7 +3,7 @@
  * and the field that is hidden from the reader, which offers none.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -90,6 +90,7 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
 }));
 
 import { RedactedField } from "../../../redacted-field.tsx";
+import { MemoryRouterWrapper } from "../../hooks/__tests__/memory-router-wrapper.tsx";
 import { IOViewer } from "../io-viewer.tsx";
 
 const TRACE_ID = "trace-1";
@@ -117,7 +118,9 @@ function comment(over: Partial<AnnotationByTrace> = {}): AnnotationByTrace {
 }
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <MemoryRouterWrapper>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
+  </MemoryRouterWrapper>
 );
 
 beforeEach(() => {

@@ -3,9 +3,9 @@
  * bar opens (`?drawer.open=<name>`).
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const agentWeb = defineWebModule("agent")
+export const agentWeb = defineBrowserModule("agent")
   .withHosts({
     requires: ["AgentManagementHostApi"],
     mounts: {
@@ -71,14 +71,14 @@ export const agentWeb = defineWebModule("agent")
     },
     agentWorkflowEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-workflow-editor-drawer.tsx"))
-          .AgentWorkflowEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentWorkflowEditorDrawer,
       }),
     },
     agentWorkflowTargetEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-workflow-target-editor-drawer.tsx"))
-          .AgentWorkflowTargetEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentWorkflowTargetEditorDrawer,
       }),
     },
     workflowSelector: {

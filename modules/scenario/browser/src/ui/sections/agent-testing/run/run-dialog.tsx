@@ -15,7 +15,7 @@ import { RunDialogFields } from "./run-dialog-fields.tsx";
 import { RunDialogFooter } from "./run-dialog-footer.tsx";
 import type { RunDialogProps, RunDialogSubject } from "./run-dialog-types.ts";
 import { RUN_MISSING_MAPPINGS_TOOLTIP } from "./run-evaluators.ts";
-import { type RunDialogForm, useRunDialogForm } from "./use-run-dialog-form.ts";
+import { type RunDialogForm, subjectKeyOf, useRunDialogForm } from "./use-run-dialog-form.ts";
 import { type RunDialogController, useRunDialogSubmit } from "./use-run-dialog-submit.ts";
 import { voiceCallTargetOf } from "./voice-call-target.ts";
 
@@ -249,10 +249,24 @@ function RunDialogContent({
   );
 }
 
-export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+function OpenRunDialog({
+  subject,
+  onClose,
+  onRunStarted,
+}: Omit<RunDialogProps, "subject"> & { subject: RunDialogSubject }) {
   const state = useRunDialogState({ subject, onClose, onRunStarted });
-
-  if (!subject) return null;
-
   return <RunDialogContent subject={subject} onClose={onClose} {...state} />;
+}
+
+/** Keyed on the subject: the form opens on what its subject holds, and never resets. */
+export function RunDialog({ subject, onClose, onRunStarted }: RunDialogProps) {
+  if (!subject) return null;
+  return (
+    <OpenRunDialog
+      key={subjectKeyOf(subject)}
+      subject={subject}
+      onClose={onClose}
+      onRunStarted={onRunStarted}
+    />
+  );
 }

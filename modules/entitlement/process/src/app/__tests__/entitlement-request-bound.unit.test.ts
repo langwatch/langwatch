@@ -1,16 +1,16 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { createAbsentRequestBound, entitlementServer } from "../../entitlement.server.ts";
+import { createAbsentRequestBound, entitlementProcessModule } from "../../entitlement.module.ts";
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
@@ -48,7 +48,7 @@ function appForLicense(plan: Plan | null) {
   });
 }
 
-describe("EntitlementApp.requestBound", () => {
+describe("EntitlementModule.requestBound", () => {
   it("resolves the free tier for an organization on the free baseline", async () => {
     const app = appForLicense(null);
 
@@ -139,7 +139,7 @@ describe("EntitlementApp.requestBound", () => {
   it("receives per-tier overrides through the installed module's config slice", async () => {
     const { logger } = createTestLogger();
     const runtime = await createApp({ role: "api" })
-      .withModules([withMemoryRepositories(entitlementServer)])
+      .withModules([withMemoryRepositories(entitlementProcessModule)])
       .withConfig({
         entitlement: {
           // The unlicensed cloud baseline resolves FREE, so the override must

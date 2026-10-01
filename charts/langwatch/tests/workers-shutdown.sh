@@ -36,7 +36,7 @@ cd "$(dirname "$0")/.."
 
 # The default drain budget (shutdownDrainSeconds, read as the queue drain by
 # packages/process-stores/src/config-owner.ts), the process deadline above it
-# (drain + 20s, read by packages/process-server/src/config.ts) and the grace
+# (drain + 20s, read by packages/process/src/config.ts) and the grace
 # period above that (deadline + 10s of kubelet slack).
 readonly DRAIN_SECONDS=25
 readonly DEADLINE_MARGIN_SECONDS=20

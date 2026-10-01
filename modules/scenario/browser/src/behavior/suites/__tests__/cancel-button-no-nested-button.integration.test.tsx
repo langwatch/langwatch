@@ -3,22 +3,19 @@
  * @vitest-environment jsdom
  * @see specs/features/scenarios/scenarios-editor-ui-regressions.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import { RunRow, ScenarioGridCard } from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ScenarioGridCard } from "../../../ui/elements/suite/runs/scenario-grid-card.tsx";
+import { RunRow } from "../../../ui/sections/suite/run-row.tsx";
 import { makeBatchRun, makeScenarioRunData, makeSummary } from "./run-history-fixtures.ts";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({
   usePrefetchRunState: () => vi.fn(),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<ScenarioGridCard/> per-row Cancel button structure (regression #3192)", () => {
   afterEach(() => {
@@ -29,7 +26,7 @@ describe("<ScenarioGridCard/> per-row Cancel button structure (regression #3192)
   describe("given an in-progress run with onCancel", () => {
     /** @scenario "Per-row Cancel control is not a nested HTML button inside the card" */
     it("does not nest a <button> element inside the outer card button", () => {
-      render(
+      renderWithDesignSystem(
         <ScenarioGridCard
           scenarioRun={makeScenarioRunData({
             status: ScenarioRunStatus.IN_PROGRESS,
@@ -39,7 +36,6 @@ describe("<ScenarioGridCard/> per-row Cancel button structure (regression #3192)
           onClick={vi.fn()}
           onCancel={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const cancelButton = screen.getByTestId("cancel-run-button");
@@ -69,7 +65,7 @@ describe("<RunRow/> per-row Cancel wiring in grid view (regression #3192)", () =
         durationInMs: 0,
       });
 
-      render(
+      renderWithDesignSystem(
         <RunRow
           batchRun={makeBatchRun({ scenarioRuns: [scenarioRun] })}
           summary={makeSummary({
@@ -85,7 +81,6 @@ describe("<RunRow/> per-row Cancel wiring in grid view (regression #3192)", () =
           onCancelRun={onCancelRun}
           viewMode="grid"
         />,
-        { wrapper: Wrapper },
       );
 
       const cancelButton = screen.getByTestId("cancel-run-button");

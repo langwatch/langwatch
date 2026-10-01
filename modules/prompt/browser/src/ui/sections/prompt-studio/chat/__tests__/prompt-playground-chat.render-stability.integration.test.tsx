@@ -4,8 +4,8 @@
  * something it did not select must not re-render it.
  * @see specs/prompts/studio-render-stability.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
@@ -40,7 +40,7 @@ vi.mock("../../../../../behavior/lent-trace.tsx", () => ({
   },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
+vi.mock("@langwatch/trace-contract/conversation", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   flattenMessages: () => [],
 }));
@@ -114,18 +114,16 @@ describe("<PromptPlaygroundChat/> render stability", () => {
       const tabId = store.getState().windows[0]?.tabs[0]?.id;
       expect(tabId).toBeDefined();
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <PromptHostProvider value={testHost}>
-            <PromptPlaygroundChatProvider>
-              <TabIdProvider tabId={tabId!}>
-                <PromptPlaygroundChat
-                  formValues={{ version: { configData: { llm: {} } } } as never}
-                />
-              </TabIdProvider>
-            </PromptPlaygroundChatProvider>
-          </PromptHostProvider>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <PromptHostProvider value={testHost}>
+          <PromptPlaygroundChatProvider>
+            <TabIdProvider tabId={tabId!}>
+              <PromptPlaygroundChat
+                formValues={{ version: { configData: { llm: {} } } } as never}
+              />
+            </TabIdProvider>
+          </PromptPlaygroundChatProvider>
+        </PromptHostProvider>,
       );
 
       expect(renderCount.value).toBe(1);

@@ -12,12 +12,13 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { getRandomWorkflowIcon, useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
+import { getRandomWorkflowIcon } from "../../model/random-workflow-icon.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker.tsx";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,

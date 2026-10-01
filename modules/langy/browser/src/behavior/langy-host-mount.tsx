@@ -13,9 +13,9 @@ import {
   type UiRoute,
   type UiSession,
 } from "@langwatch/browser-host/capabilities";
-import { isLangyDemoProject } from "@langwatch/langy-browser-kit";
 import { useMemo, type ReactNode } from "react";
 
+import { isLangyDemoProject } from "../model/langy-demo-project.ts";
 import {
   LangyHostApi,
   LangyHostProvider,
@@ -36,6 +36,7 @@ class CapabilityLangyHost extends LangyHostApi {
   private readonly feedback: UiFeedback;
   private readonly organizationRole_: LangyHostOrganizationRole;
   private readonly isDemoProject_: boolean;
+  private readonly isSaaS: boolean;
 
   constructor({
     session,
@@ -44,6 +45,7 @@ class CapabilityLangyHost extends LangyHostApi {
     feedback,
     organizationRole,
     isDemoProject,
+    isSaaS,
   }: {
     session: UiSession;
     navigation: UiNavigation;
@@ -51,6 +53,7 @@ class CapabilityLangyHost extends LangyHostApi {
     feedback: UiFeedback;
     organizationRole: LangyHostOrganizationRole;
     isDemoProject: boolean;
+    isSaaS: boolean;
   }) {
     super();
     this.session = session;
@@ -59,6 +62,7 @@ class CapabilityLangyHost extends LangyHostApi {
     this.feedback = feedback;
     this.organizationRole_ = organizationRole;
     this.isDemoProject_ = isDemoProject;
+    this.isSaaS = isSaaS;
   }
 
   project(): LangyHostProject | undefined {
@@ -122,9 +126,9 @@ class CapabilityLangyHost extends LangyHostApi {
     else this.navigationCapability.navigate(to);
   }
 
-  /** No billing capability exists here; undefined is the honest reading. */
-  planManagementUrl(): string | undefined {
-    return void 0;
+  /** SaaS manages a subscription, self-hosted a licence: same split as the shell's upgrade link. */
+  planManagementUrl(): string {
+    return this.isSaaS ? "/settings/subscription" : "/settings/license";
   }
 
   succeeded(notice: LangySuccessNotice): void {
@@ -138,7 +142,7 @@ class CapabilityLangyHost extends LangyHostApi {
 
 /**
  * The provider `mounts.load` would resolve. NOT YET WIRED: `modules/langy/browser`
- * has no `defineWebModule` to hang `.withHosts()` off — see the handoff.
+ * has no `defineBrowserModule` to hang `.withHosts()` off — see the handoff.
  */
 export default function LangyHostMount({ children }: { children?: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
@@ -159,8 +163,9 @@ export default function LangyHostMount({ children }: { children?: ReactNode }) {
         feedback,
         organizationRole,
         isDemoProject,
+        isSaaS: deployment.isSaaS,
       }),
-    [session, navigation, route, feedback, organizationRole, isDemoProject],
+    [session, navigation, route, feedback, organizationRole, isDemoProject, deployment.isSaaS],
   );
   return <LangyHostProvider value={host}>{children}</LangyHostProvider>;
 }

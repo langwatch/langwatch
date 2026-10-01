@@ -6,12 +6,6 @@
 
 import type { RunParameterValues, ScenarioRunData } from "@langwatch/scenario-contract";
 import {
-  computeGroupSummary,
-  groupRunsByTargetKey,
-  type RunGroupSummary,
-  targetKeyOfRun,
-} from "@langwatch/suite-browser-kit";
-import {
   differingParameterNames,
   targetLabels,
   targetParametersLabel,
@@ -23,6 +17,12 @@ import {
   type TargetIdentity,
   useTargetIdentityMap,
 } from "../../../../behavior/use-target-name-map.ts";
+import {
+  computeGroupSummary,
+  groupRunsByTargetKey,
+  type RunGroupSummary,
+  targetKeyOfRun,
+} from "../../../../model/suite/run-history-transforms.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { targetColor } from "../../../elements/agent-testing/shared/target-colors.ts";
 

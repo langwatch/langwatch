@@ -1,6 +1,7 @@
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { resolveInstantEvalChips } from "@langwatch/trace-contract";
 import { useMemo } from "react";
+
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 
 /**
  * The query's eval chips, each with its run or none, and the map every read

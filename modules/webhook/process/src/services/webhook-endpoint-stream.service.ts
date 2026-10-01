@@ -27,7 +27,7 @@ const logger = createLogger("langwatch:webhooks:endpoint-stream");
  * carries beside it: the durable store the buffer and outbox commit
  * through, and an overridable clock for tests. Reachable from any process
  * that holds a `processStore` — the worker's delivery process manager and
- * the api's `WebhookApp` both compose over this same service, so a replay
+ * the api's `WebhookModule` both compose over this same service, so a replay
  * append never needs the process manager's dispatch/plan/prune graph.
  */
 export interface WebhookEndpointStreamDeps {

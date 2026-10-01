@@ -7,6 +7,7 @@ import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import { type GovernanceConfig, loadConfig, saveConfig } from "./config";
+import { createIngestionKey, DeviceFlowError, forkProjectSession, logout } from "./device-flow";
 import { refreshSession as sharedRefreshSession } from "./session-refresh";
 
 export interface SessionApiOptions {
@@ -116,13 +117,14 @@ export interface SessionPersonalProject {
   id: string;
   slug: string;
   name: string;
-  api_key: string;
+  /** Sent only by servers before project sessions; the login key authenticates instead. */
+  api_key?: string;
 }
 
 /**
- * Lazy personal-key exchange. Returns null when the server predates the
- * endpoint (404) so the caller can degrade gracefully; throws SessionApiError
- * on auth failures and server errors.
+ * The personal project, read through the device session, which also proves the session live.
+ * Returns null when the server predates the endpoint (404); throws SessionApiError on auth
+ * failures and server errors.
  */
 export async function fetchPersonalProject(
   cfg: GovernanceConfig = loadConfig(),
@@ -146,11 +148,11 @@ export async function fetchPersonalProject(
     );
   }
   const parsed = (await res.json()) as { project?: SessionPersonalProject };
-  if (!parsed.project?.api_key) {
+  if (!parsed.project?.id) {
     throw new SessionApiError(
       500,
       "malformed_response",
-      "personal-project exchange returned no api_key",
+      "personal-project exchange returned no project",
     );
   }
   return parsed.project;
@@ -162,65 +164,67 @@ export interface SessionProjectKey {
 }
 
 /**
- * Non-interactive project login: resolves a shared project's existing API
- * key by slug through the device session. error_description is carried
- * through so the CLI can show the server's own sentence.
+ * Non-interactive project login: forks a child session capped at the project from the device
+ * session, mints this machine's ingestion key with it, then ends the child. The device session
+ * itself is left as it was.
  */
-export async function fetchProjectKeyBySlug(
+export async function mintProjectIngestionKey(
   cfg: GovernanceConfig,
   slug: string,
   opts: SessionApiOptions = {},
 ): Promise<SessionProjectKey> {
-  const res = await sessionRequest(cfg, "POST", "/api/auth/cli/project-key", { slug }, opts);
-  if (res.status === 401) {
-    throw new SessionApiError(
+  if (!cfg.refresh_token) {
+    throw new SessionApiError(401, "not_logged_in", "Not logged in");
+  }
+  const flow = {
+    baseUrl: cfg.control_plane_url,
+    fetchImpl: boundedFetch(opts.fetchImpl ?? fetch, opts.timeoutMs ?? SESSION_REQUEST_TIMEOUT_MS),
+  };
+  try {
+    const child = await forkProjectSession(flow, {
+      refreshToken: cfg.refresh_token,
+      projectSlug: slug,
+    });
+    const { project } = child;
+    if (!project) {
+      // An older server rotated the device session instead: keep the new pair, mint nothing.
+      cfg.access_token = child.access_token;
+      cfg.refresh_token = child.refresh_token;
+      cfg.expires_at = Math.floor(Date.now() / 1000) + child.expires_in;
+      saveConfig(cfg);
+      throw new SessionApiError(
+        404,
+        "endpoint_missing",
+        "This LangWatch server does not support project login from the command line yet. Update LangWatch, or use `langwatch login --api-key <key>`.",
+      );
+    }
+    try {
+      const apiKey = await createIngestionKey(flow, { accessToken: child.access_token, project });
+      return { api_key: apiKey, project };
+    } finally {
+      await logout(flow, child.refresh_token, child.access_token).catch(() => undefined);
+    }
+  } catch (error) {
+    throw sessionApiErrorOf({ error, slug });
+  }
+}
+
+/** The device flow's refusal, in the codes the project-login callers branch on. */
+function sessionApiErrorOf({ error, slug }: { error: unknown; slug: string }): unknown {
+  if (!(error instanceof DeviceFlowError)) return error;
+  if (error.kind === "unauthorized") {
+    return new SessionApiError(
       401,
       "unauthorized",
       "Session expired or revoked. Run `langwatch login` again.",
     );
   }
-  if (res.status === 404) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error_description?: string;
-      error?: string;
-    };
-    // Distinguish "no such project" from "server predates the endpoint":
-    // the endpoint answers with a JSON error envelope, an older server's
-    // framework 404 does not carry our error code.
-    if (body.error === "not_found") {
-      throw new SessionApiError(
-        404,
-        "project_not_found",
-        body.error_description ?? `No project with slug "${slug}"`,
-      );
-    }
-    throw new SessionApiError(
-      404,
-      "endpoint_missing",
-      "This LangWatch server does not support non-interactive project login yet. Run `langwatch login --project` in a terminal with a browser instead.",
+  if (error.kind === "denied") {
+    return new SessionApiError(
+      403,
+      "project_not_found",
+      `No project "${slug}" you can send traces to: ${error.message}`,
     );
   }
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as {
-      error?: string;
-      error_description?: string;
-    };
-    throw new SessionApiError(
-      res.status,
-      body.error ?? "error",
-      body.error_description ?? `project-key request failed (${res.status})`,
-    );
-  }
-  // Same guard as fetchPersonalProject: a 200 with no key must fail loudly
-  // here, or the caller writes `LANGWATCH_API_KEY=undefined` into .env and
-  // reports success.
-  const parsed = (await res.json().catch(() => null)) as SessionProjectKey | null;
-  if (!parsed?.api_key) {
-    throw new SessionApiError(
-      500,
-      "malformed_response",
-      "project-key exchange returned no api_key",
-    );
-  }
-  return parsed;
+  return new SessionApiError(500, "error", error.message);
 }

@@ -209,12 +209,11 @@ export interface TraceSharingConfig {
   projectEnabled: boolean;
 }
 
-/** Internal Gateway-only trace export credential, never a transport DTO. */
+/** The project a gateway's spans land in; its export key is the gateway's own, never this. */
 export const traceDestinationProjectSchema = z
   .object({
     id: z.string().min(1),
     teamId: z.string().min(1),
-    apiKey: z.string(),
     archivedAt: z.date().nullable(),
   })
   .strict();

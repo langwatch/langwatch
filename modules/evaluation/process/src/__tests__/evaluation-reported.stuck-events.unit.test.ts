@@ -4,7 +4,6 @@ import {
   analyticsEvaluationUpsertInputSchema,
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationReportedEvent } from "@langwatch/evaluation-contract";
 import {
   createTenantId,
@@ -12,6 +11,7 @@ import {
   MapProjectionExecutor,
   type ProjectionStoreContext,
 } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { EvaluationAnalyticsFoldProjection } from "../eventing/evaluation-analytics-fold.projection.ts";

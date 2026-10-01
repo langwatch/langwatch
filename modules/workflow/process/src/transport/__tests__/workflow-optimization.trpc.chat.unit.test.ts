@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `optimization.chat` runs the workflow the caller named, in the scope that was
  * checked - on the same application operation the public run endpoint reaches.
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -159,5 +159,60 @@ describe("optimization.chat", () => {
 
       expect(toggleSaveAsEvaluator).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("optimization.getPublishedWorkflow", () => {
+  /** @scenario "A published workflow read never carries a saved HTTP agent's credentials" */
+  it("answers a published graph with a saved HTTP agent's credentials blank", async () => {
+    const getPublishedWorkflow = vi.fn<WorkflowApi["getPublishedWorkflow"]>(async () => ({
+      published: true,
+      workflow: {
+        version: "1",
+        isComponent: false,
+        isEvaluator: false,
+        dsl: {
+          nodes: [
+            {
+              id: "http_agent",
+              data: {
+                agent: "agents/agent_1",
+                parameters: [
+                  { identifier: "agent_type", type: "str", value: "http" },
+                  { identifier: "auth_token", type: "str", value: "token-secret" },
+                  { identifier: "headers", type: "dict", value: { "x-tenant": "tenant-secret" } },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    }));
+    const callers = callersFor(
+      createApiFixture<WorkflowApi>({ getPublishedWorkflow }, "WorkflowApi"),
+    );
+
+    const answered = await callers.get("getPublishedWorkflow")?.({
+      projectId: "project_1",
+      workflowId: "workflow_1",
+    });
+
+    expect(JSON.stringify(answered)).not.toContain("token-secret");
+    expect(JSON.stringify(answered)).not.toContain("tenant-secret");
+    expect(JSON.stringify(answered)).toContain("x-tenant");
+    expect(answered).toMatchObject({ version: "1" });
+  });
+
+  it("answers null when nothing is published", async () => {
+    const callers = callersFor(
+      createApiFixture<WorkflowApi>(
+        { getPublishedWorkflow: async () => ({ published: false }) },
+        "WorkflowApi",
+      ),
+    );
+
+    expect(
+      await callers.get("getPublishedWorkflow")?.({ projectId: "project_1", workflowId: "w" }),
+    ).toBeNull();
   });
 });

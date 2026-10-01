@@ -1,8 +1,9 @@
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import { COMMAND_INLINE_THRESHOLD, type RecordSpanCommandData } from "@langwatch/trace-contract";
 
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { TraceIngressPayload } from "./trace-ingestion.service.ts";
-import type { TraceSpoolService } from "./trace-spool.service.ts";
 
 /**
  * The write half of the ADR-022 claim check: the edge size check, and the
@@ -15,22 +16,28 @@ import type { TraceSpoolService } from "./trace-spool.service.ts";
 // refusing the span. The warning names what was skipped.
 export class TraceEdgeSpoolService extends TraceIngressPayload {
   static create(options: {
-    spool: Pick<TraceSpoolService, "putSpool">;
+    spool: Pick<TraceBlobStoreService, "putSpool">;
     logger: Logger;
+    featureFlags?: Pick<FeatureFlagApi, "isEnabled">;
   }): TraceEdgeSpoolService {
     return new TraceEdgeSpoolService(options);
   }
 
   private constructor(
     private readonly options: {
-      spool: Pick<TraceSpoolService, "putSpool">;
+      spool: Pick<TraceBlobStoreService, "putSpool">;
       logger: Logger;
+      featureFlags?: Pick<FeatureFlagApi, "isEnabled">;
     },
   ) {
     super();
   }
 
   async prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData> {
+    if (!(await this.isOffloadEnabled(data.tenantId))) {
+      return data;
+    }
+
     const serialized = JSON.stringify(data);
     const byteLength = Buffer.byteLength(serialized, "utf8");
     if (byteLength <= COMMAND_INLINE_THRESHOLD) {
@@ -61,6 +68,21 @@ export class TraceEdgeSpoolService extends TraceIngressPayload {
       );
 
       return data;
+    }
+  }
+
+  private async isOffloadEnabled(projectId: string): Promise<boolean> {
+    const flags = this.options.featureFlags;
+    if (!flags) return true;
+    try {
+      return await flags.isEnabled("release_trace_blob_offload", { kind: "project", projectId });
+    } catch (error) {
+      this.options.logger.warn(
+        { error, projectId },
+        "blob offload flag lookup failed; inline route",
+      );
+
+      return false;
     }
   }
 }

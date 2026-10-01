@@ -1,7 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
- * A real `OpsApp` over memory repositories, fixture peers and a literal
+ * A real `OpsModule` over memory repositories, fixture peers and a literal
  * members record. Every collaborator a test wants to watch is passed in
  * rather than reached for.
  */
@@ -12,14 +11,17 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { OpsOperatorPermission } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import { AdminAccessService } from "../../services/admin-access.service.ts";
 import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
 import {
-  OpsApp,
+  OpsModule,
   type OpsAppInfrastructure,
   type OpsCapability,
   type OpsEventingIntrospection,
@@ -28,6 +30,29 @@ import {
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";
+
+/** The account the fixture's authz grants the platform-operator role. */
+export const OPS_STAFF_ID = "user_staff";
+
+/**
+ * An `AuthzApi` that answers platform-tier questions from a table of holders
+ * (user id to the permissions held there) and says no to every other user.
+ */
+export function platformOperatorAuthz({
+  holders = { [OPS_STAFF_ID]: ["ops:view", "ops:manage"] },
+  overrides = {},
+}: {
+  holders?: Readonly<Record<string, readonly OpsOperatorPermission[]>>;
+  overrides?: Partial<AuthzApi>;
+} = {}): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    can: async ({ principal, permission, scope }) =>
+      scope.type === "platform" &&
+      principal.type === "user" &&
+      (holders[principal.id] ?? []).some((held) => held === permission),
+    ...overrides,
+  });
+}
 
 /** Nothing registered: the graph a test does not care about. */
 class EmptyOpsIntrospection implements OpsEventingIntrospection {
@@ -57,7 +82,7 @@ export type OpsTestAppOptions = Readonly<{
   checkup?: OpsCheckupService;
 }>;
 
-export type OpsTestApp = Readonly<{ app: OpsApp; repositories: OpsRepositories }>;
+export type OpsTestApp = Readonly<{ app: OpsModule; repositories: OpsRepositories }>;
 
 /** The members record a process supplies, with nothing configured. */
 export function createOpsTestInfrastructure(
@@ -65,12 +90,19 @@ export function createOpsTestInfrastructure(
   capability: Partial<OpsCapability> = {},
 ): OpsAppInfrastructure {
   return {
-    createCapability: () =>
-      createApiFixture<OpsCapability>({
+    createCapability: (dependencies) => {
+      const access = AdminAccessService.create({
+        authz: dependencies.authz,
+        users: dependencies.users,
+      });
+
+      return createApiFixture<OpsCapability>({
         snapshots: null,
-        isAdmin: (identity: { email?: string | null }) => identity.email === OPS_STAFF_ADDRESS,
+        isAdmin: (identity) => access.isAdmin(identity),
+        holds: (input) => access.holds(input),
         ...capability,
-      }),
+      });
+    },
     eventingIntrospection: new EmptyOpsIntrospection(),
     pipelines: { listRegistrations: () => ({ projections: [], eventSubscribers: [] }) },
     eventLogWindow: {
@@ -98,13 +130,13 @@ export function createOpsTestInfrastructure(
 export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
   const repositories = options.repositories ?? MemoryOpsRepositories.create();
 
-  const app = OpsApp.fromInfrastructure({
+  const app = OpsModule.fromInfrastructure({
     infrastructure: createOpsTestInfrastructure(options.members, options.capability),
     dependencies: {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
       identity: createApiFixture<IdentityApi>(),
-      authz: options.authz ?? createApiFixture<AuthzApi>(),
+      authz: options.authz ?? platformOperatorAuthz(),
       retention: createApiFixture<DataRetentionApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog:

@@ -2,16 +2,16 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  findSlackConnection,
-  type SlackConnection,
-  type SlackConnectionList,
-  type SlackConnectionSaved,
-} from "@langwatch/slack-browser-kit";
 
 import { slackApi } from "../../behavior/slack-api.ts";
 import { useDeleteSlackConnection } from "../../behavior/use-delete-slack-connection.ts";
 import { useSaveSlackConnection } from "../../behavior/use-save-slack-connection.ts";
+import { findSlackConnection } from "../../model/slack-connection-name.ts";
+import {
+  type SlackConnection,
+  type SlackConnectionList,
+  type SlackConnectionSaved,
+} from "../../model/slack-connection-types.ts";
 import { SlackConnectionForm } from "../blocks/slack-connection-form.tsx";
 import { SlackConnectionReadOnly } from "../blocks/slack-connection-read-only.tsx";
 import { DeleteSlackConnectionButton } from "../elements/delete-slack-connection-button.tsx";

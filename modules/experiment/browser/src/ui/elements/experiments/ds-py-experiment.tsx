@@ -22,7 +22,6 @@ import {
 } from "@langwatch/design-system/primitives";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { titleCase } from "@langwatch/design-system/string-casing";
-import { getRunDisplayName } from "@langwatch/experiment-browser-kit";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -32,7 +31,6 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
@@ -54,6 +52,9 @@ import type {
   NameType,
   ValueType,
 } from "recharts/types/component/DefaultTooltipContent";
+
+import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";
+import { FormatMoney } from "../workflow/format-money.tsx";
 
 /** The runs query, with the contract's row rather than the router's inference. */
 type DSPyRunsQuery = UseTRPCQueryResult<
@@ -303,8 +304,8 @@ export const useDSPyExperimentState = ({
       experimentSlug: experiment.slug,
     },
     {
-      refetchInterval: 3000,
       refetchOnMount: false,
+      // needs a read hint: dspy optimisation step recorded
     },
   ) as DSPyRunsQuery;
 

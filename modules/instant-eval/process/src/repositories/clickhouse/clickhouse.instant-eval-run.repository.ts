@@ -1,7 +1,6 @@
 import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
 
-import type { InstantEvalClickHouseResolver } from "../../app/instant-eval.members.ts";
 import type {
   InstantEvalRunDefinition,
   InstantEvalRunListQuery,
@@ -16,6 +15,7 @@ import {
   toRow,
   toWriteRecord,
 } from "./clickhouse.instant-eval-run.mapper.ts";
+import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
 
 const usageRowsSchema = z.array(z.object({ Total: z.string(), FirstMs: z.string() }));
 

@@ -3,8 +3,8 @@
  * A new evaluator's footer while its default models load: nothing is saved or
  * applied before the reset that fills them in has run.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { useForm } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,10 +12,6 @@ import {
   type EvaluatorEditorController,
   EvaluatorEditorFooter,
 } from "../evaluator-editor-shared.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function FooterUnderTest({
   isLoadingEvaluator,
@@ -69,7 +65,7 @@ function FooterUnderTest({
 }
 
 function renderFooter(props: { isLoadingEvaluator: boolean; onLocalConfigChange?: () => void }) {
-  render(<FooterUnderTest {...props} />, { wrapper: Wrapper });
+  renderWithDesignSystem(<FooterUnderTest {...props} />);
 }
 
 const buttons = () =>

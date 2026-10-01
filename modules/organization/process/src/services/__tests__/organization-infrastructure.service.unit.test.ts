@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   AuthzGrantsService,
   type AuthzApi,
@@ -23,6 +22,7 @@ import {
   type PersonalFeatures,
   type PersonalWorkspace,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -98,6 +98,12 @@ class StubRepository extends OrganizationRepository {
 
   findStoredSettings(): Promise<StoredOrganizationSettings | null> {
     return Promise.resolve(this.storedSettings);
+  }
+
+  hasS3Secret = false;
+
+  async hasStoredS3Secret(): Promise<boolean> {
+    return this.hasS3Secret;
   }
 
   updateSettings(input: Record<string, unknown>): Promise<void> {
@@ -515,6 +521,35 @@ describe("OrganizationService", () => {
     expect(repository.settingsUpdate).toEqual({
       organizationId: "org",
       traceSharingEnabled: false,
+    });
+  });
+
+  describe("when the settings carry an endpoint and a key id but no secret", () => {
+    const storage = {
+      organizationId: "org",
+      s3Endpoint: "https://s3.example",
+      s3AccessKeyId: "AKIA",
+    };
+
+    /** @scenario A first-time storage setup with a blank secret is refused */
+    it("refuses it when no secret is stored yet", async () => {
+      const repository = new StubRepository("team");
+
+      await expect(createService(repository).updateSettings(storage)).rejects.toMatchObject({
+        code: "validation_error",
+        httpStatus: 400,
+      });
+      expect(repository.settingsUpdate).toBeNull();
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("keeps the stored secret when one is held", async () => {
+      const repository = new StubRepository("team");
+      repository.hasS3Secret = true;
+
+      await createService(repository).updateSettings(storage);
+
+      expect(repository.settingsUpdate).not.toHaveProperty("s3SecretAccessKey");
     });
   });
 

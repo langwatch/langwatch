@@ -1,8 +1,8 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 
 const logger = createLogger("langwatch:trace-processing:span-storage-broadcast");
 
@@ -10,7 +10,7 @@ const logger = createLogger("langwatch:trace-processing:span-storage-broadcast")
 export const SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS = 15_000;
 
 export interface SpanStorageBroadcastSubscriberDeps {
-  broadcast: TraceTenantBroadcast;
+  broadcast: Pick<PresenceApi, "publishProjectEvent">;
 }
 
 /**
@@ -31,10 +31,10 @@ export function createSpanStorageBroadcastHandler(
         traceId,
       });
 
-      await deps.broadcast.broadcastToTenant({
-        tenantId,
+      await deps.broadcast.publishProjectEvent({
+        projectId: tenantId,
+        channel: "trace_updated",
         event: payload,
-        eventType: "trace_updated",
       });
 
       logger.debug({ tenantId, traceId }, "Broadcasted trace update after span storage");

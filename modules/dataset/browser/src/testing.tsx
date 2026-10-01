@@ -2,7 +2,7 @@
  * assertion on screen output, not toast DOM.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { render, type RenderResult } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
@@ -90,9 +90,9 @@ export function DatasetTestHarness({
   children: ReactNode;
 }) {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <DatasetHostProvider value={host}>{children}</DatasetHostProvider>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

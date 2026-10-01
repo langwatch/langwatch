@@ -6,6 +6,7 @@ import { agentSchema, type Agent } from "@langwatch/agent-contract";
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { agentFixture } from "../../app/__tests__/agent.fixture.ts";
 import { AGENTS_ALIAS_SUCCESSOR } from "../agent-legacy.rest.ts";
 import { createAgentRest } from "../agent.rest.ts";
 import { buildAgentApps, PROJECT_ID } from "./agent-rest.fixture.ts";
@@ -411,5 +412,40 @@ describe("given one name and one environment holding a personal row and a host-s
     expect(hosted?.owner).toBeNull();
     expect(hosted?.selectable).toBe(true);
     expect(hosted?.notSelectableReason).toBeNull();
+  });
+});
+
+describe("given an HTTP agent still holding credentials typed inline", () => {
+  const seeded = agentFixture({
+    id: "agent_http_literal",
+    projectId: PROJECT_ID,
+    type: "http",
+    config: {
+      url: "https://agent.test/chat",
+      method: "POST",
+      headers: [
+        { key: "X-Tenant-Key", value: "tenant-literal" },
+        { key: "Accept", value: "application/json" },
+      ],
+      auth: { type: "bearer", token: "token-literal" },
+    },
+  });
+
+  /** @scenario "An agent read never answers a credential over REST" */
+  it.each([
+    ["/api/v1/agents"],
+    ["/api/v1/agents/agent_http_literal"],
+    ["/api/agents"],
+    ["/api/agents/agent_http_literal"],
+  ])("answers GET %s with the credential values blank", async (path) => {
+    const api = await buildAgentApps({ seed: [seeded] });
+
+    const response = await api.v1(path);
+    const body = JSON.stringify(await response.json());
+
+    expect(response.status).toBe(200);
+    expect(body).not.toContain("tenant-literal");
+    expect(body).not.toContain("token-literal");
+    expect(body).toContain("application/json");
   });
 });

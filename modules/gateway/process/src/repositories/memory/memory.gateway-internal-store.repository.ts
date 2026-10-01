@@ -15,7 +15,6 @@ export interface MemoryGatewayInternalStoreSeed {
     GatewayBudgetBucketBoundary,
     "budgetId" | "bucketScopeId" | "periodStartedAt"
   >[];
-  projects?: readonly { id: string; teamId: string; organizationId: string }[];
 }
 
 /**
@@ -34,14 +33,12 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRe
     GatewayBudgetBucketBoundary,
     "budgetId" | "bucketScopeId" | "periodStartedAt"
   >[];
-  #projects: { id: string; teamId: string; organizationId: string }[];
 
   private constructor(seed: MemoryGatewayInternalStoreSeed) {
     super();
     this.#virtualKeys = [...(seed.virtualKeys ?? [])];
     this.#budgets = [...(seed.budgets ?? [])];
     this.#bucketBoundaries = [...(seed.bucketBoundaries ?? [])];
-    this.#projects = [...(seed.projects ?? [])];
   }
 
   async findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
@@ -65,12 +62,6 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRe
     return boundary ? { periodStartedAt: boundary.periodStartedAt } : null;
   }
 
-  async findProjectIdsForOrganization(organizationId: string): Promise<string[]> {
-    return this.#projects
-      .filter((project) => project.organizationId === organizationId)
-      .map((project) => project.id);
-  }
-
   async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
     {
       id: string;
@@ -87,12 +78,6 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRe
         principalUserId: key.principalUserId ?? null,
         lastUsedAt: key.lastUsedAt ?? null,
       }));
-  }
-
-  async findProjectTeams(projectIds: readonly string[]): Promise<{ id: string; teamId: string }[]> {
-    return this.#projects
-      .filter((project) => projectIds.includes(project.id))
-      .map((project) => ({ id: project.id, teamId: project.teamId }));
   }
 
   async touchVirtualKeysLastUsed(input: {

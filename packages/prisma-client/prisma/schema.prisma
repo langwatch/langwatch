@@ -4083,6 +4083,14 @@ model GroupMembership {
   @@index([groupId])
 }
 
+/// Who authz treats as gone, from user's and identity's facts; authz never reads User (ARCHITECTURE.md, "Platform operators are a grant").
+model AuthzUserStanding {
+  userId            String    @id
+  deactivatedAt     DateTime?
+  erasedAt          DateTime?
+  standingChangedAt DateTime
+}
+
 model RoleBinding {
   id             String       @id @default(nanoid())
   organizationId String
@@ -4311,6 +4319,12 @@ model ApiKey {
   /// Redis-stored sessions. NULL for non-ingestion keys and for keys minted by
   /// a CLI old enough to predate device metadata.
   createdByDeviceLabel String?
+
+  /// True for a key LangWatch minted for itself (a run, the gateway's trace
+  /// export, a Langy session). Hides it from listings, refuses customer edits
+  /// and revokes, and lets an ownerless run key act as the system. Never set
+  /// by a customer create; rows before the column stay false.
+  isSystemManaged Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
@@ -5391,6 +5405,15 @@ model GatewayConnectUpstream {
   encryptedToken String
   instanceId     String
   updatedAt      DateTime @updatedAt
+}
+
+// The ownerless `traces:create` key a gateway trace project's spans are exported with. Minted
+// once by the gateway, never expiring; the token is encrypted and its id folds into the ETag.
+model GatewayTraceExportKey {
+  projectId      String   @id
+  apiKeyId       String
+  encryptedToken String
+  createdAt      DateTime @default(now())
 }
 
 model GatewayBudget {

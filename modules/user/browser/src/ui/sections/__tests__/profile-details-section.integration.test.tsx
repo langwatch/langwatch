@@ -35,6 +35,10 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
+vi.mock("../../../behavior/user-api.ts", () => ({
+  userApi: { user: { getAvatarUrl: { useQuery: () => ({ data: undefined }) } } },
+}));
+
 function renderSection(options: FakePersonalHostOptions = {}) {
   const host = fakePersonalWorkspaceHost(options);
   renderWithPersonalWorkspaceHost(<ProfileDetailsSection />, { host });

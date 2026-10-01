@@ -1,6 +1,11 @@
 import { AgentApi, agentTrpc } from "@langwatch/agent-contract";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 
+import {
+  agentWithFieldsWithoutSecrets,
+  agentWithoutSecrets,
+} from "../rules/agent-secrets.rules.ts";
+
 function withLegacyCopyCount<T extends { copyCount?: number }>(
   agent: T,
 ): T & { _count: { copiedAgents: number } } {
@@ -14,7 +19,7 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .handle(async ({ app, input, actor }) => {
       const agents = await app.getAll({ ...input, viewerUserId: actor.id });
 
-      return agents.map(withLegacyCopyCount);
+      return agents.map(agentWithoutSecrets).map(withLegacyCopyCount);
     })
 
     .procedure("getById")
@@ -22,7 +27,7 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
     .handle(async ({ app, input, actor }) => {
       const agent = await app.getById({ ...input, viewerUserId: actor.id });
 
-      return withLegacyCopyCount(agent);
+      return withLegacyCopyCount(agentWithoutSecrets(agent));
     })
 
     .procedure("create")
@@ -31,7 +36,7 @@ export const agentTrpcTransport: TrpcRouterDeclaration<AgentApi, typeof agentTrp
 
     .procedure("update")
     .withPermission("evaluations:manage")
-    .handle(({ app, input }) => app.update(input))
+    .handle(async ({ app, input }) => agentWithFieldsWithoutSecrets(await app.update(input)))
 
     .procedure("getRelatedEntities")
     .withPermission("evaluations:view")

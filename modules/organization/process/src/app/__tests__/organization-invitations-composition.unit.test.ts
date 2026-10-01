@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * `InviteServiceOrganizationInvitations` maps `InviteService`'s method names onto
  * the port the door reads; the app still refuses a role it composed none for.
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { InviteNotFoundError, type OrganizationInvite } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

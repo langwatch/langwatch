@@ -25,19 +25,13 @@ export function useOnlineEvaluations({
   const performance = monitorApi.monitors.getPerformanceForProject.useQuery(
     { projectId: projectId ?? "", timeZone: timeZone },
     {
-      enabled: !!projectId && canViewAnalytics && monitors.isSuccess,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
+      enabled: !!projectId && canViewAnalytics && monitors.isSuccess,    },
   );
 
   const experiments = monitorApi.experiments.getAllByProjectId.useQuery(
     { projectId: projectId ?? "" },
     {
-      enabled: !!projectId && canManage && canViewExperiments && monitors.isSuccess,
-      refetchOnWindowFocus: false,
-      trpc: { context: { skipBatch: true } },
-    },
+      enabled: !!projectId && canManage && canViewExperiments && monitors.isSuccess,    },
   );
 
   const performanceByMonitor = useMemo(

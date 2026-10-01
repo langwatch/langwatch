@@ -4,14 +4,13 @@
  *   specs/scenarios/scenario-version-on-runs.feature,
  *   specs/features/agent-testing/case-version-history.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser-kit";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { AgentTestingRunDrawer } from "../../agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
 
@@ -39,6 +38,37 @@ const emptyQuery = vi.hoisted(() => () => ({
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      testSuites: { getAll: { useQuery: emptyQuery } },
+    },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    storedObjects: { headById: { useQuery: () => ({ data: undefined }) } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
       scenarios: {
         getRunState: { invalidate: mockInvalidateRunState },
         getAll: { invalidate: vi.fn() },
@@ -46,10 +76,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         getByIdIncludingArchived: { invalidate: vi.fn() },
         listVersions: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
-      suites: {
-        testSuites: { getAll: { invalidate: vi.fn() } },
-        getById: { invalidate: vi.fn() },
       },
     }),
     scenarios: {
@@ -69,16 +95,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    suites: {
-      // Every run of the v2 dialog is queued under a plan name.
-      runPlan: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-      },
-      testSuites: { getAll: { useQuery: emptyQuery } },
-    },
-    agents: { getAll: { useQuery: () => ({ data: [] }) } },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
-    storedObjects: { headById: { useQuery: () => ({ data: undefined }) } },
   },
 }));
 
@@ -147,7 +163,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -163,10 +179,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeRunState(overrides: Record<string, unknown> = {}) {
   return {
@@ -219,7 +231,7 @@ function setWindowWidth(width: number) {
 }
 
 function renderWide() {
-  return render(<AgentTestingRunDrawer open />, { wrapper: Wrapper });
+  return renderWithDesignSystem(<AgentTestingRunDrawer open />);
 }
 
 beforeAll(() => {
@@ -389,11 +401,7 @@ describe("the wide run detail drawer", () => {
         ],
       }),
     );
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <AgentTestingRunDrawer open />
-      </ChakraProvider>,
-    );
+    view.rerender(<AgentTestingRunDrawer open />);
 
     expect(screen.getByText("Let me check the order")).toBeInTheDocument();
     expect(screen.getByTestId("run-verdict-pending")).toBeInTheDocument();
@@ -443,11 +451,7 @@ describe("the wide run detail drawer", () => {
         },
       }),
     );
-    view.rerender(
-      <ChakraProvider value={defaultSystem}>
-        <AgentTestingRunDrawer open />
-      </ChakraProvider>,
-    );
+    view.rerender(<AgentTestingRunDrawer open />);
 
     expect(screen.queryByTestId("run-verdict-pending")).not.toBeInTheDocument();
     expect(screen.getAllByText(/stays polite/).length).toBeGreaterThan(0);
@@ -1056,7 +1060,7 @@ describe("the classic run detail drawer", () => {
 
   /** @scenario "The v1 drawer keeps its width and its stacked results" */
   it("renders the classic layout when no variant is asked for", () => {
-    render(<ScenarioRunDetailDrawer open />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioRunDetailDrawer open />);
 
     // None of the wide furniture: no wide shell, no side-by-side grid, no
     // version chip, no History control.

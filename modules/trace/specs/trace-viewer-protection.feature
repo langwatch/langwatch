@@ -20,3 +20,9 @@ Scenario: A failed group membership read hides group-restricted trace content
   And the viewer's group membership cannot be read
   When they open a trace on that project
   Then the trace input is hidden from them
+
+  @unit
+  Scenario: A project-bound access token reads trace costs as its person
+    Given a person's project-bound access token, which has no key row
+    When it reads a trace over REST
+    Then cost visibility is asked of that person's user principal at the project

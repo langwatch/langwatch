@@ -1,3 +1,4 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Copying an experiment into another project, with its workflow or its
  * workbench state. Spec: modules/experiment/specs/experiment-service.feature.
@@ -13,16 +14,16 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
-import type { ExperimentPermissions, ExperimentWorkflowAuthoring } from "../app/experiment.app.ts";
+import type { ExperimentWorkflowAuthoringService } from "./experiment-workflow-authoring.service.ts";
 import type { ExperimentWorkflowLinkService } from "./experiment-workflow-link.service.ts";
 import type { ExperimentService } from "./experiment.service.ts";
 
 export type ExperimentCopyServiceOptions = {
   experiments: Pick<ExperimentService, "getById" | "save">;
   links: Pick<ExperimentWorkflowLinkService, "findWorkflow">;
-  workflowAuthoring: Pick<ExperimentWorkflowAuthoring, "saveVersion" | "copyWithDatasets">;
+  workflowAuthoring: Pick<ExperimentWorkflowAuthoringService, "saveVersion" | "copyWithDatasets">;
   dataset: Pick<DatasetApi, "copyDataset">;
-  permissions: ExperimentPermissions;
+  permissions: Pick<AuthzApi, "hasPermission">;
   slugify(value: string): string;
 };
 
@@ -41,8 +42,9 @@ export class ExperimentCopyService {
   ): Promise<ExperimentCopied> {
     // The declared check covers the TARGET project. The source is a second
     // project it never saw, so it is probed before anything is read.
-    const mayReadSource = await this.options.permissions.mayManageEvaluations({
-      actorId: by.id,
+    const mayReadSource = await this.options.permissions.hasPermission({
+      userId: by.id,
+      permission: "evaluations:manage",
       projectId: input.sourceProjectId,
     });
 

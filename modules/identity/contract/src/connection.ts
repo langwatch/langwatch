@@ -1,7 +1,7 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import type { RoutableConnection } from "./signin-routing.ts";
-import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * SSO connection vocabulary (ADR-117 §5, D04): states, events, and pure reducer.
@@ -230,14 +230,14 @@ export const connectionRegisteredPayloadSchema = z.object({
   idp: ssoIdpMetadataSchema,
   /** What this connection does with somebody it has never seen. */
   arrivalPolicy: ssoArrivalPolicySchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const domainClaimedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -246,7 +246,7 @@ export const domainClaimApprovedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** The ops user who approved. Recorded because first-verifier-owns makes
    *  this step the abuse boundary (D04 Security Concerns). */
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   /** Defaults to the operator, so every fact written before the published
    *  record could decide a claim decodes as exactly what it was. */
   authority: ssoDomainClaimAuthoritySchema.default("platform-operator"),
@@ -258,7 +258,7 @@ export const domainClaimRejectedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** Why ops said no, in the operator's words. Read back on re-claim. */
   note: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -270,13 +270,13 @@ export const domainClaimRejectedPayloadSchema = z.object({
 export const domainWithdrawnPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionDiscardedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -294,7 +294,7 @@ export const verificationRequestedPayloadSchema = z.object({
    * expired ceremony, the guard refuses to read it as a proof.
    */
   expiresAtMs: z.number().int().nonnegative().nullable().default(null),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -311,7 +311,7 @@ export const domainAttestedPayloadSchema = z.object({
   /** The platform operator who attested. Recorded because an attested domain
    *  is exactly as trustworthy as the operator behind it, and a dispute is
    *  answered from this fact. */
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -319,7 +319,7 @@ export const domainVerifiedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   domain: z.string().min(1),
   method: ssoVerificationMethodSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -335,7 +335,7 @@ export const domainProofWaveredPayloadSchema = z.object({
   firstAbsentAtMs: z.number().int().nonnegative(),
   /** When continued absence becomes a lapse. */
   graceEndsAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -349,7 +349,7 @@ export const domainProofLapsedPayloadSchema = z.object({
   domain: z.string().min(1),
   /** Carried forward so the fact says how long it was gone before we acted. */
   firstAbsentAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -362,7 +362,7 @@ export const domainProofRecoveredPayloadSchema = z.object({
   domain: z.string().min(1),
   /** How long the evidence was missing, end to end. */
   absentForMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -375,21 +375,21 @@ export const connectionActivatedPayloadSchema = z.object({
   /** The break-glass recovery reservation this activation holds, so a retry
    *  by the same actor reuses it and nobody else can adopt it. */
   activationReservationCommandId: z.string().min(1).optional(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionSuspendedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   reason: z.string().min(1).nullable(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionResumedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   activationReservationCommandId: z.string().min(1).optional(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -400,13 +400,13 @@ export const teardownRequestedPayloadSchema = z.object({
    *  dispatches the completion command; carrying it on the fact is what
    *  lets a replay reconstruct the deadline without a second store. */
   tearDownAfterMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const connectionTornDownPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -418,7 +418,7 @@ export const connectionTornDownPayloadSchema = z.object({
 export const connectionArrivalPolicySetPayloadSchema = z.object({
   connectionId: z.string().min(1),
   policy: ssoArrivalPolicySchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -447,7 +447,7 @@ export const connectionRenamedPayloadSchema = z.object({
   /** Trimmed and non-empty: a connection with a blank name is one whose card
    *  has nothing on it, and the cards are the only place it is read. */
   name: z.string().trim().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
@@ -460,19 +460,19 @@ export const replacementConnectionRegisteredPayloadSchema = z.object({
 export const migrationRouteSelectedPayloadSchema = z.object({
   connectionId: z.string().min(1),
   route: ssoMigrationRouteSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const migrationFinalizationStartedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 
 export const migrationFinalizedPayloadSchema = z.object({
   connectionId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   ...sourced,
 });
 

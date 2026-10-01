@@ -1,3 +1,6 @@
+import { datasetClient } from "@langwatch/dataset-client";
+import { evaluatorClient } from "@langwatch/evaluator-client";
+import { promptClient } from "@langwatch/prompt-client";
 import { BookText, Bot, Percent, Table, Workflow } from "lucide-react";
 import { useMemo } from "react";
 import { useDebounceValue } from "usehooks-ts";
@@ -88,14 +91,14 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   const canFetch = isOpen && !!projectId;
 
   const { data: prompts, isLoading: promptsLoading } =
-    navigationApi.prompts.getAllPromptsForProject.useQuery({ projectId }, { enabled: canFetch });
+    promptClient.prompts.getAllPromptsForProject.useQuery({ projectId }, { enabled: canFetch });
 
   const { data: agents, isLoading: agentsLoading } = navigationApi.agents.getAll.useQuery(
     { projectId },
     { enabled: canFetch },
   );
 
-  const { data: datasets, isLoading: datasetsLoading } = navigationApi.dataset.getAll.useQuery(
+  const { data: datasets, isLoading: datasetsLoading } = datasetClient.dataset.getAll.useQuery(
     { projectId },
     { enabled: canFetch },
   );
@@ -106,7 +109,7 @@ export function useCommandSearch(query: string, isOpen: boolean) {
   );
 
   const { data: evaluators, isLoading: evaluatorsLoading } =
-    navigationApi.evaluators.getAll.useQuery({ projectId }, { enabled: canFetch });
+    evaluatorClient.evaluators.getAll.useQuery({ projectId }, { enabled: canFetch });
 
   const isLoading =
     promptsLoading || agentsLoading || datasetsLoading || workflowsLoading || evaluatorsLoading;

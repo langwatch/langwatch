@@ -1,4 +1,4 @@
-import { Checkbox } from "@chakra-ui/react";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import {
   PopoverArrow,
   PopoverBody,

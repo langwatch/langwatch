@@ -2,7 +2,8 @@ import { Box, Code, HStack, Skeleton, Text, VStack } from "@langwatch/design-sys
 import { toEpochMs } from "@langwatch/time";
 import { useState } from "react";
 
-import { api, type RouterOutputs } from "../../../../behavior/automation-api.ts";
+import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
+import { useWebhookDeliveries } from "../../../../behavior/use-automation-reads.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
 
 type WebhookDelivery = RouterOutputs["automation"]["getWebhookDeliveries"][number];
@@ -22,10 +23,7 @@ export function WebhookDeliverySection({
   automationId: string;
   projectId: string;
 }) {
-  const deliveriesQuery = api.automation.getWebhookDeliveries.useQuery(
-    { triggerId: automationId, projectId, limit: 50 },
-    { enabled: !!projectId },
-  );
+  const deliveriesQuery = useWebhookDeliveries({ projectId, triggerId: automationId });
   const deliveries = deliveriesQuery.data ?? [];
 
   return (

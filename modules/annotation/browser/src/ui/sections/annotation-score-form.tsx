@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
+import { useScoreSetting } from "../../behavior/use-annotation-score-settings.ts";
 import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 import { AnnotationScoreEditor } from "../blocks/annotation-score-editor.tsx";
@@ -28,7 +29,7 @@ type AnnotationScoreFormProps = {
 function initialFormValues(): FormData {
   return {
     name: "",
-    dataType: "boolean",
+    dataType: AnnotationScoreDataType.OPTION,
     description: "",
     category: Array(5).fill(""),
     categoryExplanation: Array(5).fill(""),
@@ -77,7 +78,7 @@ function useExistingScoreDefaults({
     reset({
       ...initialFormValues(),
       name: score.name,
-      dataType: score.dataType ?? "boolean",
+      dataType: score.dataType ?? AnnotationScoreDataType.OPTION,
       description: score.description ?? "",
     });
 
@@ -195,13 +196,10 @@ export const AnnotationScoreForm = ({ onClose, annotationScoreId }: AnnotationSc
   const host = useAnnotationScoresHost();
   const project = host.project();
 
-  const existingAnnotationScore = annotationScoresApi.annotationScore.getById.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scoreId: annotationScoreId ?? "",
-    },
-    { enabled: !!annotationScoreId && !!project?.id },
-  );
+  const existingAnnotationScore = useScoreSetting({
+    projectId: project?.id,
+    scoreId: annotationScoreId,
+  });
 
   const form = useForm<FormData>({
     disabled: Boolean(annotationScoreId && existingAnnotationScore.isLoading),

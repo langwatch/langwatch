@@ -4,7 +4,7 @@ import {
   type RetentionManagedTable,
 } from "@langwatch/data-retention-contract/retention-tables";
 
-import type { EvaluationRetentionLookup } from "../app/evaluation.members.ts";
+import type { EvaluationRetentionLookup } from "../repositories/evaluation.repository.ts";
 
 type Retention = Pick<DataRetentionApi, "getPlatformDefaultRetentionDays" | "getRetentionDays">;
 

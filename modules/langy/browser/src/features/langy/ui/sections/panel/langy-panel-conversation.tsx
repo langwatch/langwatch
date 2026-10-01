@@ -1,13 +1,15 @@
 import { IsolatedErrorBoundary } from "@langwatch/browser-host/isolated-error-boundary";
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
-import { EmptyState, SIDEBAR_PANEL_WIDTH, useReducedMotion } from "@langwatch/langy-browser-kit";
-import type { GuidedKickoffInput } from "@langwatch/onboarding-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import type { UIMessage } from "ai";
 import { ArrowDown, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ComponentProps, Fragment, type ReactNode } from "react";
 
+import { SIDEBAR_PANEL_WIDTH } from "../../../../../model/langy-panel-layout.ts";
+import { EmptyState } from "../../../../../ui/sections/langy-empty-state.tsx";
 import { LangyModelProviderSetup } from "../../../../../ui/sections/model-provider-setup.tsx";
+import type { GuidedKickoffInput } from "../../../../guided-onboarding/model/kickoff.ts";
 import type { LangyErrorPresentation } from "../../../behavior/logic/langy-error-explainer.ts";
 import type { useLangyStickToBottom } from "../../../behavior/use-langy-stick-to-bottom.ts";
 import { ConversationSkeleton, skeletonMessageCount } from "../conversation-skeleton.tsx";

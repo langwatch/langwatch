@@ -1,9 +1,9 @@
+import { ConnectedBillingNotOnboardedError } from "@langwatch/enterprise-billing-contract";
 /**
  * The `invoice.finalized` branch for a connected self-hosted customer (ADR-156,
  * section 7): whose invoices it acts on, and whose it leaves.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { ConnectedBillingNotOnboardedError } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type Stripe from "stripe";
 import { describe, expect, it, vi } from "vitest";
 

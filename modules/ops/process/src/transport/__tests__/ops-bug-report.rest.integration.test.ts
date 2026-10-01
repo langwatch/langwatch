@@ -5,7 +5,6 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { InMemoryProcessStore } from "@langwatch/eventing";
@@ -18,6 +17,7 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";

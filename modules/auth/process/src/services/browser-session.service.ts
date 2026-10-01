@@ -82,16 +82,18 @@ export class BrowserSessionService {
     if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
 
     const { user, identityEmail } = await this.person({ userId: verified.user.id });
+    // Name and photo come from the stored person: Better Auth's cached copy of
+    // the user is written at sign-in and never told when the user module saves.
     const session = browserSessionSchema.parse({
       user: {
         id: verified.user.id,
-        name: verified.user.name ?? null,
+        name: (user ? user.name : verified.user.name) ?? null,
         email:
           (identityEmail?.kind === "resolved" ? identityEmail.email : null) ??
           user?.email ??
           verified.user.email ??
           null,
-        image: verified.user.image ?? null,
+        image: (user ? user.image : verified.user.image) ?? null,
         pendingSsoSetup: verified.user.pendingSsoSetup ?? false,
       },
       expires: verified.session.expiresAt.toISOString(),
@@ -284,8 +286,9 @@ export class BrowserSessionService {
     const records = await this.deps.sessions.findForUser({ userId });
     if (!records.some((record) => record.id === sessionId)) return { ended: 0 };
 
-    await this.clearCachedSessions({ userId });
+    const tokens = await this.tokensToClear({ userId });
     const ended = await this.deps.sessions.deleteById({ id: sessionId });
+    await this.clearCachedSessions({ userId, tokens });
     logger.info({ ended, sessionId, userId }, "Ended one of a person's own browser sessions");
 
     return { ended };
@@ -306,19 +309,22 @@ export class BrowserSessionService {
     const minted = records.filter((record) => record.identifierId === identifierId);
     if (minted.length === 0) return { ended: 0 };
 
+    const tokens = await this.tokensToClear({ userId });
     let ended = 0;
     for (const record of minted) {
       ended += await this.deps.sessions.deleteById({ id: record.id });
     }
-    await this.clearCachedSessions({ userId });
+    await this.clearCachedSessions({ userId, tokens });
     logger.info({ ended, identifierId, userId }, "Ended the sessions one sign-in method minted");
 
     return { ended };
   }
 
+  /** Rows first, then the cache (Better Auth's own order), so no refresh re-caches a dead row. */
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
-    await this.clearCachedSessions({ userId });
+    const tokens = await this.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteAllForUser({ userId });
+    await this.clearCachedSessions({ userId, tokens });
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
@@ -328,8 +334,9 @@ export class BrowserSessionService {
       return;
     }
 
-    await this.clearCachedSessions({ userId: session.userId });
+    const tokens = await this.tokensToClear({ userId: session.userId });
     const deleted = await this.deps.sessions.deleteById({ id: sessionId });
+    await this.clearCachedSessions({ userId: session.userId, tokens });
     logger.info({ deleted, sessionId, userId: session.userId }, "Revoked browser session");
   }
 
@@ -341,16 +348,24 @@ export class BrowserSessionService {
     keepSessionId: string;
   }): Promise<void> {
     const keep = await this.deps.sessions.findById({ id: keepSessionId });
-    await this.clearCachedSessions({ userId, keepToken: keep?.sessionToken });
+    const tokens = await this.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteOthersForUser({ userId, keepSessionId });
+    await this.clearCachedSessions({ userId, tokens, keepToken: keep?.sessionToken });
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
+  }
+
+  /** Read before the rows go: a deleted row no longer names its token. None without a cache. */
+  private async tokensToClear({ userId }: { userId: string }): Promise<string[]> {
+    return this.deps.cache ? this.deps.sessions.findTokensForUser({ userId }) : [];
   }
 
   private async clearCachedSessions({
     userId,
+    tokens,
     keepToken,
   }: {
     userId: string;
+    tokens: readonly string[];
     keepToken?: string;
   }): Promise<void> {
     const cache = this.deps.cache;
@@ -368,14 +383,17 @@ export class BrowserSessionService {
         }
       }
 
-      for (const token of await this.deps.sessions.findTokensForUser({ userId })) {
+      for (const token of tokens) {
         if (token !== keepToken) {
           await cache.delete({ key: tokenCacheKey(token) });
         }
       }
 
-      if (keepToken && retained.length > 0) {
-        await cache.set({ key: indexKey, value: JSON.stringify(retained) });
+      // Better Auth's own lifetime for this index: its furthest live session.
+      const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
+      const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
+      if (ttlSeconds > 0) {
+        await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
       } else {
         await cache.delete({ key: indexKey });
       }

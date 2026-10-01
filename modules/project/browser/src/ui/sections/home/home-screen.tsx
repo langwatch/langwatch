@@ -11,10 +11,7 @@ import {
 import { useEffect } from "react";
 import { LuCalendarClock } from "react-icons/lu";
 
-// The page's serif display voice (Sentient) is declared in langy-theme.css.
-// Imported HERE, not just via Langy components, so the greeting, banner, and
-// recents headings render the real face on every home — including the one
-// where no Langy surface mounts.
+// The serif display face (Sentient) is declared once in apps/ui globals.scss.
 import { homeApi } from "../../../behavior/home-api.ts";
 import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";

@@ -2,7 +2,7 @@ import { Callout, Page, Stack, useToast } from "@langwatch/design-system-interna
 import { useState } from "react";
 
 import { LIMITS_PATH, getJson, limitPath, postAction } from "../shared/api.ts";
-import { limitsSchema, type Limits } from "../shared/contract.ts";
+import { limitsSchema, type HubStack, type Limits } from "../shared/contract.ts";
 import { formatBytes } from "../shared/format.ts";
 import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { usePoll } from "../shared/use-poll.ts";
@@ -51,7 +51,7 @@ const sendAll = async ({ changes }: { changes: Change[] }): Promise<Outcome> => 
 };
 
 /** The hub's Settings page: the machine's resource limits, saved together. */
-export const SettingsPage = () => {
+export const SettingsPage = ({ hubStacks }: { hubStacks?: HubStack[] }) => {
   const toast = useToast();
   const poll = usePoll({
     key: "limits",
@@ -85,7 +85,7 @@ export const SettingsPage = () => {
 
   return (
     <Page
-      nav={<HavenTopBar current="settings" hubHref="/" />}
+      nav={<HavenTopBar current="settings" hubHref="/" stacks={hubStacks} />}
       title="Settings"
       subtitle={
         limits === undefined

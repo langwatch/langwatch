@@ -14,10 +14,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useState } from "react";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export function WorkflowReplicateDialog({
   open,

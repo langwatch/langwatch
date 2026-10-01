@@ -1,9 +1,9 @@
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,
 } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 

@@ -5,15 +5,26 @@
  */
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import { PostgresPromptAdapter, type PromptPersistence } from "../app/prompt-composition.build.ts";
-import type { PromptService } from "../services/prompt.service.ts";
+import { PostgresPromptRepositories } from "../repositories/prisma/prisma.prompt.repositories.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../services/prompt-version.service.ts";
+import { PromptService } from "../services/prompt.service.ts";
 
 export function promptServiceFixture({
   database,
   modelProviders,
 }: {
-  database: PromptPersistence;
+  database: Parameters<typeof PostgresPromptRepositories.create>[0]["prisma"];
   modelProviders: ModelProviderApi;
 }): PromptService {
-  return PostgresPromptAdapter.create({ database, modelProviders }).build();
+  const repositories = PostgresPromptRepositories.create({ prisma: database });
+
+  return PromptService.create({
+    repository: repositories.configs,
+    versionService: PromptVersionService.create(),
+    tagRepository: repositories.tagAssignments,
+    promptTagRepository: repositories.tags,
+    tagService: PromptTagService.create(repositories.tags),
+    modelProviders,
+  });
 }

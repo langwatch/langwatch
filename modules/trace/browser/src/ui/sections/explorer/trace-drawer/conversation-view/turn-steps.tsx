@@ -1,4 +1,9 @@
 import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
+import {
   Box,
   Button,
   HStack,
@@ -7,12 +12,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { formatCost, formatDuration, formatTokens } from "@langwatch/trace-browser-kit";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
-import { api } from "../../../../../behavior/trace-api.ts";
+import { useSpansFullRead } from "../../../../../behavior/reads/use-trace-detail-reads.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
@@ -54,14 +58,12 @@ export const TurnSteps = memo(function TurnSteps({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const query = api.traces.spansFull.useQuery(
-    { projectId, traceId, occurredAtMs },
-    {
-      enabled: isOpen && projectId !== "",
-      refetchOnWindowFocus: false,
-      staleTime: 60_000,
-    },
-  );
+  const query = useSpansFullRead({
+    projectId,
+    traceId,
+    occurredAtMs,
+    enabled: isOpen && projectId !== "",
+  });
 
   const steps = useMemo(() => selectSteps(query.data ?? []), [query.data]);
 

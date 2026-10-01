@@ -4,8 +4,8 @@ import "@testing-library/jest-dom/vitest";
  * Switch Dataset on the active dataset tab.
  * @see specs/experiments-v3/dataset-management.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,19 +21,14 @@ const onUploadCSV = vi.fn();
 const onEditDataset = vi.fn();
 const onSaveAsDataset = vi.fn();
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderDatasetTabs = () =>
-  render(
+  renderWithDesignSystem(
     <DatasetTabs
       onSelectExisting={onSelectExisting}
       onUploadCSV={onUploadCSV}
       onEditDataset={onEditDataset}
       onSaveAsDataset={onSaveAsDataset}
     />,
-    { wrapper: Wrapper },
   );
 
 const savedDataset = (id: string, name: string): DatasetReference => ({

@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { NoModelsConfiguredCallout } from "@langwatch/design-system/no-models-configured-callout";
 import {
   Box,
   Button,
@@ -11,17 +12,15 @@ import {
   Skeleton,
   Text,
 } from "@langwatch/design-system/primitives";
+import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Select } from "@langwatch/design-system/select";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   type GroupedModelOptions,
-  type modelProviderIcons,
   modelSelectionFrom,
   type ModelOption,
-  NoModelsConfiguredCallout,
-  ProviderIconGlyph,
-} from "@langwatch/model-provider-browser-kit";
+} from "@langwatch/model-provider-contract";
 import {
   MODEL_ICON_SIZE,
   MODEL_ICON_SIZE_SM,
@@ -189,23 +188,21 @@ function SelectedModelValue({
   isUnknown,
   label,
   providerKey,
-  showIcon,
   size,
 }: {
   isProviderMissing: boolean;
   isUnknown: boolean;
   label: string;
   providerKey: string;
-  showIcon: boolean;
   size: SelectorSize;
 }) {
   const isSmall = size === "sm";
 
   return (
     <HStack overflow="hidden" gap={2} align="center">
-      {showIcon && (
+      {isProviderKey(providerKey) && (
         <ProviderIconGlyph
-          provider={providerKey as keyof typeof modelProviderIcons}
+          provider={providerKey}
           size={isSmall ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
         />
       )}
@@ -242,17 +239,15 @@ function ModelOptionItem({
   size: SelectorSize;
 }) {
   const isSmall = size === "sm";
+  const provider = item.value.split("/")[0] ?? "";
 
   return (
     <>
       {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
       <Select.Item item={item}>
         <HStack gap={2}>
-          {item.icon && (
-            <ProviderIconGlyph
-              provider={item.value.split("/")[0] as keyof typeof modelProviderIcons}
-              size={MODEL_ICON_SIZE}
-            />
+          {isProviderKey(provider) && (
+            <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
           )}
           <Box fontSize={isSmall ? 12 : 14} fontFamily="mono" paddingY={isSmall ? 0 : "2px"}>
             {item.label}
@@ -397,7 +392,6 @@ export const ModelSelector = React.memo(function ModelSelector({
       isUnknown={isUnknown}
       label={selectedItem?.label ?? model}
       providerKey={providerKey}
-      showIcon={Boolean(selectedItem?.icon)}
       size={size}
     />
   );

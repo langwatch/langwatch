@@ -1,5 +1,5 @@
 /**
- * Both Agents doors — the tRPC router and the legacy REST app — driven over one AgentApp.
+ * Both Agents doors — the tRPC router and the legacy REST app — driven over one AgentModule.
  * @vitest-environment node
  * @see modules/agent/specs/package-boundary.feature
  */

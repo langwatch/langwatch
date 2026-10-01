@@ -3,18 +3,14 @@
  * The waiting card: for the mailboxes everyone recognizes it offers the door,
  * a real anchor to the provider's inbox in a new tab. A company domain gets no guess.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CheckYourEmail } from "../check-your-email.tsx";
 
 const renderCard = (email: string) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <CheckYourEmail email={email} what="Open it to confirm your address." />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<CheckYourEmail email={email} what="Open it to confirm your address." />);
 
 afterEach(() => cleanup());
 

@@ -2,39 +2,40 @@
  * Read-only detail panel for external SDK/CI scenario sets.
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { LangyContextTarget, scenarioContextChip } from "@langwatch/langy-browser-kit";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import {
-  availableGroupByOptions,
-  computeBatchRunSummary,
-  computeGroupSummary,
-  GroupRow,
-  groupRunsByBatchId,
-  groupRunsByScenarioId,
-  RunHistoryFilters,
-  type RunHistoryFilterValues,
-  RunHistorySkeleton,
-  RunRow,
-  type ScenarioRunContextRenderer,
-  ScenarioTabConnectedBadge,
-  useAutoExpansion,
-  useRunHistoryStore,
-  useScrollToBatch,
-} from "@langwatch/suite-browser-kit";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
+import { scenarioContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
+import { useAutoExpansion } from "../../../behavior/suite/use-auto-expansion.ts";
+import { useRunHistoryStore } from "../../../behavior/suite/use-run-history-store.ts";
+import { useScrollToBatch } from "../../../behavior/suite/use-scroll-to-batch.ts";
 import { usePrefetchRunState } from "../../../behavior/suites/use-prefetch-run-state.ts";
+import { useSuiteRunData } from "../../../behavior/suites/use-suite-run-data.ts";
 import { useSuiteRunFreshness } from "../../../behavior/suites/use-suite-run-freshness.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
+import {
+  availableGroupByOptions,
+  computeBatchRunSummary,
+  computeGroupSummary,
+  groupRunsByBatchId,
+  groupRunsByScenarioId,
+} from "../../../model/suite/run-history-transforms.ts";
+import type { Period } from "../../elements/analytics/period-selector.tsx";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
+import { RunHistorySkeleton } from "../../elements/suite/runs/run-history-skeleton.tsx";
+import { ScenarioTabConnectedBadge } from "../../elements/suite/runs/scenario-tab-connected-badge.tsx";
+import { type ScenarioRunContextRenderer } from "../../elements/suite/runs/scenario-target-row.tsx";
+import { LangyContextTarget } from "../langy/langy-context-target.tsx";
+import { GroupRow } from "../suite/group-row.tsx";
+import { RunHistoryFilters, type RunHistoryFilterValues } from "../suite/run-history-filters.tsx";
+import { RunRow } from "../suite/run-row.tsx";
 
 const renderScenarioContext: ScenarioRunContextRenderer = ({ scenarioRunId, name, children }) => (
   <LangyContextTarget target={scenarioContextChip({ scenarioId: scenarioRunId, name })}>
@@ -127,21 +128,16 @@ export function ExternalSetDetailPanel({
     isLoading,
     error,
     refetch,
-  } = api.scenarios.getSuiteRunData.useQuery(
-    {
+  } = useSuiteRunData({
+    input: {
       projectId,
       scenarioSetId,
       limit: 100,
       startDate: period.startDate.epochMilliseconds,
       endDate: period.endDate.epochMilliseconds,
     },
-    {
-      enabled: !!project,
-      // No timer on the heavy query: SSE invalidations and the freshness
-      // probe below drive refetches, so quiet sets never re-download runs.
-      trpc: { context: { skipBatch: true } },
-    },
-  );
+    enabled: !!project,
+  });
 
   const runData = runDataResult && "runs" in runDataResult ? runDataResult.runs : undefined;
 
@@ -155,7 +151,7 @@ export function ExternalSetDetailPanel({
   });
 
   // Fetch scenarios for filter options
-  const { data: scenarios } = api.scenarios.getAll.useQuery({ projectId }, { enabled: !!project });
+  const { data: scenarios } = useScenarios({ projectId });
 
   // Build scenario options for filter dropdown
   const scenarioOptions = useMemo(

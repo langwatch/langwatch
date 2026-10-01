@@ -5,18 +5,15 @@ import { useMemo } from "react";
 
 import { api } from "../../../../behavior/trace-api.ts";
 import { applyOverlayToSpanDetail } from "../../../../model/traces/edit-overlay/apply-trace-edit-overlay-to-views.ts";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useAppliedTraceEditPatch } from "./use-trace-edit-overlay.ts";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /** Every span's detail exactly as captured, before any correction. */
 export function useSpansFullCanonical(enabled: boolean) {
-  const shared = useSharedTrace();
   const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
-  const query = api.traces.spansFull.useQuery(queryArgs, {
-    enabled: enabled && isReady && hintReady && !shared,
-    staleTime: 300_000,
+  return api.traces.spansFull.useQuery(queryArgs, {
+    enabled: enabled && isReady && hintReady,
     // Hold the span tree in cache for 30 min after the last observer
     // unmounts. Lets users flip between recently-viewed traces in the
     // conversation strip with no loading flash.
@@ -26,9 +23,6 @@ export function useSpansFullCanonical(enabled: boolean) {
     // back instantly when navigating between siblings.
     placeholderData: keepPreviousData,
   });
-
-  if (shared) return asSharedQueryResult(shared.spansFull);
-  return query;
 }
 
 /**

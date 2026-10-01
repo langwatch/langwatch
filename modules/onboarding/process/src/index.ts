@@ -1,1 +1,1 @@
-export { onboardingServer } from "./onboarding.server.ts";
+export { onboardingProcessModule } from "./onboarding.module.ts";

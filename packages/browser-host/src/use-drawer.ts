@@ -4,7 +4,6 @@
  */
 
 export {
-  clearDrawerStack,
   clearFlowCallbacks,
   getAllFlowCallbacks,
   getComplexProps,
@@ -12,10 +11,13 @@ export {
   getFlowCallbacks,
   getTopDrawer,
   navigateToDrawer,
+  readDrawerLocation,
   setComplexProps,
   setFlowCallbacks,
   useDrawer,
   useDrawerParams,
   useUpdateDrawerParams,
+  type DrawerStackEntry,
   type DrawerType,
+  updateDrawerParams,
 } from "./drawer/index.ts";

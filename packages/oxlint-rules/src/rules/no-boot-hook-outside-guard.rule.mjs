@@ -6,7 +6,7 @@ import { defineRule } from "../define-rule.mjs";
 
 // A `Server` installs the first; a one-shot executable boots through the second.
 const BOOT_GUARD_FILES = new Set([
-  "packages/process-server/src/server.ts",
+  "packages/process/src/server.ts",
   "packages/observability/src/boot-guard.ts",
 ]);
 // A published SDK cannot reach either guard; it owns its own process.
@@ -30,7 +30,7 @@ export const noBootHookOutsideGuardRule = defineRule({
   messages: {
     bootHookOutsideGuard: {
       what: '`process.{{method}}("{{event}}", ...)` is registered outside the boot guard.',
-      fix: "Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process-server`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.",
+      fix: "Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.",
     },
   },
   create(context, file) {

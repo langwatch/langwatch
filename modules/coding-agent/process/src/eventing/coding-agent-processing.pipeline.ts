@@ -26,7 +26,7 @@ import {
 } from "@langwatch/metric-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { CodingAgentApp } from "../app/coding-agent.app.ts";
+import type { CodingAgentModule } from "../app/coding-agent.app.ts";
 import type {
   CodingAgentClock,
   CodingAgentCostEstimator,
@@ -234,7 +234,7 @@ export type CodingAgentProcessingPipeline = ReturnType<
  */
 export const codingAgentEventing = defineEventingModule({
   pipeline: "coding_agent_processing",
-  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentApp>) =>
+  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentModule>) =>
     app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

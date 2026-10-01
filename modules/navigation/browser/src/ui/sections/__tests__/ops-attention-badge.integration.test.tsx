@@ -4,8 +4,8 @@
  * Ops dashboard badge: verifies getBadgeCounts procedure answer reaches badge display.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type BadgeCounts = { blockedCount: number; dlqCount: number; computedAt: Date | null };
@@ -43,21 +43,19 @@ const ORGANIZATION = { id: "org_1", name: "Acme", teams: [] };
 const PROJECT = { id: "project_1", name: "Demo", slug: "demo", isPersonal: false };
 
 function renderSettingsSidebar({ hasAccess }: { hasAccess: boolean }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          organization: ORGANIZATION,
-          organizations: [ORGANIZATION],
-          project: PROJECT,
-          isLoading: false,
-          pathname: "/settings",
-          opsAccess: { hasAccess, isAdmin: hasAccess },
-        }}
-      >
-        <SidebarContent surface="settings" showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        organization: ORGANIZATION,
+        organizations: [ORGANIZATION],
+        project: PROJECT,
+        isLoading: false,
+        pathname: "/settings",
+        opsAccess: { hasAccess, isAdmin: hasAccess },
+      }}
+    >
+      <SidebarContent surface="settings" showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 
@@ -99,11 +97,12 @@ describe("the operations attention badge", () => {
       expect(opsBadgeText()).toBeNull();
     });
 
-    it("keeps re-asking, because the count is about work arriving rather than a page load", () => {
+    it("sets no timer; a read hint will refresh the count", () => {
       renderSettingsSidebar({ hasAccess: true });
 
-      expect(badgeQueryOptions).toHaveBeenCalledWith(
-        expect.objectContaining({ enabled: true, refetchInterval: 60_000 }),
+      expect(badgeQueryOptions).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }));
+      expect(badgeQueryOptions).not.toHaveBeenCalledWith(
+        expect.objectContaining({ refetchInterval: expect.anything() }),
       );
     });
   });

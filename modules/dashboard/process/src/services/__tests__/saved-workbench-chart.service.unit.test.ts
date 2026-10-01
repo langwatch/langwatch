@@ -11,7 +11,6 @@ import type {
 } from "@langwatch/analytics-contract";
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   SavedWorkbenchChartDashboardNotFoundError,
   SavedWorkbenchChartDefinitionInvalidError,
@@ -20,6 +19,7 @@ import {
   WORKBENCH_CHART_DEFINITION_VERSION,
   type SavedWorkbenchChartDefinition,
 } from "@langwatch/dashboard-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type {

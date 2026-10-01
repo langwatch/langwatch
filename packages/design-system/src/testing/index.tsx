@@ -1,10 +1,11 @@
+import { ChakraProvider } from "@chakra-ui/react";
 import { render, type RenderResult, type RenderOptions } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactNode } from "react";
 
-import { DesignSystemProvider } from "../provider/index.tsx";
+import { system } from "../system/index.ts";
 
 export function renderWithDesignSystem(
-  element: ReactElement,
+  element: ReactNode,
   options?: Omit<RenderOptions, "wrapper">,
 ): RenderResult {
   if (typeof window !== "undefined" && !window.matchMedia) {
@@ -36,10 +37,13 @@ export function renderWithDesignSystem(
       },
     });
   }
+  if (typeof window !== "undefined" && !Element.prototype.scrollTo) {
+    // jsdom has no Element.scrollTo; a Select scrolls its content to the top on open.
+    Element.prototype.scrollTo = () => undefined;
+  }
   return render(element, {
-    wrapper: ({ children }) => (
-      <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
-    ),
+    // No colour-mode provider: its style and theme script would render into the container.
+    wrapper: ({ children }) => <ChakraProvider value={system}>{children}</ChakraProvider>,
     ...options,
   });
 }

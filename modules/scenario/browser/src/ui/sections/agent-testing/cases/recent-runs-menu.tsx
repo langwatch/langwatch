@@ -4,7 +4,6 @@
  * @see specs/features/agent-testing/cases-table.feature
  */
 
-import type { Period } from "@langwatch/analytics-browser-kit";
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Menu } from "@langwatch/design-system/menu";
 import { Box, type ButtonProps, HStack, Icon, Text } from "@langwatch/design-system/primitives";
@@ -19,6 +18,7 @@ import {
   passRateColor,
 } from "../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { Period } from "../../../elements/analytics/period-selector.tsx";
 import { MENU_ACTION_ICONS, MenuActionLabel } from "./menu-action-label.tsx";
 import { useOpenPlanRun } from "./use-open-plan-run.ts";
 import { type RecentRun, useSuiteRecentRuns } from "./use-suite-recent-runs.ts";

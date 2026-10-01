@@ -86,7 +86,7 @@ func (s Stack) OverlayEnv() []string {
 		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
 		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
 		// The api application's own name for the port it binds
-		// (packages/process-server/src/config.ts), as WORKER_METRICS_PORT is the
+		// (packages/process/src/config.ts), as WORKER_METRICS_PORT is the
 		// worker's. The line above is main's monolith spelling, which it never reads.
 		fmt.Sprintf("API_PORT=%d", s.APIPort),
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),

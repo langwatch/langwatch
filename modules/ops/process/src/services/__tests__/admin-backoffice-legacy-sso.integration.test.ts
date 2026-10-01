@@ -1,15 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The backoffice's organization edit, with the routing flip on. The
  * refusal is raised in the ops service graph, and its copy is read from
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { OpsOperations } from "../../app/ops-composition.build.ts";
@@ -40,9 +40,8 @@ function backoffice(connectionDecides = true) {
     database: refuseEveryQuery as never,
     audit: new AuditStub(),
     auditLog: createApiFixture<AuditLogApi>(),
-    adminEmails: ["olive@example.com"],
+    authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),
-    auth: createApiFixture<AuthApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
       schedules: createApiFixture<AutomationApi>(),

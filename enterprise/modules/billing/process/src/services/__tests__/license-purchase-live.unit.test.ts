@@ -1,10 +1,10 @@
+import type { LicensePurchaseNotificationPayload } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 /**
  * The live pieces of main's licence purchase: licensing signs with its own key,
  * and the licence is recorded, mailed and announced.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { LicensePurchaseNotificationPayload } from "@langwatch/enterprise-billing-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryLicenseEmailChannel } from "../../channels/memory/memory.license-email.channel.ts";

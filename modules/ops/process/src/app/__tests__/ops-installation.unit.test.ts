@@ -7,7 +7,6 @@ import { generateKeyPairSync } from "node:crypto";
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -26,7 +25,6 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -34,6 +32,7 @@ import type { NotificationService as NotificationApi } from "@langwatch/notifica
 import { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -42,15 +41,16 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { opsServer } from "../../ops.server.ts";
+import { opsProcessModule } from "../../ops.module.ts";
 import { PrismaSystemMigrationStateRepository } from "../../repositories/prisma/prisma.system-migration-state.repository.ts";
 import { SNAPSHOT_LEASE_KEY } from "../../repositories/redis/redis.ops-snapshot.repository.ts";
-import { OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 /** A store that holds nothing: every command is written down, a lease `SET` is granted. */
 function memberWithoutStore<Value extends object>(commands: unknown[][] = []): Value {
@@ -69,7 +69,7 @@ function process(
   role: "api" | "worker",
   redisCommands: unknown[][] = [],
   identity: IdentityApi = createApiFixture<IdentityApi>(),
-  authz: AuthzApi = createApiFixture<AuthzApi>(),
+  authz: AuthzApi = platformOperatorAuthz({ holders: { user_alex: ["ops:view", "ops:manage"] } }),
   cloud: { asked?: boolean; privateKey?: string } = {},
 ) {
   const { logger } = createTestLogger();
@@ -81,7 +81,7 @@ function process(
         build(handle.id === "LANGWATCH_LICENSE_PRIVATE_KEY" ? cloud.privateKey : void 0),
       ),
   })
-    .withModules([withMemoryRepositories(opsServer)])
+    .withModules([withMemoryRepositories(opsProcessModule)])
     .withConfig({
       ops: {
         apiKey: undefined,
@@ -95,11 +95,11 @@ function process(
         collectClickHouseBackupMetrics: true,
         productAnalytics: { key: undefined, host: undefined },
         cloudOps: cloud.asked ?? false,
+        adminEmails: [],
       },
     })
 
     .withMember("nodeEnvironment", undefined)
-    .withMember("adminEmails", [OPS_STAFF_ADDRESS])
     .withMember("isSaas", false)
     .withMember("serviceVersion", "test")
     .withMember("publicBaseUrl", undefined)
@@ -155,11 +155,11 @@ describe("ops app installation", () => {
       try {
         const app = runtime.service(OpsApi);
 
-        expect(runtime.module(opsServer).provided).toBe(app);
-        expect(app.operatorScope({ id: "user_alex", email: OPS_STAFF_ADDRESS })).toEqual({
+        expect(runtime.module(opsProcessModule).provided).toBe(app);
+        expect(await app.operatorScope({ id: "user_alex", email: OPS_STAFF_ADDRESS })).toEqual({
           kind: "platform",
         });
-        expect(app.operatorScope({ id: "user_sam", email: "sam@acme.com" })).toEqual({
+        expect(await app.operatorScope({ id: "user_sam", email: "sam@acme.com" })).toEqual({
           kind: "none",
         });
 

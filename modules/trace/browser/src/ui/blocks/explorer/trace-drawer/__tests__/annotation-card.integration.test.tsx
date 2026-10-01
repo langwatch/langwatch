@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import "@testing-library/jest-dom/vitest";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnnotationCard } from "../annotation-card.tsx";
@@ -54,19 +54,17 @@ function renderCard({
     anchorPath: string | null;
   }) => void;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationCard
-        annotation={item}
-        scoreNamesById={SCORE_NAMES}
-        contextTraceId={contextTraceId}
-        isOwn={isOwn}
-        onEdit={onEdit}
-        openTraceId={openTraceId}
-        onJumpToAnchor={onJumpToAnchor}
-        renderAvatar={(user) => <span data-testid="annotation-avatar">{user.name ?? "?"}</span>}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotationCard
+      annotation={item}
+      scoreNamesById={SCORE_NAMES}
+      contextTraceId={contextTraceId}
+      isOwn={isOwn}
+      onEdit={onEdit}
+      openTraceId={openTraceId}
+      onJumpToAnchor={onJumpToAnchor}
+      renderAvatar={(user) => <span data-testid="annotation-avatar">{user.name ?? "?"}</span>}
+    />,
   );
 }
 

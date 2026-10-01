@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/external-sdk-ci-sets-in-sidebar.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -16,16 +16,12 @@ vi.mock("posthog-js", () => ({
 // The sidebar mounts VoiceAgentsCallout, which reaches for project context
 // and fires tRPC queries this rig does not provide. Same stub the sibling
 // suite-sidebar suites use, for the same reason.
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: vi.fn(() => ({ project: { id: "project_1" } })),
 }));
 
 import { toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing.ts";
 import { SuiteSidebar } from "../suite-sidebar.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 type SuiteSidebarProps = ComponentProps<typeof SuiteSidebar>;
 type Suite = SuiteSidebarProps["suites"][number];
@@ -82,9 +78,9 @@ describe("<SuiteSidebar/> External Sets", () => {
   describe("given no external sets exist", () => {
     /** @scenario "External Sets section is hidden when no external sets exist" */
     it("does not display the External Sets section header", () => {
-      render(<SuiteSidebar {...defaultProps} suites={[makeSuite({ name: "Critical Path" })]} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <SuiteSidebar {...defaultProps} suites={[makeSuite({ name: "Critical Path" })]} />,
+      );
 
       expect(screen.queryByTestId("external-sets-header")).not.toBeInTheDocument();
     });
@@ -103,9 +99,7 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External sets section appears with SDK-submitted scenario runs" */
     it("displays the External Sets section header", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByTestId("external-sets-header")).toHaveTextContent("EXTERNAL SETS");
     });
@@ -113,9 +107,7 @@ describe("<SuiteSidebar/> External Sets", () => {
     /** @scenario "External set batch entry displays the set name" */
     /** @scenario "External set uses scenarioSetId as its display name" */
     it("displays external set names", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByText("nightly-regression")).toBeInTheDocument();
       expect(screen.getByText("ci-smoke-tests")).toBeInTheDocument();
@@ -123,17 +115,13 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     /** @scenario "External set entry shows pass rate and recency" */
     it("displays pass/fail summary for external sets", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       expect(screen.getByText(/15 passed/)).toBeInTheDocument();
     });
 
     it("does not display a Run button on external set items", () => {
-      render(<SuiteSidebar {...defaultProps} externalSets={externalSets} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<SuiteSidebar {...defaultProps} externalSets={externalSets} />);
 
       const externalItems = screen.getAllByTestId("external-set-list-item");
       for (const item of externalItems) {
@@ -144,12 +132,11 @@ describe("<SuiteSidebar/> External Sets", () => {
     describe("when all runs pass in an external set", () => {
       /** @scenario "External set shows correct status indicator" */
       it("displays 100% pass rate", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={[makeExternalSet({ passedCount: 10, totalCount: 10 })]}
           />,
-          { wrapper: Wrapper },
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
@@ -159,12 +146,11 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     describe("when some runs fail in an external set", () => {
       it("displays pass rate reflecting failures", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={[makeExternalSet({ passedCount: 7, totalCount: 10 })]}
           />,
-          { wrapper: Wrapper },
         );
 
         const items = screen.getAllByTestId("external-set-list-item");
@@ -177,13 +163,12 @@ describe("<SuiteSidebar/> External Sets", () => {
         const user = userEvent.setup();
         const onSelectSuite = vi.fn();
 
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             onSelectSuite={onSelectSuite}
           />,
-          { wrapper: Wrapper },
         );
 
         await user.click(screen.getByText("nightly-regression"));
@@ -193,13 +178,12 @@ describe("<SuiteSidebar/> External Sets", () => {
 
     describe("when an external set is selected", () => {
       it("highlights the selected external set", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             selectedSuiteSlug={toExternalSetSelection("nightly-regression")}
           />,
-          { wrapper: Wrapper },
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");
@@ -211,13 +195,12 @@ describe("<SuiteSidebar/> External Sets", () => {
       });
 
       it("does not highlight unselected external sets", () => {
-        render(
+        renderWithDesignSystem(
           <SuiteSidebar
             {...defaultProps}
             externalSets={externalSets}
             selectedSuiteSlug={toExternalSetSelection("nightly-regression")}
           />,
-          { wrapper: Wrapper },
         );
 
         const listItems = screen.getAllByTestId("external-set-list-item");

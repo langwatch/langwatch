@@ -25,9 +25,6 @@
   "langwatchExtraReferences": [{ "path": "packages/mail/preview/tsconfig.json" }],
   "references": [
     {
-      "path": "packages/actor/tsconfig.test.json"
-    },
-    {
       "path": "modules/agent/browser/tsconfig.json"
     },
     {
@@ -41,9 +38,6 @@
     },
     {
       "path": "modules/analytics/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/analytics/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/analytics/contract/tsconfig.test.json"
@@ -73,10 +67,10 @@
       "path": "packages/api/tsconfig.type-tests.json"
     },
     {
-      "path": "packages/api-fixture/tsconfig.json"
+      "path": "modules/api-key/browser/tsconfig.json"
     },
     {
-      "path": "modules/api-key/browser/tsconfig.json"
+      "path": "modules/api-key/client/tsconfig.json"
     },
     {
       "path": "modules/api-key/contract/tsconfig.json"
@@ -89,9 +83,6 @@
     },
     {
       "path": "modules/audit-log/contract/tsconfig.json"
-    },
-    {
-      "path": "packages/audit-log-null/tsconfig.json"
     },
     {
       "path": "modules/audit-log/process/tsconfig.json"
@@ -112,9 +103,6 @@
       "path": "modules/authz/browser/tsconfig.json"
     },
     {
-      "path": "modules/authz/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/authz/contract/tsconfig.json"
     },
     {
@@ -133,10 +121,13 @@
       "path": "packages/aws-client/tsconfig.json"
     },
     {
-      "path": "packages/browser-host/tsconfig.json"
+      "path": "packages/browser/tsconfig.test.json"
     },
     {
-      "path": "packages/browser-trpc/tsconfig.json"
+      "path": "packages/browser/tsconfig.type-tests.json"
+    },
+    {
+      "path": "packages/browser-host/tsconfig.json"
     },
     {
       "path": "packages/clickhouse-client/tsconfig.json"
@@ -146,9 +137,6 @@
     },
     {
       "path": "modules/coding-agent/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/coding-agent/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/coding-agent/contract/tsconfig.json"
@@ -190,7 +178,7 @@
       "path": "modules/dataset/browser/tsconfig.json"
     },
     {
-      "path": "modules/dataset/browser-kit/tsconfig.json"
+      "path": "modules/dataset/client/tsconfig.json"
     },
     {
       "path": "modules/dataset/contract/tsconfig.json"
@@ -310,9 +298,6 @@
       "path": "modules/entitlement/process/tsconfig.json"
     },
     {
-      "path": "packages/error-presentation/tsconfig.json"
-    },
-    {
       "path": "packages/error-views/tsconfig.json"
     },
     {
@@ -325,7 +310,7 @@
       "path": "modules/evaluator/browser/tsconfig.json"
     },
     {
-      "path": "modules/evaluator/browser-kit/tsconfig.json"
+      "path": "modules/evaluator/client/tsconfig.json"
     },
     {
       "path": "modules/evaluator/contract/tsconfig.json"
@@ -341,9 +326,6 @@
     },
     {
       "path": "modules/experiment/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/experiment/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/experiment/contract/tsconfig.json"
@@ -430,19 +412,10 @@
       "path": "packages/internal-slack/tsconfig.json"
     },
     {
-      "path": "packages/kernel/tsconfig.test.json"
-    },
-    {
-      "path": "packages/kernel/tsconfig.type-tests.json"
-    },
-    {
       "path": "packages/ksuid/tsconfig.json"
     },
     {
       "path": "modules/langy/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/langy/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/langy/contract/tsconfig.json"
@@ -478,13 +451,13 @@
       "path": "modules/model-provider/browser/tsconfig.json"
     },
     {
-      "path": "modules/model-provider/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/model-provider/contract/tsconfig.json"
     },
     {
       "path": "modules/model-provider/process/tsconfig.json"
+    },
+    {
+      "path": "packages/module/tsconfig.test.json"
     },
     {
       "path": "modules/monitor/browser/tsconfig.json"
@@ -512,9 +485,6 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/onboarding/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"
@@ -571,7 +541,10 @@
       "path": "packages/prisma-client/tsconfig.json"
     },
     {
-      "path": "packages/process-server/tsconfig.test.json"
+      "path": "packages/process/tsconfig.test.json"
+    },
+    {
+      "path": "packages/process/tsconfig.type-tests.json"
     },
     {
       "path": "packages/process-stores/tsconfig.test.json"
@@ -589,7 +562,7 @@
       "path": "modules/prompt/browser/tsconfig.json"
     },
     {
-      "path": "modules/prompt/browser-kit/tsconfig.json"
+      "path": "modules/prompt/client/tsconfig.json"
     },
     {
       "path": "modules/prompt/contract/tsconfig.json"
@@ -631,6 +604,9 @@
       "path": "apps/scenario-child/tsconfig.json"
     },
     {
+      "path": "modules/scenario/client/tsconfig.json"
+    },
+    {
       "path": "modules/scenario/contract/tsconfig.json"
     },
     {
@@ -667,9 +643,6 @@
       "path": "modules/slack/browser/tsconfig.json"
     },
     {
-      "path": "modules/slack/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/slack/contract/tsconfig.json"
     },
     {
@@ -679,9 +652,6 @@
       "path": "apps/storagesim-web/tsconfig.json"
     },
     {
-      "path": "modules/stored-object/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/stored-object/contract/tsconfig.json"
     },
     {
@@ -689,9 +659,6 @@
     },
     {
       "path": "modules/suite/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/suite/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/suite/contract/tsconfig.json"
@@ -727,9 +694,6 @@
       "path": "modules/trace/browser/tsconfig.json"
     },
     {
-      "path": "modules/trace/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/trace/contract/tsconfig.json"
     },
     {
@@ -739,16 +703,7 @@
       "path": "apps/ui/tsconfig.test.json"
     },
     {
-      "path": "packages/ui-kernel/tsconfig.test.json"
-    },
-    {
-      "path": "packages/ui-kernel/tsconfig.type-tests.json"
-    },
-    {
       "path": "modules/user/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/user/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/user/contract/tsconfig.json"
@@ -776,9 +731,6 @@
     },
     {
       "path": "modules/workflow/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/workflow/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/workflow/contract/tsconfig.json"

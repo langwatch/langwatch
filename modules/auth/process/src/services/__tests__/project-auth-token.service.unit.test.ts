@@ -1,9 +1,9 @@
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * The legacy `X-Auth-Token` check: the project a token names, counted per caller first.
  * @see specs/auth/auth-rest-family-mounted.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ProjectAuthTokenService } from "../project-auth-token.service.ts";

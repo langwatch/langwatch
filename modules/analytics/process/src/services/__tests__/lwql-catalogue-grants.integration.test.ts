@@ -4,7 +4,6 @@
  * @see specs/lwql/catalogue-grants.feature
  */
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -13,6 +12,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LWQL_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";

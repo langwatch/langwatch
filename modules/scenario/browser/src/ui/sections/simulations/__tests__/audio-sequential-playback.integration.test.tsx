@@ -4,14 +4,14 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
-vi.mock("@langwatch/stored-object-browser-kit", () => ({
+vi.mock("../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
   useStoredObjectUrl: ({ reference }: { reference: string }) => ({
     status: "ready",
     url: reference,
@@ -98,10 +98,6 @@ beforeEach(() => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const PROJECT_ID = "proj_test";
 
 /** Build a minimal audio message fixture. */
@@ -132,10 +128,8 @@ function textMsg(
 }
 
 function renderMessages(messages: SimulationMessage[], opts?: { container?: HTMLElement }) {
-  return render(
-    <Wrapper>
-      <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />
-    </Wrapper>,
+  return renderWithDesignSystem(
+    <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />,
     opts,
   );
 }
@@ -361,13 +355,11 @@ describe("<ScenarioMessageRenderer/> audio sequential playback", () => {
 
         // Streaming append: re-render with a third audio message added
         rerender(
-          <ChakraProvider value={defaultSystem}>
-            <ScenarioMessageRenderer
-              messages={[audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]}
-              variant="drawer"
-              projectId={PROJECT_ID}
-            />
-          </ChakraProvider>,
+          <ScenarioMessageRenderer
+            messages={[audioMsg("a1"), audioMsg("a2"), audioMsg("a3")]}
+            variant="drawer"
+            projectId={PROJECT_ID}
+          />,
         );
 
         const [, audioB, audioC] = document.querySelectorAll<HTMLAudioElement>("audio");

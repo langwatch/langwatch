@@ -14,7 +14,7 @@ const at = ({
 
 describe("consoleLinks", () => {
   describe("given a service host in a stack", () => {
-    it("links every console of that stack, keeping the scheme and port", () => {
+    it("links every console of that stack, keeping the scheme and port, sims and tools grouped", () => {
       const chrome = at({ hostname: "mail.feat-x.langwatch.localhost" });
       expect(chrome.slug).toBe("feat-x");
       expect(chrome.homeHref).toBe("https://feat-x.langwatch.localhost:1355");
@@ -23,17 +23,39 @@ describe("consoleLinks", () => {
         { label: "Home", href: "https://feat-x.langwatch.localhost:1355" },
         { label: "Hub", href: "https://hub.langwatch.localhost:1355" },
         { label: "App", href: "https://app.feat-x.langwatch.localhost:1355" },
-        { label: "Mail", href: "https://mail.feat-x.langwatch.localhost:1355", current: true },
-        { label: "IdP", href: "https://idp.feat-x.langwatch.localhost:1355" },
-        { label: "Storage", href: "https://storage.feat-x.langwatch.localhost:1355" },
-        { label: "Voice", href: "https://voice.feat-x.langwatch.localhost:1355" },
-        { label: "LLM", href: "https://llm.feat-x.langwatch.localhost:1355" },
-        { label: "Analytics", href: "https://analytics.feat-x.langwatch.localhost:1355" },
+        {
+          label: "Mail",
+          href: "https://mail.feat-x.langwatch.localhost:1355",
+          current: true,
+          group: "Sims",
+        },
+        { label: "IdP", href: "https://idp.feat-x.langwatch.localhost:1355", group: "Sims" },
+        {
+          label: "Storage",
+          href: "https://storage.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        {
+          label: "Voice",
+          href: "https://voice.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
+        { label: "LLM", href: "https://llm.feat-x.langwatch.localhost:1355", group: "Sims" },
+        {
+          label: "Analytics",
+          href: "https://analytics.feat-x.langwatch.localhost:1355",
+          group: "Sims",
+        },
         {
           label: "Design system",
           href: "https://design-system.feat-x.langwatch.localhost:1355",
+          group: "Tools",
         },
-        { label: "Mail room", href: "https://mail-room.feat-x.langwatch.localhost:1355" },
+        {
+          label: "Mail room",
+          href: "https://mail-room.feat-x.langwatch.localhost:1355",
+          group: "Tools",
+        },
       ]);
     });
 

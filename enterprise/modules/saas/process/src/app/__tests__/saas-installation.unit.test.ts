@@ -1,22 +1,22 @@
+import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { SaasApi } from "@langwatch/enterprise-saas-contract";
+import type { OpsApi } from "@langwatch/ops-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { SaasApi } from "@langwatch/enterprise-saas-contract";
-import { createApp } from "@langwatch/kernel";
-import type { OpsApi } from "@langwatch/ops-contract";
-import { memoryStores } from "@langwatch/process-stores";
-import { createTestLogger, frozenAt, memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { saasServer } from "../../saas.server.ts";
+import { saasProcessModule } from "../../saas.module.ts";
 
 function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageReport[] }) {
   const { logger } = createTestLogger();
   return createApp({ role: "api" })
-    .withModules([saasServer])
+    .withModules([saasProcessModule])
     .withStores(memoryStores())
     .withMembers({ isSaas, rateLimiter: memoryRateLimiter(), clock: frozenAt() })
     .withObservability((observability) => observability.withLogging(logger))
@@ -46,7 +46,7 @@ describe("saas installation", () => {
     try {
       const app = runtime.service(SaasApi);
 
-      expect(runtime.module(saasServer).provided).toBe(app);
+      expect(runtime.module(saasProcessModule).provided).toBe(app);
       await expect(app.receiveUsageReport(REQUEST)).resolves.toEqual({
         message: "Event captured",
       });

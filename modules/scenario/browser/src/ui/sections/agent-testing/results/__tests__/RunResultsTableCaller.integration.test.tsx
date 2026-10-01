@@ -4,9 +4,9 @@
  * "Simulated" for a pool run and "You" for a panel run.
  * @see specs/features/agents/voice-agents-v1.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, type ScenarioRunData } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RunResultsTable } from "../run-results-table.tsx";
@@ -42,15 +42,13 @@ function run({
 }
 
 function renderTable(runs: ScenarioRunData[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <RunResultsTable
-        scenarioRuns={runs}
-        resolveTargetName={() => "Support line"}
-        iterationMap={new Map()}
-        onScenarioRunClick={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <RunResultsTable
+      scenarioRuns={runs}
+      resolveTargetName={() => "Support line"}
+      iterationMap={new Map()}
+      onScenarioRunClick={vi.fn()}
+    />,
   );
 }
 

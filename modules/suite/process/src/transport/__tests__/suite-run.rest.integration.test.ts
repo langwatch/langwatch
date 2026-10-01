@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-run-parameters.feature
@@ -12,9 +11,10 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { suiteSchema, type SuiteApi, type SuiteRunResult } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import { suiteCallerKeyFact, suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
 
 class ScenarioParameterUnknownTestError extends HandledError {
@@ -81,6 +81,7 @@ function buildApi(run: (...args: never[]) => unknown) {
         actorId: "project-key-1",
       })),
       bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
+      bindRestMiddleware(suiteCallerKeyFact, () => null),
     ],
   });
 

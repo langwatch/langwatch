@@ -5,9 +5,9 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SecurityHeaders } from "../../policy/security-headers.ts";
-import { SessionReader } from "../../rest/credential.ts";
 import { BrowserBundle } from "../browser-bundle.ts";
 import { HttpMux } from "../http-mux.ts";
+import { SessionReader } from "../session-reader.ts";
 
 const directories: string[] = [];
 afterEach(async () => {

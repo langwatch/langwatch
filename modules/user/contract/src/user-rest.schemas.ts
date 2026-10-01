@@ -89,6 +89,11 @@ export const mePersonalCredentialSchema = z.discriminatedUnion("kind", [
     userId: z.string().nullable(),
     organizationId: z.string().nullable(),
   }),
+  z.object({
+    kind: z.literal("cliAccessToken"),
+    userId: z.string(),
+    organizationId: z.string(),
+  }),
   z.object({ kind: z.literal("legacyProjectKey") }),
 ]);
 

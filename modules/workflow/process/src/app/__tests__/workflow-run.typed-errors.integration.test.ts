@@ -1,26 +1,30 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * `POST /api/workflows/:workflowId/run` over the real app and the runtime a process mounts
  * it on: the run's typed refusals keep their statuses, and an untyped failure stays opaque.
  */
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";
 import type { WorkflowRepositories } from "../../repositories/workflow-repositories.registry.ts";
 import type { WorkflowRepository } from "../../repositories/workflow.repository.ts";
-import { workflowRunRest } from "../../transport/workflow-run.rest.ts";
-import { WorkflowApp } from "../workflow.app.ts";
+import { workflowRunCallerKey, workflowRunRest } from "../../transport/workflow-run.rest.ts";
+import { WorkflowModule } from "../workflow.app.ts";
 import { createWorkflowTestInfrastructure } from "./workflow.fixture.ts";
 
 class NoopTestEncryption {
@@ -35,7 +39,7 @@ class NoopTestEncryption {
 
 async function postRun({ repositories }: { repositories: WorkflowRepositories }) {
   const members = createWorkflowTestInfrastructure();
-  const app = await WorkflowApp.create({
+  const app = await WorkflowModule.create({
     members: {
       ...members,
       prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
@@ -49,9 +53,13 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       stagingThresholdBytes: void 0,
@@ -72,6 +80,7 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
       app: () => app,
       credential: "project",
       onError: canonicalErrorResponse,
+      facts: [bindRestMiddleware(workflowRunCallerKey, () => null)],
     })
     .request("/api/workflows/workflow_1/run", {
       method: "POST",

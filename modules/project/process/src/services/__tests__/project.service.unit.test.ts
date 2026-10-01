@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationHasNoTeamError,
   OrganizationService as OrganizationServiceContract,
@@ -21,6 +20,7 @@ import {
   type ProjectWithTeam,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -610,7 +610,10 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
       });
-      created.connect({ recordProjectCreated: { send } });
+      created.connect({
+        recordProjectCreated: { send },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
         input,
@@ -634,6 +637,7 @@ describe("ProjectService", () => {
       });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
       });
 
       await expect(

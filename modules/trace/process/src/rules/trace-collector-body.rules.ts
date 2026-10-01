@@ -4,7 +4,6 @@ import { createLogger, validationMeta } from "@langwatch/observability";
 import {
   customMetadataSchema,
   langWatchSpanSchema,
-  maybeAddIdsToContextList,
   reservedTraceMetadataSchema,
   spanMetricsSchema,
   spanValidatorSchema,
@@ -16,6 +15,8 @@ import {
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+
+import { maybeAddIdsToContextList } from "./rag-context-ids.rules.ts";
 
 const logger = createLogger("langwatch.collector");
 

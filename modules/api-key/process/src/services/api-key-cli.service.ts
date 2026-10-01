@@ -5,16 +5,13 @@ import {
   cliKeySelectionSchema,
   loginKeyExpiresAt,
   CLI_LOGIN_KEY_NAME_PREFIX,
+  categorizablePermissions,
   isOffByDefaultOnCliKey,
   type CliKeyScopeSummary,
   type CliKeySelection,
   type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
-import {
-  ALL_PERMISSIONS,
-  isRegistryPermission,
-  type AuthzPermission,
-} from "@langwatch/authorization";
+import { isRegistryPermission } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import { Temporal, fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -103,9 +100,9 @@ export class ApiKeyCliService {
     userId: string;
     organizationId: string;
   }): Promise<CliKeySelection | null> {
-    const defaults = ALL_PERMISSIONS.filter(
+    const defaults = categorizablePermissions().filter(
       (permission) => !isOffByDefaultOnCliKey(permission),
-    ) as AuthzPermission[];
+    );
     if (await this.policy.isOrgAdmin(input)) {
       return {
         bindings: [{ scopeType: "ORGANIZATION", scopeId: input.organizationId }],

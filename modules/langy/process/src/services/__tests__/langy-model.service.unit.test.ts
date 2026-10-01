@@ -1,13 +1,13 @@
-/**
- * @vitest-environment node
- * @see specs/langy/langy-model-selection.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   LANGY_CHAT_FEATURE_KEY,
   type ModelProviderApi,
   type ModelProviderExecution,
 } from "@langwatch/model-provider-contract";
+/**
+ * @vitest-environment node
+ * @see specs/langy/langy-model-selection.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangyModelService } from "../langy-model.service.ts";

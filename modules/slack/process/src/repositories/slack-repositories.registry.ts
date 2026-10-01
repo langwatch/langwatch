@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemorySlackRepositories } from "./memory/memory.slack.repositories.ts";
 import { PrismaSlackRepositories } from "./prisma/prisma.slack.repositories.ts";

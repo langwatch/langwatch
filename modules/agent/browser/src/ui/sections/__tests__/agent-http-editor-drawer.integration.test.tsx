@@ -1,12 +1,12 @@
 /* @vitest-environment jsdom */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 
 /** An agent as the drawer holds one: the wire carries its instants as strings. */
 type AgentWithFields = WireOf<StoredAgentWithFields>;
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -56,11 +56,7 @@ function editorProps(props: Partial<AgentHttpEditorDrawerProps> = {}): AgentHttp
 }
 
 function renderEditor(props: Partial<AgentHttpEditorDrawerProps> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentHttpEditorDrawer {...editorProps(props)} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<AgentHttpEditorDrawer {...editorProps(props)} />);
 }
 
 describe("AgentHttpEditorDrawer", () => {
@@ -98,21 +94,15 @@ describe("AgentHttpEditorDrawer", () => {
       /** @scenario "The HTTP agent editor offers a session path" */
       it("clears the session path the saved agent carried", async () => {
         const agent = savedAgent({ sessionPath: "$.conversation_id" });
-        const { rerender } = render(
-          <ChakraProvider value={defaultSystem}>
-            <AgentHttpEditorDrawer {...editorProps({ agent, agentId: agent.id })} />
-          </ChakraProvider>,
+        const { rerender } = renderWithDesignSystem(
+          <AgentHttpEditorDrawer {...editorProps({ agent, agentId: agent.id })} />,
         );
 
         await waitFor(() => {
           expect(screen.getByPlaceholderText("$.conversation_id")).toHaveValue("$.conversation_id");
         });
 
-        rerender(
-          <ChakraProvider value={defaultSystem}>
-            <AgentHttpEditorDrawer {...editorProps()} />
-          </ChakraProvider>,
-        );
+        rerender(<AgentHttpEditorDrawer {...editorProps()} />);
 
         await waitFor(() => {
           expect(screen.getByPlaceholderText("$.conversation_id")).toHaveValue("");
@@ -184,6 +174,21 @@ describe("AgentHttpEditorDrawer", () => {
           expect(saved).toHaveLength(1);
         });
         expect(saved[0]).toMatchObject({ sessionPath: "$.conversation_id" });
+      });
+    });
+
+    describe("when a saved agent holds a credential", () => {
+      /** @scenario "The HTTP agent editor never shows a stored credential" */
+      it("leaves the token blank and says it is stored", async () => {
+        const agent = savedAgent({ auth: { type: "bearer", token: "" } });
+
+        renderEditor({ agent, agentId: agent.id });
+
+        fireEvent.mouseDown(await screen.findByRole("tab", { name: "Auth" }));
+        fireEvent.click(screen.getByRole("tab", { name: "Auth" }));
+
+        const field = await screen.findByPlaceholderText("Stored; enter a new value to replace it");
+        expect(field).toHaveValue("");
       });
     });
   });

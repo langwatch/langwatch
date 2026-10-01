@@ -4,13 +4,13 @@
  * drawer by name when there are none. Langy never creates or sees a connection's secret.
  */
 import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  type SlackConnection,
-  slackConnectionKindLabel,
-  slackConnectionScopeLabel,
-} from "@langwatch/slack-browser-kit";
 
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import {
+  slackConnectionKindLabel,
+  slackConnectionScopeLabel,
+} from "../../../../../model/slack/slack-connection-copy.ts";
+import { type SlackConnection } from "../../../../../model/slack/slack-connection-types.ts";
 import { useLangySlackConnections } from "../../../behavior/use-langy-automation-data.ts";
 import { slackConnectionChoiceMessage } from "../../../model/logic/langy-slack-connection-prompt.ts";
 import { LangyCapabilityCard } from "../capabilities/langy-capability-card.tsx";

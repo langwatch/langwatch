@@ -5,11 +5,6 @@ import {
   readLiveWorkbench,
   scopeFromRunPayload,
 } from "@langwatch/experiment-contract";
-import {
-  LangyUiPageOutOfDateError,
-  LangyUiSaveFailedError,
-  type LangyUiActionHandlers,
-} from "@langwatch/langy-browser-kit";
 import { useMemo } from "react";
 
 import { startAndIdentifyRun } from "../../model/experiments-v3/execution/run-identification.ts";
@@ -17,6 +12,11 @@ import {
   revealTargetColumn,
   targetColumnLabel,
 } from "../../model/experiments-v3/reveal-target-column.ts";
+import {
+  LangyUiPageOutOfDateError,
+  LangyUiSaveFailedError,
+} from "../../model/langy/ui-actions/langy-ui-action-errors.ts";
+import { type LangyUiActionHandlers } from "../../model/langy/ui-actions/langy-ui-action-types.ts";
 import type { AutosaveOutcome } from "./use-autosave-evaluations-v3.ts";
 import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
 import type { useExecuteEvaluation } from "./use-execute-evaluation.ts";

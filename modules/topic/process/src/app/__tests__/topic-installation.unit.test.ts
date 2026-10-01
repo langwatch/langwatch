@@ -1,15 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { topicServer } from "../../topic.server.ts";
+import { topicProcessModule } from "../../topic.module.ts";
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(topicServer)])
+    .withModules([withMemoryRepositories(topicProcessModule)])
     .provide({
       evaluation: createApiFixture<EvaluationApi>({}),
       trace: createApiFixture<TraceApi>({}),
@@ -24,7 +24,7 @@ describe("topic app installation", () => {
     try {
       const app = runtime.service(TopicApi);
 
-      expect(runtime.module(topicServer).provided).toBe(app);
+      expect(runtime.module(topicProcessModule).provided).toBe(app);
       await expect(app.getAll({ projectId: "project-1" })).resolves.toEqual([]);
       await expect(
         app.getNamesByIds({ projectId: "project-1", ids: ["topic-1"] }),

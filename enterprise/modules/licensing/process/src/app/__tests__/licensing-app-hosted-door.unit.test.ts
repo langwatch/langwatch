@@ -1,17 +1,18 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
+import { ResourceScope } from "@langwatch/process";
+import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
-import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
-import { licensingServer } from "../../licensing.server.ts";
+import { licensingProcessModule } from "../../licensing.module.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
 import { connectHostedRest } from "../../transport/connect-hosted.rest.ts";
 
@@ -39,7 +40,7 @@ async function hostedFamily() {
   const unregistered = partial.unavailableRegistry();
   const findByVirtualKeyId = vi.fn().mockResolvedValue(null);
   const resources = new ResourceScope();
-  const state = await licensingServer.install({
+  const state = await licensingProcessModule.install({
     resources,
     config: TEST_LICENSING_CONFIG,
     members: {
@@ -70,9 +71,9 @@ async function hostedFamily() {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

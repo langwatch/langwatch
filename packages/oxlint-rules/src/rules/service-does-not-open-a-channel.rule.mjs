@@ -1,3 +1,4 @@
+import { stripFeaturePrefix } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // A collaborator the module does not own is a channel, not a service member.
@@ -79,7 +80,7 @@ function isService(file) {
   return (
     file.role === "process" &&
     file.isProduction &&
-    Boolean(file.sourcePath?.startsWith("services/"))
+    Boolean(file.sourcePath && stripFeaturePrefix(file.sourcePath).startsWith("services/"))
   );
 }
 

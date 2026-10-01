@@ -107,6 +107,7 @@ export const prismaTableCatalogue = {
   "InvoiceItem": "InvoiceItem",
   "Group": "Group",
   "GroupMembership": "GroupMembership",
+  "AuthzUserStanding": "AuthzUserStanding",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
@@ -129,6 +130,7 @@ export const prismaTableCatalogue = {
   "AiToolEntryDepartment": "AiToolEntryDepartment",
   "IngestionTemplate": "IngestionTemplate",
   "GatewayConnectUpstream": "GatewayConnectUpstream",
+  "GatewayTraceExportKey": "GatewayTraceExportKey",
   "GatewayBudget": "GatewayBudget",
   "GatewayBudgetBucketBoundary": "GatewayBudgetBucketBoundary",
   "GatewayBudgetLedger": "GatewayBudgetLedger",
@@ -1921,6 +1923,12 @@ export const prismaModelFieldCatalogue = {
     "group",
     "createdAt"
   ],
+  "AuthzUserStanding": [
+    "userId",
+    "deactivatedAt",
+    "erasedAt",
+    "standingChangedAt"
+  ],
   "RoleBinding": [
     "id",
     "organizationId",
@@ -2004,6 +2012,7 @@ export const prismaModelFieldCatalogue = {
     "ingestSourceType",
     "ingestionTemplateId",
     "createdByDeviceLabel",
+    "isSystemManaged",
     "createdAt",
     "updatedAt"
   ],
@@ -2255,6 +2264,12 @@ export const prismaModelFieldCatalogue = {
     "encryptedToken",
     "instanceId",
     "updatedAt"
+  ],
+  "GatewayTraceExportKey": [
+    "projectId",
+    "apiKeyId",
+    "encryptedToken",
+    "createdAt"
   ],
   "GatewayBudget": [
     "id",
@@ -3186,6 +3201,7 @@ export const prismaRelationCatalogue = {
     "user": "User",
     "group": "Group"
   },
+  "AuthzUserStanding": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",
@@ -3260,6 +3276,7 @@ export const prismaRelationCatalogue = {
     "organization": "Organization"
   },
   "GatewayConnectUpstream": {},
+  "GatewayTraceExportKey": {},
   "GatewayBudget": {
     "createdBy": "User",
     "ledgerEntries": "GatewayBudgetLedger",

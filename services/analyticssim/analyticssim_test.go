@@ -194,6 +194,10 @@ func TestUnfakedPathsAndBadBodies(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("flags: status %d", resp.StatusCode)
 	}
+	ext := send(t, http.MethodGet, srv.URL+"/static/exception-autocapture.js?v=1", nil, nil)
+	if ext.StatusCode != http.StatusOK || ext.Header.Get("Content-Type") != "application/javascript" {
+		t.Errorf("posthog-js extension: status %d, type %q", ext.StatusCode, ext.Header.Get("Content-Type"))
+	}
 }
 
 func TestBrowserPreflightIsAllowed(t *testing.T) {

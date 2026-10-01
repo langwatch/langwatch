@@ -6,10 +6,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { ScimSyncLifecycle } from "../../app/scim.members.ts";
 import { MemoryScimRepository } from "../../repositories/memory/memory.scim.repository.ts";
 import type { ScimDirectoryIdentityRecord } from "../../repositories/scim.repository.ts";
 import { ScimDirectoryMoveService } from "../scim-directory-move.service.ts";
+import type { ScimSyncLifecycle } from "../scim-sync-lifecycle.service.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const LEGACY = "ssoc_legacy";

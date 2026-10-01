@@ -118,6 +118,30 @@ describe("RedisBroadcastRepository", () => {
     await closeWithDrain(service);
   });
 
+  /** @scenario "Presence relays a hint from the framework channel to its own tenant only" */
+  it("relays a read hint from the framework's channel only to its tenant", async () => {
+    const { RedisBroadcastRepository } =
+      await import("../../repositories/redis/redis.broadcast.repository.ts");
+    const { redis, subscriberOn } = createMockRedis();
+    const service = RedisBroadcastRepository.create(redis as any, rateLimits());
+    const acme: unknown[] = [];
+    const globex: unknown[] = [];
+    service.getTenantEmitter("acme").on("read_invalidated", (event) => acme.push(event));
+    service.getTenantEmitter("globex").on("read_invalidated", (event) => globex.push(event));
+
+    await service.start();
+    const messageListener = subscriberOn.mock.calls.find(([event]) => event === "message")?.[1];
+    if (typeof messageListener !== "function")
+      throw new Error("message listener was not registered");
+    const hint = JSON.stringify({ path: "organization.getScopeGraph" });
+    messageListener("eventing:read_invalidated", JSON.stringify({ tenantId: "acme", event: hint }));
+    messageListener("broadcast:read_invalidated", JSON.stringify({ tenantId: "acme", event: hint }));
+
+    expect(acme).toEqual([{ event: hint, timestamp: expect.any(Number) }]);
+    expect(globex).toHaveLength(0);
+    await closeWithDrain(service);
+  });
+
   describe("broadcastToTenant()", () => {
     describe("when Redis is available", () => {
       it("publishes to Redis channel", async () => {

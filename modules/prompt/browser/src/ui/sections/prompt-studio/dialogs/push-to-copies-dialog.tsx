@@ -6,7 +6,8 @@
 
 import { useState } from "react";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { usePromptCopies } from "../../../../behavior/use-prompt-copies.ts";
+import { usePromptCopyActions } from "../../../../behavior/use-prompt-copy-actions.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { PromptPushDialog, type PromptCopyItem } from "../../../blocks/prompt-push-dialog.tsx";
@@ -24,18 +25,10 @@ export const PushToCopiesDialog = ({
 }) => {
   const { project } = usePromptProject();
   const host = usePromptHost();
-  const pushToCopies = promptApi.prompts.pushToCopies.useMutation();
-  const utils = promptApi.useUtils();
+  const { pushToCopies } = usePromptCopyActions();
   const [editedCopyIds, setEditedCopyIds] = useState<Set<string> | null>(null);
 
-  const {
-    data: copies,
-    isLoading,
-    error,
-  } = promptApi.prompts.getCopies.useQuery(
-    { projectId: project?.id ?? "", idOrHandle: promptId },
-    { enabled: open && !!project?.id && !!promptId },
-  );
+  const { data: copies, isLoading, error } = usePromptCopies({ promptId, enabled: open });
 
   const availableCopies: PromptCopyItem[] = copies ?? [];
   const selectedCopyIds = editedCopyIds ?? new Set(availableCopies.map((copy) => copy.id));
@@ -66,10 +59,9 @@ export const PushToCopiesDialog = ({
             projectId: project.id,
             copyIds: Array.from(selectedCopyIds),
           });
-          await utils.prompts.getAllPromptsForProject.invalidate();
           host.succeeded({
             title: "Pushed to replicas",
-            description: `Pushed "${promptName}" to ${result.pushed} of ${selectedCopyIds.size} replicas.`,
+            description: `Pushed "${promptName}" to ${result.pushedTo} of ${selectedCopyIds.size} replicas.`,
           });
           setEditedCopyIds(new Set());
           onClose();

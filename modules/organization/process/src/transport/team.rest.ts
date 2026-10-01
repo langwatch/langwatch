@@ -4,7 +4,7 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 /**
  * `/api/teams` - the organization's teams, their members, and their projects.
  * Routes that address a single team (`:id`) check permissions at team scope;
@@ -248,7 +248,7 @@ export const teamsRest: Readonly<{
       organizationId: scope.id,
       userId: input.userId,
       role: input.role,
-      // The key bounds what it grants, never its owner (authz.server.ts rules the same).
+      // The key bounds what it grants, never its owner (authz.module.ts rules the same).
       caller: { type: "apiKey", id: key.apiKeyId },
       actor: ledgerActor,
     });

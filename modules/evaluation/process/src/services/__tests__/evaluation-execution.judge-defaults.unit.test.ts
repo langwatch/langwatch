@@ -1,20 +1,21 @@
+import type { MappingState } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 /**
  * What an evaluator reads when no mapping was saved: an LLM judge gets the
  * whole trace (tool calls and results included), every other evaluator keeps
  * the trace's own fields. Spec: specs/evaluators/judges-read-tool-evidence.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { MappingState } from "@langwatch/dataset-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import type { EvaluationLangevals, EvaluationSpanDigest } from "../../app/evaluation.members.ts";
 import {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "../evaluation-execution.service.ts";
+import type { EvaluationSpanDigestService } from "../evaluation-span-digest.service.ts";
+import type { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
 
 const DIGEST = "get_quote -> total 1387.50";
 const THREAD = "turn 1: get_quote -> 1387.50";
@@ -30,10 +31,10 @@ const trace: Trace = {
 };
 
 function buildService() {
-  const evaluated: Parameters<EvaluationLangevals["evaluate"]>[0][] = [];
+  const evaluated: Parameters<LangevalsEvaluatorService["evaluate"]>[0][] = [];
   const traceBudgets: number[] = [];
   const threadBudgets: number[] = [];
-  const spanDigest: EvaluationSpanDigest = {
+  const spanDigest: Pick<EvaluationSpanDigestService, "format" | "formatThread"> = {
     format: async ({ maxTokens }) => {
       traceBudgets.push(maxTokens);
       return DIGEST;

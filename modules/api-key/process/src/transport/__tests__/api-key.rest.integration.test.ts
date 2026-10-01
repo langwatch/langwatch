@@ -19,9 +19,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   API_KEY_ID,
   AS_SERVICE,
+  AS_SESSION,
   CALLER_USER_ID,
   ORGANIZATION_ID,
   OTHER_USER_ID,
+  PROJECT_ID,
   mountApiKeyRest,
 } from "./api-key-rest.harness.ts";
 
@@ -1047,6 +1049,88 @@ describe("the api-keys REST family", () => {
       expect((await send("/api/api-keys/nonexistent-key-id", { method: "DELETE" })).status).toBe(
         404,
       );
+    });
+  });
+
+  describe("POST /api/api-keys/ingestion", () => {
+    const INGESTION_SHAPE = {
+      name: "laptop / my-project",
+      keyType: "personal",
+      permissionMode: "restricted",
+      permissions: ["traces:create"],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+    };
+
+    function mountIngestion() {
+      const create = vi.fn(async () => ({
+        token: "sk-lw-ingestion",
+        apiKey: apiKey({ id: "ingestion-key", name: INGESTION_SHAPE.name }),
+      }));
+      const mounted = mountApiKeyRest({ apiKeys: { create } });
+      return { ...mounted, create };
+    }
+
+    /** @scenario A person's project session mints its own ingestion key */
+    it("mints the person's own ingestion key on the session's project", async () => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: INGESTION_SHAPE,
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toMatchObject({ token: "sk-lw-ingestion" });
+      expect(create).toHaveBeenCalledWith({
+        name: INGESTION_SHAPE.name,
+        description: undefined,
+        userId: CALLER_USER_ID,
+        createdByUserId: CALLER_USER_ID,
+        organizationId: ORGANIZATION_ID,
+        expiresAt: undefined,
+        permissionMode: "restricted",
+        permissions: ["traces:create"],
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: PROJECT_ID }],
+      });
+    });
+
+    /** @scenario The ingestion key route refuses any other shape */
+    it.each([
+      ["a service key", { keyType: "service" }],
+      ["another member's key", { assignedToUserId: OTHER_USER_ID }],
+      ["another project", { bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "p-2" }] }],
+      ["an organization binding", { bindings: [{ role: "CUSTOM", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }] }],
+      ["a second binding", { bindings: [...INGESTION_SHAPE.bindings, ...INGESTION_SHAPE.bindings] }],
+      ["an extra permission", { permissions: ["traces:create", "traces:view"] }],
+      ["unrestricted access", { permissionMode: "all", permissions: undefined }],
+      ["an admin role", { bindings: [{ role: "ADMIN", scopeType: "PROJECT", scopeId: PROJECT_ID }] }],
+    ])("refuses %s", async (_shape, change) => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: { ...INGESTION_SHAPE, ...change },
+        as: AS_SESSION,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An API key cannot mint an ingestion key */
+    it("refuses a caller presenting an API key", async () => {
+      const { send, create } = mountIngestion();
+
+      const response = await send("/api/api-keys/ingestion", {
+        method: "POST",
+        body: INGESTION_SHAPE,
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_scope_violation" });
+      expect(create).not.toHaveBeenCalled();
     });
   });
 });

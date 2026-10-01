@@ -1,8 +1,4 @@
-import {
-  formatEvalColumnId,
-  isEvalColumnId,
-  parseEvalColumnId,
-} from "@langwatch/trace-browser-kit";
+import { formatEvalColumnId, isEvalColumnId, parseEvalColumnId } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import type { TraceEvalResult, TraceListItem } from "../../types/trace.ts";

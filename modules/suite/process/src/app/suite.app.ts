@@ -20,8 +20,8 @@ import {
   type FeatureFlagApi as FeatureFlagApiType,
 } from "@langwatch/feature-flag-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import {
@@ -77,16 +77,19 @@ import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.s
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
-import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import {
+  ConnectedTargetService,
+  type ConnectedPresenceReader,
+} from "../services/connected-target.service.ts";
 import { RunPlanReadService } from "../services/run-plan-read.service.ts";
+import { SuiteExecutionService } from "../services/suite-execution.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
-import { SuiteRunModelsService } from "../services/suite-run-models.service.ts";
-import { SuiteService } from "../services/suite.service.ts";
 import {
-  buildSuiteInfrastructure,
-  type SuiteAppInfrastructure,
-} from "./suite-composition.build.ts";
+  SuiteRunModelsService,
+  type SuiteRunModelsResolver,
+} from "../services/suite-run-models.service.ts";
+import { SuiteService } from "../services/suite.service.ts";
 
 /**
  * What a lookup by id found. A test suite IS a suite of kind "test_suite", but the two
@@ -124,13 +127,20 @@ type SuiteProcessMembers = Readonly<{
  * naming this module and member, rather than serving an empty history from nothing.
  */
 type SuiteSetup = FeatureSetup<
-  typeof SuiteApp.dependencies,
+  typeof SuiteModule.dependencies,
   SuiteProcessMembers,
   undefined,
   SuiteRepositories
 >;
 
-export class SuiteApp implements SuiteApi {
+/** What `SuiteModule` builds for itself, over its own reads and its peers. */
+interface SuiteAppInfrastructure {
+  execution: SuiteExecution;
+  connectedPresence: ConnectedPresenceReader;
+  publicBaseUrl: string | undefined;
+}
+
+export class SuiteModule implements SuiteApi {
   static readonly contract = SuiteApi;
   static readonly dependencies = {
     scenarios: ScenarioApi,
@@ -148,10 +158,10 @@ export class SuiteApp implements SuiteApi {
   /** Every name is from the process's vocabulary; boot refuses by name. */
   static readonly reads = ["clickhouse", "publicBaseUrl", "redis"] as const;
 
-  static create(setup: SuiteSetup): SuiteApp {
+  static create(setup: SuiteSetup): SuiteModule {
     const { members, dependencies, repositories } = setup;
     const runItems = SuiteRunItemCommandsService.create();
-    const infrastructure = buildSuiteInfrastructure({
+    const infrastructure = SuiteModule.infrastructureOver({
       agents: dependencies.agents,
       scenarios: dependencies.scenarios,
       commands: runItems,
@@ -173,17 +183,17 @@ export class SuiteApp implements SuiteApi {
       connectedPresence: infrastructure.connectedPresence,
     });
 
-    return new SuiteApp({
+    return new SuiteModule({
       ...dependencies,
       suites,
       runItems,
-      runPlans: SuiteApp.buildRunPlans({
+      runPlans: SuiteModule.buildRunPlans({
         repositories,
         dependencies,
         publicBaseUrl: infrastructure.publicBaseUrl,
       }),
       publicBaseUrl: infrastructure.publicBaseUrl,
-      pipeline: SuiteApp.buildEventingPipeline({
+      pipeline: SuiteModule.buildEventingPipeline({
         clickhouse: members.clickhouse,
         redis: members.redis,
         defaultRetentionDays,
@@ -241,6 +251,28 @@ export class SuiteApp implements SuiteApi {
     });
   }
 
+  /**
+   * A run starts on `suite_run_processing` and each of its scenario runs is
+   * queued by the scenario owner. The agent directory answers presence directly.
+   */
+  private static infrastructureOver(input: {
+    agents: Pick<AgentApiType, "getPresence">;
+    scenarios: Pick<ScenarioApiType, "resolveRunParametersForScenarios" | "queueSimulationRun">;
+    commands: SuiteRunCommands;
+    resolveRunModels?: SuiteRunModelsResolver;
+    publicBaseUrl: string | undefined;
+  }): SuiteAppInfrastructure {
+    return {
+      execution: SuiteExecutionService.create({
+        commands: input.commands,
+        scenarios: input.scenarios,
+        ...(input.resolveRunModels ? { resolveRunModels: input.resolveRunModels } : {}),
+      }),
+      connectedPresence: (presenceInput) => input.agents.getPresence(presenceInput),
+      publicBaseUrl: input.publicBaseUrl,
+    };
+  }
+
   // Test-only construction with overridable collaborators and in-memory run projection.
   static createForTesting(setup: {
     repositories: SuiteRepositories;
@@ -249,9 +281,9 @@ export class SuiteApp implements SuiteApi {
     /** Deterministic ids and a fixed clock are the service's own seams, not infrastructure. */
     generateId?: () => string;
     now?: () => Instant;
-  }): SuiteApp {
+  }): SuiteModule {
     const runItems = SuiteRunItemCommandsService.create();
-    const defaults = buildSuiteInfrastructure({
+    const defaults = SuiteModule.infrastructureOver({
       agents: setup.dependencies.agents,
       scenarios: setup.dependencies.scenarios,
       commands: runItems,
@@ -271,11 +303,11 @@ export class SuiteApp implements SuiteApi {
       ...(setup.now ? { now: setup.now } : {}),
     });
 
-    return new SuiteApp({
+    return new SuiteModule({
       ...setup.dependencies,
       suites,
       runItems,
-      runPlans: SuiteApp.buildRunPlans({
+      runPlans: SuiteModule.buildRunPlans({
         repositories: setup.repositories,
         dependencies: setup.dependencies,
         publicBaseUrl: infrastructure.publicBaseUrl,

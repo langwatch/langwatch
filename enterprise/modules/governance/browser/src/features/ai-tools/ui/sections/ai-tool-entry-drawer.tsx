@@ -1,10 +1,3 @@
-import { ScopeChipPicker, type ScopeChipPickerEntry } from "@langwatch/authz-browser-kit";
-import {
-  ASSISTANT_KINDS,
-  ASSISTANT_OPTIONS,
-  ASSISTANT_PRESETS,
-  type AssistantKind,
-} from "@langwatch/coding-agent-browser-kit";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
@@ -19,6 +12,10 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerEntry,
+} from "@langwatch/design-system/scope-chip-picker";
 import { Switch } from "@langwatch/design-system/switch";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { Bot, Wrench } from "lucide-react";
@@ -30,6 +27,12 @@ import {
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
+import {
+  ASSISTANT_KINDS,
+  ASSISTANT_OPTIONS,
+  ASSISTANT_PRESETS,
+  type AssistantKind,
+} from "../../../../model/coding-agent/assistant-presets.ts";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import type { AiToolTileType } from "../../model/ai-tool-tile.ts";
 import {

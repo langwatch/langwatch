@@ -1,11 +1,11 @@
+import type * as actualModule from "@langwatch/browser-host/sse-subscription";
 /**
  * Integration tests for simulation page URL routing.
  * @vitest-environment jsdom
  * @see specs/suites/simulation-runs-page.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,8 +13,8 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("@langwatch/browser-host/sse-subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule>();
   return {
     ...actual,
     useSSESubscription: () => ({
@@ -119,6 +119,17 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getSuiteRunData: {
         useQuery: () => ({
@@ -160,7 +171,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "my-project" },
     hasAnyPermission: () => true,
@@ -192,14 +203,10 @@ vi.mock("../external-set-detail-panel.tsx", () => ({
   ),
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 let SimulationsPage: React.ComponentType;
 
 function renderSimulationsPage() {
-  return render(<SimulationsPage />, { wrapper: Wrapper });
+  return renderWithDesignSystem(<SimulationsPage />);
 }
 
 describe("Simulation Page URL Routing", () => {

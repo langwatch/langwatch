@@ -63,50 +63,13 @@ describe("better-auth secondary storage", () => {
 
       expect(redis.get).toHaveBeenCalledWith("better-auth:session-key");
       expect(redis.set).toHaveBeenCalledWith("better-auth:session-key", "value", "EX", 60);
-      expect(redis.set).toHaveBeenCalledWith("better-auth:no-ttl", "value");
+      expect(redis.del).toHaveBeenCalledWith("better-auth:no-ttl");
       expect(redis.del).toHaveBeenCalledWith("better-auth:session-key");
     });
   });
 
-  /**
-   * `getAndDelete` and `increment` arrived with better-auth 1.7. The limiter used
-   * to read-modify-write a record two pods could interleave; `increment` is the
-   * atomic replacement, so its window handling decides whether a limit works.
-   */
-  describe("given the counter behind distributed rate limiting", () => {
-    it("counts in one round trip rather than reading and writing back", async () => {
-      const redis = fakeRedis();
-      redis.incr.mockResolvedValue(4);
-
-      expect(await storeOver(redis).increment?.("rate-limit:ip", 60)).toBe(4);
-
-      expect(redis.incr).toHaveBeenCalledWith("better-auth:rate-limit:ip");
-      expect(redis.get).not.toHaveBeenCalled();
-      expect(redis.set).not.toHaveBeenCalled();
-    });
-
-    it("dates the window from the first hit in it", async () => {
-      const redis = fakeRedis();
-      redis.incr.mockResolvedValue(1);
-
-      await storeOver(redis).increment?.("rate-limit:ip", 60);
-
-      expect(redis.expire).toHaveBeenCalledWith("better-auth:rate-limit:ip", 60);
-    });
-
-    /**
-     * Re-applying the TTL on every hit means a key under sustained traffic
-     * never expires, and the limit somebody tripped once becomes permanent.
-     */
-    it("never extends the window on a later hit in the same one", async () => {
-      const redis = fakeRedis();
-      redis.incr.mockResolvedValue(2);
-
-      await storeOver(redis).increment?.("rate-limit:ip", 60);
-
-      expect(redis.expire).not.toHaveBeenCalled();
-    });
-
+  /** `getAndDelete` arrived with better-auth 1.7; the counter is the repository test's. */
+  describe("given a single-use value", () => {
     it("reads and clears a single-use value in one round trip", async () => {
       const redis = fakeRedis();
 

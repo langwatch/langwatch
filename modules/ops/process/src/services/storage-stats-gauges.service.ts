@@ -23,6 +23,9 @@ export class StorageStatsGaugesService {
     return new StorageStatsGaugesService(readings);
   }
 
+  /** Read failures log on the change into failing, not on every export tick. */
+  private failing = false;
+
   private constructor(private readonly readings: StorageStatsReadingsRepository) {}
 
   private gauge({
@@ -41,9 +44,12 @@ export class StorageStatsGaugesService {
 
   private async read(): Promise<StorageStatsReading[]> {
     try {
-      return await this.readings.findAll();
+      const readings = await this.readings.findAll();
+      this.failing = false;
+      return readings;
     } catch (error) {
-      logger.debug({ error }, "failed to read the shared storage readings");
+      if (!this.failing) logger.debug({ error }, "failed to read the shared storage readings");
+      this.failing = true;
       return [];
     }
   }

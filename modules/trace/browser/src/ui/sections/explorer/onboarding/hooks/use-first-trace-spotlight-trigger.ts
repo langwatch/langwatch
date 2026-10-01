@@ -1,9 +1,14 @@
+import { useUiDeclarations } from "@langwatch/browser-host/capabilities";
+import type { UiGuidedPathActive } from "@langwatch/browser-host/declarations";
 import { useEffect, useRef } from "react";
 
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { writeSpotlightFragment } from "../spotlights/spotlight-overlay.tsx";
 import { useTraceExplorerTourPreference } from "./use-trace-explorer-tour-preference.ts";
+
+/** A composition without onboarding has no guided path to stay quiet for. */
+const NO_GUIDED_PATH: UiGuidedPathActive = { useIsActive: () => false };
 
 interface UseFirstTraceSpotlightTriggerArgs {
   projectId: string | null;
@@ -24,6 +29,18 @@ function shouldMigrateLegacyTour({
   const alreadyHandled = attempted || isDismissed;
   const canMigrate = isResolved && hasLegacyHistory;
   return !alreadyHandled && canMigrate;
+}
+
+/** Traces have landed in a project the user has not yet been shown them in, nor is mid-path. */
+function isFirstTraceSpotlightDue(input: {
+  projectId: string | null;
+  hasAnyTraces: boolean | undefined;
+  isDismissed: boolean;
+  guidedPathActive: boolean;
+  firstTraceSpotlightFired: boolean;
+}): boolean {
+  if (!input.projectId || input.hasAnyTraces !== true) return false;
+  return !input.isDismissed && !input.guidedPathActive && !input.firstTraceSpotlightFired;
 }
 
 function startFirstTraceSpotlights(): void {
@@ -62,6 +79,8 @@ export function useFirstTraceSpotlightTrigger({
   const tourActive = useOnboardingStore((s) => s.tourActive);
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
+  const guidedPath = useUiDeclarations().declared("guidedPathActive")[0]?.capability;
+  const guidedPathActive = (guidedPath ?? NO_GUIDED_PATH).useIsActive();
   const hasLegacyTourHistoryOnMount = useRef(
     firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
   ).current;
@@ -80,10 +99,14 @@ export function useFirstTraceSpotlightTrigger({
   }, [hasLegacyTourHistoryOnMount, isDismissed, isResolved, persistDismissal]);
 
   useEffect(() => {
-    if (!projectId) return;
-    if (hasAnyTraces !== true) return;
-    if (isDismissed) return;
-    if (firstTraceSpotlightFired) return;
+    const eligible = isFirstTraceSpotlightDue({
+      projectId,
+      hasAnyTraces,
+      isDismissed,
+      guidedPathActive,
+      firstTraceSpotlightFired,
+    });
+    if (!eligible) return;
     if (spotlightsActive || tourActive) {
       // The user is already mid-tour or mid-journey — don't yank them
       // back to the first spotlight. Still mark fired so we don't
@@ -103,6 +126,7 @@ export function useFirstTraceSpotlightTrigger({
     projectId,
     hasAnyTraces,
     isDismissed,
+    guidedPathActive,
     firstTraceSpotlightFired,
     spotlightsActive,
     tourActive,

@@ -40,7 +40,11 @@ import {
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
-import { suiteSurfaceFact, toRunItemsWire } from "../rules/suite-wire-v1.rules.ts";
+import {
+  suiteCallerKeyFact,
+  suiteSurfaceFact,
+  toRunItemsWire,
+} from "../rules/suite-wire-v1.rules.ts";
 
 const logger = createLogger("langwatch:api:suites");
 
@@ -293,6 +297,7 @@ async function runSuite(params: {
   projectId: string;
   viewerUserId: string | null;
   surface: string | null;
+  callerKey: string | null;
 }): Promise<z.infer<typeof suiteRunResultSchema>> {
   const { app, input, projectId } = params;
   logger.info({ projectId, suiteId: input.id }, "Running suite");
@@ -303,6 +308,7 @@ async function runSuite(params: {
   const actor = deriveRunActor({
     userId: params.viewerUserId,
     surfaceHeader: params.surface,
+    apiKeyId: params.callerKey,
   });
   const idempotencyKey = input.idempotencyKey ?? `api-${randomUUID()}`;
 
@@ -514,14 +520,15 @@ export function createSuitesAliasRest(): Readonly<{
           "Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets, the repeat count and the models are read from the body.",
         responses: notFound,
       })
-      .withMiddleware(projectRestFacts, suiteSurfaceFact)
-      .handle(({ app, input: body, scope }, project, surface) =>
+      .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
+      .handle(({ app, input: body, scope }, project, surface, callerKey) =>
         runSuite({
           app,
           input: body,
           projectId: scope.id,
           viewerUserId: project.viewerUserId,
           surface,
+          callerKey,
         }),
       )
 

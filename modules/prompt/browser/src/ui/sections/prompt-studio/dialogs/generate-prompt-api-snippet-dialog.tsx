@@ -1,24 +1,23 @@
+import { useMintPersonalToken } from "@langwatch/api-key-client";
+import { useOptionalUiCapabilities } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
-import { HStack, Text } from "@langwatch/design-system/primitives";
-import { getGetPromptSnippets, type PromptSnippetVariable } from "@langwatch/prompt-browser-kit";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
 import type React from "react";
 import { useMemo } from "react";
 
+import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
+import { usePromptHost } from "../../../../model/prompt-host.ts";
+import {
+  getGetPromptSnippets,
+  type PromptSnippetVariable,
+} from "../../api-snippet/get-prompt-snippets.ts";
 import { GenerateApiSnippetDialog } from "./generate-api-snippet-dialog.tsx";
-
-/** Where a reader goes to mint the key the snippet needs. */
-const API_KEYS_SETTINGS_PATH = "/settings/api-keys";
-
-/**
- * Full-length stand-in for a key the project doesn't have yet - on purpose:
- * a short `sk-lw-xxx` reads like a pasteable value until the SDK rejects it.
- * Copying is switched off while this is what the snippet carries.
- */
-const PLACEHOLDER_API_KEY = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
 
 interface GeneratePromptApiSnippetButtonProps {
   promptHandle?: string | null;
-  apiKey?: string;
   label?: string;
   /** The variables the prompt declares, in the order the editor shows them. */
   variables?: PromptSnippetVariable[];
@@ -30,13 +29,22 @@ interface GeneratePromptApiSnippetButtonProps {
 
 export function GeneratePromptApiSnippetDialog({
   promptHandle,
-  apiKey,
   label,
   variables,
   children,
   open,
   onOpenChange,
 }: GeneratePromptApiSnippetButtonProps) {
+  const { project, organizationId } = usePromptProject();
+  const host = usePromptHost();
+  const minting = useMintPersonalToken({
+    organizationId,
+    projectId: project?.id,
+    userId: useOptionalUiCapabilities()?.session.currentUser()?.id,
+    name: "Personal access token",
+    permissions: ["prompts:view"],
+  });
+  const token = minting.token ?? null;
   // Keyed on the serialized variables rather than the array itself: callers
   // hand over a fresh array identity every render, which would defeat the
   // memo entirely.
@@ -45,11 +53,11 @@ export function GeneratePromptApiSnippetDialog({
     () =>
       getGetPromptSnippets({
         promptHandle: promptHandle ?? undefined,
-        apiKey: apiKey ?? PLACEHOLDER_API_KEY,
+        apiKey: token ?? API_KEY_PLACEHOLDER,
         label,
         variables: JSON.parse(variablesKey) as PromptSnippetVariable[],
       }),
-    [promptHandle, apiKey, label, variablesKey],
+    [promptHandle, token, label, variablesKey],
   );
 
   const targets = useMemo(() => snippets.map((snippet) => snippet.target), [snippets]);
@@ -70,14 +78,21 @@ export function GeneratePromptApiSnippetDialog({
     </Link>
   );
 
-  const controls = apiKey ? null : (
-    <HStack gap={2} fontSize="sm">
-      <Text color="fg.muted">The snippet needs an API key before it will run.</Text>
-      <Link href={API_KEYS_SETTINGS_PATH} color="blue.fg">
-        Create an API key
-      </Link>
-    </HStack>
-  );
+  const controls =
+    organizationId && project ? (
+      <PersonalAccessTokenBanner
+        token={token}
+        isCreating={minting.isMinting}
+        scopeNote={minting.scopeNote}
+        onCreate={() =>
+          void minting
+            .mint()
+            .catch((error: unknown) =>
+              host.failed({ error, fallbackTitle: "Couldn't create the personal access token" }),
+            )
+        }
+      />
+    ) : null;
 
   return (
     <GenerateApiSnippetDialog
@@ -86,8 +101,8 @@ export function GeneratePromptApiSnippetDialog({
       title="Get and use this prompt"
       description={description}
       controls={controls}
-      sensitiveValue={apiKey}
-      copyDisabled={!apiKey}
+      sensitiveValue={token ?? undefined}
+      copyDisabled={!token}
       open={open}
       onOpenChange={onOpenChange}
     >

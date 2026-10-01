@@ -5,6 +5,7 @@
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 
 import { api } from "../scenario-api.ts";
 import { showSuiteRunError } from "./show-suite-run-error.ts";
@@ -58,8 +59,12 @@ function showScheduledRun({
 }
 
 export function useSuiteRunMutation({ onEditSuite, onSuccess }: UseSuiteRunMutationOptions) {
+  const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
+      void scenarioUtils.scenarios.getSuiteRunData.invalidate();
+      void utils.suites.getSummaries.invalidate();
       onSuccess?.();
 
       showScheduledRun({

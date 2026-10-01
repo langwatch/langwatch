@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
@@ -17,11 +16,12 @@ import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp } from "../auth.app.ts";
+import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS, type SignInProvidersConfig } from "./support/sign-in-providers.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
@@ -57,8 +57,8 @@ async function appFor(
     askedFor?: MountsRequest[];
     identity?: IdentityApi;
   } = {},
-): Promise<AuthApp> {
-  return AuthApp.create({
+): Promise<AuthModule> {
+  return AuthModule.create({
     config: {
       sessionUrl: named ? BROWSER_SESSION.baseUrl : undefined,
       mfaEnrollmentOpen: BROWSER_SESSION.mfaEnrollmentOpen,
@@ -68,6 +68,7 @@ async function appFor(
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
     },
     repositories: MemoryAuthRepositories.create(),
@@ -217,7 +218,7 @@ const genericOAuthOptionsSchema = z.object({
 });
 
 /** Mounted means initialised too: plugin init (OIDC discovery) settles inside the test. */
-async function mountedProviderIds(app: AuthApp): Promise<string[]> {
+async function mountedProviderIds(app: AuthModule): Promise<string[]> {
   const auth = await app.betterAuth();
   await auth.$context;
   const { options } = auth;

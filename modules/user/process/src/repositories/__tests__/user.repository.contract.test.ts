@@ -23,7 +23,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       const { users } = create();
 
       await expect(users.findById("user-nobody")).resolves.toBeNull();
-      await expect(users.findByEmail(EMAIL)).resolves.toBeNull();
+      await expect(users.findByEmail(EMAIL)).resolves.toEqual([]);
       await expect(users.findAccountInfo("user-nobody")).resolves.toBeNull();
       await expect(users.findProfiles([])).resolves.toEqual([]);
     });
@@ -66,7 +66,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         name: "Ada",
         email: EMAIL,
       });
-      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject({ id: created.id });
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
     });
 
     /** A case-twin beside an address would leave two accounts answering for one person. */
@@ -81,10 +81,10 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         emailVerified: false,
       });
 
-      await expect(users.findByEmail("Ada@Example.com")).resolves.toMatchObject({
-        id: created.id,
-      });
-      await expect(users.findByEmail("other@example.com")).resolves.toBeNull();
+      await expect(users.findByEmail("Ada@Example.com")).resolves.toMatchObject([
+        { id: created.id },
+      ]);
+      await expect(users.findByEmail("other@example.com")).resolves.toEqual([]);
     });
 
     it("reports that the account can sign in with a password", async () => {
@@ -156,7 +156,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
       const created = await users.create({ name: "Ada", email: "Ada@Example.com" });
 
-      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject({ id: created.id });
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
     });
   });
 
@@ -302,6 +302,38 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(
         users.setDeactivatedAt({ id: created.id, deactivatedAt: null }),
       ).resolves.toMatchObject({ deactivatedAt: null });
+    });
+  });
+
+  describe("when two accounts hold one address in different case", () => {
+    /** @scenario "A lookup by address never guesses between case-twins" */
+    it("answers both, oldest first", async () => {
+      const { users } = create();
+      const older = await users.create({ name: "Ada", email: "Ada@Example.com" });
+      const newer = await users.create({ name: "Ada", email: EMAIL });
+
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([
+        { id: older.id },
+        { id: newer.id },
+      ]);
+    });
+  });
+
+  describe("when an operator is deactivated beside the others who hold the grant", () => {
+    /** @scenario "Deactivating the last active platform operator is refused" */
+    it("deactivates while another stays active, and refuses once none does", async () => {
+      const { users } = create();
+      const first = await users.create({ name: "First", email: "first@example.com" });
+      const second = await users.create({ name: "Second", email: "second@example.com" });
+      const at = fromDate(new Date(42));
+
+      await expect(
+        users.deactivateWhileOthersActive({ id: first.id, deactivatedAt: at, others: [second.id] }),
+      ).resolves.toMatchObject({ outcome: "deactivated", user: { deactivatedAt: new Date(42) } });
+      await expect(
+        users.deactivateWhileOthersActive({ id: second.id, deactivatedAt: at, others: [first.id] }),
+      ).resolves.toEqual({ outcome: "none_active" });
+      await expect(users.findById(second.id)).resolves.toMatchObject({ deactivatedAt: null });
     });
   });
 

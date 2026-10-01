@@ -1,6 +1,6 @@
-import { Switch } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Badge, HStack, Stack, Text, VStack } from "@langwatch/design-system/primitives";
+import { RawSwitch as Switch } from "@langwatch/design-system/switch";
 import type {
   ExperimentCatalogueEntry,
   ExperimentTenantPolicy,

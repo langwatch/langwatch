@@ -1,6 +1,6 @@
 /**
  * The per-user session version a browser's session-tier cache is stamped
- * with (ADR-164). Monotonic; a user never bumped answers 0. Kept in Redis,
+ * with (ADR-170). Monotonic; a user never bumped answers 0. Kept in Redis,
  * or in memory by a process without it.
  */
 export abstract class AuthzSessionVersionRepository {

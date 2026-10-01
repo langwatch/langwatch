@@ -1,14 +1,14 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * @vitest-environment jsdom
  * #6716: the "Send to" listbox must portal out of whatever stacked drawer it
  * renders in. jsdom has no hit-testing, so only the portal test guards the
  * regression; the dialog test covers picking an option inside an overlay.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AddParticipants } from "../add-participants.tsx";
@@ -35,10 +35,6 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 function StackedOverlayHarness({
   onSelect,
 }: {
@@ -63,11 +59,10 @@ describe("given the annotation-queue 'Send to' selector", () => {
     it("portals the listbox outside the local render tree", async () => {
       const user = userEvent.setup();
       const setAnnotators = vi.fn();
-      render(
+      renderWithDesignSystem(
         <div data-testid="stacked-drawer">
           <AddParticipants annotators={[]} setAnnotators={setAnnotators} isTrigger={true} />
         </div>,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByText("Add Participants"));
@@ -92,7 +87,7 @@ describe("given the annotation-queue 'Send to' selector", () => {
     it("selects the option and does not dismiss the parent overlay as an outside click", async () => {
       const user = userEvent.setup();
       const setAnnotators = vi.fn();
-      render(<StackedOverlayHarness onSelect={setAnnotators} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<StackedOverlayHarness onSelect={setAnnotators} />);
 
       expect(screen.getByRole("dialog")).toBeInTheDocument();
 

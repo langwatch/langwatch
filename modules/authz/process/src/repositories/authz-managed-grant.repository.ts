@@ -70,7 +70,19 @@ export abstract class AuthzManagedGrantRepository {
     groupIds: readonly string[];
   }): Promise<{ groupId: string; userId: string }[]>;
 
+  abstract findTeamMembers(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; userId: string }[]>;
+
   abstract findOrganizationUserIds(input: { organizationId: string }): Promise<string[]>;
+
+  /** Distinct principals of the role's live grants, at most `limit` of them. */
+  abstract findRoleHolderPrincipals(input: {
+    organizationId: string;
+    roleId: string;
+    limit: number;
+  }): Promise<AuthzGrantPrincipalRow["principal"][]>;
 
   /** Revoked grants included: a revocation's subscriber needs whom it took access from. */
   abstract findGrantPrincipals(input: {

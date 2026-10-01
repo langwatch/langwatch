@@ -1,3 +1,4 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useCallback, useMemo, useState } from "react";
 
 import {
@@ -8,7 +9,6 @@ import {
   type TagSelections,
 } from "../model/deploy-tags.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
-import { promptApi } from "./prompt-api.ts";
 import { usePromptTags } from "./use-prompt-tags.ts";
 
 /** The deploy dialog's versions, one select item each, newest first. */
@@ -33,7 +33,7 @@ function useVersionItems({
 
 /** Creating a tag inline: the draft name, its refusal, and the request in flight. */
 function useAddTag({ projectId, refetchTags }: { projectId: string; refetchTags: () => unknown }) {
-  const createTag = promptApi.promptTags.create.useMutation();
+  const createTag = promptClient.promptTags.create.useMutation();
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [newTagName, setNewTagName] = useState("");
   const [addTagError, setAddTagError] = useState("");
@@ -96,22 +96,22 @@ export function useDeployTags({
   projectId: string;
 }) {
   const host = usePromptHost();
-  const utils = promptApi.useUtils();
+  const utils = promptClient.useUtils();
   const { data: allTags, refetch: refetchTags } = usePromptTags({
     projectId,
     enabled: isOpen && !!projectId,
   });
   const promptReady = isOpen && !!configId && !!projectId;
-  const versionsQuery = promptApi.prompts.getAllVersionsForPrompt.useQuery(
+  const versionsQuery = promptClient.prompts.getAllVersionsForPrompt.useQuery(
     { idOrHandle: configId, projectId },
     { enabled: promptReady },
   );
-  const tagsQuery = promptApi.prompts.getTagsForConfig.useQuery(
+  const tagsQuery = promptClient.prompts.getTagsForConfig.useQuery(
     { configId, projectId },
     { enabled: promptReady },
   );
-  const assignTag = promptApi.prompts.assignTag.useMutation();
-  const deleteTag = promptApi.promptTags.delete.useMutation();
+  const assignTag = promptClient.prompts.assignTag.useMutation();
+  const deleteTag = promptClient.promptTags.delete.useMutation();
 
   const versions = useMemo(() => versionsQuery.data ?? [], [versionsQuery.data]);
   const latestVersion = versions.reduce<(typeof versions)[number] | null>(
@@ -181,6 +181,7 @@ export function useDeployTags({
       try {
         await deleteTag.mutateAsync({ projectId, name: tagName });
         await refetchTags();
+        void utils.prompts.getTagsForConfig.invalidate({ configId, projectId });
       } catch {
         host.failed({
           error: new Error("Failed to delete tag"),
@@ -188,7 +189,7 @@ export function useDeployTags({
         });
       }
     },
-    [projectId, deleteTag, refetchTags, host],
+    [projectId, configId, deleteTag, refetchTags, utils, host],
   );
 
   const addTag = useAddTag({ projectId, refetchTags });

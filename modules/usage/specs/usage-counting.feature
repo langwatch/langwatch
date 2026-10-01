@@ -72,10 +72,10 @@ Feature: Usage owns all counting
     And the warning is recorded against the month so a later 90% reading sends nothing
 
   @unit @usage @unimplemented
-  Scenario: Billing reports the month's roll-up to Stripe from usage's meter
-    Given an organization with billable events counted this month
-    When billing reports the month's usage to Stripe
-    Then the quantity is the roll-up usage answers for that organization and month
+  Scenario: Billing reports the month's total to Stripe from usage's month_counted event
+    Given a month_counted event for an organization with billable events counted this month
+    When billing's subscriber handles the event
+    Then the quantity reported to Stripe comes from the event and billing asks no usage Api
 
   @unit @usage @unimplemented
   Scenario: Entitlement answers plans and features only

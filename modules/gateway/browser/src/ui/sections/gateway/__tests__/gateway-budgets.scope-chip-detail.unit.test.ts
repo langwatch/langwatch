@@ -1,4 +1,4 @@
-import { scopeChipTooltip } from "@langwatch/authz-browser-kit";
+import { scopeChipTooltip } from "@langwatch/design-system/provider-scope-chips";
 /**
  * @vitest-environment node
  * The detail string that feeds the scope chip tooltip.

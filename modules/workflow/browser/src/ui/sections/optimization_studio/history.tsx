@@ -1,4 +1,5 @@
 import { toaster } from "@langwatch/browser-host/toaster";
+import { HistoryIcon } from "@langwatch/design-system/history-icon";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
@@ -12,8 +13,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 import { FormProvider, useForm } from "react-hook-form";
@@ -22,6 +21,7 @@ import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-or
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
+import { PersonAvatar } from "../person-avatar.tsx";
 import { useVersionState } from "./use-version-state.ts";
 import { NewVersionFields } from "./version-to-be-used.tsx";
 
@@ -226,7 +226,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     )}
                   </HStack>
                   <HStack fontSize="12px">
-                    <UserAvatar
+                    <PersonAvatar
                       size="2xs"
                       backgroundColor="orange.400"
                       color="white"
@@ -243,6 +243,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     <Button
                       variant="ghost"
                       onClick={() => void onRestoreSuccess(version.id)}
+                      data-testid="workflow-version-restore"
                       loading={restoreVersion.isPending}
                     >
                       <HistoryIcon size={24} />

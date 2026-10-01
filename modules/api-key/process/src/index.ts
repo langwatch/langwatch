@@ -5,7 +5,6 @@ export {
 } from "./eventing/api-key.pipeline.ts";
 export type { AgentSandboxKeyReapDeps } from "./eventing/agent-sandbox-key-reap.intent.ts";
 export type { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
-export type { AgentSandboxKeyShareRedis } from "./repositories/redis/redis.agent-sandbox-key-share.repository.ts";
 export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,
@@ -15,8 +14,6 @@ export {
   CLI_LOGIN_KEY_REAP_PROCESS_NAME,
 } from "./eventing/cli-login-key-reap.process.ts";
 export type { CliLoginKeyReapDeps } from "./eventing/cli-login-key-reap.intent.ts";
-export { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
-export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service.ts";
 export type {
   ApiKeySetup,
   ApiKeyCaller,
@@ -24,9 +21,9 @@ export type {
   UpdateApiKeyRequest,
 } from "./app/api-key.app.ts";
 export {
-  apiKeyServer,
+  apiKeyProcessModule,
   createAgentSandboxKeyReapService,
   createCliLoginKeyReapService,
-} from "./api-key.server.ts";
+} from "./api-key.module.ts";
 export { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
 export { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";

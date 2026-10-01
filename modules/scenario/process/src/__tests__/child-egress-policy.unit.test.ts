@@ -9,7 +9,10 @@ import {
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildChildEnvironment, type ScenarioChildProcessConfig } from "../index.ts";
+import {
+  buildChildEnvironment,
+  type ScenarioChildProcessConfig,
+} from "../services/node-scenario-child.service.ts";
 
 const config: ScenarioChildProcessConfig = {
   packageRoot: "/app/apps/worker",

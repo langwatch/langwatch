@@ -1,1 +1,1 @@
-export { roleServer } from "./role.server.ts";
+export { roleProcessModule } from "./role.module.ts";

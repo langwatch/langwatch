@@ -3,8 +3,8 @@
  * Integration tests for /auth/reset-password: the full tree renders under
  * Chakra; only the BetterAuth client and the URL search-params hook are mocked.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockResetPassword, mockRegisterPasskey, publicEnvRef, searchParamsRef } = vi.hoisted(
@@ -42,11 +42,7 @@ const setToken = (token: string | null) => {
 };
 
 const renderPage = () => {
-  const view = render(
-    <ChakraProvider value={defaultSystem}>
-      <ResetPassword />
-    </ChakraProvider>,
-  );
+  const view = renderWithDesignSystem(<ResetPassword />);
   return view;
 };
 

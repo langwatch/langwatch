@@ -6,8 +6,8 @@ import { deriveVerdictPassed, deriveVerdictScore } from "@langwatch/evaluation-c
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 
-import { type EvaluationExecutionReceipt } from "../app/evaluation.members.ts";
 import type { PreparedEvaluation } from "./evaluation-execution-preparation.service.ts";
+import type { EvaluationExecutionReceiptService } from "./evaluation-execution-receipt.service.ts";
 import {
   type EvaluationReportedEventService,
   type EvaluationReportedResult,
@@ -21,7 +21,7 @@ function isCustomerFixable(error: unknown): error is HandledError {
 
 export class EvaluationExecutionOutcomeService {
   static create(input: {
-    executionReceipt: EvaluationExecutionReceipt;
+    executionReceipt: Pick<EvaluationExecutionReceiptService, "execute">;
     reportedEvents: EvaluationReportedEventService;
   }): EvaluationExecutionOutcomeService {
     return new EvaluationExecutionOutcomeService(input);
@@ -29,7 +29,7 @@ export class EvaluationExecutionOutcomeService {
 
   private constructor(
     private readonly deps: {
-      executionReceipt: EvaluationExecutionReceipt;
+      executionReceipt: Pick<EvaluationExecutionReceiptService, "execute">;
       reportedEvents: EvaluationReportedEventService;
     },
   ) {}

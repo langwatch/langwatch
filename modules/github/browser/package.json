@@ -21,7 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "react": "catalog:",
     "zod": "catalog:"
   },

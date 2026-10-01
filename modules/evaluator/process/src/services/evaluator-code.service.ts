@@ -103,6 +103,7 @@ export class EvaluatorCodeService {
       const enriched = await this.options.workflows.enrichStudioEvent({
         event,
         projectId: input.projectId,
+        principal: input.principal,
       });
       const response = await this.options.codeExecution.execute({
         projectId: input.projectId,

@@ -39,12 +39,13 @@ vi.mock("node:child_process", () => ({
   }),
 }));
 
-import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
+import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
 import { MemoryVoiceNonceRepository } from "../repositories/memory/memory.voice-nonce.repository.ts";
 import {
   NodeScenarioChildService,
   type ScenarioChildProcessConfig,
 } from "../services/node-scenario-child.service.ts";
+import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 import { VoiceNonceRegistryService } from "../services/voice-nonce-registry.service.ts";
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * `POST /api/workflows/:id/evaluate` over the runtime a process mounts it on:
@@ -11,6 +10,7 @@ import {
   projectRestFacts,
 } from "@langwatch/api/rest";
 import { NotFoundError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   WorkflowVersionRequiredError,
   type WorkflowApi,

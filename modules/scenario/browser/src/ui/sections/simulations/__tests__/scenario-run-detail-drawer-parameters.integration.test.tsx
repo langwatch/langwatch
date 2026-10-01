@@ -3,10 +3,10 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -15,22 +15,31 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    agents: {
+      getAll: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    prompts: {
+      getAllPromptsForProject: {
+        useQuery: () => ({ data: [] }),
+      },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     scenarios: {
       getRunState: {
         useQuery: () => ({ data: mocks.runState, error: null }),
       },
       getByIdIncludingArchived: {
         useQuery: () => ({ data: undefined }),
-      },
-    },
-    agents: {
-      getAll: {
-        useQuery: () => ({ data: [] }),
-      },
-    },
-    prompts: {
-      getAllPromptsForProject: {
-        useQuery: () => ({ data: [] }),
       },
     },
   },
@@ -49,7 +58,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ closeDrawer: vi.fn(), openDrawer: vi.fn() }),
   useDrawerParams: () => ({ scenarioRunId: "run_1" }),
 }));
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
@@ -105,11 +114,7 @@ function buildRunState(metadata: Record<string, unknown> | null) {
 }
 
 function renderDrawer() {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ScenarioRunDetailDrawer open={true} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<ScenarioRunDetailDrawer open={true} />);
 }
 
 describe("<ScenarioRunDetailDrawer/> parameters", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { ScenarioSecretCipher } from "../../index.ts";
+import type { ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { ScenarioRunSecretsService } from "../scenario-run-secrets.service.ts";
 
 class ReversibleCipher implements ScenarioSecretCipher {

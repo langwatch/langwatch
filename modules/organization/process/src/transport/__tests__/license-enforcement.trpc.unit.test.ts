@@ -1,12 +1,12 @@
+import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { LimitCheckResult, OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  *
  * `licenseEnforcement.*` on organization's router: the three procedure names
  * the clients call, readable by any member, the caller forwarded whole.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { LimitCheckResult, OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

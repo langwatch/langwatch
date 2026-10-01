@@ -1,12 +1,12 @@
+import { useCallback } from "react";
+
+import { onboardingApi } from "../../../behavior/onboarding-api.ts";
 /**
  * The provider takeover step's own writes: records the connection once the
  * shared credential form has saved a row (pointing Langy's own role at the
  * picked or typed model first, same as upstream), or records a skip.
  */
-import type { GuidedProvider } from "@langwatch/onboarding-browser-kit";
-import { useCallback } from "react";
-
-import { onboardingApi } from "../../../behavior/onboarding-api.ts";
+import type { GuidedProvider } from "../model/guided-providers.ts";
 
 export interface GuidedConnectedProvider {
   provider: string;

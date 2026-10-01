@@ -2,16 +2,12 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioGenerationError } from "../../../../model/scenario-generation.ts";
 import { AICreateModal } from "../ai-create-modal.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const defaultExampleTemplates = [
   {
@@ -52,7 +48,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when open", () => {
     it("displays the provided title", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -61,7 +57,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -69,7 +64,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays custom title", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -78,7 +73,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -86,7 +80,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays textarea with custom placeholder", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -96,7 +90,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -106,7 +99,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays example pills", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -115,7 +108,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -125,7 +117,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays Generate with AI button", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -134,7 +126,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -142,7 +133,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays Skip button", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -151,7 +142,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -161,7 +151,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("displays close button", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -170,7 +160,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -180,7 +169,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when user types in textarea", () => {
     it("allows unlimited text input", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -189,7 +178,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -203,7 +191,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when user clicks example pill", () => {
     it("fills textarea with template text", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -212,7 +200,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -229,7 +216,7 @@ describe("<AICreateModal/>", () => {
     it("calls onSkip callback", () => {
       const onSkip = vi.fn();
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -238,7 +225,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={onSkip}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -252,7 +238,7 @@ describe("<AICreateModal/>", () => {
     it("calls onGenerate with description", async () => {
       const onGenerate = vi.fn().mockResolvedValue(undefined);
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -261,7 +247,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -277,7 +262,7 @@ describe("<AICreateModal/>", () => {
     it("displays generating state with spinner", async () => {
       const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -286,7 +271,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -302,7 +286,7 @@ describe("<AICreateModal/>", () => {
     it("displays custom generating text", async () => {
       const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -312,7 +296,6 @@ describe("<AICreateModal/>", () => {
           onSkip={vi.fn()}
           generatingText="Generating prompt..."
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -328,7 +311,7 @@ describe("<AICreateModal/>", () => {
     it("hides close button during generation", async () => {
       const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -337,7 +320,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -355,7 +337,7 @@ describe("<AICreateModal/>", () => {
     it("displays the registry's copy, never the failure's own message", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API connection failed"));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -364,7 +346,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -384,7 +365,7 @@ describe("<AICreateModal/>", () => {
     it("displays Try again button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -393,7 +374,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -409,7 +389,7 @@ describe("<AICreateModal/>", () => {
     it("displays Skip button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -418,7 +398,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -437,7 +416,7 @@ describe("<AICreateModal/>", () => {
     it("displays close button", async () => {
       const onGenerate = vi.fn().mockRejectedValue(new Error("API error"));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -446,7 +425,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -467,7 +445,7 @@ describe("<AICreateModal/>", () => {
         .mockRejectedValueOnce(new Error("API error"))
         .mockResolvedValueOnce(undefined);
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -476,7 +454,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -513,7 +490,7 @@ describe("<AICreateModal/>", () => {
     it("displays timeout error after 60 seconds", async () => {
       const onGenerate = vi.fn().mockImplementation(() => new Promise(() => {}));
 
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -522,7 +499,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={onGenerate}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -544,7 +520,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when open is false", () => {
     it("renders dialog in closed state", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <AICreateModal
           open={false}
           onClose={vi.fn()}
@@ -553,7 +529,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialogs = container.querySelectorAll('[role="dialog"]');
@@ -567,7 +542,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when open is true", () => {
     it("renders dialog in open state", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -576,7 +551,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const openDialog = getDialogByState("open");
@@ -596,7 +570,7 @@ describe("<AICreateModal/>", () => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(new ScenarioGenerationError("invalid_api_key", "invalid_api_key"));
-        render(
+        renderWithDesignSystem(
           <AICreateModal
             open={true}
             onClose={vi.fn()}
@@ -605,7 +579,6 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
         dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
@@ -637,7 +610,7 @@ describe("<AICreateModal/>", () => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
-        render(
+        renderWithDesignSystem(
           <AICreateModal
             open={true}
             onClose={vi.fn()}
@@ -646,7 +619,6 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
         dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
@@ -685,7 +657,7 @@ describe("<AICreateModal/>", () => {
             new ScenarioGenerationError("no_provider_configured", "no_provider_configured"),
           );
 
-        render(
+        renderWithDesignSystem(
           <AICreateModal
             open={true}
             onClose={vi.fn()}
@@ -694,7 +666,6 @@ describe("<AICreateModal/>", () => {
             onGenerate={onGenerate}
             onSkip={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         const dialog = getDialogContent();
@@ -719,7 +690,7 @@ describe("<AICreateModal/>", () => {
   describe("when tests run in isolation (regression guard for #4467)", () => {
     /** @scenario "An open modal renders a dialog into the document" */
     it("renders a dialog", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -728,7 +699,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryAllByRole("dialog", { hidden: true }).length).toBeGreaterThan(0);
@@ -742,7 +712,7 @@ describe("<AICreateModal/>", () => {
 
   describe("when rendered with default props", () => {
     it("renders textarea", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -751,7 +721,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -759,7 +728,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("renders Generate with AI button", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -768,7 +737,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();
@@ -776,7 +744,7 @@ describe("<AICreateModal/>", () => {
     });
 
     it("renders example template pills", () => {
-      render(
+      renderWithDesignSystem(
         <AICreateModal
           open={true}
           onClose={vi.fn()}
@@ -785,7 +753,6 @@ describe("<AICreateModal/>", () => {
           onGenerate={vi.fn()}
           onSkip={vi.fn()}
         />,
-        { wrapper: Wrapper },
       );
 
       const dialog = getDialogContent();

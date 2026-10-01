@@ -1,4 +1,5 @@
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
@@ -18,7 +19,6 @@ import type {
 
 import type { FacetCatalog } from "#rules/trace-facet-registry.rules";
 
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import type { FacetFilterResolver } from "../rules/trace-facet-filter.rules.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {
@@ -96,7 +96,7 @@ export class TraceListService {
     topicService: TopicApi;
     facets: FacetCatalog;
     /** Where a finished background discover refresh tells the tenant's tabs to refetch. */
-    discoverUpdates: TraceTenantBroadcast;
+    discoverUpdates: Pick<PresenceApi, "publishProjectEvent">;
   }): TraceListService {
     const topicNaming = TraceTopicNamingService.create({ topicService });
 

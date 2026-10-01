@@ -1,10 +1,3 @@
-/**
- * The worker folds langy's conversation pipeline again: a created conversation is readable through
- * its projection. Live eventing over memory stores, langy's own rows in a migrated test database.
- * @vitest-environment node
- * @see modules/langy/specs/langy.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import {
@@ -14,17 +7,17 @@ import {
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { serverModules } from "@langwatch/installed-server-modules";
-import {
-  bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
+import { processModules } from "@langwatch/installed-server-modules";
 import { LangyApi } from "@langwatch/langy-contract";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
-import { processConfig } from "@langwatch/process-server";
+import {
+  bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
+  storesBackedMembers,
+  withMemoryRepositories,
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -39,6 +32,13 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The worker folds langy's conversation pipeline again: a created conversation is readable through
+ * its projection. Live eventing over memory stores, langy's own rows in a migrated test database.
+ * @vitest-environment node
+ * @see modules/langy/specs/langy.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -63,7 +63,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -101,7 +101,7 @@ async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -121,7 +121,6 @@ async function bootWorker({ prisma }: { prisma: ProcessMembers["prisma"] }) {
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-worker",
         storageResolver: void 0,

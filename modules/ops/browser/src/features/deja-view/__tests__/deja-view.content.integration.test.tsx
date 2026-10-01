@@ -4,7 +4,8 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DejaView, useDejaViewState } from "../../../index.ts";
+import { useDejaViewState } from "../behavior/deja-view-state.ts";
+import { DejaView } from "../ui/sections/deja-view-content.tsx";
 
 const events = [
   {

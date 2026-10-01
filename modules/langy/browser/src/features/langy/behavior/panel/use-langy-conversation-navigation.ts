@@ -1,7 +1,7 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { useEffect, useEffectEvent } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyConversationCommands } from "../data/use-langy-conversation-commands.ts";
 import type { LangyPanelSend } from "./use-langy-panel-send.ts";
 

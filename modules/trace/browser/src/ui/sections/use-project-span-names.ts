@@ -28,8 +28,6 @@ export function useProjectSpanNames({
     },
     {
       enabled: !!projectId && enabled,
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     },
   );
 

@@ -1,5 +1,4 @@
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { AdminIdentity, OpsApi } from "@langwatch/ops-contract";
 import {
   type EnsuredPersonalWorkspace,
   type FindPersonalWorkspaceInput,
@@ -22,15 +21,13 @@ export class UserAccountService {
   private constructor(
     private readonly auth: AuthApi,
     private readonly organizations: OrganizationApi,
-    private readonly ops: OpsApi,
   ) {}
 
   static create(dependencies: {
     auth: AuthApi;
     organizations: OrganizationApi;
-    ops: OpsApi;
   }): UserAccountService {
-    return new UserAccountService(dependencies.auth, dependencies.organizations, dependencies.ops);
+    return new UserAccountService(dependencies.auth, dependencies.organizations);
   }
 
   personalCallerFor(input: {
@@ -68,10 +65,6 @@ export class UserAccountService {
       project: input.project,
       callerUserId: input.credential.userId,
     });
-  }
-
-  isAdmin(identity: AdminIdentity): boolean {
-    return this.ops.isAdmin(identity);
   }
 
   /** The organization a personal workspace's team belongs to. */

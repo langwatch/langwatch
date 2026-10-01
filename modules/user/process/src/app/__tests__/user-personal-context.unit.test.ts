@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { userApiPersonalContextSchema } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -24,27 +24,11 @@ function appWhere({ canManageProject }: { canManageProject: boolean }) {
   return { app, hasPermission };
 }
 
-describe("UserApp.getPersonalContext", () => {
-  describe("given the caller holds project:manage on their personal project", () => {
-    /** @scenario "A caller who may manage their personal project reads its API key in the personal context" */
-    it("returns the personal project's API key", async () => {
-      const { app, hasPermission } = appWhere({ canManageProject: true });
-
-      const context = await app.getPersonalContext({ userId: "user-1", organizationId: "org-1" });
-
-      expect(context.workspace.project.apiKey).toBe("sk-lw-secret");
-      expect(hasPermission).toHaveBeenCalledWith({
-        userId: "user-1",
-        permission: "project:manage",
-        projectId: "project-1",
-      });
-    });
-  });
-
-  describe("given the caller lacks project:manage on their personal project", () => {
-    /** @scenario "A caller who may not manage their personal project reads a blank API key in the personal context" */
+describe("UserModule.getPersonalContext", () => {
+  describe.each([true, false])("given the caller's project:manage is %s", (canManageProject) => {
+    /** @scenario "The personal context never carries the personal project's API key" */
     it("blanks the API key and still answers a valid personal context", async () => {
-      const { app } = appWhere({ canManageProject: false });
+      const { app } = appWhere({ canManageProject });
 
       const context = await app.getPersonalContext({ userId: "user-1", organizationId: "org-1" });
 

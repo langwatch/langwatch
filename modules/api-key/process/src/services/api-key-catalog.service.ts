@@ -10,14 +10,12 @@ import {
   type ApiKeyRoleSummary,
   type ApiKeyTeam,
   type ApiKeyUser,
-  HIDDEN_SYSTEM_KEY_NAMES,
+  isSystemApiKey,
 } from "@langwatch/api-key-contract";
 
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantsService } from "./api-key-grants.service.ts";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
-
-const SYSTEM_NAMES = new Set(HIDDEN_SYSTEM_KEY_NAMES);
 
 function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
@@ -61,7 +59,7 @@ export class ApiKeyCatalogService {
   }): Promise<ApiKeyDetail> {
     const row = await this.getInOrganization(input.id, input.organizationId);
     const isHiddenFromCaller =
-      SYSTEM_NAMES.has(row.name) ||
+      isSystemApiKey(row) ||
       (!input.callerCanReadAnyKey && !isApiKeyVisibleToMember(row, input.callerUserId));
     if (isHiddenFromCaller) {
       throw new ApiKeyNotFoundError(input.id);

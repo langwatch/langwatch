@@ -14,7 +14,7 @@ describe("Feature: an automation over the API always says which traces it is abo
   describe("when the create request omits the condition entirely", () => {
     it("refuses it with the machine-readable condition-required code", async () => {
       const response = await createPublicApiRig().api.post("/api/triggers", email);
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
     });
   });
 
@@ -26,7 +26,7 @@ describe("Feature: an automation over the API always says which traces it is abo
           ...email,
           filters,
         });
-        expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+        expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
       },
     );
   });
@@ -52,7 +52,7 @@ describe("Feature: an automation over the API always says which traces it is abo
       const rig = createPublicApiRig({ rows: [row] });
       const response = await rig.api.patch("/api/triggers/trigger_1", { filters: {} });
 
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
       expect(rig.rows.get("trigger_1")?.filters).toEqual(row.filters);
     });
 

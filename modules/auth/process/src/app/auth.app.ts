@@ -20,6 +20,7 @@ import {
   type BrowserSessionResolution,
   type BrowserSessionVerification,
   type CliAccessSession,
+  type CliSessionTokens,
   type CliTokenRecordEntry,
   type InviteLanding,
   type LegacySsoAccessQuery,
@@ -55,10 +56,10 @@ import {
   type SignedInWith,
   SignInMethodPolicyService,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   internalSlackSignupsWebhook,
@@ -86,9 +87,11 @@ import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.aut
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
+import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
 import { AuthDoorService } from "../services/auth-door.service.ts";
 import {
   AuthLifecycleNoticeService,
@@ -176,7 +179,7 @@ const AUTH_CLOSED_READS = [
 export type AuthInfrastructure = MembersRead<typeof AUTH_CLOSED_READS> &
   Readonly<{
     /** The public base URL this process was deployed under, or absent where
-     * it named none — the process's own fact (`packages/process-server`),
+     * it named none — the process's own fact (`packages/process`),
      * never a module-declared env spelling. */
     publicBaseUrl: string | undefined;
     /** The address the identifier ledger holds for a person, where it holds
@@ -206,13 +209,13 @@ type AuthAppPeers = Readonly<{
 }>;
 
 type AuthSetup = FeatureSetup<
-  typeof AuthApp.dependencies,
+  typeof AuthModule.dependencies,
   AuthInfrastructure,
   AuthServerConfig,
   AuthRepositories
 >;
 
-export class AuthApp implements AuthApiContract {
+export class AuthModule implements AuthApiContract {
   static readonly contract = AuthApi;
   static readonly dependencies = {
     users: UserApi,
@@ -235,7 +238,7 @@ export class AuthApp implements AuthApiContract {
     notifications: NotificationService,
     /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
     sso: SsoApi,
-    /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
+    /** Whether a CLI person may bind a session to a project (`project:view`). */
     authz: AuthzApi,
   };
   static readonly config = authServerConfig;
@@ -294,23 +297,25 @@ export class AuthApp implements AuthApiContract {
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
-   * browser-session identity. Every caller shares {@link AuthApp.#betterAuth}.
+   * browser-session identity. Every caller shares {@link AuthModule.#betterAuth}.
    */
   #composeBetterAuth: (() => Promise<BetterAuthTransport>) | null = null;
   /** Shared by the Better Auth logger and the door, per request. */
   #idTokenIssuerRefusals = IdTokenIssuerRefusalChannel.create();
   #betterAuth: Promise<BetterAuthTransport> | null = null;
-  /** The identity {@link AuthApp.create} resolved, held for {@link baseUrl}. */
+  /** The identity {@link AuthModule.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
+  /** Refuses until {@link AuthModule.create} resolves the session secret it is derived from. */
+  #deriveQueryCacheKey = queryCacheKeyDeriver({ secret: undefined });
 
-  /** This deployment's answer to {@link AuthApp.offersPasskeys}. */
+  /** This deployment's answer to {@link AuthModule.offersPasskeys}. */
   #offersPasskeys = false;
 
   offersPasskeys(): boolean {
     return this.#offersPasskeys;
   }
 
-  /** This deployment's answer to {@link AuthApp.offersTwoStepVerification}. */
+  /** This deployment's answer to {@link AuthModule.offersTwoStepVerification}. */
   #offersTwoStepVerification = false;
 
   offersTwoStepVerification(): boolean {
@@ -321,14 +326,14 @@ export class AuthApp implements AuthApiContract {
     return this.#sessions.getSignedInWith(input);
   }
 
-  /** This deployment's answer to {@link AuthApp.issuesOwnPasswords} (D09). */
+  /** This deployment's answer to {@link AuthModule.issuesOwnPasswords} (D09). */
   #issuesOwnPasswords = false;
 
   issuesOwnPasswords(): boolean {
     return this.#issuesOwnPasswords;
   }
 
-  /** This deployment's answer to {@link AuthApp.findDialableIdentityProviderOrigins}. */
+  /** This deployment's answer to {@link AuthModule.findDialableIdentityProviderOrigins}. */
   #dialableIdentityProviderOrigins: string[] = [];
 
   findDialableIdentityProviderOrigins(): string[] {
@@ -408,10 +413,12 @@ export class AuthApp implements AuthApiContract {
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
       idTokenIssuerRefusals: this.#idTokenIssuerRefusals,
       connectionIssuers,
+      deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
+      now: members.now ?? nowInstant,
     });
   }
 
-  static async create(setup: AuthSetup): Promise<AuthApp> {
+  static async create(setup: AuthSetup): Promise<AuthModule> {
     const { members, repositories, dependencies, config } = setup;
     /** Every mail auth sends goes out through notification, which owns the gateway. */
     const mailer: MailSender = { send: (content) => dependencies.notifications.sendEmail(content) };
@@ -440,7 +447,7 @@ export class AuthApp implements AuthApiContract {
         : cliDeviceSettlementChannels.memory.create(),
     });
 
-    const app = new AuthApp({
+    const app = new AuthModule({
       sessions,
       cliSessions,
       cliDeviceFlow: {
@@ -448,11 +455,11 @@ export class AuthApp implements AuthApiContract {
         directory: () => PrismaAuthDirectoryRepository.create(members.prisma),
         apiKeys: () => dependencies.apiKeys,
         ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
-        canManageProject: ({ userId, projectId }) =>
+        canViewProject: ({ userId, projectId }) =>
           dependencies.authz.hasProjectPermission({
             userId,
             projectId,
-            permission: "project:manage",
+            permission: "project:view",
           }),
         featureFlags: () => dependencies.featureFlags,
         publicBaseUrl: () => members.publicBaseUrl,
@@ -548,7 +555,7 @@ export class AuthApp implements AuthApiContract {
       baseUrl: config.sessionUrl ?? "",
     });
     const auth0ManagementSecret = await setup.secrets.into(
-      AuthApp.secrets.auth0ManagementSecret,
+      AuthModule.secrets.auth0ManagementSecret,
       (value) => value,
     );
     app.#federatedPasswords = FederatedPasswordService.create({
@@ -566,7 +573,7 @@ export class AuthApp implements AuthApiContract {
     });
 
     const signupAnnouncements = await setup.secrets.into(
-      AuthApp.secrets.internalSlackSignupsWebhook,
+      AuthModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -575,7 +582,7 @@ export class AuthApp implements AuthApiContract {
         }),
     );
 
-    return setup.secrets.into(AuthApp.secrets.session, (sessionSecret) => {
+    return setup.secrets.into(AuthModule.secrets.session, (sessionSecret) => {
       assertAuthServerConfig(config, sessionSecret);
 
       const identity: BetterAuthDeploymentIdentity | undefined =
@@ -590,6 +597,7 @@ export class AuthApp implements AuthApiContract {
             }
           : undefined;
       app.#browserSession = identity;
+      app.#deriveQueryCacheKey = queryCacheKeyDeriver({ secret: sessionSecret });
 
       if (identity) {
         app.#composeBetterAuth = () =>
@@ -808,6 +816,8 @@ export class AuthApp implements AuthApiContract {
     return {
       userId: record.user_id,
       organizationId: record.organization_id,
+      ...(record.project_id ? { projectId: record.project_id } : {}),
+      ...(record.project_locked ? { projectLocked: true } : {}),
       tokenKey: cliAccessTokenKey(token),
       ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
       ...(record.client_info
@@ -819,6 +829,11 @@ export class AuthApp implements AuthApiContract {
           }
         : {}),
     };
+  }
+
+  /** The API door's reader for a project-bound bearer; auth's own, not an `AuthApi` operation. */
+  getCliAccessProject(input: { authorization: string }): Promise<CliAccessProject> {
+    return this.#cliDeviceFlow.getAccessProject(input);
   }
 
   startCliDeviceCode(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
@@ -863,6 +878,19 @@ export class AuthApp implements AuthApiContract {
     const resolution = await this.resolveBrowserSession({ verified: verification.verified });
 
     return resolution.kind === "signed_in" ? resolution.session.user : null;
+  }
+
+  issueProjectCliSession(input: {
+    userId: string;
+    organizationId: string;
+    projectId: string;
+    clientLabel: string;
+  }): Promise<CliSessionTokens> {
+    return this.#cliDeviceFlow.issueProjectSession(input);
+  }
+
+  refreshCliSession(input: { refreshToken: string }): Promise<CliSessionTokens> {
+    return this.#cliDeviceFlow.rotateSession(input);
   }
 
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {

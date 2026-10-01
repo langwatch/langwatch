@@ -1,7 +1,7 @@
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useEffect } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { type ShortcutContext, TRACE_DRAWER_SHORTCUTS } from "./trace-drawer-shortcut-table.ts";
 import type { ConversationContextResult } from "./use-conversation-context.ts";
 import type { useTraceDrawerNavigation } from "./use-trace-drawer-navigation.ts";
@@ -25,7 +25,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 
 /**
  * Single keydown listener for the trace drawer. Reads mutable UI state directly from
- * `drawerStore.getState()` inside the handler so the effect dep list stays small — the
+ * `getTraceDrawer()` inside the handler so the effect dep list stays small — the
  * listener is registered once per `trace` and stays stable for the trace's lifetime.
  */
 export function useTraceDrawerShortcuts({
@@ -93,7 +93,7 @@ function runDrawerShortcut(
   const entry = TRACE_DRAWER_SHORTCUTS.find((s) => s.matchKeys.includes(e.key));
   if (!entry) return;
 
-  const ctx: ShortcutContext = { ...params, event: e, store: useDrawerStore.getState() };
+  const ctx: ShortcutContext = { ...params, event: e, store: getTraceDrawer() };
   if (entry.guard && !entry.guard(ctx)) return;
   e.preventDefault();
   entry.run(ctx);

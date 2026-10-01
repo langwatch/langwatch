@@ -5,7 +5,7 @@ import { defineRule } from "../define-rule.mjs";
 // `packages/test-harness`'s `createApiFixture` is the one sanctioned exception.
 
 const GOVERNED_SOURCE =
-  /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|process|browser|browser-kit)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
+  /^(?:enterprise\/)?modules\/[^/]+\/(?:contract|process|browser)\/src\/|^apps\/api\/src\/features\/|^apps\/worker\/src\/app\//;
 const EXCLUDED = /(?:^|\/)__tests__(?:\/|$)|^packages\/test-harness\//;
 const REFLECT_MEMBERS = new Set(["get", "set", "has", "apply", "construct", "deleteProperty"]);
 const DEFINE_MEMBERS = new Set(["defineProperty", "defineProperties"]);

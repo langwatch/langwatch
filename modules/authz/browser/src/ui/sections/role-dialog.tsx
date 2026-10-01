@@ -2,7 +2,6 @@
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
 import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
@@ -14,6 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useState } from "react";
 import { type FieldErrors, type UseFormRegister, useForm, useWatch } from "react-hook-form";
 

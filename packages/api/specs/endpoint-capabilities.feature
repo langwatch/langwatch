@@ -166,6 +166,15 @@ Feature: Endpoint capabilities - rate limiting, response caching, deprecation
     And an endpoint that answers without a credential may not ask, because it resolves no tenant
     And an endpoint asking when the process reads no entitlements fails the build, naming the port
 
+  @unit
+  Scenario: An endpoint declared as minting a credential refuses an impersonating actor
+    Given a REST route or tRPC procedure declares that it mints a credential
+    When an operator acting as a user reaches it
+    Then it is refused with permission_denied (403) naming the declared permission
+    And the handler never runs
+    And the same caller acting as themselves reaches the handler
+    And an endpoint that answers without a credential may not declare it, because it has no caller to refuse
+
   @integration
   Scenario: A capability declared without its port fails the build
     Given an endpoint declares a capability the process has no port for

@@ -4,7 +4,7 @@ import { browserStoreContainmentRule } from "../../src/rules/browser-store-conta
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { agent: { layoutVersion: 0, roles: { browser: {}, "browser-kit": {} } } },
+  features: { agent: { layoutVersion: 0, roles: { browser: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
@@ -62,9 +62,8 @@ describe("given a zustand store in a browser package", () => {
     });
   });
 
-  describe("when the file is a kit, a test or uses a non-zustand create", () => {
+  describe("when the file is a test or uses a non-zustand create", () => {
     it("is not governed or not a store", () => {
-      expect(report("modules/agent/browser-kit/src/model/s.ts", STORE)).toEqual([]);
       expect(report(`${BROWSER}/__tests__/s.unit.test.ts`, STORE)).toEqual([]);
       expect(report(`${BROWSER}/ui/x.ts`, 'import { create } from "other";\ncreate();')).toEqual(
         [],

@@ -115,12 +115,16 @@ flows:
       - action: expect
         with:
           text: 1 scenario
-      - action: wait
+      - action: expect
         with:
-          millis: "6000"
+          testId: cases-panel-run-suite
       - action: click
         with:
           text: Run suite
+      - action: expect
+        with:
+          testIdPrefix: run-dialog-agent-
+          timeout: "30000"
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
@@ -163,6 +167,14 @@ flows:
         with:
           count: 'button[data-testid="recent-runs-trigger"]:not([disabled])'
           timeout: "90000"
+      - action: expect
+        with:
+          testId: case-modal-history
+          timeout: "30000"
+      - action: expect
+        with:
+          count: '[data-testid="case-modal"]'
+          equals: "1"
       - action: click
         with:
           testId: recent-runs-trigger
@@ -224,12 +236,16 @@ flows:
       - action: expect
         with:
           text: 1 scenario
-      - action: wait
+      - action: expect
         with:
-          millis: "6000"
+          testId: cases-panel-run-suite
       - action: click
         with:
           text: Run suite
+      - action: expect
+        with:
+          testIdPrefix: run-dialog-agent-
+          timeout: "30000"
       - action: click
         with:
           selector: '[data-testid^="run-dialog-agent-"]'

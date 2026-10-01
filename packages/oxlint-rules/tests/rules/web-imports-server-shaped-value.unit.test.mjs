@@ -4,7 +4,7 @@ import { webImportsServerShapedValueRule } from "../../src/index.mjs";
 import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
-  features: { auth: { roles: { browser: {}, "browser-kit": {}, process: {} } } },
+  features: { auth: { roles: { browser: {}, process: {} } } },
 });
 
 afterAll(() => workspace.cleanup());
@@ -28,10 +28,10 @@ describe("given a browser module", () => {
     });
   });
 
-  describe("when the browser source is a kit or the design system", () => {
-    /** @scenario "The rule covers browser kits and the design system" */
+  describe("when the browser source is a browser package or the design system", () => {
+    /** @scenario "The rule covers browser packages and the design system" */
     it.each([
-      "modules/auth/browser-kit/src/ui/elements/auth-badge.tsx",
+      "modules/auth/browser/src/ui/elements/auth-badge.tsx",
       "packages/design-system/src/elements/table.tsx",
     ])("reports serverShaped in %s", (file) => {
       const found = report(file, 'import { PrismaClient } from "@prisma/client";');

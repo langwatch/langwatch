@@ -1,20 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AdminBackofficeService user update > changes the email and revokes sessions 1`] = `
+exports[`AdminBackofficeService user update > changes the email through user 1`] = `
 {
   "log": [
-    [
-      "users.findById",
-      "user-1",
-    ],
     [
       "users.updateProfile",
       "user-1",
       "new@example.com",
-    ],
-    [
-      "auth.revokeAllBrowserSessions",
-      "user-1",
     ],
     [
       "audit.record",
@@ -43,19 +35,15 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
     [
       "users.reactivate",
       "user-1",
-    ],
-    [
-      "users.findById",
-      "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "users.updateProfile",
       "user-1",
       "a@b.c",
-    ],
-    [
-      "auth.revokeAllBrowserSessions",
-      "user-1",
     ],
     [
       "audit.record",
@@ -101,46 +89,16 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates at a picked date 1`] = `
+exports[`AdminBackofficeService user update > deactivates on an unreadable picked date as on a readable one 1`] = `
 {
   "log": [
     [
       "users.deactivate",
       "user-1",
-    ],
-    [
-      "repository.setUserDeactivatedAt",
-      "user-1",
-      "2026-01-02T03:04:05Z",
-    ],
-    [
-      "audit.record",
-      "admin/update/user",
       {
-        "deactivate": true,
-        "id": "user-1",
-        "pickedDate": "2026-01-02T03:04:05.000Z",
+        "id": "olive",
+        "type": "user",
       },
-    ],
-    [
-      "repository.findUserById",
-      "user-1",
-    ],
-  ],
-  "result": {
-    "data": {
-      "id": "user-1",
-    },
-  },
-}
-`;
-
-exports[`AdminBackofficeService user update > deactivates without an unreadable picked date 1`] = `
-{
-  "log": [
-    [
-      "users.deactivate",
-      "user-1",
     ],
     [
       "audit.record",
@@ -163,13 +121,41 @@ exports[`AdminBackofficeService user update > deactivates without an unreadable 
 }
 `;
 
-exports[`AdminBackofficeService user update > keeps sessions when the email is unchanged 1`] = `
+exports[`AdminBackofficeService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
 {
   "log": [
     [
-      "users.findById",
+      "users.deactivate",
+      "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
+    ],
+    [
+      "audit.record",
+      "admin/update/user",
+      {
+        "deactivate": true,
+        "id": "user-1",
+      },
+    ],
+    [
+      "repository.findUserById",
       "user-1",
     ],
+  ],
+  "result": {
+    "data": {
+      "id": "user-1",
+    },
+  },
+}
+`;
+
+exports[`AdminBackofficeService user update > normalises the email before handing it to user 1`] = `
+{
+  "log": [
     [
       "users.updateProfile",
       "user-1",
@@ -196,43 +182,16 @@ exports[`AdminBackofficeService user update > keeps sessions when the email is u
 }
 `;
 
-exports[`AdminBackofficeService user update > passes an unrecognised deactivation value through 1`] = `
-{
-  "log": [
-    [
-      "repository.execute",
-      {
-        "data": {
-          "deactivatedAt": 5,
-        },
-        "id": "user-1",
-      },
-    ],
-    [
-      "audit.record",
-      "admin/update/user",
-      {
-        "data": {
-          "deactivatedAt": 5,
-        },
-        "id": "user-1",
-      },
-    ],
-  ],
-  "result": {
-    "data": {
-      "id": "user-1",
-    },
-  },
-}
-`;
-
 exports[`AdminBackofficeService user update > reactivates on a blank deactivation and saves the rest 1`] = `
 {
   "log": [
     [
       "users.reactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",
@@ -276,6 +235,10 @@ exports[`AdminBackofficeService user update > reactivates on a null deactivation
     [
       "users.reactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",

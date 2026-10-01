@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CopyDatasetInput,
   Dataset,
@@ -7,6 +6,7 @@ import type {
   DatasetLookupInput,
   DatasetWithRecords,
 } from "@langwatch/dataset-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 export type DatasetWithRecordsInput = DatasetLookupInput & {
   limitMb?: number | null;

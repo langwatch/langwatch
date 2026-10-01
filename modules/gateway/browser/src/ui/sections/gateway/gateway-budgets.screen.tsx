@@ -1,4 +1,3 @@
-import { ProviderScopeChips, type ProviderScopeType } from "@langwatch/authz-browser-kit";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
@@ -17,6 +16,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  ProviderScopeChips,
+  type ProviderScopeType,
+} from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";

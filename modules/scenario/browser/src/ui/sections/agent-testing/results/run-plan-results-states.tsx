@@ -5,7 +5,6 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import type { Period, RelativePresetKey } from "@langwatch/analytics-browser-kit";
 import {
   Box,
   EmptyState,
@@ -19,6 +18,7 @@ import { RefreshCw } from "lucide-react";
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
+import type { Period, RelativePresetKey } from "../../../elements/analytics/period-selector.tsx";
 import type { PeriodControls } from "./period-controls.ts";
 
 const DAY_MS = 86_400_000;

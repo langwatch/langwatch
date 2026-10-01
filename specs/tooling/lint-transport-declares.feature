@@ -4,7 +4,7 @@ Feature: The transport-declares lint rule
   `{ input, app, actor, scope, signal }`, calls exactly one API operation, and
   returns a plain value or throws. The rule reads a module's process source
   four ways: every source for the process-only roots it may not build, the
-  `transport/` folder for its handlers, transport and `*.server.ts` files for a
+  `transport/` folder for its handlers, transport and `*.module.ts` files for a
   request re-checked by hand, and route families for the HTTP and tRPC
   machinery underneath the chain. Scenarios about route families live in
   api-transport-through-framework.feature.

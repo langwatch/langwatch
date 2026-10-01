@@ -24,7 +24,7 @@
   ],
   "references": [
     {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
     }
   ]
 }

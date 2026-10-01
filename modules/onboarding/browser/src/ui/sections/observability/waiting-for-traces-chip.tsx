@@ -1,13 +1,13 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { Box, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
-import { useActiveProject } from "@langwatch/onboarding-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";
 
 import { api } from "../../../behavior/onboarding-api.ts";
+import { useActiveProject } from "../active-project-context.tsx";
 
 export function WaitingForTracesChip(): React.ReactElement {
   const accent = useColorRawValue("orange.400");
@@ -17,15 +17,6 @@ export function WaitingForTracesChip(): React.ReactElement {
 
   const [detected, setDetected] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
-  const [isVisible, setIsVisible] = useState<boolean>(
-    typeof document === "undefined" ? true : document.visibilityState === "visible",
-  );
-
-  useEffect(() => {
-    const onVisibility = () => setIsVisible(document.visibilityState === "visible");
-    document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
-  }, []);
 
   const timeBounds = useMemo(() => {
     const now = nowInstant().epochMilliseconds;
@@ -45,7 +36,6 @@ export function WaitingForTracesChip(): React.ReactElement {
     },
     {
       enabled: !!project?.id && !detected,
-      refetchInterval: isVisible ? 3000 : false,
       refetchOnWindowFocus: false,
     },
   );

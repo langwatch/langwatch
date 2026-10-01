@@ -45,7 +45,6 @@ import {
 } from "../../../features/ingestion-sources/model/ingestion-source-catalog.ts";
 import {
   runCompleteness,
-  SOURCE_HEALTH_REFRESH,
   sourceBadge,
 } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import {
@@ -465,14 +464,14 @@ function useIngestionSourceDetailPage() {
     { organizationId: orgId, id: sourceId ?? "" },
     {
       enabled: !!orgId && !!sourceId && canRead,
-      ...SOURCE_HEALTH_REFRESH,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
     },
   );
   const healthQuery = api.activityMonitor.sourceHealthMetrics.useQuery(
     { organizationId: orgId, sourceId: sourceId ?? "" },
     {
       enabled: !!orgId && !!sourceId && canRead && canReadActivity,
-      ...SOURCE_HEALTH_REFRESH,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
     },
   );
   // The events table walks the timestamp cursor itself (see

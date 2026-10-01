@@ -28,10 +28,11 @@ import { useMemberDisableAction } from "../../behavior/use-member-disable-action
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
 import { useTwoStepRequirement } from "../../behavior/use-two-step-requirement.ts";
-import { IdentityChip, IdentityRow } from "../elements/identity-row.tsx";
+import { IdentityChip } from "../elements/identity-row.tsx";
 import { ProvenanceChip, ProvenanceExplanation } from "../elements/member-provenance.tsx";
 import { SecondFactorCell } from "../elements/second-factor-cell.tsx";
 import { MemberAccessEditor } from "./member-access-editor.tsx";
+import { PersonIdentityRow } from "./person-identity-row.tsx";
 
 export function PersonDrawer({ open = true, userId }: { open?: boolean; userId?: string }) {
   const { closeDrawer } = useDrawer();
@@ -112,7 +113,7 @@ function PersonDetail({
 
   return (
     <VStack align="stretch" gap={6}>
-      <IdentityRow
+      <PersonIdentityRow
         name={person.user.name}
         address={person.user.email}
         image={person.user.image}

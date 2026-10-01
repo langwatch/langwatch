@@ -12,8 +12,8 @@
  *
  * Spec: specs/ai-governance/dashboard/inventory-environments.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { describe, expect, it } from "vitest";
 
@@ -32,10 +32,8 @@ function source(overrides: Partial<EnvironmentSource>): EnvironmentSource {
 }
 
 function renderTab(sources: EnvironmentSource[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EnvironmentsTab sources={sources} sampleActive={false} added={[]} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <EnvironmentsTab sources={sources} sampleActive={false} added={[]} />,
   );
 }
 

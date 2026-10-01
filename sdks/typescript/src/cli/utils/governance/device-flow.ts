@@ -44,15 +44,14 @@ export interface ExchangeProject {
 }
 
 /**
- * Shipped on device-session exchanges so data commands can authenticate
- * without an env var. Older servers omit it; the CLI then lazily exchanges
- * via `GET /api/auth/cli/personal-project` on first use.
+ * The personal workspace a device session names. Only servers before project sessions
+ * also sent its key; the login key (`cli_api_key`) authenticates instead.
  */
 export interface ExchangePersonalProject {
   id: string;
   slug: string;
   name: string;
-  api_key: string;
+  api_key?: string;
 }
 
 /**
@@ -105,7 +104,22 @@ export interface ExchangeApiKeyResult {
   endpoint?: string;
 }
 
-export type ExchangeResult = ExchangeDeviceSessionResult | ExchangeApiKeyResult;
+/** A project login: the person's session capped at one project. It carries no key. */
+export interface ExchangeProjectSessionResult {
+  kind: "project_session";
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  project: ExchangeProject;
+  user: ExchangeUser;
+  organization: ExchangeOrganization;
+  endpoint?: string;
+}
+
+export type ExchangeResult =
+  | ExchangeDeviceSessionResult
+  | ExchangeApiKeyResult
+  | ExchangeProjectSessionResult;
 
 /**
  * Back-compat: pre-`f9fcc3927` servers returned this shape unkinded; the
@@ -120,6 +134,8 @@ export interface RefreshResult {
   access_token: string;
   refresh_token: string;
   expires_in: number;
+  /** The project the pair is capped at, where it is capped at one. */
+  project?: ExchangeProject;
 }
 
 export class DeviceFlowError extends Error {
@@ -382,6 +398,71 @@ export async function refresh(
     throw new DeviceFlowError("other", `refresh failed (${res.status}): ${body.slice(0, 256)}`);
   }
   return (await res.json()) as RefreshResult;
+}
+
+/**
+ * `POST /api/auth/cli/refresh` naming a project: forks a child pair locked to it and leaves the
+ * parent pair valid. 403 means the person cannot reach that project; 401 a dead parent session.
+ */
+export async function forkProjectSession(
+  opts: DeviceFlowOptions,
+  { refreshToken, projectSlug }: { refreshToken: string; projectSlug: string },
+): Promise<RefreshResult> {
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+    project_slug: projectSlug,
+  });
+  if (res.status === 401) {
+    throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
+  }
+  if (res.status === 403) {
+    throw new DeviceFlowError("denied", `no access to project "${projectSlug}"`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new DeviceFlowError("other", `refresh failed (${res.status}): ${body.slice(0, 256)}`);
+  }
+  // An older server ignores the project and rotates the parent: no `project` comes back.
+  return (await res.json()) as RefreshResult;
+}
+
+/** The ingestion key a project session mints for this machine's app: personal, that project only. */
+export async function createIngestionKey(
+  opts: DeviceFlowOptions,
+  { accessToken, project }: { accessToken: string; project: ExchangeProject },
+): Promise<string> {
+  const res = await (opts.fetchImpl ?? fetch)(
+    `${normalizeEndpoint(opts.baseUrl)}/api/v1/api-keys/ingestion`,
+    {
+      method: "POST",
+      headers: {
+        ...buildSdkIdentityHeaders({ surface: "cli" }),
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        name: `${collectClientInfo().hostname || "this machine"} / ${project.slug}`,
+        keyType: "personal",
+        permissionMode: "restricted",
+        permissions: ["traces:create"],
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: project.id }],
+      }),
+    },
+  );
+  if (res.status === 401) {
+    throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
+  }
+  if (res.status === 403) {
+    throw new DeviceFlowError("denied", `cannot send traces to project "${project.slug}"`);
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new DeviceFlowError("other", `ingestion key failed (${res.status}): ${body.slice(0, 256)}`);
+  }
+  const minted = (await res.json()) as { token?: string };
+  if (!minted.token) throw new DeviceFlowError("other", "ingestion key answer carried no token");
+  return minted.token;
 }
 
 /**

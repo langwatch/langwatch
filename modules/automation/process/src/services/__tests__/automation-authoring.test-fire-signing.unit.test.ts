@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * A webhook test fire signs with the saved automation's secret only at the saved URL.
- * @see specs/automations/webhook-http-action.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   automationApiTestFireInputSchema,
   type TestFireInput,
@@ -11,6 +5,12 @@ import {
 } from "@langwatch/automation-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * A webhook test fire signs with the saved automation's secret only at the saved URL.
+ * @see specs/automations/webhook-http-action.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";

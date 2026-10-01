@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
@@ -8,7 +7,6 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type {
   MailDeliveryView,
   NotificationService,
@@ -16,14 +14,16 @@ import type {
 } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { authServer } from "../../auth.server.ts";
+import { authProcessModule } from "../../auth.module.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 /** A signed-out sign-up through the installed auth module, memory rows and a recording mailer. */
@@ -41,7 +41,7 @@ async function bootAuth({
 }) {
   const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(authServer)])
+    .withModules([withMemoryRepositories(authProcessModule)])
     .withMembers({
       publicBaseUrl: "https://app.acme.test",
       isSaas: false,
@@ -63,6 +63,7 @@ async function bootAuth({
         idpSimulatorUrl: undefined,
         localPasswords: false,
         auth0ManagementClientId: undefined,
+        isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
       },
     })

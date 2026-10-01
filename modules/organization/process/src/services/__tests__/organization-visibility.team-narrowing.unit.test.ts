@@ -1,9 +1,9 @@
+import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
  * @see modules/organization/specs/team-visibility.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type {
   PIIRedactionLevel,
   OtlpKeyValue,
@@ -10,8 +10,9 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
-import type { PIICheckOptions, PiiClearing } from "../../app/data-privacy.members.ts";
+import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
+import type { PIICheckOptions } from "../pii-redaction-policy.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service.ts";
 
 /**

@@ -4,7 +4,6 @@
  */
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -18,15 +17,16 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { DispatchError, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { NotificationService, SendEmailCommand } from "@langwatch/notification-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { SlackApi } from "@langwatch/slack-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -39,7 +39,7 @@ import {
   settlementSummary,
   settlementTrace,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
-import { automationServer } from "../../automation.server.ts";
+import { automationProcessModule } from "../../automation.module.ts";
 import { AutomationPersistCapService } from "../../services/persist-cap.service.ts";
 
 const CONFIG: AutomationServerConfig = {
@@ -85,7 +85,7 @@ function composed(role: "api" | "worker", eventing: EventSourcing, installed: In
     SecretsChain.start({ environment: { NEXTAUTH_SECRET: "session-secret" } }).withEnv(),
   );
   return createApp({ role, secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(automationServer)])
+    .withModules([withMemoryRepositories(automationProcessModule)])
     .withConfig({ automation: CONFIG })
     .withStores(memoryStores())
     .withEventing(eventing)

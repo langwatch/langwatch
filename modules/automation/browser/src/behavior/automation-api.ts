@@ -82,10 +82,6 @@ type BorrowedProcedures = {
     getAll: { query: { input: ProjectScope; output: AutomationDashboard[] } };
   };
 
-  dataset: {
-    getAll: { query: { input: ProjectScope; output: AutomationDataset[] } };
-  };
-
   traces: {
     list: {
       query: {
@@ -122,9 +118,9 @@ type BorrowedProcedures = {
   };
 
   organization: {
-    getAll: {
+    getScopeGraph: {
       query: {
-        input: { isDemo?: boolean };
+        input: Record<string, never>;
         output: {
           id: string;
           name: string;

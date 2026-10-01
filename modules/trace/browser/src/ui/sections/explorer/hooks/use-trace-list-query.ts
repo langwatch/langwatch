@@ -1,14 +1,11 @@
-import {
-  type TraceListCursor,
-  useFilterStore,
-  DEFAULT_SORT,
-  useViewStore,
-} from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
+import { type TraceListCursor } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { DEFAULT_SORT } from "../../../../behavior/view.slice.ts";
 import { useSamplePreview } from "../onboarding/index.ts";
 import type { TraceListItem } from "../types/trace.ts";
 import { mapTraceListPayload } from "../utils/map-trace-list-payload.ts";
@@ -119,7 +116,6 @@ export function useTraceListQuery(): TraceListQueryResult {
     }),
     {
       enabled: !!project?.id && samplePreview === null,
-      staleTime: 60_000,
       placeholderData: keepPreviousData,
     },
   );

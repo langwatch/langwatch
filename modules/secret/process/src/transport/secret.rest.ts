@@ -7,9 +7,9 @@
 // runtime's scope check compares it against the project the credential
 // resolved. Every handler reads the CREDENTIAL's project, never the claim.
 
-import type { Actor } from "@langwatch/actor";
 import { AuthenticatedActorRequiredError, PayloadTooLargeError } from "@langwatch/api";
 import { defineRestRouter } from "@langwatch/api/rest";
+import type { Actor } from "@langwatch/authorization";
 import {
   SecretApi,
   secretPublicCreateInputSchema,

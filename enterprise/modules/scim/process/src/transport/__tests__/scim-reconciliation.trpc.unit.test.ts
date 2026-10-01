@@ -2,7 +2,7 @@
 /**
  * @vitest-environment node
  * `scimReconciliation.getRequests` over the real runtime and a real
- * `ScimApp`: what the directory asked for, read by somebody who may see
+ * `ScimModule`: what the directory asked for, read by somebody who may see
  * single sign-on without managing it (ADR-126).
  */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";

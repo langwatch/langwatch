@@ -156,7 +156,7 @@ export class OpsUnknownFeatureFlagError extends HandledError {
 }
 
 /**
- * The whole platform tier is decided by the operator allow-list, not by an
+ * The whole platform tier is decided by the platform-operator grant, not by an
  * RBAC grain an id in the input could be checked at — so this refusal is the
  * module's own, not a scope decision the door could have made.
  */
@@ -190,5 +190,22 @@ export class BugReportRateLimitedError extends HandledError {
       httpStatus: 429,
       fault: "customer",
     });
+  }
+}
+
+/**
+ * The page and the task grant existing, active accounts only (the page: verified ones too).
+ * Never echoes the address: logs and responses carry the account id when there is one.
+ */
+export class PlatformOperatorUserNotFoundError extends HandledError {
+  declare readonly code: "platform_operator_user_not_found";
+
+  constructor({ userId }: { userId?: string } = {}) {
+    super("platform_operator_user_not_found", "No active account holds that address", {
+      httpStatus: 404,
+      fault: "customer",
+      ...(userId ? { meta: { userId } } : {}),
+    });
+    this.name = "PlatformOperatorUserNotFoundError";
   }
 }

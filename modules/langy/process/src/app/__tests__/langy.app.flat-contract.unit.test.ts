@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -29,6 +28,7 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -36,7 +36,7 @@ import { describe, expect, it, vi } from "vitest";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { LangyConversationUpdateService } from "../../services/langy-conversation-update.service.ts";
 import { LocalControlLongPollService } from "../../services/langy-local-control-long-poll.service.ts";
-import { LangyApp } from "../langy.app.ts";
+import { LangyModule } from "../langy.app.ts";
 
 const CONVERSATION = {
   projectId: "project_1",
@@ -44,7 +44,7 @@ const CONVERSATION = {
   userId: "user_1",
 };
 
-describe("LangyApp", () => {
+describe("LangyModule", () => {
   /** @scenario "A module's pipeline declares each tenant's retention from data retention" */
   it("declares each tenant's retention on the consuming conversation pipeline", async () => {
     const retained = { traces: 365, scenarios: 30, experiments: 30 };
@@ -183,6 +183,7 @@ function fakePresence(): PresenceApi {
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},
+    readHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
@@ -208,7 +209,7 @@ async function untilListening(fabric: EventEmitter, count: number): Promise<void
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-type LangySetupResources = Parameters<typeof LangyApp.create>[0]["resources"];
+type LangySetupResources = Parameters<typeof LangyModule.create>[0]["resources"];
 
 async function createApp({
   presence = fakePresence(),
@@ -222,8 +223,8 @@ async function createApp({
   secrets?: ScopedSecrets;
   resources?: LangySetupResources;
   repositories?: ReturnType<typeof MemoryLangyRepositories.create>;
-} = {}): Promise<LangyApp> {
-  const app = await LangyApp.create({
+} = {}): Promise<LangyModule> {
+  const app = await LangyModule.create({
     dependencies: {
       presence,
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),

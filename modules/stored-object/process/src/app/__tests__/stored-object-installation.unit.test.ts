@@ -1,16 +1,16 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import type { RateLimiter } from "@langwatch/process-stores/members";
+import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { createApp } from "@langwatch/kernel";
-import { memoryStores } from "@langwatch/process-stores";
-import type { RateLimiter } from "@langwatch/process-stores/members";
-import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { storedObjectServer } from "../../stored-object.server.ts";
+import { storedObjectProcessModule } from "../../stored-object.module.ts";
 
 function unavailable(name: string): never {
   return new Proxy(
@@ -25,7 +25,7 @@ function unavailable(name: string): never {
 
 function installation(role: "api" | "worker" | "tasks") {
   return createApp({ role })
-    .withModules([storedObjectServer])
+    .withModules([storedObjectProcessModule])
     .withConfig({
       "stored-object": {
         azureSpoolRetentionConfirmed: false,
@@ -68,7 +68,7 @@ describe("stored-object app installation", () => {
         try {
           const app = runtime.service(StoredObjectApi);
 
-          expect(runtime.module(storedObjectServer).provided).toBe(app);
+          expect(runtime.module(storedObjectProcessModule).provided).toBe(app);
 
           const stored = await app.storeFromBytes(bytes);
 

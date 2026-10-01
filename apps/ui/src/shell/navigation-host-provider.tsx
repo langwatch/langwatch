@@ -9,18 +9,19 @@ import { useUiAddress } from "@langwatch/browser-host/address";
 import { useUiCapabilities, useUiRpc, useUiScope } from "@langwatch/browser-host/capabilities";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { routePatternOf } from "@langwatch/browser-host/navigation-tracing";
+import { UiPageFailure, UiPageNotFound } from "@langwatch/browser/page-fallbacks";
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
-import { LangyMark, LangyMarkGradientDefs, useLangyStore } from "@langwatch/langy-browser-kit";
 import type {
   NavigationAccountMenu,
   NavigationLangy,
   NavigationScopeWrite,
   NavigationUser,
 } from "@langwatch/navigation-browser/navigation";
-import { UiPageFailure, UiPageNotFound } from "@langwatch/ui-kernel/page-fallbacks";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, type ReactNode } from "react";
 
+import { useLangyStore } from "./behavior/langy/langy.store.ts";
 import { browserNavigationHosts } from "./navigation-host";
 import { readNavigationDeployment } from "./navigation-host-deployment";
 import { offersLangyAsk, offersPresenceMenuItem, opsAccessOf } from "./navigation-host-gates";
@@ -37,7 +38,7 @@ import { useUiShellFailure } from "./ui-shell-failure";
 /** The gradient the palette's own Langy mark paints with. */
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
-const ORGANIZATIONS_INPUT = { isDemo: false };
+const ORGANIZATIONS_INPUT = {};
 
 /** The shell's host class over navigation's port class, built once per loaded port. */
 const browserHostClasses = new WeakMap<
@@ -122,6 +123,7 @@ function useNavigationHostReading({
     navigationHost,
     commandBar: palette,
     presenceMenuItem,
+    impersonationBanner,
   },
 }: {
   commandBar: boolean;
@@ -244,19 +246,31 @@ function useNavigationHostReading({
 
   const routePattern = routePatternOf(pathname, route.reading().params);
 
-  // THE ACCOUNT DROPDOWN'S ONE ADDITION: presence, offered only on the
-  // surface that broadcasts it. The switches come off the graph already read,
-  // so the row and the lens read the same two facts.
-  const accountMenu = useMemo<NavigationAccountMenu | null>(() => {
-    if (!offersPresenceMenuItem(routePattern)) return null;
+  // The header carries ops's impersonation banner whenever the session says so
+  // (specs/auth/impersonation-banner.feature). Presence is offered only on the
+  // surface that broadcasts it, its switches off the graph already read.
+  const accountMenu = useMemo<NavigationAccountMenu>(() => {
+    const ImpersonationBanner = impersonationBanner.default;
+    const headerBanner = currentUser?.impersonator ? (
+      <ImpersonationBanner user={currentUser} />
+    ) : null;
+    if (!offersPresenceMenuItem(routePattern)) return { headerBanner };
     const flags = presenceFlagsOf({
       read,
       organizationId: activeScope.organizationId,
       projectId: activeScope.projectId,
     });
     const PresenceMenuItem = presenceMenuItem.default;
-    return { presence: <PresenceMenuItem {...flags} /> };
-  }, [routePattern, read, activeScope.organizationId, activeScope.projectId, presenceMenuItem]);
+    return { headerBanner, presence: <PresenceMenuItem {...flags} /> };
+  }, [
+    routePattern,
+    read,
+    activeScope.organizationId,
+    activeScope.projectId,
+    presenceMenuItem,
+    impersonationBanner,
+    currentUser,
+  ]);
 
   const setDocumentTitle = useCallback(
     (title: string) => documentTitle.set(title),

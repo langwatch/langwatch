@@ -39,7 +39,7 @@ export type UiPageRouteDescriptor = {
 };
 
 /** A pathless layout the SHELL draws itself: chrome is composition, not a module page. */
-export type UiShellLayout = "auth" | "chrome";
+export type UiShellLayout = "auth" | "chrome" | "full-screen";
 
 /**
  * A layout route the shell resolves from its own source. It carries no page
@@ -259,6 +259,28 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // The published workflow chat is a chromeless page, as it was on main: one
   // full-height card with the wordmark, no header, sidebar or Langy panel.
   { path: "/:project/chat/:workflow", page: "pages/[project]/chat/[workflow]" },
+
+  // The studio canvas fills the viewport, as on main: the chrome's session and
+  // project gates, the trace drawer and Langy, but no top bar or sidebar.
+  {
+    layout: "full-screen",
+    children: [
+      {
+        page: "layouts/trace-drawer",
+        children: [
+          {
+            page: "layouts/project-langy",
+            children: [
+              {
+                path: "/:project/studio/:workflow",
+                page: "pages/[project]/studio/[workflow]",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  },
 
   // Everything behind a session, wrapped in the application chrome.
   {
@@ -751,10 +773,6 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
                 path: "/:project/workflows",
                 page: "pages/[project]/workflows",
               },
-              {
-                path: "/:project/studio/:workflow",
-                page: "pages/[project]/studio/[workflow]",
-              },
 
               // Analytics
               {
@@ -903,6 +921,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/ops/projections/[runId]",
           },
           // Instance administration, for every instance operator (ARCHITECTURE.md §3.5).
+          { path: "/ops/operators", page: "pages/ops/operators" },
           { path: "/ops/users", page: "pages/ops/users" },
           { path: "/ops/organizations", page: "pages/ops/organizations" },
           { path: "/ops/projects", page: "pages/ops/projects" },

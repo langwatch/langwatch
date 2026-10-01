@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import { cloneElement, type ReactElement } from "react";
 import type * as rechartsModule from "recharts";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -93,11 +93,11 @@ function TotalChart({ rows }: { rows: typeof ONE_DAY_WITHHELD }) {
 }
 
 const renderBoth = (rows: typeof ONE_DAY_WITHHELD) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
+  renderWithDesignSystem(
+    <>
       <TotalChart rows={rows} />
       <CostProviderDayPanel organizationId="org-1" rows={rows as never} interval="month" />
-    </ChakraProvider>,
+    </>,
   );
 
 const totalChart = () => within(screen.getByLabelText("Cost over time"));

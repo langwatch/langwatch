@@ -1,4 +1,3 @@
-import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import Document from "@tiptap/extension-document";
 import History from "@tiptap/extension-history";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -31,11 +30,13 @@ const FILTER_CHIP_CONTROL_SELECTORS = [
 import {
   buildSuggestionUI,
   CLOSED_SUGGESTION,
-  highlightedRow,
+  pickHighlightedRow,
   navigateSuggestion,
+  removeNodeAtLocation,
+  swapOperatorAtLocation,
   type SuggestionState,
   type SuggestionUIState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);
@@ -664,7 +665,7 @@ function handleEditorKeyDown({
   const triggerState = trigger !== null ? suggestionFromTrigger(text, cursorPos, trigger) : null;
   const liveState = triggerState ?? searchBarSuggestionState(text, cursorPos);
   const dismissed = ctx.dismissedRef.current;
-  const highlighted = dismissed ? null : highlightedRow(ctx.suggestionRef.current);
+  const highlighted = dismissed ? null : pickHighlightedRow(ctx.suggestionRef.current);
   const action = handleKey(
     {
       text,

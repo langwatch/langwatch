@@ -1,11 +1,11 @@
+import type * as HostDrawer from "@langwatch/browser-host/use-drawer";
 /**
  * Leaving the "Add to Dataset" drawer hands the reader back to the drawer it was opened
  * from.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as HostDrawer from "@langwatch/browser-host/use-drawer";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -86,6 +86,19 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
       dataset: { getAll: { invalidate: vi.fn() } },
       datasetRecord: { getAll: { invalidate: vi.fn() } },
     }),
+    traces: {
+      getTracesWithSpans: {
+        useQuery: () => ({ data: [{ trace_id: "trace-1" }] }),
+      },
+    },
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({
+      dataset: { getAll: { invalidate: vi.fn() } },
+      datasetRecord: { getAll: { invalidate: vi.fn() } },
+    }),
     dataset: {
       getAll: {
         useQuery: () => ({
@@ -94,11 +107,6 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
           isError: false,
           refetch: () => Promise.resolve(),
         }),
-      },
-    },
-    traces: {
-      getTracesWithSpans: {
-        useQuery: () => ({ data: [{ trace_id: "trace-1" }] }),
       },
     },
     datasetRecord: {
@@ -137,9 +145,9 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-import { clearDrawerStack, useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 
+import { useAnnotationQueueSessionStore } from "../../../../behavior/annotation-queue-session.store.ts";
 import { AddDatasetRecordDrawer } from "../add-dataset-record-drawer.tsx";
 
 /** Opens the trace drawer the way a trace row does, then the dataset drawer. */
@@ -174,11 +182,11 @@ function OpenFromSelection() {
 }
 
 function renderDrawer(Opener: () => null) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
+  return renderWithDesignSystem(
+    <>
       <Opener />
       <AddDatasetRecordDrawer traceId="trace-1" />
-    </ChakraProvider>,
+    </>,
   );
 }
 
@@ -193,7 +201,6 @@ function drawerInUrl(): Record<string, string> {
 beforeEach(() => {
   vi.clearAllMocks();
   window.history.replaceState({}, "", harness.PATH);
-  clearDrawerStack();
   useAnnotationQueueSessionStore.setState({
     active: false,
     marks: {},

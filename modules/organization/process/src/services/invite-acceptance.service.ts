@@ -1,12 +1,11 @@
-import { ledgerActorFor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/authorization";
 /**
  * Accepting an invitation: the membership write and the grant tail that follows it, both
  * idempotent so a retry repairs rather than duplicates.
  */
-import { GrantScopeTier } from "@langwatch/authz-contract";
+import { GrantScopeTier, newAuthzGrantId } from "@langwatch/authz-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   InviteNotFoundError,
@@ -18,7 +17,6 @@ import {
 
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import {
-  GRANT_KSUID_RESOURCE,
   type InviteAssignableRoles,
   type InviteServiceDependencies,
 } from "../rules/invite-contracts.rules.ts";
@@ -165,7 +163,7 @@ export class InviteAcceptanceService {
       organizationId: invite.organizationId,
       bindings: [
         {
-          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId },
           // The declared mapping, not a cast through `unknown`: the two enums
           // share three names by coincidence and EXTERNAL is not one of them,
@@ -271,7 +269,7 @@ export class InviteAcceptanceService {
       await writer.attachBindings({
         organizationId: invite.organizationId,
         bindings: teamMembershipData.map((member) => ({
-          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId },
           role: member.role,
           customRoleId: member.customRoleId ?? null,

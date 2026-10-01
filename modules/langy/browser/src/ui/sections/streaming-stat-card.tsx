@@ -1,6 +1,6 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import type { LangyTurnMetric } from "@langwatch/langy-browser-kit";
 
+import type { LangyTurnMetric } from "../../model/values/langy-turn.ts";
 import { NumberTicker } from "./number-ticker.tsx";
 
 const formatStatNumber = (value: number): string => {

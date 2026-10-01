@@ -1,5 +1,5 @@
 # Implementation:
-#   packages/ui-kernel/src/ui-module-screens.ts (the router's guard)
+#   packages/browser/src/ui-module-screens.ts (the router's guard)
 #   modules/*/browser/src/*.web.ts (each screen's `requires` and `flags`)
 # Test: apps/ui/src/shell/__tests__/page-guards-follow-main.unit.test.ts
 

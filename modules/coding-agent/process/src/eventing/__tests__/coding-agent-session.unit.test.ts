@@ -24,9 +24,9 @@ import { describe, expect, it } from "vitest";
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
 import { toCodingAgentSessionRow } from "../../rules/coding-agent-session-row-mapper.rules.ts";
 import { codingAgentSessionStateFromRow } from "../../rules/coding-agent-session-state-mapper.rules.ts";
+import { contextUsageKey } from "../../rules/coding-agent-session-usage-key.rules.ts";
 import {
   CodingAgentSessionStateProjection,
-  contextUsageKey,
   MAX_SET,
   MAX_USAGE_CONTEXTS,
 } from "../coding-agent-session-state.projection.ts";

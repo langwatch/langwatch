@@ -1,10 +1,10 @@
+import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * Which validation mode each door asks for - a choice no request schema carries.
  * @see specs/organizations/organization-members-rest-api.feature
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/trpc";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { TeamNotInOrganizationError } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 

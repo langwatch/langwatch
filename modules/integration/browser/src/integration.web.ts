@@ -1,8 +1,8 @@
 /** What a browser installs for integration: the Integrations screen and its GitHub host. */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const integrationWeb = defineWebModule("integration")
+export const integrationWeb = defineBrowserModule("integration")
   .withHosts({
     requires: ["GithubHostApi"],
     mounts: { GithubHostApi: { load: () => import("./behavior/github-host-mount.tsx") } },
@@ -14,7 +14,7 @@ export const integrationWeb = defineWebModule("integration")
       path: "/settings/integrations",
       within: "settings",
       label: "Integrations",
-      requires: "organization:manage",
+      requires: "organization:view",
       load: () => import("./ui/sections/integrations.screen.tsx"),
     },
   });

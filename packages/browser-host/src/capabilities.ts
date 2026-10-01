@@ -4,6 +4,7 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
+import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
 import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
@@ -12,7 +13,6 @@ import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
-import type { UiFeatureApiTransport } from "./transport.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
@@ -183,6 +183,11 @@ export abstract class UiSession {
     throw new UiCapabilityUnavailableError("session snapshot");
   }
 
+  /** Reads the signed-in reader again, e.g. after their name or photo changed. */
+  refresh(): Promise<void> {
+    return Promise.reject(new UiCapabilityUnavailableError("session refresh"));
+  }
+
   /**
    * Whether a flag is on, off, or not yet answered — tri-state so a guard
    * reading unanswered as off does not flash its fallback on first load.
@@ -295,6 +300,8 @@ export type UiDeployment = {
   authProvider?: string;
   /** Whether this deployment mounted passkeys; absent reads as no. */
   passkeysEnabled?: boolean;
+  /** Whether this deployment mounted email/password sign-in; absent reads as no. */
+  emailPasswordEnabled?: boolean;
   /** Whether ops offers the Cloud admin capability; off unless this is LangWatch's own cloud. */
   hasCloudOps: boolean;
   /** Where a customer's SDK reaches the gateway, without `/v1`; absent when unconfigured. */
@@ -478,7 +485,7 @@ export type UiSessionCapabilities = {
  * the reader navigates and the reads land.
  */
 export type UiSessionSource = (input: {
-  transport: UiFeatureApiTransport;
+  transport: ModuleApiClient<ModuleApiMap>;
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
 }) => UiSessionCapabilities;

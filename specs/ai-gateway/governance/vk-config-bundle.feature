@@ -201,6 +201,17 @@ Feature: AI Gateway — Virtual Key /config bundle materialisation
     # restores the project. Rerouting would scatter one key's history across
     # two projects for an act performed on a different screen.
 
+  Scenario: The bundle exports spans with a trace-export key, never the project key
+    Given a VirtualKey "vk_traced" whose traces land in project "demo"
+    When the /config bundle is materialised
+    Then `project_otlp_token` is an ownerless, hidden key holding only `traces:create` on "demo"
+    And it is minted once per project, stored encrypted, and never read from `Project.apiKey`
+
+  Scenario: The trace-export key moves the bundle's version token
+    Given a VirtualKey "vk_traced" whose trace project has no export key yet
+    When its first bundle mints the export key
+    Then the next /config version token differs, so every pod fetches the bundle carrying it
+
   # ============================================================================
   # Revision bumps invalidate auth-cache
   # ============================================================================

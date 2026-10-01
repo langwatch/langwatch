@@ -29,10 +29,10 @@
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
+      "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../dashboard/contract/tsconfig.build.json"
@@ -42,9 +42,6 @@
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../experiment/contract/tsconfig.build.json"
@@ -65,19 +62,10 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../onboarding/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../onboarding/contract/tsconfig.build.json"
@@ -95,22 +83,13 @@
       "path": "../../secret/contract/tsconfig.build.json"
     },
     {
-      "path": "../../slack/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../slack/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

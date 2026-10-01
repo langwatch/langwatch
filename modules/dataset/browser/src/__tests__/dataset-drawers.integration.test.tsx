@@ -3,9 +3,9 @@
  * Surfaces open dataset's editor by its drawer name; the name must resolve to the editor.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { installedModuleDrawers } from "@langwatch/ui-kernel/module-drawers";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { installedModuleDrawers } from "@langwatch/browser/module-drawers";
+import { screen } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -17,18 +17,23 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj_1", slug: "acme" } }),
 }));
 
-vi.mock("@langwatch/workflow-browser-kit", () => ({
+vi.mock("../model/workflow/studio-dataset.utils.ts", () => ({
   tryToMapPreviousColumnsToNewColumns: (records: unknown) => records,
 }));
 
 vi.mock("../behavior/dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
     dataset: {
       upsert: { useMutation: () => ({ isPending: false, mutate: () => void 0 }) },
       getById: { useQuery: () => ({ data: void 0 }) },
       validateDatasetName: { useQuery: () => ({ refetch: () => Promise.resolve({}) }) },
     },
-    useUtils: () => ({ dataset: { getAll: { invalidate: () => void 0 } } }),
   },
 }));
 
@@ -42,12 +47,10 @@ describe("given a browser that installs dataset", () => {
       expect(Drawer).toBeDefined();
       if (!Drawer) return;
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Suspense fallback={null}>
-            <Drawer />
-          </Suspense>
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <Suspense fallback={null}>
+          <Drawer />
+        </Suspense>,
       );
 
       expect(

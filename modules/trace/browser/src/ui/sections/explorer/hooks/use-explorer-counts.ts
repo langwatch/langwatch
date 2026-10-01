@@ -1,6 +1,6 @@
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo } from "react";
 
+import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import {
   type InstantEvalRunPhase,
   selectInstantEvalRunPhase,

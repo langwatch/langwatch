@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
@@ -9,18 +8,18 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProjectApp } from "../../app/project.app.ts";
+import { ProjectModule } from "../../app/project.app.ts";
 import { MemoryProjectDatabase } from "../../repositories/memory/memory.project.database.ts";
 import { MemoryProjectRepository } from "../../repositories/memory/memory.project.repository.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
@@ -111,7 +110,7 @@ type PermissionQuestion = {
 };
 
 /**
- * The application exactly as `ProjectApp.create` builds it at boot: its own
+ * The application exactly as `ProjectModule.create` builds it at boot: its own
  * repository over an in-memory backing, the peers it declares, and the two
  * process members it reads.
  */
@@ -119,13 +118,20 @@ function application(
   options: {
     permits?: (question: PermissionQuestion) => boolean;
     clustering?: () => Promise<void>;
+    record?: AuditLogApi["record"];
+    revoked?: (payload: unknown) => Promise<void>;
   } = {},
 ) {
   const database = MemoryProjectDatabase.create();
   database.putTeam(team());
   database.putProject(project());
   database.putProject(
-    project({ id: OTHER_PROJECT_ID, name: "Another Project", slug: "another-project" }),
+    project({
+      id: OTHER_PROJECT_ID,
+      name: "Another Project",
+      slug: "another-project",
+      apiKey: "sk-lw-base-key-of-the-other-project",
+    }),
   );
 
   const asked: PermissionQuestion[] = [];
@@ -138,11 +144,9 @@ function application(
   });
 
   const logged: { payload: Readonly<Record<string, unknown>>; message: string }[] = [];
-  const app = ProjectApp.create({
+  const app = ProjectModule.create({
     dependencies: {
-      apiKeys: Object.assign(new TestApiKeyService(), {
-        regenerateLegacyProjectKey: vi.fn(async () => "sk-lw-rotated"),
-      }),
+      apiKeys: new TestApiKeyService(),
       authorization,
       organizations: createApiFixture<OrganizationApi>({}, "organizations"),
       share: createApiFixture<ShareApi>({}, "share"),
@@ -151,8 +155,10 @@ function application(
         requestClustering: options.clustering ?? (async () => undefined),
       }),
       trace: createApiFixture<TraceApi>({}, "trace"),
-      auditLog: createApiFixture<AuditLogApi>({}, "auditLog"),
-      langy: createApiFixture<LangyApi>({}, "langy"),
+      auditLog: createApiFixture<AuditLogApi>(
+        { record: options.record ?? (async () => ({ id: "audit", occurredAt: 0 })) },
+        "auditLog",
+      ),
       dataPrivacy: createApiFixture<DataPrivacyApi>({}, "dataPrivacy"),
     },
     repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
@@ -172,12 +178,17 @@ function application(
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
   });
 
+  app.connectLifecycle({
+    recordProjectCreated: { send: async () => undefined },
+    recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
+  });
+
   return { app, database, asked, logged };
 }
 
 /**
  * The `project.*` namespace on a real tRPC root, over the real application.
- * The three members no installed peer answers are supplied here, explicitly,
+ * The two members no installed peer answers are supplied here, explicitly,
  * because the mount refuses a partial witness — everything else is the app's own answer.
  */
 function mount(options: Parameters<typeof application>[0] = {}) {
@@ -185,19 +196,16 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const { app } = built;
 
   const getFieldProtections = vi.fn(async () => ({}));
-  const provisionLangyVirtualKey = vi.fn(async () => {});
-  const recordApiKeyRegenerated = vi.fn(async () => {});
 
   const browser: ProjectBrowserApi = {
     projects: () => app.projects(),
     encryptProjectSecret: (value) => app.encryptProjectSecret(value),
     probePermission: (input) => app.probePermission(input),
-    getProject: (input) => app.getProject(input),
     archiveOtherProject: (input) => app.archiveOtherProject(input),
+    revokeProjectApiKey: (input) => app.revokeProjectApiKey(input),
+    getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
     triggerTopicClustering: (input) => app.triggerTopicClustering(input),
     getFieldProtections,
-    provisionLangyVirtualKey,
-    recordApiKeyRegenerated,
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();
@@ -211,18 +219,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
 }
 
 describe("the project tRPC namespace over the application the composition builds", () => {
-  describe("when the base key is read", () => {
-    /** @scenario "the browser door reads the project the composition built" */
-    it("answers with the project its own repository holds", async () => {
-      const { caller } = mount();
-
-      await expect(caller.getProjectAPIKey({ projectId: "project_1" })).resolves.toMatchObject({
-        id: "project_1",
-        apiKey: "sk-lw-base-key-of-the-project",
-      });
-    });
-  });
-
   describe("when the settings form carries stored-object credentials", () => {
     /** @scenario "stored-object credentials are written through the deployment's cipher" */
     it("writes each one through the process's own encryption member", async () => {
@@ -264,6 +260,79 @@ describe("the project tRPC namespace over the application the composition builds
         projectId: "project_1",
       });
       expect(database.findProject("project_1")?.traceSharingEnabled).toBe(false);
+    });
+  });
+
+  describe("when the legacy project key is revoked", () => {
+    const LEGACY_KEY = "sk-lw-base-key-of-the-project";
+
+    /** @scenario A project manager revokes the legacy project key and is shown no key */
+    it("moves the status from present to absent, audits it and answers with no key", async () => {
+      const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+      const revoked = vi.fn(async (_payload: unknown) => undefined);
+      const { app, caller, database } = mount({ record, revoked });
+
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: true,
+      });
+      const answer = await caller.revokeProjectApiKey({ projectId: "project_1" });
+
+      expect(answer).toEqual({ revoked: true });
+      expect(JSON.stringify(answer)).not.toContain(LEGACY_KEY);
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+      });
+      expect(database.findProject("project_1")?.apiKey).not.toBe(LEGACY_KEY);
+      expect(await app.findIdByLegacyApiKey({ token: LEGACY_KEY })).toBeNull();
+      const stored = database.findProject("project_1")?.apiKey ?? "";
+      expect(await app.findIdByLegacyApiKey({ token: stored })).toBeNull();
+      expect(revoked).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project_1",
+          organizationId: expect.any(String),
+          revokedByUserId: ACTOR_ID,
+        }),
+      );
+      expect(record).toHaveBeenCalledWith({
+        action: "project.apiKey.revoked",
+        userId: ACTOR_ID,
+        projectId: "project_1",
+      });
+    });
+
+    /** @scenario Revoking the legacy project key again succeeds and changes nothing a caller can use */
+    it("answers a second revocation as revoked, and the status stays absent", async () => {
+      const { caller } = mount();
+
+      await caller.revokeProjectApiKey({ projectId: "project_1" });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "project_1" })).resolves.toEqual({
+        revoked: true,
+      });
+      await expect(caller.getLegacyKeyStatus({ projectId: "project_1" })).resolves.toEqual({
+        present: false,
+      });
+    });
+
+    it("still answers revoked when the audit trail fails, and reports it", async () => {
+      const { caller, logged } = mount({
+        record: async () => {
+          throw new Error("audit down");
+        },
+      });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "project_1" })).resolves.toEqual({
+        revoked: true,
+      });
+      expect(logged).toHaveLength(1);
+    });
+
+    it("refuses a project that does not exist and audits nothing", async () => {
+      const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+      const { caller } = mount({ record });
+
+      await expect(caller.revokeProjectApiKey({ projectId: "missing" })).rejects.toBeDefined();
+      expect(record).not.toHaveBeenCalled();
     });
   });
 

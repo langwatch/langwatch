@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { MemoryUserRepositories } from "./memory/memory.user.repositories.ts";
 import { PostgresUserRepositories } from "./prisma/prisma.user.repositories.ts";

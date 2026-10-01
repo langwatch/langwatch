@@ -1,10 +1,10 @@
+import type { VersionedPrompt } from "@langwatch/prompt-contract";
 /**
  * Finding H7 of the 2026-09-04 feature-surface security pass: the prompt lookup this route
  * makes deliberately also matches ORGANIZATION-scoped prompts a sibling project owns, so
  * Spec: specs/security/resource-scope-permission-checks.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { VersionedPrompt } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PromptService } from "../../services/prompt.service.ts";

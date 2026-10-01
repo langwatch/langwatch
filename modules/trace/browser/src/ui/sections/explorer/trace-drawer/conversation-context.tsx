@@ -20,8 +20,9 @@ import {
 } from "react-icons/lu";
 
 import { getDrawerDensityTokens, useDensityStore } from "../../../../behavior/density.store.ts";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
+import { useDisplayRoleVisuals } from "../../../../behavior/scenario-role.store.tsx";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../model/constants.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
 import { RedactedInline } from "../../redacted-field.tsx";
@@ -31,7 +32,6 @@ import {
   useTextTranslation,
 } from "../hooks/use-text-translation.ts";
 import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
-import { useDisplayRoleVisuals } from "./scenario-roles.tsx";
 
 interface ConversationContextProps {
   conversationId: string | null;
@@ -226,7 +226,7 @@ export const ConversationContext = memo(function ConversationContext({
   const density = useDensityStore((s) => s.density);
   const densityTokens = getDrawerDensityTokens(density);
   const { navigateToTrace } = useTraceDrawerNavigation();
-  const viewMode = useDrawerStore((s) => s.viewMode);
+  const viewMode = useTraceDrawer((s) => s.viewMode);
   const ctx = useConversationContext(conversationId, traceId);
 
   // Memo before the early `null` return so the hook order stays stable

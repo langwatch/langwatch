@@ -1,6 +1,6 @@
 import { HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
-import { api } from "../../../../behavior/automation-api.ts";
+import { useNextFiring } from "../../../../behavior/use-automation-reads.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
 import { describeNextFiring } from "../../model/next-firing-presentation.ts";
 
@@ -16,10 +16,7 @@ export function NextFiringSection({
   automationId: string;
   projectId: string;
 }) {
-  const nextFiringQuery = api.automation.getNextFiring.useQuery(
-    { projectId, triggerId: automationId },
-    { enabled: !!projectId, retry: false },
-  );
+  const nextFiringQuery = useNextFiring({ projectId, triggerId: automationId });
 
   if (nextFiringQuery.isLoading) {
     return (

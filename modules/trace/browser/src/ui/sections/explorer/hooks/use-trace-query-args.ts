@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
 import { LIVE_WINDOW_MS } from "../../../../model/trace-freshness.ts";
@@ -14,11 +14,11 @@ import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 export function useTraceQueryArgs() {
   const { project } = useOrganizationTeamProject();
   // The share page injects its trace through context rather than the drawer
-  // store, so the global drawer mount stays inert. See TraceViewerContext.
+  // store, and seeds the cache under these keys, so it never fetches.
   const viewer = useTraceViewer();
-  const storeTraceId = useDrawerStore((s) => s.traceId);
+  const storeTraceId = useTraceDrawer((s) => s.traceId);
   const traceId = viewer.traceId ?? storeTraceId;
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
   const projectId = useDrawerProjectId();
 
   const isLive =
@@ -30,7 +30,8 @@ export function useTraceQueryArgs() {
     ...(occurredAtMs !== null ? { occurredAtMs } : {}),
   };
 
-  const isReady = !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "");
+  const isReady =
+    !!projectId && !!traceId && !isPreviewTraceId(traceId ?? "") && !viewer.isReadOnly;
   // The header read runs without the partition hint and backfills it; every other read waits.
   const hintReady = occurredAtMs !== null;
 

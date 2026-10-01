@@ -46,8 +46,7 @@ vi.mock("../../../../../behavior/use-feature-flag.ts", () => ({
   useFeatureFlag: () => ({ enabled: false }),
 }));
 
-import { useLangyStore } from "@langwatch/langy-browser-kit";
-
+import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { Composer } from "../composer.tsx";
 
 function renderComposer(onSend: (input: string) => void = () => {}) {

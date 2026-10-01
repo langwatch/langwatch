@@ -1,15 +1,15 @@
-/**
- * @vitest-environment node
- * Title generator behavior once the model answers: transcript, stripped
- * shapes, and the key the project's model is resolved by.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import type {
   ModelDefaultResolveInput,
   ModelProviderApi,
   ModelProviderTextGenerationInput,
 } from "@langwatch/model-provider-contract";
+/**
+ * @vitest-environment node
+ * Title generator behavior once the model answers: transcript, stripped
+ * shapes, and the key the project's model is resolved by.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { LangyTrustedMessageReader } from "../langy-message.service.ts";

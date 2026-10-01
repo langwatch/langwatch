@@ -1,11 +1,11 @@
+import type * as actualModule from "@langwatch/browser-host/sse-subscription";
 /**
  * Integration tests for "All Runs" default selection on the Suites page.
  * @vitest-environment jsdom
  * @see specs/features/suites/all-runs-default-open.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -13,8 +13,8 @@ vi.mock("posthog-js", () => ({
   default: { capture: vi.fn() },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("@langwatch/browser-host/sse-subscription", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule>();
   return {
     ...actual,
     useSSESubscription: () => ({
@@ -90,6 +90,17 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getExternalSetSummaries: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       getAll: {
         useQuery: () => ({ data: [], isLoading: false, error: null }),
@@ -119,7 +130,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "my-project" },
     hasAnyPermission: () => true,
@@ -163,10 +174,6 @@ vi.mock("../suite-detail-panel.tsx", () => ({
   SuiteEmptyState: () => <div data-testid="suite-empty-state">Empty</div>,
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("All Runs default selection (Issue #1771)", () => {
   let SimulationsPage: React.ComponentType;
 
@@ -193,7 +200,7 @@ describe("All Runs default selection (Issue #1771)", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
-      render(<SimulationsPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SimulationsPage />);
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
       expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
@@ -210,7 +217,7 @@ describe("All Runs default selection (Issue #1771)", () => {
         path: ["run-plans", "my-suite"],
       };
 
-      render(<SimulationsPage />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SimulationsPage />);
 
       const user = userEvent.setup();
 

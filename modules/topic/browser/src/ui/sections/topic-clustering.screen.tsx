@@ -18,7 +18,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,
   TopicClusteringRunHistoryEntry,
@@ -26,9 +25,12 @@ import type {
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
-import { useState } from "react";
 
 import { topicApi } from "../../behavior/topic-api.ts";
+import {
+  useClusteringRunHistory,
+  useClusteringStatus,
+} from "../../behavior/use-topic-clustering.ts";
 import { useTopicHost } from "../../model/topic-host.ts";
 
 /**
@@ -87,25 +89,13 @@ export default function TopicClusteringScreen() {
   );
 }
 
-/**
- * How long a just-requested run keeps the status card polling. Nothing is recorded at the
- * instant a run begins, so the card cannot see the run until the request itself reaches the
- * read model; without this window the card would settle on the pre-click answer and sit there.
- */
-const REQUEST_SETTLE_WINDOW_MS = 30_000;
-
-/** Poll cadence while a run is underway; the query stops itself once it settles. */
-const RUNNING_POLL_MS = 5_000;
-
 function TopicClusteringCard({ project }: { project: { id: string } }) {
   const host = useTopicHost();
   const utils = topicApi.useUtils();
-  const [lastTriggeredAt, setLastTriggeredAt] = useState<number | null>(null);
 
   const triggerClustering = topicApi.project.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
       if (result.started) {
-        setLastTriggeredAt(nowInstant().epochMilliseconds);
         host.succeeded({
           title: "Topic clustering started",
           description: "This can take several minutes.",
@@ -137,7 +127,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
-      <ClusteringStatusCard projectId={project.id} lastTriggeredAt={lastTriggeredAt} />
+      <ClusteringStatusCard projectId={project.id} />
       <Card.Root width="full">
         <Card.Header>
           <Heading>Manual topic clustering</Heading>
@@ -276,28 +266,8 @@ function ClusteringStatusBody({
   );
 }
 
-function ClusteringStatusCard({
-  projectId,
-  lastTriggeredAt,
-}: {
-  projectId: string;
-  lastTriggeredAt: number | null;
-}) {
-  const status = topicApi.topics.getClusteringStatus.useQuery(
-    { projectId },
-    {
-      refetchInterval: (query) => {
-        if (query.state.data?.isRunInFlight) return RUNNING_POLL_MS;
-        if (
-          lastTriggeredAt !== null &&
-          nowInstant().epochMilliseconds - lastTriggeredAt < REQUEST_SETTLE_WINDOW_MS
-        ) {
-          return RUNNING_POLL_MS;
-        }
-        return false;
-      },
-    },
-  );
+function ClusteringStatusCard({ projectId }: { projectId: string }) {
+  const status = useClusteringStatus({ projectId });
 
   return (
     <Card.Root width="full">
@@ -404,13 +374,7 @@ function RunHistoryBody({
 }
 
 function RunHistoryCard({ projectId }: { projectId: string }) {
-  const history = topicApi.topics.getClusteringRunHistory.useQuery(
-    { projectId },
-    {
-      refetchInterval: (query) =>
-        query.state.data?.some((run) => run.outcome === "running") ? RUNNING_POLL_MS : false,
-    },
-  );
+  const history = useClusteringRunHistory({ projectId });
 
   return (
     <Card.Root width="full" overflow="hidden">

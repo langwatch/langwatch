@@ -20,9 +20,6 @@ export const useFieldRedaction = (field: "input" | "output") => {
     },
     {
       enabled: !!projectId,
-      staleTime: 2 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
     },
   );
 

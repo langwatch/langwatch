@@ -40,21 +40,19 @@ Feature: The back office answers over HTTP
     When the back office resolves who is acting
     Then the admin is the actor rather than the person being impersonated
 
-  # The door was mounted and answered 404 to everybody. `ADMIN_EMAILS` names the
-  # instance staff, and the API process never read it: only the background one
-  # bound the variable, so the allow-list the back office matches against was
-  # empty on every deployment and every operator got the hide meant for someone
-  # who is not staff.
+  # The door was mounted and answered 404 to everybody, because the process
+  # never told the back office who instance staff are. Staff are the users
+  # holding the platform-operator grant, asked of authz at the platform tier.
   @integration
   Scenario: The deployment's operator list reaches the back office
-    Given the deployment names its instance staff in its own configuration
+    Given authz holds the platform-operator grant for the deployment's instance staff
     And the host composing the process states no operator list of its own
     When the process resolves who its operators are
-    Then the configured addresses are the ones the back office matches against
+    Then the users holding the grant are the ones the back office admits
 
   @integration
   Scenario: A signed-in person who is not staff cannot tell the door exists
-    Given a signed-in person the operator application does not recognise as staff
+    Given a signed-in person who holds no platform-operator grant
     When they ask the back office for a resource
     Then the answer is the same nothing an unmounted door would give
 

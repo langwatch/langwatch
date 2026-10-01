@@ -1,21 +1,21 @@
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { EntitlementApi, type EntitlementGrant, type Plan } from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { UNLIMITED } from "@langwatch/plans";
+import { createApp, MissingProviderError, withMemoryRepositories } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 /**
  * The background worker resolves a plan through the same entitlement peer the
  * interactive process installs, over the same billing and licensing sources.
  * @see specs/automations/worker-plan-resolution.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { BillingApi } from "@langwatch/enterprise-billing-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { EntitlementApi, type EntitlementGrant, type Plan } from "@langwatch/entitlement-contract";
-import { createApp, MissingProviderError, withMemoryRepositories } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { UNLIMITED } from "@langwatch/plans";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { entitlementServer } from "../../entitlement.server.ts";
+import { entitlementProcessModule } from "../../entitlement.module.ts";
 import { createEntitlementTestUsers } from "./entitlement.fixture.ts";
 
 const ORGANIZATION = "organization-1";
@@ -56,7 +56,7 @@ type Sources = Readonly<{
 function bootOn({ role = "worker", isSaas, billing, licence = unlicensed }: Sources) {
   const { logger } = createTestLogger();
   return createApp({ role })
-    .withModules([withMemoryRepositories(entitlementServer)])
+    .withModules([withMemoryRepositories(entitlementProcessModule)])
     .withConfig({ entitlement: { requestBounds: undefined } })
     .withMembers({ isSaas, processName: `langwatch-${role}` })
     .withObservability((observability) => observability.withLogging(logger))
@@ -155,7 +155,7 @@ describe("given the entitlement module installed on the worker role", () => {
       const { logger } = createTestLogger();
       const boot = Promise.resolve().then(() =>
         createApp({ role: "worker" })
-          .withModules([withMemoryRepositories(entitlementServer)])
+          .withModules([withMemoryRepositories(entitlementProcessModule)])
           .withConfig({ entitlement: { requestBounds: undefined } })
           .withMembers({ isSaas: true, processName: "langwatch-worker" })
           .withObservability((observability) => observability.withLogging(logger))
@@ -183,7 +183,7 @@ describe("given the entitlement module installed on the worker role", () => {
     it("asks the installed licensing peer, the same one every other read uses", async () => {
       const asked: string[] = [];
       const runtime = await createApp({ role: "worker" })
-        .withModules([withMemoryRepositories(entitlementServer)])
+        .withModules([withMemoryRepositories(entitlementProcessModule)])
         .withConfig({ entitlement: { requestBounds: undefined } })
         .withMembers({ isSaas: false, processName: "langwatch-worker" })
         .withObservability((observability) => observability.withLogging(createTestLogger().logger))

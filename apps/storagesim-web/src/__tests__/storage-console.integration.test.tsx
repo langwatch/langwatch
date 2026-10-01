@@ -50,17 +50,25 @@ describe("the storagesim console", () => {
   });
 
   it("lists the buckets, and a bucket opens its objects", async () => {
-    const fetch = fakeSim({ stored: [one] });
+    fakeSim({ stored: [one] });
     render(<StorageConsole />);
 
     fireEvent.click(await screen.findByText("uploads"));
 
     expect(await screen.findByText("a/one.txt")).toBeTruthy();
-    expect(screen.getByText("text/plain")).toBeTruthy();
-    expect(screen.getByText('"5d41402abc4b2a76b9719d911017c592"')).toBeTruthy();
-    expect(
-      fetch.mock.calls.some(([path]) => path.includes("/_sim/api/objects?bucket=uploads")),
-    ).toBe(true);
+    expect(screen.getByLabelText<HTMLSelectElement>("Bucket").value).toBe("uploads");
+  });
+
+  it("narrows the objects by a search on their key", async () => {
+    fakeSim({ stored: [one, { ...one, key: "b/two.json" }] });
+    window.location.hash = "objects";
+    render(<StorageConsole />);
+
+    await screen.findByText("b/two.json");
+    fireEvent.change(screen.getByLabelText("Search objects"), { target: { value: "one" } });
+
+    await waitFor(() => expect(screen.queryByText("b/two.json")).toBeNull());
+    expect(screen.getByText("a/one.txt")).toBeTruthy();
   });
 
   it("shows an object's headers, preview and download", async () => {
@@ -71,6 +79,8 @@ describe("the storagesim console", () => {
     fireEvent.click(await screen.findByText("a/one.txt"));
 
     expect(await screen.findByText("Content-Length")).toBeTruthy();
+    expect(screen.getAllByText("text/plain").length).toBeGreaterThan(0);
+    expect(screen.getByText('"5d41402abc4b2a76b9719d911017c592"')).toBeTruthy();
     expect(await screen.findByText("hello")).toBeTruthy();
     const download = screen.getByRole("link", { name: "Download" });
     expect(download.getAttribute("href")).toContain(

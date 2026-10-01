@@ -1,24 +1,26 @@
+import { useMintPersonalToken } from "@langwatch/api-key-client";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 /**
  * IntegratePane — the default view for no-traces projects.
  * Spec: specs/traces-v2/integrate-pane.feature
  */
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  type ActiveProjectContextValue,
-  ActiveProjectProvider,
-} from "@langwatch/onboarding-browser-kit";
 import { Code2, Compass } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
 import { IntegratePaneShell } from "../../../elements/explorer/traces-page/integrate-pane-shell.tsx";
+import {
+  type ActiveProjectContextValue,
+  ActiveProjectProvider,
+} from "../../onboarding/active-project-context.tsx";
 import { SetupWithAgentButton } from "../../setup-with-agent-button.tsx";
 import { ApiKeyIntegrationInfoCard } from "../onboarding/api-key-integration-info-card.tsx";
 import { writeSpotlightFragment } from "../onboarding/spotlights/spotlight-overlay.tsx";
@@ -31,7 +33,14 @@ export const IntegratePane: React.FC = () => {
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
   const { project, organization } = useOrganizationTeamProject();
   const { appBaseUrl } = useUiDeployment();
-  const [token, setToken] = useState<string | null>(null);
+  const minting = useMintPersonalToken({
+    organizationId: organization?.id,
+    projectId: project?.id,
+    userId: useOptionalTraceHost()?.currentUser()?.id,
+    // Ingestion only: the env block and the agent prompt; this pane has no MCP config.
+    name: "Personal access token",
+  });
+  const token = minting.token ?? null;
   const [showSdk, setShowSdk] = useState(false);
   // The same endpoint rule the env block above the actions follows, so
   // the keys the agent gets and the keys on screen are the same keys.
@@ -40,10 +49,9 @@ export const IntegratePane: React.FC = () => {
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
-    project: token ? { ...project, apiKey: token } : project,
+    project,
     organization,
-    freshToken: token ?? undefined,
-    onFreshToken: setToken,
+    freshToken: minting.token,
   };
 
   const enterSampleMode = () => {
@@ -76,12 +84,7 @@ export const IntegratePane: React.FC = () => {
               </Text>
             </VStack>
 
-            <ApiKeyIntegrationInfoCard
-              organizationId={organization.id}
-              projectId={project.id}
-              token={token}
-              onTokenGenerated={setToken}
-            />
+            <ApiKeyIntegrationInfoCard projectId={project.id} minting={minting} />
 
             <SetupActions
               token={token}

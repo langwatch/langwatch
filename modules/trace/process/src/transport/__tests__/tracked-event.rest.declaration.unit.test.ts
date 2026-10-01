@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { traceServer } from "../../trace.server.ts";
+import { traceProcessModule } from "../../trace.module.ts";
 import { trackedEventRest, trackedEventLegacyPathRest } from "../tracked-event.rest.ts";
 
 const declaration = trackedEventRest.router();
@@ -14,7 +14,7 @@ const declaration = trackedEventRest.router();
 describe("the tracked-event family", () => {
   describe("given the transports the trace module declares", () => {
     it("declares the canonical tracked-event route", () => {
-      expect(traceServer.transports).toContain(trackedEventRest);
+      expect(traceProcessModule.transports).toContain(trackedEventRest);
     });
 
     it("reports the event the caller posted under the canonical operation", () => {
@@ -29,7 +29,7 @@ describe("the tracked-event family", () => {
      * needs no member that can dispatch a `Request` back into a mounted family.
      */
     it("is declared, so a pre-rename SDK release still reaches the family", () => {
-      expect(traceServer.transports).toContain(trackedEventLegacyPathRest);
+      expect(traceProcessModule.transports).toContain(trackedEventLegacyPathRest);
     });
 
     it("reads the same credential and asks the same permission as the canonical route", () => {

@@ -1,5 +1,5 @@
 import { AgentNotFoundError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +26,7 @@ const input = {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("AgentApp.call", () => {
+describe("AgentModule.call", () => {
   it.each([null, "another_user"])(
     "refuses a personal agent for viewer %s before dispatch",
     async (viewerUserId) => {

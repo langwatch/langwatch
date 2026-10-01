@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * Sign-up: address, password, account; confirmation enters not gates.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
@@ -152,12 +152,7 @@ const fillPasswordPair = async (container: HTMLElement, password: string) => {
   await userEvent.type(both[1] as HTMLInputElement, password);
 };
 
-const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <VerificationFirstSignUp />
-    </ChakraProvider>,
-  );
+const renderScreen = () => renderWithDesignSystem(<VerificationFirstSignUp />);
 
 describe("given the sign-up screen", () => {
   beforeEach(() => {

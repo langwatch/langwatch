@@ -4,7 +4,7 @@
  * remove it so the next tier applies again.
  */
 
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { dataPrivacySnapshotSchema } from "./data-privacy.snapshot.ts";

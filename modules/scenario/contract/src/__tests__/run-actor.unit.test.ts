@@ -49,4 +49,15 @@ describe("what an actor writes into the run metadata", () => {
     });
     expect(withActor(undefined)).toEqual({});
   });
+
+  /** @scenario "A scenario run started with a personal access token holds no more than that token" */
+  it("writes the key the person started the run with beside them", () => {
+    const actor = deriveRunActor({ userId: "user_lena", surfaceHeader: null, apiKeyId: "pat_1" });
+
+    expect(withActor(actor)).toEqual({
+      actorId: "user_lena",
+      actorLabel: "api",
+      actorApiKeyId: "pat_1",
+    });
+  });
 });

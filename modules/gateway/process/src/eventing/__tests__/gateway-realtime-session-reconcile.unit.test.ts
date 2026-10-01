@@ -1,14 +1,14 @@
+import {
+  ModelProviderCustomKeysMissingError,
+  type ModelProviderApi,
+} from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/realtime-sessions.feature
  * One reconcile intent over the derived chain: model-provider's keys, the vendor channel and
  * the sessions.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  ModelProviderCustomKeysMissingError,
-  type ModelProviderApi,
-} from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -4,18 +4,18 @@
  * unstubbed operation refuses by name rather than answering undefined.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";
 import type { SuiteExecution } from "../suite.app.ts";
-import { SuiteApp } from "../suite.app.ts";
+import { SuiteModule } from "../suite.app.ts";
 
 /** A run that is accepted and scheduled nowhere, recording what it was handed. */
 export class RecordingSuiteExecution implements SuiteExecution {
@@ -41,8 +41,8 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
 }
 
 /**
- * `SuiteApp` now builds `execution` itself in production
- * (`suite-composition.build.ts`); this fixture uses `createForTesting`
+ * `SuiteModule` now builds `execution` itself in production
+ * (`SuiteModule.create`); this fixture uses `createForTesting`
  * instead, which still takes an `execution` override to observe a scheduled run.
  */
 export function createSuiteTestApp(
@@ -57,8 +57,8 @@ export function createSuiteTestApp(
       evaluators: EvaluatorApi;
     }>;
   }> = {},
-): SuiteApp {
-  return SuiteApp.createForTesting({
+): SuiteModule {
+  return SuiteModule.createForTesting({
     repositories: input.repositories ?? createSuiteTestRepositories(),
     dependencies: {
       scenarios: input.dependencies?.scenarios ?? createApiFixture<ScenarioApi>({}),

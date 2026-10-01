@@ -1,112 +1,145 @@
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
+/**
+ * @vitest-environment node
+ * @unit
+ * Scenario's peer reaction to a settled trace: reads trace's fold, sends its own computeRunMetrics.
+ */
+import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createTraceMetricsSyncSubscriber,
-  type TraceMetricsSyncSubscriberDeps,
+  TRACE_SPAN_METRICS_SETTLE_MS,
+  createTraceSpanMetricsSyncHandler,
+  hasSimulationMetrics,
 } from "../trace-metrics-sync.subscriber.ts";
 
 vi.mock("@langwatch/observability", () => ({
-  createLogger: () => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  }),
+  createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
 }));
 
-function finishedEvent(dataOverride: Record<string, unknown> = {}): SimulationProcessingEvent {
-  return {
-    id: "evt-1",
-    aggregateId: "run-1",
-    aggregateType: "simulation_run",
-    tenantId: "project-1",
-    createdAt: 5_000,
-    occurredAt: 5_000,
-    version: "2026-08-06",
-    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
-    data: {
-      scenarioRunId: "run-1",
-      status: "SUCCESS",
-      ...dataOverride,
-    },
-  } as SimulationProcessingEvent;
+const SETTLED = { tenantId: "project-1", traceId: "trace-1", occurredAt: 1_234 };
+
+function summary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
+  return createApiFixture<TraceSummaryData>({
+    spanCount: 2,
+    totalCost: 0.001,
+    attributes: { "scenario.run_id": "run-1" },
+    ...overrides,
+  });
 }
 
-function makeDeps(
-  overrides: Partial<TraceMetricsSyncSubscriberDeps> = {},
-): TraceMetricsSyncSubscriberDeps {
+function setup(found: TraceSummaryData | null) {
+  const findSummary = vi.fn().mockResolvedValue(found);
+  const computeRunMetrics = vi
+    .fn<(data: ComputeRunMetricsCommandData) => Promise<void>>()
+    .mockResolvedValue(undefined);
   return {
-    computeRunMetrics: vi.fn().mockResolvedValue(undefined),
-    ...overrides,
+    findSummary,
+    computeRunMetrics,
+    handle: createTraceSpanMetricsSyncHandler({ findSummary, computeRunMetrics }),
   };
 }
 
-const CONTEXT = {
-  tenantId: "project-1",
-  aggregateId: "run-1",
-  state: undefined,
-};
+describe("the trace settle window", () => {
+  it("is main's 60 seconds", () => {
+    expect(TRACE_SPAN_METRICS_SETTLE_MS).toBe(60_000);
+  });
+});
 
-describe("traceMetricsSync subscriber", () => {
-  describe("when a run finishes carrying trace ids", () => {
-    /** @scenario "Simulation-side subscriber dispatches pull-based computation on RunFinished" */
-    it("dispatches one computeRunMetrics per trace", async () => {
-      const deps = makeDeps();
-      const subscriber = createTraceMetricsSyncSubscriber(deps);
+describe("traceSpanMetricsSync handler", () => {
+  describe("when the settled trace carries a scenario run id", () => {
+    /** @scenario "Scenario's subscriber publishes metrics after the trace settles" */
+    it("reads trace's summary, then sends computeRunMetrics in pull mode at the span's time", async () => {
+      const { handle, findSummary, computeRunMetrics } = setup(summary());
 
-      await subscriber.handler(finishedEvent({ traceIds: ["trace-1", "trace-2"] }), CONTEXT);
+      await handle(SETTLED);
 
-      expect(deps.computeRunMetrics).toHaveBeenCalledTimes(2);
-      expect(deps.computeRunMetrics).toHaveBeenNthCalledWith(1, {
+      expect(findSummary).toHaveBeenCalledWith({ projectId: "project-1", traceId: "trace-1" });
+      expect(computeRunMetrics).toHaveBeenCalledExactlyOnceWith({
         tenantId: "project-1",
         scenarioRunId: "run-1",
         traceId: "trace-1",
         retryCount: 0,
-        occurredAt: expect.any(Number),
+        occurredAt: 1_234,
       });
-      expect(deps.computeRunMetrics).toHaveBeenNthCalledWith(2, {
-        tenantId: "project-1",
-        scenarioRunId: "run-1",
-        traceId: "trace-2",
-        retryCount: 0,
-        occurredAt: expect.any(Number),
-      });
+    });
+
+    it("sends when the cost is zero but the trace has spans", async () => {
+      const { handle, computeRunMetrics } = setup(summary({ totalCost: 0 }));
+
+      await handle(SETTLED);
+
+      expect(computeRunMetrics).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe("when a run finishes without trace ids", () => {
-    /** @scenario "Run with no trace IDs leaves metrics empty" */
-    it("dispatches nothing for an empty traceIds array", async () => {
-      const deps = makeDeps();
-      const subscriber = createTraceMetricsSyncSubscriber(deps);
+  describe("when the settled trace is not a scenario trace", () => {
+    /** @scenario "Scenario's subscriber ignores non-scenario traces" */
+    it("sends nothing", async () => {
+      const { handle, findSummary, computeRunMetrics } = setup(
+        summary({ attributes: { "langwatch.origin": "sdk" } }),
+      );
 
-      await subscriber.handler(finishedEvent({ traceIds: [] }), CONTEXT);
+      await handle(SETTLED);
 
-      expect(deps.computeRunMetrics).not.toHaveBeenCalled();
-    });
-
-    it("dispatches nothing when traceIds is absent (pre-enrichment event)", async () => {
-      const deps = makeDeps();
-      const subscriber = createTraceMetricsSyncSubscriber(deps);
-
-      await subscriber.handler(finishedEvent(), CONTEXT);
-
-      expect(deps.computeRunMetrics).not.toHaveBeenCalled();
+      expect(findSummary).toHaveBeenCalledTimes(1);
+      expect(computeRunMetrics).not.toHaveBeenCalled();
     });
   });
 
-  describe("when the dispatch fails", () => {
-    it("propagates the error so the GroupQueue retries", async () => {
-      const deps = makeDeps({
-        computeRunMetrics: vi.fn().mockRejectedValue(new Error("trace pipeline down")),
-      });
-      const subscriber = createTraceMetricsSyncSubscriber(deps);
+  describe("when trace has no summary for the trace yet", () => {
+    it("sends nothing", async () => {
+      const { handle, computeRunMetrics } = setup(null);
 
-      await expect(
-        subscriber.handler(finishedEvent({ traceIds: ["trace-1"] }), CONTEXT),
-      ).rejects.toThrow("trace pipeline down");
+      await handle(SETTLED);
+
+      expect(computeRunMetrics).not.toHaveBeenCalled();
     });
+  });
+
+  describe("when the trace has no spans and no cost", () => {
+    it("sends nothing", async () => {
+      const { handle, computeRunMetrics } = setup(summary({ spanCount: 0, totalCost: null }));
+
+      await handle(SETTLED);
+
+      expect(computeRunMetrics).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when computeRunMetrics fails", () => {
+    it("throws, so the queue retries the settled trace", async () => {
+      const { handle, computeRunMetrics } = setup(summary());
+      computeRunMetrics.mockRejectedValue(new Error("Dispatch error"));
+
+      await expect(handle(SETTLED)).rejects.toThrow("Dispatch error");
+    });
+  });
+
+  describe("when trace's summary cannot be read", () => {
+    it("throws, so the queue retries the settled trace", async () => {
+      const { handle, findSummary, computeRunMetrics } = setup(null);
+      findSummary.mockRejectedValue(new Error("read failed"));
+
+      await expect(handle(SETTLED)).rejects.toThrow("read failed");
+      expect(computeRunMetrics).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("hasSimulationMetrics", () => {
+  it("is true for a scenario trace with data to aggregate", () => {
+    expect(hasSimulationMetrics(summary())).toBe(true);
+  });
+
+  it("is false without a scenario run id", () => {
+    expect(hasSimulationMetrics(summary({ attributes: { "langwatch.origin": "sdk" } }))).toBe(
+      false,
+    );
+  });
+
+  it("is false for no spans and no cost", () => {
+    expect(hasSimulationMetrics(summary({ spanCount: 0, totalCost: null }))).toBe(false);
   });
 });

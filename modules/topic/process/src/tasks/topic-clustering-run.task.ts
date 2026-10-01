@@ -1,6 +1,6 @@
 import { Task } from "@langwatch/task";
 
-import type { TopicApp } from "../app/topic.app.ts";
+import type { TopicModule } from "../app/topic.app.ts";
 
 /**
  * Manual, one-shot clustering run for a single project — the operator's escape hatch for a
@@ -11,14 +11,14 @@ export class TopicClusteringRunTask extends Task {
   readonly name = "topic-clustering-run";
   readonly description = "Runs a manual topic-clustering walk for one project.";
 
-  private constructor(private readonly topics: Pick<TopicApp, "runClusteringForProject">) {
+  private constructor(private readonly topics: Pick<TopicModule, "runClusteringForProject">) {
     super();
   }
 
   static create({
     topics,
   }: {
-    topics: Pick<TopicApp, "runClusteringForProject">;
+    topics: Pick<TopicModule, "runClusteringForProject">;
   }): TopicClusteringRunTask {
     return new TopicClusteringRunTask(topics);
   }

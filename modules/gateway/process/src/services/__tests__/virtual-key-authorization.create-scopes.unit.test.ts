@@ -1,4 +1,8 @@
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzPermission } from "@langwatch/authorization";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayPermissionScope, GatewayScopePermissions } from "../../app/gateway.members.ts";
@@ -15,22 +19,10 @@ const TEAM: Scope = { scopeType: "TEAM", scopeId: "team_demo" };
 const OTHER_PROJECT: Scope = { scopeType: "PROJECT", scopeId: "proj_other" };
 
 class ProjectsOnTeamDemo extends VirtualKeyAuthorizationRepository {
-  async findProjectTeam({ projectId }: { projectId: string }) {
-    return { id: projectId, teamId: "team_demo" };
-  }
-  async findOrganizationRole() {
-    return null;
-  }
-  async findMemberTeamIds() {
-    return [];
-  }
   async findProjectIdsForTeams() {
     return [];
   }
   async findTeamIdsInOrganization() {
-    return [];
-  }
-  async findProjectIdsInOrganization() {
     return [];
   }
   async findVirtualKeyScopes() {
@@ -66,7 +58,27 @@ function keyHolding(held: readonly AuthzPermission[]) {
   };
 }
 
-const service = VirtualKeyAuthorizationService.create({ directory: new ProjectsOnTeamDemo() });
+const service = VirtualKeyAuthorizationService.create({
+  directory: new ProjectsOnTeamDemo(),
+  organizations: createApiFixture<OrganizationApi>({
+    getMember: async ({ userId }) => {
+      throw new MemberNotFoundError(userId);
+    },
+    findMemberTeamIds: async () => [],
+  }),
+  projects: createApiFixture<ProjectApi>({
+    findIdentity: async (id) => ({
+      id,
+      name: id,
+      slug: id,
+      teamId: "team_demo",
+      organizationId: "org_1",
+      isPersonal: false,
+      ownerUserId: null,
+    }),
+    listIdsByOrganization: async () => [],
+  }),
+});
 
 describe("assertActorCanCreateScopes", () => {
   describe("when the only scope is the caller's own project", () => {
@@ -139,5 +151,46 @@ describe("assertActorCanCreateScopes", () => {
         meta: { permission: "virtualKeys:manage", scopeType: "project" },
       });
     });
+  });
+});
+
+describe("given a project-bound access token held by an organization admin", () => {
+  const ctx = {
+    permissions: { sessionHolds: async () => true, apiKeyHolds: async () => false },
+    actor: { kind: "cliAccessToken" as const, userId: "user_1", projectId: "proj_demo" },
+  };
+
+  /** @scenario A project-bound access token cannot write gateway keys outside its project */
+  it("refuses a team scope, another project and an organization-owned row", async () => {
+    await expect(
+      service.assertActorCanCreateScopes(ctx, { scopes: [TEAM], callerProjectId: "proj_demo" }),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanCreateScopes(ctx, {
+        scopes: [OTHER_PROJECT],
+        callerProjectId: "proj_demo",
+      }),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanOperateAtOrganization(ctx, {
+        organizationId: "org_1",
+        permission: "virtualKeys:manage",
+      }),
+    ).rejects.toThrow(PermissionDeniedError);
+  });
+
+  it("changes only a key scoped to its own project alone", async () => {
+    await expect(
+      service.assertActorCanOperateOnAnyScope(ctx, [PROJECT, TEAM], "virtualKeys:update"),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanOperateOnAnyScope(ctx, [PROJECT], "virtualKeys:update"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("acts as the person at its own project", async () => {
+    await expect(
+      service.assertActorCanCreateScopes(ctx, { scopes: [PROJECT], callerProjectId: "proj_demo" }),
+    ).resolves.toBeUndefined();
   });
 });

@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Sub-unit range facets: slider step of 1 snaps to endpoints only; now respects unit.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -17,18 +17,16 @@ describe("RangeSection", () => {
 
   describe("when the facet span is sub-unit", () => {
     it("moves the thumb by the span-sized step on a keyboard increment", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <RangeSection
-            title="Cost"
-            field="cost"
-            min={0}
-            max={0.0139}
-            formatValue={(v) => `$${v.toFixed(4)}`}
-            onChange={vi.fn()}
-            onClear={vi.fn()}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <RangeSection
+          title="Cost"
+          field="cost"
+          min={0}
+          max={0.0139}
+          formatValue={(v) => `$${v.toFixed(4)}`}
+          onChange={vi.fn()}
+          onClear={vi.fn()}
+        />,
       );
 
       // Sections mount collapsed; the slider only mounts on expand.

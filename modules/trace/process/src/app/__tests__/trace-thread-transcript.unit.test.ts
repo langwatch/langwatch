@@ -1,12 +1,12 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ChatMessage, Span, Trace, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { TraceApp, type TraceAppDependencies } from "../trace.app.ts";
+import { TraceModule, type TraceAppDependencies } from "../trace.app.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 
 function createTraceApp(): TraceApi {
-  return TraceApp.create(
+  return TraceModule.create(
     createApiFixture<TraceAppDependencies>({
       traces: createApiFixture<TraceAppDependencies["traces"]>({
         read: createApiFixture<TraceLegacyRead>(),

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * What `POST /api/evaluations/batch/log_results` tells a caller when the write
@@ -7,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type * as observabilityModule from "@langwatch/observability";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { evaluationsLegacyRest } from "../evaluations-legacy.rest.ts";

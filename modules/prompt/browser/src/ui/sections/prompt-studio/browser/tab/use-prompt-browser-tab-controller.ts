@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
 import { usePrompts } from "../../../../../behavior/use-prompts.ts";
 import { useTabById } from "../../../../../behavior/use-tab-by-id.ts";
+import { useWarnBeforeReload } from "../../../../../behavior/use-warn-before-reload.ts";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
 import { useTabId } from "../../studio-internals.ts";
 import { usePromptTabSummary } from "./use-prompt-tab-summary.ts";
@@ -26,6 +27,8 @@ export function usePromptBrowserTabController() {
 
   const configId = tab?.data.form.currentValues?.configId;
   const isNewPrompt = !configId;
+  // A tab still loading has nothing of the reader's in it yet.
+  useWarnBeforeReload({ isUnsaved: hasUnsavedChanges && !tab?.data.loading });
 
   const { getPromptById } = usePrompts();
 

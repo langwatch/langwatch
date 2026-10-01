@@ -12,7 +12,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { ScimApp } from "../app/scim.app.ts";
+import type { ScimModule } from "../app/scim.app.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import {
   SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
@@ -32,7 +32,7 @@ export const SCIM_MAINTENANCE_PIPELINE_NAME = "scim_maintenance";
 export function buildScimMaintenance({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<ScimApp, "sweepExpiredRequests">>): StaticPipelineDefinition<never> {
+}: EventingSetup<unknown, Pick<ScimModule, "sweepExpiredRequests">>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: SCIM_MAINTENANCE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
@@ -59,5 +59,5 @@ export function buildScimMaintenance({
 
 export const scimEventing = defineEventingModule({
   pipeline: SCIM_MAINTENANCE_PIPELINE_NAME,
-  build: (setup: EventingSetup<ScimRepositories, ScimApp>) => buildScimMaintenance(setup),
+  build: (setup: EventingSetup<ScimRepositories, ScimModule>) => buildScimMaintenance(setup),
 });

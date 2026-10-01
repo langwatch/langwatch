@@ -99,6 +99,13 @@ export abstract class WorkflowRepository {
   abstract updateAutoSavedVersion(
     input: PersistWorkflowVersionInput & { id: string },
   ): Promise<WorkflowVersion>;
+  /** Replaces a version's graph only while it is as it was read; false when a write came between. */
+  abstract updateVersionDslIfUnchanged(input: {
+    id: string;
+    projectId: string;
+    dsl: WorkflowDsl;
+    updatedAt: Date;
+  }): Promise<boolean>;
   abstract setVersionPointers(input: {
     id: string;
     projectId: string;

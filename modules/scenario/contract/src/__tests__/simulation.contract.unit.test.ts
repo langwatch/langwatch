@@ -19,7 +19,7 @@ describe("Simulation contract", () => {
   });
 
   /**
-   * `ScenarioApp.queueSimulationRun` records the scenario version under the
+   * `ScenarioModule.queueSimulationRun` records the scenario version under the
    * reserved namespace, and the REST door answers it. The namespace is
    * strict, so an undeclared field is silently dropped rather than surfaced.
    */

@@ -3,12 +3,12 @@
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { SuiteRunConfirmationDialog } from "@langwatch/suite-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { SuiteRunConfirmationDialog } from "../../../ui/elements/suite/dialogs/suite-run-confirmation-dialog.tsx";
 import type { SimulationSuite } from "../../scenario-api.ts";
 import { useRunSuite } from "../use-run-suite.ts";
 
@@ -19,14 +19,20 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../scenario-api.ts", () => ({
   api: {
-    useUtils: () => ({
-      scenarios: { getSuiteRunData: { invalidate: vi.fn() } },
-    }),
+    useUtils: () => ({}),
     suites: {
       run: {
         useMutation: () => ({ mutate: mocks.mutate, isPending: false }),
       },
     },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: { getSuiteRunData: { invalidate: vi.fn() } },
+    }),
     scenarios: {
       getAll: {
         useQuery: () => ({ data: mocks.scenarios, isLoading: false }),
@@ -43,7 +49,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
 }));
 
-vi.mock("../../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project_1", slug: "test-project" },
   }),
@@ -85,11 +91,7 @@ function RunSuiteHarness() {
 
 async function openConfirmation() {
   const user = userEvent.setup();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <RunSuiteHarness />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<RunSuiteHarness />);
   await user.click(screen.getByText("Open confirmation"));
   return user;
 }

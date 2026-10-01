@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -49,11 +49,7 @@ const SPANS = [
 ];
 
 function renderStrip() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TurnSteps traceId="trace-1" occurredAtMs={1000} spanCount={2} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TurnSteps traceId="trace-1" occurredAtMs={1000} spanCount={2} />);
 }
 
 describe("TurnSteps", () => {
@@ -102,11 +98,7 @@ describe("TurnSteps", () => {
 
   describe("given a turn with no spans", () => {
     it("renders nothing rather than an empty affordance", () => {
-      const { container } = render(
-        <ChakraProvider value={defaultSystem}>
-          <TurnSteps traceId="trace-1" spanCount={0} />
-        </ChakraProvider>,
-      );
+      const { container } = renderWithDesignSystem(<TurnSteps traceId="trace-1" spanCount={0} />);
 
       expect(container).toBeEmptyDOMElement();
     });

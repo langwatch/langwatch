@@ -3,8 +3,8 @@
  *
  * Unit tests for the show-once drawer spotlight queue.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -52,11 +52,7 @@ function addAnchor(anchor: string): HTMLElement {
 }
 
 function renderDrawerSpotlights(traceId = "trace-1") {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DrawerSpotlights traceId={traceId} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<DrawerSpotlights traceId={traceId} />);
 }
 
 afterEach(() => {

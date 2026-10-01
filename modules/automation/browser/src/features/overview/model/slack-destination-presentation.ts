@@ -4,8 +4,12 @@
  * call (#6244, ADR-093 §5a).
  */
 import type { SlackDeliveryMethod, slackActionParamsSchema } from "@langwatch/automation-contract";
-import { findSlackConnection, type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import type { z } from "zod";
+
+import {
+  findSlackConnection,
+  type NamedSlackConnection,
+} from "../../../model/slack/slack-connection-name.ts";
 
 type SlackActionParams = z.infer<typeof slackActionParamsSchema>;
 

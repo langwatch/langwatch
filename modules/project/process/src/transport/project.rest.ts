@@ -18,7 +18,7 @@ import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import {
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
@@ -57,7 +57,7 @@ const PROJECT_NOT_FOUND: Readonly<{ status: 404; description: string }> = {
 };
 
 /**
- * What the management door reaches: flat operations `ProjectApp` serves via
+ * What the management door reaches: flat operations `ProjectModule` serves via
  * `implements ProjectManagementApi`, so an unsupplied member fails the build.
  * Reads mirror {@link ProjectApi} and {@link DataPrivacyApi}; five are its own.
  */

@@ -24,10 +24,10 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/actor/tsconfig.build.json"
+      "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
+      "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../packages/license-signing/tsconfig.build.json"
@@ -54,10 +54,10 @@
       "path": "../../../../packages/internal-slack/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/ksuid/tsconfig.build.json"
+      "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
@@ -70,6 +70,9 @@
     },
     {
       "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/process-stores/tsconfig.build.json"

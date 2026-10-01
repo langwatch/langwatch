@@ -1,15 +1,15 @@
 /**
  * @vitest-environment node
  * /api/gateway/v1 refusals raised by the shared gateway services, through the
- * real GatewayApp and the production error mapping.
+ * real GatewayModule and the production error mapping.
  * @see specs/ai-gateway/public-rest-api.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -17,7 +17,7 @@ import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import {
   gatewayKeyCaller,
   gatewayPlatformRest,
@@ -53,7 +53,7 @@ async function mount() {
     gatewayBudget: { findFirst: async () => null },
     virtualKey: { findFirst: async () => null },
   });
-  const app = await GatewayApp.create({
+  const app = await GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -71,6 +71,7 @@ async function mount() {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma,
@@ -98,7 +99,7 @@ async function mount() {
   const keyDoor = () => ({ ...door(), scope: { tier: "organization" as const, id: ORG_ID } });
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {
       const response = await handler();
       return { isReplayed: false, status: response.status, response };

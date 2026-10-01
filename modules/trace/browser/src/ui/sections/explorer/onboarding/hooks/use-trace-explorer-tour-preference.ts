@@ -8,10 +8,7 @@ import { api } from "../../../../../behavior/trace-api.ts";
  */
 export function useTraceExplorerTourPreference() {
   const utils = api.useUtils();
-  const preference = api.user.getTraceExplorerTourPreference.useQuery(
-    {},
-    { staleTime: Number.POSITIVE_INFINITY },
-  );
+  const preference = api.user.getTraceExplorerTourPreference.useQuery({});
   const dismissMutation = api.user.dismissTraceExplorerTour.useMutation({
     onMutate: async () => {
       await utils.user.getTraceExplorerTourPreference.cancel({});

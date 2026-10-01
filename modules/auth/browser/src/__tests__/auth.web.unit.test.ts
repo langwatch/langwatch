@@ -1,9 +1,11 @@
 /** @vitest-environment jsdom */
 
-import { createUi } from "@langwatch/ui-kernel";
-import { describe, expect, it } from "vitest";
+import { SsoTestSignInToken } from "@langwatch/auth-contract";
+import { createUi } from "@langwatch/browser";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { authWeb } from "../auth.web.ts";
+import { signInCapability } from "../behavior/sign-in-capability.ts";
 
 function browserDocument() {
   const mount = document.createElement("div");
@@ -40,6 +42,35 @@ describe("given a browser that installs auth", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
+    });
+  });
+
+  describe("when SSO's test sign-in loads what auth lent under its token", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("starts auth's sign-in for that connection and hands back the refusal", async () => {
+      const fetch = vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ code: "PROVIDER_NOT_FOUND", message: "No provider" }), {
+          status: 404,
+        }),
+      );
+      vi.stubGlobal("fetch", fetch);
+      const lend = authWeb.installation.lends.find(
+        (lent) => lent.token.key === SsoTestSignInToken.key,
+      );
+      const loaded = lend && "load" in lend ? await lend.load() : undefined;
+      expect(loaded).toHaveProperty("default", signInCapability);
+
+      const answer = await signInCapability.testSignIn({
+        connectionId: "conn_1",
+        callbackQuery: {},
+      });
+
+      expect(fetch).toHaveBeenCalledWith("/api/auth/sign-in/sso", expect.anything());
+      expect(fetch.mock.calls[0]?.[1]).toMatchObject({
+        body: expect.stringContaining('"providerId":"conn_1"'),
+      });
+      expect(answer.error).toMatchObject({ code: "PROVIDER_NOT_FOUND", status: 404 });
     });
   });
 });

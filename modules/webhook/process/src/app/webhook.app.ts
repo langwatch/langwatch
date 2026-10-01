@@ -1,8 +1,11 @@
 import { AwsClientConfiguration } from "@langwatch/aws-client";
 import { parseOutboundProxyConfig } from "@langwatch/egress";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender, ProcessStore } from "@langwatch/eventing";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
+import type {
+  EventingCommandSender,
+  EventingParticipation,
+  ProcessStore,
+} from "@langwatch/eventing";
 /**
  * The webhook feature's application: what both doors (tRPC and REST) call.
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
@@ -10,6 +13,7 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
  */
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -117,7 +121,7 @@ export interface WebhookAppDependencies {
   health?: Pick<WebhookHealthService, "health">;
   /**
    * The emitted-events log. Undefined on a deployment without ClickHouse —
-   * the log has no fallback store — which {@link WebhookApp.getEventsService}
+   * the log has no fallback store — which {@link WebhookModule.getEventsService}
    * reports as a plain "not configured" failure.
    */
   events: WebhookEventsService | undefined;
@@ -143,7 +147,7 @@ export interface WebhookAppDependencies {
 const storeReads = ["rateLimiter"] as const;
 
 type WebhookSetup = FeatureSetup<
-  typeof WebhookApp.dependencies,
+  typeof WebhookModule.dependencies,
   MembersRead<typeof storeReads> &
     Readonly<{
       isSaas: boolean;
@@ -162,16 +166,16 @@ type WebhookDeliveryParts = Readonly<{
   dispatch: () => WebhookDeliveryProcessDeps["dispatch"];
 }>;
 
-export class WebhookApp implements WebhookApiContract {
+export class WebhookModule implements WebhookApiContract {
   static readonly contract = WebhookApi;
   /** The entitlement peer this app's own plan gate reads, composed in
-   *  {@link WebhookApp.create} (`WebhookAccessService`). */
+   *  {@link WebhookModule.create} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
   static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
 
-  static create(input: WebhookSetup): WebhookApp {
+  static create(input: WebhookSetup): WebhookModule {
     const { entitlement } = input.dependencies;
     const access = WebhookAccessService.create(entitlement);
     const caps = WebhookDispatchCapService.create({ caps: input.repositories.dispatchCaps });
@@ -198,7 +202,7 @@ export class WebhookApp implements WebhookApiContract {
       }),
     });
 
-    const app = new WebhookApp({
+    const app = new WebhookModule({
       endpoints: input.repositories.endpoints,
       events: WebhookEventsService.create({
         tenants: input.repositories.tenants,
@@ -278,8 +282,8 @@ export class WebhookApp implements WebhookApiContract {
   /** Compatibility construction used by process roots and tests not yet on
    *  FeatureSetup — kept off the `create` property itself, since the
    *  installer requires `create` to carry exactly one call signature. */
-  static fromDependencies(dependencies: WebhookAppDependencies): WebhookApp {
-    return new WebhookApp(dependencies);
+  static fromDependencies(dependencies: WebhookAppDependencies): WebhookModule {
+    return new WebhookModule(dependencies);
   }
 
   #dependencies: WebhookAppDependencies;
@@ -417,8 +421,8 @@ export class WebhookApp implements WebhookApiContract {
    */
   withEntitlement(
     assertEndpointsEntitled: WebhookAppDependencies["assertEndpointsEntitled"],
-  ): WebhookApp {
-    return WebhookApp.fromDependencies({ ...this.#dependencies, assertEndpointsEntitled });
+  ): WebhookModule {
+    return WebhookModule.fromDependencies({ ...this.#dependencies, assertEndpointsEntitled });
   }
 
   /** Endpoint mutation and read. */

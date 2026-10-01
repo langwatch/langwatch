@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -11,7 +11,7 @@ import { CliTokenIdentity, type CliTokenPresented } from "../cli-token-identity.
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import type { RestAuditRow } from "../runtime.ts";
+import type { RestAuditRow } from "../../hosting/api-door.ts";
 
 const NOW = Date.parse("2026-09-25T12:00:00Z");
 
@@ -23,13 +23,19 @@ const declaration = defineRestRouter(Api)
   .withNamespace("cli-token")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
-  .withCredential("cliToken")
+  .withCredential("cli_token", {
+    session: z.object({
+      tokenKey: z.string(),
+      cliApiKeyId: z.string().optional(),
+      clientInfo: z.object({ deviceLabel: z.string(), hostname: z.string() }).optional(),
+    }),
+  })
   .get("/api/cli-token/me", "cliTokenMe")
   .withAudit("cli-token.me")
   .withAccess(anyAuthenticated({ reason: "the CLI token door fixture" }))
   .withOutput(z.object({ userId: z.string(), organizationId: z.string(), session: z.unknown() }))
-  .handle(({ app, actor, scope }) =>
-    app.whoAmI({ userId: actor.id, organizationId: scope.id, session: actor.cliSession }),
+  .handle(({ app, actor, scope, session }) =>
+    app.whoAmI({ userId: actor.id, organizationId: scope.id, session }),
   )
   .build();
 
@@ -38,6 +44,7 @@ const SESSIONS = new Map([
   ["lw_at_live", { expiresAt: NOW + 60_000, revoked: false }],
   ["lw_at_old", { expiresAt: NOW - 1, revoked: false }],
   ["lw_at_revoked", { expiresAt: NOW + 60_000, revoked: true }],
+  ["lw_at_keyless", { expiresAt: NOW + 60_000, revoked: false }],
 ]);
 
 function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) {
@@ -46,9 +53,9 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -63,6 +70,8 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
         throw new OrganizationInvalidCredentialsError();
       }
 
+      if (token === "lw_at_keyless") return { userId: "user-1", organizationId: "org-1" };
+
       return {
         userId: "user-1",
         organizationId: "org-1",
@@ -73,7 +82,7 @@ function hostWith(presented: CliTokenPresented[], audited: RestAuditRow[] = []) 
     },
   });
   host.mount(declaration.router(), () => ({ whoAmI: (input: WhoAmI) => input }), {
-    facts: [bindRestCredential("cliToken", () => door)],
+    facts: [bindRestCredential("cli_token", () => door)],
   });
 
   return host;
@@ -113,17 +122,24 @@ describe("the CLI token door", () => {
       expect(JSON.stringify(audited)).not.toContain("lw_at_live");
     });
 
-    it("masks the token key by name when an actor rides in the audited arguments", () => {
-      const actor = {
-        type: "user",
-        id: "user-1",
-        cliSession: { tokenKey: "lwcli:access:lw_at_live", cliApiKeyId: "key-1" },
-      };
+    it("masks the token key by name when a session rides in the audited arguments", () => {
+      const session = { tokenKey: "lwcli:access:lw_at_live", cliApiKeyId: "key-1" };
 
-      const redacted = JSON.stringify(redactAuditArgs({ input: { actor } }));
+      const redacted = JSON.stringify(redactAuditArgs({ input: { session } }));
 
       expect(redacted).not.toContain("lw_at_live");
       expect(redacted).toContain("key-1");
+    });
+  });
+
+  describe("given a session the route's schema refuses", () => {
+    it("answers 401 unauthorized, not a 500", async () => {
+      const response = await hostWith([]).app.request("/api/cli-token/me", {
+        headers: { authorization: "Bearer lw_at_keyless" },
+      });
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toMatchObject({ code: "unauthorized" });
     });
   });
 
@@ -163,9 +179,9 @@ describe("the CLI token door", () => {
         identities: {
           project: closed,
           organization: closed,
-          apiKey: closed,
-          scimToken: closed,
-          "instance-admin": closed,
+          api_key: closed,
+          scim_token: closed,
+          instance_admin: closed,
           browser: closed,
         },
         bearers: () => closed,

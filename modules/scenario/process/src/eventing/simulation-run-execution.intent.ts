@@ -37,6 +37,12 @@ export function createExecuteRunHandler(
       ...(payload.secretParameters !== undefined
         ? { secretParameters: payload.secretParameters }
         : {}),
+      ...(payload.startedByUserId !== undefined
+        ? { startedByUserId: payload.startedByUserId }
+        : {}),
+      ...(payload.startedByApiKeyId !== undefined
+        ? { startedByApiKeyId: payload.startedByApiKeyId }
+        : {}),
     });
     logger.info(
       { scenarioRunId: payload.scenarioRunId },

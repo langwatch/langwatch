@@ -5,6 +5,7 @@ import {
   type JoinRequestJoining,
   OrganizationService as OrganizationServiceContract,
   OrganizationNotFoundError,
+  OrganizationS3SecretRequiredError,
   PERSONAL_TEAM_ARCHIVE_REFUSAL,
   PersonalTeamProtectedError,
   TeamNotFoundError,
@@ -274,6 +275,10 @@ export class OrganizationService extends OrganizationServiceContract {
     input: UpdateOrganizationSettingsInput,
   ): Promise<UpdateOrganizationSettingsResult> {
     const parsed = updateOrganizationSettingsInputSchema.parse(input);
+    const keepsSecret = !!parsed.s3Endpoint && parsed.s3SecretAccessKey === undefined;
+    if (keepsSecret && !(await this.repository.hasStoredS3Secret(parsed.organizationId))) {
+      throw new OrganizationS3SecretRequiredError();
+    }
     const wasSharingEnabled =
       parsed.traceSharingEnabled === false
         ? (await this.repository.findStoredSettings(parsed.organizationId))?.traceSharingEnabled ===

@@ -92,6 +92,7 @@ describe("GuidedOnboardingOffer", () => {
   });
 
   describe("given a space that reads as empty", () => {
+    /** @scenario the offer shows on the project home under the search bar */
     /** @scenario the offer shows on the gateway, governance and personal homes */
     it("shows the pill in every space", () => {
       for (const space of ["project", "gateway", "governance", "me"] as const) {
@@ -99,6 +100,13 @@ describe("GuidedOnboardingOffer", () => {
         expect(pill()).toHaveTextContent("Start guided onboarding");
         unmount();
       }
+    });
+
+    /** @scenario a space the user never picked is offered too */
+    it("offers a space whose path was not among the picked ones", () => {
+      guided.state = guidedState({ paths: ["llmops"] });
+      renderOffer({ space: "governance", spaceInUse: false });
+      expect(pill()).not.toBeNull();
     });
 
     /** @scenario the offer is hidden while Langy is guiding that same space */
@@ -151,7 +159,47 @@ describe("GuidedOnboardingOffer", () => {
     });
   });
 
+  describe("given a space already in use", () => {
+    /** @scenario the offer is hidden on a project that already has traces */
+    it("stays hidden on a project that has traces", () => {
+      renderOffer({ space: "project", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a governance home with an ingestion source is not offered the guided onboarding */
+    it("stays hidden on a governance home that is in use", () => {
+      renderOffer({ space: "governance", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+
+    /** @scenario a personal home with a personal key or usage is not offered the guided onboarding */
+    it("stays hidden on a personal home that is in use", () => {
+      renderOffer({ space: "me", spaceInUse: true });
+      expect(pill()).toBeNull();
+    });
+  });
+
+  describe("given an organization outside the guided variant", () => {
+    /** @scenario an organization outside the guided variant is never offered it on the gateway, governance or personal pages */
+    it("shows no pill on the gateway, governance or personal homes", () => {
+      guided.state = guidedState({ variant: "classic" });
+      for (const space of ["gateway", "governance", "me"] as const) {
+        const { unmount } = renderOffer({ space, spaceInUse: false });
+        expect(pill()).toBeNull();
+        unmount();
+      }
+    });
+  });
+
   describe("when the pill is clicked", () => {
+    /** @scenario the offer is disabled while the path is being begun */
+    it("disables the pill until the path has begun", async () => {
+      beginPathMutate.mockReturnValue(new Promise(() => undefined));
+      renderOffer({ space: "gateway", spaceInUse: false });
+      fireEvent.click(pill() as HTMLElement);
+      await waitFor(() => expect(pill()).toBeDisabled());
+    });
+
     /** @scenario clicking the offer begins the path and runs its tour */
     it("begins the path, docks Langy and starts the tour", async () => {
       renderOffer({ space: "gateway", spaceInUse: false });

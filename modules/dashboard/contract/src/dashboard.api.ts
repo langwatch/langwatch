@@ -7,7 +7,7 @@ import type {
   LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import type { Trigger } from "@langwatch/automation-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { Dashboard, DashboardSummary } from "./dashboard.ts";
 import type { Graph, GraphLayout } from "./graph.ts";

@@ -18,7 +18,7 @@ on:
       # variable the chart sets must still be declared somewhere
       # (env-contract.mjs); without these paths a code change breaks either
       # while the chart CI never runs.
-      - "packages/process-server/src/**"
+      - "packages/process/src/**"
       - "packages/process-stores/src/config-owner.ts"
       - "packages/secrets/src/shared-secrets.ts"
       - "packages/config/src/**"
@@ -53,7 +53,7 @@ on:
       # variable the chart sets must still be declared somewhere
       # (env-contract.mjs); without these paths a code change breaks either
       # while the chart CI never runs.
-      - "packages/process-server/src/**"
+      - "packages/process/src/**"
       - "packages/process-stores/src/config-owner.ts"
       - "packages/secrets/src/shared-secrets.ts"
       - "packages/config/src/**"

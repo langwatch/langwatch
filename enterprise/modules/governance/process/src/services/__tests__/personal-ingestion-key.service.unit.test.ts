@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ApiKey,
   type ApiKeyApi,
@@ -11,6 +8,9 @@ import {
   findPersonalWorkspaceInputSchema,
   type OrganizationService,
 } from "@langwatch/organization-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** The /me ingestion-key service over ApiKeyApi, pinned to main's ingestionKey.service.ts. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";

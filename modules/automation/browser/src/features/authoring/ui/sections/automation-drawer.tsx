@@ -34,7 +34,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { nowInstant } from "@langwatch/time";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -50,9 +49,11 @@ import {
   useCloseAddressedDrawer,
   useOrganizationTeamProject,
 } from "../../../../behavior/automation-session.ts";
+import { useAutomation } from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { readHandledError } from "../../../../model/handled-error.ts";
 import { type ConfigFormCtx } from "../../../../model/provider-types.ts";
+import type { NamedSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
 import {
   ALERT_TEMPLATE_VARIABLES,
   REPORT_TEMPLATE_VARIABLES,
@@ -314,10 +315,7 @@ export function AutomationDrawer({
   });
 
   // Edit prefill from the saved trigger.
-  const triggerQuery = api.automation.getTriggerById.useQuery(
-    { triggerId: automationId ?? "", projectId },
-    { enabled: !!automationId && !!projectId },
-  );
+  const triggerQuery = useAutomation({ projectId, triggerId: automationId });
   // Gate hydration to the FIRST successful read per automationId. tRPC's
   // background refetch (window-focus, query invalidation) would otherwise
   // re-fire this effect mid-session and overwrite unsaved edits with the

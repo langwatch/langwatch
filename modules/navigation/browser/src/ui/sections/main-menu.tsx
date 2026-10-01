@@ -21,8 +21,6 @@ import { CollapsibleMenuGroup } from "../blocks/collapsible-menu-group.tsx";
 import { SideMenuLink } from "../blocks/side-menu-link.tsx";
 import { SidebarSection } from "./sidebar-section.tsx";
 
-export { MENU_WIDTH_COMPACT, MENU_WIDTH_EXPANDED } from "../../model/menu-widths.ts";
-
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group
  * is gone because the product switcher replaces it, and the Ops group because

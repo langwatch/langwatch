@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Spec: specs/support/crisp-bubble-suppression.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -11,10 +11,24 @@ const emptyQuery = { data: undefined, isLoading: false };
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
-    prompts: { getAllPromptsForProject: { useQuery: () => emptyQuery } },
     agents: { getAll: { useQuery: () => emptyQuery } },
-    dataset: { getAll: { useQuery: () => emptyQuery } },
     workflow: { getAll: { useQuery: () => emptyQuery } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    prompts: { getAllPromptsForProject: { useQuery: () => emptyQuery } },
+  },
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    dataset: { getAll: { useQuery: () => emptyQuery } },
+  },
+}));
+
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
     evaluators: { getAll: { useQuery: () => emptyQuery } },
   },
 }));
@@ -25,23 +39,21 @@ import { CommandPalette } from "../command-palette.tsx";
 function renderPalette({ query }: { query: string }) {
   const openSupportChat = vi.fn();
   const onDone = vi.fn();
-  const view = render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          deployment: { isSaaS: true },
-          supportChat: { open: openSupportChat },
-        }}
-      >
-        <CommandPalette
-          surface="dialog"
-          active={true}
-          query={query}
-          setQuery={() => undefined}
-          onDone={onDone}
-        />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  const view = renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        deployment: { isSaaS: true },
+        supportChat: { open: openSupportChat },
+      }}
+    >
+      <CommandPalette
+        surface="dialog"
+        active={true}
+        query={query}
+        setQuery={() => undefined}
+        onDone={onDone}
+      />
+    </WithStubNavigationHost>,
   );
   return { ...view, openSupportChat, onDone };
 }

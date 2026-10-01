@@ -1,6 +1,7 @@
 import type { AuthzAdmissionRepository } from "./authz-admission.repository.ts";
 import type { AuthzCutoverRepository } from "./authz-cutover.repository.ts";
 import type { AuthzManagedGrantRepository } from "./authz-managed-grant.repository.ts";
+import type { AuthzUserStandingRepository } from "./authz-user-standing.repository.ts";
 
 /**
  * The rows the authz module selects at boot. The epoch is deliberately
@@ -11,4 +12,5 @@ export interface AuthzRepositories {
   readonly bindings: AuthzManagedGrantRepository;
   readonly cutover: AuthzCutoverRepository;
   readonly admissions: AuthzAdmissionRepository;
+  readonly userStandings: AuthzUserStandingRepository;
 }

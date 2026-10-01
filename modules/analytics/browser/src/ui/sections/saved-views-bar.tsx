@@ -35,9 +35,9 @@ import { Check, MoreVertical, User, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useRef, useState } from "react";
 
+import { useSavedViews } from "../../behavior/use-saved-views.tsx";
 import { type ViewBadgeColors, viewBadgeColors } from "../../model/saved-view-colors.ts";
-import type { SavedView } from "./saved-views-logic.ts";
-import { useSavedViews } from "./use-saved-views.tsx";
+import type { SavedView } from "../../model/saved-views-logic.ts";
 
 function badgeCursor({ isEditMode, isDefault }: { isEditMode: boolean; isDefault: boolean }) {
   if (!isEditMode) return "pointer";

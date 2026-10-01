@@ -1,13 +1,13 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */
 import { ScenarioTestSuiteNotFoundError, type ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createSuiteTestApp } from "./suite.fixture.ts";
 
-describe("SuiteApp test-suite mutations", () => {
+describe("SuiteModule test-suite mutations", () => {
   /** @scenario "Renaming a missing suite reports the suite error" */
   it("translates a missing scenario test suite while renaming at the app boundary", async () => {
     const renameTestSuite = vi

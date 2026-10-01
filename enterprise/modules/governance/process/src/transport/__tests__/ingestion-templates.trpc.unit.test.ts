@@ -1,15 +1,15 @@
+import type {
+  CreateIngestionTemplateInput,
+  GovernanceRestApi,
+  IngestionTemplate,
+} from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * `ingestionTemplates.*` over the real tRPC runtime, pinned to main's wire
  * (platform/app/ee/governance/routers/ingestionTemplates.ts on origin/main).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  CreateIngestionTemplateInput,
-  GovernanceRestApi,
-  IngestionTemplate,
-} from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ingestionTemplatesTrpcTransport } from "../ingestion-templates.trpc.ts";

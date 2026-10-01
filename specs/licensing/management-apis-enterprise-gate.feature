@@ -72,7 +72,7 @@ Feature: Management APIs require an Enterprise plan
   # The Background above is deliberately the unlicensed case; this Rule is its
   # counterpart. A stored, signature-verified Enterprise license resolves the
   # Enterprise plan through the SAME entitlement peer the gate above reads
-  # (`organization.server.ts`'s `requireEnterprise`), so proving the grant here
+  # (`organization.module.ts`'s `requireEnterprise`), so proving the grant here
   # is proving the whole gate, not a second gate that happens to agree.
 
   Rule: An activated Enterprise license grants the management APIs
@@ -115,7 +115,7 @@ Feature: Management APIs require an Enterprise plan
   # The gate never checks a license directly — it asks the entitlement peer for
   # the active plan, and the plan resolves from whichever source a valid
   # signature names first. These name the resolution itself, at the boundary
-  # `EntitlementApp` owns, so a plan the gate above trusts is provably the plan
+  # `EntitlementModule` owns, so a plan the gate above trusts is provably the plan
   # this resolved.
 
   Rule: A stored license resolves the plan it grants, or degrades safely when it does not

@@ -1,19 +1,9 @@
 import type { GovernanceOcsfExportRow } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
 
+import { createGovernanceProjectApi } from "../../__tests__/testing.ts";
 import type { GovernanceOcsfEventsReader } from "../../app/governance.members.ts";
-import { GovernanceOcsfExportRepository } from "../../repositories/governance-setup-state.repository.ts";
 import { DefaultGovernanceOcsfExportService } from "../ocsf-export.service.ts";
-
-class FixedTenantRepository extends GovernanceOcsfExportRepository {
-  constructor(private readonly tenantId: string | null) {
-    super();
-  }
-
-  async findGovernanceTenantId(): Promise<string | null> {
-    return this.tenantId;
-  }
-}
 
 class FixedEventReader implements GovernanceOcsfEventsReader {
   readonly findAll = vi.fn(async (): Promise<GovernanceOcsfExportRow[]> => []);
@@ -47,7 +37,7 @@ describe("DefaultGovernanceOcsfExportService", () => {
   it("returns an empty page without reading events when no tenant exists", async () => {
     const events = new FixedEventReader();
     const page = await DefaultGovernanceOcsfExportService.create({
-      repository: new FixedTenantRepository(null),
+      projects: createGovernanceProjectApi(() => null),
       events,
     }).list({ organizationId: "organization", sinceMs: 0, limit: 500 });
 
@@ -64,7 +54,7 @@ describe("DefaultGovernanceOcsfExportService", () => {
     const events = new FixedEventReader();
     events.findAll.mockResolvedValue([event("event-1", 100), event("event-2", 100)]);
     const page = await DefaultGovernanceOcsfExportService.create({
-      repository: new FixedTenantRepository("tenant"),
+      projects: createGovernanceProjectApi(() => "tenant"),
       events,
     }).list({
       organizationId: "organization",
@@ -89,7 +79,7 @@ describe("DefaultGovernanceOcsfExportService", () => {
   it("fails clearly when a tenant exists without event storage", async () => {
     await expect(
       DefaultGovernanceOcsfExportService.create({
-        repository: new FixedTenantRepository("tenant"),
+        projects: createGovernanceProjectApi(() => "tenant"),
       }).list({ organizationId: "organization", sinceMs: 0, limit: 1 }),
     ).rejects.toThrow("OCSF event storage is not configured");
   });

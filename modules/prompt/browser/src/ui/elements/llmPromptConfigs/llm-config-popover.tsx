@@ -1,16 +1,14 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Popover } from "@langwatch/design-system/popover";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { allModelOptions } from "@langwatch/model-provider-browser-kit";
-import {
-  getParameterConfigWithModelOverrides,
-  getParamValue,
-  type LLMConfigValues,
-  ParameterRow,
-} from "@langwatch/prompt-browser-kit";
+import { allModelOptions } from "@langwatch/model-provider-contract";
 
 import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
 import { useLlmConfigPopoverState } from "../../../behavior/use-llm-config-popover-state.ts";
+import { type LLMConfigValues } from "../../sections/llm-parameters/llm-config-values.types.ts";
+import { getParameterConfigWithModelOverrides } from "../../sections/llm-parameters/parameter-config.ts";
+import { ParameterRow } from "../../sections/llm-parameters/parameter-row.tsx";
+import { getParamValue } from "../../sections/llm-parameters/parameter-value.utils.ts";
 import { type Output, OutputsSection, type OutputType } from "../outputs/outputs-section.tsx";
 
 // Default output when structured outputs is disabled

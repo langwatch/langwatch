@@ -1,4 +1,3 @@
-import { SegmentGroup } from "@chakra-ui/react";
 /**
  * "Edit API key": the same ceiling as create, on a key that already
  * exists. Selections are clamped TWICE — a stored or pre-existing level
@@ -15,6 +14,9 @@ import {
 import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
+import { TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -33,13 +35,14 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
+import { StatusCard } from "../blocks/status-card.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;
 type MyBindings = {
   data: NamedApiKeyBinding[] | undefined;
   isLoading: boolean;
+  isError: boolean;
 };
 type OrgProject = { id: string; name: string; teamId: string };
 type OrgTeam = { id: string; name: string };
@@ -247,7 +250,7 @@ export function EditApiKeyDrawer({
   const hasAnySelection =
     permissionMode === "all" || Object.values(categorySelections).some((v) => v !== "none");
 
-  const canSave = name.trim() && !isUpdating && hasAnySelection;
+  const canSave = name.trim() && !isUpdating && !myBindings.isError && hasAnySelection;
 
   return (
     <Drawer.Root
@@ -265,6 +268,12 @@ export function EditApiKeyDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={5} align="start">
+            {myBindings.isError && (
+              <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
+                A key can only carry the access you hold, so it can't be saved until it loads. Close
+                this drawer and try again.
+              </StatusCard>
+            )}
             {/* Name */}
             <VStack gap={1} align="start" width="full">
               <Text fontWeight="600" fontSize="sm">

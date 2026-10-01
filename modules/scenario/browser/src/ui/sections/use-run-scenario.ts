@@ -1,9 +1,9 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type { RunParameterValues } from "@langwatch/scenario-contract";
 import { useCallback, useState } from "react";
 
-import { api } from "../../behavior/scenario-api.ts";
 import { useModelProvidersSettings } from "../../behavior/use-model-providers-settings.ts";
 import { type PollResult, pollForScenarioRun } from "../../model/poll-for-scenario-run.ts";
 import type { ScenarioFailureAction } from "../../model/scenario-host.ts";
@@ -127,8 +127,14 @@ export function useRunScenario({
   onRunComplete,
   onRunFailed,
 }: UseRunScenarioOptions) {
-  const utils = api.useUtils();
-  const runMutation = api.scenarios.run.useMutation();
+  const utils = scenarioClient.useUtils();
+  const runMutation = scenarioClient.scenarios.run.useMutation({
+    onSuccess: () => {
+      void utils.scenarios.getSuiteRunData.invalidate();
+      void utils.scenarios.getExternalSetSummaries.invalidate();
+      void utils.scenarios.getLastResultSummaries.invalidate();
+    },
+  });
   const [isPolling, setIsPolling] = useState(false);
 
   // Check if any model providers are configured

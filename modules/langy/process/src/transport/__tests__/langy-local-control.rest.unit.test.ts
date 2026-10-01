@@ -1,7 +1,7 @@
-/** The control family hands the door's actor to one operation and answers its result (§8). */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import { type LangyApi, LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
+/** The control family hands the door's actor to one operation and answers its result (§8). */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalControlDatedRests, langyLocalControlRest } from "../langy-local-control.rest.ts";

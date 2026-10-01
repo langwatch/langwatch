@@ -1,6 +1,6 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { Evaluator } from "@langwatch/evaluator-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
 import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
@@ -16,6 +16,7 @@ import type {
   PublishWorkflowCommand,
   RunWorkflowCommand,
   UpdateWorkflowCommand,
+  WorkflowRunPrincipal,
 } from "./workflow.commands.ts";
 import type {
   WorkflowCascadeArchive,
@@ -234,11 +235,14 @@ export interface WorkflowApi {
   prepareStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    /** Who the run acts as; absent, the run gets an ownerless key bound to the project. */
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent>;
   /** A peer's inbound Studio event, prepared the same way before it re-enters the graph. */
   enrichStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent>;
   /** The evaluator-fields shape a peer's guard and run read off this workflow. */
   getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
@@ -369,6 +373,7 @@ export interface WorkflowApi {
     workflowId: string;
     projectId: string;
     body: Readonly<Record<string, unknown>>;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<WorkflowRunAnswer>;
   toggleSaveAsEvaluator(input: {
     workflowId: string;

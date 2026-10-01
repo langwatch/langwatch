@@ -19,7 +19,7 @@ often broken:
   untagged `.feature` reports `0/0 bound` and reads green.
 - A test that renders a component is `.integration.test.tsx` with a
   `// @vitest-environment jsdom` docblock; no config sets a global environment.
-- Doubles: `createApiFixture<XApi>({…})` from `@langwatch/api-fixture` (throws
+- Doubles: `createApiFixture<XApi>({…})` from `@langwatch/test-harness/api-fixture` (throws
   by name on anything unconfigured) and `createTestLogger()` from
   `@langwatch/test-harness`. A `{ getById: vi.fn() }` bag is a defect.
 - Installation tests run the production chain with `memoryStores()`

@@ -5,7 +5,7 @@ import { VirtualKeyDirectBudgetRepository } from "../gateway-virtual-key-direct-
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the direct-budget read binds to. */
-export type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget" | "project">;
+export type VirtualKeyDirectBudgetDatabase = Pick<PrismaClient, "gatewayBudget">;
 
 /** Private Prisma owner for the cap a virtual key carries on itself. */
 export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudgetRepository {
@@ -39,18 +39,5 @@ export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudg
     });
 
     return rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetRow(row));
-  }
-
-  async findProjectIdsInOrganization({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string[]> {
-    const projects = await this.database.project.findMany({
-      where: { team: { organizationId } },
-      select: { id: true },
-    });
-
-    return projects.map((project) => project.id);
   }
 }

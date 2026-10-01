@@ -1,9 +1,10 @@
+import type { PrincipalRef } from "@langwatch/authorization";
 import type {
   InstantEvalEstimateWire,
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { ExportProgressEvent } from "./export-progress.trpc.ts";
@@ -236,8 +237,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     traceId: string;
     format: "digest" | "json";
     projectSlug: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Record<string, unknown>>;
   /** One trace through the viewer's protections; refuses with `TraceNotFoundError`. */
   getTraceForViewer(input: {
@@ -270,8 +270,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTraceFacetsForApiKey(input: {
     projectId: string;
     query: TraceFacetsQuery;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<TraceFacetsAnswer>;
   /** The discover vocabulary, or the facet counts under `query` when one is given. */
   readDiscoverForQuery(input: {
@@ -364,12 +363,11 @@ export interface TraceApi extends TraceOtlpIngestApi {
   /**
    * The same redactions for an API-KEY caller: the public branch of every
    * content category, plus the credential's own `cost:view` grant. A legacy
-   * project key (`apiKeyId: null`) predates RBAC and sees costs.
+   * project key (`principal: null`) predates RBAC and sees costs.
    */
   resolveApiKeyProtections(input: {
     projectId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Protections>;
   findExistingTraceIds(input: {
     projectId: string;
@@ -702,8 +700,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
   readTraceTranscript(input: {
     projectId: string;
     traceId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<unknown>;
   /**
    * Main's `PATCH /api/traces/:traceId/metadata`: one synthetic span carrying the metadata,

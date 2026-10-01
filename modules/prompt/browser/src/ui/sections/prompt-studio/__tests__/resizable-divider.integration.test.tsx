@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResizableDivider } from "../resizable-divider.tsx";
@@ -22,11 +22,7 @@ const renderDivider = (props: {
   };
 
   return {
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <ResizableDivider {...defaultProps} />
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<ResizableDivider {...defaultProps} />),
     ...defaultProps,
   };
 };
@@ -146,14 +142,12 @@ describe("ResizableDivider", () => {
 
       // When collapsed, hovering should show ChevronDown
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <ResizableDivider
-            isExpanded={false}
-            onPositionChange={vi.fn()}
-            onDragEnd={vi.fn()}
-            onToggle={vi.fn()}
-          />
-        </ChakraProvider>,
+        <ResizableDivider
+          isExpanded={false}
+          onPositionChange={vi.fn()}
+          onDragEnd={vi.fn()}
+          onToggle={vi.fn()}
+        />,
       );
       expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
     });

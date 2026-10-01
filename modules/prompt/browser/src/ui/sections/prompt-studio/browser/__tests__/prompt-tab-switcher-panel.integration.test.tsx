@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,18 +38,16 @@ function givenTabs(fixtures: Record<string, Partial<PromptTabSummary>>) {
 function renderSwitcher(props: Partial<React.ComponentProps<typeof PromptTabSwitcher>> = {}) {
   const onSelect = props.onSelect ?? vi.fn();
   const scrollerRef = props.scrollerRef ?? React.createRef<HTMLDivElement | null>();
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptTabSwitcher
-        tabIds={props.tabIds ?? ["summarizer", "classifier"]}
-        activeTabId={props.activeTabId ?? "summarizer"}
-        onSelect={onSelect}
-        scrollerRef={scrollerRef}
-        // The switcher only exists once the strip has run out of room, so that
-        // is the default here; the fits-in-the-strip case opts out explicitly.
-        isStripOverflowing={props.isStripOverflowing ?? true}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <PromptTabSwitcher
+      tabIds={props.tabIds ?? ["summarizer", "classifier"]}
+      activeTabId={props.activeTabId ?? "summarizer"}
+      onSelect={onSelect}
+      scrollerRef={scrollerRef}
+      // The switcher only exists once the strip has run out of room, so that
+      // is the default here; the fits-in-the-strip case opts out explicitly.
+      isStripOverflowing={props.isStripOverflowing ?? true}
+    />,
   );
   return { ...utils, onSelect, scrollerRef };
 }
@@ -90,15 +88,13 @@ describe("PromptTabSwitcher", () => {
       });
 
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <PromptTabSwitcher
-            tabIds={["summarizer", "classifier", "eval-judge"]}
-            activeTabId="summarizer"
-            onSelect={vi.fn()}
-            scrollerRef={React.createRef<HTMLDivElement | null>()}
-            isStripOverflowing
-          />
-        </ChakraProvider>,
+        <PromptTabSwitcher
+          tabIds={["summarizer", "classifier", "eval-judge"]}
+          activeTabId="summarizer"
+          onSelect={vi.fn()}
+          scrollerRef={React.createRef<HTMLDivElement | null>()}
+          isStripOverflowing
+        />,
       );
 
       expect(trigger(3)).toBeInTheDocument();
@@ -111,15 +107,13 @@ describe("PromptTabSwitcher", () => {
       });
 
       rerender(
-        <ChakraProvider value={defaultSystem}>
-          <PromptTabSwitcher
-            tabIds={["summarizer", "eval-judge"]}
-            activeTabId="summarizer"
-            onSelect={vi.fn()}
-            scrollerRef={React.createRef<HTMLDivElement | null>()}
-            isStripOverflowing
-          />
-        </ChakraProvider>,
+        <PromptTabSwitcher
+          tabIds={["summarizer", "eval-judge"]}
+          activeTabId="summarizer"
+          onSelect={vi.fn()}
+          scrollerRef={React.createRef<HTMLDivElement | null>()}
+          isStripOverflowing
+        />,
       );
 
       expect(trigger(2)).toBeInTheDocument();
@@ -280,15 +274,13 @@ describe("PromptTabSwitcher", () => {
           classifier: { title: "classifier" },
         });
         rerender(
-          <ChakraProvider value={defaultSystem}>
-            <PromptTabSwitcher
-              tabIds={["summarizer", "classifier"]}
-              activeTabId="summarizer"
-              onSelect={vi.fn()}
-              scrollerRef={React.createRef<HTMLDivElement | null>()}
-              isStripOverflowing
-            />
-          </ChakraProvider>,
+          <PromptTabSwitcher
+            tabIds={["summarizer", "classifier"]}
+            activeTabId="summarizer"
+            onSelect={vi.fn()}
+            scrollerRef={React.createRef<HTMLDivElement | null>()}
+            isStripOverflowing
+          />,
         );
 
         expect(
@@ -376,8 +368,8 @@ describe("PromptTabSwitcher", () => {
   describe("given prompts are split across two panes", () => {
     /** @scenario Splitting a prompt into a second pane splits the switchers */
     it("shows a switcher for the pane with two prompts and none for the pane with one", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
+      renderWithDesignSystem(
+        <>
           <PromptTabSwitcher
             tabIds={["summarizer", "classifier"]}
             activeTabId="summarizer"
@@ -392,7 +384,7 @@ describe("PromptTabSwitcher", () => {
             scrollerRef={React.createRef<HTMLDivElement | null>()}
             isStripOverflowing
           />
-        </ChakraProvider>,
+        </>,
       );
 
       expect(trigger(2)).toBeInTheDocument();
@@ -401,16 +393,14 @@ describe("PromptTabSwitcher", () => {
 
     /** @scenario Each pane's switcher lists only that pane's prompts */
     it("lists only the prompts belonging to its own pane", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <PromptTabSwitcher
-            tabIds={["eval-judge", "regression-check", "tone-check"]}
-            activeTabId="eval-judge"
-            onSelect={vi.fn()}
-            scrollerRef={React.createRef<HTMLDivElement | null>()}
-            isStripOverflowing
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <PromptTabSwitcher
+          tabIds={["eval-judge", "regression-check", "tone-check"]}
+          activeTabId="eval-judge"
+          onSelect={vi.fn()}
+          scrollerRef={React.createRef<HTMLDivElement | null>()}
+          isStripOverflowing
+        />,
       );
 
       const menu = await openSwitcher(3);

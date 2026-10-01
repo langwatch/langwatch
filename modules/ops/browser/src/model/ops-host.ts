@@ -8,7 +8,7 @@ import { createContext, useContext } from "react";
  * Only the Foundry asks for both halves at once, to post a generated trace
  * with the project's own API key.
  */
-export type OpsProject = { id: string; apiKey: string };
+export type OpsProject = { id: string };
 
 /** The path parameters and query string the screen was opened with. */
 export type OpsRouteReading = {

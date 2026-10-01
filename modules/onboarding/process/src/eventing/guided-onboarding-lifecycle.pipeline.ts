@@ -11,7 +11,7 @@ import {
   GUIDED_ONBOARDING_LIFECYCLE_PIPELINE_NAME,
 } from "@langwatch/onboarding-contract";
 
-import type { OnboardingApp } from "../app/onboarding.app.ts";
+import type { OnboardingModule } from "../app/onboarding.app.ts";
 import { RecordGuidedOnboardingCommand } from "./guided-onboarding-lifecycle.commands.ts";
 import {
   guidedOnboardingRecordedEventSchema,
@@ -38,6 +38,6 @@ export function buildGuidedOnboardingLifecyclePipeline(): GuidedOnboardingLifecy
 
 export const guidedOnboardingLifecycleEventing = defineEventingModule({
   pipeline: GUIDED_ONBOARDING_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, OnboardingApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<never, OnboardingModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

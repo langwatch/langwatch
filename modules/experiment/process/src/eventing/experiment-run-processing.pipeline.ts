@@ -14,7 +14,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { ExperimentApp } from "../app/experiment.app.ts";
+import type { ExperimentModule } from "../app/experiment.app.ts";
 import type {
   ExperimentRunPlanFoldState,
   ExperimentRunProgressState,
@@ -76,7 +76,7 @@ import {
 
 export const experimentRunProcessingEventing = defineEventingModule({
   pipeline: "experiment_run_processing",
-  build: ({ app }: EventingSetup<never, ExperimentApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<never, ExperimentModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });
 

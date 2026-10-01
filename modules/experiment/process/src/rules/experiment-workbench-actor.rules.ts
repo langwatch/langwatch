@@ -10,6 +10,7 @@ export const workbenchActorFrom = ({
 }: {
   credential: WorkbenchCredential | null | undefined;
 }): WorkbenchActor => {
+  if (credential?.kind === "cliAccessToken") return { userId: credential.userId, label: "api" };
   if (credential?.kind !== "apiKey") return { label: "api" };
   return {
     ...(credential.userId ? { userId: credential.userId } : {}),

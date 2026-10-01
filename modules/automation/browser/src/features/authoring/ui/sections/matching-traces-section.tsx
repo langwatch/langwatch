@@ -3,8 +3,9 @@ import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-sy
 import { nowInstant } from "@langwatch/time";
 import { useState } from "react";
 
-import { api, type RouterOutputs } from "../../../../behavior/automation-api.ts";
+import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
+import { useMatchingTraces } from "../../../../behavior/use-automation-reads.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
 
 /** How far back the on-demand run looks; the composer's live preview uses the same window. */
@@ -40,14 +41,10 @@ export function MatchingTracesSection({
   // Anchored when the reader asks, so two glances at the same panel agree.
   const [timeRange, setTimeRange] = useState(windowEndingNow);
 
-  const matches = api.traces.list.useQuery(
-    { projectId, timeRange, sort: MATCH_SORT, page: 1, pageSize: MATCH_PAGE_SIZE, query },
-    {
-      enabled: hasRun && !!projectId && query.trim().length > 0,
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const matches = useMatchingTraces({
+    input: { projectId, timeRange, sort: MATCH_SORT, page: 1, pageSize: MATCH_PAGE_SIZE, query },
+    enabled: hasRun && !!projectId && query.trim().length > 0,
+  });
 
   return (
     <VStack align="start" gap={2} width="full">

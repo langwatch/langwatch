@@ -3,7 +3,7 @@
  * The declared drawers ARE the registry the browser composes, so each name
  * the address bar may carry has to answer with a real component.
  */
-import { installedDrawerLoaders } from "@langwatch/ui-kernel";
+import { installedDrawerLoaders } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
 import { evaluatorWeb } from "../evaluator.web.ts";
@@ -16,6 +16,7 @@ describe("the evaluator browser declaration", () => {
       "codeEvaluatorEditor",
       "evaluatorCategorySelector",
       "evaluatorEditor",
+      "evaluatorHistory",
       "evaluatorList",
       "guardrails",
       "onlineEvaluation",

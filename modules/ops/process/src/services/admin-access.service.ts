@@ -1,35 +1,53 @@
-import type { AdminIdentity } from "@langwatch/ops-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AdminIdentity, OpsOperatorPermission } from "@langwatch/ops-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 export interface AdminAccess {
-  isAdmin(identity: AdminIdentity): boolean;
+  /** Whether the identity holds `ops:view` at the platform tier. */
+  isAdmin(identity: AdminIdentity): Promise<boolean>;
+  holds(input: { identity: AdminIdentity; permission: OpsOperatorPermission }): Promise<boolean>;
 }
 
 export interface AdminAccessServiceOptions {
-  adminEmails: string | readonly string[];
+  authz: Pick<AuthzApi, "can">;
+  users: Pick<UserApi, "findByEmail">;
 }
 
+/**
+ * Platform-operator access: the grant is on the account, asked of authz at the
+ * platform tier. An identity naming only an address is resolved to its account.
+ */
 export class AdminAccessService implements AdminAccess {
-  private readonly normalizedEmails: readonly string[];
-
-  private constructor(options: AdminAccessServiceOptions) {
-    this.normalizedEmails = AdminAccessService.parseEmails(options.adminEmails);
-  }
+  private constructor(private readonly options: AdminAccessServiceOptions) {}
 
   static create(options: AdminAccessServiceOptions): AdminAccessService {
     return new AdminAccessService(options);
   }
 
-  static parseEmails(value: string | readonly string[]): string[] {
-    const values = typeof value === "string" ? value.split(",") : value;
-
-    return values.map((email) => email.trim().toLowerCase()).filter((email) => email.length > 0);
+  isAdmin(identity: AdminIdentity): Promise<boolean> {
+    return this.holds({ identity, permission: "ops:view" });
   }
 
-  isAdmin(identity: AdminIdentity): boolean {
-    if (!identity.email) {
-      return false;
-    }
+  async holds({
+    identity,
+    permission,
+  }: {
+    identity: AdminIdentity;
+    permission: OpsOperatorPermission;
+  }): Promise<boolean> {
+    const userId = identity.id ?? (await this.#idOfAddress(identity.email));
+    if (!userId) return false;
 
-    return this.normalizedEmails.includes(identity.email.trim().toLowerCase());
+    return this.options.authz.can({
+      principal: { type: "user", id: userId },
+      permission,
+      scope: { type: "platform" },
+    });
+  }
+
+  async #idOfAddress(email: string | null | undefined): Promise<string | undefined> {
+    if (!email?.trim()) return undefined;
+
+    return (await this.options.users.findByEmail({ email }))?.id;
   }
 }

@@ -3,7 +3,7 @@
  * sight, and the per-feature switches on that project. Only the owner may read or change
  * them, and a project that is not a personal one is refused rather than quietly edited.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzLedgerUnavailableError, type AuthzApi } from "@langwatch/authz-contract";
 import {
   PersonalProjectOwnerMismatchError,

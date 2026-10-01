@@ -3,15 +3,15 @@ import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import { lintApplicationBoundaries } from "./boundaries/application-boundaries.ts";
 import { lintArchitectureRecords } from "./boundaries/architecture-records.ts";
 import { lintCycles } from "./boundaries/cycles.ts";
+import { lintFrameworkModuleContracts } from "./boundaries/framework-module-contracts.ts";
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
+import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
 import { lintFeatureConfiguration } from "./feature-configuration.ts";
 import { lintFeatureLayouts } from "./feature-layout.ts";
 import { lintFeatureShape } from "./feature-shape.ts";
 import { lintBrowserNodeLeaks } from "./frontend/browser-node-leak.ts";
 import {
-  lintBrowserKitDependencies,
-  lintBrowserKitExports,
   lintBrowserPackageClosure,
   lintBrowserPackageExports,
   lintBrowserPackageManifestClosure,
@@ -63,7 +63,7 @@ function lintPrismaMigrationAccessPolicy(snapshot: WorkspaceSnapshot): Architect
   return lintPrismaMigrationAccess(root, catalogue, new Set(models.keys()));
 }
 
-/** Kit law 1 at both levels: each import once, each manifest edge once. */
+/** The closed browser package at both levels: each import once, each manifest edge once. */
 function lintBrowserPackageClosurePolicy(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   return [...lintBrowserPackageClosure(snapshot), ...lintBrowserPackageManifestClosure(snapshot)];
 }
@@ -130,16 +130,6 @@ export const POLICIES: readonly PolicyDefinition[] = [
     run: lintBrowserPackageExports,
   }),
   definePolicy({
-    id: "browser-kit-exports",
-    spec: "specs/frontend-feature-boundaries.feature",
-    run: lintBrowserKitExports,
-  }),
-  definePolicy({
-    id: "browser-kit-dependencies",
-    spec: "specs/frontend-feature-boundaries.feature",
-    run: lintBrowserKitDependencies,
-  }),
-  definePolicy({
     id: "architecture-records",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintArchitectureRecords,
@@ -188,6 +178,16 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "peer-cycles",
     spec: "specs/peer-cycles.feature",
     run: lintPeerCycles,
+  }),
+  definePolicy({
+    id: "platform-operator-calls",
+    spec: "specs/tooling/lint-platform-operator-calls.feature",
+    run: lintPlatformOperatorCalls,
+  }),
+  definePolicy({
+    id: "framework-module-contracts",
+    spec: "specs/framework-module-contracts.feature",
+    run: lintFrameworkModuleContracts,
   }),
   definePolicy({
     id: "eventing-table-access",

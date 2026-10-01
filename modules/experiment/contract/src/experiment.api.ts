@@ -1,6 +1,6 @@
 import type { Dataset } from "@langwatch/dataset-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
+import { moduleApi } from "@langwatch/module";
 import type {
   StudioWorkflow,
   WorkflowEvaluationRequest,
@@ -75,6 +75,7 @@ import type { SavedWorkbenchRead } from "./workbench/actions/saved-workbench-rea
  */
 export type WorkbenchCredential =
   | Readonly<{ kind: "apiKey"; userId: string | null; isLangySessionKey?: boolean }>
+  | Readonly<{ kind: "cliAccessToken"; userId: string }>
   | Readonly<{ kind: "legacyProjectKey" }>;
 
 /**

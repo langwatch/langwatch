@@ -10,14 +10,14 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
-import { FormatMoney } from "@langwatch/workflow-browser-kit";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { HoverableBigText } from "../../../../behavior/lent-hoverable-big-text.tsx";
+import { EvaluationProgressBar } from "../../BatchEvaluationV2/evaluation-progress-bar.tsx";
+import { FormatMoney } from "../../workflow/format-money.tsx";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,

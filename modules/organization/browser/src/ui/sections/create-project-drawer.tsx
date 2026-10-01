@@ -16,8 +16,8 @@ import { ProjectForm, type ProjectFormData } from "./project-form.tsx";
 /** Every list a freshly created project has to show up in right away. */
 function invalidateProjectListQueries(utils: ReturnType<typeof api.useUtils>): void {
   void utils.organization.getAll.invalidate();
+  void utils.organization.getScopeGraph.invalidate();
   void utils.limits.getUsage.invalidate();
-  void utils.team.getTeamsWithMembers.invalidate();
   void utils.team.getTeamWithMembers.invalidate();
   void utils.team.getTeamsWithGrants.invalidate();
 }

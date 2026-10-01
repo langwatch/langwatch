@@ -23,22 +23,23 @@ import { nowInstant } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  type AutomationGraph,
-  type AutomationPreviewTrace,
-  api,
+import type {
+  AutomationGraph,
+  AutomationPreviewTrace,
 } from "../../../../behavior/automation-api.ts";
 import { useDescribeError } from "../../../../behavior/automation-feedback.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import {
+  useDailyCap,
+  useGraph,
+  useProjectDashboards,
+  useProjectGraphs,
+  useTracePreview,
+} from "../../../../behavior/use-automation-reads.ts";
 import { deriveSeriesOptionsFromGraph } from "../../../../model/graph-series.ts";
 import { formatTimeAgoCompact } from "../../../../model/relative-time.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
-import {
-  DAILY_CAP_OPTIONS,
-  PREVIEW_LIST_OPTIONS,
-  PREVIEW_SORT,
-  PREVIEW_WINDOW_MS,
-} from "../../behavior/use-daily-cap-advice.ts";
+import { PREVIEW_SORT, PREVIEW_WINDOW_MS } from "../../behavior/use-daily-cap-advice.ts";
 import { checkQuery, queryIsStructurable } from "../../model/condition-query.ts";
 import { type DailyCapAdvice, dailyCapAdvice } from "../../model/daily-cap-advice.ts";
 import { estimateFiringRate, estimateRatePerDay } from "../../model/firing-rate.ts";
@@ -163,11 +164,8 @@ function GraphSubject({ prefilledGraphId }: { prefilledGraphId?: string }) {
   const draft = useDraft();
   const isPrefilled = !!prefilledGraphId;
 
-  const graphs = api.graphs.getAll.useQuery({ projectId }, { enabled: !!projectId });
-  const selectedGraphQuery = api.graphs.getById.useQuery(
-    { projectId, id: draft.customGraphId ?? "" },
-    { enabled: !!draft.customGraphId && !!projectId },
-  );
+  const graphs = useProjectGraphs({ projectId });
+  const selectedGraphQuery = useGraph({ projectId, graphId: draft.customGraphId });
   const seriesOptions = useMemo(
     () => deriveSeriesOptionsFromGraph(selectedGraphQuery.data?.graph),
     [selectedGraphQuery.data?.graph],
@@ -367,14 +365,11 @@ function ReportSubject() {
   const dispatch = useAutomationStore((s) => s.dispatch);
   const report = draft.report;
 
-  const graphs = api.graphs.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId && report.sourceKind === "customGraph" },
-  );
-  const dashboards = api.dashboards.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId && report.sourceKind === "dashboard" },
-  );
+  const graphs = useProjectGraphs({ projectId, enabled: report.sourceKind === "customGraph" });
+  const dashboards = useProjectDashboards({
+    projectId,
+    enabled: report.sourceKind === "dashboard",
+  });
 
   function renderReportSourceFields() {
     if (report.sourceKind === "traceQuery") {
@@ -597,28 +592,14 @@ function TraceQuerySubject({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debounced]);
 
-  const preview = api.traces.list.useQuery(
-    {
-      projectId,
-      timeRange,
-      sort: PREVIEW_SORT,
-      page: 1,
-      pageSize: 5,
-      query: trimmed,
-    },
-    {
-      enabled: !!projectId && trimmed.length > 0 && doesDebouncedParse,
-      ...PREVIEW_LIST_OPTIONS,
-      placeholderData: (previous) => previous,
-    },
-  );
+  const preview = useTracePreview({
+    input: { projectId, timeRange, sort: PREVIEW_SORT, page: 1, pageSize: 5, query: trimmed },
+    enabled: !!projectId && trimmed.length > 0 && doesDebouncedParse,
+  });
 
   // The plan's daily ceiling on persist actions, read once and held: it moves
   // only when the plan does, and a failed read simply means no advice below.
-  const capStatus = api.automation.getDailyCap.useQuery(
-    { projectId },
-    { enabled: !!projectId, ...DAILY_CAP_OPTIONS },
-  );
+  const capStatus = useDailyCap({ projectId });
   const setHasInvalidConditionRows = useAutomationStore((s) => s.setHasInvalidConditionRows);
 
   // Advice, never a gate: this warns that the drafted condition would outrun

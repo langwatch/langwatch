@@ -24,7 +24,7 @@ var _ = NodeError{Type: "http_error"}
 func oneCode(t *testing.T) string {
 	t.Helper()
 	return tree(t, map[string]string{
-		"packages/error-presentation/src/.keep": "",
+		"packages/handled-error/src/.keep": "",
 		"pkg/herr/herr.go":                      herrPackage,
 		"services/nlpgo/app/engine/http.go":     nodeErrorLiteral,
 		"services/nlpgo/domain/errors.go": `package domain
@@ -45,7 +45,7 @@ func RegisterStatuses() {
 	})
 }
 
-const out = "packages/error-presentation/src/codes.generated.ts"
+const out = "packages/handled-error/src/codes.generated.ts"
 
 // @scenario "Pointing the generator at the wrong root stops the run"
 // @scenario "A run that finds only half the codes stops rather than writing"
@@ -177,7 +177,7 @@ var _ = NodeError{Type: "invalid_dataset"}
 		// module that declares nothing. Writing the empty artifact there and
 		// exiting 0 is how a mistyped root deletes every code.
 		root := tree(t, map[string]string{
-			"packages/error-presentation/src/.keep": "",
+			"packages/handled-error/src/.keep": "",
 			"pkg/herr/herr.go":                      herrPackage,
 		})
 
@@ -199,7 +199,7 @@ var _ = NodeError{Type: "invalid_dataset"}
 		// that found no node codes wrote `nodeErrorCodes = {}` and exited 0 —
 		// then the drift check demanded the emptied file be committed.
 		root := tree(t, map[string]string{
-			"packages/error-presentation/src/.keep": "",
+			"packages/handled-error/src/.keep": "",
 			"pkg/herr/herr.go":                      herrPackage,
 			"services/nlpgo/domain/errors.go": `package domain
 
@@ -229,7 +229,7 @@ const ErrNotFound = herr.Code("not_found")
 		// it. This used to render in both objects with two unrelated doc blocks
 		// and a warning per code on every run.
 		root := tree(t, map[string]string{
-			"packages/error-presentation/src/.keep": "",
+			"packages/handled-error/src/.keep": "",
 			"pkg/herr/herr.go":                      herrPackage,
 			"services/nlpgo/app/engine/http.go":     nodeErrorLiteral,
 			"services/nlpgo/domain/errors.go": `package domain
@@ -298,7 +298,7 @@ const ErrNotFound = herr.Code("not_found")
 
 	t.Run("exits 2 and writes nothing when two consts disagree on a status", func(t *testing.T) {
 		root := tree(t, map[string]string{
-			"packages/error-presentation/src/.keep": "",
+			"packages/handled-error/src/.keep": "",
 			"pkg/herr/herr.go":                      herrPackage,
 			"services/nlpgo/domain/errors.go": `package domain
 

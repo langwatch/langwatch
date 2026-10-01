@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/judge-criterion-verdicts.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -15,14 +15,12 @@ describe("RunCriteriaChip", () => {
   describe("when a run has a criterion the test could not check", () => {
     /** @scenario "The criteria chip counts a criterion the test could not check apart" */
     it("lists it under Could not check, not under Unmet", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <RunCriteriaChip
-            metCriteria={["stays polite"]}
-            unmetCriteria={["names the refund window", "opens a ticket"]}
-            inconclusiveCriteria={["opens a ticket"]}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <RunCriteriaChip
+          metCriteria={["stays polite"]}
+          unmetCriteria={["names the refund window", "opens a ticket"]}
+          inconclusiveCriteria={["opens a ticket"]}
+        />,
       );
 
       await userEvent.hover(screen.getByText("1/3"));

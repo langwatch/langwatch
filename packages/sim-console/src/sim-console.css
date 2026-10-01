@@ -59,14 +59,11 @@
   min-width: 0;
 }
 
-/* The list pane is resized by its native handle; the detail takes what is left. */
+/* The list pane keeps its width; the detail takes what is left. */
 .sim-split-list {
   flex: none;
   width: 40%;
   min-width: 16rem;
-  max-width: 70%;
-  resize: horizontal;
-  overflow: auto;
 }
 
 .sim-split-detail {
@@ -78,6 +75,9 @@
   cursor: pointer;
   color: var(--ink-500);
   font-size: var(--text-sm);
+}
+
+.sim-json[open] > summary {
   padding-bottom: var(--space-2);
 }
 
@@ -93,8 +93,16 @@
 
   .sim-split-list {
     width: auto;
-    max-width: none;
     min-width: 0;
-    resize: none;
   }
+}
+
+/* A titled list sits flush in its panel, as a bare kit list does. */
+.ds-panel-body:has(> .sim-list:only-child) {
+  padding: 0;
+}
+
+.ds-panel-body > .sim-list:only-child > .ds-list {
+  border: 0;
+  border-radius: 0;
 }

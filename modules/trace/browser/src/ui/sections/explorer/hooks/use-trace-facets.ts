@@ -1,16 +1,11 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SAMPLE_DISCOVER_DESCRIPTORS } from "../onboarding/data/sample-descriptors.ts";
-import {
-  type DiscoverDescriptors,
-  getCachedDiscover,
-  setCachedDiscover,
-} from "./discover-cache.ts";
 
 const EMPTY: never[] = [];
 const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
@@ -20,46 +15,20 @@ const EMPTY_RESULT: { facets: never[]; pending: boolean } = {
 
 type DiscoverResult = RouterOutputs["traces"]["discover"] | undefined;
 
-function pendingPollDelay({
-  data,
-  attempts,
-}: {
-  data: DiscoverResult;
-  attempts: { current: number };
-}): number | false {
-  if (!data?.pending) {
-    attempts.current = 0;
-    return false;
-  }
-  const delay = Math.min(2000 * 2 ** attempts.current, 15000);
-  attempts.current += 1;
-  return delay;
-}
-
-// Resolution order: 1. Stale-project guard with no cache for the new project — show
-// the skeleton (EMPTY_RESULT) so we don't bleed project A's payload into project B's
-// render.
+// A project switch with no fresh response yet shows the skeleton, so project A's
+// payload never bleeds into project B's render.
 function pickFacetsResult({
   data,
-  cachedFacets,
   isFromOtherProject,
   isQueryLoading,
 }: {
   data: DiscoverResult;
-  cachedFacets: DiscoverDescriptors | null;
   isFromOtherProject: boolean;
   isQueryLoading: boolean;
 }) {
   const liveSettled = data && !data.pending ? data : undefined;
-  const cachedResult = cachedFacets
-    ? { facets: cachedFacets, pending: false }
-    : (data ?? EMPTY_RESULT);
-  const settledResult = liveSettled ?? cachedResult;
-  const result = isFromOtherProject && !cachedFacets ? EMPTY_RESULT : settledResult;
-  // Loading reflects what the sidebar will see: live or cached data driving `result`
-  // means a useful sidebar already, so only a first visit shows the skeleton.
-  const haveUsableData = liveSettled || cachedFacets;
-  const isLoading = haveUsableData ? false : isQueryLoading || isFromOtherProject || result.pending;
+  const result = isFromOtherProject ? EMPTY_RESULT : (liveSettled ?? data ?? EMPTY_RESULT);
+  const isLoading = liveSettled ? false : isQueryLoading || isFromOtherProject || result.pending;
   return { result, isLoading };
 }
 
@@ -70,11 +39,6 @@ export function useTraceFacets() {
   // Sample-preview rows are a client-side fixture with no ClickHouse footprint, so the
   // real `discover` query returns nothing useful.
   const isSamplePreview = usePreviewTracesActive();
-
-  // Backoff counter for the cold-miss polling fallback below. Ref because
-  // refetchInterval is read by React Query's scheduler outside React's
-  // render cycle, and we don't want a state update to retrigger the query.
-  const pendingPollAttemptsRef = useRef(0);
 
   const query = api.traces.discover.useQuery(
     {
@@ -94,14 +58,7 @@ export function useTraceFacets() {
       // the sidebar doesn't flicker. Project switches are gated below by
       // remembering which project the cached response belongs to.
       placeholderData: keepPreviousData,
-      // Discover must not batch with `list`: the list query is the slow one
-      // on heavy projects (10–30s) and batching makes the sidebar wait the
-      // full duration even though discover itself returns in ~2s.
-      trpc: { context: { skipBatch: true } },
-      // Polling fallback for cold misses: the server returns `pending: true` and kicks
-      // an async compute that broadcasts `discover_updated` over SSE when it lands.
-      refetchInterval: (query) =>
-        pendingPollDelay({ data: query.state.data, attempts: pendingPollAttemptsRef }),
+      // needs a read hint: discover computed (a cold miss returns pending: true)
     },
   );
 
@@ -119,36 +76,12 @@ export function useTraceFacets() {
     }
   }, [query.isSuccess, query.isPlaceholderData, projectId]);
 
-  // "Other project" only fires when there *was* a previous fresh
-  // response and its project no longer matches — initial mount (ref
-  // still undefined) doesn't count. Without this, the cache below would
-  // be skipped on every cold page load because the guard would treat
-  // the very first render as a project mismatch.
+  // "Other project" only fires once a fresh response exists for a different project.
   const isFromOtherProject =
     dataProjectIdRef.current !== undefined && dataProjectIdRef.current !== projectId;
 
-  // Persist successful (non-pending, non-stale) discover payloads to
-  // localStorage so subsequent visits can render the sidebar from the
-  // last known shape immediately. Writes happen on the success edge
-  // only; we don't bother caching `{ pending: true }` placeholders.
-  useEffect(() => {
-    if (!projectId) return;
-    if (!query.isSuccess || query.isPlaceholderData) return;
-    if (!query.data || query.data.pending) return;
-    setCachedDiscover({ projectId, facets: query.data.facets });
-  }, [projectId, query.isSuccess, query.isPlaceholderData, query.data]);
-
-  // Warm-start: hand the sidebar the previous session's descriptors so it renders
-  // something USEFUL (real keys + real labels, not a count-less synthesised stub) on
-  // first paint.
-  const cachedFacets = useMemo<DiscoverDescriptors | null>(
-    () => (projectId ? getCachedDiscover(projectId) : null),
-    [projectId],
-  );
-
   const { result, isLoading } = pickFacetsResult({
     data: query.data,
-    cachedFacets,
     isFromOtherProject,
     isQueryLoading: query.isLoading,
   });

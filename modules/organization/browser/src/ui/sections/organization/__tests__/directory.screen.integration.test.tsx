@@ -41,6 +41,13 @@ vi.mock("../../../../behavior/organization-api.ts", () => {
       members: [member("sam", "Sam"), member("ana", "Ana")],
       teams: [],
     },
+    "organization.getDirectoryCounts": {
+      members: 2,
+      openInvites: 2,
+      joinRequests: 1,
+      groups: 2,
+      teams: 0,
+    },
     "invite.getOrganizationPendingInvites": [
       invite("ivy", "PENDING"),
       invite("ian", "PENDING"),

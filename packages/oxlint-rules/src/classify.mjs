@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
+import { FEATURE_PREFIX, stripFeaturePrefix } from "../grammar/feature-layout-policy.mjs";
+
 // One answer to "what file am I standing in", computed once per file and read
 // by every rule. It replaces five helpers that each asked a slice of the same
 // question with their own regex: `normalizedFilename`, `isStrictServiceModule`,
@@ -11,21 +13,22 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 /** @typedef {object} FileClassification - File metadata for the feature-layout classifier. */
 
-const FEATURE_SOURCE =
-  /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)\/(.+)$/;
+const FEATURE_SOURCE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser)\/(.+)$/;
 const APPLICATION_SOURCE = /^apps\/([^/]+)\/src\/(.+)$/;
 const ENTERPRISE_COMPOSITION_SOURCE =
   /^enterprise\/packages\/composition\/(api|worker)\/src\/(.+)$/;
 const SHARED_PACKAGE_SOURCE = /^packages\/(config|design-system)\/src\/(.+)$/;
 const SHARED_PACKAGE = /^packages\/(config|design-system|eventing|group-queue)\//;
 const PACKAGE_SOURCE_OR_TESTS = /^(src|tests)\//;
-const SERVICE_MODULE = /^(enterprise\/)?modules\/[^/]+\/process\/src\/services\/.+\.service\.ts$/;
-const PRISMA_REPOSITORY_SEAM =
-  /^(?:enterprise\/)?modules\/[^/]+\/process\/src\/repositories\/prisma\/.+\.repository\.ts$/;
-const MODULE_PACKAGE =
-  /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser|browser-kit)(?:\/|$)/;
+const SERVICE_MODULE = new RegExp(
+  `^(enterprise/)?modules/[^/]+/process/src/${FEATURE_PREFIX}services/.+\\.service\\.ts$`,
+);
+const PRISMA_REPOSITORY_SEAM = new RegExp(
+  `^(?:enterprise/)?modules/[^/]+/process/src/${FEATURE_PREFIX}repositories/prisma/.+\\.repository\\.ts$`,
+);
+const MODULE_PACKAGE = /^(enterprise\/)?modules\/([^/]+)\/(contract|process|browser)(?:\/|$)/;
 const LIBRARY_SOURCE = /^((?:enterprise\/)?modules\/([^/]+)\/[^/]+)\/(.+)$/;
-const MODULE_ROLES = ["contract", "process", "browser", "browser-kit"];
+const MODULE_ROLES = ["contract", "process", "browser"];
 const PROCESS_LAYERS = new Set([
   "services",
   "repositories",
@@ -71,7 +74,8 @@ function strictSourceOf({ enterprise, feature, relative: packageRelative, role }
 
 function layerOf({ role, sourcePath }) {
   if (role !== "process" || !sourcePath) return undefined;
-  const first = sourcePath.slice(0, sourcePath.indexOf("/"));
+  const layerPath = stripFeaturePrefix(sourcePath);
+  const first = layerPath.slice(0, layerPath.indexOf("/"));
 
   return PROCESS_LAYERS.has(first) ? first : undefined;
 }

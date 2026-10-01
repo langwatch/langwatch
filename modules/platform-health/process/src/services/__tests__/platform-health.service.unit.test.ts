@@ -1,10 +1,11 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
 import { describe, expect, it } from "vitest";
 
-import type { SubsystemProbe, SubsystemProbeResult } from "../../app/platform-health.members.ts";
 import { PlatformHealthService } from "../platform-health.service.ts";
 import {
   SubsystemProbeRunService,
+  type SubsystemProbe,
+  type SubsystemProbeResult,
   type SubsystemProbeRunner,
 } from "../subsystem-probe-run.service.ts";
 import type { SubsystemProbeOutcome } from "../subsystem-probe.service.ts";

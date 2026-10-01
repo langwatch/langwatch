@@ -1,7 +1,8 @@
 import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { differenceInMinutes, differenceInSeconds, toEpochMs } from "@langwatch/time";
 
-import { api, type RouterOutputs } from "../../../../behavior/automation-api.ts";
+import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
+import { useFireHistory, useLatestEvaluation } from "../../../../behavior/use-automation-reads.ts";
 import { formatTimeAgo } from "../../../../model/relative-time.ts";
 import {
   describeEvaluation,
@@ -42,19 +43,18 @@ export function HistorySection({
   isUnconditioned = false,
   isReport = false,
 }: HistorySectionProps) {
-  const historyQuery = api.automation.getFireHistory.useInfiniteQuery(
-    { projectId, triggerId: automationId, limit: FIRE_PAGE_SIZE },
-    {
-      enabled: !!projectId,
-      getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    },
-  );
+  const historyQuery = useFireHistory({
+    projectId,
+    triggerId: automationId,
+    limit: FIRE_PAGE_SIZE,
+  });
   // Only an alert is evaluated against a threshold, so only an alert asks.
   const wantsEvaluation = !!projectId && isGraphAlert;
-  const evaluationQuery = api.automation.getLatestEvaluation.useQuery(
-    { projectId, triggerId: automationId },
-    { enabled: wantsEvaluation },
-  );
+  const evaluationQuery = useLatestEvaluation({
+    projectId,
+    triggerId: automationId,
+    enabled: wantsEvaluation,
+  });
 
   const fires = (historyQuery.data?.pages ?? []).flatMap((page) => page.fires);
   const evaluation = evaluationQuery.data ?? undefined;

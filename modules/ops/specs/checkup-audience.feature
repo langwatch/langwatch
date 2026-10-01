@@ -1,9 +1,9 @@
 Feature: Who reads what of the checkup
   The checkup's details name the install's hosts, ports, environment variables
   and versions, and the usage report counts every organization on the install.
-  Install admins read all of it: the people on the ops back-office list
-  (ADMIN_EMAILS) and the organization's managers (organization:manage), so an
-  install that sets no ADMIN_EMAILS still has someone who can. Every other
+  Install admins read all of it: the platform operators (ops:view at the
+  platform tier) and the organization's managers (organization:manage), so an
+  install with no platform operator still has someone who can. Every other
   caller, an organization member or a project API key, reads each check's
   verdict and a usage report for their own organization.
 
@@ -12,13 +12,13 @@ Feature: Who reads what of the checkup
 
   @unit
   Scenario: An install admin reads what each check found and how to fix it
-    Given the caller is on the ops back-office list
+    Given the caller holds the platform-operator grant
     When the checkup is read
     Then every row carries its verdict with its detail
 
   @unit
   Scenario: An organization manager reads what each check found with no ADMIN_EMAILS set
-    Given the install sets no ADMIN_EMAILS
+    Given the install has no platform operator
     And the caller holds organization:manage in the organization
     When the checkup is read and its paid checks are run
     Then every row carries its verdict with its detail
@@ -26,14 +26,14 @@ Feature: Who reads what of the checkup
 
   @unit
   Scenario: An organization manager changes what the install reports
-    Given the install sets no ADMIN_EMAILS
+    Given the install has no platform operator
     And the caller holds organization:manage in the organization
     When the usage report switches are changed
     Then the switches are written
 
   @unit
   Scenario: An organization member reads each check's verdict and nothing more
-    Given the caller is signed in, not on the ops back-office list and not an organization manager
+    Given the caller is signed in, holds no platform grant and is not an organization manager
     When the checkup is read and its paid checks are run
     Then every row carries its name, group, cost and outcome
     And no row carries a detail, fix, code or docs link
@@ -47,20 +47,20 @@ Feature: Who reads what of the checkup
 
   @unit
   Scenario: An install admin reads the whole install's usage report
-    Given the caller is on the ops back-office list
+    Given the caller holds the platform-operator grant
     When the usage report is read
     Then it names where the report goes, its switches and when it next goes
 
   @unit
   Scenario: An organization member reads a usage report for their own organization
-    Given the caller is signed in, not on the ops back-office list and not an organization manager
+    Given the caller is signed in, holds no platform grant and is not an organization manager
     When the usage report is read
     Then its figures count the caller's organization only
     And it carries no install identity, release, hostname or sign-in method
 
   @unit
   Scenario: An organization's report counts its own members' sign-ins and email domains
-    Given the caller is signed in, not on the ops back-office list and not an organization manager
+    Given the caller is signed in, holds no platform grant and is not an organization manager
     And members of another organization are signed in with other email domains
     When the usage report is read
     Then its signed-in users count the caller's organization's members only
@@ -68,14 +68,14 @@ Feature: Who reads what of the checkup
 
   @unit
   Scenario: An install admin changes what the install reports
-    Given the caller is on the ops back-office list
+    Given the caller holds the platform-operator grant
     When the usage report switches are changed
     Then the switches are written
     And the whole install's report comes back with its switches
 
   @unit
   Scenario: Only an install admin changes what the install reports
-    Given the caller is neither on the ops back-office list nor an organization manager
+    Given the caller holds no platform grant and is not an organization manager
     When the usage report switches are changed
     Then the change is refused as operator-only
     And nothing is written

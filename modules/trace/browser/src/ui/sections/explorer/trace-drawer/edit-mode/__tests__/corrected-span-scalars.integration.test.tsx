@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanDetail } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { CorrectedSpanScalars } from "../corrected-span-scalars.tsx";
@@ -24,14 +24,12 @@ function detail(over: Partial<SpanDetail>): SpanDetail {
 }
 
 function renderScalars(changedFields: ("name" | "type")[]) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <CorrectedSpanScalars
-        changedFields={changedFields}
-        corrected={detail({ name: "search the web", type: "agent" })}
-        captured={detail({})}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <CorrectedSpanScalars
+      changedFields={changedFields}
+      corrected={detail({ name: "search the web", type: "agent" })}
+      captured={detail({})}
+    />,
   );
 }
 

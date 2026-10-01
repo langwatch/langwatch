@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { cliAccessTokenKey } from "@langwatch/auth-contract";
@@ -8,24 +7,25 @@ import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { RateLimiter, SecretResolver } from "@langwatch/process-stores/members";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp } from "../auth.app.ts";
+import { AuthModule } from "../auth.app.ts";
 import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
 
-async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthApp> {
+async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthModule> {
   const secrets: SecretResolver = {
     find: () => void 0,
     read: (key) => {
@@ -33,7 +33,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     },
   };
 
-  return AuthApp.create({
+  return AuthModule.create({
     config: {
       sessionUrl: undefined,
       mfaEnrollmentOpen: false,
@@ -43,6 +43,7 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
       idpSimulatorUrl: undefined,
       localPasswords: false,
       auth0ManagementClientId: undefined,
+      isSaas: false,
       signInProviders: NO_SIGN_IN_PROVIDERS,
     },
     repositories,

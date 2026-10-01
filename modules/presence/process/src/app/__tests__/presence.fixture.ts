@@ -1,22 +1,22 @@
 import { EventEmitter } from "node:events";
 
-import { createApiFixture } from "@langwatch/api-fixture";
-import { ResourceScope } from "@langwatch/kernel";
 /**
  * The presence graph as its tests need it: memory sessions, a fan-out that
  * records rather than publishes, and peers that answer only what a test asked
  * for.
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { MemoryPresenceRepositories } from "../../repositories/memory/memory.presence.repositories.ts";
 import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
 import type { PresenceBroadcast, PresenceDiagnostics, PresenceEmitter } from "../presence.app.ts";
-import { PresenceApp } from "../presence.app.ts";
+import { PresenceModule } from "../presence.app.ts";
 
 type PresencePublishInput = Parameters<PresenceBroadcast["publish"]>[0];
 
@@ -67,8 +67,8 @@ export function createPresenceTestApp(
     projects?: ProjectApi;
     users?: UserApi;
   }> = {},
-): PresenceApp {
-  return PresenceApp.create({
+): PresenceModule {
+  return PresenceModule.create({
     repositories: input.repositories ?? MemoryPresenceRepositories.create(),
     members: {
       redis: null,

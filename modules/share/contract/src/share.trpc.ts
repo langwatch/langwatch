@@ -4,7 +4,7 @@
  * This namespace only mints, lists and revokes links.
  */
 
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { shareLinkSchema, shareResourceTypeSchema, shareVisibilitySchema } from "./share.ts";

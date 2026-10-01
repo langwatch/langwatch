@@ -1,15 +1,15 @@
+import type {
+  AiToolEntry,
+  GovernanceRestApi,
+  UpdateAiToolEntryInput,
+} from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * `aiTools.*` over the real tRPC runtime, pinned to main's wire
  * (platform/app/ee/governance/routers/aiTools.ts on origin/main).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  AiToolEntry,
-  GovernanceRestApi,
-  UpdateAiToolEntryInput,
-} from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { aiToolsTrpcTransport } from "../ai-tools.trpc.ts";

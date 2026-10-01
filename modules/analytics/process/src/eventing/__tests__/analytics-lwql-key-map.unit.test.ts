@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * Analytics writes a new project's key-map row from project's created event (ARCHITECTURE §9).
- * Spec: specs/lwql/project-key-map.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   createTenantId,
   defineAggregate,
@@ -21,6 +15,12 @@ import {
   type ProjectApi,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * Analytics writes a new project's key-map row from project's created event (ARCHITECTURE §9).
+ * Spec: specs/lwql/project-key-map.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

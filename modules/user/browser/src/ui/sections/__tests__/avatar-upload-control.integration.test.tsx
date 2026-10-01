@@ -30,9 +30,13 @@ vi.mock("../../../behavior/personal-workspace-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/user-browser-kit", () => ({
-  UserAvatar: ({ image }: { image?: string | null }) => (
-    <span>{image ? <img src={image} alt="" /> : null}</span>
+vi.mock("../../../behavior/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) => image ?? null,
+}));
+
+vi.mock("@langwatch/design-system/avatar", () => ({
+  UserAvatar: ({ src }: { src?: string | null }) => (
+    <span>{src ? <img src={src} alt="" /> : null}</span>
   ),
 }));
 

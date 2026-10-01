@@ -2,7 +2,22 @@
 // every request and one route per prefix, the API's whole surface behind
 // `/api`, and the browser application behind `/`.
 
-export { answerApiFailure, apiRootPaths, composeApiApplication } from "./api-application.ts";
+export {
+  type ApiDoor,
+  bindApiDoor,
+  DuplicateApiDoorError,
+  MissingApiDoorError,
+  openApiDoor,
+  type RestAuditRow,
+  type RestAuditSink,
+  type RestCaller,
+  type RestIdentity,
+  type RestResolvedInternalCredential,
+  type TrpcAuditSink,
+  type TrpcSessionVersions,
+} from "./api-door.ts";
+export { SessionReader, type SessionCaller, type SessionVerification } from "./session-reader.ts";
+export { mountApiDiscovery } from "./api-discovery.ts";
 export {
   HttpMux,
   type HttpExchange,

@@ -6,18 +6,18 @@
  */
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { authzServer } from "../../authz.server.ts";
+import { authzProcessModule } from "../../authz.module.ts";
 import { AUTHZ_ENGINE_MIGRATION_NAME } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { createAuthzTestApp } from "./authz.fixture.ts";
 
 function process() {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(authzServer)])
+    .withModules([withMemoryRepositories(authzProcessModule)])
     .withConfig({
       authz: {
         epochCacheEnabled: false,

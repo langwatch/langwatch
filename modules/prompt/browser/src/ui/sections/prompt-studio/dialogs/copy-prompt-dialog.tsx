@@ -6,7 +6,7 @@
 
 import { useState } from "react";
 
-import { promptApi } from "../../../../behavior/prompt-api.ts";
+import { usePromptCopyActions } from "../../../../behavior/use-prompt-copy-actions.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
 import { PromptReplicateDialog } from "../../../blocks/prompt-replicate-dialog.tsx";
@@ -26,7 +26,7 @@ export const CopyPromptDialog = ({
 }) => {
   const { project } = usePromptProject();
   const host = usePromptHost();
-  const copyPrompt = promptApi.prompts.copy.useMutation();
+  const { copyPrompt } = usePromptCopyActions();
   const [isCopying, setIsCopying] = useState(false);
 
   if (!project) return null;

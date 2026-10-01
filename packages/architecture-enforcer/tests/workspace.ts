@@ -47,7 +47,7 @@ export const POLICY_ANCHORS: Readonly<Record<string, string>> = {
   "packages/prisma-client/prisma/schema.prisma": "",
   "packages/clickhouse-migrations/migrations/.keep": "",
   "packages/installed-server-modules/src/server-modules.generated.ts":
-    "export const serverModules = [\n] as const;\n",
+    "export const processModules = [\n] as const;\n",
   "dev/tsconfig.declarations.json": '{ "files": [], "references": [] }\n',
   "apps/api/src/main.ts": "",
   "apps/worker/src/main.ts": "",

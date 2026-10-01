@@ -1,13 +1,10 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  useReducedMotion,
-  type LangyProgressSample,
-  type LangyTurnMetric,
-} from "@langwatch/langy-browser-kit";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { nowInstant } from "@langwatch/time";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
+import { type LangyProgressSample, type LangyTurnMetric } from "../../model/values/langy-turn.ts";
 import { LangyObserverGlyph } from "./langy-observation-state.tsx";
 import { NumberTicker } from "./number-ticker.tsx";
 import { StreamingStatCard } from "./streaming-stat-card.tsx";

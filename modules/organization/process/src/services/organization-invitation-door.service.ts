@@ -259,9 +259,9 @@ export class OrganizationInvitationDoorService {
 
     return {
       success: true,
-      invite: { ...invite, ...inviteOnWire(invite) },
+      invite: { organization: { id: invite.organization.id, name: invite.organization.name } },
       project: projectSlug ? { slug: projectSlug } : null,
-    } as OrganizationInviteAccepted;
+    };
   }
 
   async #createOrRefuse(input: OrganizationApiCreateInvitationsInput) {

@@ -3,9 +3,10 @@
  * the dataset editor.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { SelectDatasetDrawerToken, UploadCsvDrawerToken } from "@langwatch/dataset-contract";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const datasetWeb = defineWebModule("dataset")
+export const datasetWeb = defineBrowserModule("dataset")
   .withHosts({
     requires: ["DatasetHostApi"],
     mounts: { DatasetHostApi: { load: () => import("./behavior/dataset-host-mount.tsx") } },
@@ -31,17 +32,17 @@ export const datasetWeb = defineWebModule("dataset")
           .LentAddOrEditDatasetDrawer,
       }),
     },
-    selectDataset: {
-      load: async () => ({
-        default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,
-      }),
-    },
-    uploadCSV: {
-      load: async () => ({
-        default: (await import("./ui/sections/datasets/routed-upload-csv-drawer.tsx"))
-          .RoutedUploadCsvDrawer,
-      }),
-    },
+  })
+  .drawer(SelectDatasetDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/select-dataset-drawer.tsx")).SelectDatasetDrawer,
+    }),
+  })
+  .drawer(UploadCsvDrawerToken, {
+    load: async () => ({
+      default: (await import("./ui/sections/datasets/routed-upload-csv-drawer.tsx"))
+        .RoutedUploadCsvDrawer,
+    }),
   })
   /** The create-or-edit drawer, editor table, picker list and record sync, lent (§3.4 rule 7). */
   .withCapabilities({

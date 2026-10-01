@@ -1,10 +1,11 @@
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 /**
  * @vitest-environment jsdom
  * @see specs/prompts/playground-surface-hierarchy.feature
  * What the playground's chrome says: the editor header's one primary action,
  * the section title, and the toolbar's offer to start a new prompt.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -47,9 +48,9 @@ function Wrapper({
     return <FormProvider {...form}>{children}</FormProvider>;
   };
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Inner />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 
@@ -136,19 +137,13 @@ describe("the playground's chrome", () => {
   describe("given the prompt editor's section title", () => {
     /** @scenario The prompt section is titled for the mode it is in */
     it("titles the section for the mode it is in", () => {
-      const { rerender } = render(
-        <ChakraProvider value={defaultSystem}>
-          <EditingModeTitle mode="prompt" onChange={() => undefined} />
-        </ChakraProvider>,
+      const { rerender } = renderWithDesignSystem(
+        <EditingModeTitle mode="prompt" onChange={() => undefined} />,
       );
 
       expect(screen.getByText("Prompt")).toBeInTheDocument();
 
-      rerender(
-        <ChakraProvider value={defaultSystem}>
-          <EditingModeTitle mode="messages" onChange={() => undefined} />
-        </ChakraProvider>,
-      );
+      rerender(<EditingModeTitle mode="messages" onChange={() => undefined} />);
 
       expect(screen.getByText("Messages")).toBeInTheDocument();
     });
@@ -157,11 +152,7 @@ describe("the playground's chrome", () => {
   describe("given the workspace toolbar", () => {
     /** @scenario Starting a new prompt is offered from the workspace toolbar */
     it("offers to start a new prompt, in words", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <AddPromptButton />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<AddPromptButton />);
 
       expect(screen.getByRole("button", { name: /New Prompt/ })).toBeInTheDocument();
     });

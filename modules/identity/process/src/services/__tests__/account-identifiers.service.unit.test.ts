@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The account's own sign-in addresses over the real guard and reducer; the heads are in memory.
- * @see specs/identity/authentication-settings.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi, BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 import type {
   IdentityCommand,
@@ -11,6 +5,12 @@ import type {
   IdentityHeads,
 } from "@langwatch/identity-contract";
 import { memoryRateLimiter } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * The account's own sign-in addresses over the real guard and reducer; the heads are in memory.
+ * @see specs/identity/authentication-settings.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { fact, InMemoryHeads, T0, USER } from "../../__tests__/support/in-memory-heads.ts";

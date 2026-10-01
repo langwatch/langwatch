@@ -7,7 +7,7 @@ import {
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { defineCommandSchema } from "@langwatch/eventing";
 
-import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
+import type { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 
 const schema = defineCommandSchema(
   EXECUTE_EVALUATION_COMMAND_TYPE,
@@ -22,11 +22,13 @@ export class ExecuteEvaluationCommand implements CommandHandler<
 > {
   static readonly schema = schema;
 
-  static create(intent: EvaluationExecutionIntent): ExecuteEvaluationCommand {
+  static create(
+    intent: Pick<EvaluationExecutionIntentService, "execute">,
+  ): ExecuteEvaluationCommand {
     return new ExecuteEvaluationCommand(intent);
   }
 
-  private constructor(private readonly intent: EvaluationExecutionIntent) {}
+  private constructor(private readonly intent: Pick<EvaluationExecutionIntentService, "execute">) {}
 
   static getAggregateId(payload: ExecuteEvaluationCommandData): string {
     return payload.evaluationId;

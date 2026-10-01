@@ -4,9 +4,8 @@
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
 import type { PoolSizingInput } from "@langwatch/clickhouse-client";
-import type { ExecutionTarget, KillSwitch } from "@langwatch/eventing";
+import type { EventingParticipation, ExecutionTarget, KillSwitch } from "@langwatch/eventing";
 import type { GroupQueuePolicy, GroupQueueStorage } from "@langwatch/group-queue";
-import type { EventingParticipation } from "@langwatch/kernel";
 
 /** Postgres, as one guarded client per process. */
 export interface DatabaseConfig {

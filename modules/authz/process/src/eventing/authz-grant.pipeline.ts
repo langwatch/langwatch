@@ -4,12 +4,19 @@ import {
   definePipeline,
   type EventingSetup,
 } from "@langwatch/eventing";
+import { USER_ERASED_EVENT_TYPE, userErasedPayloadSchema } from "@langwatch/identity-contract";
+import {
+  USER_DEACTIVATED_EVENT_TYPE,
+  USER_REACTIVATED_EVENT_TYPE,
+  userLifecycleEventDataSchema,
+} from "@langwatch/user-contract";
 
-import type { AuthzApp } from "../app/authz.app.ts";
+import type { AuthzModule } from "../app/authz.app.ts";
 import type { AuthzAuditTrailRepository } from "../repositories/authz-audit-trail.repository.ts";
 import type { AuthzGrantProjectionRepository } from "../repositories/authz-grant-projection.repository.ts";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import type { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
+import type { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
 import {
   AttachGrantCommand,
   ChangeGrantRoleCommand,
@@ -33,6 +40,8 @@ export interface EventingAuthzAdapterOptions {
   authzAuditTrailStore: AuthzAuditTrailRepository;
   /** Absent on the consumer-only twin, which bumps no session version. */
   sessionVersions?: AuthzSessionVersionService;
+  /** Absent on the consumer-only twin, which keeps no user standing. */
+  userStandings?: AuthzUserStandingService;
 }
 
 const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
@@ -67,10 +76,29 @@ const buildAuthzGrantPipeline = (options: EventingAuthzAdapterOptions) => {
     .withCommand("defineRole", DefineRoleCommand)
     .withCommand("changeRolePermissions", ChangeRolePermissionsCommand)
     .withCommand("deleteRole", DeleteRoleCommand);
-  const { sessionVersions } = options;
+  const { sessionVersions, userStandings } = options;
+  if (userStandings) {
+    // Who is gone is user's and identity's fact; authz keeps its own table from them (§9).
+    pipeline
+      .withPeerSubscriber("userDeactivated", {
+        eventType: USER_DEACTIVATED_EVENT_TYPE,
+        data: userLifecycleEventDataSchema,
+        handle: (data) => userStandings.deactivated(data),
+      })
+      .withPeerSubscriber("userReactivated", {
+        eventType: USER_REACTIVATED_EVENT_TYPE,
+        data: userLifecycleEventDataSchema,
+        handle: (data) => userStandings.reactivated(data),
+      })
+      .withPeerSubscriber("userErased", {
+        eventType: USER_ERASED_EVENT_TYPE,
+        data: userErasedPayloadSchema,
+        handle: ({ userId }, { occurredAt }) => userStandings.erased({ userId, occurredAt }),
+      });
+  }
   if (!sessionVersions) return pipeline.build();
 
-  // Bound to the projection so a bump never lands before the change is readable (ADR-164).
+  // Bound to the projection so a bump never lands before the change is readable (ADR-170).
   return pipeline
     .withProjectionSubscriber("sessionVersion", {
       map: AUTHZ_GRANTS_WRITE_PROJECTION_NAME,
@@ -103,6 +131,6 @@ export class EventingAuthzAdapter {
 
 export const authzEventing = defineEventingModule({
   pipeline: AUTHZ_GRANT_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<AuthzRepositories, AuthzApp>) => app.eventingPipeline(),
+  build: ({ app }: EventingSetup<AuthzRepositories, AuthzModule>) => app.eventingPipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

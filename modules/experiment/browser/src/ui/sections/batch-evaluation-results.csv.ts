@@ -3,8 +3,12 @@
  */
 
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
+import numeral from "numeral";
+import Parse from "papaparse";
+import { z } from "zod";
+
+import { readableDate } from "../../model/display-formatters.ts";
 import {
-  readableDate,
   type BatchComparisonColumn,
   type BatchComparisonVerdict,
   type BatchEvaluationData,
@@ -12,10 +16,7 @@ import {
   type BatchResultRow,
   type BatchTargetColumn,
   type BatchTargetOutput,
-} from "@langwatch/experiment-browser-kit";
-import numeral from "numeral";
-import Parse from "papaparse";
-import { z } from "zod";
+} from "./batch-evaluation-results.types.ts";
 
 const jsonRecordSchema = z.record(z.string(), z.unknown());
 

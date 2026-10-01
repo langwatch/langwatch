@@ -11,14 +11,12 @@ function createService() {
     ensurePersonalWorkspace: vi.fn(),
     getPersonalWorkspace: vi.fn(),
   };
-  const ops = { isAdmin: vi.fn(() => true) };
   const service = UserAccountService.create({
     auth: auth as never,
     organizations: organizations as never,
-    ops: ops as never,
   });
 
-  return { service, auth, organizations, ops };
+  return { service, auth, organizations };
 }
 
 describe("UserAccountService", () => {

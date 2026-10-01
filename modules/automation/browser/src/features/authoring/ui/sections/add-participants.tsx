@@ -4,7 +4,7 @@
  * with this move.
  */
 
-import { CloseButton } from "@chakra-ui/react";
+import { CloseButton } from "@langwatch/design-system/close-button";
 import {
   Badge,
   Box,
@@ -17,8 +17,11 @@ import {
 import { Select } from "@langwatch/design-system/select";
 import { Users } from "react-feather";
 
-import { api } from "../../../../behavior/automation-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/automation-session.ts";
+import {
+  useAnnotationQueues,
+  useOrganizationMembers,
+} from "../../../../behavior/use-automation-reads.ts";
 import { ParticipantAvatar } from "../elements/participant-avatar.tsx";
 
 export type AutomationParticipant = { id: string; name: string };
@@ -32,15 +35,8 @@ export function AddParticipants({
 }) {
   const { organization, project } = useOrganizationTeamProject();
 
-  const annotationQueues = api.annotation.getQueues.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
-
-  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization },
-  );
+  const annotationQueues = useAnnotationQueues({ projectId: project?.id });
+  const users = useOrganizationMembers({ organizationId: organization?.id });
 
   const selectedValues = annotators.map((annotator) => annotator.id);
 

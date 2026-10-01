@@ -1,9 +1,3 @@
-/**
- * @vitest-environment jsdom
- *
- * Tests webhook client: URL validation, kept-header round-trip, JSON defaults (like slack/email).
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   type SavedTriggerRow,
   type WebhookActionParams,
@@ -12,8 +6,14 @@ import {
   DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_WEBHOOK_BODY_TEMPLATE,
 } from "@langwatch/automation-contract";
+/**
+ * @vitest-environment jsdom
+ *
+ * Tests webhook client: URL validation, kept-header round-trip, JSON defaults (like slack/email).
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -38,10 +38,6 @@ import type * as templateAuthoringModule from "../ui/sections/template-authoring
 import webhookClient, { type WebhookSlice } from "../ui/sections/webhook.client.tsx";
 
 afterEach(() => cleanup());
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeCtx(
   overrides: Partial<ConfigFormCtx<WebhookPreview>> = {},
@@ -97,9 +93,7 @@ const renderForm = ({
   initial?: WebhookSlice;
   onChangeSpy?: (next: WebhookSlice) => void;
 } = {}) =>
-  render(<Harness ctx={ctx} initial={initial} onChangeSpy={onChangeSpy} />, {
-    wrapper: Wrapper,
-  });
+  renderWithDesignSystem(<Harness ctx={ctx} initial={initial} onChangeSpy={onChangeSpy} />);
 
 function savedRowWith(actionParams: Partial<WebhookActionParams>): SavedTriggerRow {
   return { actionParams } as SavedTriggerRow;

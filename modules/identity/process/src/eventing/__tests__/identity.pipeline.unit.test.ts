@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -8,15 +7,16 @@ import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { identityServer } from "../../identity.server.ts";
+import { identityProcessModule } from "../../identity.module.ts";
 import { SsoBreakGlassService } from "../../services/sso-break-glass.service.ts";
 import { SsoDomainReproofService } from "../../services/sso-domain-reproof.service.ts";
 import {
@@ -67,9 +67,8 @@ async function installed() {
     role: "worker",
     secrets: (owner, declared) => noSecretsChain.scopeTo(owner, declared),
   })
-    .withModules([withMemoryRepositories(identityServer)])
+    .withModules([withMemoryRepositories(identityProcessModule)])
     .withMembers({
-      adminEmails: [],
       publicBaseUrl: undefined,
       isSaas: false,
       rateLimiter: { check: async () => ({ allowed: true }) },
@@ -109,7 +108,7 @@ describe("given identity's eventing declaration", () => {
   describe("when the module is declared", () => {
     /** @scenario "The worker hosts identity's scheduled sweeps from the module" */
     it("carries the declaration onto the installable module", () => {
-      const eventing = identityServer.eventing;
+      const eventing = identityProcessModule.eventing;
       const declarations = eventing && "declarations" in eventing ? eventing.declarations : [];
       expect(declarations).toContain(identityEventing);
       expect(identityEventing.pipeline).toBe(IDENTITY_MAINTENANCE_PIPELINE_NAME);

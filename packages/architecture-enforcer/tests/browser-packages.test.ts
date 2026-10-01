@@ -6,8 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { lintPolicies, POLICIES } from "../src/index.ts";
 import {
-  lintBrowserKitDependencies,
-  lintBrowserKitExports,
   lintBrowserPackageClosure,
   lintBrowserPackageExports,
   lintBrowserPackageManifestClosure,
@@ -36,6 +34,7 @@ function writePackage(
   options: {
     exports?: Record<string, unknown>;
     dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
     peerDependencies?: Record<string, string>;
   } = {},
 ): void {
@@ -47,6 +46,7 @@ function writePackage(
       main: "./src/index.ts",
       exports: options.exports ?? { ".": "./src/index.ts" },
       dependencies: options.dependencies ?? {},
+      devDependencies: options.devDependencies ?? {},
       peerDependencies: options.peerDependencies ?? {},
     }),
   );
@@ -125,6 +125,20 @@ describe("when a module's browser package is imported from outside its own direc
     expect(violations).toHaveLength(0);
   });
 
+  /** @scenario "The installed web modules package may import a browser package" */
+  it("does not report the installer package's generated declaration imports", () => {
+    writePackage("modules/trace/browser", "@langwatch/trace-browser");
+    writePackage("packages/installed-web-modules", "@langwatch/installed-web-modules");
+    write(
+      "packages/installed-web-modules/src/web-modules.generated.ts",
+      'import { traceWeb } from "@langwatch/trace-browser/declaration";\nexport const x = traceWeb;\n',
+    );
+
+    const violations = lintBrowserPackageClosure(snapshotOf({ root }));
+
+    expect(violations).toHaveLength(0);
+  });
+
   /** @scenario "A browser package's own files may import themselves" */
   it("does not report a browser package importing its own subpath", () => {
     writePackage("modules/trace/browser", "@langwatch/trace-browser");
@@ -153,6 +167,26 @@ describe("when a package.json declares a dependency on another module's browser 
     expect(violations[0]?.specifier).toBe("@langwatch/trace-browser");
     expect(violations[0]?.file).toContain("modules/scenario/browser/package.json");
   });
+
+  /** @scenario "A type-only devDependency onto a browser package passes" */
+  it("does not report a devDependencies edge whose imports are all type-only", () => {
+    writePackage("modules/trace/browser", "@langwatch/trace-browser", {
+      exports: { "./declaration": "./src/trace.web.ts" },
+    });
+    write("modules/trace/browser/src/trace.web.ts", "export const traceWeb = {};\n");
+    writePackage("modules/scenario/browser", "@langwatch/scenario-browser", {
+      devDependencies: { "@langwatch/trace-browser": "workspace:*" },
+    });
+    write(
+      "modules/scenario/browser/src/drawers.ts",
+      'import type { traceWeb } from "@langwatch/trace-browser/declaration";\nexport type T = typeof traceWeb;\n',
+    );
+
+    const snapshot = snapshotOf({ root });
+
+    expect(lintBrowserPackageManifestClosure(snapshot)).toEqual([]);
+    expect(lintBrowserPackageClosure(snapshot)).toEqual([]);
+  });
 });
 
 describe("when a browser package's exports map declares more than ./declaration", () => {
@@ -176,62 +210,9 @@ describe("when a browser package's exports map declares more than ./declaration"
   });
 });
 
-describe("when a kit's exports map declares more than .", () => {
-  /** @scenario "A kit with a named subpath export entry is reported" */
-  it("reports every entry other than .", () => {
-    writePackage("modules/trace/browser-kit", "@langwatch/trace-browser-kit", {
-      exports: { ".": "./src/index.ts", "./trace-drawer-chip": "./src/trace-drawer-chip.tsx" },
-    });
-
-    const violations = lintBrowserKitExports(snapshotOf({ root }));
-
-    expect(violations).toHaveLength(1);
-    expect(violations[0]?.specifier).toBe("./trace-drawer-chip");
-  });
-});
-
-describe("when a kit's dependencies reach outside contracts, the Design System and browser-host", () => {
-  /** @scenario "A kit depending on a browser or a sibling kit is reported" */
-  it("reports a dependency on another module's browser package and on another kit", () => {
-    writePackage("modules/trace/browser-kit", "@langwatch/trace-browser-kit", {
-      dependencies: {
-        "@langwatch/scenario-browser": "workspace:*",
-        "@langwatch/dataset-browser-kit": "workspace:*",
-        "@langwatch/trace-contract": "workspace:*",
-        "@langwatch/design-system": "workspace:*",
-        "@langwatch/browser-host": "workspace:*",
-      },
-    });
-
-    const violations = lintBrowserKitDependencies(snapshotOf({ root }));
-
-    expect(violations).toHaveLength(2);
-    expect(violations.map((v) => v.specifier!).toSorted((a, b) => a.localeCompare(b))).toEqual([
-      "@langwatch/dataset-browser-kit",
-      "@langwatch/scenario-browser",
-    ]);
-  });
-
-  /** @scenario "A kit's contract, Design System and browser-host dependencies pass" */
-  it("does not report contracts, the Design System, or browser-host", () => {
-    writePackage("modules/trace/browser-kit", "@langwatch/trace-browser-kit", {
-      dependencies: {
-        "@langwatch/trace-contract": "workspace:*",
-        "@langwatch/scenario-contract": "workspace:*",
-        "@langwatch/design-system": "workspace:*",
-        "@langwatch/browser-host": "workspace:*",
-      },
-    });
-
-    const violations = lintBrowserKitDependencies(snapshotOf({ root }));
-
-    expect(violations).toHaveLength(0);
-  });
-});
-
 describe("when one manifest edge onto a browser package could be read by three policies", () => {
   /** @scenario "One manifest edge onto a browser package is reported once" */
-  it("reports it under the manifest closure alone, not again as cross-feature or kit debt", () => {
+  it("reports it under the manifest closure alone, not again as cross-feature debt", () => {
     write(
       "modules/catalogue.json",
       JSON.stringify({
@@ -251,12 +232,9 @@ describe("when one manifest edge onto a browser package could be read by three p
     writePackage("modules/scenario/browser", "@langwatch/scenario-browser", {
       dependencies: { "@langwatch/trace-browser": "workspace:*" },
     });
-    writePackage("modules/trace/browser-kit", "@langwatch/trace-browser-kit", {
-      dependencies: { "@langwatch/scenario-browser": "workspace:*" },
-    });
 
     const registry = POLICIES.filter((policy) =>
-      ["browser-package-closure", "browser-kit-dependencies", "manifests"].includes(policy.id),
+      ["browser-package-closure", "manifests"].includes(policy.id),
     );
     const edges = lintPolicies(snapshotOf({ root }), registry)
       .filter((violation) => violation.specifier?.endsWith("-browser"))
@@ -264,7 +242,6 @@ describe("when one manifest edge onto a browser package could be read by three p
 
     expect(edges).toEqual([
       "browser-package-manifest-closure modules/scenario/browser/package.json @langwatch/trace-browser",
-      "browser-package-manifest-closure modules/trace/browser-kit/package.json @langwatch/scenario-browser",
     ]);
   });
 });

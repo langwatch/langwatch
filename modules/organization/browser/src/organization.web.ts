@@ -6,11 +6,11 @@
 
 import { planTrpc } from "@langwatch/entitlement-contract";
 import { organizationTrpc } from "@langwatch/organization-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { organizationApi } from "./behavior/organization-api.ts";
 
-export const organizationWeb = defineWebModule("organization")
+export const organizationWeb = defineBrowserModule("organization")
   // The api reads plan.getActivePlan too, so the plan's tier travels with it.
   .withApi(organizationApi, { contracts: [organizationTrpc, planTrpc] })
   .withHosts({

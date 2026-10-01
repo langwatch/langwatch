@@ -22,11 +22,13 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 }));
 
 // The picker has its own suite in authz; this file pins what the drawer sends.
-vi.mock("@langwatch/authz-browser-kit", () => ({
-  ScopeChipPicker: () => null,
+vi.mock("@langwatch/design-system/scope-chip-picker", () => ({ ScopeChipPicker: () => null }));
+
+vi.mock("@langwatch/design-system/provider-scope-chips", () => ({
   ProviderScopeChips: () => null,
-  ScopeFilter: () => null,
 }));
+
+vi.mock("@langwatch/design-system/scope-filter", () => ({ ScopeFilter: () => null }));
 
 vi.mock("../../blocks/permission-category-list.tsx", () => ({
   PermissionCounter: ({ count }: { count: number }) => <span data-testid="counter">{count}</span>,
@@ -42,13 +44,19 @@ const ADMIN_MEMBERS = [
   { id: "user-2", name: "Bob", email: "bob@acme.test" },
 ];
 
-function renderDrawer({ isOpen = true }: { isOpen?: boolean } = {}) {
+function renderDrawer({
+  isOpen = true,
+  bindingsFailed = false,
+}: { isOpen?: boolean; bindingsFailed?: boolean } = {}) {
   const onCreate = vi.fn<(input: CreateApiKeyInput) => void>();
   const props = {
     isCreating: false,
     myBindings: {
-      data: [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" as const }],
+      data: bindingsFailed
+        ? undefined
+        : [{ scopeType: "ORGANIZATION", scopeId: "org-1", role: "MEMBER" as const }],
       isLoading: false,
+      isError: bindingsFailed,
     },
     orgProjects: [{ id: "proj-1", name: "Web App", teamId: "team-1" }],
     orgTeams: [{ id: "team-1", name: "Platform" }],
@@ -89,8 +97,13 @@ describe("given a member who is not an admin", () => {
       const { onCreate } = renderDrawer();
       expect(screen.queryByText("Key type")).toBeNull();
       expect(createButton()).toBeDisabled();
-      await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
-      await user.type(screen.getByPlaceholderText("What is this key used for?"), "pipeline");
+      // Set directly: on a cold, loaded run the drawer's focus trap can land mid-typing and
+      // swallow keystrokes, leaving the button disabled. This test pins the payload.
+      const nameInput = screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev");
+      fireEvent.change(nameInput, { target: { value: "CI" } });
+      const descriptionInput = screen.getByPlaceholderText("What is this key used for?");
+      fireEvent.change(descriptionInput, { target: { value: "pipeline" } });
+      expect(createButton()).toBeEnabled();
       await user.click(createButton());
       expect(onCreate.mock.calls).toEqual([
         [
@@ -137,6 +150,20 @@ describe("given a member who is not an admin", () => {
       fireEvent.click(screen.getByText("Toggle drawer"));
       fireEvent.click(screen.getByText("Toggle drawer"));
       expect(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev")).toHaveValue("");
+    });
+  });
+});
+
+describe("given the read of the caller's access fails", () => {
+  describe("when a named key could be created", () => {
+    /** @scenario "A key minted by someone holding a grant on an archived team keeps the minter's role" */
+    it("shows the error and keeps Create disabled instead of falling back to a viewer key", async () => {
+      const user = userEvent.setup();
+      const { onCreate } = renderDrawer({ bindingsFailed: true });
+      await user.type(screen.getByPlaceholderText("e.g., CI Pipeline, Local Dev"), "CI");
+      expect(screen.getByRole("alert")).toHaveTextContent("Couldn't read your access");
+      expect(createButton()).toBeDisabled();
+      expect(onCreate).not.toHaveBeenCalled();
     });
   });
 });

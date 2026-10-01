@@ -123,6 +123,8 @@ classes (`ds-` prefix).
 - **Console links:** `consoleLinks({ location })` gives every console's
   `TopBar` its links (and `slug`, `homeHref`, `hubHref`) from the page's own
   host; a console appends its own extras after them, and parses no host itself.
+  A link with a `group` ("Sims", "Tools") sits in that group's `Menu`, whose
+  trigger names the current one ("Sims · Voice"); the rest stay flat.
 - **Theme:** `ThemeToggle` (system / light / dark, persisted in
   `localStorage` under `lw-internal-theme`, set as `data-theme` on `<html>`).
 

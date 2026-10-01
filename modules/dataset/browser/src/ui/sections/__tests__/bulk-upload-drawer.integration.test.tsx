@@ -39,6 +39,12 @@ const getByIdQuery = vi.fn(() => ({
 }));
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     dataset: {
       getById: { useQuery: () => getByIdQuery() },
       retryNormalize: {
@@ -47,7 +53,6 @@ vi.mock("../../../behavior/dataset-api.ts", () => ({
         }),
       },
     },
-    useUtils: () => ({}),
   },
 }));
 

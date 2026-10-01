@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import type { AuthzPermission } from "@langwatch/authorization";
 
 /**
@@ -288,4 +290,30 @@ export function describeAccessPolicy(policy: AccessPolicy): string {
     case "handlerManaged":
       return `handler-managed — ${policy.reason}`;
   }
+}
+
+/**
+ * Fails CLOSED, because `header === secret` read `undefined === undefined` as
+ * true and let anyone trigger destructive jobs.
+ */
+export function isInternalSecretValid({
+  authorizationHeader,
+  expected,
+}: {
+  authorizationHeader: string | undefined;
+  expected: string | undefined;
+}): boolean {
+  if (!expected) return false;
+
+  const presented = authorizationHeader?.startsWith("Bearer ")
+    ? authorizationHeader.slice("Bearer ".length)
+    : authorizationHeader;
+
+  if (!presented) return false;
+
+  const presentedBytes = Buffer.from(presented);
+  const expectedBytes = Buffer.from(expected);
+  if (presentedBytes.length !== expectedBytes.length) return false;
+
+  return timingSafeEqual(presentedBytes, expectedBytes);
 }

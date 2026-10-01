@@ -87,7 +87,7 @@ function serviceOf(store: InMemoryConnections): SsoConnectionService {
       stranding: new StubStranding([]),
       // The grandfather verb states history and runs no operator gate; an
       // empty operator set proves it does not need one.
-      platformOperators: new StubPlatformOperators(),
+      authorization: new StubPlatformOperators(),
       licensing: licensingFixture(),
     }),
     ledger,

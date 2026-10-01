@@ -9,6 +9,7 @@ import {
   type Gauge,
   type Histogram,
   type Meter,
+  type ObservableCallback,
 } from "@opentelemetry/api";
 
 import { HISTOGRAM_BOUNDARIES } from "./histogram-boundaries.ts";
@@ -28,8 +29,12 @@ export const METRICS_SCOPE_NAME = "langwatch";
 let generation = 0;
 let meter: { value: Meter; generation: number } | undefined;
 
-/** Observable gauges declared before a provider existed, awaiting activation. */
-const pendingObservations: (() => void)[] = [];
+/**
+ * Observable gauges declared before a provider, installed when one activates. Both lists
+ * clear on `deactivateMetrics`: a stopped graph's gauges must not outlive it (ADR-168).
+ */
+const moduleScopeObservations: (() => void)[] = [];
+const installedCallbacks: (() => void)[] = [];
 let activated = false;
 
 function currentMeter(): Meter {
@@ -46,8 +51,7 @@ function currentMeter(): Meter {
 export function activateMetrics(): void {
   generation += 1;
   activated = true;
-  const pending = pendingObservations.splice(0, pendingObservations.length);
-  for (const install of pending) install();
+  for (const install of moduleScopeObservations) install();
 }
 
 /**
@@ -56,10 +60,19 @@ export function activateMetrics(): void {
  * one, and the assertions would read an empty reader.
  */
 export function resetMetricsForTests(): void {
+  deactivateMetrics();
+}
+
+/**
+ * The provider is shutting down: remove every gauge callback and forget pending ones,
+ * so nothing keeps the stopped graph (and the stores its gauges read) reachable.
+ */
+export function deactivateMetrics(): void {
   generation += 1;
   meter = void 0;
   activated = false;
-  pendingObservations.length = 0;
+  moduleScopeObservations.length = 0;
+  for (const remove of installedCallbacks.splice(0)) remove();
 }
 
 /** What every instrument declaration carries. */
@@ -169,16 +182,18 @@ export function observableGauge(
     const instrument = currentMeter().createObservableGauge(definition.name, {
       description: definition.description,
     });
-    instrument.addCallback(async (result) => {
+    const callback: ObservableCallback = async (result) => {
       await observe({
         observe: (value, attributes) => result.observe(value, attributes),
       });
-    });
+    };
+    instrument.addCallback(callback);
+    installedCallbacks.push(() => instrument.removeCallback(callback));
   };
 
   // Before activation there is no provider, so registering now would attach
-  // the callback to a no-op meter that is never collected — the pull-based
-  // equivalent of the stale-meter trap this facade exists to avoid.
+  // the callback to a no-op meter that is never collected. After it, the gauge
+  // belongs to the booted graph and goes when its provider shuts down.
   if (activated) install();
-  else pendingObservations.push(install);
+  else moduleScopeObservations.push(install);
 }

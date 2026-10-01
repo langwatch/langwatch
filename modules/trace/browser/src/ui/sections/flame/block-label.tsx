@@ -1,4 +1,4 @@
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 
 import { formatPercent } from "../../../behavior/flame/tree.ts";
 

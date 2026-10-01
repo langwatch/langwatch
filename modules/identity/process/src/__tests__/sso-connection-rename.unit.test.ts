@@ -34,7 +34,7 @@ function guardsOver({ state, name }: { state: SsoConnectionState["state"]; name:
     registrationSlots: connections,
     breakGlass: new StubBreakGlassBindings(false),
     stranding: new StubStranding(),
-    platformOperators: new StubPlatformOperators(),
+    authorization: new StubPlatformOperators(),
     licensing: licensingFixture(),
   });
 }

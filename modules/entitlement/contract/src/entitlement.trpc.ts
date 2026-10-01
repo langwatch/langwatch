@@ -2,7 +2,7 @@
  * Every entitlement procedure, declared once: the plan an organization is on,
  * what it has used against that plan, and what it has spent.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -15,7 +15,7 @@ import { planSchema } from "./plan.ts";
 import { usageStatsSchema } from "./usage.ts";
 
 export const planTrpc = defineTrpcContract("plan")
-  .query("getActivePlan", { cache: { tier: "session" } })
+  .query("getActivePlan")
   .withInput(entitlementOrganizationScopeSchema)
   .withOutput(planSchema)
   .build();

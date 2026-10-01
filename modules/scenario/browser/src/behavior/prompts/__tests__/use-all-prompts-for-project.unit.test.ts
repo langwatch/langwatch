@@ -12,14 +12,17 @@ const { useQueryMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("../../scenario-api.ts", () => ({
-  api: {
+  api: {},
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
     prompts: {
       getAllPromptsForProject: { useQuery: useQueryMock },
     },
   },
 }));
 
-vi.mock("../../use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ projectId: "project-1" }),
 }));
 
@@ -31,9 +34,7 @@ describe("useAllPromptsForProject", () => {
 
       expect(useQueryMock).toHaveBeenCalledWith(
         { projectId: "project-1" },
-        expect.objectContaining({
-          trpc: { context: { skipBatch: true } },
-        }),
+        expect.objectContaining({}),
       );
     });
   });

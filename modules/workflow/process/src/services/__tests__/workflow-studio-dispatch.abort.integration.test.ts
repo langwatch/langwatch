@@ -1,10 +1,10 @@
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * A cell blocked on a slow model stops when the run does: the read races the
  * abort flag, and cancelling the reader disconnects the engine.
  * @see specs/experiments-v3/execution-backend.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   parseStudioWorkflow,
   type StudioClientEvent,

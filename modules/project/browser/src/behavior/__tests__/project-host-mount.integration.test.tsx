@@ -6,11 +6,13 @@
 import {
   UiCapabilityContextProvider,
   UiScope,
+  UiSession,
   type UiActiveScope,
+  type UiActor,
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -63,11 +65,32 @@ const ORGANIZATION_GRAPH = {
 // mount DOES with the graph, not about the wire that carries it.
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 vi.mock("../project-api.ts", () => ({
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  projectApi: { organization: { getAll: { useQuery: () => answer() } } },
 }));
+
+const drawer = { openDrawer: vi.fn() };
+vi.mock("@langwatch/browser-host/use-drawer", () => ({ useDrawer: () => drawer }));
 
 import { useProjectHost } from "../../model/project-host.ts";
 import ProjectHostMount from "../project-host-mount.tsx";
+
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
 
 class TestScope extends UiScope {
   constructor(private readonly reading: UiActiveScope) {
@@ -81,10 +104,10 @@ class TestScope extends UiScope {
 
 function harness(scope: UiActiveScope) {
   const capabilities: UiCapabilities = {
-    ...createUiCapabilitiesFromHost({
-      route: () => ({ params: {}, query: {} }),
-      navigate: () => void 0,
-    }),
+    ...createUiCapabilitiesFromHost(
+      { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+      new SignedInSession(),
+    ),
     scope: new TestScope(scope),
   };
 
@@ -114,6 +137,17 @@ function OrganizationReader() {
   );
 }
 
+/** Stands in for the settings screen's "Set up project" button. */
+function SetUpProjectButton() {
+  const host = useProjectHost();
+  const open = () => host.openOverlay("createProject", { navigateOnCreate: true });
+  return (
+    <button type="button" onClick={open}>
+      Set up project
+    </button>
+  );
+}
+
 describe("given a project host mounted above a screen that renders from it", () => {
   describe("when the organization graph has answered", () => {
     /** @scenario "A mounted host answers the reading its screen renders from" */
@@ -139,6 +173,17 @@ describe("given a project host mounted above a screen that renders from it", () 
       render(<OrganizationReader />, { wrapper: Harness });
 
       expect(screen.queryByTestId("organization")).toBeNull();
+    });
+  });
+
+  describe("when the screen opens an overlay", () => {
+    it("opens the named drawer with its props", () => {
+      const Harness = harness({ organizationId: ORGANIZATION_ID, projectId: PROJECT_ID });
+
+      render(<SetUpProjectButton />, { wrapper: Harness });
+      fireEvent.click(screen.getByRole("button", { name: "Set up project" }));
+
+      expect(drawer.openDrawer).toHaveBeenCalledWith("createProject", { navigateOnCreate: true });
     });
   });
 });

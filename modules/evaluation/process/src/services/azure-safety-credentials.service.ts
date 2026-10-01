@@ -1,17 +1,12 @@
 import { AZURE_SAFETY_PROVIDER_KEY } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
-import type {
-  EvaluationAzureSafetyCredentials,
-  EvaluationAzureSafetyCredentialsResolution,
-} from "../app/evaluation.members.ts";
-
 /**
  * Azure Content Safety credentials, solely from the project's `azure_safety`
  * model provider: there is no environment fallback.
  * @see specs/evaluators/azure-safety-byok-gating.feature
  */
-export class AzureSafetyCredentialsService implements EvaluationAzureSafetyCredentials {
+export class AzureSafetyCredentialsService {
   static create(
     modelProviders: Pick<ModelProviderApi, "getExecutionProviders">,
   ): AzureSafetyCredentialsService {
@@ -42,3 +37,11 @@ export class AzureSafetyCredentialsService implements EvaluationAzureSafetyCrede
     };
   }
 }
+
+/**
+ * The tenant's Azure Safety provider credentials, or that none is configured (the evaluation is
+ * skipped).
+ */
+export type EvaluationAzureSafetyCredentialsResolution =
+  | Readonly<{ kind: "configured"; credentials: Record<string, string> }>
+  | Readonly<{ kind: "unconfigured" }>;

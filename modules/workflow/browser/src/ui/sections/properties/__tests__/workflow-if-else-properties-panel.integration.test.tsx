@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { VariablesSection } from "@langwatch/prompt-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Component } from "@langwatch/workflow-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { VariablesSection } from "../../prompt/variables/variables-section.tsx";
 
 const mockSetNodeParameter = vi.fn();
 const mockSetNode = vi.fn();
@@ -55,25 +56,23 @@ const createIfElseNode = (overrides: Partial<Component> = {}): Node<Component> =
 });
 
 const renderPanel = (node = createIfElseNode()) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <IfElsePropertiesPanel
-        node={node}
-        renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
-        renderCodeEditor={({ code }: WorkflowCodeEditorProps) => (
-          <div data-testid="code-editor">{code}</div>
-        )}
-        renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
-        renderPropertySectionTitle={({ children }) => <span>{children}</span>}
-        renderLiquidConditionEditor={({ value, onChange }) => (
-          <input
-            data-testid="if-else-condition-input"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-          />
-        )}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <IfElsePropertiesPanel
+      node={node}
+      renderBase={({ children }) => <div data-testid="base-properties-panel">{children}</div>}
+      renderCodeEditor={({ code }: WorkflowCodeEditorProps) => (
+        <div data-testid="code-editor">{code}</div>
+      )}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderPropertySectionTitle={({ children }) => <span>{children}</span>}
+      renderLiquidConditionEditor={({ value, onChange }) => (
+        <input
+          data-testid="if-else-condition-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    />,
   );
 
 describe("IfElsePropertiesPanel", () => {

@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * Automation reacts to trace's and evaluation's existing events from its own side (§9).
- * Spec: modules/automation/specs/automation-peer-subscribers.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
@@ -12,6 +6,12 @@ import {
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, type Event } from "@langwatch/eventing";
+/**
+ * @vitest-environment node
+ * Automation reacts to trace's and evaluation's existing events from its own side (§9).
+ * Spec: modules/automation/specs/automation-peer-subscribers.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,

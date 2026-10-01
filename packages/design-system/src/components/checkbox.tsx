@@ -46,3 +46,5 @@ export const CheckboxGroup = React.forwardRef<HTMLDivElement, CheckboxGroupProps
     );
   },
 );
+
+export { Checkbox as RawCheckbox } from "@chakra-ui/react";

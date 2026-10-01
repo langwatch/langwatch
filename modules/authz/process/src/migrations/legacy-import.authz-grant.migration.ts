@@ -6,11 +6,11 @@
 
 import { createHash } from "node:crypto";
 
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   AUTHZ_ENGINE_MIGRATION_NAME,
   roleKeyForTeamRole,
   type GrantFact,
-  type GrantsLedgerActor,
   type LedgerPrincipal,
   type RoleFact,
 } from "@langwatch/authz-contract";
@@ -42,7 +42,7 @@ export { AUTHZ_ENGINE_MIGRATION_NAME };
 /** The system actor on every fact this migration authors: no human did it. */
 export const AUTHZ_ENGINE_ACTOR_ID = "system:authz-engine" as const;
 
-const ACTOR: GrantsLedgerActor = {
+const ACTOR: LedgerActor = {
   type: "system",
   id: AUTHZ_ENGINE_ACTOR_ID,
 };
@@ -65,14 +65,14 @@ const MAX_REPORTED = 50;
 export type AttachGrantLedgerInput = {
   organizationId: string;
   commandId: string;
-  grant: GrantFact & { actor: GrantsLedgerActor };
+  grant: GrantFact & { actor: LedgerActor };
 };
 
 export type DefineRoleLedgerInput = {
   organizationId: string;
   commandId: string;
   role: RoleFact;
-  actor: GrantsLedgerActor;
+  actor: LedgerActor;
 };
 
 export type ChangeGrantRoleLedgerInput = {
@@ -81,7 +81,7 @@ export type ChangeGrantRoleLedgerInput = {
   grantId: string;
   from: string | null;
   to: string;
-  actor: GrantsLedgerActor;
+  actor: LedgerActor;
   occurredAtMs: number;
 };
 
@@ -90,7 +90,7 @@ export type RevokeGrantLedgerInput = {
   commandId: string;
   grantId: string;
   reason: string;
-  actor: GrantsLedgerActor;
+  actor: LedgerActor;
   occurredAtMs: number;
 };
 
@@ -98,7 +98,7 @@ export type DeleteRoleLedgerInput = {
   organizationId: string;
   commandId: string;
   roleId: string;
-  actor: GrantsLedgerActor;
+  actor: LedgerActor;
   occurredAtMs: number;
 };
 

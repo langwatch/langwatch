@@ -8,7 +8,7 @@ import {
   cliKeyManagementPermissions,
 } from "@langwatch/api-key-contract";
 import { createRestRuntime } from "@langwatch/api/rest";
-import { CliSessionRecordNotFoundError } from "@langwatch/auth-contract";
+import { CliSessionRecordNotFoundError, cliRefreshTokenKey } from "@langwatch/auth-contract";
 import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { UserNotFoundError } from "@langwatch/user-contract";
@@ -102,7 +102,6 @@ describe("given a CLI starting a device login", () => {
         id: "project-personal",
         slug: "personal-bob",
         name: "Bob",
-        api_key: "project-key",
       });
       expect(session.cli_api_key).toBe("lw_cli_minted");
       // The hostname is normalized on the way into the key name: an
@@ -474,24 +473,251 @@ describe("given a CLI starting a device login", () => {
       return { api, grant };
     }
 
-    describe("when the project's key is rotated before the CLI polls", () => {
-      /** @scenario project-login exchange returns a key rotated after approval */
-      it("answers the key the project holds now, not the one the approval saw", async () => {
+    describe("when the CLI polls after approval", () => {
+      /** @scenario A project login answers tokens and the project, never a key */
+      it("answers a project session and no key", async () => {
         const world = deviceFlowWorld();
-        world.project = liveProject({ apiKey: "sk-lw-at-approval" });
+        world.project = liveProject();
         const { api, grant } = await approvedProjectKeyGrant(world);
-
-        world.project = liveProject({ apiKey: "sk-lw-rotated" });
 
         const exchanged = await api.post("/api/auth/cli/exchange", {
           device_code: grant.device_code,
         });
+        const body = await exchanged.text();
+        const session = JSON.parse(body) as Record<string, unknown>;
 
         expect(exchanged.status).toBe(200);
-        await expect(exchanged.json()).resolves.toMatchObject({
-          kind: "api_key",
-          api_key: "sk-lw-rotated",
+        expect(session.access_token).toMatch(/^lw_at_/);
+        expect(session.refresh_token).toMatch(/^lw_rt_/);
+        expect(session.expires_in).toEqual(expect.any(Number));
+        expect(session.project).toEqual({ id: "project-shared", slug: "shared", name: "Shared" });
+        expect(session).not.toHaveProperty("api_key");
+        expect(body).not.toContain("sk-lw-shared");
+      });
+    });
+
+    describe("when the session is re-scoped through a refresh", () => {
+      async function projectSession(world: ReturnType<typeof deviceFlowWorld>) {
+        const { api, grant } = await approvedProjectKeyGrant(world);
+        const exchanged = (await (
+          await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })
+        ).json()) as { refresh_token: string };
+
+        return { api, refreshToken: exchanged.refresh_token };
+      }
+
+      /** @scenario Refresh naming another project forks a child session and keeps the parent */
+      it("forks a pair locked to the named project and leaves the parent rotating", async () => {
+        const world = deviceFlowWorld();
+        const { api, refreshToken } = await personSession(world);
+
+        world.project = liveProject({ id: "project-other", slug: "other", name: "Other" });
+        const forked = await api.post("/api/auth/cli/refresh", {
+          refresh_token: refreshToken,
+          project_slug: "other",
         });
+
+        expect(forked.status).toBe(200);
+        await expect(forked.json()).resolves.toMatchObject({
+          access_token: expect.stringMatching(/^lw_at_/),
+          project: { id: "project-other", slug: "other", name: "Other" },
+        });
+        expect(
+          world.store
+            .dump()
+            .some(
+              (record) =>
+                record.includes('"project_id":"project-other"') &&
+                record.includes('"project_locked":true'),
+            ),
+        ).toBe(true);
+
+        const parent = await api.post("/api/auth/cli/refresh", { refresh_token: refreshToken });
+
+        expect(parent.status).toBe(200);
+      });
+
+      /** @scenario A project login is locked to the project the person approved */
+      it("refuses to fork the session a project login answered", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, refreshToken } = await projectSession(world);
+
+        world.project = liveProject({ id: "project-other", slug: "other", name: "Other" });
+        const refused = await api.post("/api/auth/cli/refresh", {
+          refresh_token: refreshToken,
+          project_slug: "other",
+        });
+
+        expect(refused.status).toBe(403);
+        world.project = liveProject();
+        const kept = await api.post("/api/auth/cli/refresh", { refresh_token: refreshToken });
+
+        expect(kept.status).toBe(200);
+        await expect(kept.json()).resolves.toMatchObject({ project: { id: "project-shared" } });
+      });
+
+      /** @scenario Refresh is refused when the person cannot access the project */
+      it("refuses a project the person cannot view and keeps the refresh token valid", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, refreshToken } = await projectSession(world);
+
+        world.administersProject = false;
+        const refused = await api.post("/api/auth/cli/refresh", {
+          refresh_token: refreshToken,
+          project_id: "project-shared",
+        });
+
+        expect(refused.status).toBe(403);
+        await expect(refused.json()).resolves.toMatchObject({ error: "forbidden" });
+
+        world.administersProject = true;
+        const kept = await api.post("/api/auth/cli/refresh", { refresh_token: refreshToken });
+
+        expect(kept.status).toBe(200);
+      });
+    });
+
+    describe("when a session that forked a child ends", () => {
+      async function forkedFamily(world: ReturnType<typeof deviceFlowWorld>) {
+        const parent = await personSession(world);
+        world.project = liveProject({ id: "project-other", slug: "other", name: "Other" });
+        const child = (await (
+          await parent.api.post("/api/auth/cli/refresh", {
+            refresh_token: parent.refreshToken,
+            project_slug: "other",
+          })
+        ).json()) as { refresh_token: string };
+
+        return { ...parent, childRefreshToken: child.refresh_token };
+      }
+
+      /** @scenario Logging out a session ends the children forked from it */
+      it("ends the child when the parent logs out", async () => {
+        const world = deviceFlowWorld();
+        const { api, accessToken, refreshToken, childRefreshToken } = await forkedFamily(world);
+
+        await api.post("/api/auth/cli/logout", {
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        const child = await api.post("/api/auth/cli/refresh", { refresh_token: childRefreshToken });
+
+        expect(child.status).toBe(401);
+        await expect(child.json()).resolves.toMatchObject({ error: "invalid_grant" });
+      });
+
+      /** @scenario Revoking a session ends the children forked from it */
+      it("ends the child when the parent's tokens are revoked", async () => {
+        const world = deviceFlowWorld();
+        const { api, refreshToken, childRefreshToken } = await forkedFamily(world);
+
+        await world.sessions.revokeTokens({
+          userId: USER_ID,
+          tokenKeys: [cliRefreshTokenKey(refreshToken)],
+        });
+        const child = await api.post("/api/auth/cli/refresh", { refresh_token: childRefreshToken });
+
+        expect(child.status).toBe(401);
+      });
+    });
+
+    describe("when a rotation fails part-way on an unexpected error", () => {
+      /** @scenario A rotation that fails part-way leaves the refresh token usable */
+      it("hands the claim back, so the next presentation rotates", async () => {
+        const world = deviceFlowWorld();
+        const { api, refreshToken } = await personSession(world);
+
+        world.directoryFails = true;
+        const failed = await api.post("/api/auth/cli/refresh", { refresh_token: refreshToken });
+
+        expect(failed.status).toBe(500);
+        world.directoryFails = false;
+        const retried = await api.post("/api/auth/cli/refresh", { refresh_token: refreshToken });
+
+        expect(retried.status).toBe(200);
+      });
+    });
+
+    describe("when one refresh token is presented twice at once", () => {
+      /** @scenario A refresh token buys one rotation, even when presented twice at once */
+      it("rotates once and refuses the second presentation as spent", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const { api, grant } = await approvedProjectKeyGrant(world);
+        const { refresh_token } = (await (
+          await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })
+        ).json()) as { refresh_token: string };
+
+        const answers = await Promise.all([
+          api.post("/api/auth/cli/refresh", { refresh_token }),
+          api.post("/api/auth/cli/refresh", { refresh_token }),
+        ]);
+
+        expect(answers.map((answer) => answer.status).sort()).toEqual([200, 401]);
+      });
+    });
+
+    describe("when a session another sign-in locked to one project is re-scoped", () => {
+      /** @scenario A session consented to one project cannot be re-scoped to another */
+      it("refuses the re-scope and keeps the session on its project", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const api = mount(world);
+        const locked = await world.flow.issueProjectSession({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          projectId: "project-shared",
+          clientLabel: "Hosted MCP",
+        });
+
+        world.project = liveProject({ id: "project-other", slug: "other", name: "Other" });
+        const refused = await api.post("/api/auth/cli/refresh", {
+          refresh_token: locked.refreshToken,
+          project_slug: "other",
+        });
+
+        expect(refused.status).toBe(403);
+      });
+
+      /** @scenario A project session is refused to a person who can no longer view the project */
+      it("refuses to issue the session once the person cannot view the project", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        world.administersProject = false;
+
+        await expect(
+          world.flow.issueProjectSession({
+            userId: USER_ID,
+            organizationId: ORGANIZATION_ID,
+            projectId: "project-shared",
+            clientLabel: "Hosted MCP",
+          }),
+        ).rejects.toMatchObject({ refusal: { error: "access_denied" } });
+      });
+
+      /** @scenario Every sign-in path reads the issued session back through the auth operations */
+      it("issues a locked session, rotates it, and refuses a token it never issued", async () => {
+        const world = deviceFlowWorld();
+        world.project = liveProject();
+        const issued = await world.flow.issueProjectSession({
+          userId: USER_ID,
+          organizationId: ORGANIZATION_ID,
+          projectId: "project-shared",
+          clientLabel: "Hosted MCP",
+        });
+
+        const rotated = await world.flow.rotateSession({ refreshToken: issued.refreshToken });
+
+        expect(rotated.accessToken).toMatch(/^lw_at_/);
+        expect(rotated.refreshToken).not.toBe(issued.refreshToken);
+        await expect(
+          world.flow.rotateSession({ refreshToken: issued.refreshToken }),
+        ).rejects.toMatchObject({ refusal: { error: "invalid_grant" } });
+        await expect(
+          world.flow.rotateSession({ refreshToken: "lw_rt_never_issued" }),
+        ).rejects.toMatchObject({ refusal: { error: "invalid_grant" } });
       });
     });
 
@@ -634,8 +860,7 @@ describe("given a CLI starting a device login", () => {
 
       expect(approved.status).toBe(200);
       await expect(exchanged.json()).resolves.toMatchObject({
-        kind: "api_key",
-        api_key: "sk-lw-mine",
+        project: { id: "project-mine" },
       });
     });
 
@@ -656,7 +881,7 @@ describe("given a CLI starting a device login", () => {
         kind: "api_key",
         project: { id: "project-shared" },
       });
-      await expect(exchanged.json()).resolves.toMatchObject({ api_key: "sk-lw-shared" });
+      await expect(exchanged.json()).resolves.toMatchObject({ project: { id: "project-shared" } });
     });
 
     /** @scenario project-login approval denies a project the caller cannot manage */
@@ -998,6 +1223,10 @@ class InMemoryDeviceSessionStore implements CliDeviceSessionRepository {
   private readonly values = new Map<string, string>();
   private readonly sets = new Map<string, Set<string>>();
 
+  dump(): string[] {
+    return [...this.values.values()];
+  }
+
   get(key: string): Promise<string> {
     const value = this.values.get(key);
 
@@ -1069,6 +1298,7 @@ type LiveProject = {
   id: string;
   slug: string;
   name: string;
+  teamId: string;
   apiKey: string;
   isPersonal: boolean;
   ownerUserId: string | null;
@@ -1079,6 +1309,7 @@ function liveProject(overrides: Partial<LiveProject> = {}): LiveProject {
     id: "project-shared",
     slug: "shared",
     name: "Shared",
+    teamId: "team-shared",
     apiKey: "sk-lw-shared",
     isPersonal: false,
     ownerUserId: null,
@@ -1121,6 +1352,8 @@ function deviceFlowWorld(
     administersProject: boolean;
     /** Whether the identity read answers at all, for the release-on-failure path. */
     personExists: boolean;
+    /** Whether the session-ceiling read fails unexpectedly, mid-rotation. */
+    directoryFails: boolean;
     store: InMemoryDeviceSessionStore;
     mintedKeys: { deviceLabel: string; userId: string }[];
     revokedForLogout: { apiKeyId: string; userId: string }[];
@@ -1136,6 +1369,7 @@ function deviceFlowWorld(
     project: null,
     administersProject: true,
     personExists: true,
+    directoryFails: false,
     store,
     mintedKeys: [],
     revokedForLogout: [],
@@ -1152,9 +1386,16 @@ function deviceFlowWorld(
         ? Promise.resolve({ id: USER_ID, name: "Bob", email: "bob@example.test" })
         : Promise.reject(new UserNotFoundError(userId)),
     getOrganization: () => Promise.resolve({ id: ORGANIZATION_ID, name: "Acme", slug: "acme" }),
-    maxSessionDurationDays: () => Promise.resolve(world.maxSessionDurationDays),
+    maxSessionDurationDays: () =>
+      world.directoryFails
+        ? Promise.reject(new Error("directory unavailable"))
+        : Promise.resolve(world.maxSessionDurationDays),
     hasActiveMembership: () => Promise.resolve(world.activeMembership),
     getLiveProject: () =>
+      world.project === null
+        ? Promise.reject(new ProjectNotFoundError())
+        : Promise.resolve(world.project),
+    getLiveProjectByRef: () =>
       world.project === null
         ? Promise.reject(new ProjectNotFoundError())
         : Promise.resolve(world.project),
@@ -1236,10 +1477,9 @@ function deviceFlowWorld(
           id: "project-personal",
           slug: "personal-bob",
           name: "Bob",
-          apiKey: "project-key",
         },
       }),
-    canManageProject: () => Promise.resolve(world.administersProject),
+    canViewProject: () => Promise.resolve(world.administersProject),
     featureFlags: () =>
       ({ isEnabled: overrides.governanceFlag ?? (() => Promise.resolve(true)) }) as never,
     publicBaseUrl: () =>
@@ -1257,7 +1497,24 @@ function deviceFlowWorld(
     watchCliDeviceApproval: (input) => flow.watchDeviceApproval(input),
   };
 
-  return Object.assign(world, { door });
+  return Object.assign(world, { door, flow, sessions });
+}
+
+/** A person's own CLI session, bound to no project, as a plain `langwatch login` holds one. */
+async function personSession(world: ReturnType<typeof deviceFlowWorld>) {
+  const api = mount(world);
+  const grant = deviceGrantSchema.parse(
+    await (await api.post("/api/auth/cli/device-code", {})).json(),
+  );
+  await api.post("/api/auth/cli/approve", {
+    user_code: grant.user_code,
+    organization_id: ORGANIZATION_ID,
+  });
+  const exchanged = (await (
+    await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })
+  ).json()) as { access_token: string; refresh_token: string };
+
+  return { api, accessToken: exchanged.access_token, refreshToken: exchanged.refresh_token };
 }
 
 function mount(world: ReturnType<typeof deviceFlowWorld>) {

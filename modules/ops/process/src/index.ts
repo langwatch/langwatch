@@ -18,11 +18,7 @@ export type { BugReportRepository } from "./repositories/bug-report.repository.t
 export type { OpsRepositories } from "./repositories/ops.repositories.ts";
 export type { OpsOperationsOptions } from "./app/ops-composition.build.ts";
 export type { ProcessControlAction } from "./repositories/ops-audit.repository.ts";
-export {
-  type AdminAccess,
-  AdminAccessService,
-  type AdminAccessServiceOptions,
-} from "./services/admin-access.service.ts";
+export type { AdminAccess, AdminAccessServiceOptions } from "./services/admin-access.service.ts";
 export type { RedisCpuSample } from "./rules/ops-redis-engine-cpu.rules.ts";
 export type { AnomalyHardTierAlert } from "./app/ops.app.ts";
 export type { QueuePayloadDecoder, QueuePayloadDecoding } from "./app/ops.app.ts";
@@ -76,7 +72,6 @@ export {
   type ProcessManagerPurgeOptions,
   type ProcessManagerPurgeReport,
 } from "./tasks/process-manager-purge.task.ts";
-export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prisma.process-manager-purge.repository.ts";
 export type { ProcessManagerPurgeTarget } from "./repositories/process-manager-purge.repository.ts";
 
 // The transport declarations the process mounts. Each is inert: it names its
@@ -101,4 +96,4 @@ export { opsBugReportTrpcTransport } from "./transport/ops-bug-report.trpc.ts";
 // decision about which client an EXPLAIN is allowed to reach.
 export type { OpsExplainBuild } from "./rules/ops-clickhouse-explain.rules.ts";
 export type { OpsExplainOutcome } from "./services/ops-clickhouse-explain.service.ts";
-export { opsServer } from "./ops.server.ts";
+export { opsProcessModule } from "./ops.module.ts";

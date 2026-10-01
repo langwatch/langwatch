@@ -4,7 +4,7 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { type ImageProxyRequest, imageProxyQuerySchema } from "@langwatch/stored-object-contract";
 
 /** The one operation the proxy door reaches. */

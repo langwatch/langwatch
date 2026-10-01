@@ -520,3 +520,17 @@ Feature: Enterprise SCIM package boundary
       Given "acme"'s plan no longer includes directory sync
       When its activity is read
       Then the read is refused with enterprise_plan_required
+
+    @unit
+    Scenario: No SCIM token is minted while an operator acts as another member
+      Given an operator acting as an organization admin through impersonation
+      When they mint a SCIM token for the organization
+      Then the mint is refused with permission_denied before any permission is asked
+
+  Rule: A directory grant's id is a role-binding KSUID, never a per-process counter
+
+    @unit
+    Scenario: Two grants minted in the same millisecond get distinct role-binding ids
+      Given the clock does not move between two directory pushes
+      When each push attaches a grant the projection does not hold
+      Then each grant carries its own rolebinding KSUID, so neither is skipped as a duplicate

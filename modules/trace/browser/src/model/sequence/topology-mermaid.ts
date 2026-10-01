@@ -1,4 +1,4 @@
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 
 import { buildSpanTree, type SpanWithChildren, sanitiseMermaidId } from "./mermaid-shared.ts";

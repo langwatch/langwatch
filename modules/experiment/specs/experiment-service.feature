@@ -150,3 +150,17 @@ Feature: Experiment service boundary
     When a caller lists runs at GET /api/experiments/runs without an experimentSlug
     Then the run list answers 400 asking for experimentSlug
     And no experiment called "runs" is looked up
+
+  @unit
+  Scenario: A saved HTTP agent target keeps no credentials in the experiment's saved state
+    Given an experiment's setup has a target that runs a saved HTTP agent
+    When the setup is saved
+    Then the stored target keeps the agent id and the request shape
+    And it keeps no header values and no authentication
+
+  @unit
+  Scenario: Reading an experiment never returns credentials an older saved state holds
+    Given an experiment saved earlier holds an HTTP target with headers and authentication
+    When the workbench, the experiment or the evaluations list is read
+    Then the answered target carries neither headers nor authentication
+    And the saved agent's credentials are read by agent id when the row runs

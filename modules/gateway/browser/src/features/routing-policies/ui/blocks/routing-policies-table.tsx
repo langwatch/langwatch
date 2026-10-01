@@ -1,5 +1,3 @@
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import {
   Badge,
   Box,
@@ -9,6 +7,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Plus } from "lucide-react";
 
 import { isModelTier } from "../../model/model-tier-presets.ts";

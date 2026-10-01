@@ -10,17 +10,16 @@ import type { BillingTenantOrganizationCache } from "../../services/tenant-organ
  * Frozen twin: the App resolves the same question through its own
  * `TtlCache<string>(10 * 60 * 1000, "ttlcache:org:resolve:")`
  * (`platform/app/src/server/organizations/resolveOrganizationId.ts`), over the
- * same Redis. They may only change together. A drifted prefix leaves each
- * graph reading a cache the other never writes — not an error, just two
- * populations of the same lookup paying for each other's misses — and a
- * drifted TTL has each side expiring the other's entries early.
+ * same Redis. The prefix may only change with it: a drifted prefix leaves each
+ * graph reading a cache the other never writes. The TTL is ours at five minutes
+ * (ARCHITECTURE §7, Alex 2026-10-01); a shorter side only expires entries early.
  *
  * The value is JSON rather than the bare id for the same reason: the App
  * stores `JSON.stringify(organizationId)`, so a reader that took the raw
  * string back would hand every caller an id wrapped in quotation marks.
  */
 export const BILLING_TENANT_ORGANIZATION_CACHE_PREFIX = "ttlcache:org:resolve:";
-export const BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS = 10 * 60 * 1000;
+export const BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** Only what this cache calls, so a test double is a two-method object. */
 export type BillingTenantOrganizationCacheRedis = Pick<Redis | Cluster, "get" | "setex">;

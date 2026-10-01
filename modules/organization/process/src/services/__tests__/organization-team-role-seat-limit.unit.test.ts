@@ -1,9 +1,9 @@
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
+import { TeamUserRole } from "@langwatch/organization-contract";
 /**
  * The seat guard on a Lite Member's team-role change, as main's organization.ts:699-730 ran it.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
-import { TeamUserRole } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationSeatLicense } from "../../app/organization.members.ts";

@@ -5,7 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
-  "files": ["./src/annotation-chips.ts", "./src/annotation.web.ts"],
+  "files": ["./src/annotation.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -27,6 +27,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
@@ -34,9 +37,6 @@
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
@@ -48,13 +48,7 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../trace/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

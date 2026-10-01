@@ -24,9 +24,8 @@ const AUTH_CODE_TTL_SECONDS = 600;
 const AUTH_CODE_BYTES = 32;
 
 /**
- * The permission a caller must hold to mint an authorization code here. The code embeds the
- * project's legacy API key, which every REST family lets past its RBAC check, so approving one
- * confers the whole project.
+ * The permission a caller must hold to mint an authorization code here. The code becomes a
+ * session as the approving person capped at this project, so approving one confers the project.
  */
 export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
 
@@ -36,7 +35,7 @@ export type McpApprover = Readonly<{ user: Readonly<{ id: string }> }>;
 /** The project an authorization code is minted against. */
 export type McpAuthorizeProject = Readonly<{
   id: string;
-  apiKey: string;
+  organizationId: string;
   /** When the project was archived, in whatever shape the host holds one. */
   archivedAt: TimeInput | null;
 }>;
@@ -53,7 +52,7 @@ export type McpApprovalRequest = Readonly<{
 
 /** What the approval reaches that this module does not own. */
 export interface McpAuthorizationCollaborators {
-  /** The project, with the credential the code embeds. Null when unreadable. */
+  /** The project and its organisation, which the session is bound to. Null when unreadable. */
   findProject(input: { projectId: string }): Promise<McpAuthorizeProject | null>;
   /**
    * Whether the approving person holds the permission on the project. It
@@ -67,8 +66,6 @@ export interface McpAuthorizationCollaborators {
   }): Promise<boolean>;
   /** Whether the project is the globally-readable demo showcase. */
   isDemoProject(input: { projectId: string }): boolean;
-  /** The at-rest cipher the embedded credential is written under. */
-  encrypt(value: string): string;
   /** The registrations a client_id and its redirect URIs are checked against. */
   clients: McpOAuthClientRepository;
   /** Where the code lives for its ten minutes. Unavailable means no code can be minted. */
@@ -204,11 +201,8 @@ export class McpAuthorizationService {
       ttlSeconds: AUTH_CODE_TTL_SECONDS,
       record: {
         projectId: project.id,
-        encryptedApiKey: this.#collaborators.encrypt(project.apiKey),
-        // Captured here so MCP tools that need a caller identity (governance
-        // install/uninstall/rotate) can attribute audit rows to the actual
-        // OAuth-flowing user instead of falling back to a project-wide
-        // identity. Read at the token-exchange step.
+        organizationId: project.organizationId,
+        // The person the token exchange binds the session to.
         userId: request.approver.user.id,
         codeChallenge,
         codeChallengeMethod: request.codeChallengeMethod ?? "S256",

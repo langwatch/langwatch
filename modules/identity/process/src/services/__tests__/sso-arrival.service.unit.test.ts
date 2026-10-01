@@ -1,11 +1,3 @@
-/**
- * @vitest-environment node
- * Whether the answer an administrator gave is the answer an arrival gets.
- * Each case asserts the CONSEQUENCE — a membership row, a request, a grant —
- * rather than that a branch was taken.
- * @see specs/identity/join-requests.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzPendingAdmission } from "@langwatch/authz-contract";
 import {
   emptySsoConnection,
@@ -13,6 +5,14 @@ import {
   type SsoDomainVerification,
   SsoConnectionNotFoundError,
 } from "@langwatch/identity-contract";
+/**
+ * @vitest-environment node
+ * Whether the answer an administrator gave is the answer an arrival gets.
+ * Each case asserts the CONSEQUENCE — a membership row, a request, a grant —
+ * rather than that a branch was taken.
+ * @see specs/identity/join-requests.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const log = vi.hoisted(() => ({ info: vi.fn(), error: vi.fn(), warn: vi.fn(), debug: vi.fn() }));

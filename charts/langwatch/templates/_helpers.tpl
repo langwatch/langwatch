@@ -1783,7 +1783,7 @@ here, once, by name, so both consuming templates agree.
                                                 in-flight jobs here
                                                 (packages/process-stores/src/config-owner.ts)
        PROCESS_SHUTDOWN_DEADLINE_MS = D + 20s   the process force-exits here
-                                                (packages/process-server/src/config.ts)
+                                                (packages/process/src/config.ts)
        required grace               = D + 30s   the kubelet SIGKILLs here
 
      The 20s above the drain pays for App.close (5s) and process teardown

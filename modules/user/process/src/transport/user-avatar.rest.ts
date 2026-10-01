@@ -10,7 +10,7 @@ import {
   STORED_OBJECT_RESPONSE_BASE_HEADERS,
   type RestBytesProducer,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { safeUserAvatarMediaType, userAvatarRestParamsSchema } from "@langwatch/user-contract";
 
 import type { ServableUserAvatar } from "../rules/user-avatar-read.rules.ts";

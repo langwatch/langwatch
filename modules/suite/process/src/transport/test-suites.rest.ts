@@ -24,6 +24,7 @@ import { z } from "zod";
 
 import {
   runPlanRunResultSchema,
+  suiteCallerKeyFact,
   suiteSurfaceFact,
   testSuiteCreateInputSchema,
   testSuiteDetailWireSchema,
@@ -163,12 +164,14 @@ async function runTestSuite(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
+  callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   await readTestSuite({ app, id: input.id, projectId });
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
+    apiKeyId: params.callerKey,
   });
   const result = await app.runPlan({
     projectId,
@@ -322,9 +325,9 @@ export function createTestSuitesRest(): Readonly<{
         "Run every scenario filed in the test suite against the targets sent with the request. The run is filed under a run plan named after the suite and its targets unless a name is sent. A request that names no target answers 422 suite_targets_required.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts, suiteSurfaceFact)
-    .handle(({ app, input, scope }, project, surface) =>
-      runTestSuite({ app, input, projectId: scope.id, project, surface }),
+    .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
+    .handle(({ app, input, scope }, project, surface, callerKey) =>
+      runTestSuite({ app, input, projectId: scope.id, project, surface, callerKey }),
     )
     .build();
 }

@@ -1,11 +1,11 @@
+import type { WireOf } from "@langwatch/api/web";
+import type { Dataset } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
  * Dataset's picker list, as it lends it to the workflow dataset node.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { WireOf } from "@langwatch/api/web";
-import type { Dataset } from "@langwatch/dataset-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -39,11 +39,7 @@ const turn10: WireOf<Dataset> = {
 };
 
 const renderPicker = (onSelect = vi.fn()) => {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <DatasetPickerList datasets={[turn10]} onSelect={onSelect} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<DatasetPickerList datasets={[turn10]} onSelect={onSelect} />);
   return onSelect;
 };
 

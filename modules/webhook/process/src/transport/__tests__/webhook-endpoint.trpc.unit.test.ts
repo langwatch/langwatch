@@ -1,17 +1,17 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `webhookEndpoints` transport over the real runtime and a real endpoint
  * store: the scope per procedure, the plan gate, and the secret-once contract.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  WebhookApp,
+  WebhookModule,
   type WebhookAppDependencies,
   type WebhookId,
   type WebhookSecret,
@@ -94,7 +94,7 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
   // that the tests below call reaches them. They throw rather than answering so
   // a future procedure that does reach one fails loudly here instead of passing
   // against a silent stub.
-  const app = WebhookApp.fromDependencies({
+  const app = WebhookModule.fromDependencies({
     endpoints,
     health: {
       health: () => {

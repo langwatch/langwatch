@@ -1,9 +1,3 @@
-/**
- * Licensing's answer to the port its screen declares. The purchase link has no
- * capability to come from yet, so it is undefined, which the port already
- * allows — a module may not read the shell's injected config itself.
- */
-
 import {
   useUiCapabilities,
   useUiDeployment,
@@ -108,12 +102,19 @@ export default function LicensingHostMount({ children }: { children?: ReactNode 
       new CapabilityLicensingHost({
         orgId: organizationId ?? void 0,
         deploymentIsSaaS: deployment.isSaaS,
-        purchaseUrl: void 0,
+        purchaseUrl: deployment.licensePaymentUrl,
         invalidate: () => void utils.invalidate(),
         feedback,
         mayManageOrganization,
       }),
-    [organizationId, deployment.isSaaS, utils, feedback, mayManageOrganization],
+    [
+      organizationId,
+      deployment.isSaaS,
+      deployment.licensePaymentUrl,
+      utils,
+      feedback,
+      mayManageOrganization,
+    ],
   );
 
   return (

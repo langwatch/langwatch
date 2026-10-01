@@ -13,7 +13,7 @@ import {
 } from "@langwatch/eventing";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
-import type { GatewayApp } from "../app/gateway.app.ts";
+import type { GatewayModule } from "../app/gateway.app.ts";
 import { GatewaySpendEventsRepository } from "../repositories/gateway-spend-events.repository.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -45,7 +45,7 @@ import { GatewaySpendFoldProjection, type GatewaySpendState } from "./gateway-sp
 /** gateway_spend, registered by the module that owns it, with its debit and settlement managers. */
 export const gatewaySpendEventing = defineEventingModule({
   pipeline: GATEWAY_SPEND_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<undefined, GatewayApp>) =>
+  build: ({ app, participation }: EventingSetup<undefined, GatewayModule>) =>
     app.spendPipeline({ participation }),
   connect: ({ app, commands }) => app.connectSpend(commands),
 });

@@ -1,3 +1,6 @@
+import { render } from "@testing-library/react";
+import { beforeEach, describe, expect, it } from "vitest";
+
 /**
  * @vitest-environment jsdom
  *
@@ -5,10 +8,7 @@
  * Explorer is unmounted, and the checked rows are not the new search's rows.
  * @see specs/langy/langy-trace-explorer-link.feature
  */
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { render } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
-
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { useResetSelectionOnViewChange } from "../use-reset-selection-on-view-change.ts";
 
 function Page() {

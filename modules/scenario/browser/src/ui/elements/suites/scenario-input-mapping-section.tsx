@@ -4,19 +4,19 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  type AvailableSource,
-  type FieldMapping,
-  type Variable,
-  VariablesSection,
-} from "@langwatch/prompt-browser-kit";
+import { type AvailableSource, type FieldMapping } from "@langwatch/workflow-contract";
+import { useMemo } from "react";
+
 import {
   fromOutputFieldState,
   resolveOutputField,
   toOutputFieldState,
-} from "@langwatch/suite-browser-kit";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
-import { useMemo } from "react";
+} from "../../../model/suite/output-field-state.ts";
+import {
+  type Variable,
+  VariablesSection,
+} from "../../sections/prompt/variables/variables-section.tsx";
+import { renderSourceTypeIcon } from "../workflow/workflow-icons.tsx";
 
 /** The scenario fields shown as input mapping rows. */
 const SCENARIO_FIELDS: Variable[] = [

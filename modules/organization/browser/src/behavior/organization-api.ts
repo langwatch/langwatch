@@ -31,10 +31,13 @@ import type {
   JoinRequestAutomaticJoins,
   JoinRequestMine,
   JoinRequestPending,
+  OrganizationDirectoryCounts,
   OrganizationInvite,
+  OrganizationMemberDirectory,
   OrganizationMemberProvenance,
-  OrganizationUser,
-  User,
+  OrganizationMemberRecord,
+  OrganizationMemberUser,
+  ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 
 import type { TeamRoleValue } from "../model/member-role-constraints.ts";
@@ -152,38 +155,6 @@ export type TeamWithGrants = TeamWithProjects & {
   projectAccess: Record<string, ProjectAccessRow[]>;
 };
 
-/** One member of the organization, with the teams they are on. */
-export type OrganizationMemberWithTeams = {
-  /** The MEMBERSHIP row's own id, which the team form's picker keys on. */
-  id: string;
-  name: string | null;
-  email: string | null;
-  userId: string;
-  role: OrganizationUserRole;
-  /** When the seat was freed reversibly. Null while the member is active. */
-  disabledAt: OrganizationUser["disabledAt"];
-  customRoleId?: string | null;
-  user: {
-    id: string;
-    name: string | null;
-    email: string | null;
-    image?: string | null;
-    pendingSince?: User["deactivatedAt"];
-    /** When the ACCOUNT was deactivated, which outlives one organization. */
-    deactivatedAt?: User["deactivatedAt"];
-    /** Whether they proved the address, which joining by domain depends on. */
-    emailVerified?: User["emailVerified"];
-  };
-  teamMemberships?: { teamId: string; role: TeamUserRole; team: { name: string } }[];
-};
-
-/** The organization the members page renders, with its people. */
-export type OrganizationWithMembersAndTheirTeams = {
-  id: string;
-  name: string;
-  members: OrganizationMemberWithTeams[];
-};
-
 /** An invitation that has not been accepted yet. */
 export type OrganizationInviteReading = {
   id: string;
@@ -281,22 +252,35 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       };
 
       /**
+       * The scope skeleton the shell resolves against: a persisted
+       * read, so it shares the shell's one cache entry (and its invalidation).
+       */
+      getScopeGraph: {
+        query: { input: Record<string, never>; output: ScopeGraphOrganization[] };
+      };
+
+      /**
        * One procedure, two readers: the audit page's user search and the
        * members table. `OrganizationMemberMatch` stays exported as the audit
        * page's narrower view (`members[].user`) of the same row.
        */
       getOrganizationWithMembersAndTheirTeams: {
         query: {
-          input: { organizationId: string; includeDeactivated?: boolean };
-          output: OrganizationWithMembersAndTheirTeams;
+          input: { organizationId: string; includeDeactivated: boolean };
+          output: OrganizationMemberDirectory;
         };
+      };
+
+      /** The Directory's tab badges, one count each, so a closed tab reads no list. */
+      getDirectoryCounts: {
+        query: { input: { organizationId: string }; output: OrganizationDirectoryCounts };
       };
 
       /** One member, as the person drawer opens them. */
       getMemberById: {
         query: {
           input: { organizationId: string; userId: string };
-          output: OrganizationMemberWithTeams;
+          output: OrganizationMemberRecord;
         };
       };
 
@@ -312,7 +296,7 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
       getAllOrganizationMembers: {
         query: {
           input: { organizationId: string };
-          output: OrganizationMemberWithTeams[];
+          output: OrganizationMemberUser[];
         };
       };
 
@@ -407,10 +391,6 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
     team: {
       getTeamWithMembers: {
         query: { input: { organizationId: string; slug: string }; output: TeamWithMembers };
-      };
-
-      getTeamsWithMembers: {
-        query: { input: { organizationId: string }; output: TeamWithMembers[] };
       };
 
       /** The teams list, with the people bound directly to each. */

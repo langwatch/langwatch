@@ -4,7 +4,6 @@
  * scope — the mint refuses (`api_key_scope_violation`) rather than dropping one.
  */
 
-import { SegmentGroup } from "@chakra-ui/react";
 import { computePermissionsFromSelections } from "@langwatch/api-key-contract";
 import type { ApiKeyRole, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -17,8 +16,11 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
+import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import type { Instant } from "@langwatch/time";
+import { TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
@@ -38,11 +40,12 @@ import {
   PermissionCounter,
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
+import { StatusCard } from "../blocks/status-card.tsx";
 
 type MyBindings = {
   data: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;
   isLoading: boolean;
+  isError: boolean;
 };
 
 type OrgProject = { id: string; name: string; teamId: string };
@@ -259,6 +262,7 @@ export function CreateApiKeyDrawer({
     name.trim() &&
     !isCreating &&
     !myBindings.isLoading &&
+    !myBindings.isError &&
     hasAnySelection &&
     (selectedScopes.length > 0 || !!currentProjectId);
 
@@ -281,6 +285,12 @@ export function CreateApiKeyDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack gap={5} align="start">
+            {myBindings.isError && (
+              <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
+                A key can only carry the access you hold, so none can be created until it loads.
+                Close this drawer and try again.
+              </StatusCard>
+            )}
             {/* Key type — only admins can create service keys */}
             {isAdmin && (
               <VStack gap={2} align="start" width="full">

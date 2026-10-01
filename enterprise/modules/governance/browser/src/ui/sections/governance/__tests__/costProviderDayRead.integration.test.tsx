@@ -1,12 +1,12 @@
+import { builtinRolePermissions } from "@langwatch/authz-contract";
 /**
  * @vitest-environment jsdom
  *
  * Tests cost-by-provider panel failure states and stale data handling.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { builtinRolePermissions } from "@langwatch/authz-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GovernanceHostProvider } from "../../../../model/governance-host.ts";
@@ -104,12 +104,10 @@ const costsHost = () =>
   });
 
 const renderScreen = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <GovernanceHostProvider value={costsHost()}>
-        <CostsPage />
-      </GovernanceHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <GovernanceHostProvider value={costsHost()}>
+      <CostsPage />
+    </GovernanceHostProvider>,
   );
 
 /** The rows a successful read answers with, for the days in the window. */

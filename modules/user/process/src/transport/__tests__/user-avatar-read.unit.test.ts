@@ -5,8 +5,8 @@
  * Spec: specs/settings/user-avatar-upload.feature
  */
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it } from "vitest";

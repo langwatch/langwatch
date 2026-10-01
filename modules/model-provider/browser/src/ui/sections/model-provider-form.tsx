@@ -10,8 +10,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   skipListToInput,
   type ModelProviderEditorValue,
@@ -96,8 +96,6 @@ export type EditModelProviderFormProps = {
   /** Why the connection did not happen: a refused credential, or a failed or timed out sign-in. */
   onFailed?: (failure: { provider: string; code: string }) => void;
 };
-
-export type { GuidedSave } from "../../behavior/use-guided-save.ts";
 
 /**
  * The current provider counts as enabled: it will be when the form saves.

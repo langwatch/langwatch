@@ -20,13 +20,12 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
-    "@langwatch/slack-browser-kit": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
+    "lucide-react": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

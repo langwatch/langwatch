@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
@@ -11,22 +11,19 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
  */
 export function usePrefetchSpanDetail() {
   const { project } = useOrganizationTeamProject();
-  const traceId = useDrawerStore((s) => s.traceId);
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
+  const traceId = useTraceDrawer((s) => s.traceId);
+  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
   const utils = api.useUtils();
 
   return useCallback(
     (spanId: string) => {
       if (!project?.id || !traceId || !spanId) return;
-      void utils.traces.spanDetail.prefetch(
-        {
-          projectId: project.id,
-          traceId,
-          spanId,
-          ...(occurredAtMs !== null ? { occurredAtMs } : {}),
-        },
-        { staleTime: 300_000 },
-      );
+      void utils.traces.spanDetail.prefetch({
+        projectId: project.id,
+        traceId,
+        spanId,
+        ...(occurredAtMs !== null ? { occurredAtMs } : {}),
+      });
     },
     [project?.id, traceId, occurredAtMs, utils],
   );

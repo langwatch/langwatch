@@ -253,6 +253,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
             duration: 2000,
           });
           void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
         },
         onError: reportTeamSaveFailure,
       },

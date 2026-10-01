@@ -4,8 +4,8 @@
  * Spec: specs/identity/identifier-model.feature.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { NavigationHostProvider } from "../../../model/navigation-host.ts";
@@ -31,16 +31,12 @@ afterEach(() => cleanup());
 const REFUSAL = /You are not part of any team in this organization/;
 
 function renderBody(readings: StubNavigationReadings) {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{ pathname: "/acme", currentUserId: "user_1", ...readings }}
-      >
-        <ShellPageBody>
-          <p>Private project content</p>
-        </ShellPageBody>
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <WithStubNavigationHost readings={{ pathname: "/acme", currentUserId: "user_1", ...readings }}>
+      <ShellPageBody>
+        <p>Private project content</p>
+      </ShellPageBody>
+    </WithStubNavigationHost>,
   );
 }
 
@@ -99,14 +95,12 @@ describe("given the join offer drawn over the page", () => {
       ...readings,
     });
     const joinOffer = vi.spyOn(host, "joinOffer");
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <NavigationHostProvider value={host}>
-          <ShellPageBody>
-            <p>Private project content</p>
-          </ShellPageBody>
-        </NavigationHostProvider>
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <NavigationHostProvider value={host}>
+        <ShellPageBody>
+          <p>Private project content</p>
+        </ShellPageBody>
+      </NavigationHostProvider>,
     );
     return joinOffer.mock.calls.at(-1)?.[0];
   }

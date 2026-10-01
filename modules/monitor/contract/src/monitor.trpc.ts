@@ -3,7 +3,7 @@ import { onlineEvaluationPerformanceSchema } from "@langwatch/evaluation-contrac
  * Every `monitors.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the surface has always called.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   monitorApiCopyInputSchema,

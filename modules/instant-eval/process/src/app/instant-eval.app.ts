@@ -22,7 +22,7 @@ import {
   type InstantEvalServerConfig,
   instantEvalConfig,
 } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
@@ -138,7 +138,7 @@ type InstantEvalSetup = FeatureSetup<
   InstantEvalRepositories
 >;
 
-export class InstantEvalApp implements InstantEvalApiContract {
+export class InstantEvalModule implements InstantEvalApiContract {
   static readonly contract = InstantEvalApi;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,
@@ -183,15 +183,15 @@ export class InstantEvalApp implements InstantEvalApiContract {
     this.hostedSpend = options.hostedSpend;
   }
 
-  static async create(setup: InstantEvalSetup): Promise<InstantEvalApp> {
-    return setup.secrets.into(InstantEvalApp.secrets.classifierApiKey, (apiKey) =>
-      InstantEvalApp.withSecrets(setup, apiKey),
+  static async create(setup: InstantEvalSetup): Promise<InstantEvalModule> {
+    return setup.secrets.into(InstantEvalModule.secrets.classifierApiKey, (apiKey) =>
+      InstantEvalModule.withSecrets(setup, apiKey),
     );
   }
 
-  private static withSecrets(setup: InstantEvalSetup, apiKey: string | undefined): InstantEvalApp {
+  private static withSecrets(setup: InstantEvalSetup, apiKey: string | undefined): InstantEvalModule {
     const repositories = setup.repositories;
-    const judge = InstantEvalApp.judgeOf(setup, apiKey);
+    const judge = InstantEvalModule.judgeOf(setup, apiKey);
     setup.resources.own("Instant Evals judge", () => judge.close?.() ?? Promise.resolve());
 
     const { analytics, projects, plans, gateway, traces } = setup.dependencies;
@@ -258,7 +258,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
       },
     });
 
-    return new InstantEvalApp({
+    return new InstantEvalModule({
       hostedSpend,
       access,
       classifications: InstantEvalClassifyService.create({ judge }),
@@ -291,7 +291,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
           isEnabled: (input) => access.isEnabled(input),
           isReleased: (input) => access.isReleased(input),
           isQueryIdentityAvailable: () => analytics.isLangWatchQLAvailable(),
-          resolveCaller: (input) => InstantEvalApp.callerOf({ analytics, ...input }),
+          resolveCaller: (input) => InstantEvalModule.callerOf({ analytics, ...input }),
           getPlan: async ({ projectId }) => {
             const plan = await plans.getActivePlan({
               organizationId: await projects.getOrganizationId(projectId),
@@ -306,7 +306,7 @@ export class InstantEvalApp implements InstantEvalApiContract {
       pipeline: InstantEvalProcessingPipelineAdapter.create({
         instantEvalRunStore: InstantEvalRunProjectionStore.create({ runs: repositories.runs }),
         dispatch: {
-          executor: InstantEvalApp.executorOf({
+          executor: InstantEvalModule.executorOf({
             context,
             rowSource,
             textSource,

@@ -5,26 +5,24 @@
  * filtered read lands, the previous one muted while a newer is in flight.
  * @see specs/traces-v2/search.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { FacetItem } from "@langwatch/trace-browser-kit";
-import { cleanup, render } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { FacetRow } from "../facet-row.tsx";
 
 const renderRow = (item: FacetItem) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetRow
-        item={item}
-        state="neutral"
-        maxCount={12}
-        onToggle={vi.fn()}
-        onExclude={vi.fn()}
-        field="status"
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FacetRow
+      item={item}
+      state="neutral"
+      maxCount={12}
+      onToggle={vi.fn()}
+      onExclude={vi.fn()}
+      field="status"
+    />,
   );
 
 const countOf = (container: HTMLElement) => container.querySelector("[data-facet-count]");

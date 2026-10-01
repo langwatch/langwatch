@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { LiveGithubRepositories } from "./live/live.github.repositories.ts";
 import { MemoryGithubRepositories } from "./memory/memory.github.repositories.ts";

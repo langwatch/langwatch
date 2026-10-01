@@ -25,7 +25,12 @@ export const exchangeRequestSchema = z.object({
   client_info: clientInfoSchema,
 });
 
-export const refreshRequestSchema = z.object({ refresh_token: z.string().min(1) });
+/** A rotation may re-scope the session to another project the person can reach, by id or slug. */
+export const refreshRequestSchema = z.object({
+  refresh_token: z.string().min(1),
+  project_id: z.string().min(1).optional(),
+  project_slug: z.string().min(1).optional(),
+});
 
 export const approveRequestSchema = z.object({
   user_code: z.string().min(1),

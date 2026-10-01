@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { datasetColumnTypeSchema } from "./prompt.enums.ts";
+import { nodeDatasetSchema, promptingTechniqueSchema } from "./prompt.field-schemas.ts";
 
 export const PROMPT_FEATURE_ID = "prompt" as const;
 export const promptScopeSchema = z.enum(["PROJECT", "ORGANIZATION"]);
@@ -16,62 +16,37 @@ export const PromptScope = {
   ORGANIZATION: "ORGANIZATION",
 } as const satisfies Record<Uppercase<PromptScope>, PromptScope>;
 
-export const promptMessageSchema = z
-  .object({
-    role: z.enum(["user", "assistant", "system"]),
-    content: z.string(),
-  })
-  .strict();
+export const promptMessageSchema = z.object({
+  role: z.enum(["user", "assistant", "system"]),
+  content: z.string(),
+});
 export type PromptMessage = z.infer<typeof promptMessageSchema>;
 
-export const promptInputSchema = z
-  .object({
-    identifier: z.string().min(1),
-    type: z.enum([
-      "str",
-      "float",
-      "bool",
-      "image",
-      "file",
-      "list",
-      "list[str]",
-      "list[float]",
-      "list[int]",
-      "list[bool]",
-      "dict",
-      "chat_messages",
-    ]),
-  })
-  .strict();
+export const promptInputSchema = z.object({
+  identifier: z.string().min(1),
+  type: z.enum([
+    "str",
+    "float",
+    "bool",
+    "image",
+    "file",
+    "list",
+    "list[str]",
+    "list[float]",
+    "list[int]",
+    "list[bool]",
+    "dict",
+    "chat_messages",
+  ]),
+});
 export type PromptInput = z.infer<typeof promptInputSchema>;
 
-export const promptOutputSchema = z
-  .object({
-    identifier: z.string().min(1),
-    type: z.enum(["str", "float", "bool", "json_schema"]),
-    json_schema: z.object({ type: z.string() }).passthrough().optional(),
-  })
-  .strict();
+export const promptOutputSchema = z.object({
+  identifier: z.string().min(1),
+  type: z.enum(["str", "float", "bool", "json_schema"]),
+  json_schema: z.object({ type: z.string() }).passthrough().optional(),
+});
 export type PromptOutput = z.infer<typeof promptOutputSchema>;
-
-export const promptDemonstrationsSchema = z
-  .object({
-    id: z.string().optional(),
-    name: z.string().optional(),
-    inline: z
-      .object({
-        records: z.record(z.string(), z.array(z.unknown())),
-        columnTypes: z.array(
-          z.object({
-            id: z.string().optional(),
-            name: z.string(),
-            type: datasetColumnTypeSchema,
-          }),
-        ),
-      })
-      .optional(),
-  })
-  .strict();
 
 /** Structured-output format for prompt versions (derived by deriveResponseFormatFromOutputs). */
 export const promptResponseFormatSchema = z.object({
@@ -84,39 +59,31 @@ export const promptResponseFormatSchema = z.object({
     .nullable(),
 });
 
-export const promptingTechniqueSchema = z
-  .object({
-    type: z.enum(["few_shot", "in_context", "chain_of_thought"]),
-    demonstrations: promptDemonstrationsSchema.optional(),
-  })
-  .strict();
-
-export const promptConfigDataSchema = z
-  .object({
-    prompt: z.string(),
-    messages: z.array(promptMessageSchema).default([]),
-    inputs: z.array(promptInputSchema).default([]),
-    outputs: z.array(promptOutputSchema).min(1),
-    model: z.string().min(1),
-    temperature: z.number().optional(),
-    max_tokens: z.number().optional(),
-    top_p: z.number().optional(),
-    frequency_penalty: z.number().optional(),
-    presence_penalty: z.number().optional(),
-    seed: z.number().optional(),
-    top_k: z.number().optional(),
-    min_p: z.number().optional(),
-    repetition_penalty: z.number().optional(),
-    reasoning: z.string().optional(),
-    reasoning_effort: z.string().optional(),
-    thinkingLevel: z.string().optional(),
-    effort: z.string().optional(),
-    verbosity: z.string().optional(),
-    demonstrations: promptDemonstrationsSchema.optional(),
-    prompting_technique: promptingTechniqueSchema.optional(),
-    response_format: z.unknown().optional(),
-  })
-  .strict();
+/** Plain objects as on main: a stored row carrying extra keys still parses (they are stripped). */
+export const promptConfigDataSchema = z.object({
+  prompt: z.string(),
+  messages: z.array(promptMessageSchema).default([]),
+  inputs: z.array(promptInputSchema).default([]),
+  outputs: z.array(promptOutputSchema).min(1),
+  model: z.string().min(1),
+  temperature: z.number().optional(),
+  max_tokens: z.number().optional(),
+  top_p: z.number().optional(),
+  frequency_penalty: z.number().optional(),
+  presence_penalty: z.number().optional(),
+  seed: z.number().optional(),
+  top_k: z.number().optional(),
+  min_p: z.number().optional(),
+  repetition_penalty: z.number().optional(),
+  reasoning: z.string().optional(),
+  reasoning_effort: z.string().optional(),
+  thinkingLevel: z.string().optional(),
+  effort: z.string().optional(),
+  verbosity: z.string().optional(),
+  demonstrations: nodeDatasetSchema.optional(),
+  prompting_technique: promptingTechniqueSchema.optional(),
+  response_format: z.unknown().optional(),
+});
 export type PromptConfigData = z.infer<typeof promptConfigDataSchema>;
 
 export const promptTagSchema = z
@@ -132,56 +99,54 @@ export const promptTagSchema = z
   .strict();
 export type PromptTag = z.infer<typeof promptTagSchema>;
 
-export const versionedPromptSchema = z
-  .object({
-    id: z.string().min(1),
-    name: z.string(),
-    handle: z.string().nullable(),
-    scope: promptScopeSchema,
-    version: z.number().int().nonnegative(),
-    versionId: z.string().min(1),
-    versionCreatedAt: z.date(),
-    model: z.string(),
-    temperature: z.number().optional(),
-    maxTokens: z.number().optional(),
-    topP: z.number().optional(),
-    frequencyPenalty: z.number().optional(),
-    presencePenalty: z.number().optional(),
-    seed: z.number().optional(),
-    topK: z.number().optional(),
-    minP: z.number().optional(),
-    repetitionPenalty: z.number().optional(),
-    reasoning: z.string().optional(),
-    verbosity: z.string().optional(),
-    prompt: z.string(),
-    projectId: z.string().min(1),
-    organizationId: z.string().min(1),
-    messages: z.array(promptMessageSchema),
-    authorId: z.string().nullable(),
-    author: z
-      .object({
-        id: z.string(),
-        name: z.string().nullable(),
-        email: z.string().nullable(),
-        image: z.string().nullable(),
-      })
-      .nullable()
-      .optional(),
-    inputs: z.array(promptInputSchema),
-    outputs: z.array(promptOutputSchema),
-    responseFormat: promptResponseFormatSchema.optional(),
-    demonstrations: promptDemonstrationsSchema.optional(),
-    promptingTechnique: promptingTechniqueSchema.optional(),
-    commitMessage: z.string().optional(),
-    updatedAt: z.date(),
-    createdAt: z.date(),
-    copiedFromPromptId: z.string().nullable().optional(),
-    copyCount: z.number().int().nonnegative().optional(),
-    _count: z.object({ copiedPrompts: z.number().int().nonnegative() }).optional(),
-    tags: z.array(z.object({ name: z.string(), versionId: z.string() }).strict()),
-    parameters: z.record(z.string(), z.unknown()),
-  })
-  .strict();
+export const versionedPromptSchema = z.object({
+  id: z.string().min(1),
+  name: z.string(),
+  handle: z.string().nullable(),
+  scope: promptScopeSchema,
+  version: z.number().int().nonnegative(),
+  versionId: z.string().min(1),
+  versionCreatedAt: z.date(),
+  model: z.string(),
+  temperature: z.number().optional(),
+  maxTokens: z.number().optional(),
+  topP: z.number().optional(),
+  frequencyPenalty: z.number().optional(),
+  presencePenalty: z.number().optional(),
+  seed: z.number().optional(),
+  topK: z.number().optional(),
+  minP: z.number().optional(),
+  repetitionPenalty: z.number().optional(),
+  reasoning: z.string().optional(),
+  verbosity: z.string().optional(),
+  prompt: z.string(),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  messages: z.array(promptMessageSchema),
+  authorId: z.string().nullable(),
+  author: z
+    .object({
+      id: z.string(),
+      name: z.string().nullable(),
+      email: z.string().nullable(),
+      image: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+  inputs: z.array(promptInputSchema),
+  outputs: z.array(promptOutputSchema),
+  responseFormat: promptResponseFormatSchema.optional(),
+  demonstrations: nodeDatasetSchema.optional(),
+  promptingTechnique: promptingTechniqueSchema.optional(),
+  commitMessage: z.string().optional(),
+  updatedAt: z.date(),
+  createdAt: z.date(),
+  copiedFromPromptId: z.string().nullable().optional(),
+  copyCount: z.number().int().nonnegative().optional(),
+  _count: z.object({ copiedPrompts: z.number().int().nonnegative() }).optional(),
+  tags: z.array(z.object({ name: z.string(), versionId: z.string() })),
+  parameters: z.record(z.string(), z.unknown()),
+});
 export type VersionedPrompt = z.infer<typeof versionedPromptSchema>;
 
 export const promptDeleteResultSchema = z.object({ success: z.boolean() }).strict();
@@ -265,9 +230,9 @@ export const promptCopyChoiceSchema = promptCopySummarySchema
 export type PromptCopyChoice = z.infer<typeof promptCopyChoiceSchema>;
 
 /** A prompt that arrived in this project as a copy, with its source named. */
-export const copiedPromptSchema = versionedPromptSchema
-  .safeExtend({ copiedFromPromptId: z.string().min(1) })
-  .strict();
+export const copiedPromptSchema = versionedPromptSchema.safeExtend({
+  copiedFromPromptId: z.string().min(1),
+});
 export type CopiedPrompt = z.infer<typeof copiedPromptSchema>;
 
 /**

@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
@@ -45,11 +45,7 @@ describe("<TargetSelector/>", () => {
     it("gives the agent row the focus and picks it on Enter", async () => {
       const user = userEvent.setup();
       const onChange = vi.fn<(value: TargetValue) => void>();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <TargetSelector value={null} onChange={onChange} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<TargetSelector value={null} onChange={onChange} />);
 
       await user.click(screen.getByTestId("target-selector-trigger"));
       await waitFor(() => {

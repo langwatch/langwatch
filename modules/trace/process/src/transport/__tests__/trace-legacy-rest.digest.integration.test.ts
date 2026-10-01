@@ -47,7 +47,7 @@ function mountWithTrace() {
   };
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
     onError: (_error, context) => context.json({ error: "unexpected" }, 500),
   });
   return (path: string) => family.request(path);

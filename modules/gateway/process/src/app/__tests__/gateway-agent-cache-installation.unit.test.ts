@@ -1,16 +1,16 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
+import type { Encryption } from "@langwatch/process-stores";
+import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { ResourceScope } from "@langwatch/kernel";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { Encryption } from "@langwatch/process-stores";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
@@ -19,8 +19,8 @@ const reversible: Encryption = {
   decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
 };
 
-function gatewayApp(): Promise<GatewayApp> {
-  return GatewayApp.create({
+function gatewayApp(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -34,6 +34,7 @@ function gatewayApp(): Promise<GatewayApp> {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma: createApiFixture<PrismaClient>({}),

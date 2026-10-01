@@ -11,11 +11,9 @@ import type {
   UiAgentEditorDrawerProps,
   UiAgentListDrawerProps,
   UiAgentTypeSelectorDrawerProps,
-  UiAgentWorkflowEditorDrawerProps,
   UiWorkflowSelectorDrawerProps,
 } from "./agent-drawers.ts";
 import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
-import type { UiSelectDatasetDrawerProps, UiUploadCsvDrawerProps } from "./dataset-drawers.ts";
 import type {
   UiCodeEvaluatorEditorDrawerProps,
   UiEvaluatorCategorySelectorDrawerProps,
@@ -40,7 +38,7 @@ export type UiDrawerMap = {
   agentList: UiAgentListDrawerProps;
   agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
   agentTypeSelector: UiAgentTypeSelectorDrawerProps;
-  agentWorkflowEditor: UiAgentWorkflowEditorDrawerProps;
+  agentWorkflowEditor: UiAgentEditorDrawerProps;
   automation: UiAutomationDrawerProps;
   codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
   evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;
@@ -52,8 +50,6 @@ export type UiDrawerMap = {
   promptEditor: UiPromptEditorDrawerProps;
   promptList: UiPromptListDrawerProps;
   scenarioRunDetail: UiScenarioRunDetailDrawerProps;
-  selectDataset: UiSelectDatasetDrawerProps;
-  uploadCSV: UiUploadCsvDrawerProps;
   workflowSelector: UiWorkflowSelectorDrawerProps;
   workflowSelectorForEvaluator: UiWorkflowSelectorForEvaluatorDrawerProps;
 };

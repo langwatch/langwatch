@@ -1,7 +1,7 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceAnnotationMarker, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

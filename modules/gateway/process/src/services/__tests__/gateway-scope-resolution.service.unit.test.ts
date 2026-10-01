@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   MANAGED_MODELS,
   type ModelProvider,
@@ -6,6 +5,8 @@ import {
   type VirtualKeyWithScopes,
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -53,10 +54,6 @@ function customerProvider(id: string): ModelProvider {
 class CustomerOrganizationScopes extends GatewayScopeResolutionRepository {
   constructor(private readonly connectServices: string[]) {
     super();
-  }
-
-  async findTeamIdsForProjects(): Promise<string[]> {
-    return [];
   }
 
   async findManagedKeyConnectServices(input: {
@@ -128,6 +125,7 @@ function serviceGranting(connectServices: string[]): GatewayScopeResolutionServi
   return GatewayScopeResolutionService.create({
     repository: new CustomerOrganizationScopes(connectServices),
     platformProviders,
+    projects: createApiFixture<ProjectApi>({ listNamesByIds: async () => [] }),
   });
 }
 

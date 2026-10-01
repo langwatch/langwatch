@@ -34,7 +34,7 @@ type WorksLedger map[string]WorksEntry
 var sharedScreenInputs = []string{"packages/browser-host", "packages/design-system", "apps/ui", "tools/visualdiff/runner/src"}
 
 // moduleHalves are the parts of a module a screen of it can reach.
-var moduleHalves = []string{"browser", "browser-kit", "process", "contract"}
+var moduleHalves = []string{"browser", "process", "contract"}
 
 func worksPath(root string) string { return filepath.Join(root, ".visualdiff", WorksFile) }
 
@@ -95,7 +95,7 @@ type screenOwner struct {
 }
 
 // ScreenOwners reads which module declares each screen from its
-// defineWebModule screens (coverage.go's declarations, with their files).
+// defineBrowserModule screens (coverage.go's declarations, with their files).
 type ScreenOwners []screenOwner
 
 func screenOwners(parser *declarationParser) ScreenOwners {

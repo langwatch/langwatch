@@ -4,9 +4,10 @@
  * materialiser. Covers specs/model-providers/google-agent-platform.feature.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProvider } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -21,6 +22,7 @@ const noPlatformProviders = createApiFixture<ModelProviderApi>({
 const assembly = GatewayConfigAssemblyService.create({
   repository: PrismaGatewayScopeResolutionRepository.create({ database: {} as never }),
   platformProviders: noPlatformProviders,
+  projects: createApiFixture<ProjectApi>(),
 });
 
 const AT = Temporal.Instant.from("2026-09-01T00:00:00.000Z");

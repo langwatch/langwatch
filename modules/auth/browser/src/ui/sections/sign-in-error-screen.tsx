@@ -9,7 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { useEffect } from "react";
 
 import { isSameOrigin, signIn, useSession } from "../../behavior/auth-client.tsx";

@@ -107,6 +107,27 @@ Feature: The analytics pages
     Then it names the action that failed and offers a retry
     And it never shows the error code slug
 
+  @integration
+  Scenario: A chart restored from the browser's saved copy is dimmed and says when it is from
+    Given a chart whose data came from the browser's saved copy, fetched at 10:42
+    When the network has not yet confirmed it
+    Then the chart is shown dimmed
+    And it says "Showing data from 10:42 · updating"
+
+  @integration
+  Scenario: A restored chart returns to full strength when the network answers
+    Given a chart shown dimmed from the browser's saved copy
+    When the network confirms its data
+    Then the chart is shown at full strength
+    And it no longer says when it is from
+
+  @integration
+  Scenario: A restored chart whose refresh failed says it could not refresh
+    Given a chart shown dimmed from the browser's saved copy
+    When the refresh fails
+    Then the chart stays dimmed
+    And it says "From 10:42 · couldn't refresh"
+
   # ---------------------------------------------------------------------------
   # Opening a trace from a chart
   # ---------------------------------------------------------------------------

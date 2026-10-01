@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
@@ -5,7 +6,6 @@ import {
   type IdentifierProvider,
   identifierArrivalStateSchema,
   identifierProviderSchema,
-  identityActorSchema,
   verificationMethodSchema,
 } from "./vocabulary.ts";
 
@@ -75,7 +75,7 @@ export const identifierAttachedPayloadSchema = z.object({
   /** FK-shaped → sso_connections from D04 on. */
   connectionId: z.string().nullable(),
   state: identifierArrivalStateSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const identifierVerifiedPayloadSchema = z.object({
@@ -84,13 +84,13 @@ export const identifierVerifiedPayloadSchema = z.object({
    *  (magic-link only; OAuth/SAML ceremonies verify by arriving). */
   verificationId: z.string().min(1).nullable(),
   method: verificationMethodSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const identifierDeadEndedPayloadSchema = z.object({
   identifierId: z.string().min(1),
   reason: z.enum(["verification_failed", "uniqueness_race_lost"]),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const primaryChangedPayloadSchema = z.object({
@@ -98,18 +98,18 @@ export const primaryChangedPayloadSchema = z.object({
   identifierId: z.string().min(1),
   /** The identifier it demotes back to VERIFIED; null on first primary. */
   previousIdentifierId: z.string().min(1).nullable(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const identifierDetachedPayloadSchema = z.object({
   identifierId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const userErasedPayloadSchema = z.object({
   userId: z.string().min(1),
   erasedIdentifierIds: z.array(z.string().min(1)),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /**
@@ -148,7 +148,7 @@ export const linkProposedPayloadSchema = z.object({
   /** Org-level fact; survives erasure. */
   domain: z.string().nullable(),
   reason: linkProposalReasonSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /** A human decided a proposal (ADR-117 §3). Names only the proposal; the address
@@ -156,13 +156,13 @@ export const linkProposedPayloadSchema = z.object({
 export const linkConfirmedPayloadSchema = z.object({
   proposalId: z.string().min(1),
   userId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const linkRejectedPayloadSchema = z.object({
   proposalId: z.string().min(1),
   userId: z.string().min(1),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /**
@@ -347,7 +347,7 @@ export const attachIdentifierCommandDataSchema = userTenantedCommandSchema({
     flow: z.string().min(1),
     requestId: z.string().min(1).optional(),
   }),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type AttachIdentifierCommandData = z.infer<typeof attachIdentifierCommandDataSchema>;
 
@@ -357,27 +357,27 @@ export const verifyIdentifierCommandDataSchema = userTenantedCommandSchema({
   verificationId: z.string().min(1).nullable(),
   method: verificationMethodSchema,
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type VerifyIdentifierCommandData = z.infer<typeof verifyIdentifierCommandDataSchema>;
 
 export const markPrimaryCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type MarkPrimaryCommandData = z.infer<typeof markPrimaryCommandDataSchema>;
 
 export const detachIdentifierCommandDataSchema = userTenantedCommandSchema({
   identifierId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type DetachIdentifierCommandData = z.infer<typeof detachIdentifierCommandDataSchema>;
 
 export const eraseUserCommandDataSchema = userTenantedCommandSchema({
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type EraseUserCommandData = z.infer<typeof eraseUserCommandDataSchema>;
 
@@ -390,7 +390,7 @@ export const proposeLinkCommandDataSchema = userTenantedCommandSchema({
   value: z.string().min(1),
   reason: linkProposalReasonSchema,
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type ProposeLinkCommandData = z.infer<typeof proposeLinkCommandDataSchema>;
 
@@ -398,7 +398,7 @@ export type ProposeLinkCommandData = z.infer<typeof proposeLinkCommandDataSchema
 const linkDecisionShape = {
   proposalId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 };
 
 export const confirmLinkCommandDataSchema = userTenantedCommandSchema(linkDecisionShape);

@@ -102,7 +102,7 @@ describe("given the REST automation create", () => {
       });
 
       expect(response.status).toBe(422);
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
     });
   });
 });
@@ -114,7 +114,7 @@ describe("given a stored automation whose condition is a filter set", () => {
       const rig = createPublicApiRig({ rows: [stored] });
       const response = await rig.api.patch("/api/triggers/trigger_1", { filters: {} });
 
-      expect(await response.json()).toEqual({ error: "trigger_filters_required" });
+      expect(await response.json()).toMatchObject({ code: "trigger_filters_required" });
       expect(rig.rows.get("trigger_1")?.filters).toEqual(stored.filters);
     });
   });
@@ -134,7 +134,7 @@ describe("given an id no live automation in the project has", () => {
         await api.delete("/api/triggers/trigger_gone"),
       ]) {
         expect(response.status).toBe(404);
-        expect(await response.json()).toEqual({ error: "trigger_not_found" });
+        expect(await response.json()).toMatchObject({ code: "trigger_not_found" });
       }
     });
   });

@@ -1,0 +1,324 @@
+import { Config } from "@langwatch/config";
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { createApp } from "../src/application.ts";
+import {
+  defineProcessModule,
+  defineRepositories,
+  withMemoryRepositories,
+  type FeatureSetup,
+  type Tier,
+} from "../src/index.ts";
+import { MissingMemberError } from "../src/module-members.ts";
+import type { MemberSource } from "../src/module-members.ts";
+import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
+import {
+  instantiateRepositories,
+  selectedRepositoryOwnership,
+} from "../src/repository-registry.ts";
+import { memberSourceOf } from "./member-source.ts";
+
+type Repositories = Readonly<{ value: { read(): string } }>;
+let liveCreates = 0;
+let memoryCreates = 0;
+
+class LiveRepositories {
+  static readonly requires = ["prisma"] as const;
+  static create({ prisma }: { prisma: { prefix: string } }): Repositories {
+    liveCreates += 1;
+    return { value: { read: () => prisma.prefix } };
+  }
+}
+
+class MemoryRepositories {
+  static readonly requires = [] as const;
+  static create(): Repositories {
+    memoryCreates += 1;
+    return { value: { read: () => "memory" } };
+  }
+}
+
+const repositories = defineRepositories({ live: LiveRepositories, memory: MemoryRepositories });
+
+class App {
+  static readonly contract = App;
+  static readonly dependencies = {};
+  static create({
+    repositories,
+    tier,
+  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): App {
+    return new App(repositories.value.read(), tier);
+  }
+  constructor(
+    readonly value: string,
+    readonly tier: Tier | undefined,
+  ) {}
+}
+
+class ConfiguredApp {
+  static readonly contract = ConfiguredApp;
+  static readonly dependencies = {};
+  static readonly reads = ["suffix"] as const;
+  static readonly config = Config.define((c) => ({ prefix: c.env("AGENT_PREFIX", z.string()) }));
+  static create({
+    repositories,
+    members,
+    config,
+  }: FeatureSetup<
+    Record<never, never>,
+    { suffix: string },
+    { prefix: string },
+    Repositories
+  >): ConfiguredApp {
+    return new ConfiguredApp(`${config.prefix}:${repositories.value.read()}:${members.suffix}`);
+  }
+  constructor(readonly value: string) {}
+}
+
+const feature = defineProcessModule("annotation")
+  .withRepositories(repositories)
+  .withApi(App)
+  .build();
+const configuredFeature = defineProcessModule("agent")
+  .withRepositories(repositories)
+  .withApi(ConfiguredApp)
+  .build();
+
+let duplicateCreates = 0;
+
+class DuplicateRepositories {
+  static readonly requires = [] as const;
+  static readonly repositories = {
+    value: { tables: { store: "postgres", tables: ["SharedTable"] } },
+  };
+  static create(): Repositories {
+    duplicateCreates += 1;
+    return { value: { read: () => "duplicate" } };
+  }
+}
+
+class DuplicateApp {
+  static readonly contract = DuplicateApp;
+  static readonly dependencies = {};
+  static create({
+    repositories,
+  }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): DuplicateApp {
+    return new DuplicateApp(repositories.value.read());
+  }
+  constructor(readonly value: string) {}
+}
+
+const duplicateRepositories = defineRepositories({
+  live: DuplicateRepositories,
+  memory: DuplicateRepositories,
+});
+const duplicateFeature = defineProcessModule("project")
+  .withRepositories(duplicateRepositories)
+  .withApi(DuplicateApp)
+  .build();
+
+class CanonicalPrismaRepositories {
+  static readonly requires = [] as const;
+  static readonly repositories = {
+    value: { tables: { store: "prisma", tables: ["SharedTable"] } },
+  };
+  static create(): Repositories {
+    duplicateCreates += 1;
+    return { value: { read: () => "canonical" } };
+  }
+}
+
+const canonicalPrismaRepositories = defineRepositories({
+  live: CanonicalPrismaRepositories,
+  memory: CanonicalPrismaRepositories,
+});
+const canonicalPrismaFeature = defineProcessModule("user")
+  .withRepositories(canonicalPrismaRepositories)
+  .withApi(DuplicateApp)
+  .build();
+
+describe("given a module that declares both repository tiers", () => {
+  describe("when the registry is defined", () => {
+    it("captures the factories and metadata against later mutation", () => {
+      class MutableProvider {
+        static readonly #value = "original";
+        static readonly requires = [] as const;
+        static repositories = { value: { tables: { store: "postgres", tables: ["Original"] } } };
+        static create(): Repositories {
+          return { value: { read: () => this.#value } };
+        }
+      }
+      const captured = defineRepositories({ live: MutableProvider, memory: MutableProvider });
+      Object.defineProperty(MutableProvider, "requires", { value: ["unexpected"] });
+      MutableProvider.repositories.value.tables.tables.push("Unclaimed");
+      MutableProvider.create = () => ({ value: { read: () => "replaced" } });
+
+      const selection = { tier: "memory", members: {} } as const;
+      expect(instantiateRepositories(captured, selection).value.read()).toBe("original");
+      expect(selectedRepositoryOwnership(captured, selection)).toEqual({
+        value: { tables: { store: "postgres", tables: ["Original"] } },
+      });
+      expect(Reflect.set(captured.definitions, "memory", MemoryRepositories)).toBe(false);
+      expect(
+        Reflect.set(captured.definitions.memory, "create", () => MemoryRepositories.create()),
+      ).toBe(false);
+    });
+  });
+
+  describe("when the process installs it as declared", () => {
+    it("builds the live tier over the member that tier requires", async () => {
+      liveCreates = 0;
+      memoryCreates = 0;
+      const runtime = await createApp({
+        role: "api",
+        members: memberSourceOf({ prisma: { prefix: "postgres" } }),
+      })
+        .withModules([feature])
+        .boot();
+
+      expect(runtime.module(feature).provided.value).toBe("postgres");
+      expect(runtime.module(feature).provided.tier).toBe("live");
+      expect(liveCreates).toBe(1);
+      expect(memoryCreates).toBe(0);
+      await runtime.stop();
+    });
+
+    it("hands the app its config, the members it reads and the live repositories", async () => {
+      const runtime = await createApp({
+        role: "api",
+        config: { agent: { prefix: "config" } },
+        members: memberSourceOf({ suffix: "infra", prisma: { prefix: "database" } }),
+      })
+        .withModules([configuredFeature])
+        .boot();
+
+      expect(runtime.module(configuredFeature).provided.value).toBe("config:database:infra");
+      await runtime.stop();
+    });
+  });
+
+  describe("when the caller asks for the memory repositories in code", () => {
+    /** @scenario "Memory is a choice a caller makes in code" */
+    it("builds the memory tier and asks for no client at all", async () => {
+      liveCreates = 0;
+      memoryCreates = 0;
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+        .withModules([withMemoryRepositories(feature)])
+        .boot();
+
+      expect(runtime.module(feature).provided.value).toBe("memory");
+      expect(runtime.module(feature).provided.tier).toBe("memory");
+      expect(liveCreates).toBe(0);
+      expect(memoryCreates).toBe(1);
+      await runtime.stop();
+    });
+
+    it("refuses on a module that declares no repositories at all", () => {
+      class StorelessApp {
+        static readonly contract = StorelessApp;
+        static readonly dependencies = {};
+        static create(): StorelessApp {
+          return new StorelessApp();
+        }
+      }
+      const plain = defineProcessModule("share").withApi(StorelessApp).build();
+
+      expect(() => withMemoryRepositories(plain)).toThrow("has no memory tier");
+    });
+  });
+
+  describe("when the store the live tier needs has no address", () => {
+    /** @scenario "A store with no address refuses at boot" */
+    it("refuses naming the module and the member, before any factory runs", async () => {
+      liveCreates = 0;
+      const booting = createApp({ role: "api", members: memberSourceOf({}) })
+        .withModules([feature])
+        .boot();
+
+      await expect(booting).rejects.toBeInstanceOf(MissingMemberError);
+      await expect(booting).rejects.toMatchObject({ module: "annotation", member: "prisma" });
+      expect(liveCreates).toBe(0);
+    });
+
+    it("refuses rather than falling back to the memory tier", async () => {
+      memoryCreates = 0;
+      await expect(
+        createApp({ role: "api", members: memberSourceOf({}) })
+          .withModules([feature])
+          .boot(),
+      ).rejects.toBeInstanceOf(MissingMemberError);
+
+      expect(memoryCreates).toBe(0);
+    });
+
+    it("refuses a member the source names but cannot build", async () => {
+      const unbuildable: MemberSource<{ prisma: { prefix: string } }> = {
+        order: ["prisma"],
+        read: () => {
+          throw new Error('This process has no "prisma" member.');
+        },
+        close: () => Promise.resolve(),
+      };
+      const booting = createApp({ role: "api", members: unbuildable })
+        .withModules([feature])
+        .boot();
+
+      await expect(booting).rejects.toMatchObject({ module: "annotation", member: "prisma" });
+    });
+  });
+
+  describe("when two selected tiers claim the same table", () => {
+    it("refuses before either repository factory runs", async () => {
+      duplicateCreates = 0;
+      const conflictingFeature = defineProcessModule("user")
+        .withRepositories(duplicateRepositories)
+        .withApi(DuplicateApp)
+        .build();
+
+      await expect(
+        createApp({ role: "api", members: memberSourceOf({}) })
+          .withModules([duplicateFeature, conflictingFeature])
+          .boot(),
+      ).rejects.toThrow(RepositoryOwnershipConflictError);
+      expect(duplicateCreates).toBe(0);
+    });
+
+    it("reads a canonical Prisma claim as a Postgres claim", async () => {
+      duplicateCreates = 0;
+
+      await expect(
+        createApp({ role: "api", members: memberSourceOf({}) })
+          .withModules([duplicateFeature, canonicalPrismaFeature])
+          .boot(),
+      ).rejects.toBeInstanceOf(RepositoryOwnershipConflictError);
+      expect(duplicateCreates).toBe(0);
+    });
+  });
+
+  describe("when the app declares no config schema", () => {
+    it("keeps the static create method the class carries", async () => {
+      class MethodApp {
+        static readonly contract = MethodApp;
+        static readonly dependencies = {};
+        static create({
+          repositories,
+        }: FeatureSetup<Record<never, never>, never, undefined, Repositories>): MethodApp {
+          return new MethodApp(repositories.value.read());
+        }
+        constructor(readonly value: string) {}
+      }
+      const methodFeature = defineProcessModule("share")
+        .withRepositories(repositories)
+        .withApi(MethodApp)
+        .build();
+
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+        .withModules([withMemoryRepositories(methodFeature)])
+        .boot();
+
+      expect(runtime.module(methodFeature).provided.value).toBe("memory");
+      await runtime.stop();
+    });
+  });
+});

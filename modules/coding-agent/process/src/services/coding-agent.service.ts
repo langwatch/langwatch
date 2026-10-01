@@ -42,9 +42,9 @@ import { CodingAgentTracePullRequestService } from "./coding-agent-trace-pull-re
 export const MAX_SESSION_EVENTS_PAGE_SIZE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
 
 /**
- * The session-aggregate capability `CodingAgentApp` composes over: private to this
+ * The session-aggregate capability `CodingAgentModule` composes over: private to this
  * package, narrower than the public `CodingAgentApi` (no viewer-scoped params, no
- * pure derivations `CodingAgentApp` answers itself).
+ * pure derivations `CodingAgentModule` answers itself).
  */
 export interface CodingAgentSessionService {
   getSessionEvents(input: CodingAgentSessionEventsInput): Promise<{

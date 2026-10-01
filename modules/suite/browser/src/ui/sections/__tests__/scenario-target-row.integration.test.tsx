@@ -1,0 +1,418 @@
+/**
+ * @vitest-environment jsdom
+ * @see specs/suites/suite-workflow.feature - "Expand run to see scenario x target breakdown"
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  SimulationRunStatus as ScenarioRunStatus,
+  SimulationVerdict as Verdict,
+} from "@langwatch/scenario-contract";
+import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { ScenarioTargetRow } from "../../elements/runs/scenario-target-row.tsx";
+import { cssRulesForElement } from "./emotion-test-css.ts";
+import { makeScenarioRunData } from "./run-history-fixtures.ts";
+
+const prefetchMock = vi.hoisted(() => vi.fn());
+
+describe("<ScenarioTargetRow/>", () => {
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  describe("given a successful scenario run with a target", () => {
+    it("displays target-prefixed scenario name", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Prod Agent: Angry refund request")).toBeInTheDocument();
+    });
+
+    /** @scenario "List view row displays passed status with criteria count" */
+    it("displays 'passed' with criteria count for SUCCESS status", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Passed (1/1)")).toBeInTheDocument();
+      expect(screen.queryByText("100%")).not.toBeInTheDocument();
+    });
+
+    it("displays duration formatted as seconds", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ durationInMs: 2300 })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("2.3s")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without a target name", () => {
+    it("displays only the scenario name", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Angry refund request")).toBeInTheDocument();
+      expect(screen.queryByText(/:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with iteration", () => {
+    it("appends iteration number to the display name", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+          iteration={3}
+        />,
+      );
+
+      expect(screen.getByText("Prod Agent: Angry refund request (#3)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run without target but with iteration", () => {
+    it("appends iteration to scenario name only", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName={null}
+          onClick={vi.fn()}
+          iteration={1}
+        />,
+      );
+
+      expect(screen.getByText("Angry refund request (#1)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed scenario run (ERROR status)", () => {
+    /** @scenario "List view row displays failed status with criteria count" */
+    it("displays 'failed' with criteria count for ERROR status", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.ERROR,
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "Error occurred",
+              metCriteria: ["c1"],
+              unmetCriteria: ["c2", "c3"],
+            },
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Failed (1/3)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a failed scenario run (FAILED status)", () => {
+    it("displays 'failed' with criteria count for FAILED status", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            results: {
+              verdict: Verdict.FAILURE,
+              reasoning: "Criteria not met",
+              metCriteria: ["c1", "c2"],
+              unmetCriteria: ["c3"],
+            },
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Failed (2/3)")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a successful run with no criteria results", () => {
+    it("displays 'passed' without count", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Passed")).toBeInTheDocument();
+    });
+  });
+
+  describe("given an in-progress scenario run", () => {
+    it("displays 'running' label instead of pass rate", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.IN_PROGRESS,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Running")).toBeInTheDocument();
+      expect(screen.queryByText(/Passed/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a stalled scenario run", () => {
+    it("displays 'stalled' label", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.STALLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Stalled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a cancelled scenario run", () => {
+    it("displays 'cancelled' label", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.CANCELLED,
+            durationInMs: 0,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Cancelled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a duration less than 1 second", () => {
+    it("displays duration in milliseconds", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ durationInMs: 450 })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("450ms")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the row is clicked", () => {
+    it("calls onClick callback", async () => {
+      const user = userEvent.setup();
+      const onClick = vi.fn();
+
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData()}
+          targetName="Prod Agent"
+          onClick={onClick}
+        />,
+      );
+
+      const row = screen.getByLabelText("View details for Prod Agent: Angry refund request");
+      await user.click(row);
+      expect(onClick).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a run that can still be stopped", () => {
+    function renderStoppable({ isCancelling = false } = {}) {
+      const onClick = vi.fn();
+      const onCancel = vi.fn();
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.IN_PROGRESS })}
+          targetName="Prod Agent"
+          onClick={onClick}
+          onCancel={onCancel}
+          isCancelling={isCancelling}
+        />,
+      );
+      return { onClick, onCancel };
+    }
+
+    it("offers stop as its own button beside the row's button", () => {
+      renderStoppable();
+
+      const open = screen.getByRole("button", {
+        name: "View details for Prod Agent: Angry refund request",
+      });
+      const stop = screen.getByRole("button", { name: "Stop run" });
+      expect(open.contains(stop)).toBe(false);
+    });
+
+    it("stops the run without opening it", async () => {
+      const user = userEvent.setup();
+      const { onClick, onCancel } = renderStoppable();
+
+      await user.click(screen.getByRole("button", { name: "Stop run" }));
+
+      expect(onCancel).toHaveBeenCalledOnce();
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("stops the run from the keyboard", async () => {
+      const user = userEvent.setup();
+      const { onCancel } = renderStoppable();
+
+      screen.getByRole("button", { name: "Stop run" }).focus();
+      await user.keyboard("{Enter}");
+
+      expect(onCancel).toHaveBeenCalledOnce();
+    });
+
+    it("disables stop while the run is being stopped", async () => {
+      const user = userEvent.setup();
+      const { onCancel } = renderStoppable({ isCancelling: true });
+
+      const stop = screen.getByRole("button", { name: "Stop run" });
+      expect(stop).toBeDisabled();
+      await user.click(stop);
+      expect(onCancel).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user hovers a row", () => {
+    /** @scenario "Hovering a run pre-loads its details" */
+    it("prefetches the run state for the hovered run", async () => {
+      prefetchMock.mockClear();
+      const user = userEvent.setup();
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ scenarioRunId: "run_hover" })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+          onPrefetch={() => prefetchMock("run_hover")}
+        />,
+      );
+
+      await user.hover(screen.getByLabelText("View details for Prod Agent: Angry refund request"));
+
+      expect(prefetchMock).toHaveBeenCalledWith("run_hover");
+    });
+  });
+
+  describe("given a scenario run with status SUCCESS", () => {
+    /** @scenario "List row shows colored status circle instead of icon" */
+    it("shows a green circle on the left, not a checkmark icon", () => {
+      const { container } = renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.SUCCESS })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      const circle = container.querySelector('div[style*="border-radius"]') ?? container.firstChild;
+      expect(container.querySelector("svg")).not.toBeInTheDocument();
+      expect(circle).toBeTruthy();
+    });
+
+    /** @scenario "List row shows status label with latency and cost" */
+    it("shows 'Passed' in green semibold text with latency and cost", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 1200,
+            totalCost: 0.003,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      const label = screen.getByText("Passed");
+      const css = cssRulesForElement(label);
+      expect(css).toContain("font-weight:var(--chakra-font-weights-semibold)");
+      expect(css).toContain("color:var(--chakra-colors-green-500)");
+      expect(screen.getByText("1.2s")).toBeInTheDocument();
+      expect(screen.getByText("$0.0030")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with status FAILED", () => {
+    /** @scenario "Failed list row shows red styling" */
+    it("shows a red circle and 'Failed' in red semibold text with latency", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.FAILED,
+            results: null,
+            durationInMs: 5400,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      const label = screen.getByText("Failed");
+      const css = cssRulesForElement(label);
+      expect(css).toContain("font-weight:var(--chakra-font-weights-semibold)");
+      expect(css).toContain("color:var(--chakra-colors-red-500)");
+      expect(screen.getByText("5.4s")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a scenario run with no duration or cost", () => {
+    /** @scenario "List row without metrics shows only status label" */
+    it("shows only the status label, not a cost", () => {
+      renderWithDesignSystem(
+        <ScenarioTargetRow
+          scenarioRun={makeScenarioRunData({
+            status: ScenarioRunStatus.SUCCESS,
+            results: null,
+            durationInMs: 0,
+            totalCost: undefined,
+          })}
+          targetName="Prod Agent"
+          onClick={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText("Passed")).toBeInTheDocument();
+      expect(screen.queryByText("$", { exact: false })).not.toBeInTheDocument();
+    });
+  });
+});

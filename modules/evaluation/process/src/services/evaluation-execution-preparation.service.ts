@@ -8,12 +8,10 @@ import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { EvaluationTraceEvent } from "@langwatch/trace-contract";
 
-import {
-  type EvaluationAzureSafetyCredentials,
-  type EvaluationSettingsRecovery,
-  type ExecuteEvaluationCommandDeps,
-} from "../app/evaluation.members.ts";
+import type { AzureSafetyCredentialsService } from "./azure-safety-credentials.service.ts";
+import type { ExecuteEvaluationCommandDeps } from "./evaluation-execution-intent.service.ts";
 import { EvaluationPreconditionService } from "./evaluation-precondition.service.ts";
+import type { EvaluationSettingsRecoverySwitchService } from "./evaluation-settings-recovery-switch.service.ts";
 import {
   EvaluatorSettingsService,
   type EvaluatorSettingsSource,
@@ -38,8 +36,8 @@ export class EvaluationExecutionPreparationService {
   static create(input: {
     monitors: ExecuteEvaluationCommandDeps["monitors"];
     traces: ExecuteEvaluationCommandDeps["traces"];
-    azureSafetyCredentials: EvaluationAzureSafetyCredentials;
-    settingsRecovery: EvaluationSettingsRecovery;
+    azureSafetyCredentials: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+    settingsRecovery: Pick<EvaluationSettingsRecoverySwitchService, "isDisabled">;
   }): EvaluationExecutionPreparationService {
     return new EvaluationExecutionPreparationService(
       input,
@@ -52,8 +50,8 @@ export class EvaluationExecutionPreparationService {
     private readonly deps: {
       monitors: ExecuteEvaluationCommandDeps["monitors"];
       traces: ExecuteEvaluationCommandDeps["traces"];
-      azureSafetyCredentials: EvaluationAzureSafetyCredentials;
-      settingsRecovery: EvaluationSettingsRecovery;
+      azureSafetyCredentials: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
+      settingsRecovery: Pick<EvaluationSettingsRecoverySwitchService, "isDisabled">;
     },
     private readonly preconditions: EvaluationPreconditionService,
     private readonly settings: EvaluatorSettingsService,

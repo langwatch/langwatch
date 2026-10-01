@@ -5,17 +5,17 @@ import { judgeBody, readField } from "./expect.ts";
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
 /**
- * request sends an API call the UI cannot make, as the step's page (`auth` is X-Auth-Token).
- * `method` defaults to POST, `body` is JSON text, `path` takes {slug}, `status` defaults to any
- * 2xx. `field` with `equals`, `contains` or `min` judges the reply; `as` keeps `field` as `{as}`.
+ * request sends an API call the UI cannot make: `auth` is X-Auth-Token (`project`: project key),
+ * `method` defaults to POST, `body` is JSON, `path` takes {slug}, `status` defaults to any 2xx;
+ * `field` with `equals`, `contains` or `min` judges the reply, and `as` keeps it as `{as}`.
  */
 export const request: Action = async (context) => {
   const { args, side } = context;
   const method = (args.method ?? "POST").toUpperCase();
   if (!METHODS.includes(method)) throw new Error(`request: unknown method "${method}"`);
   const path = fillPath({ path: argument({ context, name: "path" }), slug: context.slug });
-  const headers: Record<string, string> =
-    args.auth === undefined ? {} : { "X-Auth-Token": args.auth };
+  const token = args.auth === "project" ? context.credential.projectKey : args.auth;
+  const headers: Record<string, string> = token === undefined ? {} : { "X-Auth-Token": token };
   if (args.body !== undefined) headers["Content-Type"] = "application/json";
   const response = await side.page.request.fetch(side.baseUrl + path, {
     method,

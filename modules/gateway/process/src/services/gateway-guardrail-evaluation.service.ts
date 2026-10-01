@@ -4,7 +4,7 @@
  * as-guardrail monitor in the same project, and that monitor carries the check run here too.
  */
 
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluationApi, GuardrailCheckOutcome } from "@langwatch/evaluation-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type {
   GatewayGuardrailDirection,
@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 
 import type { GatewayGuardrailRepository } from "../repositories/gateway-guardrail.repository.ts";
 
@@ -40,6 +41,17 @@ const WIRE_DIRECTION_TO_STORED: Record<GuardrailWireDirection, GatewayGuardrailD
   stream_chunk: "STREAM_CHUNK",
 };
 
+/** The pre-dispatch budget, from specs/ai-gateway/guardrails.feature "latency budget". */
+export const REQUEST_GUARDRAIL_DEADLINE_MS = 800;
+const DEADLINE_PASSED = Symbol("guardrail deadline passed");
+const SIBLING_BLOCKED = Symbol("a sibling guardrail blocked");
+
+/** A fail-closed guardrail out of time has no verdict: the check answers a retryable 503. */
+type GuardrailOutcome = GuardrailCheckVerdict | "deadline_exceeded";
+export type GuardrailCheckAnswer =
+  | Readonly<{ status: "evaluated"; verdict: GuardrailCheckVerdict }>
+  | Readonly<{ status: "deadline_exceeded" }>;
+
 const ALLOW: GuardrailCheckVerdict = {
   decision: "allow",
   reason: null,
@@ -51,14 +63,14 @@ export class GatewayGuardrailEvaluationService {
   private constructor(
     private readonly repository: GatewayGuardrailRepository,
     private readonly monitors: MonitorApi,
-    /** Evaluation owns running an evaluator, langevals and saved ones alike. */
-    private readonly evaluations: Pick<EvaluationApi, "runEvaluator">,
+    /** Evaluation owns running a guardrail's evaluator, its deadline and its cost. */
+    private readonly evaluations: Pick<EvaluationApi, "checkGuardrail">,
   ) {}
 
   static create(input: {
     repository: GatewayGuardrailRepository;
     monitors: MonitorApi;
-    evaluations: Pick<EvaluationApi, "runEvaluator">;
+    evaluations: Pick<EvaluationApi, "checkGuardrail">;
   }): GatewayGuardrailEvaluationService {
     return new GatewayGuardrailEvaluationService(
       input.repository,
@@ -114,68 +126,138 @@ export class GatewayGuardrailEvaluationService {
     return { input: "", output: asText(content?.chunk) };
   }
 
+  /**
+   * One deadline and one cancellation cover every guardrail, lookups included: the first block,
+   * the request deadline or the caller's own abort stops the evaluators still running.
+   */
   async check({
     projectId,
     guardrailIds,
     direction,
     content,
+    signal,
   }: {
     projectId: string;
     guardrailIds: string[];
     direction: GuardrailWireDirection;
     content?: GuardrailCheckContent;
-  }): Promise<GuardrailCheckVerdict> {
+    signal?: AbortSignal | undefined;
+  }): Promise<GuardrailCheckAnswer> {
     if (guardrailIds.length === 0) {
-      return ALLOW;
+      return { status: "evaluated", verdict: ALLOW };
     }
 
-    const guardrails = await this.repository.findRunnableForCheck({
-      projectId,
-      ids: guardrailIds,
-      direction: this.storedDirectionFor(direction),
+    const settled = new AbortController();
+    const deadlineAt =
+      direction === "request"
+        ? nowInstant().epochMilliseconds + REQUEST_GUARDRAIL_DEADLINE_MS
+        : undefined;
+    const deadline =
+      deadlineAt === undefined
+        ? undefined
+        : setTimeout(() => settled.abort(DEADLINE_PASSED), REQUEST_GUARDRAIL_DEADLINE_MS);
+    const run = signal ? AbortSignal.any([settled.signal, signal]) : settled.signal;
+
+    try {
+      const outcomes = await this.runAll({
+        projectId,
+        guardrailIds,
+        direction,
+        content,
+        run,
+        settled,
+        deadlineAt,
+      });
+
+      return this.aggregate(outcomes);
+    } catch (error) {
+      // Stopped before any failure mode was known: never an allow, so a retryable 503.
+      if (run.aborted) return { status: "deadline_exceeded" };
+      throw error;
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
+
+  private async runAll({
+    projectId,
+    guardrailIds,
+    direction,
+    content,
+    run,
+    settled,
+    deadlineAt,
+  }: {
+    projectId: string;
+    guardrailIds: string[];
+    direction: GuardrailWireDirection;
+    content: GuardrailCheckContent | undefined;
+    run: AbortSignal;
+    settled: AbortController;
+    deadlineAt: number | undefined;
+  }): Promise<GuardrailOutcome[]> {
+    const guardrails = await untilAborted({
+      signal: run,
+      work: this.repository.findRunnableForCheck({
+        projectId,
+        ids: guardrailIds,
+        direction: this.storedDirectionFor(direction),
+      }),
     });
     if (guardrails.length === 0) {
-      return ALLOW;
+      return [];
     }
 
-    const monitorsByEvaluator = await this.guardrailMonitors({
-      projectId,
-      evaluatorIds: guardrails.map((guardrail) => guardrail.evaluatorId),
+    const monitorsByEvaluator = await untilAborted({
+      signal: run,
+      work: this.guardrailMonitors({
+        projectId,
+        evaluatorIds: guardrails.map((guardrail) => guardrail.evaluatorId),
+      }),
     });
 
     const data = this.evaluationDataFor({ direction, content });
 
-    const verdicts = await Promise.all(
-      guardrails.map(async (guardrail) => {
+    return Promise.all(
+      guardrails.map(async (guardrail): Promise<GuardrailOutcome> => {
         const monitor = monitorsByEvaluator.get(guardrail.evaluatorId);
-        if (!monitor) {
-          // The evaluator lost its AS_GUARDRAIL monitor after the guardrail was
-          // created. Treat it exactly like an evaluator error so the failure
-          // mode decides, rather than silently allowing.
-          return this.onFailure({
-            guardrail,
-            reason: "guardrail evaluator is not enabled for guardrail execution",
-          });
+        // A guardrail whose evaluator lost its AS_GUARDRAIL monitor fails by its failure mode.
+        const outcome = monitor
+          ? await this.runOne({ guardrail, monitor, data, projectId, signal: run, deadlineAt })
+          : this.onFailure({
+              guardrail,
+              reason: "guardrail evaluator is not enabled for guardrail execution",
+            });
+        if (outcome !== "deadline_exceeded" && outcome.decision === "block") {
+          settled.abort(SIBLING_BLOCKED);
         }
 
-        return this.runOne({ guardrail, monitor, data, projectId });
+        return outcome;
       }),
     );
+  }
 
+  private aggregate(outcomes: GuardrailOutcome[]): GuardrailCheckAnswer {
+    const verdicts = outcomes.filter((outcome) => outcome !== "deadline_exceeded");
     const blocked = verdicts.filter((verdict) => verdict.decision === "block");
     if (blocked.length === 0) {
-      return ALLOW;
+      return verdicts.length < outcomes.length
+        ? { status: "deadline_exceeded" }
+        : { status: "evaluated", verdict: ALLOW };
     }
 
     return {
-      decision: "block",
-      reason:
-        blocked
-          .map((verdict) => verdict.reason)
-          .filter(Boolean)
-          .join("; ") || null,
-      modified_content: null,
-      policies_triggered: blocked.flatMap((verdict) => verdict.policies_triggered),
+      status: "evaluated",
+      verdict: {
+        decision: "block",
+        reason:
+          blocked
+            .map((verdict) => verdict.reason)
+            .filter(Boolean)
+            .join("; ") || null,
+        modified_content: null,
+        policies_triggered: blocked.flatMap((verdict) => verdict.policies_triggered),
+      },
     };
   }
 
@@ -205,29 +287,72 @@ export class GatewayGuardrailEvaluationService {
     monitor,
     data,
     projectId,
+    signal,
+    deadlineAt,
   }: {
     guardrail: { id: string; name: string; failureMode: string };
     monitor: EnabledGuardrailMonitor;
     data: { input: string; output: string };
     projectId: string;
-  }): Promise<GuardrailCheckVerdict> {
-    let result: SingleEvaluationResult;
+    signal: AbortSignal;
+    deadlineAt: number | undefined;
+  }): Promise<GuardrailOutcome> {
+    if (signal.aborted) return this.onStopped({ guardrail, signal, by: "cancelled" });
+
+    let outcome: GuardrailCheckOutcome;
     try {
-      result = await this.evaluations.runEvaluator({
+      outcome = await this.evaluations.checkGuardrail({
         projectId,
         evaluatorType: monitor.checkType,
-        data: { type: "default", data },
         settings: (monitor.parameters ?? {}) as Record<string, unknown>,
+        data,
+        guardrail: { id: guardrail.id, name: guardrail.name, monitorId: monitor.id },
+        signal,
+        deadlineMs:
+          deadlineAt === undefined
+            ? undefined
+            : Math.max(0, deadlineAt - nowInstant().epochMilliseconds),
       });
     } catch (error) {
       logger.warn({ guardrailId: guardrail.id, projectId, error }, "guardrail evaluator threw");
 
-      return this.onFailure({
-        guardrail,
-        reason: "guardrail evaluator failed to run",
-      });
+      return this.onFailure({ guardrail, reason: "guardrail evaluator failed to run" });
     }
 
+    if (outcome.status === "stopped") {
+      logger.warn({ guardrailId: guardrail.id, projectId }, "guardrail stopped before a verdict");
+
+      return this.onStopped({ guardrail, signal, by: outcome.by });
+    }
+
+    return this.verdictFor({ guardrail, result: outcome.result });
+  }
+
+  /** A sibling's block decided it; a deadline is no verdict; a cancel fails by mode. */
+  private onStopped({
+    guardrail,
+    signal,
+    by,
+  }: {
+    guardrail: { id: string; failureMode: string };
+    signal: AbortSignal;
+    by: "deadline" | "cancelled";
+  }): GuardrailOutcome {
+    if (signal.reason === SIBLING_BLOCKED) return ALLOW;
+    if (by === "deadline" || signal.reason === DEADLINE_PASSED) {
+      return guardrail.failureMode === "FAIL_OPEN" ? ALLOW : "deadline_exceeded";
+    }
+
+    return this.onFailure({ guardrail, reason: "guardrail check was cancelled" });
+  }
+
+  private verdictFor({
+    guardrail,
+    result,
+  }: {
+    guardrail: { id: string; name: string; failureMode: string };
+    result: SingleEvaluationResult;
+  }): GuardrailCheckVerdict {
     if (result.status === "error") {
       return this.onFailure({
         guardrail,
@@ -276,4 +401,20 @@ export class GatewayGuardrailEvaluationService {
       policies_triggered: [guardrail.id],
     };
   }
+}
+
+/** Settles with the work, or rejects as soon as the signal aborts even if the work ignores it. */
+function untilAborted<T>({ work, signal }: { work: Promise<T>; signal: AbortSignal }): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = (): void => reject(signal.reason);
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    signal.addEventListener("abort", onAbort, { once: true });
+    work
+      .finally(() => signal.removeEventListener("abort", onAbort))
+      .then(resolve)
+      .catch(reject);
+  });
 }

@@ -1,10 +1,3 @@
-import {
-  type CellPosition,
-  type DatasetTableContextValue,
-  DatasetTableProvider,
-  EditableCell,
-  renderDatasetImage,
-} from "@langwatch/dataset-browser-kit";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 /**
  * @vitest-environment jsdom
@@ -13,19 +6,27 @@ import type { DatasetColumnType } from "@langwatch/dataset-contract";
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import "@testing-library/jest-dom/vitest";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StoredObjectUploadTransport } from "../../../behavior/stored-object-upload.ts";
+import "@testing-library/jest-dom/vitest";
+
+import {
+  type CellPosition,
+  type DatasetTableContextValue,
+  DatasetTableProvider,
+} from "../../../model/dataset-table-context.tsx";
 import { DatasetTestHarness, StubDatasetHost } from "../../../testing.tsx";
+import { EditableCell } from "../../elements/editable-cell.tsx";
+import { renderDatasetImage } from "../../elements/render-dataset-image.tsx";
 import { AttachmentCell } from "../attachment-cell.tsx";
 
 const fetchMock = vi.fn();
 const createUpload = vi.fn<StoredObjectUploadTransport["createUpload"]>();
 const confirmUpload = vi.fn<StoredObjectUploadTransport["confirmUpload"]>();
 const uploadTransport: StoredObjectUploadTransport = { createUpload, confirmUpload };
-vi.mock("@langwatch/stored-object-browser-kit", async () => {
+vi.mock("../stored-object/stored-object-image.tsx", async () => {
   const { ExternalImage } = await import("@langwatch/design-system/external-image");
   return {
     StoredObjectImage: ({ src, ...props }: { src: string }) => (

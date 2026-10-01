@@ -4,16 +4,6 @@
  */
 
 import {
-  isScopeInFilter,
-  resolveScopeFilter,
-  ScopeChipPicker,
-  ScopeFilter,
-  scopeFilterAddressWrite,
-  scopeFilterFromAddress,
-  scopeHierarchyOf,
-  type ScopeFilterValue,
-} from "@langwatch/authz-browser-kit";
-import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
@@ -32,6 +22,8 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -40,6 +32,13 @@ import {
   removeRetentionScope,
   retentionPolicySaver,
 } from "../../behavior/retention-policy-save.ts";
+import {
+  isScopeInFilter,
+  resolveScopeFilter,
+  scopeFilterAddressWrite,
+  scopeFilterFromAddress,
+  scopeHierarchyOf,
+} from "../../model/authz/scope-picker/scope-filter-address.ts";
 import {
   RETENTION_SCOPE_QUERY_KEY,
   useDataRetentionHost,
@@ -149,7 +148,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     projectId,
     scope: storageScope,
   });
-  // Platform admin = an email in ADMIN_EMAILS, NOT an org admin. Only they may
+  // Platform admin = a holder of the platform-operator grant, NOT an org admin. Only they may
   // disable retention; the route enforces this independently. It decides
   // nothing here but whether the drawer offers the "No retention" option.
   const isPlatformAdmin = host.isPlatformAdmin();
@@ -201,14 +200,13 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     onConfirm: () => void | Promise<void>;
   } | null>(null);
 
-  // Poll system.mutations while a retroactive apply is in flight, then idle.
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
   const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
     { projectId },
     {
       enabled: projectIsWritable,
-      refetchInterval: (query) => ((query.state.data?.length ?? 0) > 0 ? 3000 : false),
+      // needs a read hint: retroactive retention mutation finished (system.mutations)
     },
   );
   const activeMutations = progressQuery.data ?? [];

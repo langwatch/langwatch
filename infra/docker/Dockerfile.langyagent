@@ -133,12 +133,12 @@ COPY services/langyworker/scripts ./services/langyworker/scripts
 # (`pnpm -r --filter "langwatch..." --filter "@langwatch/langyworker..." exec pwd`):
 # langy-contract is bundled into the binary and imports these at runtime.
 COPY modules/authz/contract ./modules/authz/contract
-COPY packages/actor ./packages/actor
+COPY packages/authorization ./packages/authorization
 COPY packages/api ./packages/api
-COPY packages/api-fixture ./packages/api-fixture
+COPY packages/test-harness ./packages/test-harness
 COPY packages/config ./packages/config
 COPY packages/handled-error ./packages/handled-error
-COPY packages/kernel ./packages/kernel
+COPY packages/module ./packages/module
 COPY packages/ksuid ./packages/ksuid
 COPY packages/observability ./packages/observability
 COPY packages/secrets ./packages/secrets
@@ -256,7 +256,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # attributed to the requesting user. The user's short-lived user-to-server
 # token rides into the worker as GH_TOKEN; gh reads it from env, and
 # `gh auth git-credential` proxies it to git pushes so nothing is ever
-# written to disk. Issue #4747, spec specs/assistant/langy-github-prs.feature.
+# written to disk. Issue #4747, spec specs/langy/langy-github-prs.feature.
 # Pinned via the GitHub releases .deb rather than the apt repo: the apt repo
 # only carries the LATEST gh, so `apt-get install gh` ships unreviewed gh
 # behavior changes on every rebuild (and an exact apt pin breaks on every gh

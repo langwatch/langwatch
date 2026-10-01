@@ -1,16 +1,18 @@
-import {
-  buildModelChangeValues,
-  DEFAULT_SUPPORTED_PARAMETERS,
-  getDisplayParameters,
-  getMaxTokenLimit,
-  getParamValue,
-  type LLMConfigValues,
-  normalizeMaxTokens,
-  toFormKey,
-} from "@langwatch/prompt-browser-kit";
+import { computeClampedMaxTokens } from "@langwatch/model-provider-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { clampMaxTokens } from "../model/clamp-max-tokens.ts";
+import { getMaxTokenLimit } from "../model/max-token-limit.ts";
+import { type LLMConfigValues } from "../ui/sections/llm-parameters/llm-config-values.types.ts";
+import {
+  buildModelChangeValues,
+  normalizeMaxTokens,
+} from "../ui/sections/llm-parameters/max-tokens.utils.ts";
+import {
+  DEFAULT_SUPPORTED_PARAMETERS,
+  getDisplayParameters,
+  toFormKey,
+} from "../ui/sections/llm-parameters/parameter-config.ts";
+import { getParamValue } from "../ui/sections/llm-parameters/parameter-value.utils.ts";
 import { useModelProvidersSettings } from "./use-model-providers-settings.ts";
 
 /** The one output a prompt has when structured outputs are off. */
@@ -52,7 +54,7 @@ function useMaxTokensClamp({
     if (!hasMetadata) return;
     const currentMaxTokens = getParamValue(values, "max_tokens");
     if (typeof currentMaxTokens !== "number") return;
-    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
+    const clamped = computeClampedMaxTokens(currentMaxTokens, maxTokenLimit);
     if (clamped !== undefined && clamped !== currentMaxTokens) {
       onChange(normalizeMaxTokens(values, clamped));
     }

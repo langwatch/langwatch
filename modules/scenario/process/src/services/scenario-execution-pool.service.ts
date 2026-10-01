@@ -1,16 +1,21 @@
 /**
- * In-process execution pool for scenario child processes. Manages concurrency: spawns immediately
- * if capacity available, buffers pending jobs when full, dequeues on completion.
+ * In-process execution pool for scenario child processes. Weighted-slot admission: each run costs
+ * its runtime class's weight, spawns at once if it fits, buffers if not, dequeues on completion.
  * @see specs/scenarios/event-driven-execution-prep.feature
  */
 
 import type { ChildProcess } from "child_process";
 
 import { createLogger } from "@langwatch/observability";
-import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
+import {
+  SCENARIO_RESOURCE_CLASSES,
+  type ScenarioExecutionJob,
+  type ScenarioResourceClass,
+  TARGET_RESOURCE_CLASS,
+  TARGET_STOP_SIGNAL,
+} from "@langwatch/scenario-contract";
 
 import type { ScenarioExecutionRunner, ScenarioExecutionPool } from "../app/scenario.app.ts";
-import type { VoiceConcurrencyGateService } from "./voice-concurrency-gate.service.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");
 
@@ -21,6 +26,22 @@ export class JobNotAcceptedByPoolError extends Error {
     super(`Scenario execution pool does not accept target type ${job.target.type}`);
     this.name = "JobNotAcceptedByPoolError";
   }
+}
+
+/** Per-project slot budget for a resource class; a class absent here has no per-project cap. */
+export type ProjectSlotBudgets = Partial<Record<ScenarioResourceClass, number>>;
+
+function resourceClassOf(job: ExecutionJobData): ScenarioResourceClass {
+  return TARGET_RESOURCE_CLASS[job.target.type];
+}
+
+function weightOf(job: ExecutionJobData): number {
+  return SCENARIO_RESOURCE_CLASSES[resourceClassOf(job)].weight;
+}
+
+/** A run fits when the budget has room, or nothing is running, so a heavy run is never starved. */
+function fits({ used, weight, budget }: { used: number; weight: number; budget: number }): boolean {
+  return used === 0 || used + weight <= budget;
 }
 
 type ActiveExecution = {
@@ -37,19 +58,15 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   private readonly _active = new Map<string, ActiveExecution>();
   private readonly _pending: ExecutionJobData[] = [];
   private readonly _cancelled = new Set<string>();
+  /** The slot budget; a light run weighs 1, so with only light runs it is a plain run count. */
   private readonly _concurrency: number;
-  /**
-   * Per-project cap for voice runs: a voice job is admitted only while its project is under it,
-   * otherwise it waits in `_pending` like any full-pool job. Absent = no voice cap, so a pool built
-   * without one behaves exactly as it did before the cap existed.
-   */
-  private readonly _voiceGate: VoiceConcurrencyGateService | null;
+  private readonly _projectSlots: ProjectSlotBudgets;
   private readonly acceptJob: ((job: ExecutionJobData) => boolean) | undefined;
   private runner: ScenarioExecutionRunner | undefined = void 0;
 
   static create(options: {
     concurrency: number;
-    voiceGate?: VoiceConcurrencyGateService;
+    projectSlots?: ProjectSlotBudgets;
     acceptJob?: (job: ExecutionJobData) => boolean;
   }): ScenarioExecutionPoolService {
     return new ScenarioExecutionPoolService(options);
@@ -57,15 +74,15 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
 
   private constructor({
     concurrency,
-    voiceGate,
+    projectSlots,
     acceptJob,
   }: {
     concurrency: number;
-    voiceGate?: VoiceConcurrencyGateService;
+    projectSlots?: ProjectSlotBudgets;
     acceptJob?: (job: ExecutionJobData) => boolean;
   }) {
     this._concurrency = concurrency;
-    this._voiceGate = voiceGate ?? null;
+    this._projectSlots = projectSlots ?? {};
     this.acceptJob = acceptJob;
   }
 
@@ -96,15 +113,6 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   /** Number of jobs waiting for a slot. */
   get pendingCount(): number {
     return this._pending.length;
-  }
-
-  /** Access running children map (used by cancel subscription). */
-  get runningChildren(): Map<string, ChildProcess> {
-    return new Map(
-      [...this._active].flatMap(([scenarioRunId, execution]) =>
-        execution.child ? [[scenarioRunId, execution.child]] : [],
-      ),
-    );
   }
 
   /**
@@ -148,31 +156,40 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
    * Triggers dequeue of next pending job if any.
    */
   deregisterChild(scenarioRunId: string): void {
-    // Release the voice slot BEFORE the dequeue, so a queued voice run for the same project can
-    // take the freed slot in the very next dequeue pass.
-    const finished = this._active.get(scenarioRunId);
-    if (finished) {
-      this.releaseVoiceSlot(finished.job);
-    }
     this._active.delete(scenarioRunId);
     this.dequeueNext();
   }
 
+  /** Slots held by the active runs matching `include`, from `_active` alone: nothing to release. */
+  private slotsHeld(include: (job: ExecutionJobData) => boolean): number {
+    return [...this._active.values()].reduce(
+      (held, { job }) => (include(job) ? held + weightOf(job) : held),
+      0,
+    );
+  }
+
   /**
-   * Whether a job may start now: a global slot is free and, for a voice job, the project is under
-   * its cap. Admission counts against `_active`, which a job enters at `startJob` — before its
-   * child registers — so a submit in that window cannot admit past `_concurrency`.
+   * Whether a job may start now: its weight fits the global budget and its class's per-project
+   * budget. Admission counts `_active`, which a job enters at `startJob` — before its child
+   * registers — so a submit in that window cannot admit past the budget.
    */
   private canStart(jobData: ExecutionJobData): boolean {
-    if (this._active.size >= this._concurrency) {
+    const weight = weightOf(jobData);
+    const used = this.slotsHeld(() => true);
+    if (!fits({ used, weight, budget: this._concurrency })) {
       return false;
     }
 
-    if (this._voiceGate && jobData.target.type === "voice") {
-      return this._voiceGate.canAcquire(jobData.projectId);
+    const resourceClass = resourceClassOf(jobData);
+    const projectBudget = this._projectSlots[resourceClass];
+    if (projectBudget === undefined) {
+      return true;
     }
+    const projectUsed = this.slotsHeld(
+      (job) => job.projectId === jobData.projectId && resourceClassOf(job) === resourceClass,
+    );
 
-    return true;
+    return fits({ used: projectUsed, weight, budget: projectBudget });
   }
 
   /**
@@ -216,22 +233,29 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
           activeCount: this._active.size,
           targetType: jobData.target.type,
         },
-        "Execution pool full or voice cap reached, buffering job",
+        "Execution pool slots or project class budget exhausted, buffering job",
       );
       this._pending.push(jobData);
     }
   }
 
-  /** Kill all running children and clear pending queue. */
-  drain(): void {
-    for (const [id, execution] of this._active) {
-      const child = execution.child;
-      if (!child) {
-        continue;
-      }
+  /** Stop a run's child with its runtime's declared signal; false when it has no child yet. */
+  stop(scenarioRunId: string): boolean {
+    const execution = this._active.get(scenarioRunId);
+    if (!execution?.child) {
+      return false;
+    }
 
-      logger.info({ scenarioRunId: id }, "Draining: killing child process");
-      child.kill("SIGTERM");
+    execution.child.kill(TARGET_STOP_SIGNAL[execution.job.target.type]);
+
+    return true;
+  }
+
+  /** Stop all running children by their runtimes' declared signals and clear the pending queue. */
+  drain(): void {
+    for (const id of this._active.keys()) {
+      logger.info({ scenarioRunId: id }, "Draining: stopping child process");
+      this.stop(id);
     }
 
     this._pending.length = 0;
@@ -243,13 +267,6 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
     // in the spawn window (child exists but is not registered yet).
     const runner = this.requireRunner(jobData.scenarioRunId);
     this._active.set(jobData.scenarioRunId, { job: jobData });
-
-    // Reserve the project's voice slot at the same moment, so the cap is exact across the spawn
-    // window. Released in deregisterChild, or in settleUnregisteredJob when the executor never got
-    // as far as a child.
-    if (this._voiceGate && jobData.target.type === "voice") {
-      this._voiceGate.acquire(jobData.projectId);
-    }
 
     logger.info(
       {
@@ -278,9 +295,9 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   }
 
   /**
-   * Release a job's slot when the executor settled without ever calling `deregisterChild` — an
-   * early return before the child registers (prefetch failure, cancellation) would otherwise leak a
-   * voice slot forever. Idempotent: a normal exit already dropped the `_active` entry.
+   * Release a job's slots when the executor settled without ever calling `deregisterChild` — an
+   * early return before the child registers (prefetch failure, cancellation) would otherwise leak
+   * them forever. Idempotent: a normal exit already dropped the `_active` entry.
    */
   private settleUnregisteredJob(scenarioRunId: string): void {
     const execution = this._active.get(scenarioRunId);
@@ -288,16 +305,8 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
       return;
     }
 
-    this.releaseVoiceSlot(execution.job);
     this._active.delete(scenarioRunId);
     this.dequeueNext();
-  }
-
-  /** Release a voice job's reserved slot; a no-op for text jobs or no gate. */
-  private releaseVoiceSlot(jobData: ExecutionJobData): void {
-    if (this._voiceGate && jobData.target.type === "voice") {
-      this._voiceGate.release(jobData.projectId);
-    }
   }
 
   /**
@@ -323,14 +332,13 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
   }
 
   private dequeueNext(): void {
-    while (this._pending.length > 0 && this._active.size < this._concurrency) {
+    while (this._pending.length > 0) {
       if (this.skipNextCancelledPending()) {
         continue;
       }
 
-      // Start the first job that may start now. A voice job blocked by its project's cap is left in
-      // place so a runnable job behind it is not starved; the blocked job starts on a later dequeue
-      // once a slot frees.
+      // Start the first job that fits now. A job blocked by its budget stays in place so a job
+      // behind it that fits is not starved; it starts on a later dequeue once slots free.
       const startIdx = this._pending.findIndex((job) => this.canStart(job));
       if (startIdx === -1) {
         return; // Nothing admissible right now.
@@ -348,11 +356,9 @@ export class ScenarioExecutionPoolService implements ScenarioExecutionPool {
         },
         "Dequeuing pending job",
       );
+      // `startJob` records the run in `_active` synchronously, so the next pass sees its weight
+      // and a freed heavy run admits every waiting run that now fits.
       this.startJob(next);
-
-      // One real start per dequeue: `_active` only rises once the job is recorded here, so starting
-      // more would over-admit the global cap. The next completion drives the next dequeue.
-      return;
     }
   }
 }

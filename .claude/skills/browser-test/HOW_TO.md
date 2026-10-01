@@ -11,7 +11,7 @@ Lessons learned from running `/browser-test` against the LangWatch app.
    `browser_wait_for` with `time: 60` for a first page load.
 
 3. **Origin mismatch kills auth** — the trusted origin comes from `NEXTAUTH_URL`
-   (bound in `apps/api/src/platform/config/api.config.ts`; auth itself is better-auth).
+   (declared in `modules/auth/contract/src/auth.config.ts`; auth itself is better-auth).
    It must match the origin you are browsing. Under haven it is set to the
    real `https://app.<slug>.langwatch.localhost:<port>`, so browsing the app on
    `127.0.0.1` will 403 the sign-in. Under a plain `pnpm dev`, `PORT` must match.
@@ -98,10 +98,6 @@ Screenshots are uploaded to img402.dev (not committed to git). See SKILL.md Step
 
 1. **Save report** to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md` (see SKILL.md for format).
 2. **Report results** to the caller using the summary table format from `SKILL.md`.
-
-## Example Run
-
-See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with screenshots, raw logs, and a report. This was the first successful AI-driven browser verification against a local dev instance.
 
 ## Known Issues
 

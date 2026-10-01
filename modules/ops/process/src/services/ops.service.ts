@@ -24,6 +24,7 @@ import {
   type AnomalyKind,
   type GroupInfo,
   type OpsBlockedSummary,
+  type OpsOperatorPermission,
   type OpsParkedGroupsPage,
   type OpsParkedTenantsPage,
   type OpsQueueDlqGroup,
@@ -95,8 +96,12 @@ export class OpsService {
     return new OpsService(options);
   }
 
-  isAdmin(identity: AdminIdentity): boolean {
+  isAdmin(identity: AdminIdentity): Promise<boolean> {
     return this.access.isAdmin(identity);
+  }
+
+  holds(input: { identity: AdminIdentity; permission: OpsOperatorPermission }): Promise<boolean> {
+    return this.access.holds(input);
   }
 
   startImpersonation(input: StartImpersonationInput): Promise<void> {

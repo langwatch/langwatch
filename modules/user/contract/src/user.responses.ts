@@ -36,7 +36,7 @@ export const userApiLinkedAccountsSchema = z.array(userApiLinkedAccountSchema);
  * The caller's personal workspace inside one organization, plus the routing
  * policy it inherits by default. Null where the organization declares none.
  */
-/** `project.apiKey` is blank unless the caller holds `project:manage` on the personal project. */
+/** `project.apiKey` is always blank: a cached read carries no credential. */
 const personalContextWorkspaceSchema = ensuredPersonalWorkspaceSchema.safeExtend({
   project: ensuredPersonalWorkspaceSchema.shape.project.safeExtend({ apiKey: z.string() }),
 });

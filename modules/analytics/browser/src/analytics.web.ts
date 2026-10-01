@@ -5,8 +5,8 @@
  */
 
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
+import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
 import { createElement } from "react";
 
 import { analyticsApi } from "./behavior/analytics-api.ts";
@@ -22,7 +22,7 @@ function customGraph(mode: CustomGraphScreenMode) {
   };
 }
 
-export const analyticsWeb = defineWebModule("analytics")
+export const analyticsWeb = defineBrowserModule("analytics")
   .withApi(analyticsApi, { contracts: [analyticsTrpc, analyticsLwqlTrpc, savedViewTrpc] })
   .withHosts({
     requires: ["AnalyticsHostApi"],
@@ -87,7 +87,7 @@ export const analyticsWeb = defineWebModule("analytics")
     },
     filterSidebar: {
       load: async () => ({
-        default: (await import("./ui/sections/filters/filter-sidebar.tsx")).FilterSidebar,
+        default: (await import("./ui/sections/filter-sidebar.tsx")).FilterSidebar,
       }),
     },
   });

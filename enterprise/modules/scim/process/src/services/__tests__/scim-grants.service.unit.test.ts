@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
 import {
@@ -26,6 +26,8 @@ const memberGrant: DesiredScimGrant = {
   scopeType: "ORGANIZATION",
   scopeId: organizationId,
 };
+
+const roleBindingKsuid = /^(?:[a-z\d]+_)?rolebinding_[a-zA-Z\d]{29}$/;
 
 const storedMember: ScimGrantRecord = {
   id: "binding_1",
@@ -125,5 +127,26 @@ describe("SCIM grant reconciliation", () => {
       userId,
     });
     expect(grants.revokeBindings).toHaveBeenCalledWith(expect.objectContaining({ organizationId }));
+  });
+  describe("when two grants are minted in the same millisecond", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-10-01T00:00:00.000Z") });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "Two grants minted in the same millisecond get distinct role-binding ids" */
+    it("gives each its own rolebinding KSUID", async () => {
+      await reconcile([memberGrant]);
+      await reconcile([memberGrant]);
+
+      const ids = grants.attachBindings.mock.calls.map(([call]) => call.bindings[0]?.bindingId);
+      expect(ids).toHaveLength(2);
+      expect(ids[0]).toMatch(roleBindingKsuid);
+      expect(ids[1]).toMatch(roleBindingKsuid);
+      expect(ids[0]).not.toBe(ids[1]);
+    });
   });
 });

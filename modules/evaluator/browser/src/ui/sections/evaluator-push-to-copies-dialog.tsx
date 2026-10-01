@@ -7,9 +7,9 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 export function EvaluatorPushToCopiesDialog({
@@ -29,11 +29,11 @@ export function EvaluatorPushToCopiesDialog({
     null,
   );
 
-  const copies = evaluatorApi.evaluators.getCopies.useQuery(
+  const copies = evaluatorClient.evaluators.getCopies.useQuery(
     { evaluatorId, projectId: projectId ?? "" },
     { enabled: open && !!projectId && !!evaluatorId },
   );
-  const pushToCopies = evaluatorApi.evaluators.pushToCopies.useMutation();
+  const pushToCopies = evaluatorClient.evaluators.pushToCopies.useMutation();
 
   /**
    * Selection keys off the IDS, not the query result's identity: keying

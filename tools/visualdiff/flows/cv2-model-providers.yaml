@@ -57,7 +57,7 @@ flows:
       - action: expect
         with:
           api: /api/model-providers
-          field: elevenlabs.models
+          field: elevenlabs.customModels
           contains: "vd-cv2-model-{uid}"
           timeout: "20000"
       - action: click

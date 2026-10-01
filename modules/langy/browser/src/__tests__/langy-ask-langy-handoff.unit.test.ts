@@ -1,5 +1,6 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import { beforeEach, describe, expect, it } from "vitest";
+
+import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
  * The command bar's "Ask Langy" hands a question to the panel through the store: `askLangy`

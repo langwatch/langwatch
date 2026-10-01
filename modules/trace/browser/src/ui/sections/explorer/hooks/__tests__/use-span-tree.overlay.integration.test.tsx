@@ -10,6 +10,11 @@ const overlay = vi.hoisted(() => ({
   current: null as { traceId: string; patch: TraceEditOverlayPatch } | null,
 }));
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("@tanstack/react-query", () => ({
   keepPreviousData: (previous: unknown) => previous,
   useQuery: () => ({
@@ -39,11 +44,6 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../context/shared-trace-context.tsx", () => ({
-  useSharedTrace: () => null,
-  asSharedQueryResult: (data: unknown) => ({ data }),
-}));
-
 vi.mock("../span-tree-paged-query.ts", () => ({
   spanTreeQueryKey: () => ["spanTree", "trace-1"],
   spanTreeQueryFn: () => vi.fn(),
@@ -59,9 +59,11 @@ vi.mock("../use-trace-query-args.ts", () => ({
   }),
 }));
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
 import { useTraceEditStore } from "../../../../../behavior/trace-edit.store.ts";
 import { useSpanTree, useSpanTreeWithCaptured } from "../use-span-tree.ts";
+
+const OPEN_TRACE = "/acme/traces?drawer.open=traceV2Details&drawer.traceId=trace-1";
 
 function node(over: { spanId: string; parentSpanId?: string; name?: string }): SpanTreeNode {
   return {
@@ -83,7 +85,7 @@ describe("useSpanTree with a correction", () => {
     // `discard` clears the editing session, not which reading is on screen, so
     // the view a test switches would otherwise carry into the ones after it.
     useTraceEditStore.getState().setOverlayView("edited");
-    useDrawerStore.getState().setIsEditing(false);
+    setWindowAddress({ url: OPEN_TRACE });
     spans.current = [
       node({ spanId: "root" }),
       node({ spanId: "tool", parentSpanId: "root", name: "web_search" }),
@@ -166,7 +168,7 @@ describe("useSpanTree with a correction", () => {
 
     describe("when the reviewer is editing", () => {
       it("reads the captured trace so the correction is not applied twice", () => {
-        useDrawerStore.getState().setIsEditing(true);
+        setWindowAddress({ url: `${OPEN_TRACE}&drawer.edit=1` });
 
         const { result } = renderHook(() => useSpanTree());
 

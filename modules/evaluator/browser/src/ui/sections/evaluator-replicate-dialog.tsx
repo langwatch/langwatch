@@ -13,9 +13,9 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import { useState } from "react";
 
-import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 
 export function EvaluatorReplicateDialog({
@@ -34,7 +34,7 @@ export function EvaluatorReplicateDialog({
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
   const [selected, setSelected] = useState<string[]>([]);
-  const copyEvaluator = evaluatorApi.evaluators.copy.useMutation();
+  const copyEvaluator = evaluatorClient.evaluators.copy.useMutation();
 
   // Read only while open: each target costs one permissions read per project.
   const targets = open ? host.copyTargets() : [];

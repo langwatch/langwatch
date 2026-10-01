@@ -22,9 +22,10 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-contract/mapping-validation";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { AlertTriangle, ArrowLeft, HelpCircle, Spool, X } from "lucide-react";
 import {
@@ -1431,11 +1432,11 @@ function useDrawerQueries({
     { enabled: !!monitorId && canLoad },
   );
   const linkedEvaluatorId = monitorQuery.data?.evaluatorId;
-  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
+  const evaluatorQuery = evaluatorClient.evaluators.getById.useQuery(
     { id: linkedEvaluatorId ?? "", projectId: projectId ?? "" },
     { enabled: !!linkedEvaluatorId && canLoad },
   );
-  const pendingEvaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
+  const pendingEvaluatorQuery = evaluatorClient.evaluators.getById.useQuery(
     { id: pendingEvaluatorId ?? "", projectId: projectId ?? "" },
     { enabled: !!pendingEvaluatorId && canLoad },
   );

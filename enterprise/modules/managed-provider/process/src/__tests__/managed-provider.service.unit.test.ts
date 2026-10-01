@@ -2,11 +2,11 @@ import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provide
 import { describe, expect, it } from "vitest";
 
 import {
-  ManagedProviderConfigurationService,
   ManagedProviderCredentialVendor,
-  ManagedProviderService,
   type ManagedProviderCredentials,
-} from "../index.ts";
+} from "../channels/managed-provider-credentials.channel.ts";
+import { ManagedProviderConfigurationService } from "../services/managed-provider-configuration.service.ts";
+import { ManagedProviderService } from "../services/managed-provider.service.ts";
 
 class CredentialVendorTestDouble extends ManagedProviderCredentialVendor {
   configs: ManagedBedrockConfig[] = [];

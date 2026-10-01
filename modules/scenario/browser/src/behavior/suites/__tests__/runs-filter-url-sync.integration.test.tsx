@@ -5,9 +5,14 @@
  */
 
 import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { createRunHistoryStore } from "@langwatch/suite-browser-kit";
+import {
+  RUN_HISTORY_ABSENT,
+  RUN_HISTORY_SLICE,
+  type RunHistoryState,
+} from "@langwatch/suite-contract";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
@@ -15,6 +20,30 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { ScenarioHostApi, ScenarioHostProvider } from "../../../model/scenario-host.ts";
 import { ALL_RUNS_ID, EXTERNAL_SET_PREFIX, useSuiteRouting } from "../use-suite-routing.ts";
+
+// Stands in for suite, the owner of the slice, which this package only reads.
+function createRunHistoryStore() {
+  return defineSlice<RunHistoryState>({
+    name: RUN_HISTORY_SLICE,
+    create: (set, get) => ({
+      ...RUN_HISTORY_ABSENT,
+      setFilter: (key, value) => set((state) => ({ filters: { ...state.filters, [key]: value } })),
+      setGroupBy: (groupBy) => set({ groupBy }),
+      syncToUrl: (router) => {
+        const { groupBy, filters } = get();
+        const query: Record<string, string | string[]> = {};
+        for (const [key, value] of Object.entries(router.query)) {
+          if (value !== undefined) query[key] = value;
+        }
+        for (const [key, value] of Object.entries({ groupBy, ...filters })) {
+          if (value && value !== "none") query[key] = value;
+          else delete query[key];
+        }
+        router.push({ query }, { shallow: true });
+      },
+    }),
+  });
+}
 
 type Store = ReturnType<typeof createRunHistoryStore>;
 

@@ -1,13 +1,13 @@
+import { datasetClient } from "@langwatch/dataset-client";
+import { useCallback, useEffect, useRef } from "react";
+
 /**
  * Debounced sync of locally-edited dataset records. Drains pending
  * changes through datasetRecord.update with the FULL record. A failed
  * sync keeps the change for retry — never report silent success.
  */
-import type { AutosaveState } from "@langwatch/dataset-browser-kit";
-import { useCallback, useEffect, useRef } from "react";
-
+import type { AutosaveState } from "../../../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../../../model/pending-saved-changes.ts";
-import { datasetApi } from "../../dataset-api.ts";
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 
@@ -44,8 +44,8 @@ export const useDatasetRecordSync = ({
 
   // Mutations stored in refs so mutation state changes (isLoading, etc.)
   // don't re-trigger the sync effect.
-  const updateSavedRecord = datasetApi.datasetRecord.update.useMutation();
-  const deleteSavedRecords = datasetApi.datasetRecord.deleteMany.useMutation();
+  const updateSavedRecord = datasetClient.datasetRecord.update.useMutation();
+  const deleteSavedRecords = datasetClient.datasetRecord.deleteMany.useMutation();
   const updateRef = useRef(updateSavedRecord);
   updateRef.current = updateSavedRecord;
   const deleteRef = useRef(deleteSavedRecords);
@@ -153,10 +153,10 @@ export const useDatasetRecordSync = ({
 
 type RecordSyncMutations = {
   deleteMutation: Pick<
-    ReturnType<typeof datasetApi.datasetRecord.deleteMany.useMutation>,
+    ReturnType<typeof datasetClient.datasetRecord.deleteMany.useMutation>,
     "mutate"
   >;
-  updateMutation: Pick<ReturnType<typeof datasetApi.datasetRecord.update.useMutation>, "mutate">;
+  updateMutation: Pick<ReturnType<typeof datasetClient.datasetRecord.update.useMutation>, "mutate">;
 };
 
 /** Which of one dataset's pending changes are deletions and which are full-record updates. */

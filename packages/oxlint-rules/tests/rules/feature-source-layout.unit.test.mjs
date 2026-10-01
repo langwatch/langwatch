@@ -113,6 +113,67 @@ describe("given a strict feature process module", () => {
     });
   });
 
+  describe("when a concern nests its own homes under features/<concern>/", () => {
+    /** @scenario "A concern may nest services, rules, repositories and eventing one level deep" */
+    it.each([
+      "features/billing/services/invoice.service.ts",
+      "features/billing/rules/invoice.rules.ts",
+      "features/billing/repositories/prisma/prisma.invoice.repository.ts",
+      "features/billing/eventing/invoice.pipeline.ts",
+    ])("reports nothing for %s", (path) => {
+      expect(report(`modules/agent/process/src/${path}`)).toEqual([]);
+    });
+
+    /** @scenario "Nesting stops at one level and leaves the other homes at the top" */
+    it.each([
+      "features/billing/features/tax/services/tax.service.ts",
+      "services/features/billing/invoice.service.ts",
+      "features/billing/transport/invoice.rest.ts",
+      "features/billing/app/invoice.app.ts",
+      "features/billing/tasks/backfill.task.ts",
+      "features/billing/channels/invoice.channel.ts",
+    ])("reports processPath for %s", (path) => {
+      expect(report(`modules/agent/process/src/${path}`).map((e) => e.messageId)).toEqual([
+        "processPath",
+      ]);
+    });
+
+    /** @scenario "A nested rules, service or process-manager file gets the same checks as a top-level one" */
+    it("holds a nested rules module to rules purity", () => {
+      const found = report(
+        "modules/agent/process/src/features/billing/rules/invoice.rules.ts",
+        "export class Helper {} export const x = new Helper();",
+      );
+
+      expect(found.map((e) => e.messageId)).toEqual(["rulesImpurity"]);
+    });
+
+    /** @scenario "A nested rules, service or process-manager file gets the same checks as a top-level one" */
+    it("reports a nested process manager named as a service", () => {
+      const found = report(
+        "modules/agent/process/src/features/billing/services/invoice-process.service.ts",
+      );
+
+      expect(found.map((e) => e.messageId)).toEqual(["processManagerService"]);
+    });
+  });
+
+  describe("when a contract artifact sits under features/<concern>/", () => {
+    /** @scenario "A contract concern folder holds that concern's artifacts under the same names" */
+    it("accepts a named artifact and still reports a missing subject", () => {
+      expect(report("modules/agent/contract/src/features/billing/invoice.events.ts")).toEqual([]);
+      expect(report("modules/agent/contract/src/features/billing/invoice.commands.ts")).toEqual([]);
+      expect(
+        report("modules/agent/contract/src/features/billing/events.ts").map((e) => e.messageId),
+      ).toEqual(["contractMissingSubject"]);
+      expect(
+        report("modules/agent/contract/src/features/billing/invoice.repository.ts").map(
+          (e) => e.messageId,
+        ),
+      ).toEqual(["contractProcessArtifact"]);
+    });
+  });
+
   describe("when the path matches a recognized process pattern", () => {
     /** @scenario "A recognized strict process path is left alone" */
     it("reports nothing", () => {
@@ -147,7 +208,7 @@ describe("given a strict feature process module", () => {
 
 it.each([
   "modules/agent/contract/src/agent.app.ts",
-  "modules/agent/process/src/agent.server.ts",
+  "modules/agent/process/src/agent.module.ts",
   "modules/agent/process/src/app/agent.app.ts",
 ])("accepts the app composition home %s", (file) => {
   expect(report(file)).toEqual([]);

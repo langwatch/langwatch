@@ -3,7 +3,7 @@
  * `export.*` at main's names, bodies and permissions.
  * @see modules/trace/specs/export-progress.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { exportTrpc, type ExportProgressEvent, type TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

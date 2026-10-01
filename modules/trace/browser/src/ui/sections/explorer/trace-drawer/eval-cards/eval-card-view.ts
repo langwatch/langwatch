@@ -1,4 +1,4 @@
-import { formatCost, formatDuration } from "@langwatch/trace-browser-kit";
+import { formatCost, formatDuration } from "@langwatch/design-system/display-formatters";
 
 import { type EvalEntry, isCategoryOnly, isNoVerdict } from "./utils.ts";
 

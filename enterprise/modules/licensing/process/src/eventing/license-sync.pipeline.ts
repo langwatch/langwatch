@@ -17,7 +17,7 @@ import {
 } from "@langwatch/organization-contract";
 import { nowInstant } from "@langwatch/time";
 
-import type { LicensingApp } from "../app/licensing.app.ts";
+import type { LicensingModule } from "../app/licensing.app.ts";
 import { LICENSE_SYNC_PROCESS_NAME, runLicenseSync } from "./license-sync.intent.ts";
 import {
   LICENSE_SYNC_FIRST_DELAY_MS,
@@ -35,7 +35,7 @@ export const CONFIGURED_LICENSE_ON_SIGN_UP = "configuredLicenseOnSignUp";
  * first organization to store its license on; a no-op once one holds a license.
  */
 export function configuredLicenseOnSignUp(
-  app: Pick<LicensingApp, "activateConfiguredLicense">,
+  app: Pick<LicensingModule, "activateConfiguredLicense">,
 ): PeerSubscriberDefinition<typeof organizationSignedUpEventDataSchema> {
   return {
     eventType: ORGANIZATION_SIGNED_UP_EVENT_TYPE,
@@ -51,7 +51,7 @@ export function buildLicenseSync({
   app,
   processStore,
   bootedAt = nowInstant().epochMilliseconds,
-}: EventingSetup<unknown, Pick<LicensingApp, "syncLicenses" | "activateConfiguredLicense">> & {
+}: EventingSetup<unknown, Pick<LicensingModule, "syncLicenses" | "activateConfiguredLicense">> & {
   bootedAt?: number;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
@@ -82,5 +82,5 @@ export function buildLicenseSync({
 
 export const licenseSyncEventing = defineEventingModule({
   pipeline: LICENSE_SYNC_PIPELINE_NAME,
-  build: (setup: EventingSetup<undefined, LicensingApp>) => buildLicenseSync(setup),
+  build: (setup: EventingSetup<undefined, LicensingModule>) => buildLicenseSync(setup),
 });

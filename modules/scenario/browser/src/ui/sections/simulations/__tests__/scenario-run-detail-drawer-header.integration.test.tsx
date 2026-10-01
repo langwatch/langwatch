@@ -3,10 +3,9 @@
  * @vitest-environment jsdom
  * @see specs/features/scenarios/run-view-side-by-side-layout.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
-import type React from "react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunDetailDrawer } from "../scenario-run-detail-drawer.tsx";
@@ -29,6 +28,43 @@ const emptyQuery = vi.hoisted(() => () => ({
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    suites: {
+      // Every run of the v2 dialog is queued under a plan name.
+      runPlan: {
+        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
+      },
+      testSuites: { getAll: { useQuery: emptyQuery } },
+    },
+    agents: {
+      getAll: {
+        useQuery: () => ({
+          data: [{ id: "agent_1", name: "target-A", type: "http" }],
+        }),
+      },
+    },
+    storedObjects: { headById: { useQuery: () => ({ data: undefined }) } },
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
       scenarios: {
         getRunState: { invalidate: mockInvalidateRunState },
         getAll: { invalidate: vi.fn() },
@@ -36,10 +72,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         getByIdIncludingArchived: { invalidate: vi.fn() },
         listVersions: { invalidate: vi.fn() },
         getBatchRunData: { fetch: vi.fn(async () => ({ runs: [] })) },
-      },
-      suites: {
-        testSuites: { getAll: { invalidate: vi.fn() } },
-        getById: { invalidate: vi.fn() },
       },
     }),
     scenarios: {
@@ -59,22 +91,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
-    suites: {
-      // Every run of the v2 dialog is queued under a plan name.
-      runPlan: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-      },
-      testSuites: { getAll: { useQuery: emptyQuery } },
-    },
-    agents: {
-      getAll: {
-        useQuery: () => ({
-          data: [{ id: "agent_1", name: "target-A", type: "http" }],
-        }),
-      },
-    },
-    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
-    storedObjects: { headById: { useQuery: () => ({ data: undefined }) } },
   },
 }));
 
@@ -143,7 +159,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   clearFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     organization: { id: "org_1" },
@@ -159,10 +175,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function makeRunState(overrides: Record<string, unknown> = {}) {
   return {
@@ -248,7 +260,7 @@ describe("the run detail drawer", () => {
     describe("when the detail drawer opens for that run", () => {
       /** @scenario "Drawer header shows run identity and status" */
       it("reads the scenario name, the target it ran against, the failure and the duration", () => {
-        render(<ScenarioRunDetailDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioRunDetailDrawer open />);
 
         expect(
           screen.getByRole("heading", { name: "target-A: Echo user request" }),
@@ -259,7 +271,7 @@ describe("the run detail drawer", () => {
 
       /** @scenario "Criteria section shows pass/fail summary" */
       it("reads how many criteria passed and names each one with its indicator", () => {
-        render(<ScenarioRunDetailDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<ScenarioRunDetailDrawer open />);
 
         const results = document.querySelector('[data-section="results"]') as HTMLElement;
         expect(within(results).getByText("0/4")).toBeInTheDocument();

@@ -3,8 +3,8 @@
  * Covers specs/prompts/prompt-tab-switcher.feature. Only the tab's controller
  * is mocked; the tab renders for real, so it fails with no room for a folder name or close button.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -42,12 +42,10 @@ function givenTabTitled(title: string, savedTitle: string | null = title) {
 }
 
 function renderTab(props: { isActive?: boolean; isCrowded?: boolean } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TabIdProvider tabId="tab-1">
-        <PromptBrowserTab {...props} />
-      </TabIdProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TabIdProvider tabId="tab-1">
+      <PromptBrowserTab {...props} />
+    </TabIdProvider>,
   );
 }
 

@@ -78,6 +78,17 @@ function syncVersionFromParent(methods: PromptConfigForm, parsed: PromptConfigFo
   }
 }
 
+/** Adopts the parent's handle and scope as the form's saved baseline when they differ. */
+function followRenamedHandle(methods: PromptConfigForm, parsed: PromptConfigFormValues) {
+  const { handle, scope } = parsed;
+  if (handle && handle !== methods.getValues("handle")) {
+    methods.resetField("handle", { defaultValue: handle });
+  }
+  if (scope && scope !== methods.getValues("scope")) {
+    methods.resetField("scope", { defaultValue: scope });
+  }
+}
+
 /** Raises a sync-suppression flag for `ms`, so the change it guards does not echo back. */
 function suppressFor(flag: { current: boolean }, ms: number) {
   flag.current = true;
@@ -125,6 +136,9 @@ function useSyncFromParent({
       methods.reset(parsedInitialValues);
       return;
     }
+
+    // A rename lands in the parent, never in the form: adopt it without marking dirty.
+    followRenamedHandle(methods, parsedInitialValues);
 
     // Don't overwrite user edits while the form is dirty. The debounced
     // reverse sync will eventually write the user's changes to the store;

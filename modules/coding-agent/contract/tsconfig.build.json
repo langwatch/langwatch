@@ -24,7 +24,7 @@
   ],
   "references": [
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

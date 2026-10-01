@@ -4,10 +4,10 @@
  * The input minus the cursor keys the query, so a period change starts over by itself.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { useCallback, useMemo } from "react";
 
-import { api } from "../scenario-api.ts";
-import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 import { useSuiteRunFreshness } from "./use-suite-run-freshness.ts";
 
 interface UseRunHistoryPaginationOptions {
@@ -29,7 +29,7 @@ export function useRunHistoryPagination({
   const { project } = useOrganizationTeamProject();
 
   const { data, isLoading, error, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
-    api.scenarios.getSuiteRunData.useInfiniteQuery(
+    scenarioClient.scenarios.getSuiteRunData.useInfiniteQuery(
       {
         projectId: project?.id ?? "",
         scenarioSetId,
@@ -41,7 +41,6 @@ export function useRunHistoryPagination({
         getNextPageParam: (last) => (last.changed && last.hasMore ? last.nextCursor : undefined),
         // No timer on the heavy query: SSE invalidations and the freshness
         // probe below drive refetches, so quiet sets never re-download runs.
-        trpc: { context: { skipBatch: true } },
       },
     );
 

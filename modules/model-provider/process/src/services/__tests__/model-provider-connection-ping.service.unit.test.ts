@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   ProviderKeyInvalidError,
   type ModelProviderApi,
   type ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryModelProviderConnectionPingChannel } from "../../channels/memory/memory.model-provider-connection-ping.channel.ts";

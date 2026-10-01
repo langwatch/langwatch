@@ -65,7 +65,7 @@ export {
   createIngestionPullSources,
   createPulledUsageEventing,
   findAgentsListings,
-} from "./governance.server.ts";
+} from "./governance.module.ts";
 export type { AgentsListingSummary } from "./rules/agents-listing-outcome.rules.ts";
 export { deriveAgentsListingOutcome } from "./rules/agents-listing-outcome.rules.ts";
 export type {
@@ -89,8 +89,8 @@ export {
   governanceRestCaller,
   governanceRestSurface,
 } from "./transport/governance.rest.ts";
-export { GovernanceApp } from "./app/governance.app.ts";
-export { governanceServer } from "./governance.server.ts";
+export { GovernanceModule } from "./app/governance.app.ts";
+export { governanceProcessModule } from "./governance.module.ts";
 
 // The CLI governance plane: fourteen routes under `/api/auth/cli` that
 // authenticate with a device-session bearer and dispatch into governance. They

@@ -5,6 +5,7 @@
  */
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import type { EvaluatorAttachment, ScenarioMappingContext } from "@langwatch/scenario-contract";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -15,7 +16,6 @@ import {
   useSuiteEditorStore,
 } from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type AttachableEvaluator,
   missingInputsOf,

@@ -6,7 +6,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LicensingEntitlementSourceService } from "../index.ts";
+import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
 
 const paidLicense: PlanInfo = {
   ...UNLIMITED_PLAN,

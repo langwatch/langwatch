@@ -40,11 +40,6 @@ const capabilities: PromptTabsCapabilities = {
   },
 };
 
-/** Builds a large-ish string so per-tab payload size differences are obvious. */
-function buildLargeContent(label: string): string {
-  return `${label}-`.repeat(5000); // ~30-40KB per tab
-}
-
 /**
  * Helper to create a minimal TabData object for testing
  */
@@ -450,196 +445,87 @@ describe("DraggableTabsBrowserStore", () => {
   });
 
   describe("when persisting", () => {
-    describe("when updating one tab's data with other large tabs open", () => {
-      it("does not rewrite the untouched tab's full content", () => {
-        store.getState().addTab({
-          data: createTabData({
-            form: { currentValues: { handle: buildLargeContent("tab-1") } },
-          }),
-        });
-        store.getState().addTab({
-          data: createTabData({
-            form: { currentValues: { handle: buildLargeContent("tab-2") } },
-          }),
-        });
+    const layoutKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
 
-        const tab1Id = store.getState().windows[0]?.tabs[0]?.id;
-        const tab2Id = store.getState().windows[0]?.tabs[1]?.id;
-        expect(tab1Id).toBeDefined();
-        expect(tab2Id).toBeDefined();
-
-        const originalSetItem = localStorageMock.setItem.bind(localStorageMock);
-        const setItemSpy = vi.fn(originalSetItem);
-        localStorageMock.setItem = setItemSpy;
-
-        try {
-          store.getState().updateTabData({
-            tabId: tab2Id!,
-            updater: (data) => ({
-              ...data,
-              meta: { ...data.meta, title: "Updated" },
-            }),
-          });
-
-          // Every write that happened while editing tab2 must not embed
-          // tab1's untouched large content anywhere in its payload.
-          const tab1Content = buildLargeContent("tab-1");
-          for (const call of setItemSpy.mock.calls) {
-            const [, value] = call;
-            expect(value.includes(tab1Content)).toBe(false);
-          }
-
-          // Sanity check: tab1's content is still recoverable after tab2 was
-          // edited, proving we didn't just fail to persist it at all.
-          const persistedTab1 = localStorageMock.getItem(`${TEST_PROJECT_ID}:tab:${tab1Id!}`);
-          expect(persistedTab1).toContain(tab1Content);
-        } finally {
-          localStorageMock.setItem = originalSetItem;
-        }
+    /** @scenario Prompt tabs keep their layout and prompt ids, never their contents */
+    it("keeps the layout and prompt id but no message bodies, form values or variables", () => {
+      store.getState().addTab({
+        data: createTabData({
+          chat: {
+            initialMessagesFromSpanData: [{ id: "m1", role: "user", content: "span-said-this" }],
+          },
+          form: {
+            currentValues: {
+              configId: "prompt-1",
+              handle: "greeter",
+              version: { configData: { messages: [{ role: "system", content: "system-said-this" }] } },
+            },
+          },
+          meta: { title: "greeter", versionNumber: 3, scope: "PROJECT" },
+          variableValues: { name: "typed-value" },
+        }),
       });
+
+      const stored = localStorage.getItem(layoutKey) ?? "";
+      expect(stored).toContain("prompt-1");
+      expect(stored).not.toContain("span-said-this");
+      expect(stored).not.toContain("system-said-this");
+      expect(stored).not.toContain("typed-value");
+      expect(localStorage.length).toBe(1);
+    });
+
+    /** @scenario Prompt tabs keep their layout and prompt ids, never their contents */
+    it("does not keep a tab with no saved prompt behind it", () => {
+      store.getState().addTab({ data: createTabData() });
+
+      const stored = JSON.parse(localStorage.getItem(layoutKey) ?? "{}");
+      expect(stored.state.windows[0].tabs).toEqual([]);
     });
   });
 
   describe("when recovering from rehydration", () => {
-    describe("when reading the legacy single-key persisted format", () => {
-      it("adopts the embedded tab data and migrates it to per-tab keys", async () => {
-        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
+    const layoutKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
 
-        // Legacy format: full tab data embedded in the index, NO per-tab keys.
-        // This is what an existing user's localStorage looks like on upgrade.
-        localStorage.setItem(
-          lightKey,
-          JSON.stringify({
-            state: {
-              windows: [
-                {
-                  id: "window-1",
-                  activeTabId: "tab-1",
-                  tabs: [
-                    {
-                      id: "tab-1",
-                      data: createTabData({ meta: { title: "Legacy A" } }),
-                    },
-                    {
-                      id: "tab-2",
-                      data: createTabData({ meta: { title: "Legacy B" } }),
-                    },
-                  ],
-                },
-              ],
-              activeWindowId: "window-1",
-            },
-            version: 0,
-          }),
-        );
+    /** @scenario Prompt tabs keep their layout and prompt ids, never their contents */
+    it("brings each kept tab back loading, holding only its prompt id", async () => {
+      localStorage.setItem(
+        layoutKey,
+        JSON.stringify({
+          state: {
+            windows: [
+              {
+                id: "window-1",
+                activeTabId: "tab-1",
+                tabs: [{ id: "tab-1", configId: "prompt-1", title: "greeter", versionNumber: 3 }],
+              },
+            ],
+            activeWindowId: "window-1",
+          },
+          version: 0,
+        }),
+      );
 
-        await store.persist.rehydrate();
+      await store.persist.rehydrate();
 
-        // Both tabs survive the upgrade with their data intact.
-        const state = store.getState();
-        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual(["tab-1", "tab-2"]);
-        expect(state.getByTabId("tab-1")?.meta.title).toBe("Legacy A");
-        expect(state.getByTabId("tab-2")?.meta.title).toBe("Legacy B");
-
-        // A subsequent write migrates each tab into its own per-tab key.
-        store.getState().updateTabData({
-          tabId: "tab-1",
-          updater: (data) => ({ ...data, meta: { ...data.meta, title: "A2" } }),
-        });
-        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-1`)).toContain("A2");
-        expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:tab-2`)).not.toBeNull();
-      });
+      const tab = store.getState().getByTabId("tab-1");
+      expect(tab?.loading).toBe(true);
+      expect(tab?.form.currentValues).toEqual({ configId: "prompt-1" });
+      expect(tab?.meta).toMatchObject({ title: "greeter", versionNumber: 3 });
+      expect(tab?.chat.initialMessagesFromSpanData).toEqual([]);
     });
 
-    describe("when one tab's per-tab data key is missing", () => {
-      it("drops only that tab and keeps the rest instead of wiping the store", async () => {
-        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
-        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
+    describe("when the stored layout is unparseable or mis-shaped", () => {
+      it.each(["{not valid json", JSON.stringify({ state: { windows: [{ id: 1 }] } })])(
+        "removes it without throwing",
+        async (stored) => {
+          localStorage.setItem(layoutKey, stored);
 
-        // Index references two tabs, but only tab-1's data key exists — tab-2's
-        // per-tab key is absent (e.g. evicted, or a partial write). tab-1 must
-        // survive; fabricating tab-2 would fail whole-state validation and lose
-        // tab-1 too.
-        localStorage.setItem(
-          lightKey,
-          JSON.stringify({
-            state: {
-              windows: [
-                {
-                  id: "window-1",
-                  tabs: [{ id: "tab-1" }, { id: "tab-2" }],
-                  activeTabId: "tab-1",
-                },
-              ],
-              activeWindowId: "window-1",
-            },
-            version: 0,
-          }),
-        );
-        localStorage.setItem(
-          tab1Key,
-          JSON.stringify(createTabData({ meta: { title: "Survivor" } })),
-        );
+          await store.persist.rehydrate();
 
-        await store.persist.rehydrate();
-
-        const state = store.getState();
-        expect(state.windows).toHaveLength(1);
-        expect(state.windows[0]?.tabs.map((t) => t.id)).toEqual(["tab-1"]);
-        expect(state.getByTabId("tab-1")?.meta.title).toBe("Survivor");
-      });
-    });
-
-    describe("when a persisted tab fails schema validation", () => {
-      it("removes all per-tab keys along with the light index key", async () => {
-        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
-        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
-        const tab2Key = `${TEST_PROJECT_ID}:tab:tab-2`;
-
-        // Light index key parses fine and references both tabs...
-        localStorage.setItem(
-          lightKey,
-          JSON.stringify({
-            state: {
-              windows: [
-                {
-                  id: "window-1",
-                  tabs: [{ id: "tab-1" }, { id: "tab-2" }],
-                  activeTabId: "tab-1",
-                },
-              ],
-              activeWindowId: "window-1",
-            },
-            version: 0,
-          }),
-        );
-        localStorage.setItem(tab1Key, JSON.stringify(createTabData()));
-        // ...but tab-2's own data is corrupted (missing required `form`
-        // field), which fails PersistedStateSchema validation and should
-        // trigger the "invalid shape" recovery path.
-        localStorage.setItem(tab2Key, JSON.stringify({}));
-
-        await store.persist.rehydrate();
-
-        expect(localStorage.getItem(tab1Key)).toBeNull();
-        expect(localStorage.getItem(tab2Key)).toBeNull();
-        expect(localStorage.getItem(lightKey)).toBeNull();
-      });
-    });
-
-    describe("when the light index key itself is unparseable", () => {
-      it("falls back to removing the light key without throwing", async () => {
-        const lightKey = `${TEST_PROJECT_ID}:draggable-tabs-browser-store`;
-        const tab1Key = `${TEST_PROJECT_ID}:tab:tab-1`;
-
-        localStorage.setItem(tab1Key, JSON.stringify(createTabData()));
-        localStorage.setItem(lightKey, "{not valid json");
-
-        await store.persist.rehydrate();
-
-        expect(localStorage.getItem(lightKey)).toBeNull();
-        expect(localStorage.getItem(tab1Key)).toBeNull();
-      });
+          expect(localStorage.getItem(layoutKey)).toBeNull();
+          expect(store.getState().windows).toEqual([]);
+        },
+      );
     });
   });
 
@@ -701,28 +587,15 @@ describe("DraggableTabsBrowserStore", () => {
       expect(store.getState().activeWindowId).toBeNull();
     });
 
-    it("removes the per-tab localStorage keys of its own tabs", () => {
-      store.getState().addTab({ data: createTabData() });
-      const tabId = store.getState().windows[0]?.tabs[0]?.id;
-      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).not.toBeNull();
+    it("removes the stored layout", () => {
+      store.getState().addTab({
+        data: createTabData({ form: { currentValues: { configId: "prompt-1" } } }),
+      });
+      expect(localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`)).not.toBeNull();
 
       store.getState().reset();
 
-      expect(localStorage.getItem(`${TEST_PROJECT_ID}:tab:${tabId}`)).toBeNull();
       expect(localStorage.getItem(`${TEST_PROJECT_ID}:draggable-tabs-browser-store`)).toBeNull();
-    });
-
-    it("removes orphaned per-tab keys this instance never tracked", () => {
-      // Simulates the same project open in a second browser tab: another
-      // store instance wrote a per-tab key that this instance's in-memory
-      // ref map never saw. reset() must still clear it via the prefix scan.
-      const orphanKey = `${TEST_PROJECT_ID}:tab:orphan-from-other-instance`;
-      localStorage.setItem(orphanKey, JSON.stringify(createTabData()));
-
-      store.getState().addTab({ data: createTabData() });
-      store.getState().reset();
-
-      expect(localStorage.getItem(orphanKey)).toBeNull();
     });
   });
 
@@ -866,7 +739,9 @@ describe("given the application supplies the store Prompt Studio writes to", () 
       capabilities,
     });
 
-    store.getState().addTab({ data: createTabData() });
+    store.getState().addTab({
+      data: createTabData({ form: { currentValues: { configId: "prompt-1" } } }),
+    });
     const tabId = store.getState().windows[0]?.tabs[0]?.id;
     expect(tabId).toBeDefined();
     store.getState().updateTabData({
@@ -874,7 +749,9 @@ describe("given the application supplies the store Prompt Studio writes to", () 
       updater: (data) => ({ ...data, variableValues: { name: "Ada" } }),
     });
 
-    expect(localStorageMock.getItem(`${SUPPLIED_PROJECT_ID}:tab:${tabId!}`)).toContain("Ada");
+    expect(
+      localStorageMock.getItem(`${SUPPLIED_PROJECT_ID}:draggable-tabs-browser-store`),
+    ).toContain(tabId!);
 
     store.getState().removeTab({ tabId: tabId! });
     store.getState().reset();

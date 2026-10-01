@@ -3,7 +3,7 @@
  * mounts as a layout is only mounted above the routes under that layout, and
  * nothing checked that. Spec: specs/ui/module-host-mounting.feature
  */
-import { webModules } from "@langwatch/installed-web-modules";
+import { browserModules } from "@langwatch/installed-web-modules";
 import { describe, expect, it } from "vitest";
 
 import { uiRouteTable } from "../ui-route-table";
@@ -29,7 +29,7 @@ function everyPageKey(table: readonly UiRouteDescriptor[]): string[] {
 }
 
 const authScreenKeys = Object.keys(
-  webModules.find((module) => module.name === "auth")?.installation.screens ?? {},
+  browserModules.find((module) => module.name === "auth")?.installation.screens ?? {},
 );
 
 describe("given the screens the auth module declares", () => {

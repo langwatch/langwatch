@@ -1,14 +1,34 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnsuredPersonalWorkspace, OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import type { UserAvatarStorage } from "../../app/user.members.ts";
-import type { UserRepository } from "../../repositories/user.repository.ts";
+import type {
+  UserDeactivationOutcome,
+  UserRepository,
+} from "../../repositories/user.repository.ts";
+import { UserLifecycleNoticeService } from "../user-lifecycle-notice.service.ts";
 import { UserService } from "../user.service.ts";
+
+/** No platform operators, and user's facts sent nowhere. */
+function lifecyclePeers() {
+  const lifecycle = UserLifecycleNoticeService.create();
+  lifecycle.connect({
+    recordUserDeactivated: { send: async () => undefined },
+    recordUserReactivated: { send: async () => undefined },
+  });
+
+  return {
+    platformOperators: createApiFixture<AuthzApi>({ listPlatformOperators: async () => [] }),
+    lifecycle,
+    cliCredentials: { revokeForUser: async () => undefined },
+  };
+}
 
 const ENSURED_WORKSPACE: EnsuredPersonalWorkspace = {
   team: { id: "team-1", name: "Personal", slug: "personal", createdAtMs: 0 },
@@ -41,7 +61,7 @@ class StubRepository implements UserRepository {
   hasAccountOnDomain = vi.fn(async () => false);
   findProfiles = vi.fn(async () => [user]);
   findById = vi.fn(async () => user);
-  findByEmail = vi.fn(async () => user);
+  findByEmail = vi.fn(async (): Promise<UserFullProfile[]> => [user]);
   create = vi.fn(async () => user);
   updateProfile = vi.fn(async () => user);
   findAccountInfo = vi.fn(async () => ({ createdAt: user.createdAt }));
@@ -72,7 +92,12 @@ class StubRepository implements UserRepository {
   setLastLoginAt = vi.fn(async () => undefined);
   findLastHomePath = vi.fn(async () => null);
   setLastHomePath = vi.fn(async () => undefined);
+  readClock = vi.fn(async () => NOW);
   setDeactivatedAt = vi.fn(async () => user);
+  deactivateWhileOthersActive = vi.fn(async (): Promise<UserDeactivationOutcome> => ({
+    outcome: "deactivated",
+    user,
+  }));
   setAvatar = vi.fn(
     async (_input: { id: string; image: string | null }): Promise<void> => undefined,
   );
@@ -99,6 +124,7 @@ function createService({ auth = createApiFixture<AuthApi>({}) }: { auth?: AuthAp
       avatarStorage,
       credentialIssuer: ISSUER,
       now: () => NOW,
+      ...lifecyclePeers(),
     }),
     repository,
     avatarStorage,
@@ -216,36 +242,48 @@ describe("UserService", () => {
 
   /** @scenario "Deactivating a user invalidates every session family" */
   /** @scenario "user.deactivate sets deactivatedAt on the user" */
-  it("marks a user deactivated", async () => {
-    const { service, repository } = createService();
-    await service.deactivate({ id: "user-1" });
+  it("marks a user deactivated, then ends their browser sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const auth = createApiFixture<AuthApi>({
+      revokeAllBrowserSessions,
+    });
+    const { service, repository } = createService({ auth });
+    await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
       deactivatedAt: NOW,
     });
+    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
   });
 
   /** @scenario "user.reactivate clears deactivatedAt on the user" */
   it("clears the deactivation stamp when a user is reactivated", async () => {
     const { service, repository } = createService();
-    await service.reactivate({ id: "user-1" });
+    await service.reactivate({ id: "user-1", actor: { type: "system", id: null } });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
       deactivatedAt: null,
     });
   });
 
-  it("normalizes a changed email", async () => {
-    const { service, repository } = createService();
+  it("normalizes a changed email, then ends every one of the user's sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
     await service.updateProfile({ id: "user-1", email: "NEW@Example.com " });
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
       email: "new@example.com",
     });
+    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
   });
 
-  it("updates a name without changing email", async () => {
-    const { service, repository } = createService();
+  it("updates a name without changing email or ending sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
 
     await service.updateProfile({ id: "user-1", name: "Ada Lovelace" });
 
@@ -253,12 +291,17 @@ describe("UserService", () => {
       id: "user-1",
       name: "Ada Lovelace",
     });
+    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
   });
 
-  it("normalizes an email case-only update", async () => {
-    const { service, repository } = createService();
+  it("normalizes an email case-only update without ending sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
 
     await service.updateProfile({ id: "user-1", email: "ADA@EXAMPLE.COM" });
+    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
 
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
@@ -364,6 +407,7 @@ describe("given a user whose photo came from their identity provider", () => {
         avatarStorage: new StubAvatarStorage(),
         credentialIssuer: ISSUER,
         now: () => NOW,
+        ...lifecyclePeers(),
       }),
       repository,
     };
@@ -522,5 +566,96 @@ describe("getSsoStatus()", () => {
       });
       expect(asked).toEqual([]);
     });
+  });
+});
+
+describe("findByEmail()", () => {
+  const twin = (id: string, email: string): UserFullProfile => ({ ...user, id, email });
+
+  describe("given case-twins where one holds the address exactly", () => {
+    /** @scenario "A lookup by address never guesses between case-twins" */
+    it("answers the exact holder", async () => {
+      const { service, repository } = createService();
+      repository.findByEmail.mockResolvedValue([
+        twin("user-capitals", "Ada@example.com"),
+        twin("user-exact", "ada@example.com"),
+      ]);
+
+      await expect(service.findByEmail({ email: "ada@example.com" })).resolves.toMatchObject({
+        id: "user-exact",
+      });
+    });
+  });
+
+  describe("given case-twins and no exact holder", () => {
+    /** @scenario "A lookup by address never guesses between case-twins" */
+    it("refuses with user_email_ambiguous, yet still reports the address taken", async () => {
+      const { service, repository } = createService();
+      repository.findByEmail.mockResolvedValue([
+        twin("user-1", "Ada@example.com"),
+        twin("user-2", "ADA@example.com"),
+      ]);
+
+      await expect(service.findByEmail({ email: "ada@example.com" })).rejects.toMatchObject({
+        code: "user_email_ambiguous",
+      });
+      await expect(service.emailIsTaken({ email: "ada@example.com" })).resolves.toBe(true);
+    });
+  });
+
+  describe("given one account on the address in other case", () => {
+    it("answers it, case aside", async () => {
+      const { service, repository } = createService();
+      repository.findByEmail.mockResolvedValue([twin("user-1", "Ada@Example.com")]);
+
+      await expect(service.findByEmail({ email: "ada@example.com" })).resolves.toMatchObject({
+        id: "user-1",
+      });
+    });
+  });
+});
+
+describe("the lifecycle facts' clock", () => {
+  /** @scenario "A user's lifecycle fact carries the time the database recorded" */
+  it("stamps the row and the fact from the database clock, not this server's", async () => {
+    const DATABASE_NOW = fromDate(new Date(9_000));
+    const repository = new StubRepository();
+    repository.readClock.mockResolvedValue(DATABASE_NOW);
+    const sent: { type: string; occurredAt: number }[] = [];
+    const lifecycle = UserLifecycleNoticeService.create();
+    lifecycle.connect({
+      recordUserDeactivated: {
+        send: async ({ occurredAt }) => {
+          sent.push({ type: "deactivated", occurredAt });
+        },
+      },
+      recordUserReactivated: {
+        send: async ({ occurredAt }) => {
+          sent.push({ type: "reactivated", occurredAt });
+        },
+      },
+    });
+    const service = UserService.create({
+      repository,
+      organizations: createApiFixture<OrganizationApi>({}),
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions: async () => undefined }),
+      avatarStorage: new StubAvatarStorage(),
+      credentialIssuer: ISSUER,
+      now: () => NOW,
+      ...lifecyclePeers(),
+      lifecycle,
+    });
+
+    await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
+    await service.reactivate({ id: "user-1", actor: { type: "system", id: null } });
+
+    expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
+      id: "user-1",
+      deactivatedAt: DATABASE_NOW,
+    });
+    expect(sent).toEqual([
+      { type: "deactivated", occurredAt: 9_000 },
+      { type: "reactivated", occurredAt: 9_000 },
+    ]);
   });
 });

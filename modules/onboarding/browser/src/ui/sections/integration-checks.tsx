@@ -48,9 +48,8 @@ export const useIntegrationChecks = () => {
     {
       enabled: !!project,
       // Onboarding checklist: staleTime: Infinity is fine here because
-      // refetchOnWindowFocus picks up out-of-band changes (first message
-      // synced, first workflow created, etc.) when the user returns to the tab.
-      refetchOnWindowFocus: true,
+      // read hints pick up out-of-band changes (first message synced, first
+      // workflow created, etc.).
       refetchOnMount: false,
       staleTime: Infinity,
     },
@@ -70,7 +69,7 @@ export const IntegrationChecks = () => {
   const checks = integrationChecks.data;
   const automations = automationApi.automation.getTriggers.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: true, refetchOnMount: false, staleTime: Infinity },
+    { enabled: !!project, refetchOnMount: false, staleTime: Infinity },
   );
 
   return (

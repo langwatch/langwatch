@@ -21,6 +21,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "r
 import { api } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useOrganizationTeams } from "../../behavior/use-organization-teams.ts";
 import {
   getDefaultTeamRoleForOrganizationRole,
   isGrantRoleAllowedForOrganizationRole,
@@ -240,7 +241,7 @@ export const GrantInputRow = forwardRef<
   const [isDirty, setIsDirty] = useState(false);
 
   const { organization } = useOrganizationTeamProject();
-  const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
+  const teams = useOrganizationTeams({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
   const roleItems = useMemo(
@@ -277,8 +278,8 @@ export const GrantInputRow = forwardRef<
   }, [organizationRole, roleValue, customRoleId, scopeType]);
 
   const allTeamItems = useMemo(
-    () => (teams.data ?? []).map((t) => ({ label: t.name, value: t.id })),
-    [teams.data],
+    () => (teams ?? []).map((t) => ({ label: t.name, value: t.id })),
+    [teams],
   );
   const teamItems = useMemo(
     () => filterByLabel({ items: allTeamItems, search: teamSearch }),
@@ -289,10 +290,10 @@ export const GrantInputRow = forwardRef<
   // For project cascade: teams that have at least one project
   const allProjectTeamItems = useMemo(
     () =>
-      (teams.data ?? [])
+      (teams ?? [])
         .filter((t) => t.projects.length > 0)
         .map((t) => ({ label: t.name, value: t.id })),
-    [teams.data],
+    [teams],
   );
   const projectTeamItems = useMemo(
     () => filterByLabel({ items: allProjectTeamItems, search: projectTeamSearch }),
@@ -306,10 +307,10 @@ export const GrantInputRow = forwardRef<
   // Projects filtered to the selected team
   const allProjectItems = useMemo(
     () =>
-      (teams.data ?? [])
+      (teams ?? [])
         .find((t) => t.id === projectTeamId)
         ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
-    [teams.data, projectTeamId],
+    [teams, projectTeamId],
   );
   const projectItems = useMemo(
     () => filterByLabel({ items: allProjectItems, search: projectSearch }),

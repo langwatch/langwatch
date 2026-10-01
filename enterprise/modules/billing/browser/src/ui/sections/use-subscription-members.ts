@@ -9,7 +9,7 @@ export function useSubscriptionMembers(organizationId: string | undefined) {
   const enabled = !!organizationId;
   const organizationWithMembers =
     billingApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId: organizationId ?? "" },
+      { organizationId: organizationId ?? "", includeDeactivated: false },
       { enabled },
     );
   const pendingInvites = billingApi.invite.getOrganizationPendingInvites.useQuery(

@@ -21,6 +21,10 @@ export interface ScenarioExecutionJob {
   };
   parameters?: RunParameterValues;
   secretParameters?: RunSecretCiphertext;
+  /** The member who started the run; absent when nobody did, and the run acts as the system. */
+  startedByUserId?: string;
+  /** The API key that member started it with, which also bounds the run's key. */
+  startedByApiKeyId?: string;
 }
 
 export type ScenarioModelParametersFailureReason =
@@ -58,6 +62,10 @@ export type ScenarioExecutionPrefetchInput = {
     secretParameters?: RunSecretCiphertext;
   };
   target: TargetConfig;
+  /** Whose run this is: its key acts as them and holds no more than they do. */
+  startedByUserId?: string | undefined;
+  /** The API key they started it with: the run's key holds no more than it either. */
+  startedByApiKeyId?: string | undefined;
 };
 
 export type ScenarioChildEnvironment = {

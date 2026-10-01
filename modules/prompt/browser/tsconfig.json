@@ -21,13 +21,13 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
-    },
-    {
-      "path": "../../dataset/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
@@ -36,16 +36,13 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../experiment/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ksuid/tsconfig.build.json"
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+      "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -57,10 +54,7 @@
       "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
-      "path": "../../onboarding/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../browser-kit/tsconfig.build.json"
+      "path": "../client/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -72,16 +66,7 @@
       "path": "../../topic/contract/tsconfig.build.json"
     },
     {
-      "path": "../../trace/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../trace/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../../workflow/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

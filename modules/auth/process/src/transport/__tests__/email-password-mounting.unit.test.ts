@@ -1,10 +1,9 @@
+import { isEmailPasswordEnabled } from "@langwatch/auth-contract";
 /**
  * Email/password route mounting (ADR-027). License gate is the refusal, but
  * SaaS IdP is the only door, so mounting there would bypass it.
  */
 import { describe, expect, it } from "vitest";
-
-import { isEmailPasswordEnabled } from "../../channels/http/http.better-auth.channel.ts";
 
 describe("given a SaaS deployment that names an identity provider", () => {
   describe("when the email/password routes are considered", () => {

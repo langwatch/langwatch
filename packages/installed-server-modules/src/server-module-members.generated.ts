@@ -8,11 +8,11 @@
  * repository tier requires, and refuses by module and member when this
  * process cannot supply one.
  */
-export const serverModuleMembers = {
+export const processModuleMembers = {
   agent: ["publicBaseUrl"],
   analytics: ["clickhouse", "clickhouseAdmin", "databaseTarget", "prisma", "publicBaseUrl", "rateLimiter"],
   annotation: [],
-  "api-key": ["encryption", "redis"],
+  "api-key": ["redis"],
   "audit-log": [],
   auth: ["isSaas", "nodeEnvironment", "publicBaseUrl"],
   authz: ["prisma", "redis"],
@@ -30,7 +30,7 @@ export const serverModuleMembers = {
   gateway: ["clickhouse", "encryption", "prisma", "publicBaseUrl", "redis"],
   github: [],
   "hosted-mcp": ["encryption", "publicBaseUrl", "redis"],
-  identity: ["adminEmails", "encryption", "eventing", "isSaas", "prisma", "publicBaseUrl", "rateLimiter"],
+  identity: ["encryption", "eventing", "isSaas", "prisma", "publicBaseUrl", "rateLimiter"],
   "instant-eval": ["nodeEnvironment", "redis"],
   langy: ["publicBaseUrl"],
   log: ["clickhouse"],
@@ -39,7 +39,7 @@ export const serverModuleMembers = {
   monitor: ["publicBaseUrl"],
   notification: ["outboundProxy", "publicBaseUrl"],
   onboarding: [],
-  ops: ["adminEmails", "clickhouse", "eventing", "isSaas", "logger", "nodeEnvironment", "prisma", "processName", "publicBaseUrl", "redis", "serviceVersion"],
+  ops: ["clickhouse", "eventing", "isSaas", "logger", "nodeEnvironment", "prisma", "processName", "publicBaseUrl", "redis", "serviceVersion"],
   organization: ["encryption", "logger", "prisma", "processName", "publicBaseUrl", "redis"],
   "platform-health": ["publicBaseUrl"],
   presence: ["logger", "redis"],

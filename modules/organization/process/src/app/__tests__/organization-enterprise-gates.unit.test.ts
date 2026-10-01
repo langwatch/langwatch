@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -8,6 +7,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationCaller } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { type ServerOrganizationAppDependencies } from "../organization.app.ts";

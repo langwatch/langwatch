@@ -4,11 +4,11 @@
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { Temporal } from "@langwatch/time";
-import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
+import { cleanup, renderHook, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,8 +29,6 @@ const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
 
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
-    // The evaluator pills under the suite name read the saved evaluators.
-    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
     suites: {
       // Every run of the v2 dialog is queued under a plan name.
       runPlan: {
@@ -40,7 +38,22 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
       getAll: { useQuery: suitesGetAllQuery },
     },
     agents: { getAll: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
     prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
     scenarios: {
       // The run dialog reads the configurations its scope already ran with.
       getRunConfigurations: {
@@ -54,7 +67,7 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
     projectId: "proj_1",
@@ -70,10 +83,6 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
     isReady: true,
   }),
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const PERIOD = {
   startDate: Temporal.Instant.from("2026-07-01T00:00:00.000Z"),
@@ -278,7 +287,7 @@ function isEnabledRead(call: unknown[]): boolean {
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof CasesPanel>> = {}) {
   const props = panelProps(overrides);
-  const view = render(<CasesPanel {...props} />, { wrapper: Wrapper });
+  const view = renderWithDesignSystem(<CasesPanel {...props} />);
   return { props, view };
 }
 

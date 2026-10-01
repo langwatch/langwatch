@@ -26,8 +26,8 @@ import {
   type PublicAnonymousFlagMap,
   type UserExperimentEnrolmentInput,
 } from "@langwatch/feature-flag-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
@@ -62,13 +62,13 @@ export interface FeatureFlagCache {
 }
 
 type FeatureFlagSetup = FeatureSetup<
-  typeof FeatureFlagApp.dependencies,
-  MembersRead<typeof FeatureFlagApp.reads>,
+  typeof FeatureFlagModule.dependencies,
+  MembersRead<typeof FeatureFlagModule.reads>,
   FeatureFlagServerConfig,
   FeatureFlagRepositories
 >;
 
-export class FeatureFlagApp implements FeatureFlagApiContract {
+export class FeatureFlagModule implements FeatureFlagApiContract {
   static readonly contract = FeatureFlagApi;
   static readonly dependencies = {
     permissions: AuthzApi,
@@ -95,7 +95,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
     this.#organizations = dependencies.organizations;
   }
 
-  static create(setup: FeatureFlagSetup): FeatureFlagApp {
+  static create(setup: FeatureFlagSetup): FeatureFlagModule {
     const now = () => nowInstant().epochMilliseconds;
     const flags = FeatureFlagService.create({
       repository: setup.repositories.flags,
@@ -112,7 +112,7 @@ export class FeatureFlagApp implements FeatureFlagApiContract {
       }),
     });
 
-    return new FeatureFlagApp(flags, setup.dependencies);
+    return new FeatureFlagModule(flags, setup.dependencies);
   }
 
   isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean> {

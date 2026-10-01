@@ -39,6 +39,7 @@ export const experimentRestCredential = defineRestMiddleware(
       userId: z.string().nullable(),
       isLangySessionKey: z.boolean().optional(),
     }),
+    z.object({ kind: z.literal("cliAccessToken"), userId: z.string() }),
     z.object({ kind: z.literal("legacyProjectKey") }),
   ]),
 );

@@ -1,5 +1,5 @@
 /**
- * Builds the {@link IdentityInfrastructure} `IdentityApp.create` hands its services, from the
+ * Builds the {@link IdentityInfrastructure} `IdentityModule.create` hands its services, from the
  * module's own rows and the process's `eventing` member plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
@@ -17,7 +17,6 @@ import {
   type SsoConnectionEventReads,
 } from "../repositories/eventing/eventing.sso-connection-history.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
-import { isPlatformOperatorEmail } from "../rules/platform-operator.rules.ts";
 import {
   IDENTITY_LATCH_CACHE_MAX_USERS,
   IDENTITY_LATCH_CACHE_TTL_MS,
@@ -176,27 +175,19 @@ function ssoConnectionHistoryStore(options: {
   };
 }
 
-/** What this process hands `IdentityApp` at boot, built from its own rows, members and config. */
+/** What this process hands `IdentityModule` at boot, built from its own rows, members and config. */
 export function buildIdentityInfrastructure(input: {
   repositories: Pick<
     IdentityRepositories,
-    | "identityProjection"
-    | "joinRequestProjection"
-    | "secretCarry"
-    | "joinRequestAudience"
-    | "ssoPlatformOperators"
+    "identityProjection" | "joinRequestProjection" | "secretCarry" | "joinRequestAudience"
   >;
   eventing: EventSourcing;
   identityEventing: ConnectedIdentityEventing;
-  adminEmails: readonly string[];
 }): IdentityInfrastructure {
-  const { repositories, eventing, identityEventing, adminEmails } = input;
+  const { repositories, eventing, identityEventing } = input;
 
   return {
     eventing: identityEventing,
-    operators: {
-      isPlatformOperatorEmail: ({ email }) => isPlatformOperatorEmail({ adminEmails, email }),
-    },
     latch: {
       ttlMs: IDENTITY_LATCH_CACHE_TTL_MS,
       maxUsers: IDENTITY_LATCH_CACHE_MAX_USERS,
@@ -212,7 +203,6 @@ export function buildIdentityInfrastructure(input: {
     }),
     secrets: repositories.secretCarry,
     joinRequestAudience: repositories.joinRequestAudience,
-    ssoPlatformOperators: repositories.ssoPlatformOperators,
     // Absent where this process composed no event stack: the history refuses
     // by name rather than reading as empty, which is indistinguishable from
     // a connection nothing ever happened to.

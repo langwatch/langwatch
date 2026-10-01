@@ -1,7 +1,7 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { AgentApi } from "@langwatch/agent-contract";
-import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import { ApiKeyApi, ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 /**
@@ -14,12 +14,15 @@ import { EvaluatorApi, newEvaluatorId, type Evaluator } from "@langwatch/evaluat
 import type { EventingCommands, StaticPipelineDefinition } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -65,6 +68,7 @@ import {
   type WorkflowRelatedEntities,
   type WorkflowRunAnswer,
   type WorkflowRunOrigin,
+  type WorkflowRunPrincipal,
   type WorkflowSourceRow,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
@@ -112,6 +116,7 @@ import {
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { buildStudioLambdaConfig } from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
+import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
 import {
   DISPATCHABLE_STUDIO_EVENT_TYPES,
   findPostedJson,
@@ -125,6 +130,7 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowHttpSecretsService } from "../services/workflow-http-secrets.service.ts";
 import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
@@ -301,6 +307,8 @@ export interface WorkflowInfrastructure {
   datasets: DatasetApi;
   /** How a Studio graph is prepared before any version of it is written. */
   studioDsl: WorkflowStudioDsl;
+  /** Stores the tokens typed into a graph's HTTP nodes as project secrets. */
+  httpSecrets: WorkflowHttpSecrets;
   /** The agent mappings a saved Studio graph refreshes, best effort. */
   agentMappings: WorkflowAgentMapping;
   /** The bare row a Studio copy lands in, before its first version exists. */
@@ -313,7 +321,7 @@ export interface WorkflowInfrastructure {
   ids: WorkflowId;
   /** Upgrades a persisted graph before it becomes the workflow's current version. */
   dslMigration: WorkflowDslMigration;
-  /** Project credentials and decrypted secrets. */
+  /** The project's decrypted secrets. */
   projectEnvironment: WorkflowProjectEnvironment;
   /** Resolves process-specific LiteLLM credentials without exposing provider rows. */
   llmParameters: WorkflowLlmParameters;
@@ -345,6 +353,7 @@ export type WorkflowHostMembers = Omit<
   WorkflowInfrastructure,
   | "evaluators"
   | "studioDsl"
+  | "httpSecrets"
   | "agentMappings"
   | "workflowRows"
   | "workflows"
@@ -369,7 +378,7 @@ type WorkflowProcessFacts = Readonly<{
 }>;
 
 type WorkflowSetup = FeatureSetup<
-  typeof WorkflowApp.dependencies,
+  typeof WorkflowModule.dependencies,
   WorkflowHostMembers & MembersRead<readonly ["prisma", "encryption"]> & WorkflowProcessFacts,
   WorkflowServerConfig,
   WorkflowRepositories
@@ -589,7 +598,7 @@ function relatedProjectIdsOf(workflow: WorkflowLineageRow): readonly string[] {
   ];
 }
 
-export class WorkflowApp implements WorkflowApi {
+export class WorkflowModule implements WorkflowApi {
   static readonly contract = WorkflowApi;
   static readonly dependencies = {
     /** The evaluators a workflow is published as - a peer's App, not a member. */
@@ -602,10 +611,18 @@ export class WorkflowApp implements WorkflowApi {
     datasets: DatasetApi,
     /** Whether one person holds a permission on a project the caller names. */
     authz: AuthzApi,
+    /** Mints the key a run calls LangWatch back with. */
+    apiKeys: ApiKeyApi,
+    /** The projects the HTTP-token backfill task walks. */
+    projects: ProjectApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
+    /** Where the token typed into an HTTP node is stored, as a project secret. */
+    secrets: SecretApi,
+    /** Every organisation, for the task that moves old inline tokens into secrets. */
+    organizations: OrganizationApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -623,7 +640,7 @@ export class WorkflowApp implements WorkflowApi {
   static readonly repositories = workflowRepositories;
   static readonly secrets = { nlpLambdaFleet: nlpLambdaFleetSecret } as const;
 
-  static async create(setup: WorkflowSetup): Promise<WorkflowApp> {
+  static async create(setup: WorkflowSetup): Promise<WorkflowModule> {
     const engine = await composeEngine(setup);
     const datasets = setup.dependencies.datasets;
     const llmParameters = ModelProviderWorkflowLlmParameters.create({
@@ -635,8 +652,11 @@ export class WorkflowApp implements WorkflowApi {
     });
     const studioEvents = StudioEventPreparerService.create({
       datasets,
+      agents: setup.dependencies.agents,
       projectEnvironment,
       llmParameters,
+      runKeys: setup.dependencies.apiKeys,
+      dispatchKeyFloorMs: dispatchKeyFloorMs({ onLambda: engine.fleet !== undefined }),
     });
     const nlpRuntime = engine.runtime;
     const ids = KsuidWorkflowId.create();
@@ -660,7 +680,7 @@ export class WorkflowApp implements WorkflowApi {
       modelProviders,
     });
 
-    return new WorkflowApp({
+    return new WorkflowModule({
       ...setup.members,
       ...(engine.fleet ? { nlpLambdaFleet: engine.fleet } : {}),
       permissions: WorkflowPermissionService.create({ authz: setup.dependencies.authz }),
@@ -677,6 +697,7 @@ export class WorkflowApp implements WorkflowApi {
       studioDsl: ModelProviderWorkflowStudioDslService.create({
         modelProviders: setup.dependencies.modelProviders,
       }),
+      httpSecrets: WorkflowHttpSecretsService.create(setup.dependencies.secrets),
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
       workflowRows: setup.repositories.workflowRows,
       evaluations: {
@@ -709,6 +730,7 @@ export class WorkflowApp implements WorkflowApi {
     this.#studioVersions = WorkflowStudioVersionService.create({
       workflows: members.workflows,
       studioDsl: members.studioDsl,
+      httpSecrets: members.httpSecrets,
       agentMappings: members.agentMappings,
     });
     this.#studioCopies = WorkflowStudioCopyService.create({
@@ -798,6 +820,7 @@ export class WorkflowApp implements WorkflowApi {
   prepareStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#members.workflows.prepareStudioEvent(input);
   }
@@ -806,6 +829,7 @@ export class WorkflowApp implements WorkflowApi {
   enrichStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#members.workflows.enrichStudioEvent(input);
   }
@@ -824,7 +848,12 @@ export class WorkflowApp implements WorkflowApi {
     input: Omit<CreateWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    const created = await this.#members.workflows.create({ ...input, authorId: by.id });
+    const dsl = await this.#members.httpSecrets.store({
+      projectId: input.projectId,
+      dsl: input.dsl,
+      authorId: by.id,
+    });
+    const created = await this.#members.workflows.create({ ...input, dsl, authorId: by.id });
 
     this.#recordCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
 
@@ -951,11 +980,13 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     projectId: string;
     body: Readonly<Record<string, unknown>>;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<WorkflowRunAnswer> {
     return this.#members.workflows.run({
       workflowId: input.workflowId,
       projectId: input.projectId,
       inputs: { ...input.body },
+      principal: input.principal,
     });
   }
 
@@ -1075,7 +1106,11 @@ export class WorkflowApp implements WorkflowApi {
     });
     if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
 
-    const message = await this.#preparedForDispatch({ event: eventWithoutEnvs, projectId });
+    const message = await this.#preparedForDispatch({
+      event: eventWithoutEnvs,
+      projectId,
+      principal: { userId },
+    });
     if (!DISPATCHABLE_STUDIO_EVENT_TYPES.has(message.type)) {
       throw new WorkflowStudioEventInvalidError(`Unknown event type on server: ${message.type}`);
     }
@@ -1096,6 +1131,7 @@ export class WorkflowApp implements WorkflowApi {
   async #preparedForDispatch(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal: WorkflowRunPrincipal;
   }): Promise<StudioClientEvent> {
     try {
       return await this.prepareStudioEvent(input);
@@ -1458,6 +1494,7 @@ export type WorkflowExecutionInput = {
   runEvaluations?: boolean;
   origin?: WorkflowRunOrigin;
   causalityDepth?: number;
+  principal?: WorkflowRunPrincipal | undefined;
   parentTrace?: { traceId: string; parentSpanId: string };
 };
 
@@ -1494,9 +1531,14 @@ export interface WorkflowDslMigration {
   migrate(dsl: WorkflowDsl): WorkflowDsl;
 }
 
+/** A run's decrypted secrets. */
+export type WorkflowRunEnvironment = {
+  secrets: Record<string, string>;
+};
+
 /** Project credentials and decrypted secrets are application members. */
 export interface WorkflowProjectEnvironment {
-  get(input: { projectId: string }): Promise<{ apiKey: string; secrets: Record<string, string> }>;
+  get(input: { projectId: string }): Promise<WorkflowRunEnvironment>;
 }
 
 export type WorkflowLlmParameterResolution = {
@@ -1524,6 +1566,18 @@ export interface WorkflowStudioDsl {
 }
 
 /**
+ * Stores the literal credentials of a Studio graph's HTTP nodes as project secrets and
+ * answers the graph holding their `{{ secrets.NAME }}` references.
+ */
+export interface WorkflowHttpSecrets {
+  store<Dsl extends { nodes?: unknown }>(input: {
+    projectId: string;
+    dsl: Dsl;
+    authorId: string | undefined;
+  }): Promise<Dsl>;
+}
+
+/**
  * The agent-mapping recompute a saved Studio graph triggers. Best effort and
  * outside the save: a failure to refresh the host's scenario mappings must
  * never fail the version that was already written.
@@ -1534,7 +1588,9 @@ export interface WorkflowAgentMapping {
 
 /** Matched on the handled CODE: the dataset module's own class is not this module's to name. */
 function isCallerFixable(error: unknown): boolean {
-  if (error instanceof LlmModelNotSetError) return true;
+  if (error instanceof LlmModelNotSetError || error instanceof ApiKeyPermissionDeniedError) {
+    return true;
+  }
   return (
     typeof error === "object" &&
     error !== null &&

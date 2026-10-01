@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const savedCodeEvaluator = {
@@ -48,13 +47,23 @@ vi.mock("@langwatch/browser-host/errors", () => ({
 vi.mock("../evaluator-code-editor.tsx", () => ({
   EvaluatorCodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("@langwatch/prompt-browser-kit", async (importOriginal) => ({
-  ...(await importOriginal<typeof promptBrowserKitModule>()),
+vi.mock("../../prompt/variables/variables-section.tsx", async (importOriginal) => ({
+  ...(await importOriginal<typeof actualModule>()),
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
 vi.mock("../../../../behavior/evaluator-api.ts", () => ({
   evaluatorApi: {
+    useUtils: () => ({
+      evaluators: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
     useUtils: () => ({
       evaluators: {
         getAll: { invalidate: vi.fn() },
@@ -74,13 +83,8 @@ vi.mock("../../../../behavior/evaluator-api.ts", () => ({
   },
 }));
 
-import type * as promptBrowserKitModule from "@langwatch/prompt-browser-kit";
-
+import type * as actualModule from "../../prompt/variables/variables-section.tsx";
 import { CodeEvaluatorEditorDrawer } from "../code-evaluator-editor-drawer.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("CodeEvaluatorEditorDrawer", () => {
   afterEach(() => {
@@ -91,9 +95,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
     describe("when the drawer opens in edit mode", () => {
       /** @scenario Editing a code evaluator reopens the code editor */
       it("loads the saved code, name, inputs and outputs, not just the mapping", async () => {
-        render(<CodeEvaluatorEditorDrawer open evaluatorId="ev_code_1" />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open evaluatorId="ev_code_1" />);
 
         await waitFor(() => {
           expect(screen.getByText("Edit Code Evaluator")).toBeInTheDocument();
@@ -111,7 +113,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
   describe("given no evaluator id", () => {
     describe("when the drawer opens in create mode", () => {
       it("starts blank with the create affordance", async () => {
-        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
 
         await waitFor(() => {
           expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
@@ -124,7 +126,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
     describe("when required fields are incomplete", () => {
       /** @scenario A disabled code evaluator Create button explains what is missing */
       it("names the missing requirement and clears it once filled", async () => {
-        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
 
         await waitFor(() => {
           expect(screen.getByText("Create evaluator")).toBeInTheDocument();
@@ -153,7 +155,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
     describe("when an input field is added or removed", () => {
       /** @scenario Code evaluator input changes keep runs valid */
       it("rewrites the __call__ signature when an input is added", async () => {
-        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
         await waitFor(() => {
           expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
         });
@@ -169,7 +171,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
       });
 
       it("rewrites the __call__ signature when an input is removed", async () => {
-        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
         await waitFor(() => {
           expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();
         });
@@ -196,14 +198,13 @@ describe("CodeEvaluatorEditorDrawer", () => {
         const user = userEvent.setup();
         const onRequiredChange = vi.fn();
         const onRemove = vi.fn();
-        render(
+        renderWithDesignSystem(
           <CodeEvaluatorEditorDrawer
             open
             gate={{ required: false, canRequire: true }}
             onRequiredChange={onRequiredChange}
             onRemove={onRemove}
           />,
-          { wrapper: Wrapper },
         );
 
         await waitFor(() => {
@@ -223,7 +224,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
     describe("when the attachment carries no gate", () => {
       /** @scenario "An evaluator editor without a gate offers no Required to pass switch" */
       it("shows no Required to pass section and no remove action", async () => {
-        render(<CodeEvaluatorEditorDrawer open />, { wrapper: Wrapper });
+        renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
 
         await waitFor(() => {
           expect(screen.getByText("New Code Evaluator")).toBeInTheDocument();

@@ -4,8 +4,6 @@ import type { SerializedHandledError } from "@langwatch/handled-error";
 import {
   fieldSchema,
   HTTP_METHODS,
-  httpAuthSchema,
-  httpHeaderSchema,
   localPromptConfigSchema,
   type Field,
   type LocalPromptConfig,
@@ -228,14 +226,12 @@ export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http", "c
 export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
 
 /**
- * HTTP config schema for HTTP agent targets.
- * Stored on the target so DSL adapter can access it without async DB calls.
+ * HTTP config schema for HTTP agent targets: what the row shows. The saved
+ * agent owns its credentials, read by agent id when the row runs.
  */
 export const httpConfigSchema = z.object({
   url: z.string(),
   method: z.enum(HTTP_METHODS).default("POST"),
-  headers: z.array(httpHeaderSchema).optional(),
-  auth: httpAuthSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
   timeoutMs: z.number().positive().optional(),

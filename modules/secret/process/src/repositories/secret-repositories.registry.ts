@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { LiveSecretRepositories } from "./live/live.secret.repositories.ts";
 import { MemorySecretRepositories } from "./memory/memory.secret.repositories.ts";

@@ -22,8 +22,6 @@ import {
   disambiguateNames,
 } from "@langwatch/experiment-contract";
 import { targetHasMissingMappings } from "@langwatch/experiment-contract/mapping-validation";
-import { VersionBadge } from "@langwatch/prompt-browser-kit";
-import { ColorfulBlockIcon } from "@langwatch/workflow-browser-kit";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { Bot, Swords, Trophy } from "lucide-react";
 import { memo, useMemo, useState } from "react";
@@ -59,6 +57,8 @@ import type {
 } from "../../../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
+import { VersionBadge } from "../../../elements/prompt/version-badge.tsx";
+import { ColorfulBlockIcon } from "../../../elements/workflow/workflow-icons.tsx";
 import { TargetSummary } from "./target-summary.tsx";
 
 /**

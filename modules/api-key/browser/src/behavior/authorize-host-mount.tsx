@@ -24,6 +24,8 @@ import {
   type McpAuthorizeAnswer,
   type McpAuthorizeRequest,
 } from "../model/authorize-host.ts";
+import { projectTokenInput } from "../model/project-token-input.ts";
+import { apiKeyApi } from "./api-key-api.ts";
 import { useApiKeyOrganizationGraph } from "./api-key-organization-graph.ts";
 import { writeToClipboard } from "./browser-clipboard.ts";
 import { authorizeMcpClient } from "./mcp-authorize-client.ts";
@@ -44,7 +46,7 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
       query: Readonly<Record<string, string | undefined>>;
       navigate: (to: string) => void;
       replace: (to: string) => void;
-      projectApiKey: string | undefined;
+      mintProjectToken: () => Promise<string | undefined>;
       Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
       succeeded: (notice: AuthorizeSuccessNotice) => void;
       failed: (failure: AuthorizeFailureNotice) => void;
@@ -78,8 +80,8 @@ class CapabilityAuthorizeHost extends AuthorizeHostApi {
     if (typeof window !== "undefined") window.location.assign(url);
   }
 
-  revealProjectApiKey(): string | undefined {
-    return this.deps.projectApiKey;
+  mintProjectToken(): Promise<string | undefined> {
+    return this.deps.mintProjectToken();
   }
 
   /** The switcher project lends by declaration (ARCHITECTURE §10), drawn inside the card. */
@@ -124,6 +126,10 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
     projectId: activeScope.projectId ?? void 0,
   });
   const sessionActor = session.currentUser();
+  // As `useMintPersonalToken`: the token is never kept in the mutation cache.
+  const { mutateAsync: mintToken, reset: resetMint } = apiKeyApi.apiKey.create.useMutation({
+    gcTime: 0,
+  });
   const declarations = useUiDeclarations();
   // `lazy` once per declaration, never per render, so the switcher is not remounted.
   const Switcher = useMemo(() => {
@@ -144,12 +150,31 @@ export default function AuthorizeHostMount({ children }: { children?: ReactNode 
         query: Object.fromEntries(new URLSearchParams(location.search).entries()),
         navigate: (to) => navigation.navigate(to),
         replace: (to) => navigation.replace(to),
-        projectApiKey: graph.activeProject?.project.apiKey ?? void 0,
+        mintProjectToken: async () => {
+          const { organizationId, projectId } = activeScope;
+          if (!organizationId || !projectId) return void 0;
+          try {
+            return (await mintToken(projectTokenInput({ organizationId, projectId }))).token;
+          } finally {
+            resetMint();
+          }
+        },
         Switcher,
         succeeded: (notice) => feedback.succeeded(notice),
         failed: (failure) => feedback.failed(failure),
       }),
-    [activeScope.projectId, graph, sessionActor, session, location, navigation, feedback, Switcher],
+    [
+      activeScope,
+      graph,
+      sessionActor,
+      session,
+      location,
+      navigation,
+      feedback,
+      Switcher,
+      mintToken,
+      resetMint,
+    ],
   );
 
   return <AuthorizeHostProvider value={host}>{children}</AuthorizeHostProvider>;

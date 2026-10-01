@@ -2,14 +2,17 @@
  * Integration coverage for specs/traces-v2/media-rendering.feature.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { parseContentBlocks } from "@langwatch/trace-contract/transcript";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BlockStack } from "../../explorer/trace-drawer/transcript/block-stack.tsx";
+import { TerminalOutput } from "../../../elements/coding-agent/trace/terminal-output.tsx";
+import { TranscriptRenderProvider } from "../../../elements/transcript-render-ports.tsx";
+import { BlockStack } from "../../transcript/block-stack.tsx";
 import { RenderInputOutput } from "../render-input-output.tsx";
+import { TraceMediaPart } from "../trace-media-part.tsx";
 
 vi.mock(
   "../../../../behavior/lent-media-part.tsx",
@@ -44,10 +47,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 // Externalized references — the production shapes after ingest-side
 // content extraction.
 const imagePart = {
@@ -70,11 +69,10 @@ afterEach(cleanup);
 describe("Media rendering in trace views", () => {
   /** @scenario "The legacy input/output view surfaces images and attachments" */
   it("legacy input/output view shows an inline image and an attachment chip", () => {
-    render(
+    renderWithDesignSystem(
       <RenderInputOutput
         value={JSON.stringify([{ role: "user", content: [imagePart, pdfPart] }])}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("media-part-image")).toHaveAttribute("src", "/api/files/p1/img1");
@@ -88,7 +86,14 @@ describe("Media rendering in trace views", () => {
     const blocks = parseContentBlocks([imagePart]);
     expect(blocks).toEqual([expect.objectContaining({ kind: "media" })]);
 
-    render(<BlockStack blocks={blocks} toolCalls={[]} />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
+        <BlockStack blocks={blocks} toolCalls={[]} />
+      </TranscriptRenderProvider>,
+    );
 
     expect(screen.getByTestId("media-part-image")).toBeInTheDocument();
   });
@@ -97,7 +102,14 @@ describe("Media rendering in trace views", () => {
   it("traces-v2 conversation view renders a PDF as a named attachment chip", () => {
     const blocks = parseContentBlocks([pdfPart]);
 
-    render(<BlockStack blocks={blocks} toolCalls={[]} />, { wrapper: Wrapper });
+    renderWithDesignSystem(
+      <TranscriptRenderProvider
+        renderMediaPart={(part) => <TraceMediaPart part={part} />}
+        renderTerminalOutput={(text, isError) => <TerminalOutput text={text} isError={isError} />}
+      >
+        <BlockStack blocks={blocks} toolCalls={[]} />
+      </TranscriptRenderProvider>,
+    );
 
     const chip = screen.getByTestId("media-part-binary");
     expect(chip).toHaveTextContent("report.pdf");
@@ -110,9 +122,7 @@ describe("Media rendering in trace views", () => {
       value: JSON.stringify([{ role: "user", content: [audioPart, imagePart] }]),
     };
 
-    render(<RenderInputOutput value={JSON.stringify(typedRaw)} />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(<RenderInputOutput value={JSON.stringify(typedRaw)} />);
 
     expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
     expect(screen.getByTestId("media-part-image")).toBeInTheDocument();

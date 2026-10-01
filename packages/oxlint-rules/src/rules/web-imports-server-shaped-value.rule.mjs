@@ -30,7 +30,7 @@ function serverShapedPackage(specifier) {
   return SERVER_SHAPED.find((name) => specifier === name || specifier.startsWith(`${name}/`));
 }
 
-const BROWSER_ROLES = new Set(["browser", "browser-kit", "design-system"]);
+const BROWSER_ROLES = new Set(["browser", "design-system"]);
 
 function isBrowserSource(file) {
   if (BROWSER_ROLES.has(file.role)) return true;

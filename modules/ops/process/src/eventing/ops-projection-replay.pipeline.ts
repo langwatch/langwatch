@@ -8,7 +8,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { RequestProjectionReplayCommand } from "./ops-projection-replay.commands.ts";
 import {
@@ -39,7 +39,7 @@ export type ProjectionReplayDefinition = StaticPipelineDefinition<
  */
 export function buildProjectionReplay({
   app,
-}: EventingSetup<unknown, Pick<OpsApp, "executeReplay">>): ProjectionReplayDefinition {
+}: EventingSetup<unknown, Pick<OpsModule, "executeReplay">>): ProjectionReplayDefinition {
   return definePipeline({
     name: PROJECTION_REPLAY_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROJECTION_REPLAY_AGGREGATE_TYPE }),
@@ -64,6 +64,6 @@ export function buildProjectionReplay({
 
 export const projectionReplayEventing = defineEventingModule({
   pipeline: PROJECTION_REPLAY_PIPELINE_NAME,
-  build: (setup: EventingSetup<OpsRepositories, OpsApp>) => buildProjectionReplay(setup),
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildProjectionReplay(setup),
   connect: ({ app, commands }) => app.connectReplay(commands),
 });

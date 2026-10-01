@@ -3,6 +3,7 @@
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
+import type { PrincipalRef } from "@langwatch/authorization";
 import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
@@ -11,7 +12,7 @@ import {
   type EvaluationRunData,
   type EvaluationRunsByTraceQuery,
 } from "@langwatch/evaluation-contract";
-import type { EventingCommands } from "@langwatch/eventing";
+import type { EventingCommands, EventingParticipation } from "@langwatch/eventing";
 import { ValidationError } from "@langwatch/handled-error";
 import type {
   InstantEvalApi,
@@ -19,10 +20,10 @@ import type {
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
@@ -692,7 +693,7 @@ type TraceSetup = FeatureSetup<
 >;
 
 /** Trace implements its public API and the collector's internal transport seam. */
-export class TraceApp implements TraceApi, CollectorApp {
+export class TraceModule implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   static readonly config = traceConfig;
@@ -709,8 +710,8 @@ export class TraceApp implements TraceApi, CollectorApp {
     "processName",
   ] as const;
 
-  static create(input: TraceAppDependencies | TraceSetup): TraceApp {
-    if (!("members" in input)) return new TraceApp(input);
+  static create(input: TraceAppDependencies | TraceSetup): TraceModule {
+    if (!("members" in input)) return new TraceModule(input);
 
     const commands = TraceProcessingCommandsService.create({
       processName: input.members.processName,
@@ -728,7 +729,7 @@ export class TraceApp implements TraceApi, CollectorApp {
         logger: input.members.logger,
       }),
     });
-    const app = new TraceApp({
+    const app = new TraceModule({
       ...composeTraceAppDependencies({
         ...collaborators,
         ...input.dependencies,
@@ -742,6 +743,7 @@ export class TraceApp implements TraceApi, CollectorApp {
         }),
         presence: input.dependencies.presence,
         broadcast: input.dependencies.presence,
+        tenantBroadcast: input.dependencies.presence,
         shareReadLimiter: input.members.rateLimiter,
         protections: {
           authz: input.dependencies.authz,
@@ -781,7 +783,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
-      broadcast: collaborators.tenantBroadcast,
+      broadcast: input.dependencies.presence,
       milestones,
     });
     return app;
@@ -1279,8 +1281,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   async readTraceFacetsForApiKey(input: {
     projectId: string;
     query: TraceFacetsQuery;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<TraceFacetsAnswer> {
     const { field, prefix, limit, offset, startDate, endDate } = input.query;
     // One clock read for both ends, so the default window is exactly one day.
@@ -1296,8 +1297,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     }
     const protections = await this.resolveApiKeyProtections({
       projectId: input.projectId,
-      apiKeyId: input.apiKeyId,
-      userId: input.userId,
+      principal: input.principal,
     });
     const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
     const result = await this.readFacetValues({
@@ -1489,8 +1489,7 @@ export class TraceApp implements TraceApi, CollectorApp {
 
   resolveApiKeyProtections(input: {
     projectId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Protections> {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
@@ -2534,8 +2533,7 @@ export class TraceApp implements TraceApi, CollectorApp {
     traceId: string;
     format: "digest" | "json";
     projectSlug: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Record<string, unknown>> {
     const protections = await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({
@@ -2570,8 +2568,7 @@ export class TraceApp implements TraceApi, CollectorApp {
   async readTraceTranscript(input: {
     projectId: string;
     traceId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<CodingAgentTranscript> {
     const protections = await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({ ...input, protections });

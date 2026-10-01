@@ -1,15 +1,30 @@
 import type { PlatformHealthCheckName } from "@langwatch/platform-health-contract";
 
-import {
-  type SubsystemProbe,
-  type SubsystemProbeQuery,
-  type SubsystemProbeResult,
-} from "../app/platform-health.members.ts";
 import type {
   SubsystemProbeOutcome,
   SubsystemProbeReason,
   SubsystemProbeService,
 } from "./subsystem-probe.service.ts";
+
+/**
+ * What one subsystem answered. `not_configured` is the deployment's own gap —
+ * a probe pointed at nothing — and is deliberately not a failure.
+ */
+export type SubsystemProbeResult = Readonly<
+  | { outcome: "healthy" }
+  | { outcome: "unhealthy"; detail: string }
+  | { outcome: "not_configured"; detail: string }
+>;
+
+/** What a probe is asked about, and the caller's request its canaries stop with. */
+export type SubsystemProbeQuery = Readonly<{
+  triggerId?: string;
+  workflowId?: string;
+  signal: AbortSignal | undefined;
+}>;
+
+/** One subsystem, asked whether it is working right now. */
+export type SubsystemProbe = Pick<SubsystemProbeRunService, "name" | "run">;
 
 /**
  * The five probe runs, named as a shape rather than as the class, so a caller
@@ -48,7 +63,7 @@ export interface SubsystemProbeCredential {
  * workflow probe named no target reports `not_configured`: the platform is not
  * broken because nobody told the probe what to look at.
  */
-export class SubsystemProbeRunService implements SubsystemProbe {
+export class SubsystemProbeRunService {
   readonly name: PlatformHealthCheckName;
   readonly #probes: SubsystemProbeRunner;
   readonly #credential: SubsystemProbeCredential;

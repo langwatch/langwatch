@@ -3,7 +3,7 @@ import {
   SEARCH_GRAMMAR,
   type SuggestionGrammar,
   type SuggestionState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 
 /**
  * The traces bar's grammar: the kit's, plus U+00A0. The editor writes one

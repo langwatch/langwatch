@@ -5,11 +5,8 @@ import { UpcomingWorkCard as UpcomingWorkCardView } from "../elements/upcoming-w
 
 /** App transport adapter for the controlled upcoming-work presentation. */
 export function UpcomingWorkCard() {
-  const schedulesQuery = api.ops.listScheduledJobs.useQuery(
-    { limit: 50 },
-    { refetchInterval: 30_000 },
-  );
-  const wakesQuery = api.ops.listUpcomingWakes.useQuery({ limit: 50 }, { refetchInterval: 30_000 });
+  const schedulesQuery = api.ops.listScheduledJobs.useQuery({ limit: 50 }, {});
+  const wakesQuery = api.ops.listUpcomingWakes.useQuery({ limit: 50 }, {});
   const now =
     Math.max(schedulesQuery.dataUpdatedAt, wakesQuery.dataUpdatedAt) ||
     nowInstant().epochMilliseconds;

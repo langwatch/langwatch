@@ -1,6 +1,6 @@
-/** The terminal's requests are read and decided for the key's owner only. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+/** The terminal's requests are read and decided for the key's owner only. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ControlRequestService } from "../langy-local-control-request.service.ts";

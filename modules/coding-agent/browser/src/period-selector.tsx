@@ -1,6 +1,4 @@
-import type { PopoverRootProps } from "@chakra-ui/react";
-import { readableDate, type ReadableDate } from "@langwatch/coding-agent-browser-kit";
-import { Popover } from "@langwatch/design-system/popover";
+import { Popover, type PopoverRootProps } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
 import {
   Box,
@@ -24,6 +22,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { LuCalendar } from "react-icons/lu";
 
+import { readableDate, type ReadableDate } from "./model/short-date.ts";
 import type { Period, PeriodMode } from "./session-filters.ts";
 
 /**

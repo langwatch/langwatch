@@ -2,6 +2,7 @@ import { useCallback } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLangyDeletedConversationsStore } from "../stores/langy-deleted-conversations.store.ts";
 
 /**
  * Write commands for Langy conversations, through the defined tRPC API.
@@ -12,8 +13,10 @@ export function useLangyConversationCommands(): {
 } {
   const { project } = useOrganizationTeamProject();
   const utils = api.useUtils();
+  const hideConversation = useLangyDeletedConversationsStore((s) => s.hide);
   const deleteConversation = api.langy.deleteConversation.useMutation({
-    onSuccess: (_result, variables) => {
+    onSuccess: (result, variables) => {
+      if (result.success) hideConversation(variables.conversationId);
       void utils.langy.list.invalidate({ projectId: variables.projectId });
     },
   });

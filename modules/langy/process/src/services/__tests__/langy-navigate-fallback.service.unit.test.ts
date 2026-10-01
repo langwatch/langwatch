@@ -1,9 +1,9 @@
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * The navigate fallback's page half, under the asking project's own slug.
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";

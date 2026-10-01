@@ -1,9 +1,9 @@
-/** @see specs voice-agents-v1.feature: the voice door's gate, permissions and recording relay. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+/** @see specs voice-agents-v1.feature: the voice door's gate, permissions and recording relay. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryVoiceRecordingChannel } from "../../channels/memory/memory.voice-recording.channel.ts";

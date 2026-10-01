@@ -3,15 +3,15 @@ import { createHash } from "node:crypto";
 import type { ObjectStorage, StoredObjectAddress } from "@langwatch/process-stores/members";
 
 import type {
-  EvaluationInputStorage,
+  EvaluationInputRepository,
   StoredEvaluationInput,
-} from "../../app/evaluation.members.ts";
+} from "../evaluation-input.repository.ts";
 
 const JSON_MEDIA_TYPE = "application/json";
 const STORED_INPUT_ID = /^[a-f0-9]{64}$/u;
 
 /** Oversized evaluation inputs over the process's `objectStorage` member, at main's object keys. */
-export class ObjectStorageEvaluationInputRepository implements EvaluationInputStorage {
+export class ObjectStorageEvaluationInputRepository implements EvaluationInputRepository {
   static create(input: { objectStorage: ObjectStorage }): ObjectStorageEvaluationInputRepository {
     return new ObjectStorageEvaluationInputRepository(input.objectStorage);
   }

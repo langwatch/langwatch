@@ -1,6 +1,6 @@
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { toDate, type Instant } from "@langwatch/time";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 import {
   userAccountInfoSchema,
   userFullProfileSchema,
@@ -29,11 +29,15 @@ import type {
   CreateCredentialUserRow,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
+  UserDeactivationOutcome,
   UserRepository,
 } from "../user.repository.ts";
 
-/** The three models and the transaction runner these statements need. */
-export type UserDatabase = Pick<PrismaClient, "user" | "account" | "passkey" | "$transaction">;
+/** The three models, the transaction runner, and the raw read of the database's clock. */
+export type UserDatabase = Pick<
+  PrismaClient,
+  "user" | "account" | "passkey" | "$transaction" | "$queryRaw"
+>;
 
 const userProfileSelect = {
   id: true,
@@ -65,7 +69,27 @@ export class PrismaUserRepository
   extends PrismaRepository.transactionalFor("User", "Account", "Passkey")
   implements UserRepository
 {
-  static readonly create = this.factory((prisma) => new PrismaUserRepository(prisma));
+  static create({ prisma }: { prisma: UserDatabase }): PrismaUserRepository {
+    return new PrismaUserRepository(prisma);
+  }
+
+  readonly #database: UserDatabase;
+
+  private constructor(prisma: UserDatabase) {
+    super(prisma);
+    this.#database = prisma;
+  }
+
+  /** One clock for every server, so user's facts order however the servers' clocks drift. */
+  async readClock(): Promise<Instant> {
+    const [row] = await this.#database.$queryRaw<{ now: Date }[]>`
+      -- @tenancy: reads the database clock; no table is touched.
+      SELECT now() AS "now"
+    `;
+    if (!row) throw new Error("The database answered no clock reading");
+
+    return fromDate(row.now);
+  }
 
   /**
    * Folded here, in the module that owns the addresses: only the per-domain
@@ -115,13 +139,14 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
-  async findByEmail(email: string): Promise<UserProfile | null> {
-    const row = await this.prisma.user.findFirst({
+  async findByEmail(email: string): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
       select: userProfileSelect,
+      orderBy: { createdAt: "asc" },
     });
 
-    return row ? userProfileSchema.parse(row) : null;
+    return rows.map((row) => userProfileSchema.parse(row));
   }
 
   async create(input: CreateUserInput): Promise<UserProfile> {
@@ -333,6 +358,29 @@ export class PrismaUserRepository
     await this.prisma.user.update({
       where: { id: input.id },
       data: { lastHomePath: input.path },
+    });
+  }
+
+  async deactivateWhileOthersActive(input: {
+    id: string;
+    deactivatedAt: Instant;
+    others: readonly string[];
+  }): Promise<UserDeactivationOutcome> {
+    // Serializable: two deactivations each reading the other as active is a write skew
+    // Postgres refuses, and the base reruns the loser against the winner's row.
+    return this.serializableTransaction<UserDeactivationOutcome>(async (transaction) => {
+      const active = await transaction.user.count({
+        where: { id: { in: [...input.others] }, deactivatedAt: null },
+      });
+      if (active === 0) return { outcome: "none_active" };
+
+      const row = await transaction.user.update({
+        where: { id: input.id },
+        data: { deactivatedAt: toDate(input.deactivatedAt) },
+        select: userProfileSelect,
+      });
+
+      return { outcome: "deactivated", user: userProfileSchema.parse(row) };
     });
   }
 

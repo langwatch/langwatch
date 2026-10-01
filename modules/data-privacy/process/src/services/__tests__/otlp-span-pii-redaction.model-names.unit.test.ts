@@ -9,13 +9,11 @@ import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
-import type {
-  DataPrivacyResolution,
-  PIICheckOptions,
-  PiiAnalysis,
-  PiiClearing,
-} from "../../app/data-privacy.members.ts";
+import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";
+import type { DataPrivacyResolutionService } from "../data-privacy-resolution.service.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
+import type { PiiAnalysisService } from "../pii-analysis.service.ts";
+import type { PIICheckOptions } from "../pii-redaction-policy.service.ts";
 
 const TENANT = createTenantId("project-web-app");
 
@@ -36,7 +34,7 @@ const STRICT_POLICY: ResolvedDataPrivacy = {
   customAttributes: [],
 };
 
-class FailingResolution implements DataPrivacyResolution {
+class FailingResolution implements Pick<DataPrivacyResolutionService, "getResolvedForProject"> {
   async getResolvedForProject(): Promise<ResolvedDataPrivacy> {
     throw new Error("policy store unavailable");
   }
@@ -52,12 +50,12 @@ function makeService({
   presidioFails = false,
 }: {
   policy?: ResolvedDataPrivacy;
-  dataPrivacy?: DataPrivacyResolution;
+  dataPrivacy?: Pick<DataPrivacyResolutionService, "getResolvedForProject">;
   presidioFails?: boolean;
 } = {}) {
   const batchSpy = vi.fn<Batch>(async (texts) => texts.map(() => null));
   const dlpCalls: { text: string; spareNamesAndPlaces: boolean }[] = [];
-  const transport: PiiAnalysis = {
+  const transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close"> = {
     clearGoogleDlp: async ({ text, spareNamesAndPlaces }): Promise<PiiClearing> => {
       dlpCalls.push({ text, spareNamesAndPlaces: spareNamesAndPlaces ?? false });
       return { kind: "unchanged" };

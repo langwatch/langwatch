@@ -6,12 +6,17 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Inbox } from "lucide-react";
 import { useMemo } from "react";
 
-import { annotationApi } from "../../behavior/annotation-api.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
+import {
+  useAllAnnotations,
+  useAnnotationQueue,
+  useAnnotationSidebarCounts,
+  useAnnotationTraces,
+} from "../../behavior/use-annotation-reads.ts";
 import { allAnnotationsExport, csvFileName } from "../../model/annotation-export.ts";
 import { useAnnotationHost } from "../../model/annotation-host.ts";
 import type { AnnotationHostApi } from "../../model/annotation-host.ts";
@@ -38,20 +43,7 @@ export function AnnotationsScreen({ view }: { view: AnnotationView }) {
   const { params, query } = host.route();
   const editor = readQueueEditor(query);
 
-  const pendingCount = annotationApi.annotation.getPendingItemsCount.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-
-  const assignedCount = annotationApi.annotation.getAssignedItemsCount.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
-
-  const queueBadges = annotationApi.annotation.getQueueItemsCounts.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const sidebarCounts = useAnnotationSidebarCounts({ projectId: project?.id });
 
   return (
     <>
@@ -60,9 +52,9 @@ export function AnnotationsScreen({ view }: { view: AnnotationView }) {
         projectSlug={project?.slug}
         reviewerName={reviewer?.name ?? null}
         reviewerImage={reviewer?.image ?? null}
-        pendingCount={pendingCount.data?.count}
-        assignedCount={assignedCount.data?.count}
-        queues={queueBadges.data ?? []}
+        pendingCount={sidebarCounts.pendingCount}
+        assignedCount={sidebarCounts.assignedCount}
+        queues={sidebarCounts.queues}
         activeQueueSlug={params.slug}
         canManageQueues={!host.isLiteMember()}
         onCreateQueue={() => host.setQuery(queueEditorAddress({ current: query }))}
@@ -129,10 +121,7 @@ function QueueList({ host }: { host: AnnotationHostApi }) {
   const project = host.project();
   const slug = host.route().params.slug;
 
-  const queue = annotationApi.annotation.getQueueBySlugOrId.useQuery(
-    { projectId: project?.id ?? "", slug: slug ?? "" },
-    { enabled: !!project?.id && !!slug },
-  );
+  const queue = useAnnotationQueue({ projectId: project?.id, slug });
 
   if (readHandledError(queue.error)?.code === "annotation_queue_not_found") {
     return (
@@ -183,24 +172,18 @@ function AllAnnotationsList({ host }: { host: AnnotationHostApi }) {
   const project = host.project();
   const { period } = useAnnotationPeriod(host.route().query);
 
-  const annotations = annotationApi.annotation.getAll.useQuery(
-    {
-      projectId: project?.id ?? "",
-      startDate: period.startDate,
-      endDate: period.endDate,
-    },
-    { enabled: !!project?.id },
-  );
+  const annotations = useAllAnnotations({
+    projectId: project?.id,
+    startDate: period.startDate,
+    endDate: period.endDate,
+  });
 
   const traceIds = useMemo(
     () => Array.from(new Set((annotations.data ?? []).map((one) => one.traceId))),
     [annotations.data],
   );
 
-  const traces = annotationApi.traces.getTracesWithSpans.useQuery(
-    { projectId: project?.id ?? "", traceIds },
-    { enabled: !!project?.id, refetchOnWindowFocus: false },
-  );
+  const traces = useAnnotationTraces({ projectId: project?.id, traceIds });
 
   const rows: AnnotationRow[] = useMemo(
     () => groupedAnnotationsToRows(groupByTrace(annotations.data ?? [], traces.data ?? [])),

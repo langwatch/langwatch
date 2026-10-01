@@ -20,9 +20,9 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import type { ScimRemovalOperation, ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimDeprovisionService } from "./scim-deprovision.service.ts";
+import type { ScimRemovalOperation, ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 import type { ScimSyncReadsService } from "./scim-sync-reads.service.ts";
 
 const REDRIVABLE_OPS: readonly string[] = ["delete_user", "deactivate_user"] as const;

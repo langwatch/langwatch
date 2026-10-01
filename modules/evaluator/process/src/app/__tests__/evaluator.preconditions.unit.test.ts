@@ -23,7 +23,7 @@ const [expectedOutputEvaluatorType] =
     definition.requiredFields.includes("expected_output"),
   ) ?? [];
 
-describe("EvaluatorApp.findTraceIdsPassingPreconditions", () => {
+describe("EvaluatorModule.findTraceIdsPassingPreconditions", () => {
   describe("given traces and a custom check", () => {
     /** @scenario "Only traces passing every precondition match" */
     it("returns only the traces passing every precondition", async () => {

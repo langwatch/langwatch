@@ -1,9 +1,9 @@
 import { describeAnnotationAnchor } from "@langwatch/annotation-contract";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/trace-browser-kit";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 import { Crosshair, Lightbulb } from "lucide-react";
 
+import { readableDate } from "../../../../../model/display-formatters.ts";
+import { PersonAvatar } from "../../../person-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import {
   canJumpToAnnotationAnchor,
@@ -84,7 +84,7 @@ function CommentRow({
 }) {
   return (
     <HStack gap={2.5} align="start">
-      <UserAvatar
+      <PersonAvatar
         size="xs"
         background="gray.solid"
         color="white"

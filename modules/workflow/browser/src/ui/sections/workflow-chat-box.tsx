@@ -16,7 +16,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { getEntryInputs } from "@langwatch/workflow-contract";
 import type { Edge, Node } from "@xyflow/react";
 import { useCallback, useState } from "react";
@@ -25,6 +24,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /**
  * What the public workflow-run endpoint answers with. Run over that

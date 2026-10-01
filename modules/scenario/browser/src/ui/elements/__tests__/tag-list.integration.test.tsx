@@ -3,25 +3,19 @@
  * @vitest-environment jsdom
  * @see specs/features/tag-management.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TagList } from "../tag-list.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<TagList/>", () => {
   afterEach(cleanup);
 
   describe("given a list of labels", () => {
     it("displays all labels as tag pills", () => {
-      render(<TagList labels={["nightly", "regression"]} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["nightly", "regression"]} />);
 
       expect(screen.getByText("nightly")).toBeInTheDocument();
       expect(screen.getByText("regression")).toBeInTheDocument();
@@ -30,9 +24,7 @@ describe("<TagList/>", () => {
 
   describe("when onAdd is provided", () => {
     it("displays a + add button", () => {
-      render(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
       expect(screen.getByText("+ add")).toBeInTheDocument();
     });
@@ -40,9 +32,7 @@ describe("<TagList/>", () => {
     it("shows an inline text input when + add is clicked", async () => {
       const user = userEvent.setup();
 
-      render(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["ci"]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
       await user.click(screen.getByText("+ add"));
       expect(screen.getByPlaceholderText("Add label...")).toBeInTheDocument();
@@ -52,9 +42,7 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onAdd = vi.fn();
 
-      render(<TagList labels={[]} onAdd={onAdd} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={[]} onAdd={onAdd} onRemove={vi.fn()} />);
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
@@ -66,9 +54,7 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onAdd = vi.fn();
 
-      render(<TagList labels={["existing"]} onAdd={onAdd} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["existing"]} onAdd={onAdd} onRemove={vi.fn()} />);
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
@@ -79,9 +65,7 @@ describe("<TagList/>", () => {
     it("keeps the input open after pressing Enter for rapid entry", async () => {
       const user = userEvent.setup();
 
-      render(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
       await user.click(screen.getByText("+ add"));
       const input = screen.getByPlaceholderText("Add label...");
@@ -92,9 +76,7 @@ describe("<TagList/>", () => {
     it("hides the input on Escape", async () => {
       const user = userEvent.setup();
 
-      render(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={[]} onAdd={vi.fn()} onRemove={vi.fn()} />);
 
       await user.click(screen.getByText("+ add"));
       screen.getByPlaceholderText("Add label...");
@@ -105,7 +87,7 @@ describe("<TagList/>", () => {
 
   describe("when onAdd is not provided", () => {
     it("does not display a + add button", () => {
-      render(<TagList labels={["ci"]} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<TagList labels={["ci"]} />);
 
       expect(screen.queryByText("+ add")).not.toBeInTheDocument();
     });
@@ -113,9 +95,7 @@ describe("<TagList/>", () => {
 
   describe("when onRemove is provided", () => {
     it("displays remove buttons on each tag", () => {
-      render(<TagList labels={["alpha", "beta"]} onRemove={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["alpha", "beta"]} onRemove={vi.fn()} />);
 
       expect(screen.getByRole("button", { name: "Remove alpha tag" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Remove beta tag" })).toBeInTheDocument();
@@ -125,9 +105,7 @@ describe("<TagList/>", () => {
       const user = userEvent.setup();
       const onRemove = vi.fn();
 
-      render(<TagList labels={["alpha", "beta"]} onRemove={onRemove} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<TagList labels={["alpha", "beta"]} onRemove={onRemove} />);
 
       await user.click(screen.getByRole("button", { name: "Remove alpha tag" }));
       expect(onRemove).toHaveBeenCalledWith("alpha", 0);
@@ -136,9 +114,7 @@ describe("<TagList/>", () => {
 
   describe("given an empty labels array", () => {
     it("renders nothing when no onAdd is provided", () => {
-      const { container } = render(<TagList labels={[]} />, {
-        wrapper: Wrapper,
-      });
+      const { container } = renderWithDesignSystem(<TagList labels={[]} />);
 
       expect(container.textContent).toBe("");
     });

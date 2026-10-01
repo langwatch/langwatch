@@ -587,7 +587,7 @@ export class PrismaProjectRepository
         team: { organizationId: input.organizationId },
         archivedAt: null,
       },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -600,7 +600,7 @@ export class PrismaProjectRepository
         team: { organizationId },
         archivedAt: null,
       },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     });
   }
@@ -618,7 +618,7 @@ export class PrismaProjectRepository
   async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
     return this.prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -626,7 +626,7 @@ export class PrismaProjectRepository
     if (projectIds.length === 0) return [];
     const rows = await this.prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
     const byId = new Map(rows.map((row) => [row.id, row]));
     return projectIds.flatMap((projectId) => {

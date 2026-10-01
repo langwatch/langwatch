@@ -3,7 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -15,17 +16,15 @@ afterEach(cleanup);
 function renderEditor(queryText: string) {
   const applyQueryText = vi.fn();
   const submitQueryText = vi.fn();
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <ActiveSearchEditor
-        queryText={queryText}
-        applyQueryText={applyQueryText}
-        submitQueryText={submitQueryText}
-        onHasContentChange={() => {
-          /* no-op */
-        }}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <ActiveSearchEditor
+      queryText={queryText}
+      applyQueryText={applyQueryText}
+      submitQueryText={submitQueryText}
+      onHasContentChange={() => {
+        /* no-op */
+      }}
+    />,
   );
   return { ...utils, applyQueryText, submitQueryText };
 }
@@ -118,7 +117,7 @@ describe("ActiveSearchEditor applied query", () => {
     const submitQueryText = vi.fn();
     const onCursorAnchorChange = vi.fn();
     const ui = (text: string, clearNonce = 0) => (
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <ActiveSearchEditor
           queryText={text}
           applyQueryText={vi.fn()}
@@ -129,7 +128,7 @@ describe("ActiveSearchEditor applied query", () => {
           onCursorAnchorChange={onCursorAnchorChange}
           clearNonce={clearNonce}
         />
-      </ChakraProvider>
+      </DesignSystemProvider>
     );
     const utils = render(ui(queryText));
     return { ...utils, ui, submitQueryText, onCursorAnchorChange };

@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 
 import type { LangyVirtualKeyService } from "./langy-credential.service.ts";
 
@@ -14,17 +15,22 @@ export class LangyVirtualKeyProvisioningService {
     return new LangyVirtualKeyProvisioningService(input.virtualKeys);
   }
 
-  /** Best effort, as project creation always treated it: the first chat mints the key again. */
-  async provision(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void> {
+  /**
+   * Only a project somebody created, as main minted on the create request alone. Best effort, as
+   * creation always treated it: the first chat mints the key again, so a failure is not retried.
+   */
+  async provisionCreated(created: ProjectCreatedEventData): Promise<void> {
+    if (created.backfilled || !created.createdByUserId) return;
+
     try {
-      await this.virtualKeys.provision(input);
+      await this.virtualKeys.provision({
+        projectId: created.projectId,
+        organizationId: created.organizationId,
+        actorUserId: created.createdByUserId,
+      });
     } catch (error) {
       logger.error(
-        { error, projectId: input.projectId, context: "provisionVirtualKey:project.create" },
+        { error, projectId: created.projectId, context: "provisionVirtualKey:project.create" },
         "Langy virtual key provisioning failed; the first chat provisions it again.",
       );
     }

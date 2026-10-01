@@ -1,5 +1,5 @@
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import { nowInstant } from "@langwatch/time";
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../../behavior/trace-api.ts";

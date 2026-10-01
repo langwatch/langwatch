@@ -9,7 +9,7 @@ import {
   type ExperimentDspyStep,
 } from "@langwatch/experiment-contract";
 import { generate } from "@langwatch/ksuid";
-import { parseStudioWorkflow } from "@langwatch/workflow-contract";
+import { dslWithoutHttpAgentSecrets, parseStudioWorkflow } from "@langwatch/workflow-contract";
 
 /**
  * The domain type is camelCase; the page reads the snake_case wire shape
@@ -201,7 +201,7 @@ export const experimentTrpcTransport: TrpcRouterDeclaration<ExperimentApi, typeo
       return {
         ...experiment,
         dsl: workflow?.currentVersion?.dsl
-          ? parseStudioWorkflow(workflow.currentVersion.dsl)
+          ? dslWithoutHttpAgentSecrets(parseStudioWorkflow(workflow.currentVersion.dsl))
           : undefined,
       };
     })

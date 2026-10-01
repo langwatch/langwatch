@@ -2,11 +2,11 @@ import { Link } from "@langwatch/browser-host/link";
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Skeleton, Spacer, Text } from "@langwatch/design-system/primitives";
-import type { BatchEvaluationData } from "@langwatch/experiment-browser-kit";
 import type React from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 
 import type { ExperimentRow } from "../../../model/experiment-api-map.ts";
+import type { BatchEvaluationData } from "../batch-evaluation-results.types.ts";
 
 type BatchEvaluationResultsHeaderProps = {
   project?: UiHostProject;

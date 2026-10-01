@@ -3,7 +3,7 @@ import type {
   UiConversationThreadProps,
 } from "@langwatch/browser-host/declarations";
 import { Box, VStack } from "@langwatch/design-system/primitives";
-import { groupIntoTurns } from "@langwatch/trace-browser-kit";
+import { groupIntoTurns } from "@langwatch/trace-contract/conversation";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import { type ReactNode, useEffect, useMemo, useRef } from "react";
 

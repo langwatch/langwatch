@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The `connect.*` procedures over the real runtime and a real `LicensingApp`.
+ * The `connect.*` procedures over the real runtime and a real `LicensingModule`.
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";

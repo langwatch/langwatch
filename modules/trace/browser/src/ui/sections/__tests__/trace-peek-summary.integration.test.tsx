@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor } from "@testing-library/react";
 import { TRPCClientError, type TRPCLink } from "@trpc/client";
@@ -63,7 +63,7 @@ function harness(calls: RecordedCall[]) {
     return (
       <traceApi.Provider client={client} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+          <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
         </QueryClientProvider>
       </traceApi.Provider>
     );

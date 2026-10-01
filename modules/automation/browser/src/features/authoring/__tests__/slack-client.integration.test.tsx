@@ -3,8 +3,8 @@
  * The Slack step: connection picker, channel, receive chooser and template tiers. Monaco is
  * stubbed; the editors are asserted through their wrapper test ids.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -130,15 +130,14 @@ import type { SavedTriggerRow, SlackPreview } from "@langwatch/automation-contra
 import { AutomationHostProvider } from "../../../model/automation-host.ts";
 import { fakeAutomationHost } from "../../../testing.tsx";
 import { SLACK_BLOCK_KIT_TEMPLATES, templateOptionsFor } from "../../slack-templates/index.ts";
-import slackClient, { type SlackSlice } from "../ui/sections/slack.client.tsx";
+import type { SlackSlice } from "../model/slack-slice.ts";
+import slackClient from "../ui/sections/slack.client.tsx";
 
 /** The host the Slack step hands connection creation to; rebuilt per connection test. */
 let host = fakeAutomationHost();
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
-    <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
-  </ChakraProvider>
+  <AutomationHostProvider value={host}>{children}</AutomationHostProvider>
 );
 
 function makeCtx(
@@ -200,15 +199,14 @@ const renderForm = (
     onChangeSpy?: (next: SlackSlice) => void;
   } = {},
 ) =>
-  render(
-    <Harness
-      ctx={props.ctx ?? makeCtx()}
-      initial={props.initial}
-      onChangeSpy={props.onChangeSpy}
-    />,
-    {
-      wrapper: Wrapper,
-    },
+  renderWithDesignSystem(
+    <Wrapper>
+      <Harness
+        ctx={props.ctx ?? makeCtx()}
+        initial={props.initial}
+        onChangeSpy={props.onChangeSpy}
+      />
+    </Wrapper>,
   );
 
 const botSlice = (overrides: Partial<SlackSlice> = {}): SlackSlice => ({
@@ -283,7 +281,11 @@ describe("SlackConfigForm authoring tiers", () => {
     /** @scenario "The receive choice decides which layouts are offered" */
     it("filters the layout list to the chosen mode", async () => {
       const user = userEvent.setup();
-      render(<CadenceHarness />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <CadenceHarness />
+        </Wrapper>,
+      );
 
       expect(screen.getByRole("button", { name: /compact notice/i })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /digest: compact/i })).not.toBeInTheDocument();
@@ -607,10 +609,9 @@ describe("SlackConfigForm channel picker", () => {
       ];
     });
 
-    // Typed at a human cadence on purpose. The combobox resyncs the input
-    // element from a passive effect, so back-to-back synthetic keystrokes with
-    // no gap at all outrun React's effect flush and drop characters — a race no
-    // typist can win, and not the bug under test.
+    // The combobox applies each keystroke in a microtask (outside user-event's act) and resyncs
+    // the input from a passive effect, so the next key can land on a stale value. Tests that
+    // type go through `typeAndSettle`, which settles React under act between keys.
     const typist = () => userEvent.setup({ delay: 10 });
 
     /** Puts a channel in the box in ONE input event (a paste), for tests not about typing: a
@@ -629,8 +630,8 @@ describe("SlackConfigForm channel picker", () => {
       await waitFor(() => expect(input).toHaveValue(text));
     };
 
-    /** Types one character at a time, waiting for each prefix, for the test whose subject IS
-     *  the per-keystroke search. `text` is literal; key descriptors do not survive the split. */
+    /** Types one character at a time, settling React under act after each, for tests whose
+     *  subject IS typing. `text` is literal; key descriptors do not survive the split. */
     const typeAndSettle = async ({
       user,
       input,
@@ -642,7 +643,7 @@ describe("SlackConfigForm channel picker", () => {
     }): Promise<void> => {
       let typed = "";
       for (const character of text) {
-        await user.type(input, character);
+        await act(() => user.type(input, character));
         typed += character;
         await waitFor(() => expect(input).toHaveValue(typed));
       }
@@ -655,7 +656,7 @@ describe("SlackConfigForm channel picker", () => {
         const input = screen.getByPlaceholderText(/#alerts or c0123/i);
 
         await user.click(input);
-        await user.type(input, "signoff");
+        await typeAndSettle({ user, input, text: "signoff" });
 
         expect(input).toHaveValue("signoff");
       });
@@ -679,7 +680,7 @@ describe("SlackConfigForm channel picker", () => {
         renderForm({ initial: botSlice({ channelId: "" }) });
         const input = screen.getByPlaceholderText(/#alerts or c0123/i);
 
-        await user.type(input, "#adhoc");
+        await typeAndSettle({ user, input, text: "#adhoc" });
 
         expect(input).toHaveValue("#adhoc");
       });

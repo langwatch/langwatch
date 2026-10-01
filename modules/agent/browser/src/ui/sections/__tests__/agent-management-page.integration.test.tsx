@@ -1,5 +1,3 @@
-/** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type {
   Agent,
   AgentCopy,
@@ -9,16 +7,20 @@ import type {
   RelatedAgentEntities,
   UpdateAgentCommand,
 } from "@langwatch/agent-contract";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+/** @vitest-environment jsdom */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import type {
+  AgentManagementFeedback,
+  AgentManagementLifecycle,
+} from "../../../behavior/use-agent-management.ts";
 import type { AgentClient } from "../../../model/agent-client.ts";
 import {
   type AgentCardRenderInput,
   type AgentManagementCard,
-  type AgentManagementFeedback,
-  type AgentManagementLifecycle,
   type AgentManagementNavigation,
   AgentManagementPage,
   type AgentArchiveDialogInput,
@@ -233,22 +235,20 @@ const wireAgent: WireAgentWithFields = {
 };
 
 function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentManagementPage
-        data={{
-          projectId: "project_1",
-          agents: browser,
-          items: [wireAgent],
-          isLoading: false,
-        }}
-        navigation={new TestNavigation()}
-        feedback={new TestFeedback()}
-        lifecycle={lifecycle}
-        composition={new TestAgentPageComposition()}
-        card={new TestCard()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AgentManagementPage
+      data={{
+        projectId: "project_1",
+        agents: browser,
+        items: [wireAgent],
+        isLoading: false,
+      }}
+      navigation={new TestNavigation()}
+      feedback={new TestFeedback()}
+      lifecycle={lifecycle}
+      composition={new TestAgentPageComposition()}
+      card={new TestCard()}
+    />,
   );
 }
 
@@ -323,22 +323,20 @@ describe("AgentManagementPage", () => {
         openWorkflow(): void {}
       }
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <AgentManagementPage
-            data={{
-              projectId: "project_1",
-              agents: browser,
-              items: [],
-              isLoading: false,
-            }}
-            navigation={new EmptyNavigation()}
-            feedback={new TestFeedback()}
-            lifecycle={new TestLifecycle()}
-            composition={new TestAgentPageComposition()}
-            card={new TestCard()}
-          />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <AgentManagementPage
+          data={{
+            projectId: "project_1",
+            agents: browser,
+            items: [],
+            isLoading: false,
+          }}
+          navigation={new EmptyNavigation()}
+          feedback={new TestFeedback()}
+          lifecycle={new TestLifecycle()}
+          composition={new TestAgentPageComposition()}
+          card={new TestCard()}
+        />,
       );
 
       fireEvent.click(await screen.findByText("Create your first agent"));

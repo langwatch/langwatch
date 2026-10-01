@@ -14,6 +14,7 @@ const API_SOURCE = join(root, "packages/api/src");
 const TARGET_FILES = new Set([
   "index.ts",
   "access-policy.ts",
+  "route-registry.ts",
   "composition.ts",
   "dates.ts",
   "errors.ts",
@@ -30,14 +31,17 @@ const TARGET_FILES = new Set([
   "access/declared-middleware.ts",
   // Transport hosting: HTTP mux, API hosts and browser bundle (record section 4).
   "hosting/index.ts",
-  "hosting/api-application.ts",
+  "hosting/api-door.ts",
+  "hosting/session-reader.ts",
   "hosting/api-discovery.ts",
   "hosting/browser-bundle.ts",
   "hosting/framed-document.ts",
   "hosting/http-mux.ts",
   "hosting/openapi-document.ts",
+  "hosting/transport-hosts.ts",
   "hosting/transport-selection.ts",
   // Headers, CSP and client address.
+  "policy/browser-origin.ts",
   "policy/index.ts",
   "policy/client-address.ts",
   "policy/content-security-policy.ts",
@@ -71,7 +75,6 @@ const TARGET_FILES = new Set([
   "trpc/session-version.ts",
   "trpc/sse.ts",
   "trpc/throttle.ts",
-  "trpc/versioned-read.ts",
   // The browser door, folded in from @langwatch/platform-api-client.
   "web/index.ts",
   "web/module-api.ts",

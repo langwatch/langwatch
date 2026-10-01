@@ -1,3 +1,4 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
@@ -13,16 +14,15 @@ import { toEpochMs } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
+import { useAgents } from "../../../behavior/agents/use-agents.ts";
 import { useSession } from "../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
 import {
   isAgentTarget,
   notRunnableCopy,
   type ScenarioAgent,
   useFilteredAgents,
 } from "../../../behavior/scenarios/use-filtered-scenario-targets.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 
 interface SaveAndRunMenuProps {
@@ -57,10 +57,10 @@ export function SaveAndRunMenu({
 
   // Agents are only shown inside the popover, and the trigger is static —
   // don't fetch them until the menu is opened.
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: open && !!project?.id },
-  );
+  const { data: agents } = useAgents({
+    projectId: project?.id,
+    enabled: open,
+  });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 

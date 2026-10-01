@@ -11,7 +11,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { LocalFeatureApis } from "@langwatch/kernel";
+import { LocalFeatureApis } from "@langwatch/process";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { organizationKeyFacts } from "../organization-management.rest.ts";
@@ -20,7 +20,7 @@ import { teamsRest, TeamManagementApi } from "../team.rest.ts";
 export const ORGANIZATION_ID = "organization-1";
 export const USER_ID = "user-owner";
 export const CREDENTIAL = "organization-credential";
-/** The organization key the credential resolves to, as organization.server.ts binds it. */
+/** The organization key the credential resolves to, as organization.module.ts binds it. */
 export const KEY_ID = "key-1";
 
 /** Everything an organization credential holds here unless a test narrows it. */

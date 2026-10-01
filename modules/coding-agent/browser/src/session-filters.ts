@@ -1,5 +1,4 @@
-import type { ReadableDate } from "@langwatch/coding-agent-browser-kit";
-
+import type { ReadableDate } from "./model/short-date.ts";
 import type { SessionListRow } from "./session-list-row.ts";
 
 export type Period = { startDate: ReadableDate; endDate: ReadableDate };

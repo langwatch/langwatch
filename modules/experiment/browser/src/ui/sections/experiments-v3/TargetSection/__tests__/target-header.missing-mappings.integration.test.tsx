@@ -4,8 +4,8 @@
  * Header state and play-button gating for prompt targets with unmapped variables.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -122,21 +122,19 @@ const renderHeader = (
     templateFields?: Record<string, string[]>;
   },
 ) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <PromptTemplateFieldsContext.Provider
-        value={
-          templateFields
-            ? (lookedUp) => {
-                const fields = templateFields[lookedUp.id];
-                return fields ? new Set(fields) : undefined;
-              }
-            : undefined
-        }
-      >
-        <TargetHeader target={target} onRun={onRun} onEdit={onEdit} onRemove={vi.fn()} />
-      </PromptTemplateFieldsContext.Provider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <PromptTemplateFieldsContext.Provider
+      value={
+        templateFields
+          ? (lookedUp) => {
+              const fields = templateFields[lookedUp.id];
+              return fields ? new Set(fields) : undefined;
+            }
+          : undefined
+      }
+    >
+      <TargetHeader target={target} onRun={onRun} onEdit={onEdit} onRemove={vi.fn()} />
+    </PromptTemplateFieldsContext.Provider>,
   );
 
 beforeEach(() => {

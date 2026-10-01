@@ -3,8 +3,8 @@
  * Settings form pages read at one narrow measure; list and table pages at the wider one.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
@@ -23,14 +23,12 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 afterEach(() => cleanup());
 
 function measureAt({ pathname }: { pathname: string }): string {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost readings={{ pathname, currentUserId: "user_1", isLoading: true }}>
-        <ShellPageBody>
-          <p>Page content</p>
-        </ShellPageBody>
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <WithStubNavigationHost readings={{ pathname, currentUserId: "user_1", isLoading: true }}>
+      <ShellPageBody>
+        <p>Page content</p>
+      </ShellPageBody>
+    </WithStubNavigationHost>,
   );
   return screen.getByText("Page content").parentElement?.dataset.pageMeasure ?? "";
 }

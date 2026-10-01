@@ -27,6 +27,16 @@ type fakeTools struct {
 	formulae []string
 	ran      []string
 	failOn   string
+	// sysctl answers Sysctl by name; an absent name is an unreadable setting.
+	sysctl map[string]string
+}
+
+func (f *fakeTools) Sysctl(_ context.Context, name string) (string, error) {
+	v, ok := f.sysctl[name]
+	if !ok {
+		return "", errors.New("no such sysctl")
+	}
+	return v, nil
 }
 
 func (f *fakeTools) BinaryPath(name string) string {
@@ -454,4 +464,54 @@ func reportEntry(t *testing.T, report []domain.PrereqStatus, key string) domain.
 	}
 	t.Fatalf("no %q in the report", key)
 	return domain.PrereqStatus{}
+}
+
+// @scenario "A small macOS accept queue is reported with the sysctl fix"
+func TestSomaxconnBelowTheFloorIsMissingWithTheSysctlFix(t *testing.T) {
+	cases := []struct {
+		value       string
+		wantMissing bool
+	}{{"128", true}, {"1024", false}, {"", false}}
+	for _, tc := range cases {
+		tools := &fakeTools{}
+		if tc.value != "" {
+			tools.sysctl = map[string]string{"kern.ipc.somaxconn": tc.value}
+		}
+		o := installOrchestrator(tools, &fakeStore{}, nil)
+		var st domain.PrereqStatus
+		for _, s := range o.CheckPrereqs(context.Background()) {
+			if s.Key == "somaxconn" {
+				st = s
+			}
+		}
+		if got := st.State == domain.PrereqMissing; got != tc.wantMissing {
+			t.Errorf("somaxconn=%q: missing = %v, want %v (state %v)", tc.value, got, tc.wantMissing, st.State)
+		}
+	}
+	c, _ := domain.LookupCandidate(prereqByKey(t, "somaxconn"), "somaxconn")
+	if !strings.Contains(c.Manual, "sudo sysctl kern.ipc.somaxconn=1024") {
+		t.Errorf("manual fix = %q, want the sysctl command", c.Manual)
+	}
+}
+
+func prereqByKey(t *testing.T, key string) domain.Prereq {
+	t.Helper()
+	for _, p := range domain.Prereqs {
+		if p.Key == key {
+			return p
+		}
+	}
+	t.Fatalf("no prerequisite %q", key)
+	return domain.Prereq{}
+}
+
+// @scenario "The accept queue is not checked off macOS"
+func TestSomaxconnIsNotApplicableOffDarwin(t *testing.T) {
+	o := installOrchestrator(&fakeTools{}, &fakeStore{}, nil)
+	o.goos = "linux"
+	for _, s := range o.CheckPrereqs(context.Background()) {
+		if s.Key == "somaxconn" && s.State != domain.PrereqNotApplicable {
+			t.Errorf("linux somaxconn state = %v, want not applicable", s.State)
+		}
+	}
 }

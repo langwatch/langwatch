@@ -3,7 +3,7 @@
  * @vitest-environment jsdom
  */
 
-import { renderHook } from "@testing-library/react";
+import { renderHook as testingRenderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -29,6 +29,10 @@ vi.mock("../../../../elements/explorer/context/trace-viewer-context.tsx", () => 
 import type { TraceListItem } from "../../types/trace.ts";
 import { NO_TRACE_EVENTS } from "../../types/trace.ts";
 import { useConversationTurnEvents } from "../use-conversation-turn-events.ts";
+import { MemoryRouterWrapper } from "./memory-router-wrapper.tsx";
+
+const renderHook: typeof testingRenderHook = (callback, options) =>
+  testingRenderHook(callback, { ...options, wrapper: MemoryRouterWrapper });
 
 /** A turn with no events of its own, so only what the hook merges in shows up. */
 function turn(traceId: string, timestamp: number): TraceListItem {

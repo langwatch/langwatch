@@ -2,15 +2,11 @@
  * Integration tests for the scenario welcome components.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioWelcomeModal, ScenarioWelcomeScreen } from "../../scenario-welcome.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<ScenarioWelcomeScreen/>", () => {
   afterEach(() => {
@@ -20,31 +16,31 @@ describe("<ScenarioWelcomeScreen/>", () => {
 
   /** @scenario 'Scenario welcome screen content' */
   it("displays a title mentioning scenarios", () => {
-    render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={vi.fn()} />);
 
     expect(screen.getByRole("heading")).toHaveTextContent(/scenario/i);
   });
 
   it("displays a description explaining scenarios test agent behavior", () => {
-    render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={vi.fn()} />);
 
     expect(screen.getByText(/test your agent behavior/i)).toBeInTheDocument();
   });
 
   it("displays automated testing capability highlight", () => {
-    render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={vi.fn()} />);
 
     expect(screen.getByText(/automated testing/i)).toBeInTheDocument();
   });
 
   it("displays regression detection capability highlight", () => {
-    render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={vi.fn()} />);
 
     expect(screen.getByText(/regression detection/i)).toBeInTheDocument();
   });
 
   it("displays a primary call-to-action button", () => {
-    render(<ScenarioWelcomeScreen onProceed={vi.fn()} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={vi.fn()} />);
 
     expect(screen.getByRole("button", { name: /create your first scenario/i })).toBeInTheDocument();
   });
@@ -53,9 +49,7 @@ describe("<ScenarioWelcomeScreen/>", () => {
     it("calls onProceed callback", () => {
       const onProceed = vi.fn();
 
-      render(<ScenarioWelcomeScreen onProceed={onProceed} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<ScenarioWelcomeScreen onProceed={onProceed} />);
 
       fireEvent.click(screen.getByRole("button", { name: /create your first scenario/i }));
 
@@ -72,17 +66,17 @@ describe("<ScenarioWelcomeModal/>", () => {
 
   describe("when open", () => {
     it("displays a title mentioning scenarios", () => {
-      render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
+      );
 
       expect(screen.getByRole("heading")).toHaveTextContent(/scenario/i);
     });
 
     it("displays a primary call-to-action button", () => {
-      render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
+      );
 
       expect(
         screen.getByRole("button", { name: /create your first scenario/i }),
@@ -93,9 +87,9 @@ describe("<ScenarioWelcomeModal/>", () => {
       it("calls onProceed callback", () => {
         const onProceed = vi.fn();
 
-        render(<ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={onProceed} />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(
+          <ScenarioWelcomeModal open={true} onOpenChange={vi.fn()} onProceed={onProceed} />,
+        );
 
         fireEvent.click(screen.getByRole("button", { name: /create your first scenario/i }));
 
@@ -106,9 +100,8 @@ describe("<ScenarioWelcomeModal/>", () => {
 
   describe("when closed", () => {
     it("does not show an open dialog", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ScenarioWelcomeModal open={false} onOpenChange={vi.fn()} onProceed={vi.fn()} />,
-        { wrapper: Wrapper },
       );
 
       const openDialogs = container.querySelectorAll('[data-state="open"][role="dialog"]');

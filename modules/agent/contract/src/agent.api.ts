@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -177,7 +177,10 @@ export interface AgentApi {
   testRun(input: {
     agentId: string;
     projectId: string;
-    actorId: string;
+    /** The person who started it; null for a key that acts as nobody. */
+    actorId: string | null;
+    /** The API key they started it with; the run's own key holds no more than it. */
+    callerApiKeyId?: string | null;
   }): Promise<AgentTestRunResult>;
   /** The platform's own deep link to this agent's editor drawer. */
   platformUrl(input: { projectSlug: string; agentId: string; agentType: string }): string;

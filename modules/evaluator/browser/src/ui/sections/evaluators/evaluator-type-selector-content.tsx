@@ -6,7 +6,7 @@ import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";
 import { EvaluatorTypePicker } from "../../blocks/evaluator-type-picker.tsx";
 
-export { evaluatorCategoryNames as categoryNames } from "../../../index.ts";
+export { evaluatorCategoryNames as categoryNames } from "../../blocks/evaluator-category-picker.tsx";
 
 export type EvaluatorTypeSelectorContentProps = {
   category?: EvaluatorCategoryId;

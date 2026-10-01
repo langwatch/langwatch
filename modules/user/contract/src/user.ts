@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 export const USER_FEATURE_ID = "user" as const;
@@ -47,6 +48,12 @@ export type UserFullProfile = z.infer<typeof userFullProfileSchema>;
 
 export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
+
+/** A deactivation or reactivation, and who made it. */
+export const userLifecycleChangeInputSchema = z
+  .object({ id: z.string().min(1), actor: ledgerActorSchema })
+  .strict();
+export type UserLifecycleChangeInput = z.infer<typeof userLifecycleChangeInputSchema>;
 
 export const userProfilesInputSchema = z.object({ userIds: z.array(z.string().min(1)) }).strict();
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;

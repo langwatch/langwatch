@@ -22,6 +22,9 @@ export async function drainBackend({ api, worker }: BackendHalves): Promise<void
   }
 }
 
+/** The record that says both halves are serving; the dev script's ready pattern names it. */
+export const BACKEND_READY_MSG = "backend ready";
+
 /** Which half a boot failure came from, so its fatal record names it, not the launcher. */
 export type BackendHalfName = "api" | "worker";
 

@@ -1,13 +1,13 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";
 import type { SecretEncryption } from "../secret.app.ts";
-import { SecretApp } from "../secret.app.ts";
+import { SecretModule } from "../secret.app.ts";
 
 /**
  * A reversible stand-in for AES-GCM. It is not a cipher and does not pretend
@@ -108,8 +108,8 @@ export function createSecretTestApp(
     encryption?: SecretEncryption;
     peers?: SecretTestPeers;
   }> = {},
-): SecretApp {
-  return SecretApp.create({
+): SecretModule {
+  return SecretModule.create({
     repositories: input.repositories ?? MemorySecretRepositories.create(),
     dependencies: input.peers ?? teamWithMembers([]),
     members: { encryption: input.encryption ?? new ReversibleTestSecretEncryption() },

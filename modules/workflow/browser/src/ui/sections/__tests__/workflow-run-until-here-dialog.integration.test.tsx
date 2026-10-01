@@ -1,8 +1,9 @@
+import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -80,15 +81,13 @@ function renderDialog({
   onStartWorkflowExecution?: (input: unknown) => void;
 } = {}) {
   mockNodes = [entryNode(entryData), targetNode];
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <WorkflowRunUntilHereDialog
-        datasetRows={rows}
-        datasetColumns={rows.length > 0 ? datasetColumns : []}
-        onStartWorkflowExecution={onStartWorkflowExecution}
-        renderDatasetPreview={stubDatasetPreview}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <WorkflowRunUntilHereDialog
+      datasetRows={rows}
+      datasetColumns={rows.length > 0 ? datasetColumns : []}
+      onStartWorkflowExecution={onStartWorkflowExecution}
+      renderDatasetPreview={stubDatasetPreview}
+    />,
   );
   act(() => {
     useRunUntilHereDialogStore.getState().open("node-7");
@@ -249,14 +248,14 @@ describe("given the run-until-here dialog", () => {
         // A fresh array literal every render reproduces the churn a hook
         // returning a new reference each call would feed the dialog.
         return (
-          <ChakraProvider value={defaultSystem}>
+          <DesignSystemProvider forcedTheme="light">
             <WorkflowRunUntilHereDialog
               datasetRows={[{ id: "r1", question: "What is up?", context: "ctx-1" }]}
               datasetColumns={datasetColumns}
               onStartWorkflowExecution={vi.fn()}
               renderDatasetPreview={stubDatasetPreview}
             />
-          </ChakraProvider>
+          </DesignSystemProvider>
         );
       }
 

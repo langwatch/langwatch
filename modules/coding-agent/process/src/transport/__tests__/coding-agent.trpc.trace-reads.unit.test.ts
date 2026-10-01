@@ -1,12 +1,12 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
+import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 /**
  * @vitest-environment node
  * The drawer's coding-agent reads, moved from `traces.*` to `codingAgents.*`.
  * @see modules/coding-agent/specs/coding-agent-trace-reads.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
-import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

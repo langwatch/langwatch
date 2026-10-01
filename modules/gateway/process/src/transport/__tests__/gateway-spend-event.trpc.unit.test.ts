@@ -1,24 +1,24 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `gatewaySpendEvents.list` transport is a thin handler over
- * `GatewayApp.listSpendEventsPage`, pinning only the wiring and shape.
+ * `GatewayModule.listSpendEventsPage`, pinning only the wiring and shape.
  */
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import { gatewaySpendEventTrpcTransport } from "../gateway-spend-event.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -124,8 +124,8 @@ function fakePrisma(): PrismaClient {
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
 /** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayApp> {
-  return GatewayApp.create({
+async function gatewayAppStub(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -139,6 +139,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
+      apiKeys: peer("apiKeys"),
     },
     members: {
       prisma: fakePrisma(),

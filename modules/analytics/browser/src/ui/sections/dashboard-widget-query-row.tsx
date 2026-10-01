@@ -4,7 +4,6 @@
  * standalone, and its last result — whichever run produced one most recently.
  */
 
-import { LwqlEditor, type LwqlParameter } from "@langwatch/analytics-browser-kit";
 import {
   chakra,
   Accordion,
@@ -33,8 +32,10 @@ import {
   RESERVED_PARAMETERS,
 } from "../../model/dashboard-widget-definition.ts";
 import { formatNumber } from "../../model/format.ts";
+import { type LwqlParameter } from "../../model/lwql-language/lwql-completion.ts";
 import { DashboardWidgetQueryParamsEditor } from "./dashboard-widget-query-params-editor.tsx";
 import { DashboardWidgetQueryResultView } from "./dashboard-widget-query-result-view.tsx";
+import { LwqlEditor } from "./lwql-editor.tsx";
 
 /** The one-line "683 rows · 53ms" (or error) a collapsed row shows without expanding. */
 function runSummary(run: QueryLastRun | undefined): string | null {

@@ -1,7 +1,7 @@
 /**
  * Organization's answer to the port its five settings screens declare: scope
  * and grants project a `@langwatch/browser-host` capability plus this
- * family's own borrowed `organization.getAll` query. ARCHITECTURE.md §10.1.
+ * family's own `organization.getScopeGraph` query. ARCHITECTURE.md §10.1.
  */
 
 import {
@@ -10,8 +10,9 @@ import {
   useUiDeployment,
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
+import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { lazy, useMemo, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   OrganizationHostApi,
@@ -57,6 +58,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       failed: (failure: OrganizationFailureNotice) => void;
       overviewCards: readonly AuthenticationOverviewCard[];
       directorySummary: DirectorySummaryBand | undefined;
+      Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
     },
   ) {
     super();
@@ -125,9 +127,15 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
     this.deps.setQuery(next, options);
   }
 
-  /** No switcher is mounted below the root layout; the port says null is an answer. */
+  /** The switcher project lends by declaration (ARCHITECTURE §10), as main's audit log header. */
   projectSwitcher(): ReactNode | null {
-    return null;
+    const { Switcher } = this.deps;
+    if (!Switcher) return null;
+    return (
+      <Suspense fallback={null}>
+        <Switcher />
+      </Suspense>
+    );
   }
 
   navigate(to: string): void {
@@ -187,6 +195,10 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
     const [lent] = declarations.declared("directorySummary");
     return lent ? lazy(lent.capability.load) : void 0;
   }, [declarations]);
+  const Switcher = useMemo(() => {
+    const [lent] = declarations.declared("projectSwitcher");
+    return lent ? lazy(lent.capability.load) : void 0;
+  }, [declarations]);
 
   const host = useMemo(
     () =>
@@ -217,6 +229,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         failed: (failure) => feedback.failed(failure),
         overviewCards,
         directorySummary,
+        Switcher,
       }),
     [
       activeScope.organizationId,
@@ -236,6 +249,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       navigation,
       overviewCards,
       directorySummary,
+      Switcher,
     ],
   );
 

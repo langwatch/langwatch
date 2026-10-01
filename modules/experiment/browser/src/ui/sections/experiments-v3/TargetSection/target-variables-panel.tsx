@@ -2,13 +2,7 @@
 
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { getUsedFields } from "@langwatch/experiment-contract/mapping-validation";
-import {
-  VariablesSection,
-  type FieldMapping as VariableFieldMapping,
-  type Variable,
-} from "@langwatch/prompt-browser-kit";
-import { renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
-import type { Field } from "@langwatch/workflow-contract";
+import type { Field, FieldMapping as VariableFieldMapping } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
 import { buildTargetAvailableSources } from "../../../../behavior/experiments-v3/target-available-sources.ts";
@@ -18,6 +12,8 @@ import type {
   FieldMapping,
   TargetConfig,
 } from "../../../../model/experiments-v3/types.ts";
+import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
+import { VariablesSection, type Variable } from "../../prompt/variables/variables-section.tsx";
 
 interface TargetVariablesPanelProps {
   target: TargetConfig;

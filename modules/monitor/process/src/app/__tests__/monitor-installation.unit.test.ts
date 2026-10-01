@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The installer over memory persistence, in both roles that boot it.
@@ -6,12 +5,13 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { monitorServer } from "../../monitor.server.ts";
+import { monitorProcessModule } from "../../monitor.module.ts";
 
 const PUBLIC_BASE_URL = "https://app.langwatch.example";
 
@@ -32,7 +32,7 @@ function evaluatorRow(input: { id: string; projectId: string }) {
 
 function process(role: "api" | "worker") {
   return createApp({ role })
-    .withModules([withMemoryRepositories(monitorServer)])
+    .withModules([withMemoryRepositories(monitorProcessModule)])
     .withMember("publicBaseUrl", PUBLIC_BASE_URL)
     .provide({
       authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
@@ -64,7 +64,7 @@ describe("monitor app installation", () => {
       const app = runtime.service(MonitorApi);
       const monitor = await app.create({ ...created });
 
-      expect(runtime.module(monitorServer).provided).toBe(app);
+      expect(runtime.module(monitorProcessModule).provided).toBe(app);
       await expect(app.list({ projectId: "project-1" })).resolves.toMatchObject([
         { id: monitor.id },
       ]);

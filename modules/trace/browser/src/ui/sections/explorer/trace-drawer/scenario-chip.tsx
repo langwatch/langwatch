@@ -1,10 +1,10 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Circle, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import { SCENARIO_RUN_STATUS_CONFIG } from "@langwatch/suite-browser-kit";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { LuCheck, LuX } from "react-icons/lu";
 
-import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/suite/scenario-run-status-config.ts";
 import type { ChipDef } from "../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
@@ -37,15 +37,10 @@ export function useScenarioChipData(
   const isReadOnly = useIsReadOnlyTrace();
   const { openDrawer } = useDrawer();
 
-  const { data, isLoading } = api.scenarios.getRunState.useQuery(
-    {
-      scenarioRunId: scenarioRunId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!scenarioRunId && !isReadOnly,
-      staleTime: 30_000,
-    },
+  const projectId = project?.id;
+  const { data, isLoading } = scenarioClient.scenarios.getRunState.useQuery(
+    { scenarioRunId: scenarioRunId ?? "", projectId: projectId ?? "" },
+    { enabled: !!projectId && !!scenarioRunId && !isReadOnly },
   );
 
   if (!scenarioRunId) return null;

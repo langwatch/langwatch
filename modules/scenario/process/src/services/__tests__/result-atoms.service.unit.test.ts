@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @see specs/features/agent-testing/results-atoms.feature
  */
 import { ScenarioRunStatus, type ResultsFilter } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

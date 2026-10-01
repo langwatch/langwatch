@@ -213,6 +213,11 @@ func resolveLogSource(name string, available map[string]bool) (logSource, bool) 
 	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
 		return logSource{file: file, label: name, app: name}, true
 	}
+	// A one-process stack (LANGWATCH_DEV_ONE_PROCESS) writes ui, api and worker
+	// to the one app capture. ponytail: a stale api.log from an earlier up wins.
+	if available[app.AppLane] && !available[name] && (name == "ui" || slices.Contains(apiLaneApps, name)) {
+		return logSource{file: app.AppLane, label: name, app: name}, true
+	}
 	for _, lane := range []string{app.SimsLane, app.GoLane} {
 		if available[lane] && slices.Contains(goLaneSimulators, name) {
 			return logSource{file: lane, label: name, app: name}, true

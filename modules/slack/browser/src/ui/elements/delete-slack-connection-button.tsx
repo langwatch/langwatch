@@ -1,12 +1,13 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { type SlackConnection, unusedDeleteConfirmation } from "@langwatch/slack-browser-kit";
 import { useState } from "react";
 
+import { unusedDeleteConfirmation } from "../../model/slack-connection-copy.ts";
 import {
   inUseRefusalLabel,
   type SlackConnectionInUse,
 } from "../../model/slack-connection-refusals.ts";
+import { type SlackConnection } from "../../model/slack-connection-types.ts";
 
 /**
  * A connection listed as unused confirms before anything is sent; one listed as in use sends

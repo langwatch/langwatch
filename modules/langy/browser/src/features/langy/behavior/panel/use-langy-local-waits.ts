@@ -1,6 +1,5 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { useLangyStore } from "@langwatch/langy-browser-kit";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,
@@ -13,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   langyPermissionCards,
   langyQuestionCards,

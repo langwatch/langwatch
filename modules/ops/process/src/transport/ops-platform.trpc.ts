@@ -16,8 +16,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("listFeatureFlags")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.featureFlagCatalogue();
     })
@@ -26,7 +26,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.setFeatureFlagEnabled({
         key: input.key,
@@ -41,7 +41,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.setFeatureFlagRules({
         key: input.key,
@@ -56,7 +56,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.clearFeatureFlag({ key: input.key, lastEditedBy: actor.id });
 
@@ -66,8 +66,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("listBlobQueues")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listBlobQueues();
     })
@@ -75,8 +75,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("getBlobStoreStats")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getBlobStoreStats();
     })
@@ -84,8 +84,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("listBlobs")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listBlobs(input);
     })
@@ -93,8 +93,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("getBlob")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.findBlob(input);
     })
@@ -103,8 +103,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("runBlobCleanup")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.runBlobCleanup({
         operator,
@@ -119,8 +119,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("deleteBlob")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
       app.assertDestructiveOperator(operator, input.confirm);
 
       return app.deleteBlob({
@@ -134,8 +134,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("listSystemMigrations")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listSystemMigrations();
     })
@@ -143,8 +143,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("listMigrationEnrollments")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, actor }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, actor }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listMigrationEnrollments({ requestedBy: actor.id });
     })
@@ -152,8 +152,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("searchMigrationOrganizations")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.searchMigrationOrganizations({ query: input.query });
     })
@@ -162,7 +162,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.enrollMigrationTenant({
         organizationId: input.organizationId,
@@ -177,8 +177,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("enrollMigrationCohort")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.enrollMigrationCohort({
         migrationName: input.migrationName,
@@ -194,7 +194,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.withdrawMigrationTenant({
         organizationId: input.organizationId,
@@ -208,8 +208,8 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .procedure("runSystemMigrationForOrganization")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.runSystemMigrationForOrganization({
         organizationId: input.organizationId,
@@ -223,7 +223,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
       await app.runSystemMigrationPass({ operator });
 
       return { started: true as const };
@@ -233,7 +233,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.assertSystemMigrationLegacyWritersDrained({
         migrationName: input.migrationName,
@@ -250,7 +250,7 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       await app.rollBackSystemMigrationTenant({
         migrationName: input.migrationName,

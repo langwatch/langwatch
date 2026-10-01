@@ -16,7 +16,7 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/ui-kernel/tsconfig.build.json"
+      "path": "../../../packages/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/vitest-config/tsconfig.build.json"

@@ -17,14 +17,6 @@ export type GatewayRoutingPolicyOrder = {
  */
 export abstract class GatewayScopeResolutionRepository {
   /**
-   * The team each named project belongs to, so a key scoped at PROJECT:P
-   * inherits TEAM:P.teamId visibility on providers.
-   */
-  abstract findTeamIdsForProjects(input: {
-    projectIds: string[];
-    transaction?: GatewayPersistenceTransaction;
-  }): Promise<string[]>;
-  /**
    * Every live provider reachable from any of these scopes. Soft-deleted and
    * disabled rows are excluded here, so a credential an admin pulled never
    * reaches the dispatcher.

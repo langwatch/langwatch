@@ -5,12 +5,17 @@
  */
 
 import {
+  principalOfCredential,
   credentialPrincipalOf,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   resolvePersonalCaller,
-  type RestCredentialPrincipal,
 } from "@langwatch/api/rest";
+import type {
+  PrincipalRef,
+  RestCredentialPrincipal,
+  RestResolvedProjectCredential,
+} from "@langwatch/authorization";
 import { Context } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -227,5 +232,38 @@ describe("resolving who a personal-workspace read answers for", () => {
         ).toBe("personal_usage_service_key_unsupported");
       });
     });
+  });
+});
+
+describe("the key row a project credential names", () => {
+  const project = {
+    id: "project-1",
+    name: "P",
+    slug: "p",
+    teamId: "team-1",
+    organizationId: "organization-1",
+    isPersonal: false,
+    ownerUserId: null,
+  };
+  const key = {
+    type: "apiKey",
+    apiKeyId: "key_1",
+    userId: "user_1",
+    organizationId: "organization-1",
+    ingestSourceType: null,
+    ingestionTemplateId: null,
+    project,
+  } satisfies RestResolvedProjectCredential;
+
+  it.each<[string, RestResolvedProjectCredential, PrincipalRef | null]>([
+    ["a project key", key, { type: "apiKey", id: "key_1" }],
+    [
+      "a project-bound access token",
+      { type: "cliAccessToken", userId: "user_1", organizationId: "organization-1", project },
+      { type: "user", id: "user_1" },
+    ],
+    ["a legacy project key", { type: "legacyProjectKey", project }, null],
+  ])("given %s", (_label, credential, expected) => {
+    expect(principalOfCredential(credential)).toEqual(expected);
   });
 });

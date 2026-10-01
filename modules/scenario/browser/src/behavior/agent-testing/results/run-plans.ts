@@ -9,9 +9,9 @@ import type {
   ScenarioRunData,
   SuiteRunSummary,
 } from "@langwatch/scenario-contract";
-import type { RunGroupSummary } from "@langwatch/suite-browser-kit";
 import { parseSuiteScope, getSuiteSetId } from "@langwatch/suite-contract";
 
+import type { RunGroupSummary } from "../../../model/suite/run-history-transforms.ts";
 import { EXTERNAL_SET_PREFIX, isExternalSetSelection } from "../../suites/use-suite-routing.ts";
 import { RESULTS_SEGMENT } from "../use-agent-testing-routing.ts";
 

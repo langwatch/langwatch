@@ -1,6 +1,6 @@
 /** The CSV upload as an address-routed drawer, so another module's flow navigates to it. */
 
-import type { UiUploadCsvDrawerProps } from "@langwatch/browser-host/drawer";
+import type { UiUploadCsvDrawerProps } from "@langwatch/dataset-contract";
 
 import { UploadCSVDrawer } from "./upload-csv-drawer.tsx";
 

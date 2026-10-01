@@ -1,3 +1,4 @@
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 import {
   Box,
   Circle,
@@ -7,7 +8,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import type React from "react";
 import { useMemo } from "react";

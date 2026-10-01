@@ -43,8 +43,8 @@ import {
 } from "../../../model/member-role-constraints.ts";
 import { useOrganizationHost } from "../../../model/organization-host.ts";
 import { OrganizationUserRole } from "../../../model/prisma-types.ts";
-import { RandomColorAvatar } from "../../../ui/elements/random-color-avatar.tsx";
 import { DepartmentPicker } from "../../../ui/sections/department-picker.tsx";
+import { MemberAvatar } from "../member-avatar.tsx";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithGrants"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
@@ -547,7 +547,7 @@ function ProjectSection({
                 </Text>
                 {inherited.map((m, i) => (
                   <HStack key={i} py={1} opacity={0.5} fontSize="sm">
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <MemberAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.customRoleName ?? m.role}
@@ -581,7 +581,7 @@ function ProjectSection({
                 </Text>
                 {projectLevel.map((m, i) => (
                   <HStack key={i} py={1} fontSize="sm">
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <MemberAvatar name={m.name} image={m.image} size="xs" />
                     <Box flex={1}>
                       <Text display="inline">{m.name}</Text>
                       {m.source === "override" && m.teamRole && (
@@ -879,7 +879,7 @@ function TeamCard({
                     _dark={{ borderColor: "gray.700" }}
                     opacity={m.viaGroupId ? 0.7 : 1}
                   >
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <MemberAvatar name={m.name} image={m.image} size="xs" />
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
@@ -933,7 +933,7 @@ function TeamCard({
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
                   >
-                    <RandomColorAvatar name={m.name} image={m.image} size="xs" />
+                    <MemberAvatar name={m.name} image={m.image} size="xs" />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
                       {m.role}

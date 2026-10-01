@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -77,7 +77,7 @@ vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => false,
 }));
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: false,
@@ -90,9 +90,9 @@ vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   return { ...actual, useLangyStore };
 });
 
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { explainAnyError } from "../../../errors/index.ts";
 import { SearchBar } from "../search-bar.tsx";
 
@@ -129,11 +129,7 @@ beforeEach(() => {
 });
 
 function renderSearchBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SearchBar />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SearchBar />);
 }
 
 describe("<SearchBar /> unified error banner", () => {

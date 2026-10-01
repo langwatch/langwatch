@@ -1,5 +1,5 @@
 import { Circle, HStack, Text } from "@langwatch/design-system/primitives";
-import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-browser-kit";
+import { EVAL_FIELD_LABELS, type EvalColumnField } from "@langwatch/trace-contract";
 import type React from "react";
 
 import { getEvalChipDisplay } from "../../../../../../../model/evaluation-results.ts";

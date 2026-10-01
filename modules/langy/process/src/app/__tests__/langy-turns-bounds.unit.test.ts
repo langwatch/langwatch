@@ -1,13 +1,12 @@
 import { EventEmitter } from "node:events";
 
 /**
- * `LangyApp.startConversationTurn` — every turn is counted against the
+ * `LangyModule.startConversationTurn` — every turn is counted against the
  * project's tier-effective window before it dispatches; an over-limit caller
  * never reaches the engine.
  * @vitest-environment node
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -36,12 +35,13 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
-import { LangyApp } from "../langy.app.ts";
+import { LangyModule } from "../langy.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
@@ -96,13 +96,14 @@ function fakePresence(): PresenceApi {
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},
+    readHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
 }
 
 async function harness() {
-  const app = await LangyApp.create({
+  const app = await LangyModule.create({
     dependencies: {
       presence: fakePresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -177,7 +178,7 @@ async function harness() {
 
 const FREE_TURNS_PER_MINUTE = resolveRequestBound("langyTurnsPerMinute", "FREE");
 
-describe("LangyApp.startConversationTurn", () => {
+describe("LangyModule.startConversationTurn", () => {
   describe("given a free-tier project under its turn ceiling", () => {
     it("dispatches every turn", async () => {
       const { startTurn, dispatched } = await harness();

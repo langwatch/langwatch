@@ -2,7 +2,7 @@
   "name": "@langwatch/handled-error",
   "version": "0.1.0",
   "private": true,
-  "description": "The handled-error machinery: the HandledError base class, its subclasses, the serialized wire shapes and the Go herr envelope adapter. The codes and the customer copy live in @langwatch/error-presentation.",
+  "description": "The handled-error machinery: the HandledError base class, its subclasses, the serialized wire shapes and the Go herr envelope adapter, the enumerated app error codes and the code-keyed customer presentation registry.",
   "license": "MIT",
   "files": [
     "src"
@@ -22,6 +22,22 @@
     "./is-server-unreachable": {
       "types": "./dist/is-server-unreachable.d.ts",
       "default": "./src/is-server-unreachable.ts"
+    },
+    "./app-codes": {
+      "types": "./dist/app-codes.d.ts",
+      "default": "./src/app-codes.ts"
+    },
+    "./docs-url": {
+      "types": "./dist/docs-url.d.ts",
+      "default": "./src/docs-url.ts"
+    },
+    "./presentation": {
+      "types": "./dist/presentation.d.ts",
+      "default": "./src/presentation.ts"
+    },
+    "./read-handled-error": {
+      "types": "./dist/read-handled-error.d.ts",
+      "default": "./src/read-handled-error.ts"
     }
   },
   "scripts": {
@@ -29,6 +45,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "zod": "catalog:"
   },

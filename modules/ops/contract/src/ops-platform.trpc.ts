@@ -4,7 +4,7 @@ import { operatorFeatureFlagCatalogueSchema } from "@langwatch/feature-flag-cont
  * store, and system migrations. Anything that can destroy a payload also
  * asks for a non-impersonated session and a typed `confirm`.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

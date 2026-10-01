@@ -5,7 +5,7 @@ import { intentAccessorOf } from "@langwatch/eventing/testing";
 import { ORGANIZATION_SIGNED_UP_EVENT_TYPE } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { licensingServer } from "../../licensing.server.ts";
+import { licensingProcessModule } from "../../licensing.module.ts";
 import { LICENSE_SYNC_PROCESS_NAME } from "../license-sync.intent.ts";
 import {
   buildLicenseSync,
@@ -45,7 +45,7 @@ function wakeAt({ at, lastSyncAt }: { at: number; lastSyncAt: number | null }) {
 describe("given the license sync's eventing declaration", () => {
   describe("when the module is declared", () => {
     it("carries the daily sync onto the installable module", () => {
-      expect(licensingServer.eventing).toBe(licenseSyncEventing);
+      expect(licensingProcessModule.eventing).toBe(licenseSyncEventing);
       expect(licenseSyncEventing.pipeline).toBe(LICENSE_SYNC_PIPELINE_NAME);
     });
   });

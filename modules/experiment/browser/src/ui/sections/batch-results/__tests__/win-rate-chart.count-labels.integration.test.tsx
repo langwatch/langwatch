@@ -3,12 +3,12 @@ import "@testing-library/jest-dom/vitest";
 /**
  * The win count printed above each bar, and specifically the one above the TALLEST bar.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { BatchComparisonColumn } from "@langwatch/experiment-browser-kit";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { BatchComparisonColumn } from "../../batch-evaluation-results.types.ts";
 import { COUNT_LABEL_FONT_SIZE, COUNT_LABEL_OFFSET, WinRateChart } from "../win-rate-chart.tsx";
 
 // recharts lays its chart out from measurements jsdom cannot produce, so the
@@ -33,10 +33,6 @@ vi.mock("recharts", () => {
     LabelList: MockComponent,
   };
 });
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 afterEach(() => {
   cleanup();
@@ -69,9 +65,8 @@ const columnWithWins = (wins: number[]): BatchComparisonColumn => {
 
 /** Room the chart reserves above the plot area for this tally, in pixels. */
 const reservedRoomFor = (wins: number[]): number => {
-  const { getByTestId, unmount } = render(
+  const { getByTestId, unmount } = renderWithDesignSystem(
     <WinRateChart column={columnWithWins(wins)} chartHeight={200} />,
-    { wrapper: Wrapper },
   );
   const reserved = Number(getByTestId("bar-chart").dataset.marginTop);
   unmount();

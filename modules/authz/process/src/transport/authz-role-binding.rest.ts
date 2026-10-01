@@ -5,10 +5,10 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { ledgerActorSchema } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzPrincipalRefSchema,
-  grantsLedgerActorSchema,
   roleBindingRestCreateSchema,
   roleBindingRestDeletedSchema,
   roleBindingRestListQuerySchema,
@@ -30,7 +30,7 @@ export const roleBindingRestFacts = defineRestMiddleware(
   "roleBindingRestFacts",
   z.object({
     organizationId: z.string(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     caller: authzPrincipalRefSchema,
   }),
 );

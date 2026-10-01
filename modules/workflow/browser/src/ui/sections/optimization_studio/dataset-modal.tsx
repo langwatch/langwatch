@@ -11,10 +11,6 @@ import {
  */
 import { Box, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import {
-  datasetColumnsToFields,
-  inMemoryDatasetToNodeDataset,
-} from "@langwatch/workflow-browser-kit";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import type { Node, NodeProps } from "@xyflow/react";
@@ -26,6 +22,10 @@ import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
 import { DatasetPickerList } from "../../../behavior/optimization_studio/lent-dataset-picker-list.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import {
+  datasetColumnsToFields,
+  inMemoryDatasetToNodeDataset,
+} from "../../../model/studio-dataset.utils.ts";
 
 const DRAFT_DATASET_COLUMNS: DatasetColumns = [
   { name: "input", type: "string" },

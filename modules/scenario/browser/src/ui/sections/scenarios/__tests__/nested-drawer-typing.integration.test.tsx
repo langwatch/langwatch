@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  * @see specs/features/suites/nested-drawer-typing.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,6 +30,29 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
+    agents: {
+      getAll: { useQuery: () => ({ data: [] }) },
+    },
+    useUtils: () => ({}),
+  },
+}));
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
+    prompts: {
+      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
+    },
+  },
+}));
+
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    useUtils: () => ({
+      scenarios: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
+    }),
     scenarios: {
       create: {
         useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
@@ -41,18 +64,6 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
         useQuery: () => ({ data: null, isLoading: false }),
       },
     },
-    agents: {
-      getAll: { useQuery: () => ({ data: [] }) },
-    },
-    prompts: {
-      getAllPromptsForProject: { useQuery: () => ({ data: [] }) },
-    },
-    useUtils: () => ({
-      scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
-      },
-    }),
   },
 }));
 
@@ -72,7 +83,7 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-123", slug: "my-project" },
     organization: { id: "org-123" },
@@ -116,10 +127,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 describe("<ScenarioFormDrawerFromUrl/>", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,7 +142,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
   describe("when rendered from the drawer registry without an open prop", () => {
     it("opens the drawer based on URL state", async () => {
       // Simulates CurrentDrawer rendering without passing `open`
-      render(<ScenarioFormDrawerFromUrl />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       await waitFor(() => {
         expect(screen.getByText("Create Scenario")).toBeInTheDocument();
@@ -145,7 +152,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
     it("stays closed when the URL does not indicate scenarioEditor is active", async () => {
       mocks.mockDrawerOpen.mockReturnValue(false);
 
-      render(<ScenarioFormDrawerFromUrl />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       // The drawer heading should not appear
       expect(screen.queryByText("Create Scenario")).not.toBeInTheDocument();
@@ -156,7 +163,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
     /** @scenario "User types in a nested drawer opened from the suite editor" */
     it("receives keyboard input in the name field", async () => {
       const user = userEvent.setup();
-      render(<ScenarioFormDrawerFromUrl />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawerFromUrl />);
 
       await waitFor(() => {
         expect(screen.getByText("Create Scenario")).toBeInTheDocument();
@@ -175,7 +182,7 @@ describe("<ScenarioFormDrawerFromUrl/>", () => {
       // URL says drawer is NOT active, but explicit prop says it is
       mocks.mockDrawerOpen.mockReturnValue(false);
 
-      render(<ScenarioFormDrawerFromUrl open={true} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<ScenarioFormDrawerFromUrl open={true} />);
 
       await waitFor(() => {
         expect(screen.getByText("Create Scenario")).toBeInTheDocument();

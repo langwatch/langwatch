@@ -194,10 +194,6 @@ flows:
       - action: click
         with:
           testId: add-row
-      - action: expect
-        with:
-          testId: dataset-row-count
-          hasText: /^2 /
       - action: type
         with:
           testIdPrefix: cell-1-

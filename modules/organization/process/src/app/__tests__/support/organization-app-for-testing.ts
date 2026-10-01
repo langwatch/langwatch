@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { OrganizationGroupService } from "@langwatch/organization-contract";
 import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { OrganizationSeatRepository } from "../../../repositories/organization-seat.repository.ts";
 import type { InviteCreationThrottleService } from "../../../services/invite-creation-throttle.service.ts";
@@ -11,7 +11,7 @@ import type { PersonalTeamScopeReader } from "../../../services/personal-team-sc
 import type { SeatLimitNoticeService } from "../../../services/seat-limit-notice.service.ts";
 import {
   type OrganizationInfrastructure,
-  ServerOrganizationApp,
+  OrganizationModule,
   type ServerOrganizationAppDependencies,
 } from "../../organization.app.ts";
 import type {
@@ -39,7 +39,7 @@ export function organizationAppForTesting(setup: {
   members?: Partial<OrganizationInfrastructure>;
   personalTeamScope?: PersonalTeamScopeReader;
   memberProvenance?: MemberProvenanceService;
-}): ServerOrganizationApp {
+}): OrganizationModule {
   const members: OrganizationInfrastructure = {
     identities: createApiFixture<PersonalWorkspaceIdentity>({}, "personal workspace identities"),
     teamIdentities: createApiFixture<TeamIdentity>({}, "team identities"),
@@ -62,7 +62,7 @@ export function organizationAppForTesting(setup: {
     joinRequests: null,
     ...setup.members,
   };
-  return ServerOrganizationApp.createForTesting({
+  return OrganizationModule.createForTesting({
     dependencies: {
       ...setup.dependencies,
       shares: setup.dependencies.shares ?? createApiFixture<ShareApi>({}, "trace share revocation"),

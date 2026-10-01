@@ -37,6 +37,22 @@ export class ModelNotConfiguredError extends HandledError {
     this.featureDisplayName = featureDisplayName;
     this.projectId = projectId;
   }
+
+  toResponseBody(): {
+    code: typeof MODEL_NOT_CONFIGURED_CAUSE;
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+    projectId: string;
+  } {
+    return {
+      code: this.cause,
+      featureKey: this.featureKey,
+      featureDisplayName: this.featureDisplayName,
+      role: this.role,
+      projectId: this.projectId,
+    };
+  }
 }
 
 export const MODEL_PROVIDER_DISABLED_CAUSE = "MODEL_PROVIDER_DISABLED" as const;
@@ -701,17 +717,18 @@ export class AiCallFailedError extends HandledError {
     this.originalErrorMessage = originalErrorMessage;
   }
 
+  /** Never `originalErrorMessage`: a provider's text can echo a key, and the key may be ours. */
   toResponseBody(): {
-    cause: typeof AI_CALL_FAILED_CAUSE;
+    code: typeof AI_CALL_FAILED_CAUSE;
     featureKey: string;
-    role: ModelRole;
     featureDisplayName: string;
+    role: ModelRole;
   } {
     return {
-      cause: this.cause,
+      code: this.cause,
       featureKey: this.featureKey,
-      role: this.role,
       featureDisplayName: this.featureDisplayName,
+      role: this.role,
     };
   }
 }

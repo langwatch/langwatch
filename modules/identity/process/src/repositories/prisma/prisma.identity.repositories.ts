@@ -44,19 +44,17 @@ import { PrismaSsoDomainOwnershipRepository } from "./prisma.sso-domain-ownershi
 import { PrismaSsoDomainReproofTargetRepository } from "./prisma.sso-domain-reproof.repository.ts";
 import { PrismaSsoEngineProviderRepository } from "./prisma.sso-engine-provider.repository.ts";
 import { PrismaSsoMigrationEvidenceRepository } from "./prisma.sso-migration-evidence.repository.ts";
-import { AdminEmailPlatformOperatorsRepository } from "./prisma.sso-platform-operators.repository.ts";
 import { PrismaSsoRegistrantReadRepository } from "./prisma.sso-registrant.repository.ts";
 import { PrismaTwoStepVerificationRepository } from "./prisma.two-step-verification.repository.ts";
 
 /** The live tier: every identity row over the one Prisma client. */
 export class PostgresIdentityRepositories {
-  static readonly requires = ["prisma", "encryption", "adminEmails", "eventing"] as const;
+  static readonly requires = ["prisma", "encryption", "eventing"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
       encryption: Encryption;
-      adminEmails: readonly string[];
       eventing: EventSourcing;
     }>,
   ): IdentityRepositories {
@@ -103,10 +101,6 @@ export class PostgresIdentityRepositories {
       joinRequestAudience: PrismaJoinRequestAudienceRepository.create(database),
       joinRequestNotificationContext:
         PrismaJoinRequestNotificationContextRepository.create(database),
-      ssoPlatformOperators: AdminEmailPlatformOperatorsRepository.create({
-        database,
-        adminEmails: members.adminEmails,
-      }),
       ssoDomainOwnership: PrismaSsoDomainOwnershipRepository.create(database),
       identityLookup: PrismaIdentityLookupRepository.create(database),
       identityHistory: EventingIdentityHistoryRepository.create({ eventing: members.eventing }),

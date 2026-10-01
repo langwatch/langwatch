@@ -5,12 +5,18 @@
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 
 // The stores remember a preference through the host's device-storage port. The
 // application installs the browser-backed one; a jsdom suite installs the same
 // one so what a store persists is what the test can read back.
 setUiStorage(new BrowserUiStorage());
+
+// The stored-avatar mint is a tRPC read; a jsdom suite has no provider, so every avatar draws
+// the image it was given.
+vi.mock("./src/behavior/user/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) => image ?? null,
+}));
 
 // Auto-cleanup only registers itself when a global afterEach exists at import
 // time; this package runs without vitest globals, so an explicit hook is what

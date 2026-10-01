@@ -11,11 +11,11 @@ import { evaluatorTrpc } from "@langwatch/evaluator-contract";
 import { experimentsTrpc } from "@langwatch/experiment-contract";
 import { opsDashboardTrpc } from "@langwatch/ops-contract";
 import { promptTrpc } from "@langwatch/prompt-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { experimentApi } from "./behavior/experiment-api.ts";
 
-export const experimentWeb = defineWebModule("experiment")
+export const experimentWeb = defineBrowserModule("experiment")
   .withApi(experimentApi, {
     contracts: [
       experimentsTrpc,

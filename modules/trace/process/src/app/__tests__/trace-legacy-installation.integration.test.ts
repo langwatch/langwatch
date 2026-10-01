@@ -1,5 +1,4 @@
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Legacy `/api/trace/*` routes mounted over real application. Tests that
@@ -15,6 +14,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -24,7 +24,7 @@ import type { TraceService as TraceTreeService } from "../../services/trace.serv
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import { tracesRestCredential } from "../../transport/traces.rest.ts";
 import {
-  TraceApp,
+  TraceModule,
   type TraceEditOverlayStore,
   type TraceSummaryReader,
   type TracesListReader,
@@ -82,7 +82,7 @@ function bootTraceApp(options: {
     findSpanForPromptStudio: unread,
   };
 
-  const app = TraceApp.create({
+  const app = TraceModule.create({
     storedObjects: createApiFixture<StoredObjectApi>(),
     traces: {
       existence: {
@@ -137,7 +137,7 @@ function bootTraceApp(options: {
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
   });
 
   return { family, findById };

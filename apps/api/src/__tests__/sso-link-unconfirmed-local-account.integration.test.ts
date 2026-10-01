@@ -11,13 +11,7 @@ import { RestHost } from "@langwatch/api/rest";
 import { AuthApi, normalizeSignInErrorCode } from "@langwatch/auth-contract";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
-import {
-  bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
+import { processModules } from "@langwatch/installed-server-modules";
 import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
@@ -25,7 +19,13 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { processConfig } from "@langwatch/process-server";
+import {
+  bootInstalledProcess,
+  storesBackedMembers,
+  withMemoryRepositories,
+  type InstallableServerFeature,
+  processConfig,
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -91,7 +91,7 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
     API_KEY_PEPPER: "synthetic-api-key-pepper",
     ...(cloud ? { IS_SAAS: "true" } : {}),
   };
-  const owners = processConfig(serverModules, "api");
+  const owners = processConfig(processModules, "api");
   const config = parseProcessConfig({ owners, environment });
   const resolver = SecretsResolver.over(SecretsChain.start({ environment }).withEnv());
   const eventing = new EventSourcing({
@@ -101,7 +101,7 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
   });
   const runtime = await bootInstalledProcess({
     role: "api",
-    modules: serverModules.map(tierOf),
+    modules: processModules.map(tierOf),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -167,7 +167,7 @@ async function bootInstallation({ cloud }: { cloud: boolean }) {
     bearers: () => closed,
     audit: { record: async () => {} },
   });
-  const door = serverModules
+  const door = processModules
     .filter((module) => module.apiContract === AuthApi)
     .flatMap((module) => module.transports ?? [])
     .find((transport) => transport.protocol === "rest" && transport.namespace === "auth");

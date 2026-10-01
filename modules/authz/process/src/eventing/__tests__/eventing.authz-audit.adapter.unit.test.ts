@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
   GRANT_ATTACHED_EVENT_TYPE,

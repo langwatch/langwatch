@@ -80,7 +80,7 @@ export abstract class ExperimentRepository {
     projectId: string;
     id: string;
     workbenchState: SaveExperimentInput["workbenchState"];
-  }): Promise<void>;
+  }): Promise<{ version: number }>;
   abstract archiveActive(input: {
     projectId: string;
     id: string;

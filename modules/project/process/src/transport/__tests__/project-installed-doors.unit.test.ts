@@ -1,30 +1,28 @@
-/**
- * @vitest-environment node
- * @see specs/projects/projects-browser-door.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ShareApi } from "@langwatch/share-contract";
+/**
+ * @vitest-environment node
+ * @see specs/projects/projects-browser-door.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it } from "vitest";
 
-import { projectServer } from "../../project.server.ts";
+import { projectProcessModule } from "../../project.module.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
+import { SessionReader } from "@langwatch/api/hosting";
 
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
 const ORGANIZATION_ID = "organization-1";
-const ROTATED_KEY = "sk-lw-rotated";
 const CREATED_AT = new Date("2026-09-01T00:00:00.000Z");
 const CALLER_PROTECTIONS: Protections = {
   canSeeCapturedInput: false,
@@ -36,18 +34,7 @@ const CALLER_PROTECTIONS: Protections = {
 type Peers = Readonly<{
   auditLog: AuditLogApi;
   trace: TraceApi;
-  langy: LangyApi;
 }>;
-
-type LangyMint = Parameters<LangyApi["provisionVirtualKey"]>[0];
-
-function recordingLangy(minted: LangyMint[]): LangyApi {
-  return createApiFixture<LangyApi>({
-    provisionVirtualKey: async (input) => {
-      minted.push(input);
-    },
-  });
-}
 
 function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
   return createApiFixture<AuditLogApi>({
@@ -60,7 +47,7 @@ function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
 
 function installed(peers: Peers) {
   return createApp({ role: "api" })
-    .withModules([withMemoryRepositories(projectServer)])
+    .withModules([withMemoryRepositories(projectProcessModule)])
     .withConfig({ project: undefined })
     .withMembers({
       encryption: { encrypt: (plaintext: string) => `cipher(${plaintext})` },
@@ -81,15 +68,12 @@ function installed(peers: Peers) {
           updatedAt: CREATED_AT,
         }),
       }),
-      "api-key": createApiFixture<ApiKeyApi>({
-        regenerateLegacyProjectKey: async () => ROTATED_KEY,
-      }),
+      "api-key": createApiFixture<ApiKeyApi>({}),
       share: createApiFixture<ShareApi>({}),
       topic: createApiFixture<TopicApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       trace: peers.trace,
       "audit-log": peers.auditLog,
-      langy: peers.langy,
       "data-privacy": createApiFixture<DataPrivacyApi>({}),
     })
     .boot();
@@ -107,9 +91,8 @@ async function doors(overrides: Partial<Peers> = {}) {
         resolveViewerProtections: async (input) =>
           input.projectId === PROJECT_ID && input.userId === ACTOR.id ? CALLER_PROTECTIONS : {},
       }),
-    langy: overrides.langy ?? recordingLangy([]),
   });
-  const provided = () => runtime.module(projectServer).provided;
+  const provided = () => runtime.module(projectProcessModule).provided;
   const host = TrpcHost.create({
     sessions: SessionReader.create({ verify: async () => ({ userId: ACTOR.id }) }),
     authz: {
@@ -148,59 +131,32 @@ async function call(
 }
 
 describe("given the project module installed over memory repositories", () => {
-  describe("when the base key is rotated", () => {
-    /** @scenario "rotating the base key hands the new key back to the caller" */
-    it("answers with the key the rotation minted and records the rotation", async () => {
-      const recorded: RecordAuditLogCommand[] = [];
-      const { runtime, host } = await doors({ auditLog: recordingAuditLog(recorded) });
+  describe("when a project admin calls the removed key procedures", () => {
+    /** @scenario The procedures that revealed or rotated the project key are gone */
+    it.each(["project.getProjectAPIKey", "project.regenerateApiKey"])(
+      "answers %s as a procedure that does not exist",
+      async (path) => {
+        const { runtime, host } = await doors();
 
-      try {
-        expect(
-          await call(host, {
-            path: "project.regenerateApiKey",
+        try {
+          const answer = await call(host, {
+            path,
             type: "mutation",
             input: { projectId: PROJECT_ID },
-          }),
-        ).toEqual({ status: 200, body: { result: { data: { apiKey: ROTATED_KEY } } } });
-        expect(recorded).toEqual([
-          { action: "project.apiKey.regenerated", userId: ACTOR.id, projectId: PROJECT_ID },
-        ]);
-      } finally {
-        await runtime.stop();
-      }
-    });
-  });
+          });
 
-  describe("when the base key is rotated and the audit trail cannot be written", () => {
-    /** @scenario "a failing audit trail does not withhold the rotated key" */
-    it("still answers with the rotated key", async () => {
-      const { runtime, host } = await doors({
-        auditLog: createApiFixture<AuditLogApi>({
-          record: async () => {
-            throw new Error("audit store unreachable");
-          },
-        }),
-      });
-
-      try {
-        expect(
-          await call(host, {
-            path: "project.regenerateApiKey",
-            type: "mutation",
-            input: { projectId: PROJECT_ID },
-          }),
-        ).toEqual({ status: 200, body: { result: { data: { apiKey: ROTATED_KEY } } } });
-      } finally {
-        await runtime.stop();
-      }
-    });
+          expect(answer.status).toBe(404);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
   });
 
   describe("when a project is created into a new team", () => {
     /** @scenario "creating a project answers with the new project's slug" */
-    it("answers with the slug of the project it created and mints its Langy key", async () => {
-      const minted: LangyMint[] = [];
-      const { runtime, host } = await doors({ langy: recordingLangy(minted) });
+    it("answers with the slug of the project it created", async () => {
+      const { runtime, host } = await doors();
 
       try {
         expect(
@@ -221,13 +177,6 @@ describe("given the project module installed over memory repositories", () => {
             result: { data: { success: true, projectSlug: expect.stringMatching(/^my-project-/) } },
           },
         });
-        expect(minted).toEqual([
-          {
-            projectId: expect.any(String),
-            organizationId: ORGANIZATION_ID,
-            actorUserId: ACTOR.id,
-          },
-        ]);
       } finally {
         await runtime.stop();
       }

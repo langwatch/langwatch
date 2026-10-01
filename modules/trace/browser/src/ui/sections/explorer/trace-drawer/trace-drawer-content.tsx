@@ -1,15 +1,16 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, CodeBlock, Flex, Spinner } from "@langwatch/design-system/primitives";
-import {
-  useLangyContextTarget,
-  traceChipDisplayName,
-  traceContextChip,
-} from "@langwatch/langy-browser-kit";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useRef } from "react";
 
 import { useTraceSwitchOverlay } from "../../../../behavior/explorer/trace-drawer/use-trace-switch-overlay.ts";
-import { type DrawerViewMode, useDrawerStore, useShikiAdapter } from "../../../../index.ts";
+import {
+  traceChipDisplayName,
+  traceContextChip,
+} from "../../../../behavior/langy/langy-context-chips.ts";
+import { useLangyContextTarget } from "../../../../behavior/langy/use-langy-context-target.ts";
+import { ScenarioRoleProvider } from "../../../../behavior/scenario-role.store.tsx";
+import { type DrawerViewMode, useShikiAdapter, useTraceDrawer } from "../../../../index.ts";
 import { BlurredContentGate } from "../../../blocks/explorer/blurred-content-gate.tsx";
 import { TraceDrawerSkeleton } from "../../../elements/explorer/trace-drawer/trace-drawer-skeleton.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
@@ -22,7 +23,6 @@ import { DrawerHeader } from "./drawer-header/index.ts";
 import { EditModeBar } from "./edit-mode/edit-mode-bar.tsx";
 import { PaneLayout } from "./panes/pane-layout.tsx";
 import { type DrawerLayout, usePaneLayout } from "./panes/use-pane-layout.ts";
-import { ScenarioRoleProvider } from "./scenario-roles.tsx";
 import { SessionTab } from "./session-view/index.ts";
 import { TerminalTab } from "./terminal-view/index.ts";
 import { TraceAccordions } from "./trace-accordions/index.ts";
@@ -33,6 +33,8 @@ export interface TraceDrawerContentProps {
   spanTree: SpanTreeNode[];
   selectedSpan: SpanTreeNode | null;
   isLoading: boolean;
+  /** The header is the list row's fields; what only the header read knows is still loading. */
+  isPlaceholder?: boolean;
   isSpansLoading: boolean;
   onClose: () => void;
   /**
@@ -52,6 +54,7 @@ export function TraceDrawerContent({
   spanTree,
   selectedSpan,
   isLoading,
+  isPlaceholder = false,
   isSpansLoading,
   onClose,
   readOnly = false,
@@ -74,11 +77,11 @@ export function TraceDrawerContent({
     trace && !readOnly ? traceContextChip(trace.traceId, traceChipDisplayName(trace)) : null,
   );
 
-  const viewMode = useDrawerStore((s) => s.viewMode);
-  const expectedSpanCount = useDrawerStore((s) => s.expectedSpanCount);
+  const viewMode = useTraceDrawer((s) => s.viewMode);
+  const expectedSpanCount = useTraceDrawer((s) => s.expectedSpanCount);
   // Edit mode is an authenticated affordance, so the share surface never has
   // one to keep alive.
-  const isEditing = useDrawerStore((s) => s.isEditing) && !readOnly;
+  const isEditing = useTraceDrawer((s) => s.isEditing) && !readOnly;
   useTraceEditSession(readOnly ? undefined : traceId);
 
   // Watch the actual rendered container so the layout decision reflects
@@ -107,7 +110,12 @@ export function TraceDrawerContent({
               scope="Couldn't render this trace's header"
               resetKeys={[trace.traceId]}
             >
-              <DrawerHeader trace={trace} onClose={onClose} readOnly={readOnly} />
+              <DrawerHeader
+                trace={trace}
+                isPlaceholder={isPlaceholder}
+                onClose={onClose}
+                readOnly={readOnly}
+              />
             </IsolatedErrorBoundary>
           </Box>
           <Box borderBottomWidth="1px" borderColor="border" />
@@ -236,12 +244,12 @@ function ConversationModePane({
  * summary accordions.
  */
 function SummaryModePane({ trace, spanTree }: { trace: TraceHeader; spanTree: SpanTreeNode[] }) {
-  const ctxPaneState = useDrawerStore((s) => s.paneState.conversationContext);
-  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
+  const ctxPaneState = useTraceDrawer((s) => s.paneState.conversationContext);
+  const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
   // Summary-tab span references (eval / event / exception rows) jump into the
   // Trace view and open the span. See
   // specs/traces-v2/span-reference-jump-to-trace.feature
-  const openSpanInTrace = useDrawerStore((s) => s.openSpanInTrace);
+  const openSpanInTrace = useTraceDrawer((s) => s.openSpanInTrace);
 
   return (
     <IsolatedErrorBoundary scope="Couldn't render trace summary" resetKeys={[trace.traceId]}>

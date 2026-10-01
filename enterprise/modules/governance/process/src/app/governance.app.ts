@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { AgentApi } from "@langwatch/agent-contract";
+import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { CliTokenIdentity } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -62,7 +63,6 @@ import {
   type GovernanceCliBudgetOverviewAnswer,
   type GovernanceCliPersonalProjectAnswer,
   type GovernanceCliVirtualKeyAnswer,
-  type GovernanceCliProjectKeyAnswer,
   type GovernanceCliIngestionSourcesAnswer,
   type GovernanceCliIngestionSourceEventsAnswer,
   type GovernanceCliIngestionSourceHealthAnswer,
@@ -150,11 +150,10 @@ import {
   EntitlementApi,
   type EntitlementOperator,
 } from "@langwatch/entitlement-contract";
-import type { EventingCommandSender } from "@langwatch/eventing";
+import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { LogApi } from "@langwatch/log-contract";
 import { MetricApi } from "@langwatch/metric-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -164,6 +163,7 @@ import {
   type OrganizationService,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { PROJECT_KIND, ProjectApi } from "@langwatch/project-contract";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -293,7 +293,7 @@ const logger = createLogger("langwatch:governance");
 
 type EventingSenders = Readonly<Record<string, EventingCommandSender<unknown>>>;
 
-/** The peers this application reads, resolved from {@link GovernanceApp.dependencies}. */
+/** The peers this application reads, resolved from {@link GovernanceModule.dependencies}. */
 export interface GovernanceAppDependencies {
   /**
    * The organization a project belongs to, for the project-scoped REST family,
@@ -316,7 +316,6 @@ export interface GovernanceAppDependencies {
     | "findProjectsWithDepartments"
     | "assignProjectDepartment"
     | "findLiveNonGovernanceIdsByOrganization"
-    | "findLiveBySlug"
     | "findLiveByRef"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
@@ -410,6 +409,7 @@ export interface GovernanceAppDependencies {
       | "getTeamWithMembers"
       | "getSessionPolicy"
       | "saveSessionPolicy"
+      | "getSettings"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -423,10 +423,10 @@ export interface GovernanceAppDependencies {
 
 /** How a process installs this application: its peers, its members, its repositories. */
 type GovernanceSetup = Readonly<{
-  dependencies: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["dependencies"];
+  dependencies: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["dependencies"];
   config: GovernanceConfig | undefined;
-  resources: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["resources"];
-  secrets: FeatureSetup<typeof GovernanceApp.dependencies, never, undefined>["secrets"];
+  resources: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["resources"];
+  secrets: FeatureSetup<typeof GovernanceModule.dependencies, never, undefined>["secrets"];
   members: Readonly<{
     encryption: GovernanceEncryptor;
     isSaas: boolean;
@@ -437,7 +437,7 @@ type GovernanceSetup = Readonly<{
   repositories: GovernanceRepositories;
 }>;
 
-export class GovernanceApp implements GovernanceRestApi {
+export class GovernanceModule implements GovernanceRestApi {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
   static readonly reads = ["encryption", "isSaas", "publicBaseUrl", "rateLimiter"] as const;
   /**
@@ -475,7 +475,7 @@ export class GovernanceApp implements GovernanceRestApi {
     dependencies,
     repositories,
     secrets,
-  }: GovernanceSetup): Promise<GovernanceApp> {
+  }: GovernanceSetup): Promise<GovernanceModule> {
     const erasureSuppression = await secrets.into(
       governanceSecrets.erasurePseudonymSecret,
       (erasureSecret) =>
@@ -495,7 +495,7 @@ export class GovernanceApp implements GovernanceRestApi {
         secret,
       }),
     );
-    return new GovernanceApp({
+    return new GovernanceModule({
       ottl,
       ingestionSecrets,
       dependencies: {
@@ -554,7 +554,10 @@ export class GovernanceApp implements GovernanceRestApi {
     this.repositories = repositories;
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
-    this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
+    this.activityMonitor = ActivityMonitorService.create({
+      repository: repositories.activityMonitor,
+      projects: dependencies.projects,
+    });
     this.planGate = GovernancePlanGateService.create({ entitlements: dependencies.entitlements });
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(
       repositories.costAttributionPolicies,
@@ -680,7 +683,7 @@ export class GovernanceApp implements GovernanceRestApi {
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
-      repository: repositories.ocsfExports,
+      projects: dependencies.projects,
       events: repositories.ocsfEvents,
     });
     this.quarantineFill = QuarantineFillEvaluatorService.create({
@@ -699,6 +702,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.spendSpikes = SpendSpikeAnomalyEvaluatorService.create({
       repository: repositories.spendSpikeAnomalies,
+      projects: dependencies.projects,
       spend: repositories.anomalySpend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: HttpAnomalyAlertChannel.create(),
@@ -782,6 +786,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     const supportContacts = OrganizationSupportContactService.create({
       repository: repositories.supportContacts,
+      organizations: dependencies.organizations,
     });
     this.cliBootstraps = DefaultGovernanceCliBootstrapService.create({
       catalog: this.aiTools,
@@ -792,7 +797,12 @@ export class GovernanceApp implements GovernanceRestApi {
       gatewayUrl: gatewayBaseUrl,
     });
     this.cliTokenDoor = CliTokenIdentity.create({
-      verify: (presented) => dependencies.auth.getCliAccessSession(presented),
+      verify: async (presented) => {
+        const session = await dependencies.auth.getCliAccessSession(presented);
+        // A session consented to one project (hosted MCP) never reaches the organization tier.
+        if (session.projectLocked) throw new OrganizationInvalidCredentialsError();
+        return session;
+      },
     });
     this.cliAccessService = GovernanceCliAccessService.create({
       sessions: dependencies.auth,
@@ -1146,10 +1156,6 @@ export class GovernanceApp implements GovernanceRestApi {
 
   cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer> {
     return this.cliService.virtualKey(input);
-  }
-
-  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer> {
-    return this.cliService.projectKey(input);
   }
 
   cliIngestionSources(

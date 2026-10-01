@@ -3,7 +3,7 @@
  *
  * @see specs/evaluations/experiments-online-evaluations-separation.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -40,7 +40,7 @@ class TestMonitorHost extends MonitorHostApi {
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <MonitorHostProvider value={new TestMonitorHost()}>
-    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+    <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
   </MonitorHostProvider>
 );
 

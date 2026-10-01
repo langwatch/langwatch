@@ -17,6 +17,7 @@ export function useHttpTest({
   outputPath,
   bodyTemplate,
   timeoutMs,
+  agentId,
 }: {
   url: string;
   method: HttpMethod;
@@ -25,6 +26,8 @@ export function useHttpTest({
   outputPath: string;
   bodyTemplate: string;
   timeoutMs?: number;
+  /** A saved agent's id, so the server fills its stored credentials for the test. */
+  agentId?: string;
 }) {
   const { project } = useOrganizationTeamProject();
   const mutation = workflowApi.httpProxy.execute.useMutation();
@@ -44,6 +47,7 @@ export function useHttpTest({
       try {
         const result = await mutation.mutateAsync({
           projectId: project.id,
+          agentId,
           url,
           method,
           headers: headers.map((header) => ({
@@ -77,7 +81,18 @@ export function useHttpTest({
         };
       }
     },
-    [auth, bodyTemplate, headers, method, mutation, outputPath, project?.id, timeoutMs, url],
+    [
+      agentId,
+      auth,
+      bodyTemplate,
+      headers,
+      method,
+      mutation,
+      outputPath,
+      project?.id,
+      timeoutMs,
+      url,
+    ],
   );
 
   return { handleTest, isPending: mutation.isPending };

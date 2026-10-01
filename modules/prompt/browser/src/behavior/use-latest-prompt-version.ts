@@ -1,7 +1,6 @@
 import { useRef } from "react";
 
-import { promptApi } from "./prompt-api.ts";
-import { usePromptProject } from "./use-prompt-project.ts";
+import { usePromptVersion } from "./use-prompt-version.ts";
 
 type UseLatestPromptVersionResult = {
   /** The current version number */
@@ -21,12 +20,6 @@ type UseLatestPromptVersionOptions = {
   configId: string | undefined;
   /** The current version number */
   currentVersion: number | undefined;
-  /**
-   * Whether this instance re-fetches on window focus (default `true`). Pass
-   * `false` for N-mounted instances (tab, column) - that storm was #5585.
-   * Gated instances are save-driven, so other sessions need a reload.
-   */
-  isLiveRefetchEnabled?: boolean;
 };
 
 /**
@@ -37,32 +30,11 @@ type UseLatestPromptVersionOptions = {
 export const useLatestPromptVersion = ({
   configId,
   currentVersion,
-  isLiveRefetchEnabled = true,
 }: UseLatestPromptVersionOptions): UseLatestPromptVersionResult => {
-  const { project } = usePromptProject();
-
   // Keep track of the last known outdated state to prevent flicker during refetch
   const lastOutdatedRef = useRef<boolean>(false);
 
-  const {
-    data: latestPrompt,
-    isLoading,
-    isFetching,
-  } = promptApi.prompts.getByIdOrHandle.useQuery(
-    {
-      idOrHandle: configId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!configId && !!project?.id,
-      // Live by default so a version updated elsewhere stays observable
-      // without reload; N-mounted callers opt out via `isLiveRefetchEnabled:
-      // false`. True cross-session liveness would need a version-number
-      // endpoint (#5585).
-      staleTime: isLiveRefetchEnabled ? 0 : 30_000,
-      refetchOnWindowFocus: isLiveRefetchEnabled,
-    },
-  );
+  const { data: latestPrompt, isLoading, isFetching } = usePromptVersion({ idOrHandle: configId });
 
   const latestVersion = latestPrompt?.version;
 

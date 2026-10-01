@@ -3,16 +3,12 @@
  * @vitest-environment jsdom
  * @see specs/scenarios/scenario-deletion.feature - "Run again is blocked for archived scenarios"
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ScenarioRunActions } from "../ui/elements/scenario-run-actions.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 describe("<ScenarioRunActions/>", () => {
   afterEach(() => {
@@ -28,14 +24,13 @@ describe("<ScenarioRunActions/>", () => {
       it("marks the Run Again button aria-disabled and ignores clicks", async () => {
         const onRunAgain = vi.fn();
         const user = userEvent.setup();
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={archivedScenario}
             isRunning={false}
             onRunAgain={onRunAgain}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         const runAgainButton = screen.getByRole("button", {
@@ -51,28 +46,26 @@ describe("<ScenarioRunActions/>", () => {
       // the run detail drawer shows an "Archived" chip in its header strip,
       // and the disabled Run again button explains itself via tooltip.
       it("keeps the disabled Run again affordance visible", () => {
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={archivedScenario}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.getByRole("button", { name: /run again/i })).toBeVisible();
       });
 
       it("does not show the Edit Scenario button", () => {
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={archivedScenario}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.queryByRole("button", { name: /edit scenario/i })).not.toBeInTheDocument();
@@ -85,14 +78,13 @@ describe("<ScenarioRunActions/>", () => {
 
     describe("when viewing the run results", () => {
       it("enables the Run Again button", () => {
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={activeScenario}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         const runAgainButton = screen.getByRole("button", {
@@ -102,28 +94,26 @@ describe("<ScenarioRunActions/>", () => {
       });
 
       it("does not display the archived message", () => {
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={activeScenario}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.queryByText("This scenario has been archived")).not.toBeInTheDocument();
       });
 
       it("shows the Edit Scenario button", () => {
-        render(
+        renderWithDesignSystem(
           <ScenarioRunActions
             scenario={activeScenario}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(screen.getByRole("button", { name: /edit scenario/i })).toBeInTheDocument();
@@ -134,14 +124,13 @@ describe("<ScenarioRunActions/>", () => {
   describe("given no scenario data", () => {
     describe("when viewing the run results", () => {
       it("renders nothing", () => {
-        const { container } = render(
+        const { container } = renderWithDesignSystem(
           <ScenarioRunActions
             scenario={null}
             isRunning={false}
             onRunAgain={vi.fn()}
             onEditScenario={vi.fn()}
           />,
-          { wrapper: Wrapper },
         );
 
         expect(container.innerHTML).toBe("");

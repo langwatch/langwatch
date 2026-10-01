@@ -24,9 +24,7 @@ function describeSnapshotConnection({
 /** Ops landing page; always polls (subscriptions routed at host level). */
 export default function OpsDashboardScreen() {
   const payloadStore = useOpsOverlay("payloadStore");
-  const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    refetchInterval: 5000,
-  });
+  const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {});
 
   const data = snapshot.data ?? null;
 

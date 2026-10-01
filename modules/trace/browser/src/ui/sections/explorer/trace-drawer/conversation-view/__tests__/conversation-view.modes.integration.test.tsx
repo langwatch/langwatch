@@ -2,8 +2,8 @@
  * The conversation's mode segment.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -81,14 +81,12 @@ function renderView({
   currentTraceId?: string;
   fallbackTurns?: TraceListItem[];
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationView
-        conversationId={conversationId}
-        currentTraceId={currentTraceId}
-        fallbackTurns={fallbackTurns}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConversationView
+      conversationId={conversationId}
+      currentTraceId={currentTraceId}
+      fallbackTurns={fallbackTurns}
+    />,
   );
 }
 

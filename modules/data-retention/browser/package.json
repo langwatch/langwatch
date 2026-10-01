@@ -20,11 +20,10 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:"
   },
   "devDependencies": {

@@ -61,7 +61,9 @@ describe("PostgresAuthzAdapter", () => {
       "grants",
       "migration",
       "pipeline",
+      "platformOperators",
       "sessionVersions",
+      "userStandings",
     ]);
     expect(built.authz).toBeInstanceOf(AuthzServiceContract);
     expect(built.grants).toBeInstanceOf(AuthzGrantsServiceContract);

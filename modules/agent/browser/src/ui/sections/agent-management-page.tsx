@@ -1,12 +1,3 @@
-import {
-  useAgentManagement,
-  type AgentManagementFeedback,
-  type AgentManagementLifecycle,
-} from "../../behavior/use-agent-management.ts";
-export type {
-  AgentManagementFeedback,
-  AgentManagementLifecycle,
-} from "../../behavior/use-agent-management.ts";
 import type {
   AgentCopy,
   AgentWithFields as StoredAgentWithFields,
@@ -19,6 +10,11 @@ import { Grid, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import { Bot, Plus } from "lucide-react";
 import { Fragment, type ComponentType, type ReactNode } from "react";
 
+import {
+  useAgentManagement,
+  type AgentManagementFeedback,
+  type AgentManagementLifecycle,
+} from "../../behavior/use-agent-management.ts";
 import type { AgentClient, ConnectedAgentBrowser } from "../../model/agent-client.ts";
 
 /**

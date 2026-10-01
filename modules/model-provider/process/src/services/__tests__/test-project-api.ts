@@ -138,27 +138,12 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.archive?.(input) ?? this.unimplemented("archive");
   }
 
-  regenerateLegacyProjectKey(
-    input: Parameters<ProjectApi["regenerateLegacyProjectKey"]>[0],
-  ): ReturnType<ProjectApi["regenerateLegacyProjectKey"]> {
-    return (
-      this.overrides.regenerateLegacyProjectKey?.(input) ??
-      this.unimplemented("regenerateLegacyProjectKey")
-    );
-  }
-
   findIdByLegacyApiKey(
     input: Parameters<ProjectApi["findIdByLegacyApiKey"]>[0],
   ): ReturnType<ProjectApi["findIdByLegacyApiKey"]> {
     return (
       this.overrides.findIdByLegacyApiKey?.(input) ?? this.unimplemented("findIdByLegacyApiKey")
     );
-  }
-
-  rotateLegacyApiKey(
-    input: Parameters<ProjectApi["rotateLegacyApiKey"]>[0],
-  ): ReturnType<ProjectApi["rotateLegacyApiKey"]> {
-    return this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
   }
 
   findTraceSharingConfig(

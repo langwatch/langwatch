@@ -71,7 +71,7 @@ import {
   workflowCreatedEventDataSchema,
 } from "@langwatch/workflow-contract";
 
-import type { NurturingApp } from "../app/nurturing.app.ts";
+import type { NurturingModule } from "../app/nurturing.app.ts";
 import {
   checkoutCompletedSignal,
   evaluationRanSignal,
@@ -300,6 +300,6 @@ export function buildNurturingPipeline(deps: {
 
 export const nurturingEventing = defineEventingModule({
   pipeline: NURTURING_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, NurturingApp>) => app.pipeline(),
+  build: ({ app }: EventingSetup<never, NurturingModule>) => app.pipeline(),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

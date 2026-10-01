@@ -1,3 +1,9 @@
+import type { RestIdentity } from "@langwatch/api/hosting";
+import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
+import {
+  ConnectServiceNotEntitledError,
+  type LicensingApi,
+} from "@langwatch/enterprise-licensing-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -6,16 +12,7 @@
  * The control-plane end of a hosted call: the gateway resolved the caller and
  * sends it beside the caller's own JSON, which never names the key or tenant.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  createCanonicalFamilyErrorHandler,
-  createRestRuntime,
-  type RestIdentity,
-} from "@langwatch/api/rest";
-import {
-  ConnectServiceNotEntitledError,
-  type LicensingApi,
-} from "@langwatch/enterprise-licensing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { connectHostedRest } from "../connect-hosted.rest.ts";
@@ -34,7 +31,7 @@ const gatewayDoor: RestIdentity = {
 function mount(app: Partial<LicensingApi>) {
   const hono = createRestRuntime({
     identity: gatewayDoor,
-    doors: { internalSecret: gatewayDoor },
+    doors: { internal_secret: gatewayDoor },
   }).mount(connectHostedRest.router(), {
     app: () => createApiFixture<LicensingApi>(app),
     onError: createCanonicalFamilyErrorHandler({

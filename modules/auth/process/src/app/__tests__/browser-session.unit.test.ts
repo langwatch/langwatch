@@ -113,6 +113,7 @@ class Sessions implements AuthSessionRepository {
 
 class Cache implements AuthSessionCacheRepository {
   readonly values = new Map<string, string>();
+  readonly ttls = new Map<string, number>();
   readonly deleted = vi.fn();
 
   async findValues({ key }: { key: string }): Promise<string[]> {
@@ -120,8 +121,17 @@ class Cache implements AuthSessionCacheRepository {
     return value === undefined ? [] : [value];
   }
 
-  async set({ key, value }: { key: string; value: string }): Promise<void> {
+  async set({
+    key,
+    value,
+    ttlSeconds,
+  }: {
+    key: string;
+    value: string;
+    ttlSeconds: number;
+  }): Promise<void> {
     this.values.set(key, value);
+    this.ttls.set(key, ttlSeconds);
   }
 
   async delete({ key }: { key: string }): Promise<void> {
@@ -290,6 +300,23 @@ describe("BrowserSessionService", () => {
       });
     });
 
+    it("rewrites the kept device's index with that session's own remaining lifetime", async () => {
+      const cache = new Cache();
+      const inOneHour = NOW.epochMilliseconds + 3_600_000;
+      cache.values.set(
+        "better-auth:active-sessions-user-1",
+        JSON.stringify([
+          { token: "token-1", expiresAt: inOneHour },
+          { token: "token-2", expiresAt: inOneHour },
+        ]),
+      );
+      const { service: auth } = service({ cache });
+
+      await auth.revokeOtherBrowserSessions({ userId: "user-1", keepSessionId: "session-1" });
+
+      expect(cache.ttls.get("better-auth:active-sessions-user-1")).toBe(3_600);
+    });
+
     it("falls back to persisted session tokens when the active-session index is malformed", async () => {
       const cache = new Cache();
       cache.values.set("better-auth:active-sessions-user-1", "not-json");
@@ -324,6 +351,57 @@ describe("BrowserSessionService", () => {
 
       expect(sessions.deletedAll).toHaveBeenCalledWith({ userId: "user-1" });
     });
+  });
+
+  describe("when any browser session revocation runs", () => {
+    const revocations: [string, (subject: BrowserSessionService) => Promise<unknown>][] = [
+      ["all sessions", (subject) => subject.revokeAllBrowserSessions({ userId: "user-1" })],
+      ["one session", (subject) => subject.revokeBrowserSession({ sessionId: "session-2" })],
+      [
+        "every other session",
+        (subject) =>
+          subject.revokeOtherBrowserSessions({ userId: "user-1", keepSessionId: "session-1" }),
+      ],
+      [
+        "one of their own sessions",
+        (subject) => subject.endBrowserSession({ userId: "user-1", sessionId: "session-2" }),
+      ],
+    ];
+
+    /** @scenario "Every browser session revocation deletes rows before clearing the cached sessions" */
+    it.each(revocations)(
+      "deletes the rows for %s before clearing the cache",
+      async (_name, revoke) => {
+        const order: string[] = [];
+        const cache = new Cache();
+        cache.deleted.mockImplementation(() => order.push("cache"));
+        const sessions = new Sessions();
+        sessions.records = [
+          {
+            id: "session-2",
+            identifierId: "identifier-1",
+            amr: ["pwd"],
+            ipAddress: "203.0.113.4",
+            userAgent: "Mozilla/5.0",
+            createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+            updatedAt: Temporal.Instant.from("2026-01-02T00:00:00Z"),
+            expires: Temporal.Instant.from("2026-02-01T00:00:00Z"),
+          },
+        ];
+        for (const deleted of [sessions.deletedAll, sessions.deletedById, sessions.deletedOthers]) {
+          deleted.mockImplementation(async () => {
+            order.push("rows");
+            return 1;
+          });
+        }
+
+        await revoke(service({ sessions, cache }).service);
+
+        expect(order[0]).toBe("rows");
+        expect(order).toContain("cache");
+        expect(order.lastIndexOf("rows")).toBeLessThan(order.indexOf("cache"));
+      },
+    );
   });
 
   describe("when somebody reads the browsers they are signed in on", () => {

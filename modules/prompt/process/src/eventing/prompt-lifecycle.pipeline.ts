@@ -7,7 +7,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { PromptApp } from "../app/prompt.app.ts";
+import type { PromptModule } from "../app/prompt.app.ts";
 import type { PromptRepositories } from "../repositories/prompt.repositories.ts";
 import {
   RecordPromptCreatedCommand,
@@ -39,6 +39,6 @@ export function buildPromptLifecyclePipeline(): PromptLifecyclePipeline {
 
 export const promptLifecycleEventing = defineEventingModule({
   pipeline: PROMPT_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<PromptRepositories, PromptApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<PromptRepositories, PromptModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

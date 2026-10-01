@@ -4,7 +4,7 @@
  * invitation — and no email can go out for a record that was rolled back.
  * @see specs/members/update-pending-invitation.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { OrganizationInviteRepository } from "../../repositories/organization-invite.repository.ts";

@@ -4,9 +4,9 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AgentWithFields } from "@langwatch/agent-contract";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -53,12 +53,10 @@ const { AgentManagementScreen } = await import("../agent-management-screen.tsx")
 
 async function openCardMenu() {
   const host = new VoiceTestHost();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentManagementHostProvider value={host}>
-        <AgentManagementScreen />
-      </AgentManagementHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AgentManagementHostProvider value={host}>
+      <AgentManagementScreen />
+    </AgentManagementHostProvider>,
   );
   const user = userEvent.setup();
   await user.click(await screen.findByLabelText(`Actions for ${voiceAgent.name}`));

@@ -3,7 +3,7 @@
  * credentials, so tenancy is the whole game: both writes authorize against the
  * scope the application resolves, never the caller-supplied `projectId`.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { costRuleMatchingSpansPreviewSchema, modelLimitsSchema } from "./model-cost-preview.ts";

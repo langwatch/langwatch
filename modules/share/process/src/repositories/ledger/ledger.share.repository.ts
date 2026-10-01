@@ -3,7 +3,7 @@
  * reads use the compatible ShareLink head. GrantUsage owns view counts; the
  * ShareLink count is its rollback-safe mirror (ADR-092, decision 22).
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   AUTHZ_SHARE_PERMISSION,
   type AuthzApi,

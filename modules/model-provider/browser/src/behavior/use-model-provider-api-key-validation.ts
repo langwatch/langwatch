@@ -1,7 +1,7 @@
 import { describeError } from "@langwatch/browser-host/errors";
-import { explainSerializedError } from "@langwatch/error-presentation/presentation";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { explainSerializedError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useCallback, useState } from "react";
 
 import { api } from "./model-provider-api.ts";

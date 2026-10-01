@@ -1,14 +1,13 @@
 import { CheckboxCard, Box, chakra, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import {
-  type FacetItem,
-  type FacetValueState,
-  formatCount,
-  paletteFromColor,
-} from "@langwatch/trace-browser-kit";
 import { Ban, Minus } from "lucide-react";
 import { memo, useCallback } from "react";
 
+import {
+  type FacetItem,
+  type FacetValueState,
+} from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
+import { formatCount, paletteFromColor } from "./utils.ts";
 
 const MIN_VISIBLE_FILL_PCT = 4;
 

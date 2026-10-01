@@ -1,10 +1,11 @@
+import { renderHook } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  * @see specs/features/onboarding/guided-welcome-takeover.feature
  */
-import { guidedProvidersFor } from "@langwatch/onboarding-browser-kit";
-import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { guidedProvidersFor } from "../../model/guided-providers.ts";
 
 const assignRole = vi.fn().mockResolvedValue({});
 const recordProvider = vi.fn().mockResolvedValue({});

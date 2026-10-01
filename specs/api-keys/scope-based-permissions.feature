@@ -204,10 +204,10 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then Traces resets to "None" because Write exceeds my Viewer ceiling on Team Beta
 
   @integration @unimplemented
-  Scenario: Service key bypasses creator ceiling
+  Scenario: A service key is offered every permission its creator's organization role holds
     Given I am an organization admin
     When I create a service key with "Restricted" permissions
-    Then all resource menus offer None, Read, and Write regardless of my personal role
+    Then each resource menu offers the levels my organization role holds, and no more
 
   # ── Create flow ─────────────────────────────────────────────
 

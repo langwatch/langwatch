@@ -1,9 +1,7 @@
 import type { EvaluationServerConfig } from "@langwatch/evaluation-contract";
 
-import type { EvaluationInstallEnvironment } from "../app/evaluation.members.ts";
-
 /** The evaluator variables main read from the environment, from this module's declared config. */
-export class EvaluatorEnvironmentService implements EvaluationInstallEnvironment {
+export class EvaluatorEnvironmentService {
   static create({
     config,
     openAiApiKey,

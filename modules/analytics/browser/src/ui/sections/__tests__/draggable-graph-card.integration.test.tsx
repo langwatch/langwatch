@@ -53,8 +53,8 @@ vi.mock("../../../behavior/analytics-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/analytics-browser-kit", () => ({
-  usePeriodSelector: () => ({
+vi.mock("../../../behavior/use-analytics-period.ts", () => ({
+  useAnalyticsPeriod: () => ({
     period: { startDate: new Date(0), endDate: new Date(1) },
   }),
 }));

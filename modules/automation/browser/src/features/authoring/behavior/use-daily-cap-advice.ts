@@ -2,7 +2,7 @@ import type { NotificationCadence } from "@langwatch/automation-contract";
 import { nowInstant } from "@langwatch/time";
 import { useMemo } from "react";
 
-import { api } from "../../../behavior/automation-api.ts";
+import { useDailyCap, useTracePreview } from "../../../behavior/use-automation-reads.ts";
 import { type DailyCapAdvice, dailyCapAdvice, isPersistAction } from "../model/daily-cap-advice.ts";
 import { estimateRatePerDay } from "../model/firing-rate.ts";
 
@@ -10,18 +10,6 @@ import { estimateRatePerDay } from "../model/firing-rate.ts";
  *  of cache options, so the two seats never reach different verdicts. */
 export const PREVIEW_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 export const PREVIEW_SORT = { columnId: "time", direction: "desc" as const };
-export const PREVIEW_LIST_OPTIONS = {
-  retry: false,
-  // A long stale window, with `placeholderData: (previous) => previous` at
-  // each call site, keeps the last result on screen while a new query resolves.
-  staleTime: 5 * 60_000,
-  refetchOnWindowFocus: false,
-} as const;
-export const DAILY_CAP_OPTIONS = {
-  staleTime: 10 * 60 * 1000,
-  retry: false,
-  refetchOnWindowFocus: false,
-} as const;
 
 /**
  * The ceiling advice for a step without the match preview on screen (ADR-093
@@ -52,15 +40,12 @@ export function useDailyCapAdvice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimmed]);
 
-  const preview = api.traces.list.useQuery(
-    { projectId, timeRange, sort: PREVIEW_SORT, page: 1, pageSize: 5, query: trimmed },
-    { enabled: isCapGoverned, ...PREVIEW_LIST_OPTIONS, placeholderData: (previous) => previous },
-  );
+  const preview = useTracePreview({
+    input: { projectId, timeRange, sort: PREVIEW_SORT, page: 1, pageSize: 5, query: trimmed },
+    enabled: isCapGoverned,
+  });
 
-  const capStatus = api.automation.getDailyCap.useQuery(
-    { projectId },
-    { enabled: isCapGoverned, ...DAILY_CAP_OPTIONS },
-  );
+  const capStatus = useDailyCap({ projectId, enabled: isCapGoverned });
 
   return dailyCapAdvice({
     action,

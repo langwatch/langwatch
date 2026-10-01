@@ -1,8 +1,3 @@
-/**
- * The `/api/prompts` family over the runtime a process mounts it on, with the
- * two facts the process resolves bound to fixed answers.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -11,10 +6,15 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * The `/api/prompts` family over the runtime a process mounts it on, with the
+ * two facts the process resolves bound to fixed answers.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 
-import { PromptApp } from "#app/prompt.app";
+import { PromptModule } from "#app/prompt.app";
 
 import { defaultModelFixture } from "../../__tests__/default-model.test-fixture.ts";
 import type { PromptService } from "../../services/prompt.service.ts";
@@ -41,8 +41,8 @@ const renderRefusal: RestErrorHandler = (error, c) => {
 };
 
 /** The real application over a scripted engine, so the family's own operations run. */
-export function buildPromptApp(prompts: PromptService): PromptApp {
-  return PromptApp.createWithPrompts(
+export function buildPromptApp(prompts: PromptService): PromptModule {
+  return PromptModule.createWithPrompts(
     {
       dependencies: {
         projects: createApiFixture<ProjectApi>(),

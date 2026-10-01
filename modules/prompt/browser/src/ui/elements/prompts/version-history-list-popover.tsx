@@ -1,4 +1,5 @@
 import { Avatar } from "@langwatch/design-system/avatar";
+import { HistoryIcon } from "@langwatch/design-system/history-icon";
 import { Popover } from "@langwatch/design-system/popover";
 import {
   Box,
@@ -12,7 +13,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { HistoryIcon } from "@langwatch/model-provider-browser-kit";
 import { useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 

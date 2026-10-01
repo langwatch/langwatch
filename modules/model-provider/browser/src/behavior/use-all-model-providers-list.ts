@@ -34,10 +34,6 @@ export function useAllModelProvidersList() {
     {
       enabled: !!organizationId && canViewOrg,
       retry: false,
-      // A focus refetch mid-edit would re-seed whichever form is reading this
-      // list and wipe the user's in-progress typing — the same failure shape
-      // #5357 fixed for the model picker.
-      refetchOnWindowFocus: false,
     },
   );
   const projectQuery = modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
@@ -45,7 +41,6 @@ export function useAllModelProvidersList() {
     {
       enabled: !!projectId && !canViewOrg,
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
   const activeQuery = canViewOrg ? orgQuery : projectQuery;

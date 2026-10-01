@@ -25,7 +25,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { GovernanceApp } from "../app/governance.app.ts";
+import type { GovernanceModule } from "../app/governance.app.ts";
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import type { CostRollupWatchProcess } from "./cost-rollup-watch.process.ts";
 import { COST_ROLLUP_WATCH_PROCESS_NAME } from "./cost-rollup-watch.process.ts";
@@ -160,7 +160,7 @@ export class PulledUsageEventingAdapter {
 /** The api only sends; the worker also hosts main's cost rollup fold (`pipeline.ts` on main). */
 export const pulledUsageEventing = defineEventingModule({
   pipeline: PULLED_USAGE_PIPELINE_NAME,
-  build: ({ app, participation }: EventingSetup<GovernanceRepositories, GovernanceApp>) =>
+  build: ({ app, participation }: EventingSetup<GovernanceRepositories, GovernanceModule>) =>
     app.pulledUsagePipeline({ participation }),
   connect: ({ app, commands }) => app.connectPulledUsage(commands),
 });

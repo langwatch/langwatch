@@ -6,10 +6,10 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import { useEffect, useState } from "react";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
+import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /** One replica, as the picker lists it. */
 type WorkflowCopy = { id: string; name: string; fullPath: string };

@@ -15,39 +15,30 @@ export type BroadcastRateLimits = Readonly<{
   subscriber: BroadcastTenantRateLimiterService;
 }>;
 
-export type BroadcastEventType =
-  | "trace_updated"
-  | "simulation_updated"
-  | "export_progress"
-  | "presence_updated"
-  | "presence_cursor"
-  // Fires when a tenant's `discover` snapshot is warm in Redis; the client
-  // invalidates its query cache and refetches via tRPC. Payload is empty.
-  | "discover_updated"
-  // Fires when a Langy conversation's fold projection advances (ADR-046). The
-  // panel subscribes and cancels + invalidates its slim conversation list /
-  // detail queries, refetching the projection — the signal carries only the
-  // conversation id, never message content.
-  | "langy_conversation_updated"
-  // Fires when an experiment's workbench state is saved through the service
-  // seam, whoever wrote it: a person, the agent, or an API caller. The payload
-  // carries the experiment id, slug and new version only — clients refetch, so
-  // no workbench state rides the tenant-wide channel.
-  | "experiment_updated";
-
-const ALL_EVENT_TYPES: BroadcastEventType[] = [
+/** Every `broadcast:*` channel this fan-out relays; the one list of them (record §3.3). */
+const ALL_EVENT_TYPES = [
   "trace_updated",
   "simulation_updated",
   "export_progress",
   "presence_updated",
   "presence_cursor",
+  // A tenant's `discover` snapshot is warm in Redis; the payload is empty.
   "discover_updated",
+  // A Langy conversation's fold advanced (ADR-046); the conversation id and cursor, never content.
   "langy_conversation_updated",
+  // A workbench save landed: experiment id, slug and version, never the state.
   "experiment_updated",
-];
+  // A read's contract named a committed event; the payload is `{ path }` only (read-hints.feature).
+  "read_invalidated",
+] as const;
+
+export type BroadcastEventType = (typeof ALL_EVENT_TYPES)[number];
+
+/** eventing's READ_HINT_BROADCAST_CHANNEL: read hints arrive on the framework's own channel. */
+const READ_HINT_CHANNEL = "eventing:read_invalidated";
 
 function redisChannel(eventType: BroadcastEventType): string {
-  return `broadcast:${eventType}`;
+  return eventType === "read_invalidated" ? READ_HINT_CHANNEL : `broadcast:${eventType}`;
 }
 
 export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmitter {
@@ -99,22 +90,13 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     }
   }
 
-  async publish(input: {
-    projectId: string;
-    event: string;
-    channel:
-      | "presence_updated"
-      | "presence_cursor"
-      | "export_progress"
-      | "langy_conversation_updated";
-    rateLimited: boolean;
-  }): Promise<void> {
+  async publish(input: Parameters<PresenceBroadcast["publish"]>[0]): Promise<void> {
     if (input.rateLimited) {
       await this.broadcastToTenantRateLimited({
         tenantId: input.projectId,
         event: input.event,
         eventType: input.channel,
-        tier: "delta",
+        tier: input.tier ?? "delta",
       });
       return;
     }
@@ -263,7 +245,8 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     tier?: "structural" | "delta";
   }): Promise<boolean> {
     if (!this.active) throw new BroadcasterNotActiveError();
-    if (!this.senderRateLimiter.consume(tenantId, tier)) {
+    // Each channel spends its own allowance per tenant: deltas never starve cursor ticks.
+    if (!this.senderRateLimiter.consume(`${tenantId}:${eventType}`, tier)) {
       return false;
     }
     await this.broadcastToTenant(tenantId, event, eventType);

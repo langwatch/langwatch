@@ -13,7 +13,7 @@ import {
   scenarioCreatedEventSchema,
 } from "@langwatch/scenario-contract";
 
-import type { ScenarioApp } from "../app/scenario.app.ts";
+import type { ScenarioModule } from "../app/scenario.app.ts";
 import {
   RecordScenarioCreatedCommand,
   type RecordScenarioCreatedCommandData,
@@ -40,6 +40,6 @@ export function buildScenarioLifecyclePipeline(): ScenarioLifecyclePipeline {
 
 export const scenarioLifecycleEventing = defineEventingModule({
   pipeline: SCENARIO_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, ScenarioApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<never, ScenarioModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

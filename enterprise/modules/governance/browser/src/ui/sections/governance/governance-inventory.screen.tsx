@@ -69,7 +69,6 @@ import {
   PULL_SCHEDULE_DEFAULTS,
   recommendedPullSchedule,
 } from "../../../features/ingestion-sources/model/pull-cadence.ts";
-import { SOURCE_HEALTH_REFRESH } from "../../../features/ingestion-sources/model/source-health-display.ts";
 import { SAMPLE_INGESTION_SOURCES } from "../../../features/ingestion-sources/sample-ingestion-sources.ts";
 import { CatalogLayoutControl } from "../../../features/ingestion-sources/toolCatalog/catalog-layout-control.tsx";
 import { InventoryCatalogPane } from "../../../features/ingestion-sources/toolCatalog/inventory-catalog-pane.tsx";
@@ -599,7 +598,10 @@ function useIngestionSourcesPage() {
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
     { organizationId: orgId },
-    { enabled: !!orgId && canRead, ...SOURCE_HEALTH_REFRESH },
+    {
+      enabled: !!orgId && canRead,
+      // needs a read hint: ingestion source pulled (health changes only on a pull)
+    },
   );
 
   const panes = useInventoryPanes({ orgId, canManageTools });
@@ -881,9 +883,7 @@ function useAddParam({
  * ANOMALY RULES USED TO BE A FOURTH TAB AND IS NOT ONE ANY MORE. A rule is a
  * standing instruction about what to watch for, not a thing the organization
  * runs, so it belongs with alerts and signals rather than in an inventory.
- * `AnomalyRulesTab` itself is untouched and still exported, because the
- * standalone page at ee/governance/dashboard/pages/anomaly-rules.tsx renders
- * the same component.
+ * `AnomalyRulesTab` is kept, though no route renders it yet.
  *
  * The Catalog pane is `ToolCatalogTab`, over the page's own registry read;
  * registering or editing a tool opens `AiToolEntryDrawer` from the page.

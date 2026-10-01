@@ -8,11 +8,10 @@ import { SchedulerRowActions } from "./scheduler-row-actions.tsx";
 
 /** App transport adapter for the controlled scheduler presentation surface. */
 export function SchedulerContent() {
-  const jobsQuery = api.ops.listScheduledJobs.useQuery({ limit: 200 }, { refetchInterval: 10_000 });
+  const jobsQuery = api.ops.listScheduledJobs.useQuery({ limit: 200 }, {});
   const actionsQuery = api.ops.listSchedulerActions.useQuery(
     { limit: 10 },
     {
-      refetchInterval: 30_000,
       enabled: (jobsQuery.data?.length ?? 0) > 0,
     },
   );

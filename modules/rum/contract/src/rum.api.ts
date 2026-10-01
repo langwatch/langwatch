@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { RUM_SESSION_HEADER } from "@langwatch/react-rum/constants";
 import { z } from "zod";
 

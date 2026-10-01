@@ -1,8 +1,4 @@
-import type {
-  TrpcContract,
-  TrpcContractMember,
-  TrpcContractMembers,
-} from "@langwatch/kernel/contract";
+import type { TrpcContract, TrpcContractMember, TrpcContractMembers } from "@langwatch/module";
 /**
  * Several built routers, one namespace claim. A namespace outgrowing one declaration chain
  * is declared in fragments (builder's recursive generics give up at ~50 procedures).

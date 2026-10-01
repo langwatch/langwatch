@@ -12,7 +12,7 @@ import type {
   SelfHostedInstancePage,
   SignedIssuedLicense,
 } from "@langwatch/enterprise-licensing-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { OpsOperator } from "@langwatch/ops-contract";
 
 /**

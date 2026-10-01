@@ -4,7 +4,7 @@
  * injected value these screens are allowed to read.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 import { createElement } from "react";
 import { z } from "zod";
 
@@ -23,7 +23,7 @@ function annotationList(view: AnnotationView) {
   };
 }
 
-export const annotationWeb = defineWebModule("annotation")
+export const annotationWeb = defineBrowserModule("annotation")
   .withHosts({
     requires: ["AnnotationHostApi", "AnnotationScoresHostApi"],
     mounts: {

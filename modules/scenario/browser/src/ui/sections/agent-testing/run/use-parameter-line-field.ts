@@ -5,10 +5,10 @@
  */
 
 import {
-  highlightedRow,
+  pickHighlightedRow,
   navigateSuggestion,
   type SuggestionUIState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { DeclaredParameter } from "../../../../behavior/suites/use-run-suite.ts";
@@ -85,7 +85,7 @@ function handleListKey({
   const action = KEY_ACTIONS[event.key];
   if (!action) return;
   if (action === "accept") {
-    const row = highlightedRow(ui);
+    const row = pickHighlightedRow(ui);
     if (!row) return;
     event.preventDefault();
     onAccept(row);

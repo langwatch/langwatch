@@ -4,8 +4,8 @@
  * evaluator's spans would become a separate evaluation-origin trace (#8192).
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

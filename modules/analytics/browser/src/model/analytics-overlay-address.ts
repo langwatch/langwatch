@@ -34,7 +34,7 @@ function withoutDrawerKeys(
   return next;
 }
 
-/** Automation's drawer, prefilled with one graph as main's `openDrawer("automation")` was. */
+/** Automation's drawer, as main's `openDrawer("automation")`; a graph prefills it. */
 export function automationDrawerAddress({
   current,
   graphId,
@@ -42,7 +42,7 @@ export function automationDrawerAddress({
   seriesName,
 }: {
   current: Readonly<Record<string, string | undefined>>;
-  graphId: string;
+  graphId?: string;
   automationId?: string;
   seriesName?: string;
 }): AnalyticsQueryWrite {

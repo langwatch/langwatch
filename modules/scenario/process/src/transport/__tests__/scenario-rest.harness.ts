@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -14,13 +13,14 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { HTTPException } from "hono/http-exception";
@@ -34,7 +34,7 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import {
-  ScenarioApp,
+  ScenarioModule,
   type ScenarioReadOnlyClickHouse,
   type ScenarioRedis,
   type ScenarioTabStore,
@@ -50,6 +50,7 @@ export async function createScenarioRestTestApp(
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
     redis?: Partial<ScenarioRedis>;
+    presence?: Partial<PresenceApi>;
     traces?: Partial<TraceApi>;
     plans?: Partial<EntitlementApi>;
     featureFlags?: Partial<FeatureFlagApi>;
@@ -62,7 +63,7 @@ export async function createScenarioRestTestApp(
   );
   const redis = createApiFixture<ScenarioRedis>(options.redis ?? {}, "Redis");
 
-  const app = await ScenarioApp.create({
+  const app = await ScenarioModule.create({
     repositories: {
       ...MemoryScenarioRepositories.create(),
       ...(options.tabs
@@ -85,6 +86,7 @@ export async function createScenarioRestTestApp(
       presence: createApiFixture<PresenceApi>({
         getTenantEmitter: () => new EventEmitter(),
         cleanupTenantEmitter: () => {},
+        ...options.presence,
       }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),

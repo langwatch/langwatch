@@ -4,9 +4,9 @@
  *   ("An action the browser ran is saved before the agent is told it worked")
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useEvaluationsV3Store } from "../use-evaluations-v3-store.ts";
@@ -70,9 +70,7 @@ const queryClient = new QueryClient({
 });
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <QueryClientProvider client={queryClient}>
-    <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-  </QueryClientProvider>
+  <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 );
 
 let autosave: ReturnType<typeof useAutosaveEvaluationsV3> | null = null;
@@ -120,7 +118,11 @@ describe("an agent edit reaching the server", () => {
 
   describe("when the handler asks for the save before answering", () => {
     beforeEach(async () => {
-      render(<TestComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestComponent />
+        </Wrapper>,
+      );
       applyAgentEdit();
 
       // Deliberately no timer advance: the debounce has not fired, so if the
@@ -173,7 +175,11 @@ describe("an agent edit reaching the server", () => {
         };
       });
 
-      render(<TestComponent />, { wrapper: Wrapper });
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestComponent />
+        </Wrapper>,
+      );
       applyAgentEdit();
 
       let first: Promise<AutosaveOutcome> | undefined;

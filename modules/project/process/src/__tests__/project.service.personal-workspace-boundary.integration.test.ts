@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
@@ -12,6 +7,11 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

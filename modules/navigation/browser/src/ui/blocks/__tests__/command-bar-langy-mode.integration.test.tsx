@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CommandBarLangyMode } from "../command-bar-langy-mode.tsx";
@@ -31,11 +31,7 @@ function renderMode(
     ...overrides,
   };
 
-  const view = render(
-    <ChakraProvider value={defaultSystem}>
-      <CommandBarLangyMode {...props} />
-    </ChakraProvider>,
-  );
+  const view = renderWithDesignSystem(<CommandBarLangyMode {...props} />);
 
   return { ...view, props };
 }
@@ -72,16 +68,14 @@ describe("CommandBarLangyMode", () => {
     // The parent surface listens outside the mode's own tree, as the palette does.
     const parent = document.body.appendChild(document.createElement("div"));
     parent.addEventListener("keydown", parentKeyDown);
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <CommandBarLangyMode
-          query="question"
-          onQueryChange={() => undefined}
-          onSubmit={() => undefined}
-          onExit={onExit}
-          exiting={false}
-        />
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <CommandBarLangyMode
+        query="question"
+        onQueryChange={() => undefined}
+        onSubmit={() => undefined}
+        onExit={onExit}
+        exiting={false}
+      />,
       { container: parent.appendChild(document.createElement("div")) },
     );
 
@@ -95,16 +89,14 @@ describe("CommandBarLangyMode", () => {
 
   it("steps back on Backspace only when the field is already empty", () => {
     const onExit = vi.fn();
-    const { rerender } = render(
-      <ChakraProvider value={defaultSystem}>
-        <CommandBarLangyMode
-          query="question"
-          onQueryChange={() => undefined}
-          onSubmit={() => undefined}
-          onExit={onExit}
-          exiting={false}
-        />
-      </ChakraProvider>,
+    const { rerender } = renderWithDesignSystem(
+      <CommandBarLangyMode
+        query="question"
+        onQueryChange={() => undefined}
+        onSubmit={() => undefined}
+        onExit={onExit}
+        exiting={false}
+      />,
     );
     const input = screen.getByRole("textbox", { name: "Ask Langy" });
 
@@ -112,15 +104,13 @@ describe("CommandBarLangyMode", () => {
     expect(onExit).not.toHaveBeenCalled();
 
     rerender(
-      <ChakraProvider value={defaultSystem}>
-        <CommandBarLangyMode
-          query=""
-          onQueryChange={() => undefined}
-          onSubmit={() => undefined}
-          onExit={onExit}
-          exiting={false}
-        />
-      </ChakraProvider>,
+      <CommandBarLangyMode
+        query=""
+        onQueryChange={() => undefined}
+        onSubmit={() => undefined}
+        onExit={onExit}
+        exiting={false}
+      />,
     );
     fireEvent.keyDown(input, { key: "Backspace" });
     expect(onExit).toHaveBeenCalledTimes(1);

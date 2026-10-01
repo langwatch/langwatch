@@ -11,7 +11,11 @@ import { nowInstant } from "@langwatch/time";
 import type { Trace } from "@langwatch/trace-contract";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useActiveAnnotationScores } from "../../../behavior/reads/use-annotation-reads.ts";
+import {
+  useTracesWithSpansByThreadIds,
+  useFormattedSpansDigest,
+} from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import {
   availableExpansionsFor,
   datasetEntriesFor,
@@ -85,10 +89,7 @@ function useThreadTraces({
       ),
     [traces],
   );
-  return api.traces.getTracesWithSpansByThreadIds.useQuery(
-    { projectId: projectId ?? "", threadIds, withEditOverlay },
-    { enabled: !!projectId && threadIds.length > 0, refetchOnWindowFocus: false },
-  ).data;
+  return useTracesWithSpansByThreadIds({ projectId, threadIds, withEditOverlay }).data;
 }
 
 /**
@@ -209,10 +210,7 @@ export const TracesMapping = ({
     enabled: !!project,
     anchor: "all",
   });
-  const annotationScoreOptions = api.annotationScore.getAllActive.useQuery(
-    { projectId: projectId ?? "" },
-    { enabled: !!projectId, refetchOnWindowFocus: false },
-  ).data;
+  const annotationScoreOptions = useActiveAnnotationScores({ projectId }).data;
   const threadTraces = useThreadTraces({
     projectId,
     traces,
@@ -236,21 +234,12 @@ export const TracesMapping = ({
 
   // A server-only column quotes the whole trace, read the way the mapped traces
   // were, so an uncorrected read would put back what the other columns leave out.
-  const formattedDigests = api.traces.getFormattedSpansDigest.useQuery(
-    {
-      projectId: projectId ?? "",
-      traceIds: traces.map((t) => t.trace_id),
-      withEditOverlay: shouldApplyCorrections,
-    },
-    {
-      enabled:
-        !!projectId &&
-        traces.length > 0 &&
-        mapsAnySource({ mapping, sources: SERVER_ONLY_TRACE_SOURCES }),
-      refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
-    },
-  ).data;
+  const formattedDigests = useFormattedSpansDigest({
+    projectId,
+    traceIds: traces.map((t) => t.trace_id),
+    withEditOverlay: shouldApplyCorrections,
+    enabled: mapsAnySource({ mapping, sources: SERVER_ONLY_TRACE_SOURCES }),
+  }).data;
 
   const availableExpansions = useMemo(() => availableExpansionsFor(mapping), [mapping]);
   const expansions = useMemo(

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `/api/evaluators` family over the runtime a process mounts it on:
@@ -17,6 +16,7 @@ import {
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createEvaluatorRest } from "../evaluator.rest.ts";

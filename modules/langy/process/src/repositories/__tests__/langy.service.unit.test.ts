@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * What is left of `LangyService`'s own behaviour once the composed services own the rest: the
  * feedback cadence.

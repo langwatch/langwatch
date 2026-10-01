@@ -34,4 +34,21 @@ describe("scenario's voice configuration", () => {
       expect(read({ VOICE_TUNNEL: "0" }).voiceTunnel).toBe(true);
     });
   });
+
+  describe("given the worker's runtime class and slot settings", () => {
+    /** @scenario A worker only admits runtime classes it consumes */
+    it("defaults to every class and today's concurrency, and refuses unknown names", () => {
+      expect(read({})).toMatchObject({
+        consumedResourceClasses: ["light", "voice"],
+        slotBudget: 3,
+      });
+      expect(
+        read({ SCENARIO_CONSUMED_RESOURCE_CLASSES: " voice ", SCENARIO_SLOT_BUDGET: "5" }),
+      ).toMatchObject({ consumedResourceClasses: ["voice"], slotBudget: 5 });
+      expect(() => read({ SCENARIO_CONSUMED_RESOURCE_CLASSES: "heavy" })).toThrow(
+        /unknown runtime class/,
+      );
+      expect(() => read({ SCENARIO_SLOT_BUDGET: "0" })).toThrow(/positive integer/);
+    });
+  });
 });

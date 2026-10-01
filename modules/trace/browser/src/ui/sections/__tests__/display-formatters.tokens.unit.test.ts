@@ -1,4 +1,4 @@
-import { formatTokens } from "@langwatch/trace-browser-kit";
+import { formatTokens } from "@langwatch/design-system/display-formatters";
 /**
  * @vitest-environment node
  * @unit

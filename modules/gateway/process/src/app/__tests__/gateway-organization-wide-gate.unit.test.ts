@@ -1,19 +1,19 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
+import type { Encryption } from "@langwatch/process-stores";
+import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/public-rest-api.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { GatewayRequestCredential } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { Encryption } from "@langwatch/process-stores";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const PROJECT_ID = "project_caller";
@@ -25,8 +25,8 @@ const reversible: Encryption = {
   decrypt: (ciphertext) => ciphertext.replace(/^sealed:/, ""),
 };
 
-function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
-  return GatewayApp.create({
+function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: createApiFixture({}),
       entitlement: createApiFixture({}),
@@ -40,6 +40,7 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma: createApiFixture<PrismaClient>({}),
@@ -73,7 +74,7 @@ async function createBudgetGate({
   app,
   credential,
 }: {
-  app: GatewayApp;
+  app: GatewayModule;
   credential: GatewayRequestCredential;
 }): Promise<void> {
   const { actor } = app.actorForCredential({ projectId: PROJECT_ID, credential });

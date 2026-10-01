@@ -9,7 +9,6 @@ import type {
   GithubPullRequestSummary,
   MintInstallationTokenInput,
 } from "../../app/github.app.ts";
-import type { GithubHost } from "../../app/github.members.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
   GithubBranchCheckRow,
@@ -19,6 +18,7 @@ import {
   GithubBranchMappingService,
   type BranchMappingTarget,
 } from "../github-branch-mapping.service.ts";
+import type { GithubHost } from "../github-host.service.ts";
 import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
 
 const NOW = new Date("2026-01-01T00:00:00Z").getTime();

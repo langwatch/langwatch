@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   modelProviderExecutionSchema,
   type ModelProviderApi,
   type ModelProviderExecution,
 } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderEvaluatorModelEnvService } from "../model-provider-evaluator-model-env.service.ts";

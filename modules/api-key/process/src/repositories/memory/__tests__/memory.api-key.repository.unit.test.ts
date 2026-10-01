@@ -1,4 +1,8 @@
-import { AGENT_SANDBOX_API_KEY_NAME, HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
+import {
+  AGENT_SANDBOX_API_KEY_NAME,
+  HIDDEN_SYSTEM_KEY_NAMES,
+  WORKFLOW_RUN_API_KEY_NAME,
+} from "@langwatch/api-key-contract";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -84,6 +88,17 @@ describe("given the memory API-key repository", () => {
       expect(listed.map((key) => key.name)).toEqual(["Live"]);
     });
 
+    /** @scenario "A customer key named like a system key stays visible and manageable" */
+    it("hides a key the system minted and lists a customer key under the same name", async () => {
+      const { repository: keys } = repository();
+      await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME, isSystemManaged: true }));
+      const customers = await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME }));
+
+      const listed = await keys.findForOrganization({ organizationId: ORGANIZATION });
+
+      expect(listed.map((key) => key.id)).toEqual([customers.id]);
+    });
+
     it("gives a member their own keys and the ownerless non-ingestion ones", async () => {
       const { repository: keys } = repository();
       await keys.create(record({ name: "Mine", userId: "user_1" }));
@@ -131,6 +146,25 @@ describe("given the memory API-key repository", () => {
       expect((await keys.findById({ id: elapsed.id }))?.revokedAt).not.toBeNull();
       expect((await keys.findById({ id: live.id }))?.revokedAt).toBeNull();
       expect((await keys.findById({ id: endless.id }))?.revokedAt).toBeNull();
+    });
+
+    it("leaves a customer key of that name alone when only system-minted keys are swept", async () => {
+      const { repository: keys } = repository();
+      const past = fromDate(new Date(Date.now() - 60_000));
+      const minted = await keys.create(
+        record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past, isSystemManaged: true }),
+      );
+      const customers = await keys.create(record({ name: WORKFLOW_RUN_API_KEY_NAME, expiresAt: past }));
+
+      const swept = await keys.revokeExpiredByName({
+        name: WORKFLOW_RUN_API_KEY_NAME,
+        now: fromDate(new Date()),
+        systemManagedOnly: true,
+      });
+
+      expect(swept).toBe(1);
+      expect((await keys.findById({ id: minted.id }))?.revokedAt).not.toBeNull();
+      expect((await keys.findById({ id: customers.id }))?.revokedAt).toBeNull();
     });
   });
 });

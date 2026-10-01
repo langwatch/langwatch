@@ -2,7 +2,7 @@
  * Helper to create type-safe evaluator editor callbacks for experiments-v3.
  */
 
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 
 import type { ComparisonEvaluatorConfig, LocalEvaluatorConfig } from "./types.ts";
 

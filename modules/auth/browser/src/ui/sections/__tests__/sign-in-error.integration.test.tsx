@@ -1,9 +1,9 @@
+import { signInErrorMayCross } from "@langwatch/auth-contract";
 /**
  * @vitest-environment jsdom
  * Sign-in error UI; regression: federated logout on account collision
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { signInErrorMayCross } from "@langwatch/auth-contract";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
@@ -14,11 +14,11 @@ import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx"
 function renderError(error: string, extra: Record<string, string> = {}) {
   return render(
     <MemoryRouter initialEntries={[`/auth/error?error=${error}`]}>
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <WithTestAuthHost route={{ pathname: "/auth/error", query: { error, ...extra } }}>
           <SignInError error={error} />
         </WithTestAuthHost>
-      </ChakraProvider>
+      </DesignSystemProvider>
     </MemoryRouter>,
   );
 }

@@ -11,6 +11,7 @@ import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { TraceDestinationProjectService } from "../../__tests__/support/trace-destination-project-service.ts";
 import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import { GatewayEndUserCapsAdapter } from "../../app/gateway-composition.build.ts";
 import {
@@ -26,6 +27,7 @@ import {
   type GatewaySpendApp,
   GatewaySpendReconciliationService,
 } from "../../services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../../services/gateway-spend-scope.service.ts";
 import {
   type GatewaySpendDoorApi,
   gatewaySpendBillingPlanGate,
@@ -117,7 +119,10 @@ function mountSpendFamily(spend: GatewaySpendApp) {
 function buildApp(): void {
   repo = new ClickHouseGatewaySpendEventsRepository(async () => client);
   budgets = new GatewayBudgetClickHouseRepository(async () => client);
-  const scope = PrismaGatewaySpendScopeRepository.create({ database: prisma });
+  const scope = GatewaySpendScopeService.create({
+    projects: new TraceDestinationProjectService(prisma),
+    virtualKeys: PrismaGatewaySpendScopeRepository.create({ database: prisma }),
+  });
   const refuse = () => {
     throw new Error("the replay path is not under test here");
   };

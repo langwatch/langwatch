@@ -1,4 +1,3 @@
-import { useLangyStore } from "@langwatch/langy-browser-kit";
 import {
   compareLangyEventCursors,
   isLangyTurnProjectionTerminal,
@@ -6,6 +5,7 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { api } from "../../../../behavior/langy-api.ts";
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyDevLog } from "../stores/langy-dev-log.ts";
 
 type LangyUtils = ReturnType<typeof api.useUtils>["langy"];

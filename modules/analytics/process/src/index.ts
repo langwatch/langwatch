@@ -1,13 +1,9 @@
-export { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 export {
-  analyticsServer,
-  type AnalyticsClickHouseClientResolver,
-  type AnalyticsServiceCompositionInput,
+  analyticsProcessModule,
   createAnalyticsComparisonWindow,
-  createAnalyticsService,
   createLegacyFilterMatching,
   createPreconditionTraceData,
-} from "./analytics.server.ts";
+} from "./analytics.module.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
 export {
@@ -28,14 +24,6 @@ export type {
   AnalyticsFilterOptionsLookup,
   AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app.ts";
-
-/**
- * Filter matching without a query engine: the legacy `filters` grammar
- * decided in memory, published because a settled automation match is
- * re-checked in a background process with no ClickHouse round trip to spend.
- */
-export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
-export { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
 
 /**
  * The LangWatchQL workbench: the refusals a caller can act on, and the shapes

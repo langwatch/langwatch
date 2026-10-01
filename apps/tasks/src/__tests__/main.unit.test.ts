@@ -1,3 +1,4 @@
+import { SecretsChain } from "@langwatch/secrets";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveTasksConfig } from "../config.ts";
@@ -43,6 +44,7 @@ function input() {
       redis: null,
       dataplane: { dataplaneFor: () => ({ kind: "shared" as const }) },
     },
+    chain: SecretsChain.start({ environment: {} }),
     environment: {},
     signal: new AbortController().signal,
   };

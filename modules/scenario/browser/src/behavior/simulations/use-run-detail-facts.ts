@@ -6,11 +6,11 @@
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { runParameterValuesSchema } from "@langwatch/scenario-contract";
-import { buildDisplayTitle } from "@langwatch/suite-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 
 import { shouldShowNoResponse } from "../../model/scenario-run-status.utils.ts";
+import { buildDisplayTitle } from "../../model/suite/run-history-transforms.ts";
 import { useTargetNameMap } from "../use-target-name-map.ts";
 import type { ScenarioRunState } from "./use-run-state-stream.ts";
 

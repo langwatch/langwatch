@@ -11,7 +11,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { EvaluationApp } from "../app/evaluation.app.ts";
+import type { EvaluationModule } from "../app/evaluation.app.ts";
 import {
   RecordEvaluationLifecycleCompletedCommand,
   RecordEvaluationRanCommand,
@@ -48,6 +48,6 @@ export function buildEvaluationLifecyclePipeline(): EvaluationLifecyclePipeline 
 
 export const evaluationLifecycleEventing = defineEventingModule({
   pipeline: EVALUATION_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<never, EvaluationApp>) => app.lifecyclePipeline(),
+  build: ({ app }: EventingSetup<never, EvaluationModule>) => app.lifecyclePipeline(),
   connect: ({ app, commands }) => app.connectLifecycleCommands(commands),
 });

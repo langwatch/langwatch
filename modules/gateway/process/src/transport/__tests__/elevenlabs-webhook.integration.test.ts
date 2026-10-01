@@ -5,9 +5,7 @@
  */
 import { createHmac } from "crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
-import { createApp } from "@langwatch/kernel";
 import {
   ModelProviderNotFoundError,
   type ModelProviderApi,
@@ -21,16 +19,18 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp } from "@langwatch/process";
 import { resolvedSecrets } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GatewayApp } from "../../app/gateway.app.ts";
+import { GatewayModule } from "../../app/gateway.app.ts";
 import type { GatewaySpendConfirmation } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
-import { gatewayServer } from "../../gateway.server.ts";
+import { gatewayProcessModule } from "../../gateway.module.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
@@ -130,7 +130,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
     role: "api",
     secrets: (owner, declared) => secretsChain.scopeTo(owner, declared),
   })
-    .withModules([gatewayServer])
+    .withModules([gatewayProcessModule])
     .withConfig({
       gateway: {
         spendSettlementGraceMs: undefined,
@@ -161,10 +161,11 @@ async function mountWebhook(): Promise<MountableRestApp> {
       "model-provider": modelProviders,
       trace: peer("trace"),
       secret: peer("secret"),
+      "api-key": peer("api key"),
     })
     .boot();
-  const gateway = runtime.module(gatewayServer).provided;
-  if (!(gateway instanceof GatewayApp)) throw new Error("gateway installs as its own app");
+  const gateway = runtime.module(gatewayProcessModule).provided;
+  if (!(gateway instanceof GatewayModule)) throw new Error("gateway installs as its own app");
   gateway.connectSpend({
     confirmSpend: {
       send: async (payload: unknown) => {

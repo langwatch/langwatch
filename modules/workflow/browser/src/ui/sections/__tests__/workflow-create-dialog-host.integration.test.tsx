@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/workflows/workflow-management.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../behavior/workflow-api.ts", () => {
@@ -22,7 +22,7 @@ vi.mock("../../../behavior/workflow-api.ts", () => {
   };
 });
 
-vi.mock("@langwatch/workflow-browser-kit", async (importOriginal) => ({
+vi.mock("../../../model/workflow-host.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkflowHost: () => ({
     scope: () => ({ projectId: "project_1", projectSlug: "project-one" }),
@@ -43,11 +43,7 @@ describe("WorkflowCreateDialogHost", () => {
   describe("when the blank template is chosen", () => {
     /** @scenario "The create dialog's submit button says what it creates" */
     it("offers a submit button reading Create workflow", () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <WorkflowCreateDialogHost open onClose={vi.fn()} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<WorkflowCreateDialogHost open onClose={vi.fn()} />);
 
       fireEvent.click(within(screen.getByTestId("new-workflow-card-blank")).getByRole("button"));
 

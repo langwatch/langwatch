@@ -25,8 +25,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "better-auth": "catalog:",
     "zod": "catalog:"

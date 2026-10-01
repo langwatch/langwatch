@@ -17,7 +17,7 @@ import {
   PeriodicExportingMetricReader,
 } from "@opentelemetry/sdk-metrics";
 
-import { activateMetrics, metricHistogramViews } from "../metrics/index.ts";
+import { activateMetrics, deactivateMetrics, metricHistogramViews } from "../metrics/index.ts";
 import { createAuthoritativeOtlpConfiguration } from "./otlp-configuration.ts";
 import type { ProcessObservabilityFlusher } from "./process-observability.ts";
 
@@ -105,8 +105,12 @@ export function startOtlpMetricsExport(
 
   return {
     name: "metrics",
+    // Shutdown, not just flush: the provider's export timer, its host metrics and every
+    // gauge callback stop with it, and the global slot frees for a successor (ADR-168).
     shutdown: async () => {
-      await meterProvider.forceFlush();
+      await meterProvider.shutdown();
+      metrics.disable();
+      deactivateMetrics();
     },
   };
 }

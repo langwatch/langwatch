@@ -1,6 +1,6 @@
-import { ProviderScopeChips } from "@langwatch/authz-browser-kit";
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 

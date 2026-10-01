@@ -97,7 +97,7 @@ beforeEach(() => {
     registrationSlots: connections,
     breakGlass,
     stranding: new StubStranding([]),
-    platformOperators: new StubPlatformOperators([OLIVE.id]),
+    authorization: new StubPlatformOperators([OLIVE.id]),
     licensing: licensingFixture(),
   });
 });

@@ -83,7 +83,10 @@ export class PrismaSecretRepository
     try {
       const row = await this.prisma.projectSecret.update({
         where: { id: input.id, projectId: input.projectId },
-        data: { encryptedValue: input.encryptedValue, updatedById: input.actorId },
+        data: {
+          encryptedValue: input.encryptedValue,
+          updatedById: input.actorId,
+        },
         select: safeSecretSelect,
       });
 

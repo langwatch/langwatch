@@ -1,14 +1,14 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";
-import { RoleApp } from "../role.app.ts";
+import { RoleModule } from "../role.app.ts";
 
 /** A valid plan literal. ENTERPRISE by default, so custom-role writes are allowed
  * unless a test names another type. */
@@ -65,10 +65,10 @@ export function createRoleTestApp(
     entitlement?: Partial<EntitlementApi>;
     prisma?: PrismaClient;
   }> = {},
-): { app: RoleApp; roles: MemoryRoleRepository } {
+): { app: RoleModule; roles: MemoryRoleRepository } {
   const roles = input.roles ?? MemoryRoleRepository.create();
 
-  const app = RoleApp.create({
+  const app = RoleModule.create({
     repositories: { roles },
     dependencies: {
       // A caller holds every permission unless a test says otherwise (the escalation rule).

@@ -4,7 +4,7 @@
  * A minted session tells nurturing through auth's own event, ids only, and never fails the sign-in.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BetterAuthHooksRepository } from "../../../repositories/better-auth-hooks.repository.ts";

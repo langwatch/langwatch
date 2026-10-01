@@ -1,1 +1,1 @@
-export { dashboardServer } from "./dashboard.server.ts";
+export { dashboardProcessModule } from "./dashboard.module.ts";

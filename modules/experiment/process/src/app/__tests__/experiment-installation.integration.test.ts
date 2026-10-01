@@ -4,7 +4,6 @@
  * @vitest-environment node
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -20,9 +19,10 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
-import { createApp } from "@langwatch/kernel";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
+import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -30,6 +30,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   parseStudioWorkflow,
   type WorkflowApi,
@@ -38,7 +39,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { experimentServer } from "../../experiment.server.ts";
+import { experimentProcessModule } from "../../experiment.module.ts";
 
 /** A ClickHouse that holds no rows: every read answers empty, every write is kept. */
 class EmptyDriver implements QueryDriver {
@@ -86,7 +87,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
     processStore: InMemoryProcessStore.createForTesting(),
   });
   const runtime = await createApp({ role: "worker" })
-    .withModules([experimentServer])
+    .withModules([experimentProcessModule])
     .withStores(memoryStores())
     .withEventing(eventing)
     .withRelational(createApiFixture<ProcessMembers["prisma"]>({}, "prisma (unused at boot)"))
@@ -109,6 +110,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
       evaluator: createApiFixture<EvaluatorApi>({}),
       prompt: createApiFixture<PromptApi>({}),
       authz: createApiFixture<AuthzApi>({}),
+      presence: createApiFixture<PresenceApi>({}),
       project: createApiFixture<ProjectApi>({}),
       entitlement: createApiFixture<EntitlementApi>({}),
       evaluation: createApiFixture<EvaluationApi>({}),

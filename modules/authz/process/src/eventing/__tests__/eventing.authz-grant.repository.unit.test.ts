@@ -2,7 +2,7 @@
  * Ledger-backed writer preserves two typed failures across all write paths
  * (ADR-092 §13); assert each mapping by code for REST contract correctness.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import { BindingMissingError, DuplicateBindingError } from "@langwatch/authz-contract";
 import { describe, expect, it, vi } from "vitest";
 

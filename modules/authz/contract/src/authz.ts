@@ -70,6 +70,23 @@ export const authzScopeRefSchema = z.discriminatedUnion("type", [
 ]);
 export type AuthzScopeRef = z.infer<typeof authzScopeRefSchema>;
 
+/** The tenant and scope id every PLATFORM-tier grant is stored under; never a KSUID org id. */
+export const PLATFORM_TENANT_ID = "platform" as const;
+
+/** The installation itself: asked only of `can`, answered only from PLATFORM-tier grants. */
+export const platformScopeRefSchema = z.object({ type: z.literal("platform") }).strict();
+export type PlatformScopeRef = z.infer<typeof platformScopeRefSchema>;
+
+/** Where `can` may be asked: every organization-rooted scope, or the platform. */
+export const authzCanScopeRefSchema = z.discriminatedUnion("type", [
+  projectScopeRefSchema,
+  teamScopeRefSchema,
+  organizationScopeRefSchema,
+  resourceScopeRefSchema,
+  platformScopeRefSchema,
+]);
+export type AuthzCanScopeRef = z.infer<typeof authzCanScopeRefSchema>;
+
 export const authzPrincipalRefSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string() }).strict(),
   z.object({ type: z.literal("apiKey"), id: z.string() }).strict(),

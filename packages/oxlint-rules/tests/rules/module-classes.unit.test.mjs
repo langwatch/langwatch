@@ -157,7 +157,7 @@ describe("given an interface file", () => {
     it("reports nothing for an interface or an abstract class", () => {
       expect(report("export interface AgentRepository {}", REPOSITORY)).toEqual([]);
       expect(report("export abstract class AgentService {}", CONTRACT_SERVICE)).toEqual([]);
-      expect(report("export interface AgentApp {}", CONTRACT_APP)).toEqual([]);
+      expect(report("export interface AgentModule {}", CONTRACT_APP)).toEqual([]);
     });
   });
 
@@ -176,7 +176,7 @@ describe("given a process app or migration module", () => {
   describe("when the concrete class has no static create", () => {
     /** @scenario "A concrete class without static create is reported" */
     it("reports create for an App and for a Migration", () => {
-      expect(located(report("export class ComposedAgentApp {}", APP))).toEqual([["create", 1]]);
+      expect(located(report("export class ComposedAgentModule {}", APP))).toEqual([["create", 1]]);
       expect(located(report("export class LegacyAgentMigration {}", MIGRATION))).toEqual([
         ["create", 1],
       ]);
@@ -188,7 +188,7 @@ describe("given a process app or migration module", () => {
     it("reports nothing, leaving the constructor check to services", () => {
       expect(
         report(
-          "export class ComposedAgentApp { static create() { return new ComposedAgentApp(); } }",
+          "export class ComposedAgentModule { static create() { return new ComposedAgentModule(); } }",
           APP,
         ),
       ).toEqual([]);

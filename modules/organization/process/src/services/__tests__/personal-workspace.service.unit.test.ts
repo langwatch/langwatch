@@ -1,12 +1,12 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { PersonalProjectOwnerMismatchError } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  * Organization writes a personal workspace's project row itself, so it records the new workspace
  * and project records the project as created (ARCHITECTURE §9).
  * Spec: specs/lwql/project-key-map.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import { PersonalProjectOwnerMismatchError } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PersonalWorkspaceIdentity } from "../../app/organization.members.ts";

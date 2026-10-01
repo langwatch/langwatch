@@ -12,17 +12,17 @@ import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
  */
 
 /** Source files a folder may hold before it is a filing cabinet rather than a module. */
-export const FOLDER_BUDGET = 12;
+export const FOLDER_BUDGET = 30;
 
 /** Below this many lines a file is suspected of being a paragraph of another file. */
 export const FRAGMENT_FLOOR = 20;
 
 /**
- * Files the feature grammar requires one of per feature: the installer (`<f>.server.ts`)
+ * Files the feature grammar requires one of per feature: the installer (`<f>.module.ts`)
  * and the process mount that binds a transport declaration. Their size is set by the
  * runtime's signature, not by the author.
  */
-const GRAMMAR_REQUIRED_SUFFIXES = [".server.ts", ".mount.ts"];
+const GRAMMAR_REQUIRED_SUFFIXES = [".module.ts", ".mount.ts"];
 
 export const SOURCE_FOLDER_SHAPE_KINDS = ["crowded-folder", "fragment-file"] as const;
 

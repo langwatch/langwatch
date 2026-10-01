@@ -1,44 +1,100 @@
 ---
 name: design-system
-description: "Where LangWatch's UI components, tokens and Chakra setup live, and the pattern docs to read before building a screen, list, drawer, settings page or chart. Use when someone asks which component to use, how to theme something, why Chakra is not imported directly, or before writing any non-trivial UI in apps/ui or a *-web package."
+description: "Which component to use, where tokens and colour live, and why nothing but packages/design-system imports Chakra or Emotion. Use when someone says 'which component', 'design system', '@langwatch/design-system', 'import Chakra', '@chakra-ui/react', 'primitives', 'Box/Flex/Button', 'theme', 'token', 'colour', 'hex', 'fg.muted', 'dark mode', 'renderWithDesignSystem', 'story', 'list table', 'alert vs toast', 'no-direct-chakra', 'no-raw-color', or before writing any non-trivial screen, list, drawer, settings page or chart in a module's browser/ or apps/ui. Teaches the record (ARCHITECTURE.md section 2, design-system and colour rulings)."
 user-invocable: true
-argument-hint: "[component or pattern]"
+argument-hint: "[component, token or pattern]"
 ---
 
-# Design system
+# The design system
 
-`@langwatch/design-system` (`packages/design-system`) owns Chakra v3 (`^3.36.0`) for the
-whole repository. Feature web packages and `apps/ui` import from it, not from
-`@chakra-ui/react`. It is one of the two package roles `ui-screen-closure` always allows
-inside a screen's closure, so a component reached through it never breaks a closure.
+`@langwatch/design-system` (`packages/design-system`) is the one place that
+touches Chakra v3. Read `dev/docs/ARCHITECTURE.md` §2 (the `design-system`
+bullet, ADR-001 as amended 2026-10-01) before building. Its own checklist is
+`packages/design-system/README.md`.
 
-Look here before writing a component:
+## Rules that matter
 
-- `packages/design-system/src/components/` — the components, one file each, exported by
-  a named subpath (`@langwatch/design-system/avatar`, `/checkbox`, …).
-- `packages/design-system/src/system/` — the Chakra system, tokens and recipes.
-  `@langwatch/design-system/provider` and `/color-mode` are the app-level wrappers,
-  `/testing` the render helpers.
-- `packages/design-system/src/index.ts` — the formatters and small pure helpers
-  (money, metrics, slugify, text overflow); do not reimplement one in a module.
-- `packages/design-system/stories/` for what a component looks like,
-  `packages/design-system/specs/` for what it promises.
+1. **Only `packages/design-system` imports `@chakra-ui/*` or `@emotion/*`.**
+   Feature browsers, apps and tests import `@langwatch/design-system/<subpath>`
+   (named subpaths, never a deep path). Enforced by `no-direct-chakra`, which is
+   ruled but not live yet (§10.2: it turns on once Chakra waves 2-3 are green).
+   A few direct imports remain (some enterprise billing tests); they are debt,
+   not precedent. New code never adds one.
+2. **Primitives and wrappers.** `@langwatch/design-system/primitives`
+   re-exports Chakra's primitives and raw parts unchanged (`Box`, `Flex`,
+   `Button`, `Table`, `Heading`, ...) until real components replace them. A
+   wrapped part (Checkbox, Switch, Tooltip, Menu, Dialog, Avatar, Drawer)
+   comes from its own subpath. Look for a named component before using a
+   primitive.
+3. **Colour is made only here.** Elsewhere, name a semantic token: `fg.*`,
+   `bg.*`, `border.*`, `fg|bg|border.<status>`, `<palette>.<role>` (`red.solid`),
+   `chart.N`, `accent.*`, `bg.scrim`. Never a scale step, hex, `rgb()` or bare
+   white or black (`no-raw-color`). A library that needs a string takes
+   `useToken` / `system.token.var` (a CSS variable that follows the mode) or
+   `getRawColorValue` / `useColorRawValue` from `@langwatch/design-system/color-mode`
+   (a literal for the current mode). A new colour need is a semantic token in
+   `src/system/config.ts`, a light and a dark value, and a story row.
+4. **Components take props or a query result. They never fetch**, never import
+   a contract, a router or a feature (the package has no contract dependency, so
+   it restates contract types structurally). Data meets layout in a module's
+   `ui/sections`, see `browser-module`.
+5. **A component two modules need goes here, not into a kit.** Kits are gone
+   (§3.4). Adding one: one kebab-case file in `src/components/`, a subpath in
+   `package.json` `exports`, a `.stories.tsx` beside it covering each real
+   state (default, loading, empty, error, disabled, long text, narrow), and a
+   scenario in `packages/design-system/specs/`. The catalogue spec fails a
+   component with no story or one that will not render in both modes.
+6. **Native elements, styled.** An interactive thing is a `button`, `a` or
+   `input` styled through the system, never a `div` with a role. In-app links
+   use `@langwatch/browser-host/link` or a component handed `onNavigate`.
+7. **Tests mount `renderWithDesignSystem`** from
+   `@langwatch/design-system/testing`, not Chakra's default provider.
 
-Read before building, not after:
+## Where to look before writing a component
 
-- `dev/docs/best_practices/react.md` — the house React rules.
-- `dev/docs/best_practices/drawers.md` — drawers are URL-routed singletons with a stack.
-- `dev/docs/best_practices/row-actions-overflow-menu.md`,
-  `dev/docs/best_practices/selection-action-bar.md` — list surfaces.
-- `dev/docs/best_practices/scope-selector-and-badges.md`,
-  `dev/docs/best_practices/scoped-resources.md` — scope selection is always
-  `ScopeChipPicker`, never a hand-rolled Select.
-- `dev/docs/best_practices/copywriting.md` — no abbreviations, no internals in copy.
-- `dev/docs/best_practices/alerts-toasts-and-field-errors.md`: alert versus toast versus
-  field error, which alert variant and size, and how toasts stack; never restyle an
-  alert at the call site.
+- `packages/design-system/src/components/`: one file per component
+  (`avatar`, `drawer`, `cached-view`, `section-navigation-frame`, `list-table`, ...).
+- `packages/design-system/src/system/` (tokens, recipes, `config.ts`),
+  `src/provider/`, `src/color-mode/`, `src/testing/`.
+- `packages/design-system/src/index.ts` and sibling files: formatters and small
+  pure helpers (money, metrics, slugify, text overflow). Do not reimplement.
+- `pnpm --filter @langwatch/design-system storybook`, or `/design-system` while
+  the dev server runs, to see what each looks like.
 
-A component that a second module needs is published as a surface, not copied; see
-`.claude/skills/module/references/web-surface.md`. A component the whole product needs
-belongs in the design system. Adding one there means a story and a spec scenario
-alongside it.
+## Pattern docs to read first
+
+`dev/docs/design/guidelines.md` (§4 screen layout), `dev/docs/design/components.md`,
+and in `dev/docs/best_practices/`: `list-table.md`, `row-actions-overflow-menu.md`,
+`selection-action-bar.md`, `scope-selector-and-badges.md` (scope pickers are
+`ScopeChipPicker`, never a hand-rolled Select), `alerts-toasts-and-field-errors.md`
+(never restyle an alert at the call site), `icon-button-labels.md`,
+`copywriting.md` (no abbreviations, no internals), `async-processing-ui.md`.
+Extend an existing pattern, do not invent one.
+
+## Worked example
+
+```tsx
+// the shared list look: one component, tokens only
+import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+```
+
+A page needing a rail across modules takes
+`@langwatch/design-system/section-navigation-frame` (links and active one in,
+no data) and each owning page renders it with the same entries (§10).
+
+## Traps
+
+- **`import { Box } from "@chakra-ui/react"` in a module.** Take it from
+  `@langwatch/design-system/primitives`.
+- **The `chakra-ui-builder`, `chakra-ui-refactor` and `chakra-ui-migrate`
+  skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
+  (rule 1); use them for Chakra v3 API knowledge only.
+- **A colour from a scale step or hex "just here".** Add a semantic token.
+- **Pattern docs lag the record.** `dev/docs/best_practices/react.md` still
+  says `web` packages and `screens/`; browser packages are `*-browser` (§16).
+  `best_practices/drawers.md` no longer exists: drawers are routed singletons,
+  see `browser-module`.
+- **Fetching or reading `*HostApi` inside a shared component.** The owner lends
+  it by token (§10.1) and the consumer renders what it is handed.
+- **Mail has its own expressive design system.** See the `mail-template` skill.

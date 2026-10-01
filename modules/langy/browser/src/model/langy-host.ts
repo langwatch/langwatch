@@ -9,7 +9,6 @@ export type LangyHostProject = {
   slug: string;
   name: string;
   firstMessage?: boolean;
-  apiKey?: string;
 };
 
 export type LangyHostTeam = {

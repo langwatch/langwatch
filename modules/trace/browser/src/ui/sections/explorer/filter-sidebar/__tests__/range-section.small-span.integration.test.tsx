@@ -2,8 +2,8 @@
 // reverted to zag-js default `step: 1`, violating min/max/step invariant.
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -18,18 +18,16 @@ vi.mock("../../../../../behavior/facet-lens.store.ts", () => ({
 import { RangeSection } from "../range-section.tsx";
 
 const renderRange = ({ min, max }: { min: number; max: number }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <RangeSection
-        title="Cost"
-        field="trace.cost"
-        min={min}
-        max={max}
-        formatValue={(v) => `$${v}`}
-        onChange={vi.fn()}
-        onClear={vi.fn()}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <RangeSection
+      title="Cost"
+      field="trace.cost"
+      min={min}
+      max={max}
+      formatValue={(v) => `$${v}`}
+      onChange={vi.fn()}
+      onClear={vi.fn()}
+    />,
   );
 
 describe("RangeSection", () => {

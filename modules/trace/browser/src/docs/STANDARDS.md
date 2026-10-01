@@ -24,7 +24,7 @@ follows these conventions.
 │  ZUSTAND  │         TANSTACK QUERY                    │
 │  (intent) │         (server state + cache)             │
 │           │                                           │
-│  filter   │  queryClient (httpBatchStreamLink)         │
+│  filter   │  queryClient (httpLink)         │
 │  view     │  ├─ trace.list (stale: 30s)               │
 │  drawer   │  ├─ trace.header (stale: 5min)            │
 │  ui       │  ├─ span.summary (stale: 5min)            │
@@ -122,9 +122,7 @@ features/traces-v2/
 │   │   └── useTraceFacets.test.ts
 │   └── index.ts
 ├── stores/
-│   ├── explorer.store.ts   (query/view/selection/rows slices, in browser-kit)
-│   ├── drawerStore.ts
-│   ├── uiStore.ts
+│   ├── explorer.store.ts   (client state in the one global UI store)
 │   ├── __tests__/
 │   │   ├── query.slice.test.ts
 │   │   └── view.slice.test.ts
@@ -263,8 +261,8 @@ const DensityContext = createContext<Density>("comfortable");
 
 // ✅ Zustand via hook (for other shared state)
 export const TraceTableRow: React.FC<TraceTableRowProps> = ({ trace }) => {
-  const { open } = useDrawerStore(); // reads from store, no prop drilling
-  return <Tr onClick={() => open(trace.traceId)}>...</Tr>;
+  const { openDrawer } = useDrawer(); // writes the address, no prop drilling
+  return <Tr onClick={() => openDrawer("traceV2Details", { traceId: trace.traceId })}>...</Tr>;
 };
 ```
 
@@ -303,7 +301,7 @@ These rules were discovered during the throwaway mock and prevent real bugs:
 ### Zustand — one Explorer store, four slices
 
 Each slice owns one domain of user intent, and all four compose into the one
-Explorer store in `@langwatch/trace-browser-kit` (ADR-152).
+Explorer store in `behavior/explorer.store.ts` (ADR-152).
 
 ```tsx
 // query.slice.ts
@@ -340,21 +338,8 @@ interface ViewState {
 ```
 
 ```tsx
-// stores/drawerStore.ts
-interface DrawerState {
-  isOpen: boolean;
-  traceId: string | null;
-  activeTab: DrawerTab;
-  selectedSpanId: string | null;
-  open: (traceId: string) => void;
-  close: () => void;
-  setTab: (tab: DrawerTab) => void;
-  selectSpan: (spanId: string | null) => void;
-}
-```
-
-```tsx
-// stores/uiStore.ts
+// Client state is kept in the one global UI store. Drawer open state and params
+// are URL state (`drawer.open`, `drawer.<key>`); nested drawers use history.state.
 type Density = "compact" | "comfortable";
 
 interface UiState {
@@ -617,7 +602,7 @@ Feature: Trace Table
   Scenario: Click row opens drawer
     Given the table has rendered with traces
     When the user clicks trace row "trace-123"
-    Then drawerStore.open is called with "trace-123"
+    Then the URL opens the drawer with `drawer.open` and its trace parameter
 
   @unit
   Scenario: Density affects row sizing
@@ -647,7 +632,7 @@ Feature: Trace Table
 
 - One scenario per behavior. Not one scenario per user story.
 - Given = state setup. When = user action or data change. Then = observable result.
-- Reference specific store methods and hook names (e.g., `drawerStore.open`, `useTraceList`).
+- Reference observable behaviour and hook names (e.g., URL drawer state, `useTraceList`).
 - Include data contracts: "useTraceList returns 25 traces" not just "there are traces."
 - Include density scenarios for every density-aware component.
 
@@ -732,7 +717,7 @@ import { describe, it, expect, vi } from "vitest";
 import { useTraceList } from "../useTraceList";
 
 // Mock the store: one module, every slice the hook reads
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../behavior/explorer.store.ts", () => ({
   useExplorerStore: vi.fn((selector) =>
     selector({
       ast: emptyAst(),

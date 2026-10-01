@@ -17,7 +17,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/model-provider-browser-kit";
+import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
 import groupBy from "lodash-es/groupBy";
 import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";

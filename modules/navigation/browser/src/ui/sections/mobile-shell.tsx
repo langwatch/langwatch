@@ -1,5 +1,6 @@
 /** Mobile shell: compact bar with logo, product selector, menu. Menu opens overlay. */
 
+import { LogoIcon } from "@langwatch/design-system/logo-icon";
 import { Box, HStack, IconButton, Spacer, Text, chakra } from "@langwatch/design-system/primitives";
 import { Menu as MenuIcon, Settings as SettingsIcon, X } from "lucide-react";
 import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
@@ -8,7 +9,6 @@ import type { NavigationShellReadyState } from "../../behavior/use-navigation-sh
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import type { ProductId } from "../../model/products.ts";
-import { LogoIcon } from "../elements/logo-icon.tsx";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 import { SideMenuDensityProvider } from "../elements/side-menu-density.tsx";
 import { AppHeaderUserMenu } from "./app-header-user-menu.tsx";
@@ -113,7 +113,7 @@ function MobileTopBar({
     >
       <HStack gap={2} minWidth={0} flex={1} alignItems="center">
         <NavigationLink href="/" display="flex" alignItems="center" flexShrink={0}>
-          <LogoIcon width={LOGO_HEIGHT * (38 / 52)} height={LOGO_HEIGHT} />
+          <LogoIcon height={LOGO_HEIGHT} />
         </NavigationLink>
         {activeProductId ? (
           <ProductSwitcherMenu activeProductId={activeProductId} />

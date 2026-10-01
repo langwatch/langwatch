@@ -1,10 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EvaluatorConfig, TargetConfig } from "../../../../../model/experiments-v3/types.ts";
@@ -105,10 +104,6 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const createTarget = (overrides: Partial<TargetConfig> = {}): TargetConfig => ({
   id: "target-1",
   type: "prompt",
@@ -137,7 +132,7 @@ describe("TargetCellContent", () => {
     it("renders trace button when traceId is provided", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Test output"
@@ -145,7 +140,6 @@ describe("TargetCellContent", () => {
           row={0}
           traceId="trace_abc123"
         />,
-        { wrapper: Wrapper },
       );
 
       const traceButton = screen.getByTestId("trace-link-target-1");
@@ -156,7 +150,7 @@ describe("TargetCellContent", () => {
       const user = (await import("@testing-library/user-event")).default.setup();
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Test output"
@@ -164,7 +158,6 @@ describe("TargetCellContent", () => {
           row={0}
           traceId="trace_abc123"
         />,
-        { wrapper: Wrapper },
       );
 
       const traceButton = screen.getByTestId("trace-link-target-1");
@@ -178,7 +171,7 @@ describe("TargetCellContent", () => {
     it("does not render trace button when traceId is null", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Test output"
@@ -186,7 +179,6 @@ describe("TargetCellContent", () => {
           row={0}
           traceId={null}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
@@ -195,9 +187,8 @@ describe("TargetCellContent", () => {
     it("does not render trace button when traceId is undefined", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output="Test output" evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByTestId("trace-link-target-1")).not.toBeInTheDocument();
@@ -208,9 +199,8 @@ describe("TargetCellContent", () => {
     it("renders output text", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output="Hello world" evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Hello world")).toBeInTheDocument();
@@ -219,9 +209,9 @@ describe("TargetCellContent", () => {
     it("renders 'No output yet' when output is empty", () => {
       const target = createTarget();
 
-      render(<TargetCellContent target={target} output={null} evaluatorResults={{}} row={0} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <TargetCellContent target={target} output={null} evaluatorResults={{}} row={0} />,
+      );
 
       expect(screen.getByText("No output yet")).toBeInTheDocument();
     });
@@ -229,7 +219,7 @@ describe("TargetCellContent", () => {
     it("renders loading skeleton when isLoading is true", () => {
       const target = createTarget();
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output={null}
@@ -237,7 +227,6 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper },
       );
 
       // Skeleton elements should be present
@@ -247,7 +236,7 @@ describe("TargetCellContent", () => {
     it("renders error message when error is provided", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output={null}
@@ -255,7 +244,6 @@ describe("TargetCellContent", () => {
           row={0}
           error="Something went wrong"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Something went wrong")).toBeInTheDocument();
@@ -265,7 +253,7 @@ describe("TargetCellContent", () => {
     it("names the evaluator and the fix when no input resolved", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output={null}
@@ -283,7 +271,6 @@ describe("TargetCellContent", () => {
             reasons: [],
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText(/This evaluator had nothing to read/)).toBeInTheDocument();
@@ -297,9 +284,8 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       const objectOutput = { key: "value", nested: { foo: "bar" } };
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output={objectOutput} evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       // Should contain the JSON key
@@ -314,9 +300,8 @@ describe("TargetCellContent", () => {
       // Generate text longer than MAX_DISPLAY_CHARS (10000)
       const longText = generateLongText(15000);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output={longText} evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       // Should show truncated indicator
@@ -326,9 +311,8 @@ describe("TargetCellContent", () => {
     it("does not show truncation indicator for short text", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output="Short text" evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.queryByText("(truncated)")).not.toBeInTheDocument();
@@ -339,14 +323,13 @@ describe("TargetCellContent", () => {
     it("renders output content in a container", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Some output text"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Output text should be present
@@ -357,9 +340,8 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       const multilineText = "Line 1\nLine 2\nLine 3";
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output={multilineText} evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       // The text should be in the document (pre-wrap preserves newlines)
@@ -399,14 +381,13 @@ describe("TargetCellContent", () => {
       // Simulate overflow by mocking scrollHeight > max height (120)
       mockScrollHeight(200);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is some content that would overflow"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Find and click the output text
@@ -425,14 +406,13 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       mockScrollHeight(200);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is some content that would overflow"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -464,14 +444,13 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       mockScrollHeight(200);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is some content that would overflow"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       const outputText = screen.getByText(/This is some content/);
@@ -493,14 +472,13 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       mockScrollHeight(200);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is some content that would overflow"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -518,7 +496,7 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       mockScrollHeight(200);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Content that overflows"
@@ -527,7 +505,6 @@ describe("TargetCellContent", () => {
           traceId="trace_123"
           onRunCell={() => {}}
         />,
-        { wrapper: Wrapper },
       );
 
       // Open expanded view
@@ -551,9 +528,8 @@ describe("TargetCellContent", () => {
       // Mock scrollHeight less than max height (120)
       mockScrollHeight(50);
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent target={target} output="Short content" evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       // Click the output text
@@ -581,14 +557,13 @@ describe("TargetCellContent", () => {
       // Mock scrollHeight greater than max height (120)
       mockScrollHeight(200);
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is content that would overflow the container"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Find the fade overlay element by class
@@ -601,9 +576,8 @@ describe("TargetCellContent", () => {
       // Mock scrollHeight less than max height
       mockScrollHeight(50);
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <TargetCellContent target={target} output="Short" evaluatorResults={{}} row={0} />,
-        { wrapper: Wrapper },
       );
 
       // Fade overlay should not be present
@@ -615,14 +589,13 @@ describe("TargetCellContent", () => {
       const target = createTarget();
       mockScrollHeight(200);
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is content that would overflow"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       const fadeOverlay = container.querySelector(".cell-fade-overlay");
@@ -648,14 +621,13 @@ describe("TargetCellContent", () => {
         toJSON: () => {},
       }));
 
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Content that overflows"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       // Click the fade overlay
@@ -677,7 +649,7 @@ describe("TargetCellContent", () => {
     it("shows skeleton when isLoading is true and no output", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output={undefined}
@@ -685,7 +657,6 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper },
       );
 
       // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
@@ -699,7 +670,7 @@ describe("TargetCellContent", () => {
     it("shows skeleton when isLoading is true EVEN WITH existing output", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="This is existing output that should be hidden during loading"
@@ -707,7 +678,6 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={true}
         />,
-        { wrapper: Wrapper },
       );
 
       // Should show skeleton elements (Chakra v3 uses class containing 'skeleton')
@@ -723,7 +693,7 @@ describe("TargetCellContent", () => {
     it("shows output when isLoading is false", () => {
       const target = createTarget();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={target}
           output="Completed output"
@@ -731,7 +701,6 @@ describe("TargetCellContent", () => {
           row={0}
           isLoading={false}
         />,
-        { wrapper: Wrapper },
       );
 
       // Should NOT show skeleton
@@ -784,14 +753,13 @@ describe("TargetCellContent", () => {
       seedStoreWithEvaluatorAndDataset();
       const user = userEvent.setup();
 
-      render(
+      renderWithDesignSystem(
         <TargetCellContent
           target={targetWithEvaluator()}
           output="some output"
           evaluatorResults={{}}
           row={0}
         />,
-        { wrapper: Wrapper },
       );
 
       await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));

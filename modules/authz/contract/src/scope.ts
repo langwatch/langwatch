@@ -104,10 +104,8 @@ export function bindingScopeCanGrantPermission({
   // fixed org-exclusive set.
   if (!def) return true;
   const scopes: readonly AuthzScopeType[] = def.scopes;
-  // LEGACY-QUIRK(C): the legacy fence only knows the org-exclusive set, so a
-  // custom role CAN today grant `ops:*` from any binding. The platform tier
-  // becomes a real fence in stage C when platform-ops turns into a principal.
-  if (scopes.includes("platform")) return true;
+  // Platform permissions (`ops:*`) count only from PLATFORM-tier grants, never a binding.
+  if (scopes.includes("platform")) return false;
   if (scopeType === "ORGANIZATION") return true;
   return scopes.includes("team") || scopes.includes("project");
 }

@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * The egress allow-list door, through the composition production uses.
  * @vitest-environment node

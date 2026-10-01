@@ -151,6 +151,31 @@ describe("createExecuteRunHandler", () => {
       );
     });
 
+    /** @scenario "The run's starter travels from the queued event to the child's key" */
+    it("forwards the run's starter onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(executionService(submit));
+
+      await run(makeExecutePayload({ startedByUserId: "user_1" }), makeContext());
+
+      expect(submit).toHaveBeenCalledWith(expect.objectContaining({ startedByUserId: "user_1" }));
+    });
+
+    /** @scenario "A scenario run started with a personal access token holds no more than that token" */
+    it("forwards the key the starter used onto the pool job", async () => {
+      const submit = vi.fn();
+      const run = createExecuteRunHandler(executionService(submit));
+
+      await run(
+        makeExecutePayload({ startedByUserId: "user_1", startedByApiKeyId: "pat_1" }),
+        makeContext(),
+      );
+
+      expect(submit).toHaveBeenCalledWith(
+        expect.objectContaining({ startedByUserId: "user_1", startedByApiKeyId: "pat_1" }),
+      );
+    });
+
     it("omits scenarioName when the intent carries no name", async () => {
       const submit = vi.fn();
       const run = createExecuteRunHandler(executionService(submit));

@@ -5,6 +5,7 @@
  */
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { useCallback } from "react";
@@ -13,7 +14,6 @@ import { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testi
 import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
 import { useOpenSuiteEditor } from "../../../../behavior/agent-testing/suite/use-open-suite-editor.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { RunScope } from "./run-configuration";
 import { isEvaluatorFlowDrawer, type SuiteRow } from "./run-evaluators";
 import type { ScopeScenario } from "./run-scope-section.tsx";

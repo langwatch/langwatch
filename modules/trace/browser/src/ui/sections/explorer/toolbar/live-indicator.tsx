@@ -1,7 +1,7 @@
+import type { ConnectionState } from "@langwatch/browser-host/sse-subscription";
 import { Box, Flex, IconButton, keyframes } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant } from "@langwatch/time";
-import type { ConnectionState } from "@langwatch/trace-browser-kit";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 

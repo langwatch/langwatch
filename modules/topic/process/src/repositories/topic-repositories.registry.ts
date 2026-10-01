@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { LiveTopicRepositories } from "./live/live.topic.repositories.ts";
 import { MemoryTopicRepositories } from "./memory/memory.topic.repositories.ts";

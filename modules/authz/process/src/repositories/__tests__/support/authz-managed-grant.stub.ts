@@ -13,9 +13,13 @@ export class StubAuthzManagedGrantRepository extends AuthzManagedGrantRepository
   readonly findGroupMembers = vi.fn<AuthzManagedGrantRepository["findGroupMembers"]>(
     async () => [],
   );
+  readonly findTeamMembers = vi.fn<AuthzManagedGrantRepository["findTeamMembers"]>(async () => []);
   readonly findOrganizationUserIds = vi.fn<AuthzManagedGrantRepository["findOrganizationUserIds"]>(
     async () => [],
   );
+  readonly findRoleHolderPrincipals = vi.fn<
+    AuthzManagedGrantRepository["findRoleHolderPrincipals"]
+  >(async () => []);
   readonly findGrantPrincipals = vi.fn<AuthzManagedGrantRepository["findGrantPrincipals"]>(
     async () => [],
   );

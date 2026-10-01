@@ -6,7 +6,7 @@
 import { useUiAddress } from "@langwatch/browser-host/address";
 import { resolveUiFailureCopy, type ResolvedUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { isUiNavigatingAway, uiLeaveTo } from "@langwatch/browser-host/navigation";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 
 /**

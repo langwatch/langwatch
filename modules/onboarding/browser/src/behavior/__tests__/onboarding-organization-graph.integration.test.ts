@@ -1,13 +1,18 @@
 /**
  * @vitest-environment jsdom
- * The organization graph keeps each project's server-redacted base key behind a
- * lookup and its creation time on the host teams.
+ * The organization graph carries no project key, and keeps each project's creation
+ * time on the host teams.
  * Spec: specs/features/onboarding/manual-setup-api-key.feature
  */
+import {
+  UiCapabilityContextProvider,
+  UiSession,
+  type UiActor,
+} from "@langwatch/browser-host/capabilities";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
 import { renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-
-const TEST_KEY = "sk-lw-test-fixture-not-a-real-key-000000000000";
 
 const graph = [
   {
@@ -24,14 +29,12 @@ const graph = [
             id: "proj_managed",
             name: "Managed",
             slug: "acme-managed",
-            apiKey: TEST_KEY,
             createdAt: "2026-09-01T00:00:00Z",
           },
           {
             id: "proj_withheld",
             name: "Withheld",
             slug: "acme-withheld",
-            apiKey: "",
             createdAt: "2026-09-02T00:00:00Z",
           },
         ],
@@ -48,17 +51,43 @@ vi.mock("../onboarding-api.ts", () => ({
 
 import { useOnboardingOrganizationGraph } from "../onboarding-organization-graph.ts";
 
+class SignedInSession extends UiSession {
+  currentUser(): UiActor {
+    return { id: "user-1", name: null, email: null, image: null };
+  }
+
+  hasPermission(): boolean {
+    return false;
+  }
+
+  isSettled(): boolean {
+    return true;
+  }
+
+  featureFlag(): boolean | undefined {
+    return false;
+  }
+}
+
+const capabilities = createUiCapabilitiesFromHost(
+  { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
+  new SignedInSession(),
+);
+
+function SignedIn({ children }: { children: ReactNode }) {
+  return createElement(UiCapabilityContextProvider, { value: capabilities }, children);
+}
+
 describe("useOnboardingOrganizationGraph", () => {
-  describe("when the graph lists a managed project and one whose key the server withheld", () => {
-    /** @scenario "The organization graph keeps each project's key and creation time" */
-    it("answers the managed key, no key for the withheld one, and keeps creation times", () => {
-      const { result } = renderHook(() =>
-        useOnboardingOrganizationGraph({ organizationId: "org_1", projectId: void 0 }),
+  describe("when the graph lists two projects", () => {
+    /** @scenario "The organization graph carries no project key and keeps each creation time" */
+    it("offers no key lookup, and keeps creation times", () => {
+      const { result } = renderHook(
+        () => useOnboardingOrganizationGraph({ organizationId: "org_1", projectId: void 0 }),
+        { wrapper: SignedIn },
       );
 
-      expect(result.current.projectApiKey("proj_managed")).toBe(TEST_KEY);
-      expect(result.current.projectApiKey("proj_withheld")).toBeUndefined();
-      expect(result.current.projectApiKey("proj_unknown")).toBeUndefined();
+      expect(result.current).not.toHaveProperty("projectApiKey");
       expect(result.current.organization?.teams[0]?.projects.map((p) => p.createdAt)).toEqual([
         "2026-09-01T00:00:00Z",
         "2026-09-02T00:00:00Z",

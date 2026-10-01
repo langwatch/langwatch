@@ -8,13 +8,14 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useFilterStore, useUIStore } from "@langwatch/trace-browser-kit";
 import { BookOpen, Check, Plus, Search } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { dedupeByValue } from "../../../../model/dedupe-by-value.ts";
 import { useFacetSearch } from "../hooks/use-facet-search.ts";
 import { useTraceFacets } from "../hooks/use-trace-facets.ts";

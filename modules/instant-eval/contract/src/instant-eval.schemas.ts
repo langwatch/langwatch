@@ -5,8 +5,8 @@
  */
 
 import { MAX_LWQL_LENGTH } from "@langwatch/analytics-contract";
-import type { RestProjectCredentialPrincipal } from "@langwatch/api/rest";
-import { defineRestMiddleware } from "@langwatch/kernel/contract";
+import type { RestProjectCredentialPrincipal } from "@langwatch/authorization";
+import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -447,6 +447,13 @@ export const instantEvalRestCredentialSchema: z.ZodType<RestProjectCredentialPri
       projectId: z.string(),
       teamId: z.string(),
       isLangySessionKey: z.boolean().optional(),
+    }),
+    z.object({
+      kind: z.literal("cliAccessToken"),
+      userId: z.string(),
+      organizationId: z.string(),
+      projectId: z.string(),
+      teamId: z.string(),
     }),
     z.object({ kind: z.literal("legacyProjectKey") }),
   ]);

@@ -10,7 +10,7 @@ import {
 } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
-import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityModule } from "../app/identity.app.ts";
 import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
 import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
@@ -246,7 +246,7 @@ export function composeIdentityPipeline({
 
 export const identityPipelineEventing = defineEventingModule({
   pipeline: IDENTITY_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.identityPipeline(),
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityModule>) => app.identityPipeline(),
   connect: ({ app, commands }) =>
     app.connectPipeline({ pipeline: IDENTITY_PIPELINE_NAME, commands }),
 });

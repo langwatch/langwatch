@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId, type Event, type EventSubscriberDefinition } from "@langwatch/eventing";
 import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -8,6 +7,7 @@ import {
   type CanonicalMetricDataPoint,
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
 } from "@langwatch/metric-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {

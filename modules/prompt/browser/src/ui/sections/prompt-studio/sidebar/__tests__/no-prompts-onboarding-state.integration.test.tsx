@@ -4,9 +4,9 @@
  */
 
 import "@testing-library/jest-dom/vitest";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
@@ -50,11 +50,7 @@ describe("NoPromptsOnboardingState", () => {
   /** @scenario "A project with no prompts offers to set them up via an agent" */
   it("offers Create First Prompt and trace's Setup via Agent menu for prompts", async () => {
     declarations.current = traceLends;
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <NoPromptsOnboardingState />
-      </ChakraProvider>,
-    );
+    renderWithDesignSystem(<NoPromptsOnboardingState />);
     expect(screen.getByRole("button", { name: "Create First Prompt" })).toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "Setup via Agent (prompts)" }),

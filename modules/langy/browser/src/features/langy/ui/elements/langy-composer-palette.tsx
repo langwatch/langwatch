@@ -7,16 +7,16 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import {
-  absorbContextTarget,
-  type LangyContextChip,
-  type LangyContextTargetDescriptor,
-  useLangyContextTargetStore,
-} from "@langwatch/langy-browser-kit";
 import { disabledLangySkillIds, LANGY_SKILL_GATE_FLAG } from "@langwatch/langy-contract";
 import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
 import { useEffect, useMemo } from "react";
 
+import {
+  absorbContextTarget,
+  type LangyContextTargetDescriptor,
+  useLangyContextTargetStore,
+} from "../../../../behavior/langy-context-target.store.ts";
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
 import { useFeatureFlag } from "../../../../behavior/use-feature-flag.ts";
 import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
 

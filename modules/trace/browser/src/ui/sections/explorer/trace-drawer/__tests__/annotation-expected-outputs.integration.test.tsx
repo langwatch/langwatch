@@ -3,8 +3,8 @@
  * Saved suggestions edit in correction popover (not textarea) so save button
  * and input stay together.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -70,11 +70,7 @@ vi.mock("../conversation-view/annotation-popover.tsx", async () => {
 const { AnnotationExpectedOutputs } = await import("../annotation-expected-outputs.tsx");
 
 const renderOutputs = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationExpectedOutputs traceId="trace-1" output="the raw output" />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<AnnotationExpectedOutputs traceId="trace-1" output="the raw output" />);
 
 beforeEach(() => {
   vi.clearAllMocks();

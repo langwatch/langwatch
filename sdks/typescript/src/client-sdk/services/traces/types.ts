@@ -94,18 +94,3 @@ export interface GetTraceResponse {
   spans?: TraceSpan[];
   evaluations?: TraceEvaluation[];
 }
-
-/**
- * Custom error class for Traces API operations.
- * Provides context about the failed operation and the original error.
- */
-export class TracesError extends Error {
-  constructor(
-    message: string,
-    public readonly operation: string,
-    public readonly originalError?: any,
-  ) {
-    super(message);
-    this.name = "TracesError";
-  }
-}

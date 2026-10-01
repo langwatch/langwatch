@@ -1,4 +1,3 @@
-import type { EventingParticipation } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { SpanKind } from "@opentelemetry/api";
@@ -8,6 +7,7 @@ import { DisabledPipeline } from "./disabledPipeline.ts";
 import { createEventCatalogue } from "./domain/definitions.ts";
 import type { Event, Projection } from "./domain/types.ts";
 import type { KillSwitch } from "./kill-switch/index.ts";
+import type { EventingParticipation, ReadHintMap } from "./pipeline/feature-eventing.ts";
 import {
   type SealedPipelineDefinition,
   sealPipelineDefinition,
@@ -92,6 +92,11 @@ export interface EventSourcingOptions {
   participation?: EventingParticipation;
   /** The runtime's own maintenance pipelines, installed once where the role drains. */
   maintenance?: () => readonly StaticPipelineDefinition<never>[];
+  /** Builds the read-hint subscriber; absent where nothing can publish a hint. */
+  readHints?: (input: {
+    hinted: ReadHintMap;
+    declaredEventTypes: ReadonlySet<string>;
+  }) => StaticPipelineDefinition<never>;
 }
 
 /**
@@ -148,6 +153,7 @@ export class EventSourcing {
   private readonly _processManagerMode: "run" | "producer-only";
   private readonly _participation?: EventingParticipation;
   private readonly _maintenance?: () => readonly StaticPipelineDefinition<never>[];
+  private readonly _readHints?: EventSourcingOptions["readHints"];
   private _processRuntimeInstance?: ProcessRuntime;
   /** Each registered pipeline's re-drive of its recorded hand-offs, by pipeline name. */
   private readonly handoffRedrives = new Map<
@@ -172,6 +178,7 @@ export class EventSourcing {
     this._processManagerMode = options.processManagerMode ?? "run";
     this._participation = options.participation;
     this._maintenance = options.maintenance;
+    this._readHints = options.readHints;
 
     this.projectionRegistry = new ProjectionRegistry<Event>({
       parseEvent: (value) => this.parseRegisteredEvent(value),
@@ -282,6 +289,17 @@ export class EventSourcing {
   /** The blob and process-manager sweeps this runtime was built with; none if it drains nothing. */
   maintenancePipelines(): readonly StaticPipelineDefinition<never>[] {
     return this._maintenance?.() ?? [];
+  }
+
+  /** The read-hint subscriber over the pipelines registered so far, or none without a publisher. */
+  readHintPipeline(hinted: ReadHintMap): StaticPipelineDefinition<never> | undefined {
+    if (!this._readHints) return;
+    const declaredEventTypes = new Set(
+      this._definitions.flatMap((definition) =>
+        definition.aggregate.events.map((event) => event.type),
+      ),
+    );
+    return this._readHints({ hinted, declaredEventTypes });
   }
 
   /** A queued event parsed with the schema of whichever registered pipeline declares its type. */

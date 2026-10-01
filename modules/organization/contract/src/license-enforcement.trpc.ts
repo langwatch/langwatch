@@ -3,7 +3,7 @@
  * nothing: the upgrade dialog is already on screen and the alert it raises is
  * a side effect nobody waits on.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

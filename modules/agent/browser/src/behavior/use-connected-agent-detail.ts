@@ -4,7 +4,7 @@ import { useMemo } from "react";
 
 import type { ConnectedAgentBrowser } from "../model/agent-client.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
-import { agentApi } from "./agent-api.ts";
+import { useAgents } from "./use-agents.ts";
 
 type AgentListItem = WireOf<AgentOverview>;
 
@@ -31,10 +31,7 @@ export function connectedAgentsOf(items: readonly AgentListItem[]): ConnectedAge
 /** One connected agent, read by the id its address carries. */
 export function useConnectedAgentDetail(agentId: string | undefined) {
   const project = useAgentManagementHost().project();
-  const query = agentApi.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: Boolean(project) },
-  );
+  const query = useAgents({ projectId: project?.id });
   const agent = useMemo(
     () => connectedAgentsOf(query.data ?? []).find((candidate) => candidate.id === agentId),
     [query.data, agentId],

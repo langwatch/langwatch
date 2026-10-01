@@ -4,16 +4,18 @@
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { HStack, Spacer, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { scenarioClient } from "@langwatch/scenario-client";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
-import { api, type Scenario } from "../../../behavior/scenario-api.ts";
+import type { Scenario } from "../../../behavior/scenario-api.ts";
+import { useScenarios } from "../../../behavior/scenarios/use-scenarios.ts";
 import { useAgentTestingRedirect } from "../../../behavior/suites/use-agent-testing-redirect.ts";
 import { useNewScenarioFlow } from "../../../behavior/use-new-scenario-flow.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioLabelFilter as useLabelFilter } from "../../../behavior/use-scenario-label-filter.ts";
 import { useScenarioSelection } from "../../../behavior/use-scenario-selection.ts";
@@ -44,13 +46,9 @@ function ScenarioLibraryPage() {
     { type: "single"; scenario: Scenario } | { type: "batch" } | null
   >(null);
 
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
 
-  const {
-    data: scenarios,
-    isLoading,
-    error,
-  } = api.scenarios.getAll.useQuery({ projectId: project?.id ?? "" }, { enabled: !!project });
+  const { data: scenarios, isLoading, error } = useScenarios({ projectId: project?.id });
 
   const handleArchiveSuccess = useCallback(() => {
     void utils.scenarios.getAll.invalidate();
@@ -58,7 +56,7 @@ function ScenarioLibraryPage() {
     setArchiveTarget(null);
   }, [utils.scenarios.getAll, deselectAll]);
 
-  const archiveMutation = api.scenarios.archive.useMutation({
+  const archiveMutation = scenarioClient.scenarios.archive.useMutation({
     onSuccess: handleArchiveSuccess,
     onError: (err) =>
       showErrorToast({
@@ -67,7 +65,7 @@ function ScenarioLibraryPage() {
       }),
   });
 
-  const batchArchiveMutation = api.scenarios.batchArchive.useMutation({
+  const batchArchiveMutation = scenarioClient.scenarios.batchArchive.useMutation({
     onSuccess: (result) => {
       if (result.failed.length > 0) {
         // A partial success: the server answered, and the count is the only

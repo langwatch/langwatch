@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the Sessions screen, the personal
  * usage card and the pull-request drawer have always called.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import { codingAgentTranscriptSchema } from "./coding-agent-transcript.ts";
 import {

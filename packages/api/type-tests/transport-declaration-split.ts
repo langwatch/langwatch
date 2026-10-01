@@ -3,7 +3,7 @@ import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, type FeatureApiWitness, type RestRawResult } from "@langwatch/api/rest";
 import type { TrpcFeatureApiWitness } from "@langwatch/api/trpc";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 type Equal<Left, Right> =

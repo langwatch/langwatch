@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -38,6 +39,8 @@ type PrereqTools interface {
 	// `brew install --cask` asks for a password, and a picker that swallowed
 	// the prompt would look like a hang.
 	Install(ctx context.Context, command string) error
+	// Sysctl reads one kernel setting (`sysctl -n name`), trimmed.
+	Sysctl(ctx context.Context, name string) (string, error)
 }
 
 // platform is the GOOS prerequisites are planned for: the pinned one, else
@@ -82,6 +85,9 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	}
 	if c.Key == "golangci-lint" {
 		return o.probeGolangciLint(ctx)
+	}
+	if c.Key == "somaxconn" {
+		return o.probeSomaxconn(ctx)
 	}
 	if c.FormulaIsAuthority {
 		// haven starts this one with `brew services`, so brew's answer is the
@@ -138,6 +144,18 @@ func (o *Orchestrator) probeHavenPath(ctx context.Context) domain.Found {
 	default:
 		return domain.Found{Detail: p.RCPath}
 	}
+}
+
+// probeSomaxconn reports the accept-queue cap as present when it is at least
+// the floor. An unreadable value reports present: a row nobody can satisfy
+// would only nag.
+func (o *Orchestrator) probeSomaxconn(ctx context.Context) domain.Found {
+	out, err := o.prereqTools().Sysctl(ctx, "kern.ipc.somaxconn")
+	n, convErr := strconv.Atoi(out)
+	if err != nil || convErr != nil {
+		return domain.Found{Present: true, Detail: "kern.ipc.somaxconn unreadable, not checked"}
+	}
+	return domain.Found{Present: n >= domain.SomaxconnFloor, Detail: "kern.ipc.somaxconn=" + out}
 }
 
 // probePortless folds the proxy's two questions — is one resolvable, and is
@@ -512,4 +530,7 @@ func (nullPrereqTools) FormulaInstalled(context.Context, string) (string, bool) 
 }
 func (nullPrereqTools) Install(context.Context, string) error {
 	return fmt.Errorf("no installer is wired in")
+}
+func (nullPrereqTools) Sysctl(context.Context, string) (string, error) {
+	return "", fmt.Errorf("no sysctl reader is wired in")
 }

@@ -1,11 +1,11 @@
 import { Box, Button, Flex, Icon, IconButton } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { Bookmark, Compass, Download, Map, Tent } from "lucide-react";
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useDismissTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
 import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../model/explorer/onboarding/spotlights/spotlights.ts";
@@ -97,7 +97,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
   const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
   const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
 
-  const closeDrawer = useDrawerStore((s) => s.closeDrawer);
+  const closeDrawer = useDismissTraceDrawer();
   const handleSamplePreviewToggle = useCallback(() => {
     if (showSamplePreview) {
       setShowSamplePreview(false);

@@ -1,9 +1,9 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useMemo } from "react";
 
+import { useAgents } from "../../../behavior/agents/use-agents.ts";
 import { useSession } from "../../../behavior/auth-session.ts";
 import { useAllPromptsForProject } from "../../../behavior/prompts/use-all-prompts-for-project.ts";
-import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { agentHasDevTunnel } from "../../../model/agent-dev-tunnel.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { ScenarioTargetSelector } from "../scenario-target-selector.tsx";
@@ -26,10 +26,7 @@ export function TargetSelector({
   // Read without requiring a session: the page is already behind the sign-in
   // gate, and only a development agent's ownership depends on who is reading.
   const { data: session } = useSession();
-  const { data: agents } = api.agents.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const { data: agents } = useAgents({ projectId: project?.id });
   const scenarioAgents = useMemo(
     () =>
       agents?.map((agent) => ({

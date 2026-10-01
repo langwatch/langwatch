@@ -1,28 +1,19 @@
 /* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
 
-.llm-row {
+.llm-turn {
   display: grid;
   gap: var(--space-1);
+  justify-items: start;
 }
 
-.llm-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: baseline;
-}
-
-.llm-detail,
-.llm-settings {
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4);
+.llm-text {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .llm-settings {
   max-width: 32rem;
-}
-
-.llm-muted {
-  color: var(--ink-500);
 }

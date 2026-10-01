@@ -3,8 +3,8 @@
  * The label under each bar when two targets carry the identical name.
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -55,13 +55,8 @@ vi.mock("../use-show-comparison-leaderboard.ts", () => ({
 import {
   type ComparisonRunData,
   transformBatchEvaluationData,
-} from "@langwatch/experiment-browser-kit";
-
+} from "../../../ui/sections/batch-evaluation-results.types.ts";
 import { ComparisonCharts } from "../../../ui/sections/batch-results/comparison-charts.tsx";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** A finished run with one output row per named target. */
 const runWithTargets = (targets: { name: string; promptId?: string }[]): ComparisonRunData => ({
@@ -102,14 +97,13 @@ const barLabels = ({
   xAxisOption?: string;
   promptNames?: Record<string, string>;
 }): string[] => {
-  render(
+  renderWithDesignSystem(
     <ComparisonCharts
       comparisonData={[runWithTargets(targets)]}
       isVisible={true}
       xAxisOption={xAxisOption}
       promptNames={promptNames}
     />,
-    { wrapper: Wrapper },
   );
 
   const format = captured.tickFormatters[0]!;

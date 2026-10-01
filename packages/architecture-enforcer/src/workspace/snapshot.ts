@@ -22,7 +22,6 @@ const FEATURE_ROLES: ReadonlySet<string> = new Set<FeaturePackageRole>([
   "contract",
   "process",
   "browser",
-  "browser-kit",
 ]);
 
 const isFeatureRole = (name: string): name is FeaturePackageRole => FEATURE_ROLES.has(name);
@@ -152,8 +151,7 @@ function checkFeatureRoot({
       policy: "feature-layout",
       file: featureManifest,
       message: "A feature ownership directory cannot itself be a package.",
-      allowed:
-        "Put package.json inside contract, process, browser, browser-kit, or a named library folder.",
+      allowed: "Put package.json inside contract, process, browser, or a named library folder.",
     });
   }
 }

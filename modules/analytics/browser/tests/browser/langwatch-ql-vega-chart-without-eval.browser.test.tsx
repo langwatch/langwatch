@@ -4,13 +4,15 @@
  * after every module import, since the harness itself evals from source text.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+/* oxlint-disable no-eval -- this test stubs eval to prove the chart never calls it */
+
 import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLDatasetColumn,
   LWQL_QUERY_RESULT_DATASET,
 } from "@langwatch/analytics-contract/visualization";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import embed from "vega-embed";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { page } from "vitest/browser";
@@ -151,18 +153,16 @@ describe("the LangWatchQL chart on a page that forbids string evaluation", () =>
         try {
           refusingAtRenderTime = hardening.isRefusing();
 
-          render(
-            <ChakraProvider value={defaultSystem}>
-              <LangWatchQLVegaLiteChart
-                spec={BAR_SPECIFICATION}
-                datasets={{ [LWQL_QUERY_RESULT_DATASET]: RESULT.rows }}
-                columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: COLUMNS }}
-                themeConfig={{}}
-                pinnedConfig={{}}
-                colorMode="light"
-                ariaLabel="Evaluations by evaluator"
-              />
-            </ChakraProvider>,
+          renderWithDesignSystem(
+            <LangWatchQLVegaLiteChart
+              spec={BAR_SPECIFICATION}
+              datasets={{ [LWQL_QUERY_RESULT_DATASET]: RESULT.rows }}
+              columnsByDataset={{ [LWQL_QUERY_RESULT_DATASET]: COLUMNS }}
+              themeConfig={{}}
+              pinnedConfig={{}}
+              colorMode="light"
+              ariaLabel="Evaluations by evaluator"
+            />,
           );
           drawn = await poll(() => bars().length === RESULT.rows.length);
 

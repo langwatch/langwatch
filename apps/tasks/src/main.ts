@@ -72,12 +72,13 @@ export async function runTasks(argv: readonly string[], input: TaskInput): Promi
  */
 async function openConnections({
   config,
+  chain,
   argv,
 }: {
   config: TasksConfig;
+  chain: SecretsChain;
   argv: readonly string[];
 }): Promise<TaskConnections> {
-  const chain = SecretsChain.start({ environment: process.env }).withEnv().withFile();
   const resolver = SecretsResolver.over(chain);
   const declared = Object.values(tasksSecrets);
   await resolver.preflight(declared);
@@ -123,11 +124,16 @@ async function main(): Promise<void> {
   const source = { ...process.env };
   const environment = resolveTasksEnvironment(source);
   const config = resolveTasksConfig(source);
-  const connections = await openConnections({ config, argv });
+  const chain = SecretsChain.start({ environment: process.env })
+    .withEnv()
+    .withFile()
+    .withOnePassword(config.onePasswordAccount);
+  const connections = await openConnections({ config, chain, argv });
   try {
     await runTasks(argv, {
       config,
       connections,
+      chain,
       environment,
       signal: controller.signal,
     });

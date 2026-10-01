@@ -33,9 +33,9 @@ Feature: ClickHouse analytics stays available under concurrent query load
     Then the read is not retried
     And the error is surfaced immediately
 
-  @unit @regression
-  Scenario: Live polling eases off when ClickHouse is overloaded
-    Given the traces view is polling for new traces every few seconds
-    When a poll fails because ClickHouse is overloaded
-    Then the next poll is scheduled after a longer interval
-    And polling returns to its fast cadence once a poll succeeds again
+  @unit @regression @unimplemented
+  Scenario: The traces view updates on its server event and never on a timer
+    Given the traces view is showing the newest traces
+    When ClickHouse is overloaded and a read fails
+    Then no timer retries it
+    And the view updates again on the next server event that names new traces

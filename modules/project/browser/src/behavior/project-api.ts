@@ -6,9 +6,14 @@
 import { createModuleApi } from "@langwatch/api/web";
 
 import type { ProjectHostOrganization, ProjectHostProject } from "../model/project-host.ts";
+import type { ProjectSwitchOrganization } from "../model/project-switch.ts";
 
 export type ProjectApiMap = {
   organization: {
+    /** The shell's scope read, as the switcher reads it; invalidated beside getAll after a save. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: ProjectSwitchOrganization[] };
+    };
     /**
      * Application shell's organization graph; also defaults for forms; refetched
      * after save.
@@ -85,6 +90,3 @@ export type ProjectApiMap = {
 
 /** The project family's typed tRPC hooks. */
 export const projectApi = createModuleApi<ProjectApiMap>();
-
-/** The alias the screen moved with: `api.organization.update…`, unchanged. */
-export const api = projectApi;

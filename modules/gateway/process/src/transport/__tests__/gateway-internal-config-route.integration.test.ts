@@ -19,9 +19,10 @@ import { GatewayConfigMaterialiserService } from "../../services/gateway-config-
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
+import { organizationApiOver } from "../../__tests__/support/prisma-organization-api.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { GatewayConfigAssemblyService } from "../../services/gateway-config-assembly.service.ts";
 import { GatewayScopeResolutionService } from "../../services/gateway-scope-resolution.service.ts";
@@ -55,12 +56,30 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRES_AT = nowInstant().add({ milliseconds: 7 * DAY_MS });
 
 class SuiteProjectService extends TestProjectApi {
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
+  }
+
   override async findTraceDestination(
     projectId: string,
   ): ReturnType<ProjectApi["findTraceDestination"]> {
     return prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -69,7 +88,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -90,6 +109,7 @@ function buildApp(): void {
   const projects = new SuiteProjectService();
   const gateway = PrismaGatewayAdapter.create({
     database: prisma,
+    organizations: organizationApiOver(prisma),
     projects,
     evaluators: {} as never,
     monitors: {} as never,
@@ -100,6 +120,7 @@ function buildApp(): void {
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects,
     }),
     projects: projects,
     chRepo: null,
@@ -108,6 +129,7 @@ function buildApp(): void {
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects,
     }),
   });
   const store = PrismaGatewayInternalStoreRepository.create({ database: prisma });

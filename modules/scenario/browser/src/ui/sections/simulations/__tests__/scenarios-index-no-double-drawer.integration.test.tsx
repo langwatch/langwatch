@@ -29,14 +29,10 @@ describe("Scenarios index page (regression #3194)", () => {
   });
 
   describe("given what this package publishes for the drawer registry", () => {
-    /**
-     * The registry is the composing app's now — this package only publishes drawer
-     * COMPONENTS — so the test can just check the `scenarioEditor` address still
-     * resolves to the component the page must not also mount.
-     */
-    it("still publishes ScenarioFormDrawerFromUrl for the scenarioEditor address", () => {
-      const source = readFileSync(join(process.cwd(), "src/drawers.ts"), "utf-8");
-      expect(source).toMatch(/export \{ ScenarioFormDrawerFromUrl \}/);
+    /** The declaration registers the drawer the page must not also mount. */
+    it("still registers ScenarioFormDrawerFromUrl for the scenarioEditor address", () => {
+      const source = readFileSync(join(process.cwd(), "src/scenario.web.ts"), "utf-8");
+      expect(source).toMatch(/scenarioEditor:[\s\S]*?\.ScenarioFormDrawerFromUrl/);
     });
   });
 });

@@ -18,7 +18,7 @@ const { state, polls } = vi.hoisted(() => {
   });
 
   return {
-    polls: [] as { enabled: boolean; refetchInterval: number | false }[],
+    polls: [] as { enabled: boolean }[],
     state: {
       claimDomain: operation(),
       proveDomain: operation(),
@@ -175,20 +175,20 @@ const PROVED: DomainEvidenceView = {
 
 describe("given a command the server accepted before the read caught up", () => {
   /** @scenario "A recorded proof refreshes until the setup view shows the proved domain" */
-  it("says the proof was accepted, reads again, and stops the moment it is proved", () => {
+  it("says the proof was accepted, reads while it waits on a hint, and stops the moment it is proved", () => {
     state.proveDomain.answer = { proved: false, record: RECORD };
     const { withRead } = renderSection();
     fireEvent.click(screen.getByRole("button", { name: "Prove this domain" }));
     fireEvent.click(screen.getByRole("button", { name: "Check for it now" }));
 
     expect(screen.getByTestId("connection-domain-pending")).toHaveTextContent("Proof accepted");
-    expect(polls.at(-1)).toEqual({ enabled: true, refetchInterval: 1_000 });
+    expect(polls.at(-1)).toEqual({ enabled: true });
 
     withRead({ evidence: [PROVED], claims: [] });
 
     expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
     expect(screen.queryByTestId("connection-domain-record")).toBeNull();
-    expect(polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+    expect(polls.at(-1)).toEqual({ enabled: false });
     expect(state.checkDomainRecord.calls).toHaveLength(1);
   });
 
@@ -201,7 +201,7 @@ describe("given a command the server accepted before the read caught up", () => 
     withRead({ evidence: [], claims: [] });
 
     expect(screen.queryByTestId("connection-domain-pending")).toBeNull();
-    expect(polls.at(-1)).toEqual({ enabled: false, refetchInterval: false });
+    expect(polls.at(-1)).toEqual({ enabled: false });
   });
 
   it("reads nothing again while nothing is waiting, so a settled page never polls", () => {

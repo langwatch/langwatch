@@ -19,6 +19,7 @@ import {
 } from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -46,6 +47,24 @@ const COST_PER_REQUEST = 0.001;
  * answered from the rows this suite writes.
  */
 class SuiteProjectService extends TestProjectApi {
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
+  }
+
   override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return [PROJECT_ID, IDLE_PROJECT_ID];
   }
@@ -55,7 +74,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 }
@@ -173,6 +192,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
       );
       service = PrismaGatewayAdapter.create({
         database: prisma,
+        organizations: organizationApiOver(prisma),
         projects: new SuiteProjectService(),
         evaluators: {} as never,
         monitors: {} as never,
@@ -272,6 +292,7 @@ describe.skipIf(!databaseUrl || !chUrl)(
       it("reports spend as unavailable rather than as zero", async () => {
         const withoutLedger = PrismaGatewayAdapter.create({
           database: prisma,
+          organizations: organizationApiOver(prisma),
           projects: new SuiteProjectService(),
           evaluators: {} as never,
           monitors: {} as never,

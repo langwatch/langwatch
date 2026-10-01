@@ -4,7 +4,7 @@
 #   modules/trace/browser/src/ui/elements/explorer/trace-drawer/exceptions-content.tsx            (header exceptions)
 #   modules/trace/browser/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx  (summary tab)
 #   modules/trace/browser/src/ui/sections/explorer/trace-drawer/waterfall-view/waterfall-view.tsx   (selected span)
-#   modules/trace/browser/src/drawer.store.ts  (viewMode, selectSpan)
+#   modules/trace/browser/src/behavior/trace-drawer.ts  (viewMode, selectSpan; both live in the address)
 #
 # Motivation (round 5): span reference buttons (an error span in the
 # header, eval/event/exception spans in the Summary tab, span refs in the

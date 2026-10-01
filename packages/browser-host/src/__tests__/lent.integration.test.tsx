@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { uiTokens } from "@langwatch/kernel/contract";
+import { uiTokens } from "@langwatch/module";
 import { render, renderHook, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";

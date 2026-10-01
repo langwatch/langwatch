@@ -2,8 +2,8 @@
  * Who is offered the Annotations column.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const harness = vi.hoisted(() => ({
@@ -22,8 +22,8 @@ vi.mock("../../hooks/use-evaluator-options.ts", () => ({
   useEvaluatorOptions: () => ({ options: [], nameByKey: new Map() }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule>();
   return {
     ...actual,
     useViewStore: (selector: (s: unknown) => unknown) =>
@@ -41,8 +41,7 @@ vi.mock("../../../../../behavior/time-format.store.ts", () => ({
     selector({ format: "relative", setFormat: vi.fn() }),
 }));
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-
+import type * as actualModule from "../../../../../behavior/explorer.store.ts";
 import { ColumnPickerContent } from "../column-picker-content.tsx";
 
 afterEach(cleanup);
@@ -52,11 +51,7 @@ beforeEach(() => {
 });
 
 function renderPicker() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ColumnPickerContent />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ColumnPickerContent />);
 }
 
 /** The column toggles the reader can actually turn on, by their label. */

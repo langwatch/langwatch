@@ -1,20 +1,25 @@
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import { createTenantId } from "@langwatch/eventing";
-import type { EventingParticipation, PriorEventsRead, ResourceOwnership } from "@langwatch/kernel";
+import {
+  createTenantId,
+  type EventingParticipation,
+  type PriorEventsRead,
+} from "@langwatch/eventing";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   loadRunAttachments,
-  SCENARIO_WORKER,
   SimulationRunNotFoundError,
   type RunScenarioEvaluationsDeps,
   type SimulationProcessingEvent,
   type SimulationService,
+  type ScenarioResourceClass,
 } from "@langwatch/scenario-contract";
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 
 import type { CancellationPublisher } from "../app/scenario.app.ts";
 import type { SimulationRunProcessingRepository } from "../repositories/simulation-run-processing.repository.ts";
+import { consumesJobClass } from "../rules/resource-class-admission.rules.ts";
 import { isSimulationProcessingEvent } from "../rules/simulation-run-event.rules.ts";
 import { ScenarioExecutionPoolService } from "../services/scenario-execution-pool.service.ts";
 import type { ScenarioExecutorService } from "../services/scenario-executor.service.ts";
@@ -63,6 +68,12 @@ const GRADING_PROTECTIONS: Protections = {
   canSeeCapturedOutput: true,
 };
 
+/** What this worker's pool holds: the slots it has and the runtime classes it consumes. */
+export interface ExecutionPoolBudget {
+  readonly slotBudget: number;
+  readonly consumed: readonly ScenarioResourceClass[];
+}
+
 /** What simulation_processing's `build` is handed by the process. */
 export interface SimulationPipelineSetup {
   readonly participation: EventingParticipation;
@@ -93,6 +104,7 @@ export class SimulationProcessingRuntimeAdapter {
       executor: ScenarioExecutorService;
       grading: SimulationGradingPeers;
       milestones: SimulationMilestonePeers;
+      pool: ExecutionPoolBudget;
     },
   ) {}
 
@@ -108,6 +120,7 @@ export class SimulationProcessingRuntimeAdapter {
     executor: ScenarioExecutorService;
     grading: SimulationGradingPeers;
     milestones: SimulationMilestonePeers;
+    pool: ExecutionPoolBudget;
   }): SimulationProcessingRuntimeAdapter {
     return new SimulationProcessingRuntimeAdapter(input);
   }
@@ -117,7 +130,10 @@ export class SimulationProcessingRuntimeAdapter {
     const loadPriorEvents = this.#priorEventsLoader(setup.priorEvents);
     const pool =
       setup.participation === "consume"
-        ? ScenarioExecutionPoolService.create({ concurrency: SCENARIO_WORKER.CONCURRENCY })
+        ? ScenarioExecutionPoolService.create({
+            concurrency: this.input.pool.slotBudget,
+            acceptJob: (job) => consumesJobClass({ consumed: this.input.pool.consumed, job }),
+          })
         : void 0;
     if (pool) this.input.executor.connect({ pool, resources: setup.resources });
 
@@ -171,6 +187,10 @@ export class SimulationProcessingRuntimeAdapter {
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
       suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
+      traceSpanMetricsSync: {
+        findSummary: (input) => traces.findSummary(input),
+        computeRunMetrics: (data) => commands.computeRunMetrics(data),
+      },
       retention: {
         resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
       },

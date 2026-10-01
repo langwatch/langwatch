@@ -1,5 +1,4 @@
 import { Box, HStack, Skeleton, VStack } from "@langwatch/design-system/primitives";
-import { type LayoutMode, LayoutModeContext } from "@langwatch/prompt-browser-kit";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import cloneDeep from "lodash-es/cloneDeep";
 import debounce from "lodash-es/debounce";
@@ -8,6 +7,7 @@ import { type DeepPartial, FormProvider } from "react-hook-form";
 
 import { usePromptConfigForm } from "../../../../../behavior/use-prompt-config-form.ts";
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import { type LayoutMode, LayoutModeContext } from "../../../../../model/layout-mode.ts";
 import { type TabData, useTabId } from "../../studio-internals.ts";
 import { PromptBrowserHeader } from "./prompt-browser-header.tsx";
 import { PromptMessagesEditor } from "./prompt-messages-editor.tsx";

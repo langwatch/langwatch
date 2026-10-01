@@ -1,24 +1,21 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const { mint } = vi.hoisted(() => ({ mint: vi.fn() }));
 
-vi.mock("@langwatch/stored-object-browser-kit", () => ({ useStoredObjectUrl: mint }));
+vi.mock("../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
+  useStoredObjectUrl: mint,
+}));
 
 import { ImagePart } from "../parts.tsx";
 
 const part = { kind: "image", id: "img-1", src: "/api/files/p1/i1", role: "user" } as const;
 
-const renderPart = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ImagePart part={part} />
-    </ChakraProvider>,
-  );
+const renderPart = () => renderWithDesignSystem(<ImagePart part={part} />);
 
 describe("ImagePart", () => {
   describe("given the stored image's URL mints", () => {

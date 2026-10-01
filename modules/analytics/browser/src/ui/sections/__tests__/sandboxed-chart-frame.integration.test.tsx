@@ -5,7 +5,7 @@
  * The frame points at the shared frame-document route and hands the widget
  * source to the bridge; a code change remounts the iframe for a fresh init.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -29,14 +29,14 @@ const dashboardContext = {
 };
 
 const ui = (code: string) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <SandboxedChartFrame
       code={code}
       executeQuery={vi.fn()}
       dashboardContext={dashboardContext}
       onLog={vi.fn()}
     />
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 afterEach(() => {

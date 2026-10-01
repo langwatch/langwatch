@@ -3,9 +3,9 @@
  * rules screen.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const dataPrivacyWeb = defineWebModule("data-privacy")
+export const dataPrivacyWeb = defineBrowserModule("data-privacy")
   .withHosts({
     requires: ["DataPrivacyHostApi"],
     mounts: {

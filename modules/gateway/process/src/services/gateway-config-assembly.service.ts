@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import { llmModels, toLegacyCompatibleCustomModels } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 import {
   type GatewayModelProviderCredentials,
@@ -57,11 +58,13 @@ export class GatewayConfigAssemblyService implements GatewayConfigAssembly {
   static create(input: {
     repository: GatewayScopeResolutionRepository;
     platformProviders: GatewayPlatformProviders;
+    projects: Pick<ProjectApi, "listNamesByIds">;
   }): GatewayConfigAssemblyService {
     return new GatewayConfigAssemblyService(
       GatewayScopeResolutionService.create({
         repository: input.repository,
         platformProviders: input.platformProviders,
+        projects: input.projects,
       }),
     );
   }

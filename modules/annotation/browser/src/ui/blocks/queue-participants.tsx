@@ -3,7 +3,7 @@
  * Family-local copy (see platform/app/src/components/traces/AddParticipants).
  */
 
-import { CloseButton } from "@chakra-ui/react";
+import { CloseButton } from "@langwatch/design-system/close-button";
 import {
   Badge,
   Box,

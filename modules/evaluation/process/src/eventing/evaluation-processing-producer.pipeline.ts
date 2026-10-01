@@ -5,7 +5,6 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 
-import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
 import type { EvaluationAnalyticsData } from "./evaluation-analytics-fold.projection.ts";
 import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup.projection.ts";
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
@@ -50,7 +49,7 @@ class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
 }
 
 /** The execution intent this process does not hold. */
-class ProducerOnlyExecutionIntent implements EvaluationExecutionIntent {
+class ProducerOnlyExecutionIntent {
   constructor(private readonly processName: string) {}
 
   execute(): Promise<never> {

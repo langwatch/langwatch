@@ -127,7 +127,7 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
       case "grant.setRole":
         return this.compatForRoleChange(write.grantId);
       case "grant.revoke":
-        return this.compatForRevoke(write.grantId);
+        return this.compatForRevoke(write);
       case "role.upsert":
         return this.compatForRole(write.row, typeof result === "number" && result > 0);
       case "role.setPermissions":
@@ -256,12 +256,18 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
    * tables have nowhere to record "ended", so a surviving row would leave the
    * legacy resolver answering yes to access that has already ended.
    */
-  private async compatForRevoke(grantId: string): Promise<void> {
+  private async compatForRevoke({
+    grantId,
+    organizationId,
+  }: {
+    grantId: string;
+    organizationId: string;
+  }): Promise<void> {
     const row = await this.prisma.grant.findUnique({
       where: { id: grantId },
       select: { organizationId: true, projectId: true },
     });
-    if (!row) return;
+    if (!row || row.organizationId !== organizationId) return;
     await this.prisma.roleBinding.deleteMany({
       where: { organizationId: row.organizationId, id: grantId },
     });
@@ -334,13 +340,13 @@ export class PrismaAuthzProjectionRepository extends AuthzGrantProjectionReposit
           },
         });
 
-      // `revokedAt: null` in the WHERE stops a second revoke moving the
-      // first one's timestamp: when access ended is a fact, and the earliest
-      // revocation is the true one.
+      // `revokedAt: null` stops a second revoke moving the first one's timestamp;
+      // `organizationId` keeps a revoke from ending another organization's grant.
       case "grant.revoke":
         return this.prisma.grant.updateMany({
           where: {
             id: write.grantId,
+            organizationId: write.organizationId,
             revokedAt: null,
             occurredAt: { lte: toDate(write.occurredAt) },
           },

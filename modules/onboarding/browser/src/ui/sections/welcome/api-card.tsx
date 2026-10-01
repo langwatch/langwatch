@@ -1,5 +1,7 @@
+import { useMintPersonalToken } from "@langwatch/api-key-client";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Link } from "@langwatch/browser-host/link";
+import { API_KEY_PLACEHOLDER } from "@langwatch/design-system/personal-access-token-banner";
 import {
   Alert,
   Box,
@@ -16,23 +18,28 @@ import { useOnboardingHost } from "../../../model/onboarding-host.ts";
 import { CopyableInputWithPrefix } from "../../elements/observability/copyable-input-with-prefix.tsx";
 import ObservabilityCard from "../../elements/welcome/observability-card.tsx";
 import { useIntegrationChecks } from "../integration-checks.tsx";
+import { ProjectTokenBanner } from "../observability/project-token-banner.tsx";
 
-/**
- * API key asked via host port respects server-side access redaction; credentials
- * cannot ride in the scope graph.
- */
+/** A personal access token is minted on a click and held here, in memory only. */
 const APICard: React.FC = () => {
   const host = useOnboardingHost();
+  const minting = useMintPersonalToken({
+    organizationId: host.scope().organization?.id,
+    projectId: host.scope().project?.id,
+    userId: host.currentUser()?.id,
+    name: "Personal access token",
+  });
+  const token = minting.token;
   const { appBaseUrl } = useUiDeployment();
   const integrationChecks = useIntegrationChecks();
   const hasFirstMessage = Boolean(integrationChecks.data?.firstMessage);
 
-  const effectiveApiKey = host.revealProjectApiKey() ?? "";
   const effectiveEndpoint = appBaseUrl;
 
   async function copyApiKey({ withBashPrefix }: { withBashPrefix: boolean }): Promise<void> {
+    const apiKey = token ?? API_KEY_PLACEHOLDER;
     await host.copyToClipboard({
-      text: withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey,
+      text: withBashPrefix ? `LANGWATCH_API_KEY=${apiKey}` : apiKey,
       succeeded: { title: "Copied", description: "API key copied to clipboard" },
     });
   }
@@ -63,11 +70,11 @@ const APICard: React.FC = () => {
             Keep it secret, keep it safe. Don&apos;t let this key fall into prying eyes.
           </Text>
         </VStack>
+        <ProjectTokenBanner minting={minting} />
         <CopyableInputWithPrefix
           prefix="LANGWATCH_API_KEY="
-          value={effectiveApiKey}
+          value={token ?? API_KEY_PLACEHOLDER}
           ariaLabel="API key"
-          showVisibilityToggle
           onCopy={copyApiKey}
         />
       </VStack>

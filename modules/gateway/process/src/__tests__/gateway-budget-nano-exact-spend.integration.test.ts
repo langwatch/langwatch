@@ -44,6 +44,7 @@ import {
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import * as budgetDtos from "../rules/gateway-budget-dto.rules.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -74,6 +75,24 @@ const LOOSE_LIMIT_USD = "5";
 
 /** The org's one project: the tenant every debit here lands in. */
 class SuiteProjectService extends TestProjectApi {
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
+  }
+
   override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
     return [PROJECT_ID];
   }
@@ -242,6 +261,7 @@ describe.skipIf(!databaseUrl || !chUrl)("nano-exact budget totals (real PG + rea
     chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
     service = PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: organizationApiOver(prisma),
       projects: new SuiteProjectService(),
       evaluators: {} as never,
       monitors: {} as never,

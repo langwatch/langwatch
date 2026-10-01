@@ -3,8 +3,8 @@
  * Spec: specs/navigation/mobile-chrome.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -73,14 +73,12 @@ function renderShell({
     commandBar: { shortcut: "⌘K", open: () => undefined, trigger: null },
     currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
   });
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <NavigationHostProvider value={host}>
-        <MobileShell state={readyState(state)}>
-          <div data-testid="page-body" />
-        </MobileShell>
-      </NavigationHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <NavigationHostProvider value={host}>
+      <MobileShell state={readyState(state)}>
+        <div data-testid="page-body" />
+      </MobileShell>
+    </NavigationHostProvider>,
   );
 }
 
@@ -149,14 +147,12 @@ describe("the mobile chrome", () => {
         commandBar: { shortcut: "⌘K", open: () => undefined, trigger: null },
         currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
       });
-      const view = render(
-        <ChakraProvider value={defaultSystem}>
-          <NavigationHostProvider value={host}>
-            <MobileShell state={readyState()}>
-              <div data-testid="page-body" />
-            </MobileShell>
-          </NavigationHostProvider>
-        </ChakraProvider>,
+      const view = renderWithDesignSystem(
+        <NavigationHostProvider value={host}>
+          <MobileShell state={readyState()}>
+            <div data-testid="page-body" />
+          </MobileShell>
+        </NavigationHostProvider>,
       );
 
       await user.click(screen.getByRole("button", { name: "Open navigation menu" }));
@@ -182,13 +178,11 @@ describe("the mobile chrome", () => {
         currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
       });
       view.rerender(
-        <ChakraProvider value={defaultSystem}>
-          <NavigationHostProvider value={movedHost}>
-            <MobileShell state={readyState()}>
-              <div data-testid="page-body" />
-            </MobileShell>
-          </NavigationHostProvider>
-        </ChakraProvider>,
+        <NavigationHostProvider value={movedHost}>
+          <MobileShell state={readyState()}>
+            <div data-testid="page-body" />
+          </MobileShell>
+        </NavigationHostProvider>,
       );
 
       await waitFor(() => {

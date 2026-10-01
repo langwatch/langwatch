@@ -7,8 +7,8 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithEvaluatorHost } from "../../../testing.tsx";
 import EvaluatorsScreen from "../evaluators.screen.tsx";
+import { renderWithEvaluatorHost } from "./testing.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -30,7 +30,7 @@ const calls = vi.hoisted(() => ({
   invalidateLimit: vi.fn(),
 }));
 
-vi.mock("../../../behavior/evaluator-api.ts", () => {
+const { mutation } = vi.hoisted(() => {
   const mutation = (spy: (input: unknown) => unknown) => ({
     useMutation: (options?: {
       onSuccess?: (result: unknown, variables: unknown) => void;
@@ -48,31 +48,42 @@ vi.mock("../../../behavior/evaluator-api.ts", () => {
       mutateAsync: async (input: unknown) => spy(input),
     }),
   });
+  return { mutation };
+});
 
+vi.mock("../../../behavior/evaluator-api.ts", () => {
   return {
     evaluatorApi: {
       useUtils: () => ({
         evaluators: { getAll: { invalidate: calls.invalidateAll } },
         licenseEnforcement: { checkLimit: { invalidate: calls.invalidateLimit } },
       }),
-      evaluators: {
-        getAll: {
-          useQuery: () => ({ data: state.evaluators, isLoading: state.isLoading }),
-        },
-        getRelatedEntities: {
-          useQuery: () => ({ data: state.related, isLoading: state.relatedLoading }),
-        },
-        getCopies: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
-        getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
-        delete: mutation(calls.deleteEvaluator),
-        cascadeArchive: mutation(calls.cascadeArchive),
-        syncFromSource: mutation(calls.syncFromSource),
-        copy: mutation(vi.fn()),
-        pushToCopies: mutation(vi.fn()),
-      },
     },
   };
 });
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      evaluators: { getAll: { invalidate: calls.invalidateAll } },
+      licenseEnforcement: { checkLimit: { invalidate: calls.invalidateLimit } },
+    }),
+    evaluators: {
+      getAll: {
+        useQuery: () => ({ data: state.evaluators, isLoading: state.isLoading }),
+      },
+      getRelatedEntities: {
+        useQuery: () => ({ data: state.related, isLoading: state.relatedLoading }),
+      },
+      getCopies: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      getHistory: { useQuery: () => ({ data: [], isLoading: false, isError: false }) },
+      delete: mutation(calls.deleteEvaluator),
+      cascadeArchive: mutation(calls.cascadeArchive),
+      syncFromSource: mutation(calls.syncFromSource),
+      copy: mutation(vi.fn()),
+      pushToCopies: mutation(vi.fn()),
+    },
+  },
+}));
 
 const evaluator = (overrides: Record<string, unknown> = {}) => ({
   id: "eval_1",
@@ -168,13 +179,19 @@ describe("given a project with evaluators", () => {
 
   describe("when one evaluator's history is opened", () => {
     /** @scenario "The history I am reading is in the address" */
-    it("puts the evaluator in the address rather than in component state", async () => {
+    it("opens the evaluatorHistory drawer naming the evaluator", async () => {
       const { host } = renderWithEvaluatorHost(<EvaluatorsScreen />);
 
       await userEvent.click(screen.getByRole("button", { name: /Actions for Answer relevancy/i }));
       await userEvent.click(await screen.findByText("View history"));
 
-      expect(host.queries).toEqual([{ history: "eval_1" }]);
+      expect(host.overlays).toEqual([
+        {
+          drawer: "evaluatorHistory",
+          params: { evaluatorId: "eval_1", evaluatorName: "Answer relevancy" },
+        },
+      ]);
+      expect(host.queries).toEqual([]);
     });
   });
 

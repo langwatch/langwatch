@@ -1,9 +1,9 @@
 import { managedProviderSecrets } from "@langwatch/enterprise-managed-provider-contract";
-import { ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/process";
 import { SecretsChain, SecretsResolver, type ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
-import { ManagedProviderApp } from "../managed-provider.app.ts";
+import { ManagedProviderModule } from "../managed-provider.app.ts";
 
 const DEPLOYMENT = {
   proxyRoleArn: "proxy",
@@ -24,7 +24,7 @@ function secretsFrom(environment: Record<string, string | undefined>): ScopedSec
 }
 
 function install(environment: Record<string, string | undefined>) {
-  return ManagedProviderApp.create({
+  return ManagedProviderModule.create({
     config: void 0,
     resources: new ResourceScope(),
     secrets: secretsFrom(environment),

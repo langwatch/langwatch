@@ -1,6 +1,6 @@
 /**
  * The stored rows a Studio run's environment is built from: the project's
- * API key and its project-scoped secrets, still encrypted. Decryption is a
+ * project-scoped secrets, still encrypted. Decryption is a
  * process capability, not a stored row — never the repository's to hold.
  */
 
@@ -12,7 +12,6 @@ export type StoredProjectSecret = Readonly<{
 
 /** A project's stored run environment, before any value is decrypted. */
 export type StoredProjectEnvironment = Readonly<{
-  apiKey: string;
   secrets: readonly StoredProjectSecret[];
 }>;
 

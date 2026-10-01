@@ -13,8 +13,8 @@ export const opsBugReportTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("getAll")
     .withFacts(opsOperatorFact)
     .noPermission(BUG_REPORTS_STAFF_ONLY)
-    .handle(({ app, input }, operator) => {
-      const staff = app.admitStaff(operator);
+    .handle(async ({ app, input }, operator) => {
+      const staff = await app.admitStaff(operator);
 
       return app.listBugReports({ ...input, actorUserId: staff.id });
     })
@@ -22,8 +22,8 @@ export const opsBugReportTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof ops
     .procedure("getById")
     .withFacts(opsOperatorFact)
     .noPermission(BUG_REPORTS_STAFF_ONLY)
-    .handle(({ app, input }, operator) => {
-      const staff = app.admitStaff(operator);
+    .handle(async ({ app, input }, operator) => {
+      const staff = await app.admitStaff(operator);
 
       return app.getBugReport({ id: input.id, actorUserId: staff.id });
     })

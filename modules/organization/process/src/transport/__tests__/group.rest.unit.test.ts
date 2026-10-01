@@ -1,22 +1,22 @@
-/**
- * @vitest-environment node
- * `/api/groups` on a real declaration over an application fixture: what each route
- * asks of the application and how it answers.
- * @see specs/groups/groups-rest-api.feature
- */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
   UnauthorizedError,
 } from "@langwatch/api/rest";
+/**
+ * @vitest-environment node
+ * `/api/groups` on a real declaration over an application fixture: what each route
+ * asks of the application and how it answers.
+ * @see specs/groups/groups-rest-api.feature
+ */
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   GroupBindingNotFoundError,
   GroupNotFoundError,
   type OrganizationApi,
 } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { groupsRest } from "../group.rest.ts";

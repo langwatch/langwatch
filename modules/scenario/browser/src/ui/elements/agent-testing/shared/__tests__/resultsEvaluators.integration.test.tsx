@@ -4,16 +4,15 @@
  * result row pills, a verdict label, and the drawer's Evaluators panel.
  * @see specs/features/agent-testing/results-tabs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import {
   ScenarioRunStatus,
   Verdict,
   type ScenarioEvaluationResult,
   type ScenarioRunData,
 } from "@langwatch/scenario-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
@@ -27,10 +26,6 @@ import { RunResultsTable } from "../../../../sections/agent-testing/results/run-
 import { RunVerdictPanel } from "../../drawers/run-verdict-panel.tsx";
 import { LastResultLabel } from "../last-result-label.tsx";
 import { passRateColor } from "../pass-rate-color.ts";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** The CSS variable Chakra emits for a colour token. */
 function cssVarOfToken(token: string) {
@@ -144,18 +139,17 @@ function renderHeader(runs: ScenarioRunData[], note: string | null = null) {
     isRunSettingsShown: false,
     onToggleRunSettings: vi.fn(),
   };
-  return render(<RunPlanDetailHeader {...props} />, { wrapper: Wrapper });
+  return renderWithDesignSystem(<RunPlanDetailHeader {...props} />);
 }
 
 function renderTable(runs: ScenarioRunData[]) {
-  return render(
+  return renderWithDesignSystem(
     <RunResultsTable
       scenarioRuns={runs}
       resolveTargetName={() => null}
       iterationMap={new Map()}
       onScenarioRunClick={vi.fn()}
     />,
-    { wrapper: Wrapper },
   );
 }
 
@@ -422,7 +416,7 @@ describe("<LastResultLabel/> with evaluator results", () => {
   describe("given a run that met every criterion and failed a required evaluator", () => {
     /** @scenario "A failed required evaluator names itself beside the verdict of a row" */
     it("reads Failed with the criteria count and names the evaluator on hover", () => {
-      render(
+      renderWithDesignSystem(
         <LastResultLabel
           status={ScenarioRunStatus.FAILED}
           results={{
@@ -431,7 +425,6 @@ describe("<LastResultLabel/> with evaluator results", () => {
             evaluations: [sqlFailed],
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       const label = screen.getByText("Failed (3/3)");
@@ -441,7 +434,7 @@ describe("<LastResultLabel/> with evaluator results", () => {
 
   describe("given a run that failed on its criteria alone", () => {
     it("names no evaluator", () => {
-      render(
+      renderWithDesignSystem(
         <LastResultLabel
           status={ScenarioRunStatus.FAILED}
           results={{
@@ -450,7 +443,6 @@ describe("<LastResultLabel/> with evaluator results", () => {
             evaluations: [sqlPassed],
           }}
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Failed (1/2)").closest("[title]")).toBeNull();
@@ -472,7 +464,7 @@ describe("<RunVerdictPanel/> evaluators", () => {
     unmetCriteria?: string[];
     evaluations?: ScenarioEvaluationResult[];
   } = {}) {
-    return render(
+    return renderWithDesignSystem(
       <RunVerdictPanel
         status={status}
         metCriteria={metCriteria}
@@ -480,7 +472,6 @@ describe("<RunVerdictPanel/> evaluators", () => {
         declaredCriteria={[...metCriteria, ...unmetCriteria]}
         evaluations={evaluations}
       />,
-      { wrapper: Wrapper },
     );
   }
 

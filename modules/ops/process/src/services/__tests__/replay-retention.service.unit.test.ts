@@ -1,10 +1,10 @@
+import type { DataRetentionApi, ResolvedRetention } from "@langwatch/data-retention-contract";
 /**
  * @vitest-environment node
  * The retention a replay stamps on rebuilt rows, asked of data retention per tenant.
  * Spec: modules/ops/specs/projection-replay-console.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { DataRetentionApi, ResolvedRetention } from "@langwatch/data-retention-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ReplayRetentionService } from "../replay-retention.service.ts";

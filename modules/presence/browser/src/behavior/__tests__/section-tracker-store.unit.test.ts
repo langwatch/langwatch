@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { selectMostVisibleSection, useSectionTrackerStore } from "../section-tracker-store.ts";
+import { pickMostVisibleSection, useSectionTrackerStore } from "../section-tracker-store.ts";
 
 beforeEach(() => {
   useSectionTrackerStore.getState().reset();
@@ -9,14 +9,14 @@ beforeEach(() => {
 describe("given the section tracker store", () => {
   describe("when no section has been registered", () => {
     it("reports no most-visible section", () => {
-      expect(selectMostVisibleSection(useSectionTrackerStore.getState())).toBeNull();
+      expect(pickMostVisibleSection(useSectionTrackerStore.getState())).toBeUndefined();
     });
   });
 
   describe("when a section's ratio is at or below the 10% noise floor", () => {
     it("does not surface it as most visible", () => {
       useSectionTrackerStore.getState().setVisibility("input", 0.1);
-      expect(selectMostVisibleSection(useSectionTrackerStore.getState())).toBeNull();
+      expect(pickMostVisibleSection(useSectionTrackerStore.getState())).toBeUndefined();
     });
   });
 
@@ -26,7 +26,7 @@ describe("given the section tracker store", () => {
       useSectionTrackerStore.getState().setVisibility("output", 0.8);
       useSectionTrackerStore.getState().setVisibility("evals", 0.5);
 
-      expect(selectMostVisibleSection(useSectionTrackerStore.getState())).toBe("output");
+      expect(pickMostVisibleSection(useSectionTrackerStore.getState())).toBe("output");
     });
   });
 

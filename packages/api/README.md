@@ -1,7 +1,7 @@
 # @langwatch/api
 
 LangWatch's API framework, in five entry points. What a feature declares,
-`defineTrpcContract`, lives in the light core, `@langwatch/kernel/contract`, so a
+`defineTrpcContract`, lives in the light core, `@langwatch/module`, so a
 contract depends on no framework.
 
 | Import                  | What it is                                                                                                                                                                                                                                                                                                                                                |
@@ -15,7 +15,7 @@ contract depends on no framework.
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
 one wiring tRPC imports `@langwatch/api/trpc`; one _declaring_ procedures for
-both a server and a browser imports `@langwatch/kernel/contract`; a feature web
+both a server and a browser imports `@langwatch/module`; a feature web
 package imports `@langwatch/api/web`. Most REST call sites need two of the five,
 and that is the point — the import says which half of the framework a file
 depends on.
@@ -33,7 +33,7 @@ Behaviour: [specs/transport-declaration-split.feature](./specs/transport-declara
 
 ```ts
 // contract/src/annotation.trpc.ts — imports zod and its own schemas, nothing else.
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 export const annotationTrpc = defineTrpcContract("annotation")
   .query("getById")
@@ -315,7 +315,6 @@ rest.route("/", createThingsRestApp({ security: restSecurity /* ... */ }));
 ## Compatibility registration methods
 
 - **`registerRoute(method, path, version, handler, define)`** — the existing HTTP endpoint API. It retains explicit path, query and body schemas until migrated to `createRestService`. Every route declares `withOutput`; use `z.void()` for an endpoint with no response body.
-- **`registerSse(name, version, handler, define?)`** — a dotted name mounted as a GET, with `.withEvents({...})` / `.withQuery(...)`. The name is an identifier, not a URL: slash-less, dotted lower-camelCase, at least one dot — `^[a-z][a-zA-Z0-9]*(\.[a-z][a-zA-Z0-9]*)+$`, checked by `assertSseName` at registration. See SSE streaming below.
 - **`withdraw(name, version)`** — answers 410 Gone from that version onward, on every mount, with the withdrawn endpoint's config still on the mount report.
 
 An earlier revision offered a third style: `register(name, version, ...)` mounted a dotted RPC operation as a POST, with a compile-time name grammar and a raw-`Response` escape hatch. No service ever registered one, so it and the `rpc.discover` catalogues derived from it were removed.
@@ -389,7 +388,7 @@ The chain is the only extension point — a new capability is a new chain call a
 
 ### Service-level defaults and groups
 
-A `.withX()` on the service builder is the default for every endpoint; endpoint re-declaration wins; middleware stacks. `service.group(name, define?)` returns a registrar (`registerSse`/`registerRoute`/`withdraw`) whose chain declares defaults for everything registered through it. `registerRoute` paths are used as-is; `registerSse` and `withdraw` prefix the group name onto a dotted name (`things.registerSse("watch", ...)` → `things.watch`). Precedence runs service < group < endpoint. Groups do not nest and carry no version.
+A `.withX()` on the service builder is the default for every endpoint; endpoint re-declaration wins; middleware stacks. `service.group(name, define?)` returns a registrar (`registerRoute`/`withdraw`) whose chain declares defaults for everything registered through it. `registerRoute` paths are used as-is; `withdraw` prefixes the group name onto a dotted name. Precedence runs service < group < endpoint. Groups do not nest and carry no version.
 
 ## Version namespaces
 
@@ -419,19 +418,7 @@ The pipeline positions are fixed: rate limit after auth, before validation (429 
 
 ## SSE streaming
 
-`registerSse` mounts a dotted name as a GET. A stream has no request body and no path params, so the chain offers neither; request data arrives through `withQuery` and is read as `c.get("query")`. The handler takes `(c, stream)`; `stream.emit()` validates the payload against its declared event schema, and on failure writes an `error` event carrying the issues and rejects — so the handler must catch to continue streaming. A handler error propagates to the service error handler, and client disconnect settles the stream's completion rather than leaking it.
-
-```ts
-.registerSse("things.watch", "2026-08-07", async (c, stream) => {
-  const { channel } = c.get("query") as { channel: string };
-  await stream.emit("ready", { channel });
-  stream.close();
-}, (b) =>
-  b
-    .withQuery(z.object({ channel: z.string() }))
-    .withEvents({ ready: z.object({ channel: z.string() }) }),
-);
-```
+A stream is a route in a `defineRestRouter` declaration with `.withResponse("sse", {})`. Its handler answers `response.events(source)`, where `source` is an `AsyncIterable<RestEvent>` (`{ event?, data, id?, retryMs? }`, `data` already a string). The framework frames the events, publishes `text/event-stream` and ends the handler's own stream when the caller hangs up. A route that answers JSON or a stream by the caller's `Accept` declares `.withResponse("negotiated", {})` and branches on `response.wantsEvents`. Specified in `specs/declared-response-kinds.feature`.
 
 ## Route mounting callback
 
@@ -439,7 +426,7 @@ The pipeline positions are fixed: rate limit after auth, before validation (429 
 
 | Field              | Meaning                                                                                                            |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `method`           | Mounted HTTP method. SSE endpoints report `"get"`, guards `"all"`.                                                 |
+| `method`           | Mounted HTTP method. Guards report `"all"`.                                                                        |
 | `path`             | Absolute path including the base path, byte-identical to what the Hono route table (`app.routes[i].path`) reports. |
 | `version`          | `"2026-08-07"`, `"latest"`, `"preview"`, or `null` for the guards.                                                 |
 | `status`           | `"stable"`, `"latest"`, `"preview"`, or `null` for the guards.                                                     |
@@ -556,7 +543,6 @@ src/
     public-rest-routing.ts, public-rest-input.ts, rest-version-selector.ts
     response.ts           # Output validation + serialization
     middleware.ts         # Built-in tracer + logger (uses @langwatch/observability)
-    sse.ts                # registerSse() typed event stream
     types.ts              # ServiceConfig, EndpointDef, EndpointDocs, MountedRoute, ServiceContext, ...
     security/             # Route-policy registry, OpenAPI security projection, SecuredApp
 
@@ -587,7 +573,7 @@ When creating a new API service using this framework:
 2. Mount the result in the owning application's composition, e.g. `apps/api/src/app/api-production.composition.ts`, with `rest.route("/", create<Feature>RestApp(...))` next to the other families (do not create a `route.ts`; `routeHandlers()` is only for legacy Next-style hosts)
 3. Use `createService({ name })` from `@langwatch/api/rest`, with the service name matching the URL path segment
 4. Pass auth and organization middleware through `createService({ auth, _legacy: { organizationMiddleware } })`; pass capability ports through `createService({ rateLimiter, cache })` when any endpoint declares them — declaring without the port fails the build
-5. Use `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and `registerSse` for streams
+5. Use `createRestService().get/post/put/patch/delete` for new public REST, compatibility `registerRoute` for existing HTTP, and a `defineRestRouter` route declaring `.withResponse("sse", {})` for streams
 6. Compose one application instance at process boot and expose it as `context.app`; expose the authenticated request principal as `context.actor()`. Feature handlers must not construct or resolve services per request. Handler signature is `(context, input)`; REST path, query and body fields are already merged into `input`
 7. Declare capabilities on the definition chain. Public REST has one `withInput` and one `withOutput`; compatibility HTTP retains `withParams`/`withQuery`
 8. Handlers return raw data when `withOutput` is declared; the framework validates and serializes

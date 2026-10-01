@@ -300,43 +300,29 @@ flows:
           equals: "0"
 
   - id: webhook-endpoint-deliveries-drawer
-    title: Open a new endpoint's delivery log and health strip
+    title: Open an endpoint's delivery log and health strip once a delivery attempt is recorded
     steps:
-      - action: go
+      - action: request
         with:
-          path: /gateway/webhooks
-      - action: click
-        with:
-          testId: webhook-new
-      - action: fill
-        with:
-          testId: webhook-url-input
-          value: "https://example.com/vd-{uid}"
-      - action: click
-        with:
-          testId: webhook-family-toggle-gateway
-      - action: click
-        with:
-          testId: webhook-save
-      - action: expect
-        with:
-          testId: webhook-secret-dialog
-      - action: expect
-        with:
-          testId: webhook-secret-value
-      - action: click
-        with:
-          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
-      - action: expect
-        with:
-          text: "example.com/vd-{uid}"
-      # A virtual key made now is a gateway event; the endpoint listens to that family, so the
-      # delivery worker records an attempt against it for the drawer to list.
+          path: /api/webhooks/v1/endpoints
+          auth: "{orgKey}"
+          body: '{"url":"https://example.com/vd-{uid}","enabled_events":["gateway.virtual_key.created"]}'
+          field: data.id
+          as: endpointId
+      # A virtual key made now is a gateway event the endpoint listens to, so the delivery worker
+      # records an attempt. The drawer lists attempts once when it opens, so it opens after one exists.
       - action: request
         with:
           path: /api/gateway/v1/virtual-keys
           auth: "{orgKey}"
           body: '{"name":"vd-whk-{uid}"}'
+      - action: expect
+        with:
+          api: /api/webhooks/v1/endpoints/{endpointId}/deliveries
+          auth: "{orgKey}"
+          field: data.0.attempt
+          min: "1"
+          timeout: "60000"
       - action: go
         with:
           path: /gateway/webhooks
@@ -355,7 +341,7 @@ flows:
           testId: webhook-health-lag
       - action: expect
         with:
-          text: not failing
+          text: Failing since
       - action: expect
         with:
           text: Attempt
@@ -384,9 +370,9 @@ flows:
       - action: click
         with:
           testId: webhook-save
-      - action: wait
+      - action: expect
         with:
-          millis: "2500"
+          text: That webhook endpoint can't be saved
       - action: expect
         with:
           testId: webhook-save
@@ -427,9 +413,9 @@ flows:
       - action: click
         with:
           testId: webhook-save
-      - action: wait
+      - action: expect
         with:
-          millis: "2500"
+          text: That webhook endpoint can't be saved
       - action: expect
         with:
           testId: webhook-save
@@ -479,13 +465,13 @@ flows:
           path: /settings/usage
       - action: expect
         with:
-          text: /Resource (Usage|Limits)/
+          text: /^Usage$/
       - action: expect
         with:
-          text: /Members/
+          text: /Team members/
       - action: expect
         with:
-          text: /(Events|Traces) \/ Month/
+          text: /(Events|Traces) \/ month/i
       - action: expect
         with:
           text: Unable to load resource limits

@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
   JUDGE_MODEL_FEATURE_KEY,
   SIMULATOR_MODEL_FEATURE_KEY,
   type ScenarioApi,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/scenarios/resolved-run-models-on-runs.feature

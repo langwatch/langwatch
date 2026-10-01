@@ -1,5 +1,6 @@
-import { ProviderScopeChips, ScopeChipPicker } from "@langwatch/authz-browser-kit";
 import { Text, VStack } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
 import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 import type {

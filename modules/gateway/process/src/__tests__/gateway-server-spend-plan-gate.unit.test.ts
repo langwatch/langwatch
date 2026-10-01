@@ -6,7 +6,7 @@ import { recordOrganizationCredential } from "@langwatch/api/rest";
  */
 import { describe, expect, it } from "vitest";
 
-import { gatewaySpendPlanOrganizationId } from "../gateway.server.ts";
+import { gatewaySpendPlanOrganizationId } from "../gateway.module.ts";
 
 describe("gatewaySpendPlanOrganizationId", () => {
   /** @scenario The spend-plan gate reads the credential door's own organization */

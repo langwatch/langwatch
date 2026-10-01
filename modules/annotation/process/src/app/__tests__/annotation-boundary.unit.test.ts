@@ -15,7 +15,7 @@ import {
   createAnnotationTestProjects,
 } from "./annotation.fixture.ts";
 
-describe("AnnotationApp boundary", () => {
+describe("AnnotationModule boundary", () => {
   /** @scenario "a required annotation lookup throws" */
   it("throws when an annotation is absent", async () => {
     const app = createAnnotationTestApp();

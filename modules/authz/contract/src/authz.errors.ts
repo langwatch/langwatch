@@ -391,3 +391,44 @@ export class GrantExceedsCallerPermissionsError extends HandledError {
     this.name = "GrantExceedsCallerPermissionsError";
   }
 }
+
+/** Nobody grants the platform-operator role to themselves, on any deployment. */
+export class PlatformOperatorSelfGrantError extends HandledError {
+  declare readonly code: "platform_operator_self_grant";
+
+  constructor(meta: { userId: string }) {
+    super("platform_operator_self_grant", "You cannot make yourself a platform operator", {
+      httpStatus: 403,
+      meta,
+    });
+    this.name = "PlatformOperatorSelfGrantError";
+  }
+}
+
+/** Revoking this grant would leave the installation with no platform operator. */
+export class PlatformOperatorLastHolderError extends HandledError {
+  declare readonly code: "platform_operator_last_holder";
+
+  constructor(meta: { grantId: string; userId: string }) {
+    super(
+      "platform_operator_last_holder",
+      "The last platform operator cannot be revoked; grant the role to someone else first",
+      { httpStatus: 409, meta },
+    );
+    this.name = "PlatformOperatorLastHolderError";
+  }
+}
+
+/** A platform permission (`ops:*`) belongs to the platform-operator grant, never a custom role. */
+export class PlatformPermissionNotAssignableError extends HandledError {
+  declare readonly code: "platform_permission_not_assignable";
+
+  constructor(meta: { permissions: readonly string[] }) {
+    super(
+      "platform_permission_not_assignable",
+      "Platform permissions are held only through the platform-operator grant",
+      { httpStatus: 422, meta: { permissions: [...meta.permissions] } },
+    );
+    this.name = "PlatformPermissionNotAssignableError";
+  }
+}

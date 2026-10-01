@@ -1,6 +1,5 @@
 import type { AgentApi, AgentOverview } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -17,6 +16,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { promptServiceFixture } from "@langwatch/prompt-process/testing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 /**
  * Integration tests for the execution-data load against the real database.

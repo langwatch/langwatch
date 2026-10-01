@@ -1,11 +1,11 @@
+import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
 /**
  * @vitest-environment node
  * `/api/health/*` pinned to main's statuses and bodies, over the real probes.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
-import type { ScenarioApi } from "@langwatch/scenario-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemorySubsystemProbeChannel } from "../../channels/memory/memory.subsystem-probe.channel.ts";

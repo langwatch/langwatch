@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 type ScimDirectoryMoveDeps = {
   directory: Pick<ScimRepository, "findTokenIdsForConnection" | "moveDirectoryToConnection">;

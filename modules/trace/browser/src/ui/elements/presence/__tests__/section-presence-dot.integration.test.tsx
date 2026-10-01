@@ -1,15 +1,35 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { defineSlice } from "@langwatch/browser-host/global-store";
 import "@testing-library/jest-dom/vitest";
-import type { PresenceLocation, PresenceSession } from "@langwatch/presence-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  PRESENCE_ABSENT,
+  PRESENCE_SESSIONS_SLICE,
+  type PresenceLocation,
+  type PresenceSession,
+  type PresenceState,
+} from "@langwatch/presence-contract";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { usePresenceStore } from "../../../../behavior/presence/presence-store.ts";
 import { SectionPresenceDot } from "../section-presence-dot.tsx";
 
 afterEach(cleanup);
+
+// Stands in for presence, the owner of the slice, which this package only reads.
+const usePresenceStore = defineSlice<PresenceState>({
+  name: PRESENCE_SESSIONS_SLICE,
+  create: (set) => ({
+    ...PRESENCE_ABSENT,
+    applyEvent: (event) => {
+      if (event.kind === "snapshot") {
+        set({ sessions: new Map(event.sessions.map((s) => [s.sessionId, s])) });
+      }
+    },
+    reset: () => set({ sessions: new Map() }),
+  }),
+});
 
 beforeEach(() => {
   usePresenceStore.getState().reset();
@@ -36,10 +56,8 @@ describe("given a section presence dot", () => {
         sessions: [session("trace-1", "summary", "input")],
       });
 
-      const { container } = render(
-        <ChakraProvider value={defaultSystem}>
-          <SectionPresenceDot traceId="trace-1" tab="summary" section="output" />
-        </ChakraProvider>,
+      const { container } = renderWithDesignSystem(
+        <SectionPresenceDot traceId="trace-1" tab="summary" section="output" />,
       );
       expect(container).toBeEmptyDOMElement();
     });
@@ -52,10 +70,8 @@ describe("given a section presence dot", () => {
         sessions: [session("trace-1", "summary", "input")],
       });
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <SectionPresenceDot traceId="trace-1" tab="summary" section="input" />
-        </ChakraProvider>,
+      renderWithDesignSystem(
+        <SectionPresenceDot traceId="trace-1" tab="summary" section="input" />,
       );
       expect(screen.getByLabelText("Alice is here · input section")).toBeInTheDocument();
     });

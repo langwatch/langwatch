@@ -1,8 +1,8 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Button, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { ArrowLeft } from "lucide-react";
 
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { WiredTalkToItPanel } from "../../../../features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx";
 import type { VoiceCallTarget } from "./voice-call-target.ts";
 

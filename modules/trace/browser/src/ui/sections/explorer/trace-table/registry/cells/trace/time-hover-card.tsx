@@ -1,14 +1,14 @@
 import { Box, HoverCard, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
+import type React from "react";
+import { useState } from "react";
+
 import {
   formatAbsoluteTime,
   formatDayOfWeek,
   formatISOTimestamp,
   formatLocalWithZone,
   resolveViewerTimeZone,
-} from "@langwatch/trace-browser-kit";
-import type React from "react";
-import { useState } from "react";
-
+} from "../../../../../../../model/display-formatters.ts";
 import { useVerboseRelativeTime } from "../../../../utils/use-relative-time.ts";
 
 /**

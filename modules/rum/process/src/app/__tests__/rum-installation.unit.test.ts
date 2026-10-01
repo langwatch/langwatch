@@ -3,7 +3,7 @@ import { RumApi } from "@langwatch/rum-contract";
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { rumServer } from "../../rum.server.ts";
+import { rumProcessModule } from "../../rum.module.ts";
 import {
   COLLECTOR_ENDPOINT,
   exportWith,
@@ -42,7 +42,7 @@ describe("rum app installation", () => {
     const runtime = await rumInstallation({ collectorEndpoint: COLLECTOR_ENDPOINT }).boot();
 
     const api = runtime.service(RumApi);
-    expect(runtime.module(rumServer).provided).toBe(api);
+    expect(runtime.module(rumProcessModule).provided).toBe(api);
     await api.ingestBrowserTraces(report);
 
     await vi.waitFor(() => expect(collector).toHaveBeenCalledOnce());

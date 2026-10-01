@@ -1,36 +1,46 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type {
-  McpClientAddress,
-  McpLiveProjectLookup,
-  McpProjectLookup,
-  McpSessionGrant,
-} from "../app/hosted-mcp.members.ts";
 import { extractBearerToken } from "../rules/mcp-routes.rules.ts";
+import type { AuthzMcpSessionGrantService } from "./authz-mcp-session-grant.service.ts";
+import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
-import type { McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
+import type { McpCliSessions } from "./mcp-oauth-token.service.ts";
 import { McpRateLimitService } from "./mcp-rate-limit.service.ts";
+import type {
+  McpLiveProjectLookup,
+  ProjectMcpProjectLookupService,
+} from "./project-mcp-project-lookup.service.ts";
 
 const logger = createLogger("langwatch:mcp");
 
 /**
- * How long a re-checked grant is trusted. The bearer lives thirty days; the membership behind it
- * is re-proved on this cadence, so an offboarded person loses the session in minutes.
+ * How long a re-checked grant is trusted. A refresh token outlives the access token it rotates,
+ * so the membership behind it is re-proved on this cadence: an offboarded person loses the
+ * session in minutes.
  */
 const GRANT_RECHECK_INTERVAL_MS = 5 * 60 * 1000;
 
 /** The refusal a caller whose minting grant is gone reads on the wire. */
 const GRANT_REVOKED_CODE = "mcp_grant_revoked";
 
+/** The access tokens auth mints for a person; anything else is read as a project key. */
+const ACCESS_TOKEN_PREFIX = "lw_at_";
+
 /**
- * A bearer read: the key it stands for, and the person who approved it when it was minted by the
- * OAuth flow (absent for a project key passed as the bearer), or a refusal.
+ * A bearer read: the credential tool calls run on, and the person and project an access token is
+ * bound to (absent for a project key passed as the bearer), or a refusal.
  */
 export type McpCallerLookup =
-  | Readonly<{ kind: "resolved"; apiKey: string; userId: string | undefined }>
+  | Readonly<{
+      kind: "resolved";
+      apiKey: string;
+      userId: string | undefined;
+      projectId: string | undefined;
+    }>
   | Readonly<{ kind: "refused" }>;
 
 /** An authenticated request's key and the project it belongs to, or a 401 already sent. */
@@ -39,10 +49,10 @@ export type McpAuthentication =
   | Readonly<{ kind: "answered" }>;
 
 type McpCallerAuthCollaborators = Readonly<{
-  oauthTokens: McpOAuthTokenService;
-  projects: McpProjectLookup;
-  grants: McpSessionGrant;
-  address: McpClientAddress;
+  cliSessions: Pick<McpCliSessions, "getCliAccessSession">;
+  projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
+  grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
+  address: Pick<HeaderMcpClientAddressService, "clientIp">;
   http: McpHttpService;
 }>;
 
@@ -74,14 +84,16 @@ export class McpCallerAuthService {
     return this.#authFailures.isBlocked(this.clientIpOf(req));
   }
 
-  /** An OAuth-minted token runs on its approval, re-proved; a project key is its own check. */
+  /** An access token is the person capped at a project, re-proved; a project key is its own check. */
   async resolveCaller(token: string): Promise<McpCallerLookup> {
-    const lookup = await this.#collaborators.oauthTokens.resolve(token);
-    if (lookup.kind === "refused") return { kind: "refused" };
-    const { apiKey, userId } = lookup.context;
-    if (userId === undefined) return { kind: "resolved", apiKey, userId };
-    const granted = await this.#grantStillHolds({ token, apiKey, userId });
-    return granted ? { kind: "resolved", apiKey, userId } : { kind: "refused" };
+    if (!token.startsWith(ACCESS_TOKEN_PREFIX)) {
+      return { kind: "resolved", apiKey: token, userId: undefined, projectId: undefined };
+    }
+    const session = await this.#readAccessToken(token);
+    if (session === null) return { kind: "refused" };
+    const { userId, projectId } = session;
+    const granted = await this.#grantStillHolds({ token, userId, projectId });
+    return granted ? { kind: "resolved", apiKey: token, userId, projectId } : { kind: "refused" };
   }
 
   /** A request that presented no bearer reads as refused. */
@@ -118,16 +130,16 @@ export class McpCallerAuthService {
       return { kind: "answered" };
     }
 
-    const lookup = await this.#validateApiKey(caller.apiKey);
-    if (lookup.kind === "unknown") {
+    const projectId = caller.projectId ?? (await this.projectIdOf(caller.apiKey));
+    if (projectId === undefined) {
       this.#authFailures.track(this.clientIpOf(req));
       http.send401(res, "Invalid API key");
       return { kind: "answered" };
     }
 
     // MCP runs outside the app's request context, so the access log carries the tenant instead.
-    http.noteLogFields(res, { projectId: lookup.project.id });
-    return { kind: "authenticated", apiKey: caller.apiKey, projectId: lookup.project.id };
+    http.noteLogFields(res, { projectId });
+    return { kind: "authenticated", apiKey: caller.apiKey, projectId };
   }
 
   /** The project a key belongs to, for a session record written before records carried one. */
@@ -151,26 +163,38 @@ export class McpCallerAuthService {
     this.#authFailures.clear();
   }
 
+  /** The person and project an access token is bound to, or nothing when it is not usable here. */
+  async #readAccessToken(
+    token: string,
+  ): Promise<Readonly<{ userId: string; projectId: string }> | null> {
+    try {
+      const session = await this.#collaborators.cliSessions.getCliAccessSession({
+        authorization: `Bearer ${token}`,
+      });
+      return session.projectId === undefined
+        ? null
+        : { userId: session.userId, projectId: session.projectId };
+    } catch (err) {
+      if (!HandledError.isHandled(err)) logger.error({ error: err }, "MCP access token read failed");
+      return null;
+    }
+  }
+
   /** Probed on first use and every {@link GRANT_RECHECK_INTERVAL_MS} after. */
   async #grantStillHolds(input: {
     token: string;
-    apiKey: string;
     userId: string;
+    projectId: string;
   }): Promise<boolean> {
     const cached = this.#grantChecks.get(input.token);
     if (cached && nowInstant().epochMilliseconds - cached.checkedAt < GRANT_RECHECK_INTERVAL_MS) {
       return cached.granted;
     }
-    const lookup = await this.#validateApiKey(input.apiKey);
-    if (lookup.kind === "unknown") {
-      this.#grantChecks.delete(input.token);
-      return false;
-    }
     let granted: boolean;
     try {
       granted = await this.#collaborators.grants.stillGranted({
         userId: input.userId,
-        projectId: lookup.project.id,
+        projectId: input.projectId,
       });
     } catch (err) {
       logger.error({ error: err }, "MCP grant re-check failed");

@@ -5,11 +5,11 @@
  */
 import type { WireOf } from "@langwatch/api/web";
 import type { NextFiring } from "@langwatch/automation-contract";
-import { type SlackConnection } from "@langwatch/slack-browser-kit";
 
 import { api } from "../../../behavior/langy-api.ts";
 import { slackApi } from "../../../behavior/slack-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { type SlackConnection } from "../../../model/slack/slack-connection-types.ts";
 import {
   type LangyAutomationRecord,
   readAutomations,
@@ -26,7 +26,7 @@ export function useLangySlackConnections(): {
   const projectId = project?.id ?? "";
   const list = slackApi.slackIntegration.list.useQuery(
     { projectId },
-    { enabled: !!projectId, refetchOnWindowFocus: true },
+    { enabled: !!projectId },
   );
   return {
     connections: list.data?.connections,

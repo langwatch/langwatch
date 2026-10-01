@@ -1,9 +1,4 @@
-import {
-  PeriodSelector,
-  usePeriodSelector,
-  useFilterParams,
-  FilterToggle,
-} from "@langwatch/analytics-browser-kit";
+import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/period-selector";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -26,7 +21,6 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Money } from "@langwatch/design-system/type-utils";
-import { evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   evaluatorSettingsSchemaFor,
   type EvaluatorDefinition,
@@ -44,12 +38,15 @@ import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { FilterSidebar } from "../../../behavior/lent-peers.tsx";
 import { HoverableBigText, RedactedField } from "../../../behavior/lent-workflow.tsx";
 import { readableDate } from "../../../model/display-formatters.ts";
+import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
+import { FilterToggle } from "../analytics/filters/filter-toggle.tsx";
+import { useFilterParams } from "../analytics/use-filter-params.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 
 type RunRequestState = "idle" | "paused" | "running";
@@ -128,7 +125,6 @@ export function TryItOut({
     {
       enabled: !!filterParams.projectId && !!fetchingParams,
       refetchOnMount: false,
-      refetchOnWindowFocus: false,
     },
   );
 

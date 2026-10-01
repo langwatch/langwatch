@@ -4,9 +4,9 @@
  * screens (project authorize, MCP authorize).
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const apiKeyWeb = defineWebModule("api-key")
+export const apiKeyWeb = defineBrowserModule("api-key")
   .withHosts({
     requires: ["ApiKeyHostApi", "AuthorizeHostApi"],
     mounts: {

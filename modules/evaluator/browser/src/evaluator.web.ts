@@ -4,12 +4,12 @@
  * used. Its screens join this declaration in the declarations fan-out.
  */
 
+import { defineBrowserModule } from "@langwatch/browser";
 import { evaluatorTrpc } from "@langwatch/evaluator-contract";
-import { defineWebModule } from "@langwatch/ui-kernel";
 
 import { evaluatorApi } from "./behavior/evaluator-api.ts";
 
-export const evaluatorWeb = defineWebModule("evaluator")
+export const evaluatorWeb = defineBrowserModule("evaluator")
   .withApi(evaluatorApi, { contracts: [evaluatorTrpc] })
   .withHosts({
     requires: ["EvaluatorHostApi"],
@@ -21,6 +21,9 @@ export const evaluatorWeb = defineWebModule("evaluator")
       load: () => import("./ui/sections/evaluators.screen.tsx"),
     },
     "pages/[project]/evaluations/[id]/edit": {
+      load: () => import("./ui/sections/evaluation-edit.screen.tsx"),
+    },
+    "pages/[project]/evaluations/[id]/edit/choose": {
       load: () => import("./ui/sections/evaluation-edit.screen.tsx"),
     },
   })
@@ -53,6 +56,11 @@ export const evaluatorWeb = defineWebModule("evaluator")
         default: (
           await import("./ui/elements/evaluators/workflow-selector-for-evaluator-drawer.tsx")
         ).WorkflowSelectorForEvaluatorDrawer,
+      }),
+    },
+    evaluatorHistory: {
+      load: async () => ({
+        default: (await import("./ui/sections/evaluator-history-panel.tsx")).EvaluatorHistoryPanel,
       }),
     },
     onlineEvaluation: {

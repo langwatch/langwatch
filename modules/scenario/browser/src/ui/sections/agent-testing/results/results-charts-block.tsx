@@ -6,9 +6,9 @@
 
 import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { AtomCost, ResultTotals, SeriesBucket } from "@langwatch/scenario-contract";
-import { formatCost } from "@langwatch/suite-browser-kit";
 
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { formatCost } from "../../../../model/suite/formatters.ts";
 import {
   formatPassRate,
   passRateColor,

@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see modules/organization/specs/scope-graph.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ScopeGraphOrganization } from "@langwatch/organization-contract";
@@ -13,6 +8,11 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * @vitest-environment node
+ * @see modules/organization/specs/scope-graph.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -184,18 +184,8 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
     });
   });
 
-  describe("when the browser already holds the current version", () => {
-    /** @scenario "A browser holding the current version is answered unchanged" */
-    it("answers the same graph twice, so the host's hash of it is the held version", async () => {
-      const first = await service.getScopeGraph({ id: ids.caller });
-      const again = await service.getScopeGraph({ id: ids.caller });
-
-      expect(JSON.stringify(again)).toBe(JSON.stringify(first));
-    });
-  });
-
   describe("when a project the caller can see is renamed", () => {
-    /** @scenario "A rename answers a new version" */
+    /** @scenario "A rename answers the new name" */
     it("answers a different graph carrying the new name", async () => {
       const before = await service.getScopeGraph({ id: ids.caller });
 

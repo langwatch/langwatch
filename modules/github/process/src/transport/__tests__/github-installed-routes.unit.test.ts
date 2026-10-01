@@ -1,22 +1,22 @@
-/**
- * @vitest-environment node
- * @see modules/github/specs/github-install-routes.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, UnauthorizedError } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import { createApp, type ModuleSecretsScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * @see modules/github/specs/github-install-routes.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { githubServer } from "../../github.server.ts";
+import { githubProcessModule } from "../../github.module.ts";
 import { githubInstallRest } from "../github-install.rest.ts";
 
 const SESSION_COOKIE = "session=flow-owner";
@@ -40,7 +40,7 @@ async function installedGithub(
   const { signedInAs = "user-1", canManage = true } = options;
 
   return createApp({ role: "api", secrets: githubSecrets() })
-    .withModules([githubServer])
+    .withModules([githubProcessModule])
     .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
     .withStores(memoryStores())
     .provide({
@@ -80,9 +80,9 @@ function restHost(): RestHost {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: {
         identify: () => {
           throw new UnauthorizedError("Not authenticated");
@@ -110,7 +110,7 @@ async function setupAfterSignedFlow(runtime: Awaited<ReturnType<typeof installed
     nonceRegistered: false,
   });
   const host = restHost();
-  host.mount(githubInstallRest.router(), () => runtime.module(githubServer).provided);
+  host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);
 
   const response = await host.app.request(
     new Request(
@@ -130,7 +130,7 @@ describe("given the github module installed over memory stores", () => {
 
       try {
         const host = restHost();
-        const provided = runtime.module(githubServer).provided;
+        const provided = runtime.module(githubProcessModule).provided;
         host.mount(githubInstallRest.router(), () => provided);
 
         const response = await host.app.request(
@@ -154,7 +154,7 @@ describe("given the github module installed over memory stores", () => {
 
       try {
         const host = restHost();
-        host.mount(githubInstallRest.router(), () => runtime.module(githubServer).provided);
+        host.mount(githubInstallRest.router(), () => runtime.module(githubProcessModule).provided);
 
         const response = await host.app.request(
           new Request("http://api.test/api/github/setup?installation_id=1&state=not-signed"),

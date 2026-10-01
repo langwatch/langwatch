@@ -30,6 +30,14 @@ export type ProjectFirstMessage = z.infer<typeof projectFirstMessageSchema>;
 export const projectApiKeyRotationSchema = z.object({ apiKey: z.string().min(1) }).strict();
 export type ProjectApiKeyRotation = z.infer<typeof projectApiKeyRotationSchema>;
 
+/** Whether a legacy project key still authenticates; never the key or any part of it. */
+export const projectLegacyKeyStatusSchema = z.object({ present: z.boolean() }).strict();
+export type ProjectLegacyKeyStatus = z.infer<typeof projectLegacyKeyStatusSchema>;
+
+/** The legacy project key is gone for good; the answer never carries a key. */
+export const projectApiKeyRevokedSchema = z.object({ revoked: z.literal(true) }).strict();
+export type ProjectApiKeyRevoked = z.infer<typeof projectApiKeyRevokedSchema>;
+
 /**
  * Whether this viewer may read captured input and output, and the human label
  * of who can when they may not.

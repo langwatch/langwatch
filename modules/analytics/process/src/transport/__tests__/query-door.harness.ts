@@ -9,7 +9,7 @@ import {
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import { LocalFeatureApis } from "@langwatch/kernel";
+import { LocalFeatureApis } from "@langwatch/process";
 import { TRACE_FILTER_EXAMPLES } from "@langwatch/trace-contract";
 import { Hono } from "hono";
 

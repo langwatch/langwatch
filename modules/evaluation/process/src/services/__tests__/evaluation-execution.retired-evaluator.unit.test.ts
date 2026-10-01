@@ -1,11 +1,11 @@
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { HandledError } from "@langwatch/handled-error";
 /**
  * A saved evaluation can name an evaluator this install no longer has, and the
  * failure has to name it: a bare throw reaches the customer as a generic
  * "unknown error". @see specs/npx-installer/07-lean-install.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

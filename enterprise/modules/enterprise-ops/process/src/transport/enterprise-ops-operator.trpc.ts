@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Gated like main's back office: the ADMIN_EMAILS staff list checked by the application, never RBAC. */
+/** Gated like the back office: the platform-operator grant checked by the application, never org RBAC. */
 import { defineTrpcFact } from "@langwatch/api/trpc";
 import { opsOperatorSchema } from "@langwatch/ops-contract";
 
@@ -8,13 +8,13 @@ export const operatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.null
 
 export const STAFF_LIST = {
   reason:
-    "back-office surface gated on the ADMIN_EMAILS staff list, not on an RBAC permission; cross-tenant by design",
+    "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design",
 } as const;
 
 export const STAFF_LIST_FOR_ORGANIZATION = {
   ...STAFF_LIST,
   allow: {
     organizationId:
-      "names the customer organization a license is linked to; the caller's reach is the ADMIN_EMAILS staff list and is never derived from this id",
+      "names the customer organization a license is linked to; the caller's reach is the platform-operator grant and is never derived from this id",
   },
 } as const;

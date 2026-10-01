@@ -5,7 +5,7 @@ import type { AddressInfo } from "node:net";
 import { metrics } from "@opentelemetry/api";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { counter, resetMetricsForTests } from "../../metrics/index.ts";
+import { counter, observableGauge, resetMetricsForTests } from "../../metrics/index.ts";
 import { processMetrics } from "../process-metrics.ts";
 import type { TelemetrySecrets, TelemetrySettings } from "../telemetry-settings.ts";
 
@@ -154,6 +154,26 @@ describe("the process metrics transport", () => {
 
       expect(routeIn(contributions)).toBeUndefined();
       await stopAll(contributions);
+    });
+  });
+
+  describe("given a stopped process is replaced in the same Node process", () => {
+    it("never reads a gauge the stopped process declared", async () => {
+      let reads = 0;
+      observableGauge({ name: "langwatch_test_stale", description: "stale" }, (observer) => {
+        reads += 1;
+        observer.observe(1);
+      });
+      const first = await composeMetrics({ metrics: { mode: "prometheus", enabled: true } });
+      await stopAll(first);
+
+      const second = await composeMetrics({ metrics: { mode: "prometheus", enabled: true } });
+      const response = await scrape(second);
+
+      expect(response.status).toBe(200);
+      expect(await response.text()).not.toContain("langwatch_test_stale");
+      expect(reads).toBe(0);
+      await stopAll(second);
     });
   });
 });

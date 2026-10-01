@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {
@@ -31,7 +31,7 @@ export type BillingStaff = Readonly<{ id: string; email?: string | null | undefi
  * What the billing module answers other modules: invoice billing for a
  * connected self-hosted customer (ADR-156 section 7). Every operation refuses
  * off LangWatch Cloud, and where no payment provider is configured. The
- * backoffice operations answer anyone off the operator staff list not found.
+ * backoffice operations answer anyone without the platform-operator grant not found.
  */
 export interface BillingApi {
   /** The commercial state of one connected customer. */

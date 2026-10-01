@@ -1,14 +1,6 @@
 ---
 name: chakra-ui-refactor
-description: >
-  Review, convert, and improve UI code using Chakra UI v3. Use this skill
-  whenever a user wants to review Chakra UI code for issues, convert plain
-  HTML/CSS, Tailwind, CSS Modules, or styled-components to Chakra UI, clean up
-  messy Chakra components, fix layout structure or token usage, or asks anything
-  like "is this correct", "what's wrong with this", "review my component",
-  "refactor this", "clean up", "convert", or "chakra-ify this" — even without
-  the words "review" or "refactor". Trigger on any request to check, improve, or
-  convert Chakra UI code, however casually phrased.
+description: "Review or refactor Chakra UI v3 code INSIDE packages/design-system only. Use only when editing files under packages/design-system. Feature code in modules/*/browser or apps/ui never imports Chakra: use the design-system skill instead."
 ---
 
 # Chakra UI Refactor & Review

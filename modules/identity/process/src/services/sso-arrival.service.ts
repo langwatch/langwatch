@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { type AuthzApi, AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {

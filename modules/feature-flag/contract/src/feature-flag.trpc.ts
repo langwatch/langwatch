@@ -4,7 +4,7 @@
  * each of them and repeats nothing.
  */
 
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { experimentCatalogueEntrySchema } from "./feature-flag-experiment.ts";
@@ -28,24 +28,24 @@ export const experimentsOutputSchema = z
 export const experimentWriteOutputSchema = z.object({ ok: z.literal(true) }).strict();
 
 export const featureFlagTrpc = defineTrpcContract("featureFlag")
-  .query("isEnabled", { cache: { tier: "session" } })
+  .query("isEnabled")
   .withInput(featureFlagReadInputSchema)
   .withOutput(enabledOutputSchema)
 
   /** True when the flag is on for any organization the caller belongs to. */
-  .query("isEnabledForAnyOrganization", { cache: { tier: "session" } })
+  .query("isEnabledForAnyOrganization")
   .withInput(organizationFeatureFlagsInputSchema)
   .withOutput(enabledOutputSchema)
 
-  .query("isEnabledForEachOrganization", { cache: { tier: "session" } })
+  .query("isEnabledForEachOrganization")
   .withInput(organizationFeatureFlagsInputSchema)
   .withOutput(enabledByOrganizationOutputSchema)
 
-  .query("resolve", { cache: { tier: "session" } })
+  .query("resolve")
   .withInput(featureFlagTargetRequestSchema)
   .withOutput(resolvedFlagsOutputSchema)
 
-  .query("experiments", { cache: { tier: "session" } })
+  .query("experiments")
   .withInput(featureFlagTargetRequestSchema)
   .withOutput(experimentsOutputSchema)
 

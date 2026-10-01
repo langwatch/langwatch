@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/kernel";
+import { defineRepositories } from "@langwatch/process";
 
 import { ClickHouseInstantEvalRepositories } from "./clickhouse/clickhouse.instant-eval.repositories.ts";
 import { MemoryInstantEvalRepositories } from "./memory/memory.instant-eval.repositories.ts";

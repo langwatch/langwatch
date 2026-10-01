@@ -1,3 +1,4 @@
+import { describeError } from "@langwatch/browser-host/errors";
 import { useCallback, useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
@@ -7,7 +8,6 @@ import { api } from "../../../behavior/gateway-api.ts";
  * and callbacks only, never JSX.
  */
 import { useGatewayToaster, useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
-import { describeError } from "../../../model/describe-error.ts";
 import {
   modelAliasesFromForm,
   type RoutingPolicyFormValues,

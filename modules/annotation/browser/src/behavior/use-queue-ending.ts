@@ -4,8 +4,9 @@
  * one, and the last item is recorded done at that same moment.
  */
 
-import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useAnnotationQueueSessionStore } from "./annotation-queue-session.store.ts";
 
 /** `walking` until the last item; then the dataset offer, the question, and done. */
 export type QueueEnding = "walking" | "handoff" | "asking" | "done";

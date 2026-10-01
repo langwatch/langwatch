@@ -116,8 +116,11 @@ const manifestEntries = ({ dir, manifest }) => {
     specs.add(file);
   };
 
-  add(".", manifest.main);
-  add(".", manifest.module);
+  // Node and bundlers ignore `main`/`module` once an `exports` map exists.
+  if (manifest.exports === undefined) {
+    add(".", manifest.main);
+    add(".", manifest.module);
+  }
   for (const [subpath, target] of exportTargets(manifest.exports)) add(subpath, target);
   if (typeof manifest.bin === "string") add(null, manifest.bin);
   else for (const value of Object.values(manifest.bin ?? {})) add(null, value);
@@ -143,9 +146,69 @@ const parseManifest = (dir) => {
   }
 };
 
+/** JSON with comments and trailing commas, as tsconfig files are written. */
+export const parseJsonc = (text) => {
+  let out = "";
+  for (let at = 0; at < text.length; at++) {
+    const char = text[at];
+    if (char === '"') {
+      const end = text.indexOf('"', at + 1);
+      let close = end;
+      while (close > 0 && text[close - 1] === "\\") close = text.indexOf('"', close + 1);
+      out += text.slice(at, close + 1);
+      at = close;
+    } else if (char === "/" && text[at + 1] === "/") {
+      at = text.indexOf("\n", at) - 1;
+      if (at < 0) break;
+    } else if (char === "/" && text[at + 1] === "*") {
+      at = text.indexOf("*/", at) + 1;
+    } else out += char;
+  }
+  return JSON.parse(out.replace(/,(\s*[}\]])/g, "$1"));
+};
+
+/** Walks up from a file's directory to the repository root; the first dir `pick` answers wins. */
+const nearest = ({ cache, file, pick }) => {
+  const visited = [];
+  let dir = dirname(file);
+  let found = null;
+  for (;;) {
+    if (cache.has(dir)) {
+      found = cache.get(dir);
+      break;
+    }
+    visited.push(dir);
+    found = pick(dir === "." ? "" : dir);
+    if (found !== null || dir === "." || dir === "") break;
+    dir = dirname(dir);
+  }
+  for (const seen of visited) cache.set(seen, found);
+  return found;
+};
+
+/** `{ base, paths }` from one tsconfig, following a relative `extends` one level. */
+const readTsconfigPaths = ({ configFile, followExtends = true }) => {
+  let config;
+  try {
+    config = parseJsonc(read(join(ROOT, configFile)));
+  } catch {
+    return null;
+  }
+  const options = config?.compilerOptions ?? {};
+  const configDir = dirname(configFile);
+  if (options.paths) {
+    return { base: join(configDir, options.baseUrl ?? "."), paths: options.paths };
+  }
+  const parent = typeof config?.extends === "string" ? config.extends : "";
+  if (!followExtends || !parent.startsWith(".")) return null;
+  const parentFile = join(configDir, parent.endsWith(".json") ? parent : `${parent}.json`);
+  return readTsconfigPaths({ configFile: parentFile, followExtends: false });
+};
+
 /** name -> { dir, entries } for every workspace package, plus every declared root spec. */
 const readWorkspace = () => {
   const byName = new Map();
+  const byDir = new Map();
   const rootSpecs = new Set();
 
   for (const dir of packageDirs()) {
@@ -154,9 +217,60 @@ const readWorkspace = () => {
     const { entries, specs } = manifestEntries({ dir, manifest });
     for (const spec of specs) rootSpecs.add(spec);
     byName.set(manifest.name, { dir, entries });
+    byDir.set(dir, manifest);
   }
 
-  return { byName, rootSpecs, roots: new Set() };
+  const manifestCache = new Map();
+  const tsconfigCache = new Map();
+  const importsFor = (file) =>
+    nearest({
+      cache: manifestCache,
+      file,
+      pick: (dir) => {
+        const manifest = byDir.get(dir);
+        if (!manifest) return null;
+        return { dir, imports: manifest.imports ?? {} };
+      },
+    });
+  const pathsFor = (file) =>
+    nearest({
+      cache: tsconfigCache,
+      file,
+      pick: (dir) => {
+        const configFile = join(dir, "tsconfig.json");
+        if (!existsSync(join(ROOT, configFile))) return null;
+        return readTsconfigPaths({ configFile }) ?? { base: dir, paths: {} };
+      },
+    });
+
+  return { byName, rootSpecs, roots: new Set(), importsFor, pathsFor };
+};
+
+/**
+ * The best key for a specifier in an `imports` or `paths` map: exact first,
+ * then the longest prefix of a single-`*` pattern. -> { key, star } or null.
+ */
+export const matchPattern = ({ keys, specifier }) => {
+  if (keys.includes(specifier)) return { key: specifier, star: "" };
+  let best = null;
+  for (const key of keys) {
+    const star = key.indexOf("*");
+    if (star < 0) continue;
+    const [prefix, suffix] = [key.slice(0, star), key.slice(star + 1)];
+    if (specifier.length < prefix.length + suffix.length) continue;
+    if (!specifier.startsWith(prefix) || !specifier.endsWith(suffix)) continue;
+    if (best && prefix.length <= best.prefixLength) continue;
+    const middle = specifier.slice(prefix.length, specifier.length - suffix.length);
+    best = { key, star: middle, prefixLength: prefix.length };
+  }
+  return best && { key: best.key, star: best.star };
+};
+
+/** Every string target under a (possibly conditional) `imports` value, in declared order. */
+const conditionTargets = (value) => {
+  if (typeof value === "string") return [value];
+  const nested = Array.isArray(value) ? value : Object.values(value ?? {});
+  return nested.flatMap(conditionTargets);
 };
 
 /**
@@ -233,36 +347,76 @@ const CANDIDATE_SUFFIXES = [
   "/index.js",
 ];
 
-/** Resolves one specifier to a repository-relative file, or null when it leaves the workspace. */
-const resolveSpecifier = ({ specifier, fromFile, workspace, known }) => {
-  const attempt = (base) => {
-    for (const suffix of CANDIDATE_SUFFIXES) {
-      const candidate = `${base}${suffix}`.split("\\").join("/");
-      if (known.has(candidate)) return candidate;
-    }
-    // `./x.ts` written for a file the loader resolves as `./x.ts` directly.
-    const rewritten = base
-      .replace(/\.[cm]?js$/, ".ts")
-      .split("\\")
-      .join("/");
-    return known.has(rewritten) ? rewritten : null;
-  };
+/** The first file a base path names, trying each loader suffix. */
+const attemptPath = ({ base, known }) => {
+  const hit = CANDIDATE_SUFFIXES.map((suffix) => `${base}${suffix}`.split("\\").join("/")).find(
+    (candidate) => known.has(candidate),
+  );
+  if (hit) return hit;
+  // `./x.js` written for a file the loader resolves as `./x.ts`.
+  const rewritten = base
+    .replace(/\.[cm]?js$/, ".ts")
+    .split("\\")
+    .join("/");
+  return known.has(rewritten) ? rewritten : null;
+};
 
-  if (specifier.startsWith(".")) {
-    return attempt(join(dirname(fromFile), specifier));
+/** A `#` specifier through the nearest package.json `imports` map. */
+const resolveHashImport = ({ specifier, fromFile, workspace, known }) => {
+  const scope = workspace.importsFor?.(fromFile);
+  const hit = scope && matchPattern({ keys: Object.keys(scope.imports), specifier });
+  if (!hit) return null;
+  for (const target of conditionTargets(scope.imports[hit.key])) {
+    const filled = target.replaceAll("*", hit.star);
+    const found = filled.startsWith(".")
+      ? attemptPath({ base: join(scope.dir, filled), known })
+      : resolveSpecifier({ specifier: filled, fromFile, workspace, known });
+    if (found) return found;
   }
+  return null;
+};
+
+/** A bare specifier through the nearest tsconfig `paths`, or null when no alias hits. */
+const resolvePathAlias = ({ specifier, fromFile, workspace, known }) => {
+  const aliases = workspace.pathsFor?.(fromFile);
+  const alias = aliases && matchPattern({ keys: Object.keys(aliases.paths), specifier });
+  if (!alias) return null;
+  for (const target of aliases.paths[alias.key]) {
+    const base = join(aliases.base, target.replaceAll("*", alias.star));
+    const found = attemptPath({ base, known });
+    if (found) return found;
+  }
+  return null;
+};
+
+/** A bare specifier naming a workspace package, through its entries or its tree. */
+const resolveWorkspacePackage = ({ specifier, workspace, known }) => {
   const parts = specifier.split("/");
   const name = specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0];
   const pkg = workspace.byName.get(name);
   if (!pkg) return null;
   const subpath = specifier === name ? "." : `./${specifier.slice(name.length + 1)}`;
   const declared = pkg.entries.get(subpath) ?? pkg.entries.get(".");
-  if (subpath !== "." && !pkg.entries.has(subpath)) {
-    // No exports map entry: fall back to the path as written under the package.
-    const direct = attempt(join(pkg.dir, subpath));
-    if (direct) return direct;
+  // No exports map entry: fall back to the path as written under the package.
+  const direct =
+    subpath !== "." && !pkg.entries.has(subpath)
+      ? attemptPath({ base: join(pkg.dir, subpath), known })
+      : null;
+  return direct ?? declared ?? null;
+};
+
+/** Resolves one specifier to a repository-relative file, or null when it leaves the workspace. */
+const resolveSpecifier = ({ specifier, fromFile, workspace, known }) => {
+  if (specifier.startsWith(".")) {
+    return attemptPath({ base: join(dirname(fromFile), specifier), known });
   }
-  return declared ?? null;
+  if (specifier.startsWith("#")) {
+    return resolveHashImport({ specifier, fromFile, workspace, known });
+  }
+  return (
+    resolvePathAlias({ specifier, fromFile, workspace, known }) ??
+    resolveWorkspacePackage({ specifier, workspace, known })
+  );
 };
 
 /** Forward and reverse import graphs over every tracked source file. */
@@ -591,7 +745,9 @@ export const findDanglingGuards = ({ files, readFile = read }) => {
 
 const selfTest = () => {
   const failures = [];
+  let checks = 0;
   const check = (name, actual, expected) => {
+    checks += 1;
     const ok = JSON.stringify(actual) === JSON.stringify(expected);
     if (!ok)
       failures.push(`${name}: got ${JSON.stringify(actual)}, want ${JSON.stringify(expected)}`);
@@ -832,8 +988,46 @@ const selfTest = () => {
     ["p/src/main.ts"],
   );
 
+  check(
+    "jsonc: a `/*` inside a string survives comment stripping",
+    parseJsonc(`{\n  // note\n  "paths": { "@/*": ["./src/*"], }, /* x */\n}`),
+    { paths: { "@/*": ["./src/*"] } },
+  );
+  check(
+    "entries: `main` is not an entry when `exports` exists",
+    [
+      ...manifestEntries({
+        dir: "p",
+        manifest: { main: "./src/legacy.ts", exports: { ".": "./src/index.ts" } },
+      }).specs,
+    ],
+    ["p/src/index.ts"],
+  );
+  const aliasSources = {
+    "s/src/index.ts": `import "#internal/a";\nimport "@/b";`,
+    "s/src/internal/a.ts": "",
+    "s/src/b.ts": "",
+  };
+  const aliasGraph = buildGraph({
+    files: Object.keys(aliasSources),
+    workspace: {
+      byName: new Map(),
+      importsFor: () => ({
+        dir: "s",
+        imports: { "#*": { types: "./dist/*.d.ts", default: "./src/*.ts" } },
+      }),
+      pathsFor: () => ({ base: "s", paths: { "@/*": ["./src/*"] } }),
+    },
+    readFile: (absolute) => aliasSources[relative(ROOT, absolute).split("\\").join("/")] ?? "",
+  });
+  check(
+    "resolve: `#` imports and tsconfig `paths` aliases are edges",
+    [...aliasGraph.imports.get("s/src/index.ts")].toSorted(byCodeUnit),
+    ["s/src/b.ts", "s/src/internal/a.ts"],
+  );
+
   for (const failure of failures) console.error(`self-test FAILED  ${failure}`);
-  if (failures.length === 0) console.error(`self-test passed (${30} cases)`);
+  if (failures.length === 0) console.error(`self-test passed (${checks} cases)`);
   return failures.length === 0 ? 0 : 2;
 };
 

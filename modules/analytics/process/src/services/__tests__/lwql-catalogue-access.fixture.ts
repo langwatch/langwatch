@@ -1,7 +1,12 @@
 import type { LangWatchQLCatalogueAccess } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { AuthzApi, AuthzPrincipalRef, AuthzScopeRef } from "@langwatch/authz-contract";
+import type {
+  AuthzApi,
+  AuthzCanScopeRef,
+  AuthzPrincipalRef,
+  AuthzScopeRef,
+} from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { EVERY_CATALOGUE_PERMISSION } from "../../app/__tests__/analytics.fixture.ts";
 
@@ -23,7 +28,7 @@ export function catalogueWithout(
 export type AuthzCheck = Readonly<{
   principal: AuthzPrincipalRef;
   permission: AuthzPermission;
-  scope: AuthzScopeRef;
+  scope: AuthzCanScopeRef;
 }>;
 
 export const PROJECT_SCOPE = {

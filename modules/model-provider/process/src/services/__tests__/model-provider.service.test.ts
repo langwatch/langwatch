@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
 import {
   ModelCostNotFoundError,
@@ -19,6 +18,7 @@ import {
 } from "@langwatch/model-provider-contract";
 import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -543,10 +543,10 @@ class Organizations extends OrganizationService {
   listGroupBindings() {
     return this.notUsed();
   }
-  addGroupBinding() {
+  addGroupGrant() {
     return this.notUsed();
   }
-  removeGroupBinding() {
+  removeGroupGrant() {
     return this.notUsed();
   }
   applyGroupEdits() {

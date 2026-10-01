@@ -1,6 +1,6 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
@@ -36,7 +36,6 @@ import {
   type TwoStepVerificationApi,
   type VerifiedEmailsResolution,
 } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 /**
@@ -46,6 +45,7 @@ import { NotificationService } from "@langwatch/notification-contract";
  */
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
@@ -179,14 +179,13 @@ type IdentityMembers = MembersRead<readonly ["prisma", "eventing", "encryption",
   Readonly<{
     /** LangWatch's own cloud: what licenses federation, and so automatic joining. */
     isSaas: boolean;
-    adminEmails: readonly string[];
     /** Where this deployment answers, which is what a SAML identity provider
      *  is told LangWatch is called. A process fact, not one of the fourteen. */
     publicBaseUrl: string | undefined;
   }>;
 
 type IdentitySetup = FeatureSetup<
-  typeof IdentityApp.dependencies,
+  typeof IdentityModule.dependencies,
   IdentityMembers,
   IdentityServerConfig
 > &
@@ -395,7 +394,7 @@ function joinRateLimit(limiter: RateLimiter): JoinRequestsServiceDeps["rateLimit
   };
 }
 
-export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
+export class IdentityModule implements IdentityApi, IdentityLookupApi, TwoStepVerificationApi {
   static readonly contract = IdentityApi;
   static readonly config = identityConfig;
   /** The two peers an admission orchestrates: the module that owns
@@ -425,18 +424,17 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     "encryption",
     "rateLimiter",
     "isSaas",
-    "adminEmails",
     "publicBaseUrl",
   ] as const;
   /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and auth. */
   static readonly secrets = { internalSlackSignupsWebhook } as const;
 
-  static async create(setup: IdentitySetup): Promise<IdentityApp> {
+  static async create(setup: IdentitySetup): Promise<IdentityModule> {
     const mailer: MailSender = {
       send: (content) => setup.dependencies.notifications.sendEmail(content),
     };
     const signupAnnouncements = await setup.secrets.into(
-      IdentityApp.secrets.internalSlackSignupsWebhook,
+      IdentityModule.secrets.internalSlackSignupsWebhook,
       (webhookUrl) =>
         SignupAnnouncementService.create({
           channel: webhookUrl ? signupAnnouncementChannels.live.create({ webhookUrl }) : undefined,
@@ -455,7 +453,6 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       repositories: setup.repositories,
       eventing: setup.members.eventing,
       identityEventing,
-      adminEmails: setup.members.adminEmails,
     });
     const reservations = setup.repositories.reservations;
     const identityGuards = IdentityGuardsService.create({
@@ -526,6 +523,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
         baseUrl: setup.members.publicBaseUrl ?? "",
       }),
       licensing: setup.dependencies.licensing,
+      authorization: setup.dependencies.permissions,
     });
     const ssoConnectionGuards = ssoConnectionGraph.guards;
     const ssoConnections: SsoConnectionService | null = ssoConnectionGraph.connections;
@@ -719,7 +717,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
       }),
     });
 
-    return new IdentityApp({
+    return new IdentityModule({
       emails,
       ceremonies,
       identityGuards,
@@ -779,7 +777,7 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
           proposals: setup.repositories.identityHistory,
           accounts: setup.dependencies.auth,
         }),
-        platformOperators: setup.repositories.ssoPlatformOperators,
+        authorization: setup.dependencies.permissions,
         auditLog: setup.dependencies.auditLog,
         rateLimiter: setup.members.rateLimiter,
         sessions: setup.dependencies.auth,

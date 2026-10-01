@@ -12,6 +12,10 @@ export {
   intentAccessorOf,
   TEST_CONSTANTS,
 } from "./services/__tests__/testHelpers.ts";
+export { InMemoryProcessStore } from "./process-manager/stores/inMemoryProcessStore.ts";
+export type { ProcessStore } from "./process-manager/stores/processStore.types.ts";
+export type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queues/index.ts";
+export { testEventSchema } from "./services/__tests__/testHelpers.ts";
 export { processCommand, processCommandBatch } from "./services/commands/commandDispatcher.ts";
 export type {
   ProcessCommandBatchParams,

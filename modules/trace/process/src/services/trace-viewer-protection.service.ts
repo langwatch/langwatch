@@ -1,3 +1,4 @@
+import type { PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   describeAudience,
@@ -63,10 +64,10 @@ export class TraceViewerProtectionService {
     }
   }
 
-  /** API-KEY redactions: anonymous resolution + credential's cost grant.
-   * Legacy keys bypass RBAC for full access. */
+  /** Credential redactions: anonymous resolution + the principal's cost grant. A legacy
+   * API key (no principal) bypasses RBAC for full access. */
   async resolveForApiKey(
-    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
+    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
   ): Promise<Protections> {
     const [protections, canSeeCosts] = await Promise.all([
       this.resolve({ projectId: input.projectId, userId: void 0, publiclyShared: false }),
@@ -76,16 +77,22 @@ export class TraceViewerProtectionService {
   }
 
   /** One permission, asked of the CREDENTIAL rather than of whoever holds it. */
-  private keyPermitted(
-    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
+  private async keyPermitted(
+    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
   ): Promise<boolean> {
-    if (input.apiKeyId === null) return Promise.resolve(true);
-    return this.options.authz.hasApiKeyPermission({
-      apiKeyId: input.apiKeyId,
-      userId: input.userId,
-      organizationId: "",
-      scope: { type: "project", id: input.projectId, teamId: "" },
+    if (input.principal === null) return true;
+    const project = await this.options.projects.findIdentity(input.projectId);
+    if (!project) return false;
+
+    return this.options.authz.can({
+      principal: input.principal,
       permission: "cost:view",
+      scope: {
+        type: "project",
+        id: project.id,
+        teamId: project.teamId,
+        organizationId: project.organizationId,
+      },
     });
   }
 

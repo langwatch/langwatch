@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzPermission } from "@langwatch/authorization";
 import type { OrganizationSettings } from "@langwatch/organization-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import type { SlackApi } from "@langwatch/slack-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySlackWebApiChannel } from "../../channels/memory/memory.slack-web-api.channel.ts";
 import { MemorySlackRepositories } from "../../repositories/memory/memory.slack.repositories.ts";

@@ -1,11 +1,11 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { Task } from "@langwatch/task";
 
-import type { ProjectApp } from "../app/project.app.ts";
+import type { ProjectModule } from "../app/project.app.ts";
 
 type BackfillPeers = Readonly<{
   organizations: Pick<OrganizationApi, "findAllIds">;
-  projects: Pick<ProjectApp, "recordExistingProjectsCreated">;
+  projects: Pick<ProjectModule, "recordExistingProjectsCreated">;
 }>;
 
 /**

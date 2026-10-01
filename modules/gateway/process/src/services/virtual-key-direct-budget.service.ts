@@ -1,6 +1,7 @@
 import type { GatewayBudget } from "@langwatch/gateway-contract";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * The budget a key carries on itself, with spend in its own current period. That is distinct from
  * calendar-month spend: a daily cap measures against today, so a monthly figure and a daily one
@@ -81,18 +82,18 @@ type PeriodSpend = { totalled: true; byBudgetId: Map<string, string> } | { total
  * rollup renders as an unknown on the bar rather than as a confident zero.
  */
 async function loadPeriodSpend(args: {
-  repository: VirtualKeyDirectBudgetRepository;
+  projects: Pick<ProjectApi, "listIdsByOrganization">;
   organizationId: string;
   budgets: GatewayBudget[];
   chRepo: GatewayBudgetSpend | undefined;
   now: Instant;
 }): Promise<PeriodSpend> {
-  const { repository, organizationId, budgets, chRepo, now } = args;
+  const { projects, organizationId, budgets, chRepo, now } = args;
   if (!chRepo) {
     return { totalled: false };
   }
 
-  const projectIds = await repository.findProjectIdsInOrganization({ organizationId });
+  const projectIds = await projects.listIdsByOrganization({ organizationId });
   try {
     const spends = await chRepo.getSpendForTargetsAcrossTenants(
       projectIds,
@@ -119,12 +120,16 @@ async function loadPeriodSpend(args: {
 
 /** The budget a key carries on itself, with its current-period spend. */
 export class VirtualKeyDirectBudgetService {
-  private constructor(private readonly repository: VirtualKeyDirectBudgetRepository) {}
+  private constructor(
+    private readonly repository: VirtualKeyDirectBudgetRepository,
+    private readonly projects: Pick<ProjectApi, "listIdsByOrganization">,
+  ) {}
 
   static create(input: {
     repository: VirtualKeyDirectBudgetRepository;
+    projects: Pick<ProjectApi, "listIdsByOrganization">;
   }): VirtualKeyDirectBudgetService {
-    return new VirtualKeyDirectBudgetService(input.repository);
+    return new VirtualKeyDirectBudgetService(input.repository, input.projects);
   }
 
   /**
@@ -160,7 +165,7 @@ export class VirtualKeyDirectBudgetService {
     }
 
     const periodSpend = await loadPeriodSpend({
-      repository: this.repository,
+      projects: this.projects,
       organizationId: args.organizationId,
       budgets: [...chosen.values()],
       chRepo,

@@ -2,7 +2,7 @@ import {
   availableFilters,
   type FilterDefinition,
   type FilterField,
-} from "@langwatch/analytics-browser-kit";
+} from "@langwatch/analytics-filters";
 
 /**
  * One chip per condition a stored structured filter states. A keyed field

@@ -1,12 +1,12 @@
+import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
 /**
  * The Expansions switches as the Add to Dataset drawer actually composes them, beside
  * the preview table.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { Dataset, DatasetColumns } from "@langwatch/dataset-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Trace } from "@langwatch/trace-contract";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,12 +37,17 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
     useUtils: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
     annotationScore: { getAllActive: { useQuery: () => ({ data: [] }) } },
-    dataset: { updateMapping: { useMutation: () => ({ mutate: vi.fn() }) } },
     traces: {
       getTracesWithSpansByThreadIds: { useQuery: () => ({ data: undefined }) },
       getFormattedSpansDigest: { useQuery: () => ({ data: undefined }) },
       getSampleTracesDataset: { useQuery: () => ({ data: [] }) },
     },
+  },
+}));
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({ dataset: { getAll: { invalidate: vi.fn() } } }),
+    dataset: { updateMapping: { useMutation: () => ({ mutate: vi.fn() }) } },
   },
 }));
 
@@ -101,17 +106,15 @@ const DATASET: Dataset = {
 const switchNamed = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name });
 
 function renderPreview() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DatasetMappingPreview
-        traces={[TRACE]}
-        columnTypes={COLUMN_TYPES}
-        rowData={[{ id: "row-1", selected: true }]}
-        selectedDataset={DATASET}
-        onEditColumns={vi.fn()}
-        onRowDataChange={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <DatasetMappingPreview
+      traces={[TRACE]}
+      columnTypes={COLUMN_TYPES}
+      rowData={[{ id: "row-1", selected: true }]}
+      selectedDataset={DATASET}
+      onEditColumns={vi.fn()}
+      onRowDataChange={vi.fn()}
+    />,
   );
 }
 

@@ -2,19 +2,15 @@
  * @vitest-environment jsdom
  * @see specs/prompts/prompt-editor-outputs.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Output, OutputsSection } from "../outputs-section.tsx";
 
 const renderSection = (outputs: Output[], onChange = vi.fn()) => {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <OutputsSection outputs={outputs} onChange={onChange} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<OutputsSection outputs={outputs} onChange={onChange} />);
   return { onChange };
 };
 

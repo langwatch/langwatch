@@ -4,9 +4,13 @@
  * (`?drawer.open=<name>`) under the name the product has always used.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const traceWeb = defineWebModule("trace")
+// Declare the `trace:` slices at install, so langy and annotation read them from first paint.
+import "./behavior/annotation-queue-session.store.ts";
+import "./behavior/explorer-scope.slice.ts";
+
+export const traceWeb = defineBrowserModule("trace")
   .withHosts({
     requires: ["TraceHostApi"],
     mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },
@@ -29,6 +33,13 @@ export const traceWeb = defineWebModule("trace")
       load: async () => ({
         default: (await import("./ui/sections/datasets/add-dataset-record-drawer.tsx"))
           .AddDatasetRecordDrawer,
+      }),
+    },
+    // Kept so links naming the removed legacy drawer still resolve to the Trace Explorer one.
+    traceDetails: {
+      load: async () => ({
+        default: (await import("./ui/sections/legacy-trace-drawer-redirect.tsx"))
+          .LegacyTraceDrawerRedirect,
       }),
     },
   })

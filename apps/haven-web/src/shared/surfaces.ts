@@ -1,4 +1,4 @@
-import type { StatusState } from "@langwatch/design-system-internal";
+import type { ConsoleLink, StatusState } from "@langwatch/design-system-internal";
 
 import type { Surface, SurfaceStatus } from "./contract.ts";
 
@@ -11,28 +11,26 @@ const STATES: Record<SurfaceStatus, { state: StatusState; label?: string }> = {
 
 export const surfaceState = ({ status }: { status: SurfaceStatus }) => STATES[status];
 
-/** The surfaces a developer opens in a browser, by the name the top bar gives them. */
-const CONSOLE_LABELS: Record<string, string> = {
-  app: "App",
-  mail: "Mail",
-  idp: "IdP",
-  storage: "Storage",
-  voice: "Voice",
-  llm: "LLM",
-  analytics: "Analytics",
-  "design-system": "Design system",
-  "mail-room": "Mail room",
-  observability: "Grafana",
+/** The surfaces a developer opens in a browser, by the name and menu the top bar gives them. */
+const CONSOLES: Record<string, { label: string; group?: string }> = {
+  app: { label: "App" },
+  mail: { label: "Mail", group: "Sims" },
+  idp: { label: "IdP", group: "Sims" },
+  storage: { label: "Storage", group: "Sims" },
+  voice: { label: "Voice", group: "Sims" },
+  llm: { label: "LLM", group: "Sims" },
+  analytics: { label: "Analytics", group: "Sims" },
+  "design-system": { label: "Design system", group: "Tools" },
+  "mail-room": { label: "Mail room", group: "Tools" },
+  observability: { label: "Grafana", group: "Tools" },
 };
 
-export const consoleLabel = ({ name }: { name: string }) => CONSOLE_LABELS[name];
-
-export const consolesOf = ({ surfaces }: { surfaces: Surface[] }) =>
+export const consolesOf = ({ surfaces }: { surfaces: Surface[] }): ConsoleLink[] =>
   surfaces.flatMap((surface) => {
-    const label = consoleLabel({ name: surface.name });
+    const known = CONSOLES[surface.name];
     const answers = surface.status === "live" || surface.status === "starting";
-    if (label === undefined || surface.url === "" || !answers) return [];
-    return [{ label, href: surface.url }];
+    if (known === undefined || surface.url === "" || !answers) return [];
+    return [{ ...known, href: surface.url }];
   });
 
 /** A stack's own surfaces: selected, and not the machine-wide Grafana every stack shares. */

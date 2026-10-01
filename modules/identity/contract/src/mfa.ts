@@ -1,7 +1,7 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import { userTenantedCommandSchema } from "./facts.ts";
-import { identityActorSchema } from "./vocabulary.ts";
 
 /** Two-step verification facts: one enrollment per person, user-tenanted. Records lifecycle only,
  * not secrets or backup codes. See D06.
@@ -49,7 +49,7 @@ export const mfaEnrolledPayloadSchema = z.object({
   userId: z.string().min(1),
   /** The method, and nothing else about it: no secret, no issuer, no URI. */
   method: mfaMethodSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const mfaConfirmedPayloadSchema = z.object({
@@ -58,7 +58,7 @@ export const mfaConfirmedPayloadSchema = z.object({
    *  so "how many are left" subtracts the consumed positions without any
    *  code ever being stated. */
   backupCodeCount: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const mfaEnrollmentExpiredPayloadSchema = z.object({
@@ -68,7 +68,7 @@ export const mfaEnrollmentExpiredPayloadSchema = z.object({
 export const mfaDisabledPayloadSchema = z.object({
   enrollmentId: z.string().min(1),
   via: mfaDisableViaSchema,
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 export const backupCodeConsumedPayloadSchema = z.object({
@@ -85,7 +85,7 @@ export const backupCodeConsumedPayloadSchema = z.object({
 export const backupCodesRegeneratedPayloadSchema = z.object({
   enrollmentId: z.string().min(1),
   backupCodeCount: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /**
@@ -291,7 +291,7 @@ export const enrollMfaCommandDataSchema = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   method: mfaMethodSchema,
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type EnrollMfaCommandData = z.infer<typeof enrollMfaCommandDataSchema>;
 
@@ -299,7 +299,7 @@ export const confirmMfaCommandDataSchema = userTenantedCommandSchema({
   enrollmentId: z.string().min(1),
   backupCodeCount: z.number().int().nonnegative(),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type ConfirmMfaCommandData = z.infer<typeof confirmMfaCommandDataSchema>;
 
@@ -317,7 +317,7 @@ export const disableMfaCommandDataSchema = userTenantedCommandSchema({
    */
   requiringOrganizationSlugs: z.array(z.string().min(1)),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type DisableMfaCommandData = z.infer<typeof disableMfaCommandDataSchema>;
 
@@ -330,7 +330,7 @@ export type ConsumeBackupCodeCommandData = z.infer<typeof consumeBackupCodeComma
 export const regenerateBackupCodesCommandDataSchema = userTenantedCommandSchema({
   backupCodeCount: z.number().int().positive(),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 export type RegenerateBackupCodesCommandData = z.infer<
   typeof regenerateBackupCodesCommandDataSchema

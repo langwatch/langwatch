@@ -5,8 +5,8 @@
  * What Settings, Connect says about the daily license sync: when it last
  * succeeded, and why it is failing.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
@@ -55,12 +55,10 @@ function renderSync(sync: ConnectEnabledStatus["sync"]) {
     refusal: null,
     sync,
   };
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <LicensingHostProvider value={new TestHost()}>
-        <ConnectSyncSection status={status} />
-      </LicensingHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <LicensingHostProvider value={new TestHost()}>
+      <ConnectSyncSection status={status} />
+    </LicensingHostProvider>,
   );
 }
 

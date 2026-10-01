@@ -1,20 +1,16 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { chakra, HStack, Icon, Input, Stack, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
-import {
-  type LensColumnOption,
-  LENS_CAPABILITIES,
-  useViewStore,
-  isEvalColumnId,
-  parseEvalColumnId,
-} from "@langwatch/trace-browser-kit";
+import { isEvalColumnId, parseEvalColumnId } from "@langwatch/trace-contract";
 import { Search } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
 
+import { useViewStore } from "../../../../behavior/explorer.store.ts";
 import type { TimeColumnFormat } from "../../../../behavior/time-format.store.ts";
 import { useTimeFormatStore } from "../../../../behavior/time-format.store.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { type LensColumnOption, LENS_CAPABILITIES } from "../../../../model/lens-capabilities.ts";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import { evalColumnLabel } from "../trace-table/eval-columns.ts";
 import { AddEvalColumnForm, COLUMN_APPENDED_HINT } from "./column-picker/add-eval-column-form.tsx";

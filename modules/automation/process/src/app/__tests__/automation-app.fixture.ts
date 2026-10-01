@@ -1,13 +1,13 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -25,7 +25,7 @@ import type { AutomationRunawayRepository } from "../../repositories/automation-
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
 import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
-import { AutomationApp, type AutomationInfrastructure } from "../automation.app.ts";
+import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
 import type {
   AutomationLogger,
   AutomationRunawaySignals,
@@ -33,7 +33,7 @@ import type {
 } from "../automation.members.ts";
 
 export function createCanonicalAutomationApp(): {
-  app: AutomationApp;
+  app: AutomationModule;
   triggerCreate: ReturnType<typeof vi.fn>;
   resources: ResourceScope;
 } {
@@ -116,7 +116,6 @@ export function createCanonicalAutomationApp(): {
     create: vi.fn(),
     updateSettings: vi.fn(),
     archive: vi.fn(),
-    regenerateLegacyProjectKey: vi.fn(),
     requestTopicClustering: vi.fn(),
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),
@@ -191,7 +190,7 @@ export function createCanonicalAutomationApp(): {
     hasRecordedSince: vi.fn(async () => false),
   };
   return {
-    app: AutomationApp.fromInfrastructure({
+    app: AutomationModule.fromInfrastructure({
       repositories: PostgresAutomationRepositories.create({
         prisma: database,
         redis: memoryRedisDouble(),

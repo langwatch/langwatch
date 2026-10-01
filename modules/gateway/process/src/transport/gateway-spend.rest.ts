@@ -23,7 +23,7 @@ import {
   type GatewaySpendSummariesPage,
   type GatewaySpendSummariesQuery,
 } from "@langwatch/gateway-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 /**

@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The `license.*` procedures over the real runtime and a real `LicensingApp`.
+ * The `license.*` procedures over the real runtime and a real `LicensingModule`.
  * @see specs/licensing/license-router.feature
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";

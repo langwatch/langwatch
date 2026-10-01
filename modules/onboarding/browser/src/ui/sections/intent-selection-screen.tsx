@@ -1,16 +1,16 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { Box, HStack, Icon, RadioCard, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  accentChipBg,
-  accentChipBorder,
-  selectedSurfaceBg,
-  selectedSurfaceBorder,
-} from "@langwatch/onboarding-browser-kit";
 import type { OrganizationIntent } from "@langwatch/organization-contract";
 import { ChartNoAxesColumn, Telescope } from "lucide-react";
 import type React from "react";
 
 import type { OnboardingScreenProps } from "../../behavior/types.ts";
+import {
+  accentChipBg,
+  accentChipBorder,
+  selectedSurfaceBg,
+  selectedSurfaceBorder,
+} from "../../model/shared/accent-surface.ts";
 import { useOnboardingFormContext } from "./form-context.tsx";
 
 interface IntentOption {

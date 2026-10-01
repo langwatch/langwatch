@@ -1,6 +1,6 @@
 /**
- * The server half of `identityLookup.*` (D05): gated on the ADMIN_EMAILS staff
- * list by the application, never an RBAC permission, and refused as a 404.
+ * The server half of `identityLookup.*` (D05): gated on the platform-operator
+ * grant by the application, never an org RBAC permission, and refused as a 404.
  */
 import { defineTrpcFact, defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import {
@@ -15,14 +15,14 @@ const operatorFact = defineTrpcFact("opsOperator", opsOperatorSchema.nullable())
 
 const NO_PERMISSION = {
   reason:
-    "back-office surface gated on the ADMIN_EMAILS staff list, not on an RBAC permission; cross-organization by design",
+    "back-office surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-organization by design",
 } as const;
 
 const NO_PERMISSION_FOR_ORGANIZATION = {
   ...NO_PERMISSION,
   allow: {
     organizationId:
-      "names the tenant whose invitation the command touches; the caller's reach is the ADMIN_EMAILS staff list and is never derived from this id",
+      "names the tenant whose invitation the command touches; the caller's reach is the platform-operator grant and is never derived from this id",
   },
 } as const;
 

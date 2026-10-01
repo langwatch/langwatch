@@ -1,8 +1,9 @@
-import { DatasetPreviewTable } from "@langwatch/dataset-browser-kit";
 import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
 import { Box, Center, HStack, Text } from "@langwatch/design-system/primitives";
 import { Pencil } from "lucide-react";
 import type { ComponentProps } from "react";
+
+import { DatasetPreviewTable } from "../../../blocks/dataset/dataset-preview-table.tsx";
 
 /**
  * The read-only table a prompt's demonstrations render in. The TABLE

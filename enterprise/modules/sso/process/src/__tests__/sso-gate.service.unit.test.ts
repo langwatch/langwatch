@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type LicensingApi,
   type PlatformLicenseAccess,
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { isNamedProviderMounted } from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SsoGateLogger } from "../app/sso.members.ts";

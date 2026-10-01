@@ -3,15 +3,13 @@
  * The name each target column shows in its header.
  * @see specs/batch-evaluation-results/target-column-identity.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  transformBatchEvaluationData,
-  BatchEvaluationResultsTable,
-} from "@langwatch/experiment-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { transformBatchEvaluationData } from "../../batch-evaluation-results.types.ts";
+import { BatchEvaluationResultsTable } from "../../batch-results/batch-evaluation-results-table.tsx";
 
 vi.mock("@langwatch/browser-host/drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
@@ -22,10 +20,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 vi.mock("@langwatch/browser-host/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: false, isLoading: false }),
 }));
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 /** A finished run over one dataset row, with one output per named target. */
 const runWithTargetNames = (names: string[]): ExperimentRunWithItems => ({
@@ -50,12 +44,11 @@ const runWithTargetNames = (names: string[]): ExperimentRunWithItems => ({
 });
 
 const renderTableFor = (names: string[]) => {
-  render(
+  renderWithDesignSystem(
     <BatchEvaluationResultsTable
       data={transformBatchEvaluationData(runWithTargetNames(names))}
       disableVirtualization
     />,
-    { wrapper: Wrapper },
   );
 };
 
@@ -72,13 +65,12 @@ const renderComparisonFor = (names: string[]) => {
     },
   }));
 
-  render(
+  renderWithDesignSystem(
     <BatchEvaluationResultsTable
       data={runs[0]!.data}
       comparisonData={runs}
       disableVirtualization
     />,
-    { wrapper: Wrapper },
   );
 };
 

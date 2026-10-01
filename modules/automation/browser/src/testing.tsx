@@ -1,10 +1,9 @@
 // Fake automation application for testing: fakeAutomationHost provides port mock with recording,
 // renderWithAutomationHost mounts tree with query string state management.
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { permissionSatisfiedBy } from "@langwatch/authorization";
-import type { SlackConnectionSaved } from "@langwatch/slack-browser-kit";
-import { render, type RenderResult } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { AutomationToast, AutomationToaster } from "./behavior/automation-feedback.ts";
@@ -21,6 +20,7 @@ import {
   type AutomationSuccessNotice,
   type AutomationTeam,
 } from "./model/automation-host.ts";
+import type { SlackConnectionSaved } from "./model/slack/slack-connection-types.ts";
 
 export type AutomationQuery = Readonly<Record<string, string | undefined>>;
 
@@ -317,9 +317,7 @@ export function renderWithAutomationHost(
   element: ReactElement,
   { host }: { host: FakeAutomationHost },
 ): RenderResult {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AutomationHostHarness host={host}>{element}</AutomationHostHarness>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AutomationHostHarness host={host}>{element}</AutomationHostHarness>,
   );
 }

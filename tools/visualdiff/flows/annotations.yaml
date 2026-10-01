@@ -18,6 +18,9 @@ flows:
       - action: go
         with:
           path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace trace_visualdiff_1"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: "{noteText}"
@@ -29,6 +32,9 @@ flows:
       - action: go
         with:
           path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: hover
+        with:
+          selector: '[data-testid="annotation-row"]:has([aria-label="Select trace trace_visualdiff_1"]) [data-testid="annotation-comments-chip"]'
       - action: expect
         with:
           text: "{noteText}"
@@ -198,7 +204,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -207,7 +214,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -407,7 +414,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -416,7 +424,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/
@@ -492,7 +500,8 @@ flows:
           text: Add Participants
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-participant-option
+          hasText: Haven
       - action: click
         with:
           label: /^Description/
@@ -501,7 +510,7 @@ flows:
           text: Add Score Type
       - action: click
         with:
-          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+          testId: annotation-queue-editor-score-option
       - action: click
         with:
           label: /^Description/

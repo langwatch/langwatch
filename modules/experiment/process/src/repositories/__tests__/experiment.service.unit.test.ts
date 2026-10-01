@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import {
@@ -13,6 +12,7 @@ import {
   persistedEvaluationsV3StateSchema,
 } from "@langwatch/experiment-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -151,7 +151,10 @@ class MemoryExperimentRepository implements ExperimentRepository {
     workbenchState: SaveExperimentInput["workbenchState"];
   }) {
     const value = await this.findById(input);
-    if (value) value.workbenchState = input.workbenchState;
+    if (!value) return { version: 0 };
+    value.workbenchState = input.workbenchState;
+    value.workbenchVersion += 1;
+    return { version: value.workbenchVersion };
   }
   async archiveActive(input: {
     projectId: string;

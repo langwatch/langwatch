@@ -1,12 +1,12 @@
+import { createTrpcRuntime } from "@langwatch/api/trpc";
+import type { AuthApi } from "@langwatch/auth-contract";
 /**
  * @vitest-environment node
  * `signInSecurity.*`: each procedure calls its one operation, and a release is
  * recorded against the administrator the session carried.
  * @see specs/identity/org-account-lockout.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { AuthApi } from "@langwatch/auth-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

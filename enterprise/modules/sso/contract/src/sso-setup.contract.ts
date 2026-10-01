@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What an organization's own administrator reads about its connection, as
@@ -50,7 +51,7 @@ const ssoSetupProofSchema = z
     /** When a lapse becomes final; null while the evidence is there. */
     graceEndsAtMs: z.number().nullable(),
     verifiedAtMs: z.number(),
-    verifier: z.object({ type: z.enum(["user", "system"]), id: z.string().nullable() }).strict(),
+    verifier: ledgerActorSchema,
   })
   .strict();
 

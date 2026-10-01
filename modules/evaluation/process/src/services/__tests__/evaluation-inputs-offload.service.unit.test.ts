@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-  EvaluationInputStorage,
+  EvaluationInputRepository,
   StoredEvaluationInput,
-} from "../../app/evaluation.members.ts";
+} from "../../repositories/evaluation-input.repository.ts";
 import {
   EvaluationInputsOffloadService,
   EVAL_INPUTS_HARD_CEILING_BYTES,
@@ -12,7 +12,7 @@ import {
   STORED_OBJECT_MARKER_KEY,
 } from "../evaluation-inputs-offload.service.ts";
 
-class MemoryStorage implements EvaluationInputStorage {
+class MemoryStorage implements EvaluationInputRepository {
   readonly stored = new Map<string, Uint8Array>();
   private sequence = 0;
 

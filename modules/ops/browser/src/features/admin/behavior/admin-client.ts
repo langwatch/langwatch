@@ -134,6 +134,15 @@ export class AdminClient {
     });
     if (!res.ok) await throwAdminError(res, "Impersonation failed");
   }
+
+  /** Ends the caller's own impersonation; the session is the admin's again. */
+  async stopImpersonation(): Promise<void> {
+    const res = await this.fetcher(`${this.basePath}/impersonate`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) await throwAdminError(res, "Stopping impersonation failed");
+  }
 }
 
 export const adminClient = AdminClient.create();

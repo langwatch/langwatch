@@ -1,10 +1,3 @@
-/**
- * @vitest-environment node
- * The automation view's reads over the real runtime: the fire-history page,
- * the latest evaluation (recorded through the real service over its memory
- * twin), and when the automation acts next. Each is gated by `triggers:view`.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import {
   TriggerNotFoundError,
@@ -12,6 +5,13 @@ import {
   type TriggerLatestEvaluation,
 } from "@langwatch/automation-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * The automation view's reads over the real runtime: the fire-history page,
+ * the latest evaluation (recorded through the real service over its memory
+ * twin), and when the automation acts next. Each is gated by `triggers:view`.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

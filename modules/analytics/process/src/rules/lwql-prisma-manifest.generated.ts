@@ -1484,6 +1484,12 @@ export interface LwqlPrismaRows {
     readonly groupId: "String";
     readonly createdAt: "DateTime";
   };
+  readonly AuthzUserStanding: {
+    readonly userId: "String";
+    readonly deactivatedAt: "DateTime?";
+    readonly erasedAt: "DateTime?";
+    readonly standingChangedAt: "DateTime";
+  };
   readonly RoleBinding: {
     readonly id: "String";
     readonly organizationId: "String";
@@ -1559,6 +1565,7 @@ export interface LwqlPrismaRows {
     readonly ingestSourceType: "String?";
     readonly ingestionTemplateId: "String?";
     readonly createdByDeviceLabel: "String?";
+    readonly isSystemManaged: "Boolean";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
   };
@@ -1780,6 +1787,12 @@ export interface LwqlPrismaRows {
     readonly encryptedToken: "String";
     readonly instanceId: "String";
     readonly updatedAt: "DateTime";
+  };
+  readonly GatewayTraceExportKey: {
+    readonly projectId: "String";
+    readonly apiKeyId: "String";
+    readonly encryptedToken: "String";
+    readonly createdAt: "DateTime";
   };
   readonly GatewayBudget: {
     readonly id: "String";

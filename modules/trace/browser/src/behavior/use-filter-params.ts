@@ -19,7 +19,7 @@ export function useFilterParams() {
         endDate,
         filters: {},
       },
-      queryOpts: { enabled: !!project?.id, refetchOnWindowFocus: false },
+      queryOpts: { enabled: !!project?.id },
     };
   }, [project?.id]);
 }

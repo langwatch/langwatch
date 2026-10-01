@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * Characterizes starting an optimization: the entry limits, the version it runs on, and failures.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type UseFormReturn, useForm } from "react-hook-form";
@@ -109,11 +109,11 @@ function Harness() {
     },
   });
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       <Dialog.Root open>
         <OptimizeModalContent form={form} onClose={() => undefined} />
       </Dialog.Root>
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 }
 

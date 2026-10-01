@@ -28,7 +28,7 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
   ],
   "@langwatch/csv": sourceRoots,
-  "@langwatch/error-presentation": sourceRoots,
+  "@langwatch/handled-error": sourceRoots,
   "@langwatch/scenario-contract": sourceRoots,
   "@langwatch/analytics-process": [
     "dev/docs/**/*",
@@ -89,7 +89,7 @@ export const reads = {
     "modules/annotation/browser/src/behavior/annotation-scores-api.ts",
   ],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
-  "@langwatch/config": ["packages/ui-kernel/src/public-config.ts"],
+  "@langwatch/config": ["packages/browser/src/public-config.ts"],
   "@langwatch/mail": ["skills/tracing/SKILL.mdx"],
   "@langwatch/mcp-server": ["feature-map.json"],
   "@langwatch/plans": ["packages/prisma-client/prisma/schema.prisma"],

@@ -5,7 +5,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 /**
  * REST for the user events a trace carries. `POST /api/events/track` is
  * canonical; `POST /api/track_event` is the older name, forwarding rather

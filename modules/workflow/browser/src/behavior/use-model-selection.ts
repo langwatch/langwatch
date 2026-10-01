@@ -1,4 +1,4 @@
-import { modelSelectionFrom } from "@langwatch/model-provider-browser-kit";
+import { modelSelectionFrom } from "@langwatch/model-provider-contract";
 import { useMemo } from "react";
 
 import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";

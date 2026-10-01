@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   DepartmentAssignmentTargetNotFoundError,
   DepartmentNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

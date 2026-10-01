@@ -80,7 +80,7 @@ remain visible in the catalogue.
 ## Shared session and active scope
 
 The application shell resolves identity and navigation scope once. Features
-read `useSession()`, `useActiveScope()` and `usePermissions()` from
+read `useSession()` and `useActiveScope()` from
 `@langwatch/browser-host/session`. These hooks read the existing capability provider;
 they do not fetch, persist selections, redirect or mount another provider.
 Session status describes authentication, scope status describes the selected

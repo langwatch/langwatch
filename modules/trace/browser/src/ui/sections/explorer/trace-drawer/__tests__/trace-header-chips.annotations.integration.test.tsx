@@ -2,8 +2,8 @@
  * The drawer header's annotations chip.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -37,8 +37,8 @@ vi.mock("../../hooks/use-span-tree.ts", () => ({
   useSpanTree: () => ({ data: [{ spanId: "span-7", name: "web_search" }] }),
 }));
 
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: (selector: (state: unknown) => unknown) =>
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (state: unknown) => unknown) =>
     selector({ setViewMode: mocks.setViewMode }),
 }));
 
@@ -92,10 +92,8 @@ function renderChips({ conversationId }: { conversationId: string | null }) {
     spanCount: 1,
     attributes: {},
   };
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceHeaderChips trace={trace} onSelectSpan={vi.fn()} onOpenPromptsTab={vi.fn()} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TraceHeaderChips trace={trace} onSelectSpan={vi.fn()} onOpenPromptsTab={vi.fn()} />,
   );
 }
 

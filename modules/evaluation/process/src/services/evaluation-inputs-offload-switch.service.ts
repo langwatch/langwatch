@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 
-import type { EvaluationInputsOffload } from "../app/evaluation.members.ts";
+import type { EvaluationInputsOffload } from "./evaluation-inputs-offload.service.ts";
 
 /** Offloads oversized inputs unless the operator switched offloading off; then they stay inline. */
 export class FlaggedEvaluationInputsOffloadService implements EvaluationInputsOffload {

@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import type { JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 
-import type { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
+import type { McpCallerAuthService, McpCallerLookup } from "./mcp-caller-auth.service.ts";
 import type { McpHttpService } from "./mcp-http.service.ts";
 import {
   MAX_SESSIONS_PER_KEY,
@@ -78,7 +78,7 @@ export class McpSseTransportService {
       sessions.releaseSse(sessionId, apiKey).catch(() => undefined);
     });
 
-    await sessions.connectServer({ transport, apiKey, userId });
+    await sessions.connectServer({ transport, apiKey, projectId, userId });
   }
 
   /**
@@ -107,7 +107,7 @@ export class McpSseTransportService {
 
     const local = sessions.sse.get(sessionId);
     if (local) {
-      await this.#postLocally({ req, res, sessionId, apiKey: caller.apiKey, session: local });
+      await this.#postLocally({ req, res, sessionId, caller, session: local });
       return;
     }
     await this.#relayToHolder({ req, res, sessionId, apiKey: caller.apiKey });
@@ -117,12 +117,12 @@ export class McpSseTransportService {
     req: IncomingMessage;
     res: ServerResponse;
     sessionId: string;
-    apiKey: string;
+    caller: McpCallerLookup;
     session: McpSseSession;
   }): Promise<void> {
     const { http, sessions } = this.#collaborators;
-    const { session } = input;
-    if (input.apiKey !== session.apiKey) {
+    const { session, sessionId, caller } = input;
+    if (!sessions.adoptsCaller({ transport: "sse", sessionId, session, caller })) {
       http.send401(input.res, "Bearer token does not match session");
       return;
     }

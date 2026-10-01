@@ -424,7 +424,7 @@ function excludesMembers(raw: string | undefined): boolean {
 export const scimProtocolRest = defineRestRouter(ScimApi)
   .withNamespace("scim")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("scimToken")
+  .withCredential("scim_token")
   .withAddressing("v1-in-path", { generation: "v2" })
 
   // ── Discovery ─────────────────────────────────────────────────────────────

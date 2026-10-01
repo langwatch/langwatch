@@ -194,7 +194,7 @@ export function ProcessInstancesDrawer({ processName, onClose, onOpenInstance }:
       pageSize: PAGE_SIZE,
       search: search.trim() || undefined,
     },
-    { refetchInterval: 15_000 },
+    {},
   );
   const now = query.dataUpdatedAt || nowInstant().epochMilliseconds;
   const total = query.data?.total ?? 0;

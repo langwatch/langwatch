@@ -1,15 +1,15 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */
 import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { LangevalsEvaluateParams } from "../../app/evaluation.members.ts";
 import { HttpLangevalsChannel } from "../../channels/http/http.langevals.channel.ts";
 import type { LangevalsPayloadStaging } from "../../channels/langevals.channel.ts";
 import { NullLangevalsChannel } from "../../channels/null.langevals.channel.ts";
 import { LangevalsEvaluatorService } from "../langevals-evaluator.service.ts";
+import type { LangevalsEvaluateParams } from "../langevals-evaluator.service.ts";
 
 const ENDPOINT = "http://langevals.internal.langwatch.svc.cluster.local:5562";
 
@@ -145,6 +145,43 @@ describe("LangevalsEvaluatorService", () => {
       expect(error.message).toBe("Unexpected response: invalid results");
       expect(error.meta).toEqual({ evaluatorType: "langevals/llm_boolean" });
       expect(error.reasons).toHaveLength(1);
+    });
+  });
+
+  describe("given the caller aborts while langevals is still judging", () => {
+    /** @scenario "a cancelled guardrail check aborts the evaluator's call to the analysis service" */
+    it("aborts the request and does not retry", async () => {
+      const fetchMock = vi.fn(
+        (_url: unknown, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(init.signal?.reason), {
+              once: true,
+            });
+          }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      const service = LangevalsEvaluatorService.create({
+        config: { endpoint: ENDPOINT, maxRetries: 2, timeoutMs: 60_000 },
+        langevals: HttpLangevalsChannel.create({
+          config: {
+            stagingThresholdBytes: undefined,
+            stagingTtlSeconds: 60,
+            evaluationMaxPayloadBytes: 1_000_000,
+            topicClusteringMaxPayloadBytes: 1_000_000,
+          },
+          staging: createApiFixture<LangevalsPayloadStaging>(),
+        }),
+      });
+      const caller = new AbortController();
+
+      const run = service
+        .evaluate({ ...params, signal: caller.signal })
+        .catch((error: unknown) => error);
+      await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+      caller.abort();
+
+      await expect(run).resolves.toBeInstanceOf(Error);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
     });
   });
 

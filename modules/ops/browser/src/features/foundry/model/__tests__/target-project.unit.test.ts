@@ -2,10 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { pickTargetProject } from "../target-project.ts";
 
-const projects = [
-  { id: "p1", apiKey: "k1" },
-  { id: "p2", apiKey: "k2" },
-];
+const projects = [{ id: "p1" }, { id: "p2" }];
 
 describe("given the Foundry's project list", () => {
   describe("when the page has no project and none was picked", () => {

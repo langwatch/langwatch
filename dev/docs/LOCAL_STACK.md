@@ -2,7 +2,7 @@
 
 Reference for bringing up and debugging a LangWatch stack on a development
 machine. The first-run walkthrough is `GETTING_STARTED.md`; failures that look
-like a slow boot are covered by the `haven-setup` skill.
+like a slow boot are covered by the `haven` skill's `troubleshooting.md`.
 
 ## Processes
 
@@ -172,6 +172,7 @@ worker first. Production runs three Node deployments.
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- |
 | `pnpm dev`                               | ui + backend + go (+ langy when selected)                                                |
 | `pnpm dev:ui` / `dev:backend` / `dev:go` | one lane alone                                                                           |
+| `pnpm dev:one`                           | ui + api + worker in one Node process (see "One process" below)                          |
 | `pnpm dev:api` + `pnpm dev:worker`       | the production process shape; use when a blocked worker job must not read as API latency |
 
 Both Node lanes restart on change, debounced by
@@ -184,6 +185,22 @@ service with `LANGWATCH_SKIP_AIGATEWAY=1`, `LANGWATCH_SKIP_NLP=1` or
 or `make service-watch svc=nlpgo`. The gateway needs the "AI GATEWAY" block
 from `.env.example`; langyagent writes its own `.env` block on first run and
 needs the worker binary (`pnpm --filter @langwatch/langyworker build:binary`).
+
+### One process (trial, ADR-168 B1)
+
+`LANGWATCH_DEV_ONE_PROCESS=1` (plain `pnpm dev`, or `haven up -f` with it
+exported or in `.env`) replaces the ui and backend lanes with one `app` lane:
+`tools/dev-runtime` hosts the UI's Vite server (`apps/ui/vite.config.ts`,
+unchanged, still proxying `/api`) and loads the api and worker through a Vite
+module runner. `pnpm dev:one` runs that process alone. Ports are unchanged.
+
+A backend edit that touches a loaded file re-links only what it reaches, then
+drains the old generation (worker, then api) and boots the new one; the browser
+keeps its HMR socket. A change that does not link leaves the old generation
+serving; a failed boot waits for the next change. Each generation logs one
+`backend ready` line with its number, changed files, `drainMs`, `readyMs` and
+`rssMiB`. Under haven, `haven logs ui|api|worker` read the `app` capture;
+`haven restart ui` or `api` restarts the whole process.
 
 ## Build cache
 

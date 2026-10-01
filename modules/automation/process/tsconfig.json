@@ -57,13 +57,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../../packages/mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../monitor/contract/tsconfig.build.json"
@@ -79,6 +79,9 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../packages/process-stores/tsconfig.build.json"
@@ -109,9 +112,6 @@
     },
     {
       "path": "../../webhook/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { ManagerCard, type DejaViewProcessManager } from "../../../index.ts";
+import { ManagerCard, type DejaViewProcessManager } from "../ui/blocks/deja-view-manager-card.tsx";
 
 const running: DejaViewProcessManager = {
   processName: "langyConversation",

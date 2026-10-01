@@ -4,8 +4,8 @@
  * and error handling. See {@link specs/data-retention/retention-policy-configuration.feature}
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -80,7 +80,7 @@ vi.mock("../../../behavior/data-retention-api.ts", () => ({
       },
       killMutation: { useMutation: () => ({ mutate: killMutation, isPending: false }) },
     },
-    organization: { getAll: { useQuery: () => ({ data: [] }) } },
+    organization: { getScopeGraph: { useQuery: () => ({ data: [] }) } },
   },
 }));
 
@@ -145,12 +145,10 @@ class TestRetentionHost extends DataRetentionHostApi {
 }
 
 function renderScreen(host: TestRetentionHost) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DataRetentionHostProvider value={host}>
-        <DataRetentionScreen />
-      </DataRetentionHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <DataRetentionHostProvider value={host}>
+      <DataRetentionScreen />
+    </DataRetentionHostProvider>,
   );
 }
 

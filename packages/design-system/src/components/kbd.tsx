@@ -201,3 +201,5 @@ export function Kbd({
     </Box>
   );
 }
+
+export { Kbd as RawKbd } from "@chakra-ui/react";

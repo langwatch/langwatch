@@ -1,8 +1,9 @@
-import { type PageCursor, useExplorerStore } from "@langwatch/trace-browser-kit";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import type React from "react";
 
+import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
+import { type PageCursor } from "../../../../behavior/query.slice.ts";
 import { Pagination as PaginationBar } from "../../../elements/pagination.tsx";
 import { useExplorerCounts } from "../hooks/use-explorer-counts.ts";
 

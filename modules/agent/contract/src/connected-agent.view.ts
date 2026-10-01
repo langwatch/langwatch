@@ -53,7 +53,7 @@ export interface ConnectedAgentView extends ConnectedAgentSelectability {
   config: { description?: string; sdk?: ConnectedAgentSdk };
 }
 
-/** One row of `agents.getAll`/`getById`, as `AgentApp` actually answers it. */
+/** One row of `agents.getAll`/`getById`, as `AgentModule` actually answers it. */
 export type AgentListView = AgentWithFields &
   ConnectedAgentSelectability & {
     owner: ConnectedAgentOwner | null;

@@ -1,13 +1,13 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Button, Input, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  type AttributeKey,
-  type FacetValueState,
-  MAX_VISIBLE_ATTRIBUTE_KEYS,
-} from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
+import {
+  type AttributeKey,
+  type FacetValueState,
+} from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { MAX_VISIBLE_ATTRIBUTE_KEYS } from "../../../../behavior/facet-constants.ts";
 import { SidebarSection } from "../../../elements/explorer/filter-sidebar/sidebar-section.tsx";
 import { AttributeKeyRow } from "./attribute-key-row.tsx";
 

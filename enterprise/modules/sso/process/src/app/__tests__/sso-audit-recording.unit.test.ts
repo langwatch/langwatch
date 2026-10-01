@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -6,14 +5,13 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * back office did, so a refused attempt still leaves its row.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createSsoTestApp,
-  createSsoTestUsers,
+  createSsoTestAuthorization,
   RecordingSsoConnectionLedger,
-  SSO_TEST_STAFF_EMAIL,
 } from "./sso.fixture.ts";
 
 const STAFF_ID = "user_olive";
@@ -32,7 +30,7 @@ async function harness() {
   const app = await createSsoTestApp({
     dependencies: {
       auditLog: createApiFixture<AuditLogApi>({ record }),
-      users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL, [CUSTOMER_ID]: null }),
+      authorization: createSsoTestAuthorization([STAFF_ID]),
     },
     connections,
   });
@@ -63,18 +61,17 @@ describe("the back office's audit trail", () => {
     });
   });
 
-  describe("given somebody outside the staff list", () => {
+  describe("given somebody without the platform-operator grant", () => {
     /** @scenario "Somebody outside the staff list leaves no audit row" */
     it("writes no audit row when the gate refuses before the ledger is asked", async () => {
       const denial = await context.app.attestDomain(TARGET, { id: CUSTOMER_ID }).then(
         () => {
           throw new Error("attestDomain resolved: the back office gate let the call through");
         },
-        (error: unknown) => error as AdminSurfaceHiddenError,
+        (error: unknown) => error,
       );
 
-      expect(denial).toBeInstanceOf(AdminSurfaceHiddenError);
-      expect(denial.code).toBe("not_found");
+      expect(denial).toMatchObject({ code: "not_found" });
       expect(context.connections.attestDomain).not.toHaveBeenCalled();
       expect(context.record).not.toHaveBeenCalled();
     });

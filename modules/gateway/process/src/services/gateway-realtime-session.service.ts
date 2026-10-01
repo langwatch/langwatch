@@ -441,7 +441,7 @@ async function recordRealtimeSessionSpan(params: {
     // ingestNormalizedSpan, not the raw command — the seam both OTLP and REST
     // collectors route through, whose (tenant, trace, span) dedup gate makes
     // a resent webhook or retried usage report write this span once, not
-    // twice. `traceIngestion`, not `traces`: App.traces is a read-only TraceApp,
+    // twice. `traceIngestion`, not `traces`: App.traces is a read-only TraceModule,
     // and reaching for traces?.collection silently no-ops with no span written.
     if (!params.spanIngestion) {
       return;

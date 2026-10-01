@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { Activity } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -17,9 +17,8 @@ vi.mock("../../../../ui/sections/explorer/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 const ITEMS: FacetItem[] = [
   { value: "error", label: "error", count: 9, dotColor: "red", dimmed: false },
@@ -36,18 +35,16 @@ const ITEMS: FacetItem[] = [
 const renderSection = (included: ReadonlySet<string>) => {
   const getValueState = (value: string): FacetValueState =>
     included.has(value) ? "include" : "neutral";
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetSection
-        title="STATUS"
-        icon={Activity}
-        field="status"
-        items={ITEMS}
-        getValueState={getValueState}
-        onToggle={vi.fn()}
-        onExclude={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <FacetSection
+      title="STATUS"
+      icon={Activity}
+      field="status"
+      items={ITEMS}
+      getValueState={getValueState}
+      onToggle={vi.fn()}
+      onExclude={vi.fn()}
+    />,
   );
 };
 

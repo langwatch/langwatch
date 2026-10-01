@@ -6,7 +6,6 @@
 
 import {
   useUiCapabilities,
-  useUiDeployment,
   useUiScope,
   type UiFeedback,
   type UiNavigation,
@@ -18,11 +17,9 @@ import { useMemo, type ReactNode } from "react";
 import {
   GovernanceHostApi,
   GovernanceHostProvider,
-  type GovernanceDeployment,
   type GovernanceFailureNotice,
   type GovernanceOrganization,
   type GovernanceRouteReading,
-  type GovernanceScope,
   type GovernanceSuccessNotice,
 } from "../model/governance-host.ts";
 import { governanceApi } from "./governance-api.ts";
@@ -33,12 +30,9 @@ const NO_ORGANIZATIONS: readonly GovernanceOrganization[] = [];
 class CapabilityGovernanceHost extends GovernanceHostApi {
   constructor(
     private readonly inputs: {
-      organizationId: string | null;
-      projectId: string | null;
       orgs: readonly GovernanceOrganization[];
       org: GovernanceOrganization | undefined;
       plan: { isEnterprise: boolean; isLoading: boolean };
-      deployment: GovernanceDeployment;
       routeReading: GovernanceRouteReading;
       session: UiSession;
       routeCapability: UiRoute;
@@ -47,10 +41,6 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     },
   ) {
     super();
-  }
-
-  scope(): GovernanceScope {
-    return { organizationId: this.inputs.organizationId, projectId: this.inputs.projectId };
   }
 
   organizations(): readonly GovernanceOrganization[] {
@@ -85,10 +75,6 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
     return this.inputs.plan;
   }
 
-  deployment(): GovernanceDeployment {
-    return this.inputs.deployment;
-  }
-
   route(): GovernanceRouteReading {
     return this.inputs.routeReading;
   }
@@ -120,10 +106,12 @@ class CapabilityGovernanceHost extends GovernanceHostApi {
  */
 export default function GovernanceHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, navigation, route } = useUiCapabilities();
-  const { organizationId, projectId } = useUiScope().activeScope();
-  const uiDeployment = useUiDeployment();
+  const { organizationId } = useUiScope().activeScope();
 
-  const organizations = governanceApi.organization.getAll.useQuery({ isDemo: false });
+  const organizations = governanceApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const orgs = organizations.data ?? NO_ORGANIZATIONS;
 
   const org = useMemo(
@@ -143,40 +131,21 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
     [activePlan.data, activePlan.isLoading],
   );
 
-  const deployment = useMemo(
-    () => ({ isSaas: uiDeployment.isSaaS, appBaseUrl: uiDeployment.appBaseUrl }),
-    [uiDeployment.isSaaS, uiDeployment.appBaseUrl],
-  );
   const routeReading = route.reading();
 
   const host = useMemo(
     () =>
       new CapabilityGovernanceHost({
-        organizationId,
-        projectId,
         orgs,
         org,
         plan,
-        deployment,
         routeReading,
         session,
         routeCapability: route,
         navigation,
         feedback,
       }),
-    [
-      organizationId,
-      projectId,
-      orgs,
-      org,
-      plan,
-      deployment,
-      routeReading,
-      session,
-      route,
-      navigation,
-      feedback,
-    ],
+    [orgs, org, plan, routeReading, session, route, navigation, feedback],
   );
 
   return <GovernanceHostProvider value={host}>{children}</GovernanceHostProvider>;

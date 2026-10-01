@@ -6,16 +6,18 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   createEventingGroupQueueFactory,
+  type EventingParticipation,
   EventSourcing,
-  EventStoreProducerOnly,
-  type EventStore,
   type EventSourcingOptions,
+  type EventStore,
+  EventStoreProducerOnly,
   type ProcessStore,
 } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createEventingRetentionConfiguration,
   createProcessManagerMaintenancePipeline,
+  createReadHintsPipeline,
   EventingClickHouseEventRepository,
   EventingClickHouseEventStore,
   OtelProcessRetentionMetricsAdapter,
@@ -28,7 +30,6 @@ import {
   type GroupQueueContextMetadata,
 } from "@langwatch/group-queue";
 import { BlobSweeper } from "@langwatch/group-queue/operational";
-import type { EventingParticipation } from "@langwatch/kernel";
 import {
   createContextFromJobData,
   getJobContextMetadata,
@@ -92,7 +93,10 @@ export function buildEventing(options: {
     ...(config.killSwitch === undefined ? {} : { killSwitch: config.killSwitch }),
     ...(options.redis === undefined
       ? {}
-      : { maintenance: eventingMaintenance({ redis: options.redis, processStore }) }),
+      : {
+          maintenance: eventingMaintenance({ redis: options.redis, processStore }),
+          readHints: readHintsOver(options.redis),
+        }),
   });
 
   return { value: eventing, close: () => eventing.close() };
@@ -126,6 +130,16 @@ function eventingMaintenance({
       },
     }),
   ];
+}
+
+/** The read-hint subscriber, publishing on this process's Redis (read-hints.feature). */
+function readHintsOver(redis: RedisConnection): NonNullable<EventSourcingOptions["readHints"]> {
+  return ({ hinted, declaredEventTypes }) =>
+    createReadHintsPipeline({
+      hinted,
+      declaredEventTypes,
+      publish: (channel, message) => redis.publish(channel, message),
+    });
 }
 
 /** Where this role appends: a producer refuses reads, a draining role reads the event log. */

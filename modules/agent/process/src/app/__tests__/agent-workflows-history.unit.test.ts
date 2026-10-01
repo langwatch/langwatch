@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, AuditLogHistoryEntry } from "@langwatch/audit-log-contract";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -25,7 +25,7 @@ const copyInput = {
   actorUserId: "user_1",
 };
 
-describe("AgentApp workflow and audit ownership", () => {
+describe("AgentModule workflow and audit ownership", () => {
   it("refuses to fabricate a navigation path when a copy's project is missing", async () => {
     const { app, repositories } = createAgentAppFixture({
       projects: createApiFixture<ProjectApi>({ listPaths: async () => [] }),

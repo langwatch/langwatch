@@ -3,15 +3,11 @@ import "@testing-library/jest-dom/vitest";
  * Integration tests for BatchRunsSidebar component
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type BatchRunSummary, BatchRunsSidebar } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+import { type BatchRunSummary, BatchRunsSidebar } from "../batch-runs-sidebar.tsx";
 
 const createRun = ({
   runId,
@@ -58,11 +54,7 @@ describe("BatchRunsSidebar", () => {
     /** @scenario Display list of evaluation runs */
     /** @scenario Select a different run */
     it("displays runs newest-first", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       const items = screen.getAllByRole("button");
       // Newest run (Run #3) appears first, oldest (Run #1) last
@@ -72,11 +64,7 @@ describe("BatchRunsSidebar", () => {
     });
 
     it("preserves chronological Run # numbering (Run #1 = oldest)", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       // The oldest run should always be Run #1 regardless of display order
       const oldestItem = screen.getByTestId("run-item-run-old");
@@ -95,11 +83,7 @@ describe("BatchRunsSidebar", () => {
     ];
 
     it("still displays runs newest-first with correct numbering", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       const items = screen.getAllByRole("button");
       expect(items[0]).toHaveTextContent("Run #3");
@@ -119,11 +103,7 @@ describe("BatchRunsSidebar", () => {
 
     /** @scenario A run with a commit message still shows the commit message */
     it("uses commit message instead of Run # when available", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       // Newest run (no commit message) appears first as "Run #2"
       const items = screen.getAllByRole("button");
@@ -141,11 +121,7 @@ describe("BatchRunsSidebar", () => {
 
     /** @scenario A run without a commit message shows index then a middle-dot separator */
     it("renders 'Run #N · runId' with a middle-dot separator and no parentheses", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       const item = screen.getByTestId("run-item-snobbish-otter-1f2a3b9c4d");
       expect(item).toHaveTextContent("Run #1 · snobbish-otter-1f2a3b9c4d");
@@ -155,11 +131,7 @@ describe("BatchRunsSidebar", () => {
 
     /** @scenario The run id uses the available width instead of an early hard truncation */
     it("keeps the full run id without truncating it to eight characters", () => {
-      render(
-        <Wrapper>
-          <BatchRunsSidebar runs={runs} onSelectRun={noop} />
-        </Wrapper>,
-      );
+      renderWithDesignSystem(<BatchRunsSidebar runs={runs} onSelectRun={noop} />);
 
       const item = screen.getByTestId("run-item-snobbish-otter-1f2a3b9c4d");
       // Full id present in the DOM (layout clips overflow visually, the

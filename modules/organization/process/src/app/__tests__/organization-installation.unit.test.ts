@@ -1,23 +1,23 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
-import { organizationServer } from "../../organization.server.ts";
+import { organizationProcessModule } from "../../organization.module.ts";
 
 /**
  * @vitest-environment node
@@ -28,7 +28,7 @@ import { organizationServer } from "../../organization.server.ts";
 function process(role: "api" | "worker") {
   const secrets = SecretsResolver.over(SecretsChain.start({ environment: {} }));
   return createApp({ role, secrets: (owner, declared) => secrets.scopeTo(owner, declared) })
-    .withModules([withMemoryRepositories(organizationServer)])
+    .withModules([withMemoryRepositories(organizationProcessModule)])
     .withMembers({
       encryption: { encrypt: (value: string) => value, decrypt: (value: string) => value },
       processName: "organization-installation-test",
@@ -56,7 +56,7 @@ describe("organization app installation", () => {
     const runtime = await process(role).boot();
 
     try {
-      expect(runtime.service(OrganizationApi)).toBe(runtime.module(organizationServer).provided);
+      expect(runtime.service(OrganizationApi)).toBe(runtime.module(organizationProcessModule).provided);
     } finally {
       await runtime.stop();
     }

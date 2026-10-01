@@ -1,15 +1,15 @@
-/** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
 } from "@langwatch/api/rest";
+/** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { traceServer } from "../../trace.server.ts";
+import { traceProcessModule } from "../../trace.module.ts";
 import { tracesRestCredential, tracesRest } from "../traces.rest.ts";
 
 function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
@@ -31,7 +31,9 @@ function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: "key-1", userId: "user-1" })),
+      bindRestMiddleware(tracesRestCredential, () => ({
+        principal: { type: "apiKey" as const, id: "key-1" },
+      })),
     ],
   });
 
@@ -109,7 +111,7 @@ describe("the metadata update route as the module declares it", () => {
       .router()
       .routes.find((declared) => declared.operation === "updateTraceMetadata");
 
-    expect(traceServer.transports).toContain(tracesRest);
+    expect(traceProcessModule.transports).toContain(tracesRest);
     expect(route?.method).toBe("patch");
     expect(route?.permission).toBe("traces:update");
     expect(route?.docs?.description).toContain("synthetic span");

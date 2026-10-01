@@ -1,11 +1,11 @@
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * One read for the setup page: identity folds where the journey stands, this
  * module adds the addresses it is the one serving.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

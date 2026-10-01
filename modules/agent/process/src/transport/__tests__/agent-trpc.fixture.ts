@@ -1,13 +1,12 @@
+import type { AuthzDeclaration } from "@langwatch/api/access";
+import type { TrpcProcedureFactory, TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * The declared tRPC path, as these tests need it: a runtime whose members permit
  * everything, and a factory that records what each procedure declared without
  * building one.
  */
-import type { Actor } from "@langwatch/actor";
-import type { AuthzDeclaration } from "@langwatch/api/access";
-import type { TrpcProcedureFactory, TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import { createTrpcRuntime } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authorization";
+import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;

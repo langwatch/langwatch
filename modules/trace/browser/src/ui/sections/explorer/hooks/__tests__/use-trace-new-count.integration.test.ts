@@ -1,8 +1,9 @@
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+import type * as actualModule0 from "@langwatch/browser-host/page-visibility";
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type * as actualModule1 from "../../../../../behavior/explorer.store.ts";
 import { useTraceNewCount } from "../use-trace-new-count.ts";
 
 type QueryInput = {
@@ -15,7 +16,7 @@ type QueryInput = {
 type QueryOptions = {
   enabled: boolean;
   retry: number;
-  refetchInterval: number | false;
+  refetchInterval?: number | false;
 };
 
 type QueryCall = { input: QueryInput; options: QueryOptions };
@@ -33,7 +34,6 @@ const stores = vi.hoisted(() => ({
   },
   debouncedQueryText: "evaluator:monitor_x",
   sseConnectionState: "disconnected",
-  fastPollRequestedAt: 0,
   liveUpdatesMode: "live",
 }));
 
@@ -76,13 +76,17 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "p1" } }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async () => {
-  const actual = await vi.importActual<typeof traceBrowserKitModule>(
-    "@langwatch/trace-browser-kit",
-  );
+vi.mock("@langwatch/browser-host/page-visibility", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     usePageVisibility: () => true,
+  };
+});
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useFilterStore: (selector: (s: unknown) => unknown) =>
       selector({
         debouncedTimeRange: stores.debouncedTimeRange,
@@ -96,7 +100,6 @@ vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
     (selector: (s: unknown) => unknown) =>
       selector({
         sseConnectionState: stores.sseConnectionState,
-        fastPollRequestedAt: stores.fastPollRequestedAt,
         liveUpdatesMode: stores.liveUpdatesMode,
       }),
     { getState: () => ({ liveUpdatesMode: stores.liveUpdatesMode }) },
@@ -140,7 +143,6 @@ describe("useTraceNewCount", () => {
     stores.debouncedTimeRange = { from: 1, to: 2, label: "Last 24h" };
     stores.debouncedQueryText = "evaluator:monitor_x";
     stores.sseConnectionState = "disconnected";
-    stores.fastPollRequestedAt = 0;
     stores.liveUpdatesMode = "live";
     instantEvalRuns.current = undefined;
     vi.clearAllMocks();
@@ -179,12 +181,22 @@ describe("useTraceNewCount", () => {
   });
 
   describe("when SSE is delivering updates", () => {
-    it("stops polling and leaves freshness to the stream", () => {
+    it("sets no timer and leaves freshness to the stream", () => {
       stores.sseConnectionState = "connected";
 
       renderHook(() => useTraceNewCount());
 
-      expect(lastOptions().refetchInterval).toBe(false);
+      expect(lastOptions()).not.toHaveProperty("refetchInterval");
+    });
+  });
+
+  describe("when SSE is down", () => {
+    it("still sets no timer; a read hint drives the count", () => {
+      stores.sseConnectionState = "disconnected";
+
+      renderHook(() => useTraceNewCount());
+
+      expect(lastOptions()).not.toHaveProperty("refetchInterval");
     });
   });
 
@@ -198,39 +210,12 @@ describe("useTraceNewCount", () => {
     });
   });
 
-  describe("when a live poll fails because ClickHouse is overloaded", () => {
-    /** @scenario Live polling eases off when ClickHouse is overloaded */
-    it("backs the poll cadence off to the slow interval", () => {
-      const { rerender } = renderHook(() => useTraceNewCount());
+  describe("when a count read fails because ClickHouse is overloaded", () => {
+    it("retries once and sets no timer of its own", () => {
+      renderHook(() => useTraceNewCount());
 
-      const initialOptions = lastOptions();
-      expect(initialOptions.retry).toBe(1);
-      expect(initialOptions.refetchInterval).toBe(5000);
-
-      act(() => {
-        queryResult.errorUpdatedAt = 1_000;
-        rerender();
-      });
-
-      expect(lastOptions().refetchInterval).toBe(30000);
-    });
-
-    it("returns to the fast cadence once a poll succeeds again", () => {
-      const { rerender } = renderHook(() => useTraceNewCount());
-
-      act(() => {
-        queryResult.errorUpdatedAt = 1_000;
-        rerender();
-      });
-      expect(lastOptions().refetchInterval).toBe(30000);
-
-      act(() => {
-        queryResult.data = { count: 3 };
-        queryResult.dataUpdatedAt = 2_000;
-        rerender();
-      });
-
-      expect(lastOptions().refetchInterval).toBe(5000);
+      expect(lastOptions().retry).toBe(1);
+      expect(lastOptions()).not.toHaveProperty("refetchInterval");
     });
   });
 

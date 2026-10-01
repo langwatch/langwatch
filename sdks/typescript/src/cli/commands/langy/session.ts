@@ -605,7 +605,7 @@ async function readKeyOrRefuse({
     if (status === 403) {
       throw new LocalCallFailure({
         code: "key_refused",
-        message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
+        message: `LangWatch did not mint an ingestion key for this login: it needs permission to send traces (traces:create) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
       });
     }
     if (code === "endpoint_missing") {

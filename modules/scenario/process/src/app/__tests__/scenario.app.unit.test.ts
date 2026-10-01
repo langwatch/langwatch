@@ -1,17 +1,16 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
- * `ScenarioApp.queueSimulationRun` — the metadata envelope a queued run carries.
+ * `ScenarioModule.queueSimulationRun` — the metadata envelope a queued run carries.
  * @vitest-environment node
  * @see specs/scenarios/simulation-runner.feature
  */
@@ -22,6 +21,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -34,7 +34,7 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
+import { ScenarioModule, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 async function harness() {
   const commands: SimulationQueueRun[] = [];
@@ -46,7 +46,7 @@ async function harness() {
     },
   };
 
-  const app = await ScenarioApp.create({
+  const app = await ScenarioModule.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
@@ -108,7 +108,7 @@ async function harness() {
   return { queue, queued, metadata };
 }
 
-describe("ScenarioApp.queueSimulationRun", () => {
+describe("ScenarioModule.queueSimulationRun", () => {
   describe("given a run that resolved secret parameters", () => {
     const secretParameters = {
       OPENAI_API_KEY: "ciphertext-for-openai",
@@ -368,12 +368,12 @@ describe("given a run a suite queued", () => {
   });
 });
 
-describe("ScenarioApp.getRunDataForAllSuites", () => {
+describe("ScenarioModule.getRunDataForAllSuites", () => {
   describe("given a process that composed no simulation reads", () => {
     it("refuses the read by name instead of crashing on the missing member", async () => {
       // Neither the member nor the ClickHouse the module would derive it
       // from: the only shape that still owes the caller a refusal.
-      const app = await ScenarioApp.create({
+      const app = await ScenarioModule.create({
         repositories: {
           ...MemoryScenarioRepositories.create(),
         },
@@ -420,7 +420,7 @@ describe("given a process that supplies no simulations member but does read Clic
   /** @scenario "Simulation reads are derived from the deployment's own ClickHouse" */
   it("serves the read from ClickHouse instead of refusing", async () => {
     const asked: { tenantId: string }[] = [];
-    const app = await ScenarioApp.create({
+    const app = await ScenarioModule.create({
       repositories: MemoryScenarioRepositories.create(),
       dependencies: {
         agents: createApiFixture<AgentApi>(),

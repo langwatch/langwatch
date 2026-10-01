@@ -5,10 +5,9 @@ import { useColorModeValue } from "@langwatch/design-system/color-mode";
  * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
  */
 import { Box } from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type { ReactNode } from "react";
-
-import { useReducedMotion } from "../elements/use-reduced-motion.ts";
 
 /** Langy's palette, resolved. The shader cannot read CSS variables. */
 const GROUND_COLORS = ["#f56b1a", "#ffb380", "#6e57d2"];

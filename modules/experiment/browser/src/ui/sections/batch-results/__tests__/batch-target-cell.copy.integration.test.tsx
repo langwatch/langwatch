@@ -1,15 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type BatchTargetOutput, BatchTargetCell } from "@langwatch/experiment-browser-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
+import { type BatchTargetOutput } from "../../batch-evaluation-results.types.ts";
+import { BatchTargetCell } from "../batch-target-cell.tsx";
 
 const targetOutput = (output: Record<string, unknown>): BatchTargetOutput => ({
   targetId: "target-1",
@@ -34,9 +31,8 @@ describe("given a cell whose output changed after it first rendered", () => {
         configurable: true,
       });
 
-      const { rerender } = render(
+      const { rerender } = renderWithDesignSystem(
         <BatchTargetCell targetOutput={targetOutput({ output: "first answer" })} />,
-        { wrapper: Wrapper },
       );
       rerender(<BatchTargetCell targetOutput={targetOutput({ output: "second answer" })} />);
 

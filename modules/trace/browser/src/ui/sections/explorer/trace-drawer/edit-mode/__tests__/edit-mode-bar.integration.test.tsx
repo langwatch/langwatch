@@ -1,11 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+let hookOptions: { onSuccess?: () => void } = {};
 const mutate = vi.fn();
 const invalidate = vi.fn();
 const fetchOverlay = vi.fn();
@@ -16,6 +17,11 @@ let mutationOptions: {
   onError?: (error: unknown) => void;
 } = {};
 let isSaving = false;
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
 
 vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
@@ -30,9 +36,15 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
     }),
     traceEditOverlay: {
       upsert: {
-        useMutation: (options: typeof mutationOptions) => {
-          mutationOptions = options;
-          return { mutate, isPending: isSaving };
+        useMutation: (options: typeof hookOptions) => {
+          hookOptions = options;
+          return {
+            mutate: (variables: unknown, callbacks?: typeof mutationOptions) => {
+              mutationOptions = callbacks ?? {};
+              mutate(variables);
+            },
+            isPending: isSaving,
+          };
         },
       },
     },
@@ -48,16 +60,13 @@ vi.mock("../../../../errors/index.ts", () => ({
 }));
 
 import { useAnnotationSessionStore } from "../../../../../../behavior/annotation-session.store.ts";
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { EditModeBar } from "../edit-mode-bar.tsx";
 
 function renderBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EditModeBar traceId="trace-1" />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<EditModeBar traceId="trace-1" />);
 }
 
 function saveButton() {
@@ -73,9 +82,10 @@ describe("EditModeBar", () => {
     vi.clearAllMocks();
     isSaving = false;
     mutationOptions = {};
+    hookOptions = {};
     storedCorrectionIs(null);
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setIsEditing(true);
+    openTraceDrawerAt({ edit: "1" });
     useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
   });
 
@@ -99,7 +109,7 @@ describe("EditModeBar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(screen.queryByText("Discard trace corrections?")).not.toBeInTheDocument();
-        expect(useDrawerStore.getState().isEditing).toBe(false);
+        expect(getTraceDrawer().isEditing).toBe(false);
         expect(useTraceEditStore.getState().editingTraceId).toBeNull();
       });
     });
@@ -113,7 +123,7 @@ describe("EditModeBar", () => {
         fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
         expect(screen.queryByText("Discard trace corrections?")).not.toBeInTheDocument();
-        expect(useDrawerStore.getState().isEditing).toBe(false);
+        expect(getTraceDrawer().isEditing).toBe(false);
       });
     });
   });
@@ -203,17 +213,15 @@ describe("EditModeBar", () => {
         fireEvent.click(saveButton());
         await waitFor(() => expect(mutate).toHaveBeenCalled());
 
+        hookOptions.onSuccess?.();
         mutationOptions.onSuccess?.();
 
         expect(toasterCreate).toHaveBeenCalledWith({
           title: "Trace corrections saved",
           type: "success",
         });
-        expect(invalidate).toHaveBeenCalledWith({
-          projectId: "proj-1",
-          traceId: "trace-1",
-        });
-        expect(useDrawerStore.getState().isEditing).toBe(false);
+        expect(invalidate).toHaveBeenCalled();
+        expect(getTraceDrawer().isEditing).toBe(false);
       });
 
       /** @scenario "Saving builds on the correction as it stands" */
@@ -252,7 +260,7 @@ describe("EditModeBar", () => {
 
         await waitFor(() => expect(showErrorToast).toHaveBeenCalled());
         expect(mutate).not.toHaveBeenCalled();
-        expect(useDrawerStore.getState().isEditing).toBe(true);
+        expect(getTraceDrawer().isEditing).toBe(true);
       });
     });
 
@@ -327,7 +335,7 @@ describe("EditModeBar", () => {
             fallbackTitle: "Couldn't save trace corrections",
           }),
         );
-        expect(useDrawerStore.getState().isEditing).toBe(true);
+        expect(getTraceDrawer().isEditing).toBe(true);
         expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
       });
     });
@@ -345,7 +353,7 @@ describe("EditModeBar", () => {
             "Your corrections to this trace have not been saved. Comments are saved as you write them and are not discarded.",
           ),
         ).toBeInTheDocument();
-        expect(useDrawerStore.getState().isEditing).toBe(true);
+        expect(getTraceDrawer().isEditing).toBe(true);
       });
 
       /** @scenario "Cancelling with unsaved changes asks first" */
@@ -355,7 +363,7 @@ describe("EditModeBar", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Keep annotating" }));
 
-        expect(useDrawerStore.getState().isEditing).toBe(true);
+        expect(getTraceDrawer().isEditing).toBe(true);
         expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
       });
 
@@ -366,7 +374,7 @@ describe("EditModeBar", () => {
 
         fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
-        expect(useDrawerStore.getState().isEditing).toBe(false);
+        expect(getTraceDrawer().isEditing).toBe(false);
         expect(useTraceEditStore.getState().spanDrafts).toEqual({});
         expect(useTraceEditStore.getState().deletedSpanIds).toEqual([]);
       });

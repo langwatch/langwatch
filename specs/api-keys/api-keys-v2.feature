@@ -73,11 +73,46 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       And no other key of project "alpha" is affected
 
     @integration
-    Scenario: A banner urges replacing the legacy key by the deadline
+    Scenario: A banner tells an admin that legacy project keys are going away
       Given project "alpha" still has a live legacy key
       When "ada" opens the API keys of project "alpha"
-      Then a banner asks her to create a new key and revoke the legacy one before 31 March 2027
-      And the banner is gone once the legacy key is revoked
+      Then a warning banner titled "Legacy project keys are going away" says to use personal access tokens instead
+      And the banner offers no action
+
+    @integration
+    Scenario: A reader who cannot manage the project sees no banner and no error
+      Given project "alpha" still has a live legacy key
+      When "max" opens the API keys of project "alpha"
+      Then the legacy key status is not read
+      And no banner and no error is shown
+
+    @unimplemented
+    Scenario: The banner offers to revoke the project key
+      Given project "alpha" still has a live legacy key
+      When "ada" opens the API keys of project "alpha"
+      Then the banner says that once revoked the key stops working for good and cannot be restored
+      And the banner offers "Revoke project key..."
+
+    @unimplemented
+    Scenario: Revoking the project key takes two confirmations
+      Given "ada" chose "Revoke project key..."
+      Then a dialog "Revoke the project key?" offers Cancel and Continue
+      When she chooses Continue
+      Then a second step asks her to type the project name to confirm
+      And "Revoke for good" stays disabled until she types the project name exactly
+
+    @unimplemented
+    Scenario: A name that does not match keeps the revoke disabled
+      Given "ada" is on the second step of revoking the project key of "alpha"
+      When she types "alph"
+      Then "Revoke for good" is disabled
+
+    @unimplemented
+    Scenario: A revoked project key hides the banner
+      Given "ada" typed the exact project name on the second step
+      When she chooses "Revoke for good"
+      Then a toast says "Project key revoked"
+      And the banner is gone
 
     @unit
     Scenario: A new project gets no customer-facing project key
@@ -195,22 +230,58 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
         | DELETE /api/api-keys/{id} |
         | apiKey.revoke             |
 
-  Rule: every screen that showed the project key offers "Create a key" instead
+  Rule: every screen that showed the project key offers a personal access token instead
 
     @integration
-    Scenario Outline: A setup screen mints instead of revealing
+    Scenario Outline: Integrating a project offers a personal access token, shown once
       When "ada" opens <screen> for project "alpha"
-      Then no key is on the page
-      And "Create a key" opens the mint drawer with project "alpha" chosen
+      Then no key is on the page and the snippets show "<YOUR_LANGWATCH_API_KEY>"
+      When she chooses "Create a personal access token"
+      Then a personal key on project "alpha" is minted holding only <permissions>
+      And the screen says the token <can do> in this project and nothing else
+      And the token is shown once and fills the snippets while the screen is open
+      And the token is held in memory only, never in a store, local storage or the query cache
+      And the token is dropped when the project, organization or signed-in user changes
 
       Examples:
-        | screen                              |
-        | the onboarding API card             |
-        | the traces integrate drawer         |
-        | the prompt API snippet dialog       |
-        | the workflow publish dialog         |
-        | the personal workspace setup        |
-        | the project home agent pill         |
+        | screen                        | permissions                                     | can do                         |
+        | the onboarding API card       | traces:create, as a CLI "login --project" key   | can only send data             |
+        | the personal workspace setup  | traces:create                                   | can only send data             |
+        | the traces integrate drawer   | traces:create                                   | can only send data             |
+        | the traces MCP config         | the project read grants only                    | can read this project's data   |
+        | the onboarding MCP config     | the project read grants only                    | can read this project's data   |
+        | the prompt API dialog         | prompts:view                                    | can read prompts               |
+        | the evaluator API integration | evaluations:manage                              | can manage evaluations         |
+        | the workflow publish dialog   | workflows:manage                                | can manage workflows           |
+
+    @integration
+    Scenario: A token holding more than the reader may grant is refused
+      Given "max" cannot view prompts in project "alpha"
+      When "max" chooses "Create a personal access token" in the prompt API dialog
+      Then the mint is refused with "api_key_scope_violation"
+      And the refusal is shown and no token is
+
+    @unimplemented
+    Scenario Outline: A refused setup token says what is missing and how to carry on
+      Given "max" cannot read the data of project "alpha"
+      When "max" chooses "Create a personal access token" in <screen>
+      Then the mint is refused with "api_key_scope_violation"
+      And the screen says "You need read access to this project's data to create a setup token"
+      And the screen points to an admin, or to an ingestion-only token from Settings
+      And no token is shown
+
+      Examples:
+        | screen                      |
+        | the traces integrate pane   |
+        | the traces integrate drawer |
+        | the onboarding API card     |
+        | the onboarding product setup |
+
+    @integration
+    Scenario: The authorize page mints a personal access token
+      When "ada" opens "/authorize" and chooses "Create and copy a personal access token"
+      Then a personal key for her active project is minted and its token copied
+      And no project key is read
 
     @integration
     Scenario: The secret panel shows the token once with ready-to-copy snippets
@@ -224,6 +295,40 @@ Feature: API keys v2 - the secret is shown once, and a project key is minted, ne
       Given the secret panel is open and "I've stored this key" is not ticked
       When "ada" closes the drawer
       Then she is asked to confirm that the key will not be shown again
+
+  Rule: a setup token holds the least its screen needs (Alex, 2026-10-01)
+
+    @integration
+    Scenario: A coding-agent setup mints its MCP token with project reads only, apart from the ingestion token
+      When "ada" creates a token on the onboarding manual setup for project "alpha"
+      Then that token holds only traces:create
+      When she creates a token on the coding-agent setup's MCP tab
+      Then a second token on project "alpha" is minted holding only the project read grants
+      And the MCP config is filled with that second token, never the ingestion one
+
+    @integration
+    Scenario: The traces integrate drawer mints an ingestion token for .env and a reads token for MCP
+      When "ada" opens the traces integrate drawer for project "alpha"
+      Then the env block's token holds only traces:create
+      And the MCP config's token holds only the project read grants
+
+    @integration
+    Scenario: The traces integrate pane mints only an ingestion token
+      When "ada" opens the traces integrate pane for project "alpha"
+      Then the token it mints holds only traces:create
+
+    @unimplemented
+    Scenario: A setup skill that creates something gets its own token holding exactly that create permission
+      When "ada" sets up a skill that creates scenarios in project "alpha"
+      Then a token for that skill alone is minted holding only the create permission it calls
+      And the skill is handed no other setup token
+
+    @unimplemented
+    Scenario: The authorize page mints the device-flow default set, capped at what the person holds
+      Given "max" holds only some of the device-flow default permissions on project "alpha"
+      When "max" opens "/authorize" and creates a personal access token
+      Then the token holds the device-flow defaults that "max" holds, and no others
+      And no token with every permission ("permissionMode: all") is minted
 
   Rule: the CLI and MCP flows mint a key rather than hand out the project key
 

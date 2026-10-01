@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a job that ran to the end records: the connected agent instance that
  * answered it, when one did.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {

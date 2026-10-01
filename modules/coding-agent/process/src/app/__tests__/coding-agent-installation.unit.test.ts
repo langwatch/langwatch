@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The organization rollup, booted the way a process boots coding-agent: its
- * caller scope, visibility and audit come from peers, never from members.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -11,15 +5,21 @@ import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import type { GithubApi } from "@langwatch/github-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * The organization rollup, booted the way a process boots coding-agent: its
+ * caller scope, visibility and audit come from peers, never from members.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { pullRequest } from "../../__tests__/fixtures/coding-agent.fixture.ts";
-import { codingAgentServer } from "../../coding-agent.server.ts";
+import { codingAgentProcessModule } from "../../coding-agent.module.ts";
 
 const ORGANIZATION = "organization-1";
 
@@ -65,7 +65,7 @@ function installation() {
   const projects = [project("project-shared"), project("project-other")];
 
   const process = createApp({ role: "api" })
-    .withModules([withMemoryRepositories(codingAgentServer)])
+    .withModules([withMemoryRepositories(codingAgentProcessModule)])
     .provide({
       project: createApiFixture<ProjectApi>({
         listByOrganization: async ({ page, limit }) => ({

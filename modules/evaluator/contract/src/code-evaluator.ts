@@ -22,6 +22,8 @@ export type CodeEvaluatorExecutionInput = {
   traceId?: string;
   parentCausalityDepth?: number;
   parentTrace?: { traceId: string; parentSpanId: string };
+  /** The member the run acts as, when one started it; absent, the run key has no owner. */
+  principal?: { userId: string } | undefined;
 };
 
 /** The fixed result fields a stored code evaluator may return. */

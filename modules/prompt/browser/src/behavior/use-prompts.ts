@@ -1,6 +1,6 @@
+import { promptClient } from "@langwatch/prompt-client";
 import { useCallback } from "react";
 
-import { promptApi } from "./prompt-api.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 
 /**
@@ -8,12 +8,12 @@ import { usePromptProject } from "./use-prompt-project.ts";
  * Enforces refresh of queries when mutations are successful.
  */
 export const usePrompts = () => {
-  const trpc = promptApi.useUtils();
-  const createPrompt = promptApi.prompts.create.useMutation();
-  const updatePrompt = promptApi.prompts.update.useMutation();
-  const updateHandle = promptApi.prompts.updateHandle.useMutation();
-  const restoreVersion = promptApi.prompts.restoreVersion.useMutation();
-  const deletePrompt = promptApi.prompts.delete.useMutation();
+  const trpc = promptClient.useUtils();
+  const createPrompt = promptClient.prompts.create.useMutation();
+  const updatePrompt = promptClient.prompts.update.useMutation();
+  const updateHandle = promptClient.prompts.updateHandle.useMutation();
+  const restoreVersion = promptClient.prompts.restoreVersion.useMutation();
+  const deletePrompt = promptClient.prompts.delete.useMutation();
   const { project } = usePromptProject();
   const projectId = project?.id ?? "";
 

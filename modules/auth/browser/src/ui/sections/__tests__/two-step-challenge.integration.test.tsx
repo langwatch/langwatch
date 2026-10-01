@@ -4,8 +4,8 @@
  * and navigation are mocked; the error registry is the real one.
  * Spec: specs/identity/signin-signup-screens.feature, mfa-and-session-shape.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -45,11 +45,7 @@ function ChallengeCard({ callbackUrl }: { callbackUrl?: string }) {
 
 const renderChallenge = (callbackUrl?: string) => {
   startTwoStepChallenge({ callbackUrl });
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ChallengeCard callbackUrl={callbackUrl} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<ChallengeCard callbackUrl={callbackUrl} />);
 };
 
 const typeCode = async (code: string) => {

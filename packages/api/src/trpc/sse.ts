@@ -15,7 +15,8 @@ import {
   LiveStreamNotFoundError,
   LiveStreamUnsupportedProcedureError,
 } from "../errors.ts";
-import { BrowserOriginGuard, registerRoutePolicy } from "../rest/security.ts";
+import { BrowserOriginGuard } from "../policy/browser-origin.ts";
+import { registerRoutePolicy } from "../route-registry.ts";
 
 /** How often the channel writes a comment so an idle proxy keeps it open. */
 const SSE_KEEPALIVE_INTERVAL_MS = 25_000;

@@ -6,7 +6,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { clearDrawerStack, clearFlowCallbacks } from "../../../behavior/use-drawer.ts";
+import { clearFlowCallbacks } from "../../../behavior/use-drawer.ts";
 import { CurrentDrawer } from "../current-drawer.tsx";
 
 function AutomationDrawer({ initialFilterQuery }: { initialFilterQuery?: string }) {
@@ -26,7 +26,6 @@ function mount(at: string): void {
 }
 
 beforeEach(() => {
-  clearDrawerStack();
   clearFlowCallbacks();
 });
 

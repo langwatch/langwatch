@@ -1,5 +1,4 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
@@ -12,38 +11,38 @@ import type {
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { withMemoryRepositories } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { withMemoryRepositories } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  EvaluationCustomEvaluators,
-  EvaluationInstallEnvironment,
-  EvaluationReport,
-  EvaluationRescore,
-  EvaluationRunAnalytics,
-  EvaluationWarmupProbe,
-} from "../../app/evaluation.members.ts";
 import { MemoryLangevalsChannel } from "../../channels/memory/memory.langevals.channel.ts";
-import { evaluationServer } from "../../evaluation.server.ts";
+import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationProcessingStoresAdapter } from "../../eventing/evaluation-processing-stores.pipeline.ts";
 import type { EvaluationRepositories } from "../../repositories/evaluation.repositories.ts";
+import type { EvaluationRetentionLookup } from "../../repositories/evaluation.repository.ts";
 import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
+import type { EvaluationCommandDispatcherService } from "../../services/evaluation-command-dispatcher.service.ts";
+import type { EvaluationExecutionService } from "../../services/evaluation-execution.service.ts";
+import type { EvaluationInputsOffloadService } from "../../services/evaluation-inputs-offload.service.ts";
 import { EvaluationRunProjectionService } from "../../services/evaluation-run-projection.service.ts";
+import type { EvaluatorEnvironmentService } from "../../services/evaluator-environment.service.ts";
 import { LangevalsClusteringService } from "../../services/langevals-clustering.service.ts";
 import { LangevalsPiiDetectionService } from "../../services/langevals-pii-detection.service.ts";
-import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
-import type {
-  EvaluationExecution,
-  EvaluationInputsResolution,
-  EvaluationRetentionLookup,
-} from "../evaluation.members.ts";
+import {
+  EvaluationModule,
+  type EvaluationCustomEvaluators,
+  type EvaluationInfrastructure,
+  type EvaluationRescore,
+  type EvaluationRunAnalytics,
+  type EvaluationWarmupProbe,
+} from "../evaluation.app.ts";
 
 /** The environment a test names, with nothing inherited from the process. */
-export class TestEvaluationInstallEnvironment implements EvaluationInstallEnvironment {
+export class TestEvaluationInstallEnvironment implements Pick<EvaluatorEnvironmentService, "read"> {
   constructor(private readonly environment: Readonly<Record<string, string | undefined>> = {}) {}
 
   read(): Readonly<Record<string, string | undefined>> {
@@ -94,20 +93,21 @@ export class TestEvaluationRunAnalytics implements EvaluationRunAnalytics {
   }
 }
 
-export class TestEvaluationReport implements EvaluationReport {
+export class TestEvaluationReport implements Pick<
+  EvaluationCommandDispatcherService,
+  "reportEvaluation"
+> {
   readonly reported: ReportEvaluationCommandData[] = [];
 
   constructor(private readonly failing = false) {}
 
-  async reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown> {
+  async reportEvaluation(data: ReportEvaluationCommandData): Promise<void> {
     if (this.failing) throw new Error("queue unavailable");
     this.reported.push(data);
-
-    return undefined;
   }
 }
 
-class UnreachableExecution implements EvaluationExecution {
+class UnreachableExecution implements Pick<EvaluationExecutionService, "execute"> {
   execute(): never {
     throw new Error("This test composed no evaluator engine.");
   }
@@ -123,7 +123,7 @@ class PlatformDefaultRetention implements EvaluationRetentionLookup {
   }
 }
 
-class PassThroughInputsResolution implements EvaluationInputsResolution {
+class PassThroughInputsResolution implements Pick<EvaluationInputsOffloadService, "resolveInputs"> {
   async resolveInputs(input: {
     tenantId: string;
     inputs: Record<string, unknown>;
@@ -208,10 +208,10 @@ export function createEvaluationTestApp(
     }>;
     clustering?: LangevalsClusteringService;
   }> = {},
-): EvaluationApp {
+): EvaluationModule {
   const repositories = input.repositories ?? MemoryEvaluationRepositories.create();
 
-  return EvaluationApp.fromInfrastructure({
+  return EvaluationModule.fromInfrastructure({
     infrastructure: createEvaluationTestInfrastructure(input.members ?? {}),
     repositories,
     dependencies: {
@@ -254,7 +254,7 @@ export function createEvaluationTestApp(
   });
 }
 
-const memoryEvaluation = withMemoryRepositories(evaluationServer);
+const memoryEvaluation = withMemoryRepositories(evaluationProcessModule);
 
 /** `createApp` composes no secrets chain: the install gets a scope answering every handle unset. */
 export const installableEvaluation: typeof memoryEvaluation = {

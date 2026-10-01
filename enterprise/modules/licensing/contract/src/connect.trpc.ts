@@ -3,7 +3,7 @@
  * Every `connect.*` procedure, declared once: what a self-hosted install's
  * Settings, Connect page reads and writes (ADR-156, section 9).
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

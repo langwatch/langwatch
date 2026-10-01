@@ -2,7 +2,6 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EventingCommands } from "@langwatch/eventing";
-import type { FeatureSetup } from "@langwatch/kernel";
 import {
   MetricApi,
   METRIC_DEFAULT_RETENTION_DAYS,
@@ -17,6 +16,7 @@ import {
   type MetricServerConfig,
 } from "@langwatch/metric-contract";
 import type { OtlpDoorRequest } from "@langwatch/otlp";
+import type { FeatureSetup } from "@langwatch/process";
 import { TraceApi } from "@langwatch/trace-contract";
 
 import { ClickHouseMetricDataPointAppendRepository } from "../repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts";
@@ -43,7 +43,7 @@ type MetricDependencies = Readonly<{
 type MetricSetup = FeatureSetup<MetricDependencies, MetricInfrastructure, MetricServerConfig>;
 
 /** The process-owned metric preparation capability, and its durable processing pipeline. */
-export class MetricApp implements MetricApiContract {
+export class MetricModule implements MetricApiContract {
   static readonly contract = MetricApi;
   static readonly config = metricConfig;
   static readonly dependencies: MetricDependencies = {
@@ -73,7 +73,7 @@ export class MetricApp implements MetricApiContract {
     this.#collection = parts.collection;
   }
 
-  static create({ dependencies, members, config }: MetricSetup): MetricApp {
+  static create({ dependencies, members, config }: MetricSetup): MetricModule {
     const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
     const pipeline = MetricProcessingService.create({
       repository: ClickHouseMetricDataPointAppendRepository.create({
@@ -93,7 +93,7 @@ export class MetricApp implements MetricApiContract {
       metrics: service,
       recordDataPoints: (points) => app.recordCanonicalMetricDataPoints(points),
     });
-    const app: MetricApp = new MetricApp({
+    const app: MetricModule = new MetricModule({
       service,
       pipeline,
       receiver: OtlpMetricReceiverService.create({ traces: dependencies.traces, collection }),

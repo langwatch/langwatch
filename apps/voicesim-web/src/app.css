@@ -1,24 +1,51 @@
 /* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
 
-.voice-row {
+.voice-transcript {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.voice-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  align-items: baseline;
-}
-
-.voice-turns,
-.voice-events {
+.voice-turn {
   display: grid;
   gap: var(--space-2);
-  padding-left: var(--space-4);
 }
 
-.voice-muted {
+.voice-turn-time {
+  justify-self: center;
+  font-size: var(--text-xs);
   color: var(--ink-500);
+}
+
+/* The caller speaks from the left, the agent answers from the right. */
+.voice-line {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  max-width: 80%;
+}
+
+.voice-line[data-side="agent"] {
+  justify-self: end;
+  justify-items: end;
+}
+
+.voice-speaker {
+  font-size: var(--text-xs);
+  color: var(--ink-500);
+}
+
+.voice-bubble {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--paper-deep);
+  color: var(--ink-900);
+  overflow-wrap: anywhere;
+}
+
+.voice-line[data-side="agent"] .voice-bubble {
+  background: var(--rust-soft);
 }

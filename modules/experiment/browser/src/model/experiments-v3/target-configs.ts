@@ -1,5 +1,6 @@
 /** The workbench column a picked agent, evaluator or prompt becomes. */
 import type { UiAgentListDrawerProps } from "@langwatch/browser-host/drawer";
+import { type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import {
   type ComparisonEvaluatorConfig,
@@ -7,11 +8,13 @@ import {
   newTargetId,
   toComparisonConfig,
 } from "@langwatch/experiment-contract";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-browser-kit";
 import { nowInstant } from "@langwatch/time";
-import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
+import type {
+  Field,
+  FieldMapping as UIFieldMapping,
+  HttpComponentConfig,
+} from "@langwatch/workflow-contract";
 
-import type { ExperimentApiOutputs } from "../experiment-api-map.ts";
 import { convertFromUIMapping } from "./field-mapping-converters.ts";
 import { buildInputsFromBodyTemplate, convertHttpComponentConfig } from "./http-agent-utils.ts";
 import { type PromptOutputField, toTargetOutputFields } from "./target-output-fields.ts";
@@ -30,7 +33,7 @@ type EvaluatorDbConfig = {
   settings?: Record<string, unknown>;
 };
 
-export type EvaluatorWithFields = NonNullable<ExperimentApiOutputs["evaluators"]["getById"]>;
+export type EvaluatorWithFields = NonNullable<EvaluatorOutputs["evaluators"]["getById"]>;
 
 const DEFAULT_INPUT: Field = { identifier: "input", type: "str" };
 const DEFAULT_OUTPUT: Field = { identifier: "output", type: "str" };

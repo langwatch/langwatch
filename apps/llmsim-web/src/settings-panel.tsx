@@ -1,8 +1,8 @@
-import { Button, Input, Select } from "@langwatch/design-system-internal";
+import { Button, Input, KeyValue, Panel, Select, Stack } from "@langwatch/design-system-internal";
 import { SimRefusal } from "@langwatch/sim-console";
 import { useState } from "react";
 
-import { type Settings, saveSettings } from "./llm-api.ts";
+import { type Info, saveSettings } from "./llm-api.ts";
 
 const ERROR_OPTIONS = [
   { value: "0", label: "Off: answer normally" },
@@ -13,12 +13,13 @@ const ERROR_OPTIONS = [
 
 /** The switches every call without its own X-Llmsim-* header follows. */
 export const SettingsPanel = ({
-  settings,
+  info,
   onSaved,
 }: {
-  settings: Settings;
+  info: Info;
   onSaved: () => void;
 }) => {
+  const { settings } = info;
   const [forcedError, setForcedError] = useState(String(settings.forcedError));
   const [seed, setSeed] = useState(settings.seed);
   const [saving, setSaving] = useState(false);
@@ -39,22 +40,38 @@ export const SettingsPanel = ({
 
   return (
     <div className="llm-settings" data-testid="settings">
-      <Select
-        label="Forced error"
-        options={ERROR_OPTIONS}
-        value={forcedError}
-        onChange={setForcedError}
-      />
-      <Input
-        label="Seed"
-        hint='Empty seeds each call from its prompt; "random" draws a fresh seed per call; anything else pins one.'
-        value={seed}
-        onChange={setSeed}
-      />
-      {error ? <SimRefusal message={error} /> : null}
-      <Button variant="primary" loading={saving} onClick={() => void save()}>
-        Save
-      </Button>
+      <Stack gap={4}>
+        <Panel title="Answers">
+          <Stack gap={4}>
+            <Select
+              label="Forced error"
+              options={ERROR_OPTIONS}
+              value={forcedError}
+              onChange={setForcedError}
+            />
+            <Input
+              label="Seed"
+              hint='Empty seeds each call from its prompt; "random" draws a fresh seed per call; anything else pins one.'
+              value={seed}
+              onChange={setSeed}
+            />
+            {error ? <SimRefusal message={error} /> : null}
+            <div>
+              <Button variant="primary" loading={saving} onClick={() => void save()}>
+                Save
+              </Button>
+            </div>
+          </Stack>
+        </Panel>
+        <Panel title="Simulator">
+          <KeyValue
+            items={[
+              { label: "Models", value: info.models.join(", ") || "any", copy: false },
+              { label: "Calls kept", value: String(info.capacity), copy: false },
+            ]}
+          />
+        </Panel>
+      </Stack>
     </div>
   );
 };

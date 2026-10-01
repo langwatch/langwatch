@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 
-import type { RestIdentity, RestCaller } from "@langwatch/api/rest";
 import {
   GatewayInternalAuthenticationError,
   GatewayInternalAuthenticationUnavailableError,
@@ -13,6 +12,7 @@ import {
   GATEWAY_SIGNATURE_WINDOW_SECONDS,
 } from "../rules/gateway-internal-identity.rules.ts";
 import { GatewayAuthDecisionService } from "./gateway-auth-decision.service.ts";
+import type { RestCaller, RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * This family's gate travels with the declaration since a published control

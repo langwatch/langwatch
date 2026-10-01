@@ -1,9 +1,10 @@
-import { INITIAL_TIME_RANGE, useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { useCallback } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../../behavior/explorer.store.ts";
 import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
 import { useOnboardingActive } from "../../../../../behavior/explorer/onboarding/use-onboarding-active.ts";
 import { useProjectHasTraces } from "../../../../../behavior/explorer/use-project-has-traces.ts";
+import { INITIAL_TIME_RANGE } from "../../../../../behavior/query.slice.ts";
 import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 

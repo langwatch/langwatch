@@ -16,10 +16,6 @@ import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
 import { ClickHouseSimulationRunMetricsRepository } from "../repositories/clickhouse/clickhouse.simulation-run-metrics.repository.ts";
 import { ClickHouseSimulationRunStateRepository } from "../repositories/clickhouse/clickhouse.simulation-run-state.repository.ts";
 import type { SimulationEventingClickHouseResolver } from "../repositories/clickhouse/clickhouse.simulation-session.store.ts";
-import {
-  ClickHouseStalledSimulationRunRepository,
-  type StalledSimulationRunClickHouseClient,
-} from "../repositories/clickhouse/clickhouse.stalled-simulation-run.repository.ts";
 import { MemorySimulationRunStateRepository } from "../repositories/memory/memory.simulation-run-state.repository.ts";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
@@ -186,17 +182,5 @@ export class SimulationRunMetricsStore implements AppendStore<SimulationRunMetri
     context: BulkAppendContext,
   ): Promise<void> {
     return this.store.bulkAppend(records, context);
-  }
-}
-
-export class SimulationStalledRunStore {
-  static create(client: StalledSimulationRunClickHouseClient): SimulationStalledRunStore {
-    return new SimulationStalledRunStore(ClickHouseStalledSimulationRunRepository.create(client));
-  }
-
-  private constructor(private readonly repository: ClickHouseStalledSimulationRunRepository) {}
-
-  findStalledRuns(input: { now: number; thresholdMs: number }): Promise<SimulationStalledRun[]> {
-    return this.repository.findStalledRuns(input);
   }
 }

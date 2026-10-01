@@ -93,8 +93,8 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   /** The signing secret. Never logged, never reported, never defaulted. */
   secret: string;
   /**
-   * Whether the email/password routes MOUNT. See {@link isEmailPasswordEnabled}
-   * for the rule; mounting is not the gate, the request hook is.
+   * Whether the email/password routes MOUNT. The auth contract's
+   * `isEmailPasswordEnabled` is the rule; mounting is not the gate, the request hook is.
    */
   emailPasswordEnabled: boolean;
   /** Whether the two-factor plugin is mounted. */
@@ -116,17 +116,6 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   /** Generic-OIDC connections this deployment mounted, already built. */
   genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
 }>;
-
-/**
- * Whether BetterAuth's email/password (credentials) routes are MOUNTED.
- * (ADR-027). Mounting is not the gate: the `before` hook below is what blocks
- */
-export const isEmailPasswordEnabled = (deployment: {
-  authProvider: string | undefined;
-  isSaas: boolean;
-  localPasswords: boolean;
-}): boolean =>
-  deployment.authProvider === "email" || !deployment.isSaas || deployment.localPasswords;
 
 /**
  * Seals better-auth's own sign-up route unconditionally, before any licence

@@ -13,18 +13,25 @@ import {
   PROJECT_LIFECYCLE_PIPELINE_NAME,
 } from "@langwatch/project-contract";
 
-import type { ProjectApp } from "../app/project.app.ts";
+import type { ProjectModule } from "../app/project.app.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
-import { RecordProjectCreatedCommand } from "./project-lifecycle.commands.ts";
-import { projectCreatedEventSchema } from "./project-lifecycle.events.ts";
+import {
+  RecordProjectCreatedCommand,
+  RecordProjectLegacyKeyRevokedCommand,
+} from "./project-lifecycle.commands.ts";
+import {
+  projectCreatedEventSchema,
+  projectLegacyKeyRevokedEventSchema,
+} from "./project-lifecycle.events.ts";
 
 function lifecycleCommands() {
   return definePipeline({
     name: PROJECT_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: PROJECT_AGGREGATE_TYPE }),
   })
-    .withEvents([projectCreatedEventSchema])
-    .withCommand("recordProjectCreated", RecordProjectCreatedCommand);
+    .withEvents([projectCreatedEventSchema, projectLegacyKeyRevokedEventSchema])
+    .withCommand("recordProjectCreated", RecordProjectCreatedCommand)
+    .withCommand("recordProjectLegacyKeyRevoked", RecordProjectLegacyKeyRevokedCommand);
 }
 
 export type ProjectLifecycleDefinition = ReturnType<ReturnType<typeof lifecycleCommands>["build"]>;
@@ -48,7 +55,7 @@ export function buildProjectLifecyclePipeline(deps: {
 
 export const projectLifecycleEventing = defineEventingModule({
   pipeline: PROJECT_LIFECYCLE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<ProjectRepositories, ProjectApp>) =>
+  build: ({ app }: EventingSetup<ProjectRepositories, ProjectModule>) =>
     buildProjectLifecyclePipeline({
       recordProjectCreated: (input) => app.recordProjectCreated(input),
     }),

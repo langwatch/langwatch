@@ -172,7 +172,11 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	defer cancel()
 	httpReq = httpReq.WithContext(reqCtx)
 
-	resp, err := e.client.Do(httpReq)
+	client := clientDroppingCrossOriginReferer(e.client)
+	if carriesCredentials(req) || urlCarriesCredentials(httpReq.URL) {
+		client = clientFollowingSameOrigin(e.client)
+	}
+	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("httpblock: %w", err)
 	}

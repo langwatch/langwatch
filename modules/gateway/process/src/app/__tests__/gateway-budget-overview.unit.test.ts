@@ -1,21 +1,21 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
- * `GatewayApp.budgetOverviewForUser`: delegates to `BudgetOverviewService`
+ * `GatewayModule.budgetOverviewForUser`: delegates to `BudgetOverviewService`
  * and proves it stays scoped to the caller's own organization.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { type OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp } from "../gateway.app.ts";
+import { GatewayModule } from "../gateway.app.ts";
 
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
@@ -41,7 +41,7 @@ const isMember = vi.fn();
 const getPersonalWorkspace = vi.fn();
 const isEnabled = vi.fn();
 const virtualKeyFindMany = vi.fn();
-const groupMembershipFindMany = vi.fn();
+const listGroupsForMember = vi.fn();
 const gatewayBudgetFindMany = vi.fn();
 
 function organizationsStub(overrides: Partial<OrganizationApi>): OrganizationApi {
@@ -64,15 +64,14 @@ function fakeClickHouse(overrides: Partial<ClickHouseQueryClient>): ClickHouseQu
 /** Answers the reads the budget-resolution repository makes, one delegate at a time. */
 function fakePrisma(overrides: {
   virtualKey?: Partial<PrismaClient["virtualKey"]>;
-  groupMembership?: Partial<PrismaClient["groupMembership"]>;
   gatewayBudget?: Partial<PrismaClient["gatewayBudget"]>;
 }): PrismaClient {
   return overrides as PrismaClient;
 }
 
 /** The slice of the application this surface reaches, and nothing else. */
-async function gatewayAppStub(): Promise<GatewayApp> {
-  return GatewayApp.create({
+async function gatewayAppStub(): Promise<GatewayModule> {
+  return GatewayModule.create({
     dependencies: {
       webhooks: peer("webhooks"),
       entitlement: peer("entitlement"),
@@ -81,16 +80,16 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       evaluators: peer("evaluators"),
       evaluations: peer("evaluations"),
       monitors: peer("monitors"),
-      organizations: organizationsStub({ isMember, getPersonalWorkspace }),
+      organizations: organizationsStub({ isMember, getPersonalWorkspace, listGroupsForMember }),
       featureFlags: featureFlagsStub({ isEnabled }),
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
+      apiKeys: peer("apiKeys"),
     },
     members: {
       prisma: fakePrisma({
         virtualKey: { findMany: virtualKeyFindMany },
-        groupMembership: { findMany: groupMembershipFindMany },
         gatewayBudget: { findMany: gatewayBudgetFindMany },
       }),
       clickhouse: fakeClickHouse({ query: vi.fn(), insert: vi.fn() }),
@@ -111,13 +110,13 @@ async function gatewayAppStub(): Promise<GatewayApp> {
   });
 }
 
-describe("GatewayApp.budgetOverviewForUser", () => {
+describe("GatewayModule.budgetOverviewForUser", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getPersonalWorkspace.mockRejectedValue(new TeamNotFoundError());
     isEnabled.mockResolvedValue(true);
     virtualKeyFindMany.mockResolvedValue([]);
-    groupMembershipFindMany.mockResolvedValue([]);
+    listGroupsForMember.mockResolvedValue([]);
     gatewayBudgetFindMany.mockResolvedValue([]);
   });
 

@@ -1,5 +1,6 @@
-import type { ExplorerResults } from "@langwatch/trace-browser-kit";
 import { buildFacetStateLookup, type ExplorerState, parse } from "@langwatch/trace-contract";
+
+import type { ExplorerResults } from "../../behavior/rows.slice.ts";
 
 /** One value the query filters on, as the sidebar would show it. */
 export interface ActiveFacet {

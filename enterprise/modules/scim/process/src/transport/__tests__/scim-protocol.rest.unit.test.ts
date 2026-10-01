@@ -12,7 +12,6 @@ import {
   bindRestMiddleware,
   RestHost,
   scimCredentialOfRequest,
-  type RestIdentity,
 } from "@langwatch/api/rest";
 import {
   ScimProtocolError,
@@ -28,6 +27,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolRest, scimRestCredential } from "../scim-protocol.rest.ts";
 import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 type PublishedSchema = Readonly<{
   type?: string;
@@ -125,9 +125,9 @@ function mount(
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -136,7 +136,7 @@ function mount(
 
   host.mount(scimProtocolRest.router(), () => app, {
     facts: [
-      bindRestCredential("scimToken", () => app.directoryDoor),
+      bindRestCredential("scim_token", () => app.directoryDoor),
       bindRestMiddleware(scimRestCredential, (c) => ({
         connectionId: scimCredentialOfRequest(c.req.raw).connectionId,
       })),
@@ -851,7 +851,7 @@ describe("given the SCIM 2.0 protocol declaration", () => {
 
   describe("when the door each route answers behind is read", () => {
     it("keeps the three discovery routes public and the twelve behind the directory token", () => {
-      expect(declaration.credential).toBe("scimToken");
+      expect(declaration.credential).toBe("scim_token");
 
       const kinds = Object.fromEntries(
         declaration.routes.map((route) => [route.operation, route.access?.kind]),

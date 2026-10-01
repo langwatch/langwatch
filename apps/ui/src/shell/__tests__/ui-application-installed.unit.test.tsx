@@ -2,11 +2,11 @@
  * The application a composing host actually gets from `@langwatch/ui`.
  */
 
-import { webModules } from "@langwatch/installed-web-modules";
-import { createUiApplication } from "@langwatch/ui-kernel/application";
-import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/ui-kernel/feature-install";
-import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
-import { installedModuleScreens } from "@langwatch/ui-kernel/module-screens";
+import { browserModules } from "@langwatch/installed-web-modules";
+import { createUiApplication } from "@langwatch/browser/application";
+import { uiRoutePageKeys, type UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -23,7 +23,7 @@ function PassThrough({ children }: { children: ReactNode }) {
 
 /**
  * A host registry missing governance's keys — a composition fault ONLY if
- * nothing else supplies them. Here `installedModuleScreens(webModules)`
+ * nothing else supplies them. Here `installedModuleScreens(browserModules)`
  * does, exactly as `main.tsx` composes it (ARCHITECTURE §10.1, §11).
  */
 function hostRegistryWithoutGovernance(): UiPageLoaderRegistry {
@@ -54,12 +54,13 @@ function applicationFromPackageEntry() {
       shellLayouts: {
         auth: async () => ({ default: () => null }),
         chrome: async () => ({ default: () => null }),
+        "full-screen": async () => ({ default: () => null }),
       },
       loaders: hostRegistryWithoutGovernance(),
       errorFallback: () => null,
       rootErrorBoundary: () => null,
     },
-    features: { loaders: installedModuleScreens(webModules).loaders },
+    features: { loaders: installedModuleScreens(browserModules).loaders },
     sessionQueryKey: ["test", "session"],
   });
 }

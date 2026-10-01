@@ -86,7 +86,7 @@ function firstCall(method: unknown): Record<string, unknown> {
   return mock.mock.calls[0]?.[0] as Record<string, unknown>;
 }
 
-describe("DatasetApp", () => {
+describe("DatasetModule", () => {
   describe("when an upsert names the row it is replacing by slug", () => {
     it("takes the name that patch did not send from that row", async () => {
       const { app, dataset } = harness();

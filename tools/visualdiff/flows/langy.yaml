@@ -18,6 +18,17 @@ flows:
       - action: expect
         with:
           label: Langy assistant
+      - action: click
+        with:
+          label: /^Model:/
+      - action: type
+        with:
+          placeholder: Search models
+          text: langy-echo
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /langy.?echo/
       - action: fill
         with:
           selector: "[data-langy-composer] textarea"
@@ -210,6 +221,17 @@ flows:
         with:
           label: Open Langy assistant
           optional: "true"
+      - action: click
+        with:
+          label: /^Model:/
+      - action: type
+        with:
+          placeholder: Search models
+          text: langy-echo
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /langy.?echo/
       - action: fill
         with:
           selector: "[data-langy-composer] textarea"
@@ -225,7 +247,7 @@ flows:
           label: Recent chats
       - action: click
         with:
-          label: Conversation actions
+          selector: 'li:has-text("Rename this chat vd{uid}") [aria-label="Conversation actions"]'
       - action: click
         with:
           selector: "[role=menuitem]"
@@ -288,7 +310,7 @@ flows:
           label: Recent chats
       - action: click
         with:
-          label: Conversation actions
+          selector: 'li:has-text("Delete this chat vd{uid}") [aria-label="Conversation actions"]'
       - action: click
         with:
           selector: "[role=menuitem]"
@@ -306,7 +328,7 @@ flows:
           timeout: "30000"
       - action: click
         with:
-          label: Conversation actions
+          selector: 'li:has-text("Doomed vd{uid}") [aria-label="Conversation actions"]'
       - action: click
         with:
           selector: "[role=menuitem]"

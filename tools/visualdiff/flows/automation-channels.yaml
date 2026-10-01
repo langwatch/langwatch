@@ -137,11 +137,11 @@ flows:
         with:
           label: Search filters or type what you are looking for
           text: status:error
-          submit: true
+          submit: "2"
       - action: expect
         with:
           count: tbody:not([data-row-variant="error"])
-          equals: '"0"'
+          equals: "0"
           timeout: "30000"
       - action: click
         with:

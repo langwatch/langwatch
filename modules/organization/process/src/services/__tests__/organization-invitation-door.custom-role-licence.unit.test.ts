@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
@@ -6,6 +5,7 @@ import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
  * question is declared on the doors: transport/__tests__/custom-role-gate.trpc.declaration.
  */
 import type { OrganizationCaller } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type {

@@ -3,8 +3,8 @@
  * @see specs/traces-v2/default-drawer-routing.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NavigationProject } from "../../../model/navigation-host.ts";
@@ -20,18 +20,16 @@ vi.mock("../../../behavior/navigation-api.ts", () => ({
 const PROJECT: NavigationProject = { id: "project-1", slug: "demo", name: "Demo" };
 
 function renderMenu() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost
-        readings={{
-          project: PROJECT,
-          pathname: "/[project]",
-          permissions: ["scenarios:view"],
-        }}
-      >
-        <MainMenuSections showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        project: PROJECT,
+        pathname: "/[project]",
+        permissions: ["scenarios:view"],
+      }}
+    >
+      <MainMenuSections showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 

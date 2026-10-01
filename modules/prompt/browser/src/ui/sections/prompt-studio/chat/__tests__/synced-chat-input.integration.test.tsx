@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptHostProvider } from "../../../../../model/prompt-host.ts";
@@ -96,21 +96,19 @@ const renderSyncedChatInput = ({ tabId, inProgress = false }: RenderOptions) => 
   const onStop = vi.fn();
 
   return {
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <PromptHostProvider value={testHost}>
-          <TabIdProvider tabId={tabId}>
-            <PromptPlaygroundChatProvider>
-              <SyncedChatInput
-                inProgress={inProgress}
-                onSend={onSend}
-                isVisible={true}
-                onStop={onStop}
-              />
-            </PromptPlaygroundChatProvider>
-          </TabIdProvider>
-        </PromptHostProvider>
-      </ChakraProvider>,
+    ...renderWithDesignSystem(
+      <PromptHostProvider value={testHost}>
+        <TabIdProvider tabId={tabId}>
+          <PromptPlaygroundChatProvider>
+            <SyncedChatInput
+              inProgress={inProgress}
+              onSend={onSend}
+              isVisible={true}
+              onStop={onStop}
+            />
+          </PromptPlaygroundChatProvider>
+        </TabIdProvider>
+      </PromptHostProvider>,
     ),
     onSend,
     onStop,

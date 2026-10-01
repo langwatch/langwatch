@@ -1,11 +1,12 @@
 // The kit's grant dialog, fed from this module's queries and saved through its mutations.
 
-import { GrantDialog, type GrantRow, type GrantScope } from "@langwatch/authz-browser-kit";
 import { useState } from "react";
 
 import { useGrantDialogData } from "../../behavior/use-grant-dialog-data.ts";
 import { useGrantSave } from "../../behavior/use-grant-mutations.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
+import { type GrantRow } from "../../model/grants/grants.ts";
+import { GrantDialog, type GrantScope } from "./grants/grant-dialog.tsx";
 
 export function AccessGrantDialog({
   organizationId,

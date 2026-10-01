@@ -30,6 +30,7 @@ import {
   rerunInputSchema,
   runPlanRunInputSchema,
   runPlanRunResultSchema,
+  suiteCallerKeyFact,
   suiteSurfaceFact,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
@@ -67,11 +68,13 @@ async function runConfiguration(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
+  callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
+    apiKeyId: params.callerKey,
   });
   const result = await app.runPlan({
     projectId,
@@ -98,6 +101,7 @@ async function rerunStoredPlan(params: {
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
+  callerKey: string | null;
 }): Promise<z.infer<typeof runPlanRunResultSchema>> {
   const { app, input, projectId } = params;
   const plan = await app.getRunPlan({
@@ -108,6 +112,7 @@ async function rerunStoredPlan(params: {
   const actor = deriveRunActor({
     userId: params.project.viewerUserId,
     surfaceHeader: params.surface,
+    apiKeyId: params.callerKey,
   });
   // Any refusal (a missing target, an archived scenario, ...) is a
   // `HandledError` the process's own boundary already serializes.
@@ -176,9 +181,9 @@ export function createRunPlansRest(): Readonly<{
       description:
         "Run a configuration under a name. The name identifies the run plan: send a name already in use and that plan's configuration is replaced with this one, send a new name and the plan is created, send no name and one is derived from what the run covers and what it runs against.",
     })
-    .withMiddleware(projectRestFacts, suiteSurfaceFact)
-    .handle(({ app, input, scope }, project, surface) =>
-      runConfiguration({ app, input, projectId: scope.id, project, surface }),
+    .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
+    .handle(({ app, input, scope }, project, surface, callerKey) =>
+      runConfiguration({ app, input, projectId: scope.id, project, surface, callerKey }),
     )
 
     .get("/:id", "getRunPlan")
@@ -208,9 +213,9 @@ export function createRunPlansRest(): Readonly<{
         "Run a run plan again, with the configuration it already holds. To run a different configuration, post it to /run under the plan's name.",
       responses: notFound,
     })
-    .withMiddleware(projectRestFacts, suiteSurfaceFact)
-    .handle(({ app, input, scope }, project, surface) =>
-      rerunStoredPlan({ app, input, projectId: scope.id, project, surface }),
+    .withMiddleware(projectRestFacts, suiteSurfaceFact, suiteCallerKeyFact)
+    .handle(({ app, input, scope }, project, surface, callerKey) =>
+      rerunStoredPlan({ app, input, projectId: scope.id, project, surface, callerKey }),
     )
 
     .delete("/:id", "archiveRunPlan")

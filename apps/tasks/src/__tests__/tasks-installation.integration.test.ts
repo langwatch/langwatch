@@ -1,9 +1,3 @@
-/**
- * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
- * @vitest-environment node
- * @see specs/platform/process-installation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import {
@@ -12,14 +6,14 @@ import {
   type BlobCleanupDeps,
   type ProcessRetentionSweepDeps,
 } from "@langwatch/eventing/server";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
+  type InstallableServerFeature,
+  processConfig,
   storesBackedMembers,
   withMemoryRepositories,
-  type InstallableServerFeature,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -35,6 +29,12 @@ import {
 } from "@langwatch/secrets";
 import { Task } from "@langwatch/task";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
+ * @vitest-environment node
+ * @see specs/platform/process-installation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "tasks";
@@ -55,7 +55,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 }
 
 async function bootTasks() {
-  const owners = processConfig(serverModules);
+  const owners = processConfig(processModules);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -94,7 +94,7 @@ async function bootTasks() {
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
     members: {
@@ -114,7 +114,6 @@ async function bootTasks() {
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-tasks",
         storageResolver: void 0,
@@ -156,9 +155,12 @@ describe("the tasks process installation", () => {
         "demo-data",
         "model-registry-sync",
         "process-manager-purge",
+        "grant-platform-operator",
+        "backfill-project-created",
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",
+        "backfill-http-credentials-to-secrets",
       ]);
     } finally {
       await runtime.stop();

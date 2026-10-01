@@ -70,7 +70,7 @@ describe("given a file outside the boot guard", () => {
     it("reports nothing", () => {
       const code = "process.on('uncaughtException', () => {});";
 
-      expect(report(code, "packages/process-server/src/server.ts")).toEqual([]);
+      expect(report(code, "packages/process/src/server.ts")).toEqual([]);
       expect(report(code, "packages/observability/src/boot-guard.ts")).toEqual([]);
     });
   });

@@ -4,9 +4,9 @@
  * band. Always installed — scim refuses per-organization on entitlement, never by tier.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
-export const scimWeb = defineWebModule("scim")
+export const scimWeb = defineBrowserModule("scim")
   .withHosts({
     requires: ["ScimHostApi"],
     mounts: { ScimHostApi: { load: () => import("./behavior/scim-host-mount.tsx") } },
@@ -21,9 +21,10 @@ export const scimWeb = defineWebModule("scim")
       requires: "sso:view",
       load: () => import("./ui/sections/connectors.screen.tsx"),
     },
-    // Ops' directory sync across every customer; the server answers
-    // operators only and refuses everyone else as not found.
+    // Ops' directory sync across every customer: operators only, as main's
+    // back-office shell guarded it; the server refuses everyone else as not found.
     "pages/ops/directory-sync": {
+      requires: "ops:manage",
       load: () => import("./ui/sections/directory-sync-view.screen.tsx"),
     },
   })

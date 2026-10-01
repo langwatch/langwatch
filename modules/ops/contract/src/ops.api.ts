@@ -2,13 +2,12 @@ import type {
   FeatureFlagRules,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { SearchProjectsResult } from "@langwatch/project-contract";
 
 import type {
   AdminImpersonationStarted,
   AdminImpersonationStopped,
-  AdminOperationInput,
   AdminOperationResult,
   RunAdminOperationInput,
   StartAdminImpersonationInput,
@@ -42,6 +41,7 @@ import type {
   AggregateSearchResult,
   ProjectionStateAtEvent,
 } from "./ops-event-log.ts";
+import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
   AggregateProcessManager,
   DeadLetterCount,
@@ -409,7 +409,6 @@ export interface OpsApi {
   runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult>;
   startImpersonation(input: StartImpersonationInput): Promise<void>;
   stopImpersonation(input: StopImpersonationInput): Promise<void>;
-  adminOperation(input: AdminOperationInput): Promise<AdminOperationResult>;
   listBlobQueues(): Promise<string[]>;
   getBlobStoreStats(): Promise<OpsBlobStoreStats>;
   listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
@@ -466,22 +465,23 @@ export interface OpsApi {
   reconcileQueuePending(input: ReconcileQueuePendingInput): Promise<OpsQueueReconcileOutcome>;
   readQueuePendingDrift(input: ReadQueuePendingDriftInput): Promise<number>;
   listParkedQueueTenants(input: ListParkedQueueTenantsInput): Promise<OpsParkedTenantsPage>;
-  isAdmin(identity: AdminIdentity): boolean;
+  /** Whether this identity holds `ops:view` at the platform: the platform-operator grant. */
+  isAdmin(identity: AdminIdentity): Promise<boolean>;
   assertDestructiveOperator(operator: OpsOperator | null, confirmation: string | undefined): void;
   /**
    * The caller's operator reach. `{ kind: "none" }` is an answer rather than a
    * refusal, so the global menu can poll it on every page load.
    */
-  operatorScope(operator: OpsOperator | null): OpsScope;
-  /** Refuses anyone who is not on the deployment's operator allow-list. */
-  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): void;
-  /** Refuses anyone who is not on the deployment's staff allow-list. */
-  admitStaff(operator: OpsOperator | null): OpsOperator;
+  operatorScope(operator: OpsOperator | null): Promise<OpsScope>;
+  /** Refuses anyone who does not hold the permission at the platform tier. */
+  admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): Promise<void>;
+  /** Refuses anyone who does not hold `ops:view` at the platform tier. */
+  admitStaff(operator: OpsOperator | null): Promise<OpsOperator>;
   /**
    * The staff list, refused as not-found so a probe learns nothing about the
    * surface, and only where ops's cloud-ops capability is on (§3.5).
    */
-  admitCloudAdmin(operator: OpsOperator | null): OpsOperator;
+  admitCloudAdmin(operator: OpsOperator | null): Promise<OpsOperator>;
   /** Whether Cloud admin is on here: the one answer the browser's public config projects. */
   offersCloudOps(): boolean;
   /**
@@ -587,6 +587,15 @@ export interface OpsApi {
   }): Promise<SearchProjectsResult[]>;
   /** The orphaned-organization rate for a window, derived from stored rows (D12). */
   getSignUpHealth(input: OpsSignUpHealthInput): Promise<SignUpHealth>;
+  /** Every live platform operator, named, oldest first. */
+  listPlatformOperators(): Promise<OpsPlatformOperator[]>;
+  /** Grants the role to the account an address belongs to, by a signed-in operator. */
+  grantPlatformOperator(input: {
+    email: string;
+    operator: OpsOperator | null;
+  }): Promise<OpsPlatformOperator>;
+  /** Revokes one holder; authz refuses the last holder. */
+  revokePlatformOperator(input: { grantId: string; operator: OpsOperator | null }): Promise<void>;
   featureFlagCatalogue(): Promise<OperatorFeatureFlagCatalogue>;
   setFeatureFlagEnabled(input: {
     key: string;

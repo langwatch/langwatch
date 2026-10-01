@@ -3,11 +3,11 @@ import type {
   UiRenderMediaPart,
 } from "@langwatch/browser-host/declarations";
 import { Box, Image, Text, VStack } from "@langwatch/design-system/primitives";
-import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
-import { getDisplayRoleVisuals } from "@langwatch/trace-browser-kit";
+import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { ConversationRoleMode, DisplayPart } from "@langwatch/trace-contract/conversation";
 import type { ReactNode } from "react";
 
+import { useStoredObjectUrl } from "../../../behavior/stored-object/use-stored-object-url.ts";
 import { Bubble } from "../explorer/trace-table/registry/addons/conversation/bubble.tsx";
 import { RenderInputOutput } from "../traces/render-input-output.tsx";
 import { ToolPairCard } from "../transcript/tool-blocks.tsx";

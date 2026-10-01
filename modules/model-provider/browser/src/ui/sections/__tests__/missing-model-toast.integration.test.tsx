@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  * UX contract: specs/model-providers/missing-model-popup.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Toaster, toaster } from "@langwatch/design-system/toaster";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -25,11 +25,7 @@ afterEach(() => {
 });
 
 function mountToaster() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <Toaster />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<Toaster />);
 }
 
 describe("showMissingModelToast", () => {

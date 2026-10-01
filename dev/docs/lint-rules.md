@@ -438,7 +438,7 @@ Messages:
   - what: `{{path}}` is a process manager named as a service.
   - fix: Move it to `eventing/{{subject}}.process.ts`, beside the pipeline that names it.
 - `processPath`
-  - what: `{{path}}` has no home in layout v0. Only this shape is allowed: index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), channels/ (the interface, the bundle, the registry, and a tier folder beside them), eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, tasks/<name>.task.ts, migrations/, app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks).
+  - what: `{{path}}` has no home in layout v0. Only this shape is allowed: index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, transport/<feature>.<rest|trpc|ws>.ts, services/<name>.service.ts, repositories/ (interfaces, the bundle, the registry, and a backend folder beside them), channels/ (the interface, the bundle, the registry, and a tier folder beside them), eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, tasks/<name>.task.ts, migrations/, features/<concern>/ holding that concern's own services/, rules/, repositories/ and eventing/ (one level, nothing else nests), app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks).
   - fix: Move `{{path}}` onto one of those paths: a service flattens to `services/<name>.service.ts`, with no subdirectory under `services/` and no qualifier before `.service`; owned state becomes `repositories/<backend>/<backend>.<subject>.repository.ts`, a message to anything the module does not own becomes `channels/<tier>/<tier>.<subject>.channel.ts`; a projection, subscriber, process manager or intent becomes `eventing/<feature>.<projection|subscriber|process|intent>.ts`; a transport becomes `transport/<feature>.<rest|trpc|ws>.ts`; a file with no artifact suffix moves into the module that already uses it.
 - `rulesImpurity`
   - what: Rules module `{{path}}` may only export functions and constants (found {{found}}).
@@ -657,7 +657,7 @@ Messages:
 
 - `bootHookOutsideGuard`
   - what: `process.{{method}}("{{event}}", ...)` is registered outside the boot guard.
-  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process-server`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.
+  - fix: Delete this listener and boot through the guard: a long-running process through the `Server` from `@langwatch/process`, a one-shot executable through `bootNodeExecutable` from `@langwatch/observability`.
 
 ## `langwatch/no-form-watch-in-child`
 
@@ -852,7 +852,7 @@ Messages:
   - fix: Call the procedure through this module's derived tRPC client, and import any shared type from the owning module's contract.
 - `browserSideDoor`
   - what: `{{specifier}}` reaches past `{{module}}`'s browser declaration, the only door a browser package has.
-  - fix: Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `{{kit}}`.
+  - fix: Import `@langwatch/{{module}}-browser/declaration` and read the capability from its `withCapabilities` slot, or move a shared component into `@langwatch/design-system`.
 - `compositionRoot`
   - what: `{{specifier}}` is `{{module}}`'s process package, and an application composes modules without naming one.
   - fix: Take `{{module}}` from the generated `@langwatch/installed-server-modules` list (catalogue-driven, `pnpm generate:modules`), and move whatever this root builds from `{{specifier}}` behind the module's own declaration so the module constructs it.
@@ -864,22 +864,16 @@ Messages:
   - fix: Depend on that module's peer `*Api` from its contract instead; the enterprise module installs like any other and the process resolves the peer (ARCHITECTURE.md §11).
 - `crossModuleBrowser`
   - what: `{{specifier}}` is `{{module}}`'s browser package, which is closed to every other module.
-  - fix: Move what this needs into `{{kit}}` and import it from there; where fewer than two modules share it, inline it here instead (the kit law, ARCHITECTURE.md §3.4).
+  - fix: Move what this needs out of `{{module}}`'s browser package: pure domain logic into the owner's contract, shared UI into `@langwatch/design-system`, a framework hook into `@langwatch/browser-host`. Where fewer than two modules share it, inline it here instead (ARCHITECTURE.md §3.4).
 - `crossModuleProcess`
   - what: `{{specifier}}` is another module's process package.
   - fix: Call `{{api}}` from `{{contract}}` instead; if the operation is not there, it is a new `{{api}}` operation to propose to the module's owner.
-- `kitFetches`
-  - what: `{{specifier}}` fetches, and a browser kit fetches nothing.
-  - fix: Take the data as a prop (`options`, `value`, `onChange`) and let each consumer run its own query.
-- `kitLeaf`
-  - what: `{{specifier}}` is a browser package, and a browser kit is a leaf.
-  - fix: Import only contracts, `@langwatch/design-system` and `@langwatch/browser-host` here; take what `{{specifier}}` provides as a prop from the consumer.
 - `libraryRuntime`
   - what: `{{specifier}}` is a runtime, framework or another package's implementation, and this is a module's portable, framework-free library.
   - fix: Import only this module's contract, other module libraries and framework-free packages here; move the code that needs `{{specifier}}` into the module's process or browser package.
 - `packageEscape`
   - what: `{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.
-  - fix: Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser|browser-kit>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.
+  - fix: Replace `{{specifier}}` with the target's package name — `@langwatch/<module>-<contract|process|browser>` for a module package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.
 - `processImportsBrowser`
   - what: `{{specifier}}` is browser-only, and this is a process package.
   - fix: Move the browser-only code into this module's browser package; share a type through the contract.
@@ -894,7 +888,7 @@ Messages:
   - fix: Export a plain Zod schema from the contract and let the transport adapt it.
 - `sealedExports`
   - what: `{{subpath}}` is not in `{{package}}`'s `exports`.
-  - fix: Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration` and a kit only `.`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.
+  - fix: Import from `{{package}}` itself when its entry already re-exports the symbol. A browser package exports only `./declaration`, so there the symbol is private; for a contract or process package, add `"{{subpath}}"` to its `exports` and re-export the symbol from that entry.
 - `undeclaredDependency`
   - what: `{{dependency}}` is imported but not declared in `{{packageRoot}}/package.json`, so the task graph has no edge to it and a cached result survives its changes.
   - fix: Add `"{{dependency}}": "workspace:*"` to `{{packageRoot}}/package.json` (`devDependencies` when only tests import it), or remove the import.

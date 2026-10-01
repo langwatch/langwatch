@@ -28,7 +28,6 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { UserProfile } from "@langwatch/user-contract";
 
-import type { ScimSyncLifecycle, ScimUserPushOperation } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import {
   digestScimToken,
@@ -42,6 +41,7 @@ import { ScimDirectoryService } from "./scim-directory.service.ts";
 import { ScimGrantsService } from "./scim-grants.service.ts";
 import { ScimProvisioningService, type ScimUserProvisioning } from "./scim-provisioning.service.ts";
 import { ScimRequestLogService } from "./scim-request-log.service.ts";
+import type { ScimSyncLifecycle, ScimUserPushOperation } from "./scim-sync-lifecycle.service.ts";
 
 const logger = createLogger("langwatch:scim:tokens");
 

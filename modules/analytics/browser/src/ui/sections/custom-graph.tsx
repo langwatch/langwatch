@@ -1,11 +1,14 @@
-import { getGroup, getMetric } from "@langwatch/analytics-browser-kit";
 import type { AnalyticsTimeseriesResult } from "@langwatch/analytics-contract";
+import { trpcQueryKey } from "@langwatch/api/web";
+import { useReadFreshness } from "@langwatch/browser-host/read-freshness";
 import {
   resolveGraphTimeScale,
   withGroupedPipeline,
   type CustomGraphInput,
 } from "@langwatch/dashboard-contract";
+import { CachedView } from "@langwatch/design-system/cached-view";
 import { useColorModeValue, useColorRawValue } from "@langwatch/design-system/color-mode";
+import { Delayed } from "@langwatch/design-system/delayed";
 import {
   Badge,
   Box,
@@ -50,10 +53,12 @@ import type {
 
 import { analyticsApi } from "../../behavior/analytics-api.ts";
 import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
+import { useDashboardRefetchInterval } from "../../behavior/use-dashboard-auto-refresh.ts";
 import { useFilterParams } from "../../behavior/use-filter-params.ts";
 import { useGetRotatingColorForCharts } from "../../behavior/use-rotating-chart-color.ts";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
+import { getGroup, getMetric } from "../../model/analytics-registry.ts";
 import { formatChartDate } from "../../model/chart-date.ts";
 import {
   clickedBucketRange,
@@ -70,7 +75,6 @@ import { formatSeriesGroupName, formatSingleSeriesName } from "../../model/serie
 import { resolveSeriesValueFormat } from "../../model/series-value-format.ts";
 import { ChartErrorState } from "../elements/chart-error-state.tsx";
 import { ChartTooltip } from "../elements/chart-tooltip.tsx";
-import { Delayed } from "../elements/delayed.tsx";
 import { SummaryMetric } from "../elements/summary-metric.tsx";
 
 export type { CustomGraphInput };
@@ -263,23 +267,33 @@ function useGraphTimeseries({
   load: boolean;
 }) {
   const { filterParams, queryOpts } = useFilterParams();
+  const refetchInterval = useDashboardRefetchInterval();
   const query = {
     ...filterParams,
     filters: { ...filterParams.filters, ...filters },
     ...queryInput,
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   };
-  const timeseries = analyticsApi.analytics.getTimeseries.useQuery(
-    { ...query, timeScale },
-    { ...queryOpts, enabled: queryOpts.enabled && load },
-  );
+  const timeseriesInput = { ...query, timeScale };
+  const timeseries = analyticsApi.analytics.getTimeseries.useQuery(timeseriesInput, {
+    ...queryOpts,
+    enabled: queryOpts.enabled && load,
+    refetchInterval,
+  });
+  const freshness = useReadFreshness({
+    queryKey: trpcQueryKey("analytics.getTimeseries", { input: timeseriesInput, type: "query" }),
+  });
   // A monitor card headlines the whole period as one "full" bucket, which run-weights it;
   // averaging daily buckets would weigh a 1-run day like a 100-run day.
   const monitorSummaryTimeseries = analyticsApi.analytics.getTimeseries.useQuery(
     { ...query, timeScale: "full" },
-    { ...queryOpts, enabled: queryOpts.enabled && load && input.graphType === "monitor_graph" },
+    {
+      ...queryOpts,
+      enabled: queryOpts.enabled && load && input.graphType === "monitor_graph",
+      refetchInterval,
+    },
   );
-  return { timeseries, monitorSummaryTimeseries, filterParams };
+  return { timeseries, monitorSummaryTimeseries, filterParams, freshness };
 }
 
 function isPassRateMonitor(input: CustomGraphInput): boolean {
@@ -993,7 +1007,7 @@ const CustomGraph_ = React.memo(
       [input.graphType, input.timeScale, daysDifference],
     );
     const queryInput = useMemo(() => withGroupedPipeline(input), [input]);
-    const { timeseries, monitorSummaryTimeseries, filterParams } = useGraphTimeseries({
+    const { timeseries, monitorSummaryTimeseries, filterParams, freshness } = useGraphTimeseries({
       input,
       queryInput,
       timeScale,
@@ -1109,20 +1123,26 @@ const CustomGraph_ = React.memo(
     })();
 
     return (
-      <GraphContainer
-        graphType={input.graphType}
-        timeseries={timeseries}
-        isEmpty={graphIsEmpty({
-          graphType: input.graphType,
-          timeseries,
-          allValues: graphRows.allValues,
-          rows: graphRows.rows,
-        })}
-        height_={height_}
-        emptyState={emptyState}
+      <CachedView
+        asOf={freshness.asOf}
+        confirmed={freshness.confirmed}
+        failed={Boolean(timeseries.error) && !timeseries.isFetching}
       >
-        {graph}
-      </GraphContainer>
+        <GraphContainer
+          graphType={input.graphType}
+          timeseries={timeseries}
+          isEmpty={graphIsEmpty({
+            graphType: input.graphType,
+            timeseries,
+            allValues: graphRows.allValues,
+            rows: graphRows.rows,
+          })}
+          height_={height_}
+          emptyState={emptyState}
+        >
+          {graph}
+        </GraphContainer>
+      </CachedView>
     );
   },
   (prevProps, nextProps) => {

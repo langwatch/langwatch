@@ -1,24 +1,24 @@
 /**
- * The project's key, fetched with the developer's own device session from
- * POST /api/auth/cli/project-key (project administration required). The route
- * takes a slug and the Langy request an id, so the id is looked up first.
+ * The project's ingestion key, minted with a child of the developer's own device session
+ * (traces:create on the project required). The fork takes a slug and the Langy request an id,
+ * so the id is looked up first.
  */
 
 import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
 import { loadConfig } from "../../utils/governance/config";
-import { fetchProjectKeyBySlug } from "../../utils/governance/session-api";
+import { mintProjectIngestionKey } from "../../utils/governance/session-api";
 
 export interface ProjectKeySources {
   /** The project's slug, read with the credentials the command signed in with. */
   lookupSlug: (projectId: string) => Promise<string>;
-  /** The project's key, traded for the device session. */
+  /** The project's ingestion key, minted with the device session. */
   fetchKeyBySlug: (slug: string) => Promise<string>;
 }
 
 /**
  * A failure on the way to the key, naming the step that failed: the lookup
  * answers to the permission to view the project, the key to the permission to
- * manage it, so the caller's guidance depends on which one refused.
+ * send it traces, so the caller's guidance depends on which one refused.
  */
 export class ProjectKeyError extends Error {
   constructor(
@@ -81,6 +81,6 @@ export function platformProjectKeyReader({
   const projects = new ProjectsApiService({ endpoint, apiKey });
   return createProjectKeyReader({
     lookupSlug: async (projectId) => (await projects.get(projectId)).slug,
-    fetchKeyBySlug: async (slug) => (await fetchProjectKeyBySlug(loadConfig(), slug)).api_key,
+    fetchKeyBySlug: async (slug) => (await mintProjectIngestionKey(loadConfig(), slug)).api_key,
   });
 }

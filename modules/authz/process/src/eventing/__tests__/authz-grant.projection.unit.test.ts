@@ -245,6 +245,26 @@ describe("AuthzGrantProjection", () => {
     });
   });
 
+  /** @scenario "A revoke ends a grant only inside its own organization" */
+  it("takes the organization a revoke may end a grant in from the event's tenant", () => {
+    const write = projection.map(
+      event(
+        {
+          type: GRANT_REVOKED_EVENT_TYPE,
+          data: { grantId: "grant_1", actor: ACTOR },
+        },
+        "grant_1",
+        3,
+      ),
+    );
+
+    expect(write).toMatchObject({
+      kind: "grant.revoke",
+      organizationId: TENANT_ID,
+      grantId: "grant_1",
+    });
+  });
+
   /**
    * The compat row reads `role = legacyRole ?? "CUSTOM"`, so a legacyRole
    * left over from the import projected an adopted ADMIN binding as

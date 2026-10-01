@@ -9,8 +9,9 @@ import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
-import type { PiiAnalysis, PiiClearing } from "../../app/data-privacy.members.ts";
+import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
+import type { PiiAnalysisService } from "../pii-analysis.service.ts";
 
 const TENANT = createTenantId("project-web-app");
 const DECIMAL_TRACE_ADDRESS = "17575001234540000091234567890123";
@@ -31,7 +32,7 @@ function policyAt(level: "essential" | "strict"): ResolvedDataPrivacy {
 /** The redaction service with only the analysis transport doubled; `submitted()` is its intake. */
 function makeService(level: "essential" | "strict") {
   const batchSpy = vi.fn(async (texts: string[]) => texts.map(() => null));
-  const transport: PiiAnalysis = {
+  const transport: Pick<PiiAnalysisService, "clearGoogleDlp" | "clearPresidio" | "close"> = {
     clearGoogleDlp: async (): Promise<PiiClearing> => ({ kind: "unchanged" }),
     clearPresidio: async ({ texts }) => batchSpy(texts),
     close: async () => undefined,

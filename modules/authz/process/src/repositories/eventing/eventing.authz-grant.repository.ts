@@ -3,7 +3,7 @@
  * reads use the live grant and role heads. Fail-safe atomicity through per-org
  * FIFO (ADR-092 §13).
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   BindingMissingError,
   DuplicateBindingError,

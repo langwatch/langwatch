@@ -1,3 +1,4 @@
+import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 
 import type { TeamIdentity } from "../app/organization.members.ts";
@@ -5,7 +6,6 @@ import { organizationResourceSlug } from "../rules/organization-resource-slug.ru
 
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const TEAM_KSUID_RESOURCE = "team";
-const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /** The id's random tail the slug is told apart by; a KSUID's head is its timestamp. */
 const TEAM_ID_SLUG_CHARS = 6;
@@ -28,6 +28,6 @@ export class TeamIdentityService implements TeamIdentity {
   }
 
   createBindingId(): string {
-    return generate(GRANT_KSUID_RESOURCE).toString();
+    return newAuthzGrantId();
   }
 }

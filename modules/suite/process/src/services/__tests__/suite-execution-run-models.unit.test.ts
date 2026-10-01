@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { QueueSimulationRunInput, ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Queued suite run model recording via SuiteExecutionService.
  * @vitest-environment node

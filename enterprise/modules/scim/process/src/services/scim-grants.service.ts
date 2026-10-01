@@ -15,20 +15,18 @@
  * fired-employee case and the deny has to hold before this call returns.
  * Additions are plain queued commands.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   type AuthzGrantsService,
   type AuthzLedgerBindingAttach,
   authzBindingIdentityKey,
+  newAuthzGrantId,
 } from "@langwatch/authz-contract";
-import { nowInstant } from "@langwatch/time";
 
 import type {
   ScimGrantBindingScope,
   ScimGrantRepository,
 } from "../repositories/scim.repository.ts";
-
-let bindingSequence = 0;
 
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = {
@@ -142,7 +140,7 @@ export class ScimGrantsService {
         organizationId: input.scope.organizationId,
         bindings: toAttach.map((grant) => ({
           ...grant,
-          bindingId: `rolebinding_${nowInstant().epochMilliseconds}_${bindingSequence++}`,
+          bindingId: newAuthzGrantId(),
         })),
         caller: { type: "system" },
         actor: input.actor,

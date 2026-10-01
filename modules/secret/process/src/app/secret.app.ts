@@ -1,5 +1,5 @@
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
+import type { FeatureSetup } from "@langwatch/process";
 /** The secret feature application shared by all transports. */
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -31,13 +31,13 @@ import { SecretService } from "../services/secret.service.ts";
  * this module rather than storing a project's value in the clear.
  */
 type SecretSetup = FeatureSetup<
-  typeof SecretApp.dependencies,
-  MembersRead<typeof SecretApp.reads>,
+  typeof SecretModule.dependencies,
+  MembersRead<typeof SecretModule.reads>,
   undefined,
   SecretRepositories
 >;
 
-export class SecretApp implements SecretApiContract {
+export class SecretModule implements SecretApiContract {
   static readonly contract = SecretApi;
   static readonly dependencies = { projects: ProjectApi, permissions: AuthzApi };
   static readonly reads = ["encryption"] as const;
@@ -50,8 +50,8 @@ export class SecretApp implements SecretApiContract {
     this.#reveals = reveals;
   }
 
-  static create(setup: SecretSetup): SecretApp {
-    return new SecretApp(
+  static create(setup: SecretSetup): SecretModule {
+    return new SecretModule(
       SecretService.create({
         repository: setup.repositories.secrets,
         encryption: setup.members.encryption,

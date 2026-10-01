@@ -13,8 +13,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("searchAggregates")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.searchAggregates({
         query: input.query,
@@ -26,8 +26,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("getEventLogSearchWindow")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getEventLogSearchWindow();
     })
@@ -35,8 +35,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("loadAggregateEvents")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getAggregateEvents(input);
     })
@@ -44,8 +44,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("computeProjectionState")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.computeProjectionState(input);
     })
@@ -53,8 +53,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("discoverAggregates")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.discoverAggregates({
         projectionNames: input.projectionNames,
@@ -66,8 +66,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("searchTenants")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.searchProjects({ query: input.query });
     })
@@ -75,8 +75,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("dryRunReplay")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return {
         status: "coming_soon" as const,
@@ -89,8 +89,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("getReplayHistory")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getHistory();
     })
@@ -98,8 +98,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("getReplayRun")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.findHistoryEntry({ runId: input.runId });
     })
@@ -108,7 +108,7 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       return app.startReplay({
         projectionNames: input.projectionNames,
@@ -125,8 +125,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("getReplayStatus")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getStatus();
     })
@@ -134,8 +134,8 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .procedure("cancelReplay")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.cancelReplay();
     })
@@ -144,7 +144,7 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
     .handle(async ({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+      await app.admitOperator(operator, "ops:view");
 
       return { anomalies: await app.listAnomalies() };
     })
@@ -153,7 +153,7 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
     .handle(async ({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+      await app.admitOperator(operator, "ops:manage");
 
       return { dismissed: await app.dismissAnomaly(input) };
     })

@@ -1,6 +1,7 @@
-import { lwqlMarkersFromViolations, type LwqlEditorMarker } from "@langwatch/analytics-browser-kit";
 import { useDebounceValue } from "usehooks-ts";
 
+import { type LwqlEditorMarker } from "../model/lwql-language/lwql-marker.ts";
+import { lwqlMarkersFromViolations } from "../model/lwql-language/lwql-markers.ts";
 import { analyticsApi } from "./analytics-api.ts";
 
 const VALIDATE_DEBOUNCE_MS = 500;
@@ -24,7 +25,6 @@ export function useLwqlDiagnostics({
     {
       enabled: projectId.length > 0 && settled.length > 0,
       retry: false,
-      refetchOnWindowFocus: false,
     },
   );
 

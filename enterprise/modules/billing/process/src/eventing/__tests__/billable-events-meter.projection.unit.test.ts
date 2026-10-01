@@ -127,16 +127,16 @@ describe("BillableEventsMeterProjection", () => {
 
       // The key, lifetime and encoding are spelled out, not read back from
       // their constants: the App writes this exact keyspace via its own
-      // `TtlCache<string>(10 * 60 * 1000, "ttlcache:org:resolve:")`, so this
-      // assertion checks agreement with a literal in another package.
+      // `TtlCache<string>(..., "ttlcache:org:resolve:")`; the lifetime is the
+      // five-minute cache class (ARCHITECTURE §7).
       expect(redis.get).toHaveBeenCalledWith("ttlcache:org:resolve:project_alpha");
       expect(redis.setex).toHaveBeenCalledWith(
         "ttlcache:org:resolve:project_alpha",
-        600,
+        300,
         '"org_1"',
       );
       expect(BILLING_TENANT_ORGANIZATION_CACHE_PREFIX).toBe("ttlcache:org:resolve:");
-      expect(BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS).toBe(600_000);
+      expect(BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS).toBe(300_000);
     });
 
     /** @scenario "Both graphs attribute a project from one shared keyspace" */

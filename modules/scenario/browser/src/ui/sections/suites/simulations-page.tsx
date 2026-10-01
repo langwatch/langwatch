@@ -2,20 +2,15 @@
  * Unified simulations page — the primary view for all simulation runs.
  */
 
-import { type Period, PeriodSelector, usePeriodSelector } from "@langwatch/analytics-browser-kit";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, EmptyState, HStack, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import { scenarioClient } from "@langwatch/scenario-client";
 import type { ScenarioTabNavigatePayload, SuiteRunSummary } from "@langwatch/scenario-contract";
-import {
-  SuiteArchiveDialog,
-  SuiteContextMenu,
-  SuiteRunConfirmationDialog,
-  NowProvider,
-} from "@langwatch/suite-browser-kit";
 import { fromDate, nowInstant, subDays } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,15 +19,28 @@ import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import { api, type SimulationSuite } from "../../../behavior/scenario-api.ts";
 import { useRunSuite } from "../../../behavior/suites/use-run-suite.ts";
 import {
+  useExternalSetSummaries,
+  useSuiteSummaries,
+} from "../../../behavior/suites/use-set-summaries.ts";
+import {
   ALL_RUNS_ID,
   extractExternalSetId,
   isExternalSetSelection,
   useSuiteRouting,
 } from "../../../behavior/suites/use-suite-routing.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useSuites } from "../../../behavior/suites/use-suites.ts";
 import { usePreloadDrawer } from "../../../behavior/use-preload-drawer.ts";
 import { useScenarioTabFollow } from "../../../behavior/use-scenario-tab-follow.ts";
 import { useSimulationUpdateListener } from "../../../behavior/use-simulation-update-listener.ts";
+import {
+  type Period,
+  PeriodSelector,
+  usePeriodSelector,
+} from "../../elements/analytics/period-selector.tsx";
+import { SuiteArchiveDialog } from "../../elements/suite/dialogs/suite-archive-dialog.tsx";
+import { SuiteContextMenu } from "../../elements/suite/dialogs/suite-context-menu.tsx";
+import { SuiteRunConfirmationDialog } from "../../elements/suite/dialogs/suite-run-confirmation-dialog.tsx";
+import { NowProvider } from "../../elements/suite/runs/now-provider.tsx";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
 import { RunHistoryPanel } from "./run-history-panel.tsx";
 import { SuiteDetailPanel, SuiteEmptyState } from "./suite-detail-panel.tsx";
@@ -52,6 +60,7 @@ export default function SimulationsPage() {
   // the click opens the drawer rather than a spinner.
   usePreloadDrawer("scenarioRunDetail", "suiteEditor");
   const utils = api.useUtils();
+  const scenarioUtils = scenarioClient.useUtils();
   const { selectedSuiteSlug, navigateToSuite, highlightBatchId } = useSuiteRouting();
 
   const router = useRouter();
@@ -70,30 +79,19 @@ export default function SimulationsPage() {
   const [archiveConfirmId, setArchiveConfirmId] = useState<string | null>(null);
 
   // Queries
-  const {
-    data: suites,
-    isLoading,
-    error,
-  } = api.suites.getAll.useQuery({ projectId: project?.id ?? "" }, { enabled: !!project });
+  const { data: suites, isLoading, error } = useSuites({ projectId: project?.id });
 
-  const { data: externalSets, isLoading: isExternalSetsLoading } =
-    api.scenarios.getExternalSetSummaries.useQuery(
-      {
-        projectId: project?.id ?? "",
-        startDate: period.startDate.epochMilliseconds,
-        endDate: period.endDate.epochMilliseconds,
-      },
-      { enabled: !!project, refetchInterval: 15000 },
-    );
+  const { data: externalSets, isLoading: isExternalSetsLoading } = useExternalSetSummaries({
+    projectId: project?.id,
+    startDate: period.startDate.epochMilliseconds,
+    endDate: period.endDate.epochMilliseconds,
+  });
 
-  const { data: suiteSummariesData } = api.suites.getSummaries.useQuery(
-    {
-      projectId: project?.id ?? "",
-      startDate: period.startDate.epochMilliseconds,
-      endDate: period.endDate.epochMilliseconds,
-    },
-    { enabled: !!project, refetchInterval: 30_000 },
-  );
+  const { data: suiteSummariesData } = useSuiteSummaries({
+    projectId: project?.id,
+    startDate: period.startDate.epochMilliseconds,
+    endDate: period.endDate.epochMilliseconds,
+  });
 
   // Connect the sidebar-level query to SSE events so new runs appear without
   // waiting for the 30s poll interval. Without this, the SSE listener only
@@ -107,7 +105,7 @@ export default function SimulationsPage() {
     projectId: project?.id ?? "",
     refetch: () => {
       void utils.suites.getSummaries.invalidate();
-      void utils.scenarios.getExternalSetSummaries.invalidate();
+      void scenarioUtils.scenarios.getExternalSetSummaries.invalidate();
     },
     enabled: !!project?.id,
     debounceMs: 500,
@@ -150,6 +148,7 @@ export default function SimulationsPage() {
   const archiveMutation = api.suites.archive.useMutation({
     onSuccess: () => {
       void utils.suites.getAll.invalidate();
+      void utils.suites.getSummaries.invalidate();
       const archivedSuite = suites?.find((s) => s.id === archiveConfirmId);
       if (archivedSuite && archivedSuite.slug === selectedSuiteSlug) {
         navigateToSuite(ALL_RUNS_ID);

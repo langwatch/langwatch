@@ -3,17 +3,12 @@
  * page, whose Access tab /settings/role-bindings now redirects to.
  */
 
-import { defineWebModule } from "@langwatch/ui-kernel";
+import { defineBrowserModule } from "@langwatch/browser";
 
 import { authzApi } from "./behavior/authz-api.ts";
 
-export const authzWeb = defineWebModule("authz")
-  // authzTrpc lives in authz/process (a cycle from here), so its one tier is stated.
-  .withApi(authzApi, {
-    contracts: [
-      { namespace: "authz", members: { effectivePermissions: { cache: { tier: "session" } } } },
-    ],
-  })
+export const authzWeb = defineBrowserModule("authz")
+  .withApi(authzApi)
   .withHosts({
     requires: ["AuthzHostApi"],
     mounts: { AuthzHostApi: { load: () => import("./behavior/authz-host-mount.tsx") } },

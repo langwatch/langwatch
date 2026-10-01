@@ -6,6 +6,7 @@ import {
   useDrawerParams,
 } from "@langwatch/browser-host/drawer";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import {
   Box,
@@ -21,8 +22,9 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
+import { scenarioClient } from "@langwatch/scenario-client";
 import {
   parseCallerVoiceConfig,
   parseScenarioParameterDefinitions,
@@ -34,7 +36,8 @@ import { type Control, type FieldErrors, useFormState, useWatch } from "react-ho
 
 import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
 import { api, type Scenario } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useScenario } from "../../../behavior/scenarios/use-scenario.ts";
+import { useTestSuites } from "../../../behavior/suites/use-test-suites.ts";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
 import {
@@ -392,10 +395,7 @@ function ScenarioFormWithSuites({
   onControllerChange: (controller: ScenarioFormController | null) => void;
 }) {
   const { project } = useOrganizationTeamProject();
-  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project?.id },
-  );
+  const { data: testSuites } = useTestSuites({ projectId: project?.id });
   const testSuiteOptions: ScenarioTestSuiteOption[] = useMemo(
     () =>
       (testSuites ?? []).map((testSuite) => ({
@@ -680,9 +680,9 @@ function useScenarioSave({
   openDrawer: Dispatchers["openDrawer"];
   setStaleVersion: (version: number | null) => void;
 }) {
-  const utils = api.useUtils();
+  const utils = scenarioClient.useUtils();
 
-  const createMutation = api.scenarios.create.useMutation({
+  const createMutation = scenarioClient.scenarios.create.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: projectId ?? "" });
       onSuccess?.(data);
@@ -690,7 +690,7 @@ function useScenarioSave({
     onError: (error) =>
       rejectScenarioSave({ error, form: formInstance, fallbackTitle: "Couldn't create scenario" }),
   });
-  const updateMutation = api.scenarios.update.useMutation({
+  const updateMutation = scenarioClient.scenarios.update.useMutation({
     onSuccess: (data: Scenario) => {
       void utils.scenarios.getAll.invalidate({ projectId: projectId ?? "" });
       // The saved record goes into the cache before the refetch, not after
@@ -1227,10 +1227,7 @@ function useScenarioRead({
     isError: isScenarioReadFailed,
     error: scenarioReadError,
     refetch: refetchScenario,
-  } = api.scenarios.getById.useQuery(
-    { projectId: projectId ?? "", id: scenarioId ?? "" },
-    { enabled: !!projectId && !!scenarioId },
-  );
+  } = useScenario({ projectId, id: scenarioId });
   // Editing an existing scenario means the fields are empty until the query answers.
   const isHydrating = !!scenarioId && (!projectId || isScenarioLoading);
   // A read that fails ends the wait without producing a record, so the form would come

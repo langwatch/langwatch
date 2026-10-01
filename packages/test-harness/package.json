@@ -34,6 +34,10 @@
       "types": "./dist/cleanup-test-rows.d.ts",
       "default": "./src/cleanup-test-rows.ts"
     },
+    "./api-fixture": {
+      "types": "./dist/api-fixture/index.d.ts",
+      "default": "./src/api-fixture/index.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"

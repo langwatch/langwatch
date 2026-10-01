@@ -8,8 +8,8 @@ import {
   Portal,
   Text,
 } from "@langwatch/design-system/primitives";
+import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { modelProviderIcons, ProviderIconGlyph } from "@langwatch/model-provider-browser-kit";
 import { LANGY_CHAT_FEATURE_KEY, findModelById } from "@langwatch/model-provider-contract";
 import {
   Brain,

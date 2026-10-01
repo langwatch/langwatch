@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type CliBootstrapResult,
   type GovernanceBudgetOverviewForUser,
@@ -6,6 +5,7 @@ import {
   PLATFORM_TOOL_POLICY_DEFAULTS,
   type PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createUserTestApp, createUserTestOrganizations } from "./user.fixture.ts";
@@ -50,7 +50,7 @@ function appWhere({ member }: { member: boolean }) {
   return { app, personalUsageDashboard, personalBudgetOverview, cliBootstrap };
 }
 
-describe("UserApp governance reads", () => {
+describe("UserModule governance reads", () => {
   describe("given a caller outside the organization", () => {
     /** @scenario "A caller outside the organization cannot read a personal usage rollup" */
     it("refuses the personal usage read before governance is asked", async () => {

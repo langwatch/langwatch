@@ -1,11 +1,7 @@
-import { GatewayOrganizationNotFoundError } from "@langwatch/gateway-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /** The client slice the organization/group tenancy reads below touch. */
-export type GatewayOrganizationDirectoryDatabase = Pick<
-  PrismaClient,
-  "organization" | "group" | "groupMembership" | "organizationUser"
->;
+export type GatewayOrganizationDirectoryDatabase = Pick<PrismaClient, "group" | "groupMembership">;
 
 export class PrismaGatewayOrganizationDirectoryRepository {
   static create(
@@ -15,16 +11,6 @@ export class PrismaGatewayOrganizationDirectoryRepository {
   }
 
   private constructor(private readonly database: GatewayOrganizationDirectoryDatabase) {}
-
-  /** Refuses an organization id that names no organization. */
-  async assertExists(organizationId: string): Promise<void> {
-    const organization = await this.database.organization.findUnique({
-      where: { id: organizationId },
-    });
-    if (!organization) {
-      throw new GatewayOrganizationNotFoundError();
-    }
-  }
 
   /** The groups a per-member budget can target, with their sizes. */
   async findGroupTargets(
@@ -69,15 +55,5 @@ export class PrismaGatewayOrganizationDirectoryRepository {
       _count: { groupId: true },
     });
     return new Map(counts.map((row) => [row.groupId, row._count.groupId]));
-  }
-
-  /** Whether a user belongs to this organization. */
-  async isMember(input: { organizationId: string; userId: string }): Promise<boolean> {
-    return (
-      (await this.database.organizationUser.findFirst({
-        where: { organizationId: input.organizationId, userId: input.userId },
-        select: { userId: true },
-      })) !== null
-    );
   }
 }

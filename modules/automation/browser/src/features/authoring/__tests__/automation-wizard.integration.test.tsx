@@ -1,13 +1,13 @@
+import { TriggerAction } from "@langwatch/automation-contract";
 /**
  * @vitest-environment jsdom
  * The wizard's surface: rail summaries, the review overview, the locked subject on
  * edit, and the two seats of the ceiling advice (ADR-093 §4).
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "@langwatch/automation-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAutomationStore } from "../ui/sections/automation-store.ts";
@@ -82,10 +82,6 @@ vi.mock("../ui/elements/query-filter-input.tsx", () => ({
   ),
 }));
 
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 /** 7-day totals the preview reports, at a plan ceiling of 100 a day. */
 const OVER_CAP_HITS = 7000; // 1,000 a day
 const PLAN_CAP = 100;
@@ -99,11 +95,8 @@ const persistDraft: AutomationDraft = {
 };
 
 const renderWizard = (props: Partial<ComponentProps<typeof AutomationWizard>> = {}) =>
-  render(
+  renderWithDesignSystem(
     <AutomationWizard projectId="project-1" isEdit={false} subjectLocked={false} {...props} />,
-    {
-      wrapper: Wrapper,
-    },
   );
 
 describe("AutomationWizard", () => {

@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 
+import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 /**
  * The application's error toast: the close button every toast carries, plus
  * the docs page and error id a failure gets through `renderMeta`.
  * UX contract: specs/components/toasts.feature.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
-import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
-import { cleanup, render, screen } from "@testing-library/react";
+import { UiErrorToaster } from "@langwatch/browser/error-toaster";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 beforeEach(() => {
@@ -39,11 +39,7 @@ const TIMED_OUT_SEARCH = {
 
 describe("given the application renders its error toaster", () => {
   beforeEach(() => {
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <UiErrorToaster />
-      </ChakraProvider>,
-    );
+    renderWithDesignSystem(<UiErrorToaster />);
   });
 
   describe("when a failure is reported through the feedback capability", () => {

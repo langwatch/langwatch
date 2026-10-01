@@ -2,7 +2,7 @@
  * Settings, Checkup on a self-hosted install. Every procedure answers
  * `{ deployment: "saas" }` on LangWatch Cloud, where the page is not linked.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { usageReportPreviewSchema } from "./checkup-usage-report.ts";

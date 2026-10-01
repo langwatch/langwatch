@@ -16,18 +16,22 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type NamedSlackConnection } from "@langwatch/slack-browser-kit";
 import { Calendar, TrendingUp } from "react-feather";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
-import { api } from "../../../../behavior/automation-api.ts";
 import {
   useCloseAddressedDrawer,
   useOrganizationTeamProject,
 } from "../../../../behavior/automation-session.ts";
-import { slackApi } from "../../../../behavior/slack-api.ts";
+import {
+  useAutomation,
+  useGraph,
+  useProjectDatasets,
+  useSlackConnections,
+} from "../../../../behavior/use-automation-reads.ts";
 import { useAutomationHost } from "../../../../model/automation-host.ts";
 import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import { type NamedSlackConnection } from "../../../../model/slack/slack-connection-name.ts";
 import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
 import { EmailList, type TriggerActionParams } from "../../../overview/index.ts";
 import {
@@ -73,10 +77,7 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
 
-  const triggerQuery = api.automation.getTriggerById.useQuery(
-    { triggerId: automationId, projectId },
-    { enabled: !!projectId },
-  );
+  const triggerQuery = useAutomation({ projectId, triggerId: automationId });
   const trigger = triggerQuery.data ?? undefined;
   const isGraphAlert = !!trigger?.customGraphId;
   const isWebhook = trigger?.action === "SEND_WEBHOOK";
@@ -93,18 +94,15 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
 
   // The watched graph names the stored series key; the dataset list names the
   // ADD_TO_DATASET destination; the Slack connections name a Slack one.
-  const graphQuery = api.graphs.getById.useQuery(
-    { projectId, id: trigger?.customGraphId ?? "" },
-    { enabled: !!projectId && !!trigger?.customGraphId, retry: false },
-  );
-  const datasetsQuery = api.dataset.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId && trigger?.action === "ADD_TO_DATASET" },
-  );
-  const slackConnectionsQuery = slackApi.slackIntegration.list.useQuery(
-    { projectId },
-    { enabled: !!projectId && trigger?.action === "SEND_SLACK_MESSAGE" },
-  );
+  const graphQuery = useGraph({ projectId, graphId: trigger?.customGraphId });
+  const datasetsQuery = useProjectDatasets({
+    projectId,
+    enabled: trigger?.action === "ADD_TO_DATASET",
+  });
+  const slackConnectionsQuery = useSlackConnections({
+    projectId,
+    enabled: trigger?.action === "SEND_SLACK_MESSAGE",
+  });
   const datasetName = actionParams.datasetId
     ? (datasetsQuery.data?.find((d) => d.id === actionParams.datasetId)?.name ?? null)
     : null;

@@ -1,7 +1,6 @@
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -20,10 +19,8 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type {
   LangyConversationCommands,
-  LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-process";
-import { LangyBlockMetricsOtelService, LangyPostgresService } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
@@ -38,14 +35,18 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { LangyApp } from "../app/langy.app.ts";
+import { LangyModule } from "../app/langy.app.ts";
 import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
+import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
+import { LangyPostgresService } from "../services/langy-postgres.service.ts";
 import { LangyService } from "../services/langy.service.ts";
 
 function commands(): LangyConversationCommands {
@@ -271,8 +272,8 @@ function compositionOptions() {
 /** No handle is ever resolved through it in these tests. */
 const noSecrets = new ScopedSecrets(async (_handle, build) => build(undefined));
 
-async function createApp(): Promise<LangyApp> {
-  const app = await LangyApp.create({
+async function createApp(): Promise<LangyModule> {
+  const app = await LangyModule.create({
     dependencies: {
       presence: testPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -320,7 +321,7 @@ async function createApp(): Promise<LangyApp> {
 }
 
 /** Registers the pipeline's producer half and hands its senders to the app, as boot does. */
-function connectProducer(app: LangyApp): void {
+function connectProducer(app: LangyModule): void {
   const registered = producerEventing().register(
     app.conversationPipeline({ participation: "produce" }),
   );
@@ -338,6 +339,7 @@ function testPresence(): PresenceApi {
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},
+    readHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };

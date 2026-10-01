@@ -1,4 +1,5 @@
-import type { AuthApi } from "@langwatch/auth-contract";
+import type { LedgerActor } from "@langwatch/authorization";
+import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
   adminOperationInputSchema,
@@ -7,7 +8,6 @@ import {
   type AdminOperationResult,
   type AdminOperationParams,
 } from "@langwatch/ops-contract";
-import { Temporal, toEpochMs } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
@@ -15,11 +15,12 @@ import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
+/** User writes that would skip the user module's facts and last-operator rule. */
+const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 
 export interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserApi;
-  auth: AuthApi;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -47,20 +48,17 @@ type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
 export class AdminBackofficeService {
   private readonly repository: AdminBackofficeRepository;
   private readonly users: UserApi;
-  private readonly auth: AuthApi;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
 
   private constructor(deps: {
     repository: AdminBackofficeRepository;
     users: UserApi;
-    auth: AuthApi;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
   }) {
     this.repository = deps.repository;
     this.users = deps.users;
-    this.auth = deps.auth;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
   }
@@ -69,7 +67,6 @@ export class AdminBackofficeService {
     return new AdminBackofficeService({
       repository: options.repository,
       users: options.users,
-      auth: options.auth,
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
     });
@@ -77,6 +74,20 @@ export class AdminBackofficeService {
 
   async execute(input: AdminOperationInput): Promise<AdminOperationResult> {
     const parsed = adminOperationInputSchema.parse(input);
+    if (parsed.resource === "user" && USER_METHODS_REFUSED.has(parsed.method)) {
+      throw new ValidationError("The admin API does not bulk-update or delete users", {
+        meta: { fieldErrors: { method: ["Deactivate users one at a time instead."] } },
+      });
+    }
+    if (
+      parsed.resource === "user" &&
+      parsed.method === "create" &&
+      "deactivatedAt" in (parsed.params.data ?? {})
+    ) {
+      throw new ValidationError("A new account starts active", {
+        meta: { fieldErrors: { deactivatedAt: ["Create the account, then deactivate it."] } },
+      });
+    }
     if (
       parsed.resource === "user" &&
       parsed.method === "update" &&
@@ -99,9 +110,14 @@ export class AdminBackofficeService {
     const sideEffectAudits: UserSideEffectAudit[] = [];
 
     if ("deactivatedAt" in data) {
-      const audits = await this.applyDeactivation({ userId, value: data.deactivatedAt });
-      if (audits.length > 0) delete data.deactivatedAt;
-      sideEffectAudits.push(...audits);
+      sideEffectAudits.push(
+        await this.applyDeactivation({
+          userId,
+          actorId: input.actorId,
+          value: data.deactivatedAt,
+        }),
+      );
+      delete data.deactivatedAt;
     }
 
     if ("email" in data && typeof data.email === "string") {
@@ -132,40 +148,38 @@ export class AdminBackofficeService {
     return result;
   }
 
-  /** Reactivates on a blank value, deactivates on a date; any other value is left to the save. */
+  /**
+   * Reactivates on a blank value, deactivates on a date; any other value is refused.
+   * Both go through user's lifecycle, which stamps the database's clock, so a picked date is
+   * not kept: the fact names the operator as its actor.
+   */
   private async applyDeactivation({
     userId,
+    actorId,
     value,
   }: {
     userId: string;
+    actorId: string;
     value: unknown;
-  }): Promise<UserSideEffectAudit[]> {
+  }): Promise<UserSideEffectAudit> {
+    const actor: LedgerActor = { type: "user", id: actorId };
     if (value === null || value === "") {
-      await this.users.reactivate({ id: userId });
-      return [{ action: "update/user", payload: { id: userId, reactivate: true } }];
+      await this.users.reactivate({ id: userId, actor });
+      return { action: "update/user", payload: { id: userId, reactivate: true } };
     }
-    if (typeof value !== "string" && !(value instanceof Date)) return [];
-
-    await this.users.deactivate({ id: userId });
-    const pickedMs = toEpochMs(value);
-    if (Number.isNaN(pickedMs)) {
-      return [{ action: "update/user", payload: { id: userId, deactivate: true } }];
-    }
-    const picked = Temporal.Instant.fromEpochMilliseconds(pickedMs);
-    await this.repository.setUserDeactivatedAt(userId, picked);
-    return [
-      {
-        action: "update/user",
-        payload: {
-          id: userId,
-          deactivate: true,
-          pickedDate: picked.toString({ fractionalSecondDigits: 3 }),
+    if (typeof value !== "string" && !(value instanceof Date)) {
+      throw new ValidationError("Unreadable deactivation", {
+        meta: {
+          fieldErrors: { deactivatedAt: ["Send a date to deactivate, or null to reactivate."] },
         },
-      },
-    ];
+      });
+    }
+
+    await this.users.deactivate({ id: userId, actor });
+    return { action: "update/user", payload: { id: userId, deactivate: true } };
   }
 
-  /** Saves the normalised email; a real change signs the user out of every browser. */
+  /** Saves the normalised email; user signs the user out of every browser on a real change. */
   private async applyEmailChange({
     userId,
     email: rawEmail,
@@ -174,11 +188,7 @@ export class AdminBackofficeService {
     email: string;
   }): Promise<UserSideEffectAudit> {
     const email = rawEmail.trim().toLowerCase();
-    const previous = await this.users.findById({ id: userId });
-    const updated = await this.users.updateProfile({ id: userId, email });
-    if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
-      await this.auth.revokeAllBrowserSessions({ userId });
-    }
+    await this.users.updateProfile({ id: userId, email });
     return { action: "update/user", payload: { id: userId, email } };
   }
 

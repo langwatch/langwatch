@@ -19,7 +19,7 @@ const mockSetReplacingData = vi.fn();
 
 // ─── Store mocks ─────────────────────────────────────────────────────────────
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useFilterStore: (selector: (s: unknown) => unknown) =>
     selector({
       debouncedQueryText: mockQueryText,

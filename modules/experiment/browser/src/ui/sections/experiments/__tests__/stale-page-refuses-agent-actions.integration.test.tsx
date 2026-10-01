@@ -3,10 +3,10 @@
  * @see specs/langy/langy-ui-actions.feature
  *   ("A page that cannot save refuses the action instead of reporting success")
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { LangyUiActionHandlers } from "@langwatch/langy-browser-kit";
-import { render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { LangyUiActionHandlers } from "../../../../model/langy/ui-actions/langy-ui-action-types.ts";
 
 const captured = vi.hoisted(() => ({
   handlers: undefined as LangyUiActionHandlers | undefined,
@@ -113,7 +113,7 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
   useOptimizeWithLangy: () => undefined,
 }));
 
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../langy/langy-page-context.tsx", async (importOriginal) => {
   const actual = await importOriginal<typeof langyPageRegistrationModule>();
   return {
     ...actual,
@@ -158,22 +158,38 @@ vi.mock("../../../../behavior/experiment-api.ts", () => ({
   experimentApi: {
     useUtils: () => ({}),
     useQueries: () => [],
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({}),
     evaluators: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
       delete: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/prompt-client", () => ({
+  promptClient: {
+    useUtils: () => ({}),
     prompts: {
       create: { useMutation: () => ({ mutate: vi.fn() }) },
       update: { useMutation: () => ({ mutate: vi.fn() }) },
     },
+  },
+}));
+
+vi.mock("@langwatch/dataset-client", () => ({
+  datasetClient: {
+    useUtils: () => ({}),
     dataset: { upsert: { useMutation: () => ({ mutate: vi.fn() }) } },
     datasetRecord: { create: { useMutation: () => ({ mutate: vi.fn() }) } },
   },
 }));
 
-import type * as langyPageRegistrationModule from "@langwatch/langy-browser-kit";
-
+import type * as langyPageRegistrationModule from "../../langy/langy-page-context.tsx";
 import ExperimentsWorkbenchPage from "../workbench.screen.tsx";
 
 const OUT_OF_DATE = "langy_ui_page_out_of_date";
@@ -193,11 +209,7 @@ describe("given the server holds a newer version than this page", () => {
   describe("when the agent dispatches a transform action", () => {
     /** @scenario "A page that cannot save refuses the action instead of reporting success" */
     it("refuses with a code, and changes nothing", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const duplicate = captured.handlers?.["workbench.duplicateTarget"];
       expect(duplicate).toBeTruthy();
@@ -214,11 +226,7 @@ describe("given the server holds a newer version than this page", () => {
   describe("when the agent dispatches workbench.run", () => {
     /** @scenario "A page that cannot save does not run the document it holds" */
     it("refuses instead of running a document the server does not have", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const runAction = captured.handlers?.["workbench.run"];
       expect(runAction).toBeTruthy();
@@ -246,11 +254,7 @@ describe("given a page whose save fails for a reason other than a newer version"
   describe("when the agent dispatches a transform action", () => {
     /** @scenario "A save that does not land is refused rather than reported as done" */
     it("refuses with a code instead of answering that the change was saved", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const duplicate = captured.handlers?.["workbench.duplicateTarget"];
       expect(duplicate).toBeTruthy();
@@ -267,11 +271,7 @@ describe("given a page whose save fails for a reason other than a newer version"
   describe("when the agent dispatches workbench.run", () => {
     /** @scenario "A save that does not land stops the run that would follow it" */
     it("refuses instead of running a document the server does not have", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const runAction = captured.handlers?.["workbench.run"];
       expect(runAction).toBeTruthy();
@@ -297,11 +297,7 @@ describe("given a page that is current with the server", () => {
 
   describe("when the agent dispatches a transform action", () => {
     it("applies it and answers", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       const duplicate = captured.handlers?.["workbench.duplicateTarget"];
       await expect(duplicate!.run({ targetId: "t1" } as never)).resolves.toBeTruthy();
@@ -311,11 +307,7 @@ describe("given a page that is current with the server", () => {
 
   describe("when the agent dispatches workbench.run", () => {
     it("runs it", async () => {
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ExperimentsWorkbenchPage />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ExperimentsWorkbenchPage />);
 
       await captured.handlers!["workbench.run"]!.run({} as never);
       expect(executeEvaluation).toHaveBeenCalledTimes(1);

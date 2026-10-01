@@ -28,7 +28,7 @@ describe("given a repository", () => {
       const code = [
         'import { z } from "zod";',
         'import { AgentService } from "../../services/agent.service.ts";',
-        'import { AgentApp } from "#app/agent.app";',
+        'import { AgentModule } from "#app/agent.app";',
         'import { AgentDerived } from "../../eventing/agent-derived.projection.ts";',
       ].join("\n");
 
@@ -48,7 +48,7 @@ describe("given a repository", () => {
         'import { agentRules } from "../../rules/agent.rules.ts";',
         'import { AgentStore } from "../../eventing/agent-item.store.ts";',
         'import type { AgentService } from "../../services/agent.service.ts";',
-        'import { type AgentApp } from "../../app/agent.app.ts";',
+        'import { type AgentModule } from "../../app/agent.app.ts";',
       ].join("\n");
 
       expect(report(REPOSITORY, code)).toEqual([]);
@@ -104,6 +104,20 @@ describe("given a transport", () => {
       { crossed: "a service", line: 3, messageId: "transportCrossing" },
       { crossed: "a channel", line: 4, messageId: "transportCrossing" },
       { crossed: "a channel", line: 5, messageId: "transportCrossing" },
+    ]);
+  });
+});
+
+describe("given a service nested under features/<concern>/", () => {
+  /** @scenario "A nested service is held to the same layers as a top-level one" */
+  it("reads its layer from the folder below features/<concern>/ and reports a backend", () => {
+    const code = [
+      'import type { AgentRepository } from "../repositories/agent.repository.ts";',
+      'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";',
+    ].join("\n");
+
+    expect(report(`${PROCESS}/features/billing/services/billing.service.ts`, code)).toEqual([
+      { crossed: "a repository backend", line: 2, messageId: "serviceNamesABackend" },
     ]);
   });
 });

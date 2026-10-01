@@ -331,6 +331,7 @@ export function instanceGroup(): SettingsMenuGroup {
     id: "settings-ops-instance",
     label: "Instance",
     items: [
+      { label: "Operators", href: "/ops/operators", icon: KeyRound },
       { label: "Users", href: "/ops/users", icon: UserCog },
       { label: "Organizations", href: "/ops/organizations", icon: Building2 },
       { label: "Projects", href: "/ops/projects", icon: FolderOpen },

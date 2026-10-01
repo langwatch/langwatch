@@ -1,9 +1,9 @@
+import { TriggerAction } from "@langwatch/automation-contract";
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { TriggerAction } from "@langwatch/automation-contract";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -89,10 +89,6 @@ vi.mock("../ui/elements/query-filter-input.tsx", () => ({
   QueryFilterInput: () => <div data-testid="query-filter-input" />,
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 function selectContainingOption(optionName: RegExp): HTMLSelectElement {
   const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
   const match = selects.find((select) =>
@@ -161,7 +157,7 @@ describe("SubjectSection", () => {
   describe("given an alert draft", () => {
     it("renders the graph and series pickers", () => {
       seedGraphDraft();
-      render(<SubjectSection />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SubjectSection />);
 
       expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
       expect(selectContainingOption(/select a series/i)).toBeInTheDocument();
@@ -170,18 +166,14 @@ describe("SubjectSection", () => {
     describe("when opened prefilled from a graph card", () => {
       it("locks the graph select to the launching graph", () => {
         seedGraphDraft();
-        render(<SubjectSection prefilledGraphId="graph-1" />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SubjectSection prefilledGraphId="graph-1" />);
 
         expect(selectContainingOption(/select a graph/i)).toBeDisabled();
       });
 
       it("keeps the series select enabled", () => {
         seedGraphDraft();
-        render(<SubjectSection prefilledGraphId="graph-1" />, {
-          wrapper: Wrapper,
-        });
+        renderWithDesignSystem(<SubjectSection prefilledGraphId="graph-1" />);
 
         expect(selectContainingOption(/select a series/i)).toBeEnabled();
       });
@@ -191,7 +183,7 @@ describe("SubjectSection", () => {
       it("records it on the draft", async () => {
         const user = userEvent.setup();
         seedGraphDraft();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         await user.selectOptions(selectContainingOption(/select a series/i), "p95 latency");
 
@@ -203,7 +195,7 @@ describe("SubjectSection", () => {
       beforeEach(() => {
         server.graphs = [];
         seedFreshAlertDraft();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
       });
 
       /** @scenario "A project with no custom graphs offers to create one" */
@@ -224,7 +216,7 @@ describe("SubjectSection", () => {
       it("keeps the picker with the selection, not the empty state", () => {
         server.graphs = [];
         seedGraphDraft();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
         expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
@@ -235,7 +227,7 @@ describe("SubjectSection", () => {
       it("still shows the locked graph picker, not the empty state", () => {
         server.graphs = [];
         seedGraphDraft();
-        render(<SubjectSection prefilledGraphId="graph-1" />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection prefilledGraphId="graph-1" />);
 
         expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
       });
@@ -245,7 +237,7 @@ describe("SubjectSection", () => {
       /** @scenario "A failed graph list shows a retry, not the empty-project state" */
       it("shows a load failure, not the no-graphs-yet empty state", () => {
         graphListFails();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByText(/couldn.t be loaded right now/i)).toBeInTheDocument();
         expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
@@ -256,7 +248,7 @@ describe("SubjectSection", () => {
         server.graphsErrorValue = new Error(
           "upstream exploded: connect ECONNREFUSED 10.0.0.7:8123",
         );
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.queryByText(/upstream exploded/i)).toBeNull();
         expect(screen.queryByText(/ECONNREFUSED/i)).toBeNull();
@@ -264,7 +256,7 @@ describe("SubjectSection", () => {
 
       it("does not offer to create a graph the project may already have", () => {
         graphListFails();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(
           screen.queryByRole("link", { name: /create a custom graph/i }),
@@ -275,7 +267,7 @@ describe("SubjectSection", () => {
         it("re-runs the graph list query", async () => {
           const user = userEvent.setup();
           graphListFails();
-          render(<SubjectSection />, { wrapper: Wrapper });
+          renderWithDesignSystem(<SubjectSection />);
 
           await user.click(screen.getByRole("button", { name: /try again/i }));
 
@@ -288,7 +280,7 @@ describe("SubjectSection", () => {
       it("keeps showing the working picker with the selection intact, not the failure screen", () => {
         server.isGraphsError = true;
         seedGraphDraft();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.queryByText(/couldn.t be loaded right now/i)).not.toBeInTheDocument();
         expect(selectContainingOption(/select a graph/i)).toHaveValue("graph-1");
@@ -299,7 +291,7 @@ describe("SubjectSection", () => {
       it("shows neither the empty state nor the picker's missing-graph error", () => {
         server.isGraphsLoading = true;
         seedFreshAlertDraft();
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
         expect(screen.queryByText("Pick a custom graph to continue.")).not.toBeInTheDocument();
@@ -313,7 +305,7 @@ describe("SubjectSection", () => {
       it("warns that the condition is over the daily limit", () => {
         seedTraceDraft(TriggerAction.ADD_TO_DATASET);
         previewReturns(OVER_CAP_HITS);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByTestId("daily-cap-advice")).toHaveTextContent(
           "About 1,000 matches a day is over your plan's daily automation " +
@@ -325,7 +317,7 @@ describe("SubjectSection", () => {
       it("warns for the annotation-queue action too", () => {
         seedTraceDraft(TriggerAction.ADD_TO_ANNOTATION_QUEUE);
         previewReturns(OVER_CAP_HITS);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByTestId("daily-cap-advice")).toBeInTheDocument();
       });
@@ -334,7 +326,7 @@ describe("SubjectSection", () => {
       it("links to the plans page, since a bigger plan is the other way out", () => {
         seedTraceDraft(TriggerAction.ADD_TO_DATASET);
         previewReturns(OVER_CAP_HITS);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByTestId("daily-cap-advice-upgrade")).toHaveAttribute(
           "href",
@@ -348,7 +340,7 @@ describe("SubjectSection", () => {
       it("says nothing about the daily limit", () => {
         seedTraceDraft(TriggerAction.SEND_SLACK_MESSAGE);
         previewReturns(OVER_CAP_HITS);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
       });
@@ -362,7 +354,7 @@ describe("SubjectSection", () => {
         server.cap = { data: null };
         const before = useAutomationStore.getState().draft;
 
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
         expect(useAutomationStore.getState().draft).toBe(before);
@@ -375,7 +367,7 @@ describe("SubjectSection", () => {
     it("says nothing about the daily limit", () => {
       seedTraceDraft(TriggerAction.ADD_TO_DATASET);
       previewReturns(WITHIN_CAP_HITS);
-      render(<SubjectSection />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SubjectSection />);
 
       // The preview itself rendered, so the absent advice is a decision.
       expect(screen.getByText(String(WITHIN_CAP_HITS))).toBeInTheDocument();
@@ -400,7 +392,7 @@ describe("SubjectSection", () => {
       /** @scenario "The missing condition is only flagged once the delivery is set up" */
       it("offers the empty condition as guidance, not as an error", () => {
         seedEmptyConditionDraft([]);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(
           screen.getByText("Add a condition to see which traces would match."),
@@ -413,7 +405,7 @@ describe("SubjectSection", () => {
       /** @scenario "The missing condition is only flagged once the delivery is set up" */
       it("flags the missing condition", () => {
         seedEmptyConditionDraft([{ id: "u_1", name: "Ada" }]);
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByText("Add at least one condition.")).toBeInTheDocument();
       });
@@ -433,7 +425,7 @@ describe("SubjectSection", () => {
       /** @scenario "The Code tab only marks a query answered when it parses" */
       it("shows the parse error inline and no answered check", () => {
         seedQuery("status:error AND (model:gpt");
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByRole("alert")).toHaveTextContent(/./);
         expect(screen.queryByText("Answered")).toBeNull();
@@ -444,7 +436,7 @@ describe("SubjectSection", () => {
       /** @scenario "The Code tab only marks a query answered when it parses" */
       it("warns that it never matches and shows no answered check", () => {
         seedQuery("status:error#simplified");
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByRole("status")).toHaveTextContent(
           "`status` is never `error#simplified`: expected one of error, warning, ok.",
@@ -457,7 +449,7 @@ describe("SubjectSection", () => {
       /** @scenario "The Code tab only marks a query answered when it parses" */
       it("warns that the field is unknown and shows no answered check", () => {
         seedQuery("stauts:error");
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByRole("status")).toHaveTextContent("Unknown field `stauts`");
         expect(screen.queryByText("Answered")).toBeNull();
@@ -468,7 +460,7 @@ describe("SubjectSection", () => {
       /** @scenario "The Code tab only marks a query answered when it parses" */
       it("marks the section answered and says nothing more", () => {
         seedQuery("status:error AND trace.attribute.plan:pro");
-        render(<SubjectSection />, { wrapper: Wrapper });
+        renderWithDesignSystem(<SubjectSection />);
 
         expect(screen.getByText("Answered")).toBeInTheDocument();
         expect(screen.queryByRole("alert")).toBeNull();
@@ -488,7 +480,7 @@ describe("SubjectSection", () => {
       };
       const before = useAutomationStore.getState().draft;
 
-      render(<SubjectSection />, { wrapper: Wrapper });
+      renderWithDesignSystem(<SubjectSection />);
 
       expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
       expect(useAutomationStore.getState().draft).toBe(before);

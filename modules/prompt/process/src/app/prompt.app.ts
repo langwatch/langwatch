@@ -2,11 +2,11 @@ import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authoriz
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
 /**
  * The prompt library's application: what its doors call.
  */
-import type { FeatureSetup } from "@langwatch/kernel";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
@@ -125,7 +125,7 @@ type PromptAppDependencies = Readonly<{
   lifecycle: PromptLifecyclePipeline | undefined;
 }>;
 
-export class PromptApp implements PromptApi {
+export class PromptModule implements PromptApi {
   static readonly contract = PromptApi;
   static readonly dependencies: PromptDependencies = {
     projects: ProjectApi,
@@ -139,7 +139,7 @@ export class PromptApp implements PromptApi {
    */
   static readonly reads = ["logger", "rateLimiter", "publicBaseUrl"] as const;
 
-  static create(setup: PromptRepositorySetup): PromptApp {
+  static create(setup: PromptRepositorySetup): PromptModule {
     const prompts = PromptService.create({
       repository: setup.repositories.configs,
       versionService: PromptVersionService.create(),
@@ -149,7 +149,7 @@ export class PromptApp implements PromptApi {
       modelProviders: setup.dependencies.modelProviders,
     });
 
-    return PromptApp.createWithPrompts(setup, prompts);
+    return PromptModule.createWithPrompts(setup, prompts);
   }
 
   /**
@@ -157,12 +157,12 @@ export class PromptApp implements PromptApi {
    * for the engine without a real database - the engine is this module's own
    * seam, not a process member (see {@link PromptInfrastructure.prompts}).
    */
-  static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptApp {
+  static createWithPrompts(setup: PromptSetup, prompts: PromptService): PromptModule {
     const { dependencies, members } = setup;
     const lifecycle = buildPromptLifecyclePipeline();
     // Tied the knot: the callback below fires only once a request calls
     // `announceCreated`, by which point `app` is always assigned.
-    const appRef: { current?: PromptApp } = {};
+    const appRef: { current?: PromptModule } = {};
     const afterPromptCreated: PromptInfrastructure["afterPromptCreated"] = (input) => {
       const app = appRef.current;
       if (!app) return;
@@ -173,7 +173,7 @@ export class PromptApp implements PromptApi {
         ),
       );
     };
-    const app = new PromptApp({
+    const app = new PromptModule({
       prompts,
       projects: dependencies.projects,
       permissions: dependencies.permissions,
@@ -201,8 +201,8 @@ export class PromptApp implements PromptApi {
    * prompts for a run and never writes one, so every permission check and
    * every write refuses by name instead of reaching a peer it does not have.
    */
-  static createReader(input: { prompts: PromptService; projects: ProjectApi }): PromptApp {
-    return new PromptApp({
+  static createReader(input: { prompts: PromptService; projects: ProjectApi }): PromptModule {
+    return new PromptModule({
       prompts: input.prompts,
       projects: input.projects,
       permissions: null,
@@ -300,11 +300,14 @@ export class PromptApp implements PromptApi {
     });
   }
 
-  executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>> {
+  executePlayground(
+    input: PromptExecuteRequest,
+    by?: PromptCaller,
+  ): Promise<AsyncIterable<PlaygroundStreamEvent>> {
     const execution = this.#dependencies.execution;
     if (!execution) throw new PromptPlaygroundUnavailableError();
 
-    return execution.execute(input);
+    return execution.execute(input, by);
   }
 
   // -- the library -----------------------------------------------------------
@@ -741,7 +744,7 @@ export class PromptApp implements PromptApi {
         source,
         targetIdOrHandle: input.idOrHandle,
         targetProjectId: input.projectId,
-        commitMessage: PromptApp.commitMessageFor("synced", source),
+        commitMessage: PromptModule.commitMessageFor("synced", source),
       },
       by,
     );
@@ -770,7 +773,7 @@ export class PromptApp implements PromptApi {
 
     if (selected.length === 0) throw new PromptNoCopiesSelectedError();
 
-    const commitMessage = PromptApp.commitMessageFor("pushed", source);
+    const commitMessage = PromptModule.commitMessageFor("pushed", source);
     const results: PromptPushToCopiesResult["results"] = [];
 
     for (const copy of selected) {

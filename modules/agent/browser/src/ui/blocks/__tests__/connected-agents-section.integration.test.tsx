@@ -4,20 +4,15 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ConnectedAgentBrowser as ConnectedAgentView } from "../../../model/agent-client.ts";
 import { ConnectedAgentsSection, OFFLINE_AGENT_TEST_COPY } from "../connected-agents-section.tsx";
 
 type ConnectedAgentInstance = ConnectedAgentView["instances"][number];
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function instance(overrides: Partial<ConnectedAgentInstance> = {}): ConnectedAgentInstance {
   return {
@@ -62,14 +57,13 @@ function renderSection(
     onTest?: (agent: ConnectedAgentView) => void;
   } = {},
 ) {
-  return render(
+  return renderWithDesignSystem(
     <ConnectedAgentsSection
       agents={agents}
       onOpen={handlers.onOpen ?? vi.fn()}
       onDelete={handlers.onDelete}
       onTest={handlers.onTest}
     />,
-    { wrapper: Wrapper },
   );
 }
 

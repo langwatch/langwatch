@@ -38,7 +38,6 @@ import { MemorySsoDomainOwnershipRepository } from "./memory.sso-domain-ownershi
 import { MemorySsoDomainReproofTargetRepository } from "./memory.sso-domain-reproof.repository.ts";
 import { MemorySsoEngineProviderRepository } from "./memory.sso-engine-provider.repository.ts";
 import { MemorySsoMigrationEvidenceRepository } from "./memory.sso-migration-evidence.repository.ts";
-import { MemorySsoPlatformOperatorsRepository } from "./memory.sso-platform-operators.repository.ts";
 import { MemorySsoRegistrantReadRepository } from "./memory.sso-registrant.repository.ts";
 import { MemoryStateProjectionRepository } from "./memory.state-projection.repository.ts";
 import { MemoryTwoStepVerificationRepository } from "./memory.two-step-verification.repository.ts";
@@ -49,18 +48,15 @@ import { MemoryTwoStepVerificationRepository } from "./memory.two-step-verificat
  * connection sits behind the Prisma tier.
  */
 export class MemoryIdentityRepositories {
-  static readonly requires = ["adminEmails"] as const;
+  static readonly requires = [] as const;
 
-  static create(members: Readonly<{ adminEmails: readonly string[] }>): IdentityRepositories {
-    return identityRepositoriesOverMemory(MemoryIdentityStore.create(), members.adminEmails);
+  static create(): IdentityRepositories {
+    return identityRepositoriesOverMemory(MemoryIdentityStore.create());
   }
 }
 
 /** The same tier over a store the caller keeps, for tests that seed rows. */
-export function identityRepositoriesOverMemory(
-  store: MemoryIdentityStore,
-  adminEmails: readonly string[] = [],
-): IdentityRepositories {
+export function identityRepositoriesOverMemory(store: MemoryIdentityStore): IdentityRepositories {
   return {
     heads: MemoryIdentityHeadsRepository.create(store),
     latch: MemoryIdentityLatchRepository.create(store),
@@ -93,7 +89,6 @@ export function identityRepositoriesOverMemory(
     secretCarry: MemoryIdentitySecretCarryRepository.create(),
     joinRequestAudience: MemoryJoinRequestAudienceRepository.create(store),
     joinRequestNotificationContext: MemoryJoinRequestNotificationContextRepository.create(store),
-    ssoPlatformOperators: MemorySsoPlatformOperatorsRepository.create({ store, adminEmails }),
     ssoDomainOwnership: MemorySsoDomainOwnershipRepository.create(store),
     identityLookup: MemoryIdentityLookupRepository.create(store),
     identityHistory: MemoryIdentityHistoryRepository.create(store),

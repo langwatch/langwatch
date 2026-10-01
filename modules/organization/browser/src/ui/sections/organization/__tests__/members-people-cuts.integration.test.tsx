@@ -70,6 +70,10 @@ vi.mock("../../../../behavior/use-join-requests.ts", () => ({
   }),
 }));
 
+vi.mock("../../../../behavior/user/use-user-avatar-url.ts", () => ({
+  useUserAvatarUrl: (image?: string | null) => image ?? null,
+}));
+
 vi.mock("../../../../behavior/use-two-step-requirement.ts", () => ({
   useTwoStepRequirement: () => ({ show: false, mfaRequired: false, byUser: new Map() }),
 }));

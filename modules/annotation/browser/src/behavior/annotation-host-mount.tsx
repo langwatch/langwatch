@@ -24,6 +24,8 @@ import {
   type AnnotationRouteReading,
   type AnnotationSuccessNotice,
 } from "../model/annotation-host.ts";
+import { isOwnPersonalWorkspace } from "../model/annotation-personal-workspace.ts";
+import { annotationApi } from "./annotation-api.ts";
 
 class CapabilityAnnotationHost extends AnnotationHostApi {
   constructor(
@@ -31,6 +33,7 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
       organizationId: string | undefined;
       project: AnnotationHostProject | undefined;
       isLiteMember: boolean;
+      isOwnPersonalWorkspace: boolean;
       session: UiSession;
       navigation: UiNavigation;
       route: UiRoute;
@@ -66,9 +69,8 @@ class CapabilityAnnotationHost extends AnnotationHostApi {
     return this.deps.isLiteMember;
   }
 
-  /** No capability answers ownership of the reader's own personal workspace. */
   isOwnPersonalWorkspace(): boolean {
-    return false;
+    return this.deps.isOwnPersonalWorkspace;
   }
 
   route(): AnnotationRouteReading {
@@ -121,6 +123,13 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
   const hostProject = scopeHost?.project();
   const isLiteMember = scopeHost?.organizationRole() === "EXTERNAL";
   const { openDrawer, drawerOpen } = useDrawer();
+  const userId = session.currentUser()?.id;
+  const scopeGraph = annotationApi.organization.getScopeGraph.useQuery({}, { enabled: !!userId });
+  const ownPersonal = isOwnPersonalWorkspace({
+    graph: scopeGraph.data ?? [],
+    projectId: hostProject?.id,
+    userId,
+  });
 
   const host = useMemo(
     () =>
@@ -130,6 +139,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
           ? { id: hostProject.id, slug: hostProject.slug, name: hostProject.name }
           : void 0,
         isLiteMember,
+        isOwnPersonalWorkspace: ownPersonal,
         session,
         navigation,
         route,
@@ -140,6 +150,7 @@ export default function AnnotationHostMount({ children }: { children?: ReactNode
       organizationId,
       hostProject,
       isLiteMember,
+      ownPersonal,
       session,
       navigation,
       route,

@@ -3,8 +3,8 @@
  * departures, external opens, query writes, and failures.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { render, type RenderResult } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { type RenderResult } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
@@ -76,10 +76,6 @@ export function renderWithGithubHost(
 ): RenderResult & { host: FakeGithubHost } {
   return {
     host,
-    ...render(
-      <ChakraProvider value={defaultSystem}>
-        <GithubHostProvider value={host}>{element}</GithubHostProvider>
-      </ChakraProvider>,
-    ),
+    ...renderWithDesignSystem(<GithubHostProvider value={host}>{element}</GithubHostProvider>),
   };
 }

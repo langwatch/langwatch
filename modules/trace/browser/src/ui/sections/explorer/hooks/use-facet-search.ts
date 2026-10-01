@@ -1,6 +1,6 @@
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
@@ -14,7 +14,6 @@ export function useFacetSearch({
   prefix,
   enabled,
   limit = 100,
-  staleTimeMs = 60_000,
 }: {
   /** Facet to search — identity-mapped to the server's `facetKey`. */
   facetKey: string;
@@ -25,9 +24,6 @@ export function useFacetSearch({
   enabled: boolean;
   /** Max distinct values to return (the server caps at 1000). */
   limit?: number;
-  /** How long results stay fresh — distinct values turn over slowly, and SSE
-   *  invalidates on real changes. */
-  staleTimeMs?: number;
 }) {
   const { project } = useOrganizationTeamProject();
   const timeRange = useFilterStore((s) => s.debouncedTimeRange);
@@ -47,7 +43,6 @@ export function useFacetSearch({
     },
     {
       enabled: enabled && !!project?.id && !!facetKey,
-      staleTime: staleTimeMs,
       placeholderData: keepPreviousData,
     },
   );

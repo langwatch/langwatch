@@ -3,15 +3,16 @@
  * @see specs/suites/test-suites.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
   EvaluatorAttachment,
+  Scenario,
   ScenarioApi,
   ScenarioTestSuite,
 } from "@langwatch/scenario-contract";
 import type { RunPlanConfigInput } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";
@@ -82,17 +83,43 @@ function archivedTestSuite(evaluators: EvaluatorAttachment[]): ScenarioTestSuite
 let database: MemorySuiteDatabase;
 let service: SuiteService;
 let testSuites: ScenarioTestSuite[];
+let filed: Scenario[];
+
+function filedScenario(testSuiteId: string): Scenario {
+  return {
+    id: "scenario-1",
+    projectId,
+    name: "Checkout",
+    situation: "",
+    criteria: [],
+    labels: [],
+    parameters: {},
+    simulatorModel: null,
+    judgeModel: null,
+    maxTurns: null,
+    minTurns: null,
+    fields: {},
+    callerVoice: null,
+    testSuiteId,
+    version: 1,
+    lastUpdatedById: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
 
 beforeEach(() => {
   database = MemorySuiteDatabase.create();
   testSuites = [];
+  filed = [];
   const references = async ({ ids }: { ids: string[] }) =>
     ids.map((id) => ({ id, archivedAt: null }));
   service = SuiteService.create({
     repository: MemorySuiteRepository.create({ database }),
     scenarios: createApiFixture<ScenarioApi>({
       findTestSuite: async () => null,
-      list: async () => [],
+      list: async () => filed,
       listTestSuites: async ({ includeArchived }) =>
         testSuites.filter((suite) => includeArchived || !suite.archivedAt),
       getReferenceStates: references,
@@ -217,6 +244,7 @@ describe("a run plan's own evaluators", () => {
 describe("the evaluators one run carries", () => {
   describe("when the run's test suite is archived and its plan attaches its own", () => {
     /** @scenario "A run's evaluators are its test suite's, then its plan's own, each listed once" */
+    /** @scenario "A run plan carries its own evaluators beside the suites' ones" */
     it("lists the suite's first, then the plan's", async () => {
       const suiteCopy = { ...attachment("evaluator-2"), id: "suite-attachment" };
       testSuites = [archivedTestSuite([suiteCopy])];
@@ -263,5 +291,32 @@ describe("the saved evaluators a run's attachments name", () => {
         { identifier: "output", type: "str" },
       ]);
     });
+  });
+});
+
+describe("a run of a test suite whose scenarios are filed under it", () => {
+  const live = (evaluators: EvaluatorAttachment[]): ScenarioTestSuite => ({
+    ...archivedTestSuite(evaluators),
+    archivedAt: null,
+  });
+
+  /** @scenario "A run is refused while a suite evaluator has a missing required mapping" */
+  it("is refused when the suite's evaluator has a required input unmapped", async () => {
+    testSuites = [live([{ ...attachment("evaluator-1"), mappings: {} }])];
+    filed = [filedScenario("suite-1")];
+
+    await expect(runPlan([])).rejects.toMatchObject({
+      code: "suite_evaluator_mappings_missing",
+      meta: { evaluatorId: "evaluator-1", suiteId: "suite-1", inputs: ["output"] },
+    });
+    expect(database.plans.size).toBe(0);
+  });
+
+  /** @scenario "A duplicated plan attachment with a missing mapping does not refuse a run the suite's own attachment fully maps" */
+  it("is not refused by a plan's copy of an evaluator the suite maps fully", async () => {
+    testSuites = [live([attachment("evaluator-1")])];
+    filed = [filedScenario("suite-1")];
+
+    await expect(runPlan([{ ...attachment("evaluator-1"), mappings: {} }])).resolves.toBeDefined();
   });
 });

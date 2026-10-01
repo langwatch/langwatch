@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ExecutionState } from "@langwatch/workflow-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../behavior/use-field-redaction.ts", () => ({
@@ -22,10 +22,6 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
 
 import { ExecutionOutputPanel } from "../execution-output-panel.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const successState = (outputs: Record<string, unknown>): ExecutionState => ({
   status: "success",
   timestamps: { started_at: 1000, finished_at: 1016 },
@@ -38,12 +34,11 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
   describe("given an if/else run whose condition was false", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of false, not both branch handles", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ExecutionOutputPanel
           executionState={successState({ true: false, false: true })}
           nodeType="if_else"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Condition")).toBeInTheDocument();
@@ -57,12 +52,11 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
   describe("given an if/else run whose condition was true", () => {
     /** @scenario The if/else result shows a single condition value */
     it("shows one Condition box of true", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ExecutionOutputPanel
           executionState={successState({ true: true, false: false })}
           nodeType="if_else"
         />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("Condition")).toBeInTheDocument();
@@ -80,9 +74,9 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
         outputs: { true: false, false: true },
       };
 
-      render(<ExecutionOutputPanel executionState={zeroDuration} nodeType="if_else" />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(
+        <ExecutionOutputPanel executionState={zeroDuration} nodeType="if_else" />,
+      );
 
       expect(screen.getByText("0ms")).toBeInTheDocument();
     });
@@ -90,9 +84,8 @@ describe("ExecutionOutputPanel - if/else outputs", () => {
 
   describe("given a non if/else node", () => {
     it("still renders each named output", () => {
-      const { container } = render(
+      const { container } = renderWithDesignSystem(
         <ExecutionOutputPanel executionState={successState({ answer: "hello" })} nodeType="code" />,
-        { wrapper: Wrapper },
       );
 
       expect(screen.getByText("answer")).toBeInTheDocument();

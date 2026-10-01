@@ -32,6 +32,7 @@ function noticeOver() {
         sent.push(payload);
       },
     },
+    recordProjectLegacyKeyRevoked: { send: async () => undefined },
   });
   return { notice, sent };
 }

@@ -42,6 +42,7 @@ import {
 } from "../rules/gateway-config-wire.rules.ts";
 import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import type { GatewayTraceExportKeyService } from "./gateway-trace-export-key.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 const logger = createLogger("langwatch:gateway:config-materialiser");
@@ -74,6 +75,7 @@ export class GatewayConfigMaterialiserService {
   private readonly assembly: GatewayConfigAssembly;
   private readonly langyMirrorProjectId: string | undefined;
   private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
+  private readonly traceExportKeys: GatewayTraceExportKeyService | undefined;
 
   private constructor(
     /** Which providers a key reaches, and in which dispatch order. */
@@ -86,6 +88,7 @@ export class GatewayConfigMaterialiserService {
       assembly,
       langyMirrorProjectId,
       connectUpstream,
+      traceExportKeys,
     }: {
       scopeResolution: GatewayScopeResolutionService;
       projects: ProjectApi;
@@ -95,6 +98,7 @@ export class GatewayConfigMaterialiserService {
       assembly: GatewayConfigAssembly;
       langyMirrorProjectId: string | undefined;
       connectUpstream: GatewayConnectUpstreamService | undefined;
+      traceExportKeys: GatewayTraceExportKeyService | undefined;
     },
   ) {
     this.scopeResolution = scopeResolution;
@@ -105,6 +109,7 @@ export class GatewayConfigMaterialiserService {
     this.assembly = assembly;
     this.langyMirrorProjectId = langyMirrorProjectId;
     this.connectUpstream = connectUpstream;
+    this.traceExportKeys = traceExportKeys;
   }
 
   static create(input: {
@@ -118,6 +123,8 @@ export class GatewayConfigMaterialiserService {
     /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
     langyMirrorProjectId?: string | undefined;
     connectUpstream?: GatewayConnectUpstreamService | undefined;
+    /** Absent only in tests: the bundle then carries no export token. */
+    traceExportKeys?: GatewayTraceExportKeyService | undefined;
   }): GatewayConfigMaterialiserService {
     return new GatewayConfigMaterialiserService({
       scopeResolution: input.scopeResolution,
@@ -128,6 +135,7 @@ export class GatewayConfigMaterialiserService {
       assembly: input.assembly,
       langyMirrorProjectId: input.langyMirrorProjectId,
       connectUpstream: input.connectUpstream,
+      traceExportKeys: input.traceExportKeys,
     });
   }
 
@@ -174,7 +182,24 @@ export class GatewayConfigMaterialiserService {
    * drifting apart is what lets a 304 confirm a stale bundle.
    */
   async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
-    return this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const token = await this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+    const keyIds =
+      vk.traceProjectId && this.traceExportKeys
+        ? await this.traceExportKeys.findKeyIds(vk.traceProjectId)
+        : [];
+    return [token, ...keyIds].join(".");
+  }
+
+  /** The trace project's export token; never `Project.apiKey`. */
+  private async traceExportToken(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string } | null,
+  ): Promise<string | null> {
+    if (!traceProject || !this.traceExportKeys) return null;
+    return this.traceExportKeys.tokenFor({
+      organizationId: vk.organizationId,
+      projectId: traceProject.id,
+    });
   }
 
   /** The organization's hosted provider on a connected install, if licensing wrote one. */
@@ -223,6 +248,7 @@ export class GatewayConfigMaterialiserService {
         guardrailIds: [...attachment.guardrailIds],
       })),
     });
+    const otlpToken = await this.traceExportToken(vk, traceProject);
 
     return {
       revision: vk.revision.toString(),
@@ -231,7 +257,7 @@ export class GatewayConfigMaterialiserService {
       display_prefix: vk.displayPrefix,
       organization_id: vk.organizationId,
       project_id: traceProject?.id ?? null,
-      project_otlp_token: traceProject?.apiKey ?? null,
+      project_otlp_token: otlpToken,
       team_id: traceProject?.teamId ?? null,
       principal_id: vk.principalUserId,
       // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the

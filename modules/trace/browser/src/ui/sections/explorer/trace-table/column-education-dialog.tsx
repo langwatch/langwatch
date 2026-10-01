@@ -1,4 +1,4 @@
-import { Checkbox } from "@chakra-ui/react";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useState } from "react";

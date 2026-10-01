@@ -1,6 +1,6 @@
 import { checkInstance, Instance } from "./instance.ts";
 import type { Ksuid } from "./ksuid.ts";
-import { getRandomBytes, detectPlatform } from "./platform.ts";
+import { getRandomBytes } from "./platform.ts";
 import type { KsuidComponents } from "./types.ts";
 import { checkPrefix, checkNonEmptyString } from "./validation.ts";
 
@@ -64,112 +64,6 @@ export class Node {
   }
 
   private createInstance(): Instance {
-    const platform = detectPlatform();
-
-    if (platform.isBrowser) {
-      const buf = getRandomBytes(8);
-      return new Instance(Instance.schemes.RANDOM, buf);
-    }
-
-    if (platform.isNode) {
-      // Try Docker container first
-      const dockerInstance = this.getDockerInstance();
-      if (dockerInstance) {
-        return dockerInstance;
-      }
-
-      // Try MAC + PID
-      const macPidInstance = this.getMacPidInstance();
-      if (macPidInstance) {
-        return macPidInstance;
-      }
-
-      // Fallback to random
-      const buf = getRandomBytes(8);
-      return new Instance(Instance.schemes.RANDOM, buf);
-    }
-
-    // For Bun, Deno, and other platforms, use random
-    const buf = getRandomBytes(8);
-    return new Instance(Instance.schemes.RANDOM, buf);
-  }
-
-  private getDockerInstance(): Instance | null {
-    try {
-      const fs = require("fs") as {
-        existsSync: (path: string) => boolean;
-
-        readFileSync: (path: string, encoding: string) => string;
-      };
-
-      const path = require("path") as {
-        basename: (path: string) => string;
-      };
-
-      if (!fs.existsSync("/proc/1/cpuset")) {
-        return null;
-      }
-
-      const src = fs.readFileSync("/proc/1/cpuset", "utf8").trim();
-
-      if (!src.startsWith("/docker")) {
-        return null;
-      }
-
-      const containerId = path.basename(src);
-      if (containerId.length !== 64) {
-        return null;
-      }
-
-      const bytes = Buffer.from(containerId, "hex");
-      if (bytes.length !== 32) {
-        return null;
-      }
-
-      return new Instance(Instance.schemes.DOCKER_CONT, bytes.slice(0, 8));
-    } catch {
-      return null;
-    }
-  }
-
-  private getMacPidInstance(): Instance | null {
-    try {
-      const os = require("os") as {
-        networkInterfaces: () => Record<
-          string,
-          {
-            internal: boolean;
-            mac: string;
-          }[]
-        >;
-      };
-      const interfaces = Object.values(os.networkInterfaces()).flat() as {
-        internal: boolean;
-        mac: string;
-      }[];
-
-      const int = interfaces.find(
-        (i) => !i.internal && i.mac !== "00:00:00:00:00:00" && !i.mac.startsWith("02:42"),
-      );
-
-      if (!int) {
-        return null;
-      }
-
-      const buf = new Uint8Array(8);
-      const macBytes = Buffer.from(int.mac.replace(/:/g, ""), "hex");
-      buf.set(macBytes.slice(0, 6), 0);
-
-      // Write PID in last 2 bytes
-      if (typeof process !== "undefined") {
-        const pid = process.pid % 65536;
-        buf[6] = (pid >> 8) & 0xff;
-        buf[7] = pid & 0xff;
-      }
-
-      return new Instance(Instance.schemes.MAC_AND_PID, buf);
-    } catch {
-      return null;
-    }
+    return new Instance(Instance.schemes.RANDOM, getRandomBytes(8));
   }
 }

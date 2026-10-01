@@ -12,9 +12,6 @@ import {
 import type { PreviewOptions, PreviewResult } from "../model/preview-types.ts";
 import { pythonReprToJson } from "../model/python-repr.ts";
 
-export { pythonReprToJson } from "../model/python-repr.ts";
-export type { NewlineTreatment, PreviewOptions, PreviewResult } from "../model/preview-types.ts";
-
 const ELLIPSIS = "…";
 
 /**

@@ -1,6 +1,6 @@
 /** The `identity.*` procedures: the session user's own identity (D01).
  *  Spec: specs/identity/identifier-model.feature. */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

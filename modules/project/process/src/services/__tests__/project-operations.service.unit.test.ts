@@ -1,14 +1,13 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
  * `ProjectOperationsService`'s cross-entity half: saving the settings form
  * revokes outstanding trace shares when sharing is turned OFF. Characterized
  * here because it is the application's decision, not one door's.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -32,6 +31,12 @@ class CharacterizationProjectDirectory implements ProjectOperationsDirectory {
 
   archive: ProjectOperationsDirectory["archive"] = (input) =>
     this.overrides.archive?.(input) ?? this.unimplemented("archive");
+
+  getById: ProjectOperationsDirectory["getById"] = (id) =>
+    this.overrides.getById?.(id) ?? this.unimplemented("getById");
+
+  rotateLegacyApiKey: ProjectOperationsDirectory["rotateLegacyApiKey"] = (input) =>
+    this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
 
   private unimplemented(operation: string): Promise<never> {
     return Promise.reject(
@@ -63,12 +68,6 @@ class CharacterizationShareApi implements ShareApi {
     return Promise.reject(new Error("CharacterizationShareApi operation is not configured"));
   }
 }
-
-const refusingApiKeys = (): ApiKeyApi =>
-  new Proxy({} as ApiKeyApi, {
-    get: () => (): Promise<never> =>
-      Promise.reject(new Error("the api-key boundary is not configured for this test")),
-  });
 
 const refusingTopics = (): TopicApi =>
   new Proxy({} as TopicApi, {
@@ -132,12 +131,14 @@ function characterizationOperations(options: {
 }): ProjectOperationsService {
   return ProjectOperationsService.create({
     projects: new CharacterizationProjectDirectory(options.projects),
-    apiKeys: refusingApiKeys(),
     share: new CharacterizationShareApi(options.revokeAllTraceShares),
     topics: refusingTopics(),
-    now: () => 0,
-    auditLog: createApiFixture<AuditLogApi>({}),
+    auditLog: createApiFixture<AuditLogApi>({
+      record: async () => ({ id: "audit", occurredAt: 0 }),
+    }),
+    lifecycle: { legacyKeyRevoked: async () => undefined },
     logger: { error: () => undefined },
+    now: () => 0,
   });
 }
 
@@ -175,6 +176,43 @@ describe("ProjectOperationsService", () => {
       await operations.updateSettings({ projectId: "project_123", traceSharingEnabled: false });
 
       expect(revokeAllTraceShares).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the settings form saves an endpoint with a blank secret", () => {
+    const storage = {
+      projectId: "project_123",
+      s3Endpoint: "cipher(https://s3.example)",
+      s3AccessKeyId: "cipher(AKIA)",
+    };
+
+    /** @scenario A first-time storage setup with a blank secret is refused */
+    it("refuses it when no secret is stored yet", async () => {
+      const update = vi.fn(async () => characterizationProject(false));
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => characterizationProject(false), update },
+        revokeAllTraceShares: async () => {},
+      });
+
+      await expect(operations.updateSettings(storage)).rejects.toMatchObject({
+        code: "validation_error",
+        httpStatus: 400,
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("keeps the stored secret when one is held", async () => {
+      const stored = { ...characterizationProject(false), s3SecretAccessKey: "cipher(shh)" };
+      const update = vi.fn(async () => stored);
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => stored, update },
+        revokeAllTraceShares: async () => {},
+      });
+
+      await operations.updateSettings(storage);
+
+      expect(update).toHaveBeenCalledOnce();
     });
   });
 });

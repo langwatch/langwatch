@@ -1,0 +1,98 @@
+/**
+ * RunSummaryCounts component with icon-based status display.
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { RunSummaryCounts } from "../../elements/runs/run-summary-counts.tsx";
+import { makeSummary } from "./run-history-fixtures.ts";
+
+describe("<RunSummaryCounts/>", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("given a summary with only passed counts non-zero", () => {
+    it("displays passed count with check icon and hides failed", () => {
+      renderWithDesignSystem(
+        <RunSummaryCounts summary={makeSummary({ passedCount: 8, failedCount: 0 })} />,
+      );
+
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with passed and failed counts non-zero", () => {
+    it("displays both as word labels", () => {
+      renderWithDesignSystem(
+        <RunSummaryCounts summary={makeSummary({ passedCount: 8, failedCount: 2 })} />,
+      );
+
+      expect(screen.getByText("8 passed")).toBeInTheDocument();
+      expect(screen.getByText("2 failed")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with all status counts non-zero", () => {
+    it("displays all statuses as word labels", () => {
+      renderWithDesignSystem(
+        <RunSummaryCounts
+          summary={makeSummary({
+            passedCount: 5,
+            failedCount: 1,
+            stalledCount: 2,
+            cancelledCount: 1,
+          })}
+        />,
+      );
+
+      expect(screen.getByText("5 passed")).toBeInTheDocument();
+      expect(screen.getByText("1 failed")).toBeInTheDocument();
+      expect(screen.getByText("2 stalled")).toBeInTheDocument();
+      expect(screen.getByText("1 cancelled")).toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with stalled and cancelled counts at zero", () => {
+    it("does not display stalled or cancelled counts", () => {
+      renderWithDesignSystem(
+        <RunSummaryCounts
+          summary={makeSummary({
+            passedCount: 8,
+            failedCount: 2,
+            stalledCount: 0,
+            cancelledCount: 0,
+          })}
+        />,
+      );
+
+      expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a summary with all counts at zero", () => {
+    it("renders empty container with no status items", () => {
+      const { container } = renderWithDesignSystem(
+        <RunSummaryCounts
+          summary={makeSummary({
+            passedCount: 0,
+            failedCount: 0,
+            stalledCount: 0,
+            cancelledCount: 0,
+          })}
+        />,
+      );
+
+      const countsEl = container.querySelector('[data-testid="run-summary-counts"]');
+      expect(countsEl).toBeInTheDocument();
+      expect(screen.queryByText(/passed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/failed/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/stalled/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/cancelled/)).not.toBeInTheDocument();
+    });
+  });
+});

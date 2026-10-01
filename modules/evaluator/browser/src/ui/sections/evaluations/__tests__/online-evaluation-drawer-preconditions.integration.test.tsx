@@ -9,6 +9,9 @@ import "@testing-library/jest-dom/vitest";
 vi.mock("../../../../behavior/evaluator-api.ts", async () =>
   (await import("./online-evaluation-drawer.test-helpers.tsx")).createApiMock(),
 );
+vi.mock("@langwatch/evaluator-client", async () =>
+  (await import("./online-evaluation-drawer.test-helpers.tsx")).createEvaluatorClientMock(),
+);
 vi.mock("@langwatch/browser-host/use-organization-team-project", async () =>
   (await import("./online-evaluation-drawer.test-helpers.tsx")).createOrgMock(),
 );

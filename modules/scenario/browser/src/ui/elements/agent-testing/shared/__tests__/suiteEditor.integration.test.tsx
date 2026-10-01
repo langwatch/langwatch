@@ -1,24 +1,21 @@
+import type * as errorsModule from "@langwatch/browser-host/errors";
 /**
  * @vitest-environment jsdom
  * The suite editor drawer: name, fields and evaluators a test suite
  * declares, the chips that open them, and what a save sends and hears back.
  * @see specs/features/agent-testing/suite-editor.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type * as errorsModule from "@langwatch/browser-host/errors";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useSuiteEditorStore } from "../../../../../behavior/agent-testing/suite/suite-editor-store.ts";
-// DANGLING: `SuiteEditorDrawer` / `useSuiteEditorStore` do not exist anywhere
-// in this tree - the whole never-ported suite-editor surface (also
-// SuiteEvaluatorsSection, useOpenSuiteEditor, evaluators/attachment-rules,
-// useOpenScenarioEvaluatorEditor, useProjectEvaluators). See handoff
-// merge-scenario-dangling-imports.
-import { SUITE_EDITOR_DRAWER, SuiteEditorDrawer } from "../../suite/suite-editor-drawer.tsx";
+import {
+  SUITE_EDITOR_DRAWER,
+  SuiteEditorDrawer,
+} from "../../../../sections/agent-testing/drawers/suite-editor-drawer.tsx";
 
 const mockSuiteGetById = vi.hoisted(() => vi.fn());
 const mockEvaluatorsGetAll = vi.hoisted(() => vi.fn());
@@ -63,11 +60,22 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
         },
       },
     },
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    useUtils: () => ({
+      suites: {
+        testSuites: { getAll: { invalidate: vi.fn() } },
+        getById: { invalidate: vi.fn() },
+      },
+      evaluators: { getById: { fetch: mockEvaluatorFetch } },
+    }),
     evaluators: { getAll: { useQuery: mockEvaluatorsGetAll } },
   },
 }));
 
-vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj_1", slug: "test-project" },
   }),
@@ -103,10 +111,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   },
   getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
 }));
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const SQL_EVALUATOR = {
   id: "eval_sql",
@@ -193,7 +197,7 @@ function openEditor(suite = storedSuite()) {
   drawerState.open = SUITE_EDITOR_DRAWER;
   drawerState.params = { testSuiteId: "suite_1" };
   drawerState.stack = [{ drawer: SUITE_EDITOR_DRAWER }];
-  return render(<SuiteEditorDrawer />, { wrapper: Wrapper });
+  return renderWithDesignSystem(<SuiteEditorDrawer />);
 }
 
 const draft = () => useSuiteEditorStore.getState().draft;

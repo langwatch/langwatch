@@ -1,7 +1,7 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import type React from "react";
 
-import { useDrawerStore } from "../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../behavior/trace-drawer.ts";
 import { isTraceExplorerPath } from "../../../model/trace-explorer-path.ts";
 import { useTraceDrawerUrlHydrator } from "./hooks/use-trace-drawer-url-hydrator.ts";
 import { TraceV2DrawerShell } from "./trace-drawer/index.ts";
@@ -19,7 +19,7 @@ export const GlobalTraceV2DrawerMount: React.FC = () => {
 
 const GlobalTraceV2DrawerMountInner: React.FC = () => {
   useTraceDrawerUrlHydrator();
-  const hasTrace = useDrawerStore((s) => !!s.traceId);
+  const hasTrace = useTraceDrawer((s) => !!s.traceId);
   if (!hasTrace) return null;
   return <TraceV2DrawerShell />;
 };

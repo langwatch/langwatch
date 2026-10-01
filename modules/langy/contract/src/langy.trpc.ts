@@ -2,8 +2,9 @@
  * Every `langy.*` procedure the panel calls, declared once: name, kind, input, answer.
  * Spec: modules/langy/specs/langy-panel-trpc.feature
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
+import { LANGY_CONVERSATION_EVENT_TYPES } from "./constants.ts";
 import {
   langyAnswerLocalPermissionInputSchema,
   langyAnswerQuestionInputSchema,
@@ -67,7 +68,12 @@ export const langyTrpc = defineTrpcContract("langy")
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyConversationDetailSchema.nullable())
 
-  .query("messages")
+  .query("messages", {
+    invalidatedBy: [
+      LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+      LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED,
+    ],
+  })
   .withInput(langyPanelConversationInputSchema)
   .withOutput(langyConversationMessagesDtoSchema)
 

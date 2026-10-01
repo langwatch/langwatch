@@ -1,5 +1,6 @@
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   DEFAULT_SET_ID,
@@ -24,15 +25,13 @@ import {
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { ScenarioEventBroadcast } from "../channels/scenario-event-broadcast.channel.ts";
-
 const logger = createLogger("langwatch:scenario-events");
 
 export class ScenarioEventService {
   static create(input: {
     simulations: SimulationService;
     scenarioTabs: ScenarioTabRegistry;
-    broadcast: ScenarioEventBroadcast;
+    broadcast: Pick<PresenceApi, "publishProjectEvent">;
     traces: TraceApi;
     entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
     projects: Pick<ProjectApi, "getOrganizationId">;
@@ -42,7 +41,7 @@ export class ScenarioEventService {
 
   #simulations: SimulationService;
   #scenarioTabs: ScenarioTabRegistry;
-  #broadcast: ScenarioEventBroadcast;
+  #broadcast: Pick<PresenceApi, "publishProjectEvent">;
   #traces: TraceApi;
   #entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
   #projects: Pick<ProjectApi, "getOrganizationId">;
@@ -50,7 +49,7 @@ export class ScenarioEventService {
   private constructor(input: {
     simulations: SimulationService;
     scenarioTabs: ScenarioTabRegistry;
-    broadcast: ScenarioEventBroadcast;
+    broadcast: Pick<PresenceApi, "publishProjectEvent">;
     traces: TraceApi;
     entitlement: Pick<EntitlementApi, "assertWithinUsageLimit">;
     projects: Pick<ProjectApi, "getOrganizationId">;
@@ -138,11 +137,16 @@ export class ScenarioEventService {
       tabKey: input.tabKey,
       url: input.url,
     });
-    await this.#broadcast.broadcastToTenant({
-      projectId: input.projectId,
-      message: JSON.stringify(payload),
-      eventType: "simulation_updated",
-    });
+    try {
+      await this.#broadcast.publishProjectEvent({
+        projectId: input.projectId,
+        channel: "simulation_updated",
+        event: JSON.stringify(payload),
+      });
+    } catch (error) {
+      // The pending navigate is durable, so the handoff still counts as delivered.
+      logger.warn({ error, projectId: input.projectId }, "Failed to broadcast tab handoff");
+    }
 
     logger.info(
       { projectId: input.projectId, batchRunId: input.batchRunId },
@@ -291,10 +295,10 @@ export class ScenarioEventService {
         event.type === ScenarioEventType.TOOL_CALL_ARGS
           ? "delta"
           : "structural";
-      await this.#broadcast.broadcastToTenantRateLimited({
+      await this.#broadcast.publishProjectEvent({
         projectId,
-        message: payload,
-        eventType: "simulation_updated",
+        channel: "simulation_updated",
+        event: payload,
         tier,
       });
     } catch (error) {

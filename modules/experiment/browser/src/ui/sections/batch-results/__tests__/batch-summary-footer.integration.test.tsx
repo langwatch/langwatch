@@ -4,17 +4,15 @@ import "@testing-library/jest-dom/vitest";
  *
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { type BatchRunSummary, BatchSummaryFooter } from "@langwatch/experiment-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { type BatchRunSummary } from "../batch-runs-sidebar.tsx";
+import { BatchSummaryFooter } from "../batch-summary-footer.tsx";
+
 // Wrapper with Chakra provider
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 // Helper to create run summary
 const createRunSummary = (overrides: Partial<BatchRunSummary> = {}): BatchRunSummary => ({
@@ -50,9 +48,7 @@ describe("BatchSummaryFooter", () => {
     it("displays evaluation name and pass rate", () => {
       const run = createRunSummary();
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Exact Match")).toBeInTheDocument();
       // The text includes avg score when different from pass rate
@@ -69,9 +65,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Eval A")).toBeInTheDocument();
       expect(screen.getByText("Eval B")).toBeInTheDocument();
@@ -90,9 +84,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("response_length")).toBeInTheDocument();
       // Should show the score only, not a pass rate
@@ -114,9 +106,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Score Only Eval")).toBeInTheDocument();
       expect(screen.getByText("0.75")).toBeInTheDocument();
@@ -136,9 +126,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Total Cost")).toBeInTheDocument();
       // Total is 0.15
@@ -156,9 +144,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Runtime")).toBeInTheDocument();
       // Should show runtime in format like "00:01:05" - numeral(65).format("00:00:00")
@@ -175,9 +161,7 @@ describe("BatchSummaryFooter", () => {
         },
       });
 
-      render(<BatchSummaryFooter run={run} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} />);
 
       expect(screen.getByText("Stopped")).toBeInTheDocument();
     });
@@ -194,9 +178,7 @@ describe("BatchSummaryFooter", () => {
         total: 10,
       });
 
-      render(<BatchSummaryFooter run={run} showProgress />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} showProgress />);
 
       expect(screen.getByText("Running")).toBeInTheDocument();
       expect(screen.getByText("5/10")).toBeInTheDocument();
@@ -212,9 +194,7 @@ describe("BatchSummaryFooter", () => {
         total: 10,
       });
 
-      render(<BatchSummaryFooter run={run} showProgress />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} showProgress />);
 
       expect(screen.queryByText("Running")).not.toBeInTheDocument();
     });
@@ -231,9 +211,7 @@ describe("BatchSummaryFooter", () => {
         total: 10,
       });
 
-      render(<BatchSummaryFooter run={run} showProgress onStop={onStop} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} showProgress onStop={onStop} />);
 
       expect(screen.getByText("Stop")).toBeInTheDocument();
     });
@@ -249,9 +227,7 @@ describe("BatchSummaryFooter", () => {
         total: 10,
       });
 
-      render(<BatchSummaryFooter run={run} showProgress onStop={onStop} />, {
-        wrapper: Wrapper,
-      });
+      renderWithDesignSystem(<BatchSummaryFooter run={run} showProgress onStop={onStop} />);
 
       await user.click(screen.getByText("Stop"));
 

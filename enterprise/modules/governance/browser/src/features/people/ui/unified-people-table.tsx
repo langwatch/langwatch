@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { UserAvatar } from "@langwatch/design-system/avatar";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { Badge, Button, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 import { MoreVertical } from "lucide-react";
 import numeral from "numeral";
 

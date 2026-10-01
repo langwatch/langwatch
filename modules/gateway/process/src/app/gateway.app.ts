@@ -2,14 +2,16 @@
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
-import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
-import { type AuthzPermission } from "@langwatch/authorization";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestDeclaredResult } from "@langwatch/api/rest";
+import { type AuthzPermission, PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
   EventingCommandSender,
+  EventingParticipation,
   Projection,
   RegisteredCommand,
   StaticPipelineDefinition,
@@ -128,11 +130,11 @@ import {
   type GatewayPrincipalSpendWindow,
 } from "@langwatch/gateway-contract";
 import { ValidationError } from "@langwatch/handled-error";
-import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import { type ProcessMembers } from "@langwatch/process-stores/members";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -177,6 +179,7 @@ import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/pri
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
+import { PrismaGatewayTraceExportKeyRepository } from "../repositories/prisma/prisma.gateway-trace-export-key.repository.ts";
 import {
   type GatewayAgentCacheEntryStore,
   RedisGatewayAgentCacheEntryRepository,
@@ -224,6 +227,8 @@ import {
   type GatewaySpendScope,
   type GatewaySpendScopeQuery,
 } from "../services/gateway-spend-reconciliation.service.ts";
+import { GatewaySpendScopeService } from "../services/gateway-spend-scope.service.ts";
+import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
 import type {
   VirtualKeyCamelDto,
@@ -237,6 +242,7 @@ import type {
   GatewayInternalChangesRequest,
   GatewayInternalConfigRequest,
   GatewayInternalDoorApi,
+  GatewayInternalGuardrailRequest,
   GatewayInternalRawRequest,
   GatewayInternalResolveKeyRequest,
   GatewayInternalSessionRequest,
@@ -247,6 +253,7 @@ import {
   GatewayEndUserCapsAdapter,
 } from "./gateway-composition.build.ts";
 import { type GatewayBudgetSpend, type GatewayChangeEvents } from "./gateway.members.ts";
+import type { RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -585,7 +592,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     scopes: readonly GatewayVirtualKeyScope[];
     callerProjectId: string;
   }): Promise<void>;
-  /** One named permission on AT LEAST ONE of the key's existing scopes. */
+  /** One named permission at EVERY one of the key's existing scopes (Alex, 2026-10-01). */
   assertCanOperateOnAnyScope(input: {
     actor: GatewayActor;
     scopes: readonly GatewayVirtualKeyScope[];
@@ -716,7 +723,7 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 };
 
 type GatewaySetup = FeatureSetup<
-  typeof GatewayApp.dependencies,
+  typeof GatewayModule.dependencies,
   Pick<ProcessMembers, "prisma" | "clickhouse" | "encryption" | "redis"> &
     Readonly<{
       /** The expected control plane, where the gateway's own setting says nothing. */
@@ -725,7 +732,7 @@ type GatewaySetup = FeatureSetup<
   GatewayServerConfig
 >;
 
-export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
+export class GatewayModule implements GatewayApi, GatewayInternalDoorApi, GatewaySpendDoorApi {
   static readonly contract = GatewayApiToken;
   static readonly dependencies = {
     /**
@@ -764,6 +771,8 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     traces: TraceApi,
     /** Parks a fresh key's secret for one later read, when its create asks for `revealOnce`. */
     oneTimeReveals: SecretApi,
+    /** Mints the ownerless key each trace project's gateway spans are exported with. */
+    apiKeys: ApiKeyApi,
   };
   static readonly config = gatewayConfig;
   static readonly publicConfig = gatewayBrowserConfig.project;
@@ -784,11 +793,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
    */
   static readonly reads = ["prisma", "clickhouse", "encryption", "redis", "publicBaseUrl"] as const;
 
-  static async create(setup: GatewaySetup): Promise<GatewayApp> {
-    return setup.secrets.into(GatewayApp.secrets.internalSecret, (internalSecret) =>
-      setup.secrets.into(GatewayApp.secrets.jwtSecret, (jwtSecret) =>
-        setup.secrets.into(GatewayApp.secrets.virtualKeyPepper, (virtualKeyPepper) =>
-          GatewayApp.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
+  static async create(setup: GatewaySetup): Promise<GatewayModule> {
+    return setup.secrets.into(GatewayModule.secrets.internalSecret, (internalSecret) =>
+      setup.secrets.into(GatewayModule.secrets.jwtSecret, (jwtSecret) =>
+        setup.secrets.into(GatewayModule.secrets.virtualKeyPepper, (virtualKeyPepper) =>
+          GatewayModule.#createWithSecrets(setup, { internalSecret, jwtSecret, virtualKeyPepper }),
         ),
       ),
     );
@@ -801,7 +810,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       jwtSecret: string | undefined;
       virtualKeyPepper: string | undefined;
     }>,
-  ): GatewayApp {
+  ): GatewayModule {
     const governanceEvents = GatewayGovernanceEventsService.create({
       projects: setup.dependencies.projects,
     });
@@ -811,6 +820,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       peers: {
         authz: setup.dependencies.authz,
         projects: setup.dependencies.projects,
+        organizations: setup.dependencies.organizations,
         evaluators: setup.dependencies.evaluators,
         monitors: setup.dependencies.monitors,
         platformProviders: setup.dependencies.modelProviders,
@@ -855,8 +865,14 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
           database: setup.members.prisma,
         }),
         platformProviders: setup.dependencies.modelProviders,
+        projects: setup.dependencies.projects,
       }),
       connectUpstream,
+      traceExportKeys: GatewayTraceExportKeyService.create({
+        repository: PrismaGatewayTraceExportKeyRepository.create(setup.members.prisma),
+        cipher: setup.members.encryption,
+        apiKeys: setup.dependencies.apiKeys,
+      }),
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
       repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
@@ -882,7 +898,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       realtimeSessions,
     });
 
-    return new GatewayApp({
+    return new GatewayModule({
       members: {
         ...controlPlane,
         agentCache: {
@@ -959,7 +975,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   #spend: GatewaySpendCollaborators | undefined;
   #spendPipeline: GatewaySpendPipelineParts | undefined;
   #spendProcessing: EventingGatewaySpendAdapter | undefined;
-  #spendScope: PrismaGatewaySpendScopeRepository | undefined;
+  #spendScope: GatewaySpendScopeService | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
@@ -1239,7 +1255,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   }
 
   answerInternalGuardrailCheck(
-    input: GatewayInternalRawRequest,
+    input: GatewayInternalGuardrailRequest,
   ): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>> {
     return this.#internalAnswers.answerGuardrailCheck(input);
   }
@@ -1376,8 +1392,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
   resolveSpendScope(input: GatewaySpendScopeQuery): Promise<GatewaySpendScope> {
     // Held rather than rebuilt per call: the adapter keeps a project cache, and
     // a fresh one per request would resolve every filter from cold.
-    this.#spendScope ??= PrismaGatewaySpendScopeRepository.create({
-      database: this.#spendCollaborators.prisma,
+    this.#spendScope ??= GatewaySpendScopeService.create({
+      projects: this.#dependencies.projects,
+      virtualKeys: PrismaGatewaySpendScopeRepository.create({
+        database: this.#spendCollaborators.prisma,
+      }),
     });
 
     return this.#spendScope.resolveSpendScope(input);
@@ -2228,6 +2247,7 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
    */
   async authorizeVirtualKeyCreate(input: {
     actor: GatewayActor;
+    impersonatorId?: string | undefined;
     organizationId: string;
     scopes: readonly GatewayVirtualKeyScope[];
     traceProjectId: string | null | undefined;
@@ -2235,6 +2255,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     callerProjectId?: string | undefined;
   }): Promise<void> {
     const { actor, organizationId, scopes, traceProjectId, guardrailAttachments } = input;
+    refuseImpersonatedMint({
+      impersonatorId: input.impersonatorId,
+      permission: "virtualKeys:create",
+      organizationId,
+    });
     if (input.callerProjectId === undefined) {
       await this.authorizeVirtualKeyScopeSelection({
         actor,
@@ -2325,10 +2350,18 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
    */
   async authorizeVirtualKeyOperation(input: {
     actor: GatewayActor;
+    impersonatorId?: string | undefined;
     organizationId: string;
     id: string;
     permission: AuthzPermission;
   }): Promise<VirtualKeyWithScopes> {
+    if (input.permission === "virtualKeys:rotate") {
+      refuseImpersonatedMint({
+        impersonatorId: input.impersonatorId,
+        permission: input.permission,
+        organizationId: input.organizationId,
+      });
+    }
     const existing = await this.#dependencies.getExistingVirtualKey({
       organizationId: input.organizationId,
       id: input.id,
@@ -2405,4 +2438,18 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       actorUserId: authorized.actorUserId,
     };
   }
+}
+
+/** An operator acting as a member holds no grant to issue credentials as them (F05). */
+function refuseImpersonatedMint(input: {
+  impersonatorId: string | undefined;
+  permission: AuthzPermission;
+  organizationId: string;
+}): void {
+  if (!input.impersonatorId) return;
+  throw new PermissionDeniedError({
+    permission: input.permission,
+    scope: { type: "organization", id: input.organizationId },
+    denialReason: "no-binding",
+  });
 }

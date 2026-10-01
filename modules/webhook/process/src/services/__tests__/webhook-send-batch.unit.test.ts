@@ -14,8 +14,8 @@
  * failure it would be a backoff floor on a batch that is already dead.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { DispatchError, type IntentContext, type ProcessStore } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WebhookEndpointView } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 

@@ -11,7 +11,7 @@ import {
 /** The client slice the scope graph is read through. */
 export type GatewayScopeResolutionDatabase = Pick<
   PrismaClient,
-  "modelProvider" | "project" | "routingPolicy" | "virtualKey"
+  "modelProvider" | "routingPolicy" | "virtualKey"
 >;
 
 type ScopePredicate =
@@ -29,21 +29,6 @@ export class PrismaGatewayScopeResolutionRepository extends GatewayScopeResoluti
 
   private constructor(private readonly database: GatewayScopeResolutionDatabase) {
     super();
-  }
-
-  async findTeamIdsForProjects({
-    projectIds,
-    transaction,
-  }: {
-    projectIds: string[];
-    transaction?: GatewayPersistenceTransaction;
-  }): Promise<string[]> {
-    const projects = await this.client(transaction).project.findMany({
-      where: { id: { in: projectIds } },
-      select: { teamId: true },
-    });
-
-    return projects.map((project) => project.teamId);
   }
 
   async findProvidersReachableFromScopes({

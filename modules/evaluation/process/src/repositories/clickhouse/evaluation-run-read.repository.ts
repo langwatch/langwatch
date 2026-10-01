@@ -12,9 +12,11 @@ import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { EvaluationRetentionLookup } from "../../app/evaluation.members.ts";
 import { DEFAULT_SCHEDULED_AT_SLACK_MS } from "../../rules/evaluation-run-lookup.rules.ts";
-import type { EvaluationRunFloorLookup } from "../evaluation.repository.ts";
+import type {
+  EvaluationRunFloorLookup,
+  EvaluationRetentionLookup,
+} from "../evaluation.repository.ts";
 import type {
   EvaluationClickHouseClient,
   EvaluationClickHouseResolver,

@@ -6,7 +6,7 @@ import {
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { STORAGE_STATS_PROCESS_NAME, runStorageStats } from "./ops-storage-stats.intent.ts";
 import {
@@ -23,7 +23,7 @@ export const STORAGE_STATS_PIPELINE_NAME = "ops_storage_stats";
 export function buildStorageStats({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<OpsApp, "measureStorage">>): StaticPipelineDefinition<never> {
+}: EventingSetup<unknown, Pick<OpsModule, "measureStorage">>): StaticPipelineDefinition<never> {
   return definePipeline({
     name: STORAGE_STATS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: "global" }),
@@ -50,5 +50,5 @@ export function buildStorageStats({
 
 export const storageStatsEventing = defineEventingModule({
   pipeline: STORAGE_STATS_PIPELINE_NAME,
-  build: (setup: EventingSetup<OpsRepositories, OpsApp>) => buildStorageStats(setup),
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildStorageStats(setup),
 });

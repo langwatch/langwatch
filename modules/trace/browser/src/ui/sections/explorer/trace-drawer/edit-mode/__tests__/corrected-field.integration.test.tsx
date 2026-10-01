@@ -1,9 +1,9 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 /**
  * @vitest-environment jsdom
  */
 import { Text } from "@langwatch/design-system/primitives";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
@@ -17,12 +17,10 @@ import {
 const CAPTURED_OUTPUT = "the answer is 41";
 
 function renderFrame(original: string) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <CorrectedFieldFrame label="Output" original={original}>
-        <Text>the answer is 42</Text>
-      </CorrectedFieldFrame>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <CorrectedFieldFrame label="Output" original={original}>
+      <Text>the answer is 42</Text>
+    </CorrectedFieldFrame>,
   );
 }
 
@@ -84,12 +82,10 @@ describe("CorrectedField", () => {
     describe("when the span detail renders", () => {
       /** @scenario "A corrected span name names its captured name" */
       it("marks it as edited and names the captured value", () => {
-        render(
-          <ChakraProvider value={defaultSystem}>
-            <CorrectedScalar label="Span name" original="web_search">
-              <Text>search the web</Text>
-            </CorrectedScalar>
-          </ChakraProvider>,
+        renderWithDesignSystem(
+          <CorrectedScalar label="Span name" original="web_search">
+            <Text>search the web</Text>
+          </CorrectedScalar>,
         );
 
         expect(

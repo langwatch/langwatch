@@ -280,12 +280,13 @@ product capability in the browser, not a rename of a backend module, and forcing
 one entry per module to carry a declaration would make it both.
 
 A module therefore declares, in the `feature.json` it already has, the sibling
-web surfaces its own web package consumes:
+web surfaces its own web package consumes (illustrative; no package exports a
+`surfaces/` subpath today):
 
 ```json
 {
   "layoutVersion": 0,
-  "web": { "uses": { "surfaces": ["@langwatch/suite-browser/surfaces/run-formatters"] } }
+  "web": { "uses": { "surfaces": ["@langwatch/example-browser/surfaces/run-formatters"] } }
 }
 ```
 

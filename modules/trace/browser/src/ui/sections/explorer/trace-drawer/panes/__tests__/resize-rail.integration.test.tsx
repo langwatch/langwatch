@@ -1,19 +1,24 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, fireEvent, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   DRAWER_MAXIMIZE_EDGE_PX,
   DRAWER_MIN_WIDTH_PX,
-  useDrawerStore,
-} from "../../../../../../behavior/drawer.store.ts";
+  drawerChrome,
+} from "../../../../../../behavior/drawer-chrome.store.ts";
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 import { ResizeRail } from "../resize-rail.tsx";
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 const VIEWPORT_WIDTH = 1440;
@@ -23,8 +28,8 @@ beforeEach(() => {
     configurable: true,
     value: VIEWPORT_WIDTH,
   });
-  useDrawerStore.getState().setWidthPx(null);
   localStorage.clear();
+  drawerChrome.setState(drawerChrome.getInitialState(), true);
 });
 
 afterEach(cleanup);
@@ -77,9 +82,9 @@ describe("ResizeRail", () => {
   describe("given the user drags the rail", () => {
     describe("when pointermove fires with a leftward delta", () => {
       /** @scenario Drag the left-edge grip to resize the drawer */
-      it("updates drawerStore.widthPx to current + |dx|", () => {
+      it("updates the drawer width to current + |dx|", () => {
         // Start from a known width so the math is checkable.
-        useDrawerStore.getState().setWidthPx(640);
+        drawerChrome.getState().setWidthPx(640);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -90,7 +95,7 @@ describe("ResizeRail", () => {
         fireEvent.pointerMove(el, { clientX: 800, pointerId: 1 });
 
         // Dragging the rail leftward by 200px widens the drawer to 840px.
-        expect(useDrawerStore.getState().widthPx).toBe(840);
+        expect(drawerChrome.getState().widthPx).toBe(840);
 
         fireEvent.pointerUp(el, { clientX: 800, pointerId: 1 });
       });
@@ -99,7 +104,7 @@ describe("ResizeRail", () => {
     describe("when pointermove drags past the min clamp", () => {
       /** @scenario Width is clamped to a minimum */
       it("does not let widthPx drop below DRAWER_MIN_WIDTH_PX", () => {
-        useDrawerStore.getState().setWidthPx(400);
+        drawerChrome.getState().setWidthPx(400);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -108,7 +113,7 @@ describe("ResizeRail", () => {
         // Drag rightward 800px → propose 400 - 800 = -400, clamp to min.
         fireEvent.pointerMove(el, { clientX: 1800, pointerId: 1 });
 
-        expect(useDrawerStore.getState().widthPx).toBe(DRAWER_MIN_WIDTH_PX);
+        expect(drawerChrome.getState().widthPx).toBe(DRAWER_MIN_WIDTH_PX);
 
         fireEvent.pointerUp(el, { clientX: 1800, pointerId: 1 });
       });
@@ -117,7 +122,7 @@ describe("ResizeRail", () => {
     describe("when pointermove drags past the max clamp", () => {
       /** @scenario Width is clamped to a maximum */
       it("does not let widthPx exceed viewport - edge", () => {
-        useDrawerStore.getState().setWidthPx(800);
+        drawerChrome.getState().setWidthPx(800);
 
         render(<ResizeRail />, { wrapper });
         const el = getRail();
@@ -126,7 +131,7 @@ describe("ResizeRail", () => {
         // Drag leftward 2000px → propose 2800px, clamp to viewport-edge.
         fireEvent.pointerMove(el, { clientX: -1000, pointerId: 1 });
 
-        expect(useDrawerStore.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
+        expect(drawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
 
         fireEvent.pointerUp(el, { clientX: -1000, pointerId: 1 });
       });
@@ -137,11 +142,11 @@ describe("ResizeRail", () => {
     describe("when double-click fires", () => {
       /** @scenario Double-click the grip toggles maximize and restore */
       it("snaps the width to viewport - edge", () => {
-        useDrawerStore.getState().setWidthPx(700);
+        drawerChrome.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });
         const el = getRail();
         fireEvent.doubleClick(el);
-        expect(useDrawerStore.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
+        expect(drawerChrome.getState().widthPx).toBe(VIEWPORT_WIDTH - DRAWER_MAXIMIZE_EDGE_PX);
       });
     });
   });
@@ -150,14 +155,14 @@ describe("ResizeRail", () => {
     describe("when only a pointerdown/up fires (no double click)", () => {
       /** @scenario Single-click the grip does NOT toggle width */
       it("does not change the width", () => {
-        useDrawerStore.getState().setWidthPx(700);
+        drawerChrome.getState().setWidthPx(700);
         render(<ResizeRail />, { wrapper });
         const el = getRail();
 
         fireEvent.pointerDown(el, { clientX: 1000, button: 0, pointerId: 1 });
         fireEvent.pointerUp(el, { clientX: 1000, pointerId: 1 });
 
-        expect(useDrawerStore.getState().widthPx).toBe(700);
+        expect(drawerChrome.getState().widthPx).toBe(700);
       });
     });
   });

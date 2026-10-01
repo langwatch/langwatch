@@ -3,6 +3,7 @@
  * wire schemas those doors publish stay beside their declaration; these are the
  * shapes the operations themselves take.
  */
+import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 
 const batchTargetSchema = z.object({
@@ -114,7 +115,26 @@ export type RunEvaluatorInput = Readonly<{
   data: EvaluationDispatchData;
   settings: Record<string, unknown>;
   workflowId?: string | null;
+  /** Aborts the downstream judge once the caller's deadline passes or its answer is moot. */
+  signal?: AbortSignal | undefined;
 }>;
+
+/** One guardrail's evaluator run, bounded by the caller's signal and its own deadline. */
+export type GuardrailCheckInput = Readonly<{
+  projectId: string;
+  evaluatorType: string;
+  settings: Record<string, unknown>;
+  data: Readonly<{ input: string; output: string }>;
+  /** The guardrail, and the monitor its cost is recorded against. */
+  guardrail: Readonly<{ id: string; name: string; monitorId: string }>;
+  signal?: AbortSignal | undefined;
+  deadlineMs?: number | undefined;
+}>;
+
+/** The evaluator's result, or why the run stopped before it had one. */
+export type GuardrailCheckOutcome =
+  | Readonly<{ status: "evaluated"; result: SingleEvaluationResult }>
+  | Readonly<{ status: "stopped"; by: "deadline" | "cancelled" }>;
 
 /** Which model the project's cascade resolves for one feature key. */
 export type EvaluationModelLookup = Readonly<{ projectId: string; featureKey: string }>;

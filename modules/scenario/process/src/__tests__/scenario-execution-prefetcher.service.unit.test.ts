@@ -2,8 +2,9 @@
  * Unit tests for model selection logic with dependency injection.
  */
 
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { ApiKeyPermissionDeniedError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import { ModelNotConfiguredError, findAliasTarget } from "@langwatch/model-provider-contract";
+import { CHILD_PROCESS } from "@langwatch/scenario-contract";
 import type {
   ScenarioChildEnvironment,
   ScenarioExecutionPrefetchInput,
@@ -42,17 +43,19 @@ async function prefetchWithFixture({
   target,
   deps,
   observeChildEnvironment,
+  startedByUserId,
 }: {
   context: ScenarioExecutionPrefetchInput["context"];
   target: TargetConfig;
   deps: ScenarioPrefetchFixture;
   observeChildEnvironment?: (inputs: ScenarioChildEnvironment) => void;
+  startedByUserId?: string;
 }): Promise<ScenarioExecutionPrefetchResult> {
   const preparation = createTestScenarioExecutionPrefetcherService(deps, {
     langwatchEndpoint: "http://app:5560",
     nlpServiceUrl: "http://langwatch_nlp:5561",
     legacyDefaultModel: DEFAULT_MODEL,
-  }).prepare({ context, target });
+  }).prepare({ context, target, startedByUserId });
   const environment = preparation.childEnvironment.then((inputs) => {
     if (inputs) observeChildEnvironment?.(inputs);
   });
@@ -202,9 +205,18 @@ describe("prefetchWithFixture, given child environment readiness", () => {
   describe("when the scenario and project resolve", () => {
     /** @scenario "A worker prepares a run through canonical services" */
     it("announces the labels and api key the child environment needs", async () => {
+      // The run key is minted for the resolved target, so the prompt must resolve.
       const deps = createMockDeps({
         scenarioFetcher: {
           getById: vi.fn().mockResolvedValue({ ...defaultScenario, labels: ["smoke"] }),
+        },
+        promptFetcher: {
+          findByIdOrHandle: vi.fn().mockResolvedValue({
+            id: "prompt_123",
+            prompt: "You are helpful",
+            messages: [],
+            model: "openai/gpt-4",
+          }),
         },
       });
       const observeChildEnvironment = vi.fn();
@@ -220,7 +232,7 @@ describe("prefetchWithFixture, given child environment readiness", () => {
       expect(observeChildEnvironment).toHaveBeenCalledWith(
         expect.objectContaining({
           labels: ["smoke"],
-          telemetry: expect.objectContaining({ apiKey: "test-api-key" }),
+          telemetry: expect.objectContaining({ apiKey: "run-key" }),
         }),
       );
     });
@@ -245,10 +257,10 @@ describe("prefetchWithFixture, given child environment readiness", () => {
       expect(observeChildEnvironment).not.toHaveBeenCalled();
     });
 
-    it("stays silent when the project has no api key", async () => {
+    it("stays silent when the project does not exist", async () => {
       const deps = createMockDeps({
         projectFetcher: {
-          findUnique: vi.fn().mockResolvedValue({ apiKey: null }),
+          findUnique: vi.fn().mockResolvedValue(null),
         },
       });
       const observeChildEnvironment = vi.fn();
@@ -261,6 +273,40 @@ describe("prefetchWithFixture, given child environment readiness", () => {
       });
 
       expect(observeChildEnvironment).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("prefetchWithFixture, given a run its starter may not run", () => {
+  /** @scenario "A scenario run is refused before it starts when its starter may not do what the target needs" */
+  it("refuses the run naming the missing permission and mints no key", async () => {
+    const deps = createMockDeps({
+      promptFetcher: {
+        findByIdOrHandle: vi.fn().mockResolvedValue({
+          id: "prompt_123",
+          prompt: "You are helpful",
+          messages: [],
+          model: "openai/gpt-4",
+        }),
+      },
+      modelParamsProvider: { prepare: vi.fn().mockResolvedValue(defaultModelParamsResult) },
+      apiKeys: {
+        mintRunKey: async () => {
+          throw new ApiKeyPermissionDeniedError("traces:create");
+        },
+      },
+    });
+
+    const result = await prefetchWithFixture({
+      context: defaultContext,
+      target: { type: "prompt", referenceId: "prompt_123" },
+      deps,
+      startedByUserId: "user_1",
+    });
+
+    expect(result).toMatchObject({
+      success: false,
+      error: expect.stringContaining("traces:create"),
     });
   });
 });
@@ -496,14 +542,15 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
     archivedAt: null,
   };
 
-  function codeDeps(mint: ApiKeyApi["getOrMintAgentSandboxKey"]) {
-    const getOrMintAgentSandboxKey = vi.fn(mint);
+  function codeDeps(mintSandbox: ApiKeyApi["mintRunKey"]) {
+    const sandboxMints = vi.fn(mintSandbox);
+    const mintRunKey: ApiKeyApi["mintRunKey"] = async (input) =>
+      input.permissions.includes("agentCache:manage") ? sandboxMints(input) : "run-key";
     const deps = createMockDeps({
       agentFetcher: { findById: vi.fn().mockResolvedValue(codeAgent) },
-      organizationId: "organization_1",
-      apiKeys: { getOrMintAgentSandboxKey },
+      apiKeys: { mintRunKey },
     });
-    return { deps, getOrMintAgentSandboxKey };
+    return { deps, sandboxMints };
   }
 
   function sandboxKeyOf(result: ScenarioExecutionPrefetchResult): string | undefined {
@@ -512,19 +559,23 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
   }
 
   describe("when the run data is prefetched", () => {
-    it("carries the project's one sandbox key, minted for its project and organization", async () => {
-      const { deps, getOrMintAgentSandboxKey } = codeDeps(async () => "sandbox-key-1");
+    /** @scenario "A code agent's sandbox holds a per-run key reaching only the agent cache" */
+    it("carries a per-run key for the starter holding only the agent cache", async () => {
+      const { deps, sandboxMints } = codeDeps(async () => "sandbox-key-1");
 
       const result = await prefetchWithFixture({
         context: defaultContext,
         target: { type: "code", referenceId: "agent_code" },
         deps,
+        startedByUserId: "user_1",
       });
 
       expect(sandboxKeyOf(result)).toBe("sandbox-key-1");
-      expect(getOrMintAgentSandboxKey).toHaveBeenCalledWith({
+      expect(sandboxMints).toHaveBeenCalledWith({
+        userId: "user_1",
         projectId: "proj_123",
-        organizationId: "organization_1",
+        permissions: ["agentCache:manage"],
+        minRemainingMs: CHILD_PROCESS.TIMEOUT_MS,
       });
     });
   });
@@ -549,7 +600,7 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
 
   describe("when the target is not a code agent", () => {
     it("mints no key", async () => {
-      const { deps, getOrMintAgentSandboxKey } = codeDeps(async () => "sandbox-key-1");
+      const { deps, sandboxMints } = codeDeps(async () => "sandbox-key-1");
       deps.promptFetcher.findByIdOrHandle = vi.fn().mockResolvedValue({ model: "openai/gpt-4" });
 
       await prefetchWithFixture({
@@ -558,7 +609,7 @@ describe("prefetchWithFixture, given a code target in a project with an organiza
         deps,
       });
 
-      expect(getOrMintAgentSandboxKey).not.toHaveBeenCalled();
+      expect(sandboxMints).not.toHaveBeenCalled();
     });
   });
 });
@@ -1352,7 +1403,7 @@ describe("prefetchWithFixture, when the prefetch succeeds", () => {
         });
         expect(result.telemetry).toEqual({
           endpoint: "http://app:5560",
-          apiKey: "test-api-key",
+          apiKey: "run-key",
         });
       });
     });

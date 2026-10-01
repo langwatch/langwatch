@@ -1,4 +1,4 @@
-import type { HealthRoute } from "@langwatch/process-server";
+import type { HealthRoute } from "@langwatch/process";
 
 /**
  * Parity with platform/app's routes/health.ts: operational infrastructure

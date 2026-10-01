@@ -3,8 +3,8 @@
  * Integration tests for /auth/forgot-password: the full tree renders under
  * Chakra; only the BetterAuth client and the public-env hook are mocked.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
@@ -33,12 +33,7 @@ vi.mock("../../../behavior/use-public-env.ts", () => ({
 
 import ForgotPassword from "../forgot-password-screen.tsx";
 
-const renderPage = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ForgotPassword />
-    </ChakraProvider>,
-  );
+const renderPage = () => renderWithDesignSystem(<ForgotPassword />);
 
 const submitEmail = (email: string) => {
   fireEvent.change(screen.getByRole("textbox"), { target: { value: email } });

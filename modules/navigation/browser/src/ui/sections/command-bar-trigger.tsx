@@ -1,4 +1,4 @@
-import { Kbd } from "@chakra-ui/react";
+import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Button, Text } from "@langwatch/design-system/primitives";
 import { Search } from "lucide-react";
 

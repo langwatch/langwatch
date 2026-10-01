@@ -2,11 +2,11 @@ import { createServer, type Server } from "node:http";
 
 import type { AgentApi, AgentConnectCredentials } from "@langwatch/agent-contract";
 import { WebSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 
-import { agentServer } from "../../agent.server.ts";
+import { agentProcessModule } from "../../agent.module.ts";
 import { CONNECT_PATH, createAgentWebSocketProtocol } from "../agent-connect.ws.ts";
 
 describe("the connected agents' socket", () => {
@@ -40,7 +40,7 @@ describe("the connected agents' socket", () => {
   /** @scenario "The agent module declares its socket where main served it" */
   it("is declared among the agent module's transports at main's path", () => {
     expect(CONNECT_PATH).toBe("/api/v1/agents/connect");
-    expect(agentServer.transports.some((transport) => transport.protocol === "websocket")).toBe(
+    expect(agentProcessModule.transports.some((transport) => transport.protocol === "websocket")).toBe(
       true,
     );
   });

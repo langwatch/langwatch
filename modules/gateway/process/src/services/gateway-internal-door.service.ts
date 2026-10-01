@@ -447,8 +447,10 @@ export class GatewayInternalDoorService {
 
   async answerGuardrailCheck({
     raw,
+    signal,
   }: {
     raw: string;
+    signal?: AbortSignal | undefined;
   }): Promise<RestDeclaredResult<typeof gatewayInternalGuardrailAnswers>> {
     const body = readJson(raw);
     if (body === null) {
@@ -472,7 +474,16 @@ export class GatewayInternalDoorService {
       guardrailIds: parsed.data.guardrail_ids,
       direction: parsed.data.direction,
       content: parsed.data.content,
+      signal,
     });
+    if (check.status === "deadline_exceeded") {
+      return refuse(503, {
+        type: "service_unavailable",
+        code: "guardrail_deadline_exceeded",
+        message: "a fail-closed guardrail had no verdict before its deadline; retry the request",
+        retryable: true,
+      });
+    }
     if (check.status === "unavailable") {
       // Refused, never allowed: a deployment with no evaluator runtime says so instead of
       // waving every request through an active protection.

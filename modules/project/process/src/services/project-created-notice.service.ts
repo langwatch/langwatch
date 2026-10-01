@@ -1,11 +1,18 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { RecordProjectCreatedCommandData } from "../eventing/project-lifecycle.events.ts";
+import type {
+  RecordProjectCreatedCommandData,
+  RecordProjectLegacyKeyRevokedCommandData,
+} from "../eventing/project-lifecycle.events.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 export type ProjectLifecycleSenders = Readonly<{
   recordProjectCreated: Pick<EventingCommandSender<RecordProjectCreatedCommandData>, "send">;
+  recordProjectLegacyKeyRevoked: Pick<
+    EventingCommandSender<RecordProjectLegacyKeyRevokedCommandData>,
+    "send"
+  >;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -18,9 +25,9 @@ type NoticeDependencies = Readonly<{
 }>;
 
 /**
- * Where a new project is recorded as project's event, with the organization's admin at that
- * moment; analytics and nurturing react from their own side (§9). Best effort, as main's inline
- * sync was: a failed record is logged. The sender arrives once the pipeline registers.
+ * Where a new project is recorded as project's event, with the organization's admin and its
+ * creator; peers react from their own side (§9). Best effort, as main's inline sync was: a
+ * failed record is logged. The sender arrives once the pipeline registers.
  */
 export class ProjectCreatedNoticeService {
   static create(dependencies: NoticeDependencies): ProjectCreatedNoticeService {
@@ -41,9 +48,12 @@ export class ProjectCreatedNoticeService {
     await this.#send({ ...input, adminUserId: admin?.adminUserId ?? null });
   }
 
-  async created(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
+  async created(
+    input: Readonly<{ projectId: string; organizationId: string; createdByUserId: string | null }>,
+  ): Promise<void> {
     try {
-      await this.record(input);
+      const admin = await this.dependencies.projects.findWithOrgAdmin(input.projectId);
+      await this.#send({ ...input, adminUserId: admin?.adminUserId ?? null });
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
@@ -73,11 +83,32 @@ export class ProjectCreatedNoticeService {
     return recorded;
   }
 
+  /** Best effort: the revocation has happened, so a failed record is logged, not raised. */
+  async legacyKeyRevoked(
+    input: Readonly<{ projectId: string; organizationId: string; revokedByUserId: string }>,
+  ): Promise<void> {
+    try {
+      const senders = this.#senders;
+      if (!senders) throw new Error("project_lifecycle is not registered in this process");
+      await senders.recordProjectLegacyKeyRevoked.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the legacy key revocation failed; the status read refreshes on its own",
+      );
+    }
+  }
+
   async #send(
     input: Readonly<{
       projectId: string;
       organizationId: string;
       adminUserId: string | null;
+      createdByUserId?: string | null;
       backfilled?: boolean;
     }>,
   ): Promise<void> {

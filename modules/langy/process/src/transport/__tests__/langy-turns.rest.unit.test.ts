@@ -1,5 +1,3 @@
-/** @see specs/langy/langy-api-key-turns.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type {
   LangyApi,
@@ -7,6 +5,8 @@ import type {
   LangyTurnSettlementWait,
   LangyTurnSettlementWaitInput,
 } from "@langwatch/langy-contract";
+/** @see specs/langy/langy-api-key-turns.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { langyTurnsRest } from "../langy-turns.rest.ts";

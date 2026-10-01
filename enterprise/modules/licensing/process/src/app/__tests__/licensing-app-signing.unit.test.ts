@@ -1,15 +1,15 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { ScopedSecrets } from "@langwatch/secrets";
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { ResourceScope } from "@langwatch/kernel";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -18,7 +18,7 @@ import {
 } from "../../__tests__/fixtures/license-keys.fixture.ts";
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";
 import { LicensingInfrastructureService } from "../../services/licensing-infrastructure.service.ts";
-import { LicensingApp } from "../licensing.app.ts";
+import { LicensingModule } from "../licensing.app.ts";
 
 const PURCHASE = {
   organizationName: "Acme",
@@ -27,8 +27,8 @@ const PURCHASE = {
   maxMembers: 4,
 };
 
-function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingApp> {
-  return LicensingApp.create({
+function licensingWithSigningKey(signingKey: string | undefined): Promise<LicensingModule> {
+  return LicensingModule.create({
     dependencies: {
       instantEval: createApiFixture<InstantEvalApi>(),
       projects: createApiFixture<ProjectApi>(),

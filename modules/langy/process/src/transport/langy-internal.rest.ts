@@ -16,7 +16,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/internal/langy/turn/:turnId/result", "ingestTurnResult")
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .withAccess(
     anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
   )
@@ -27,7 +27,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .handle(({ app, input }) => app.ingestInternalTurnResult(input))
 
   .post("/api/internal/langy/credentials/revoke", "revokeWorkerSessionKey")
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .withAccess(
     anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
   )
@@ -36,7 +36,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
   .handle(({ app, input }) => app.revokeInternalCredentials(input))
 
   .post("/api/internal/langy/relay/frames", "streamRelayFrames")
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .withAccess(
     anyAuthenticated({ reason: "The deployment's Langy bearer authenticates its control plane." }),
   )

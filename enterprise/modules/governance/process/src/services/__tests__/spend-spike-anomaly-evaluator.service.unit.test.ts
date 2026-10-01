@@ -6,6 +6,7 @@ import type {
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { createGovernanceProjectApi } from "../../__tests__/testing.ts";
 import {
   type AnomalyAlertHttpClient,
   type AnomalySpendReader,
@@ -70,10 +71,6 @@ class MemoryAnomalyRepository extends SpendSpikeAnomalyRepository {
     return this.rules;
   }
 
-  async findGovernanceTenantId(): Promise<string | null> {
-    return this.tenantId;
-  }
-
   async hasOpenAlert(): Promise<boolean> {
     return this.hasOpen;
   }
@@ -104,6 +101,7 @@ function createService(
   return {
     service: SpendSpikeAnomalyEvaluatorService.create({
       repository,
+      projects: createGovernanceProjectApi(() => repository.tenantId),
       spend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: new SuccessfulHttp(),

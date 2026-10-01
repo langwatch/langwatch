@@ -17,6 +17,7 @@ export const infoSchema = z.object({
   capacity: z.number(),
   settings: settingsSchema,
 });
+export type Info = z.infer<typeof infoSchema>;
 
 export const callSchema = z.object({
   id: z.string(),

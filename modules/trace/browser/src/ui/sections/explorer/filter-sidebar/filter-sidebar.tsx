@@ -19,12 +19,6 @@ import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
-  useFilterStore,
-  useViewStore,
-  useUIStore,
-  getFacetIcon,
-} from "@langwatch/trace-browser-kit";
-import {
   ChevronsDownUp,
   ChevronsUpDown,
   FilterX,
@@ -36,8 +30,10 @@ import {
 import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { useProjectHasTraces } from "../../../../behavior/explorer/use-project-has-traces.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
 import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
@@ -46,6 +42,7 @@ import { FacetManagerPopover } from "./facet-manager-popover.tsx";
 import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data.ts";
 import { HoverHighlightStyle } from "./hover-highlight-style.tsx";
 import { SectionRenderer } from "./section-renderer.tsx";
+import { getFacetIcon } from "./utils.ts";
 
 const DRAG_ACTIVATION_DISTANCE_PX = 5;
 
@@ -540,7 +537,7 @@ function useSidebarShortcuts(actions: Record<string, (() => void) | undefined>) 
   actionsRef.current = actions;
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (useDrawerStore.getState().isOpen) return;
+      if (getTraceDrawer().isOpen) return;
       if (e.ctrlKey || e.metaKey || e.altKey || isTypingTarget(e.target)) return;
       const action = actionsRef.current[e.key.toLowerCase()];
       if (!action) return;

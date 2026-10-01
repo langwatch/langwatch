@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { FilterDisplay } from "../filter-display.tsx";
@@ -14,14 +14,12 @@ const renderFilters = ({
   filters: Record<string, unknown>;
   shouldClampValues?: boolean;
 }) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FilterDisplay
-        filters={filters}
-        hasBorder={true}
-        {...(shouldClampValues === undefined ? {} : { shouldClampValues })}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FilterDisplay
+      filters={filters}
+      hasBorder={true}
+      {...(shouldClampValues === undefined ? {} : { shouldClampValues })}
+    />,
   );
 
 // One unbreakable token, the shape of a monitor id. Without min-width: 0 on

@@ -68,8 +68,10 @@ function assertScopeCanGrantRole({
   }
 
   const permissions = rolesById.get(binding.customRoleId) ?? [];
+  // A legacy `ops:*` entry is inert at every tier (the platform fence), so it refuses nothing here.
   const exclusivePermission = permissions.find(
     (permission) =>
+      bindingScopeCanGrantPermission({ scopeType: "ORGANIZATION", permission }) &&
       !bindingScopeCanGrantPermission({
         scopeType: binding.scopeType,
         permission,

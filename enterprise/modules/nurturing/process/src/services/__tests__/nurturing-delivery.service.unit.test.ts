@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * @see enterprise/modules/nurturing/specs/nurturing.feature
  */
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 

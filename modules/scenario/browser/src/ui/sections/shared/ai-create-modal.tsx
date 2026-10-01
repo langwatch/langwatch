@@ -1,3 +1,4 @@
+import { LangyMark, LangyMarkGradientDefs } from "@langwatch/design-system/langy-mark";
 import {
   Box,
   Button,
@@ -10,7 +11,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { LangyMark, LangyMarkGradientDefs, CARD } from "@langwatch/langy-browser-kit";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ErrorActions } from "../../../behavior/errors.tsx";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
+import { CARD } from "../../../model/langy/asaplangy-tokens.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

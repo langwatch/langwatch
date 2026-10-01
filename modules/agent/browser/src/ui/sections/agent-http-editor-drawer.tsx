@@ -120,6 +120,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                 onAuthChange={(value) => form.change({ auth: value })}
                 headers={form.draft.headers}
                 onHeadersChange={(value) => form.change({ headers: value })}
+                stored={form.stored}
                 method={form.draft.method}
                 url={form.draft.url}
                 localMappings={form.localMappings}

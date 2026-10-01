@@ -14,7 +14,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { docsUrl } from "@langwatch/error-presentation/docs-url";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 

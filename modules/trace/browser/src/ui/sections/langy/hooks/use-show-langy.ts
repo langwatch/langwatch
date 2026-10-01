@@ -1,10 +1,10 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { useFeatureFlag } from "@langwatch/browser-host/feature-flag";
 
 import { useRequiredSession } from "../../../../behavior/auth-session.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { LANGY_RELEASE_FLAG } from "../../../../model/langy-release-flag.ts";
 import { OrganizationUserRole } from "../../../../model/prisma-types.ts";
-import { useFeatureFlag } from "../../use-feature-flag.ts";
 
 /**
  * Langy's visibility gate — "does this user have Langy?". Three layers:

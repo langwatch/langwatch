@@ -21,7 +21,9 @@ type GrantFindFirst = PrismaAuthzAdmissionDatabase["grant"]["findFirst"];
 type MembershipRow = Awaited<ReturnType<MembershipFindFirst>>;
 type GrantRow = Awaited<ReturnType<GrantFindFirst>>;
 
-function harness(rows: { membership?: MembershipRow; grant?: GrantRow; updated?: number } = {}) {
+function harness(
+  rows: { membership?: MembershipRow; grant?: GrantRow; updated?: number; inactive?: boolean } = {},
+) {
   const membershipFindFirst = vi.fn(
     async (_args: Parameters<MembershipFindFirst>[0]) => rows.membership ?? null,
   );
@@ -29,14 +31,19 @@ function harness(rows: { membership?: MembershipRow; grant?: GrantRow; updated?:
   const executeRaw = vi.fn(
     async (_query: TemplateStringsArray, ..._values: unknown[]) => rows.updated ?? 0,
   );
+  const queryRaw = vi.fn(async (_query: TemplateStringsArray, ..._values: unknown[]) =>
+    rows.inactive ? [{ userId: USER_ID }] : [],
+  );
   const database: PrismaAuthzAdmissionDatabase = {
     organizationUser: { findFirst: membershipFindFirst },
     grant: { findFirst: grantFindFirst },
     $executeRaw: executeRaw,
+    $queryRaw: queryRaw,
   };
 
   return {
     membershipFindFirst,
+    queryRaw,
     grantFindFirst,
     executeRaw,
     repository: PrismaAuthzAdmissionRepository.create({ database }),
@@ -54,10 +61,20 @@ describe("the admission marker read", () => {
         userId: USER_ID,
         organizationId: ORGANIZATION_ID,
         disabledAt: null,
-        user: { deactivatedAt: null },
         pendingSsoGrantId: { not: null },
       },
     });
+  });
+
+  it("answers absent for a user authz's standing table holds as deactivated or erased", async () => {
+    const { repository, queryRaw } = harness({
+      membership: { pendingSsoGrantId: GRANT_ID, createdAt: new Date(1_700_000_000_000) },
+      inactive: true,
+    });
+
+    await expect(repository.readAdmissionMarker(SCOPE)).resolves.toEqual({ found: false });
+    expect(queryRaw.mock.calls[0]?.slice(1)).toEqual([USER_ID]);
+    expect(queryRaw.mock.calls[0]?.[0].join("")).toContain('"AuthzUserStanding"');
   });
 
   it("answers absent when no membership carries one", async () => {
@@ -126,6 +143,16 @@ describe("clearing an admission", () => {
     await repository.completeAdmission({ ...SCOPE, grantId: GRANT_ID });
 
     expect(executeRaw.mock.calls[0]?.slice(1)).toEqual([USER_ID, ORGANIZATION_ID, GRANT_ID]);
+  });
+
+  it("fences completion on authz's standing table, never the User table", async () => {
+    const { repository, executeRaw } = harness({ updated: 1 });
+
+    await repository.completeAdmission({ ...SCOPE, grantId: GRANT_ID });
+
+    const statement = executeRaw.mock.calls[0]?.[0].join("") ?? "";
+    expect(statement).toContain('"AuthzUserStanding"');
+    expect(statement).not.toContain('"User"');
   });
 
   it("clears a revoked marker without asking the ledger anything", async () => {

@@ -1,5 +1,4 @@
 import type { AgentOverview } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
@@ -8,7 +7,7 @@ import {
   type ExperimentRunPlan,
 } from "@langwatch/experiment-contract";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * One cell of a pipeline-driven run: what it reads from the run's folds, and what it appends.
@@ -626,18 +625,12 @@ const codePlan = (): ExperimentRunPlan => ({
 });
 
 /** A cell of a code target, lent whatever key the project's credential answers with. */
-async function codeCell(credential: {
-  findOrganizationId: ProjectApi["findOrganizationId"];
-  mint: ApiKeyApi["getOrMintAgentSandboxKey"];
-}) {
+async function codeCell(credential: { mint: ApiKeyApi["mintRunKey"] }) {
   const { folds, cells } = compose({
     agents: [codeAgent],
     collaborating: {
       sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-        projects: createApiFixture<ProjectApi>({
-          findOrganizationId: credential.findOrganizationId,
-        }),
-        apiKeys: createApiFixture<ApiKeyApi>({ getOrMintAgentSandboxKey: credential.mint }),
+        apiKeys: createApiFixture<ApiKeyApi>({ mintRunKey: credential.mint }),
       }),
     },
   });
@@ -648,12 +641,21 @@ async function codeCell(credential: {
 }
 
 describe("given a cell whose target executes code", () => {
-  /** @scenario "A run lends the project's shared sandbox key to the code it executes" */
-  it("lends the project's sandbox key to the dispatched workflow", async () => {
+  /** @scenario "A run lends its code a per-run key holding only the agent cache" */
+  it("lends a per-run key holding only the agent cache to the dispatched workflow", async () => {
+    const asked: string[][] = [];
+    const floors: (number | undefined)[] = [];
     const executed = await codeCell({
-      findOrganizationId: async () => "organization_1",
-      mint: async () => "sandbox-key",
+      mint: async ({ permissions, minRemainingMs }) => {
+        asked.push(permissions);
+        floors.push(minRemainingMs);
+        return "sandbox-key";
+      },
     });
+
+    expect(asked).toEqual([["agentCache:manage"]]);
+    // It must outlive a Lambda dispatch (900 s and a minute back), like the engine's own key.
+    expect(floors).toEqual([960_000]);
 
     expect(executed.outcome).toBe("succeeded");
     expect(engine.sandboxKeys).toEqual(["sandbox-key"]);
@@ -662,20 +664,9 @@ describe("given a cell whose target executes code", () => {
   /** @scenario "A run whose sandbox key cannot be minted still runs without one" */
   it("runs without a key when the mint refuses", async () => {
     const executed = await codeCell({
-      findOrganizationId: async () => "organization_1",
       mint: async () => {
         throw new Error("mint refused");
       },
-    });
-
-    expect(executed.outcome).toBe("succeeded");
-    expect(engine.sandboxKeys).toEqual([undefined]);
-  });
-
-  it("runs without a key for a project with no organization", async () => {
-    const executed = await codeCell({
-      findOrganizationId: async () => undefined,
-      mint: async () => "sandbox-key",
     });
 
     expect(executed.outcome).toBe("succeeded");

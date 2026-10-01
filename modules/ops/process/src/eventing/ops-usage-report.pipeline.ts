@@ -7,7 +7,7 @@ import {
 } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { OpsApp } from "../app/ops.app.ts";
+import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import { USAGE_REPORT_PROCESS_NAME, type UsageReportRunDeps } from "./ops-usage-report.intent.ts";
 import { usageReportPM } from "./ops-usage-report.process.ts";
@@ -35,7 +35,7 @@ export function buildOpsUsageReportPipeline(
 export function buildUsageReport({
   app,
   processStore,
-}: EventingSetup<unknown, Pick<OpsApp, "sendUsageReport">>): StaticPipelineDefinition<never> {
+}: EventingSetup<unknown, Pick<OpsModule, "sendUsageReport">>): StaticPipelineDefinition<never> {
   return buildOpsUsageReportPipeline({
     send: () => app.sendUsageReport(),
     deleteDispatchedBefore: (params) => processStore.deleteDispatchedBefore(params),
@@ -45,5 +45,5 @@ export function buildUsageReport({
 
 export const usageReportEventing = defineEventingModule({
   pipeline: USAGE_REPORT_PIPELINE_NAME,
-  build: (setup: EventingSetup<OpsRepositories, OpsApp>) => buildUsageReport(setup),
+  build: (setup: EventingSetup<OpsRepositories, OpsModule>) => buildUsageReport(setup),
 });

@@ -13,8 +13,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("getAggregateProcessManagers")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getForAggregate({
         aggregateType: input.aggregateType,
@@ -26,8 +26,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("requeueDeadOutboxMessages")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.requeueDeadMessages({
         processName: input.processName,
@@ -41,8 +41,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listProcessFleet")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getFleetSummary();
     })
@@ -50,8 +50,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listDeadLetters")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getDeadLetters(input);
     })
@@ -59,8 +59,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listDeadLetterCounts")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getDeadLetterCounts();
     })
@@ -68,8 +68,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listProcessInstances")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getInstances(input);
     })
@@ -77,8 +77,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listUpcomingWakes")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getUpcomingWakes(input);
     })
@@ -86,8 +86,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("getProcessInstance")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.findInstanceDetail({ ref: input });
     })
@@ -95,8 +95,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listProcessOutbox")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       const { page, pageSize, ...ref } = input;
 
@@ -106,8 +106,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listProcessActions")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.listRecentActions(input);
     })
@@ -115,8 +115,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("processWakeNow")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.wakeNow({ ref: input, actorUserId: actor.id });
     })
@@ -124,8 +124,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("processRedriveDeadInstance")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.redriveDeadInstance({ ref: input, actorUserId: actor.id });
     })
@@ -133,8 +133,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("processRedriveDeadMessage")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       const { messageId, ...ref } = input;
 
@@ -144,8 +144,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("processDiscardDeadMessage")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       const { messageId, ...ref } = input;
 
@@ -155,8 +155,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("redriveDeadLetters")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.redriveDeadLetters({ ...input, actorUserId: actor.id });
     })
@@ -164,8 +164,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("discardDeadLetters")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       return app.discardDeadLetters({
         ...(input.processName ? { processName: input.processName } : {}),
@@ -176,8 +176,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("listOutboxAttempts")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_VIEW)
-    .handle(({ app, input }, operator) => {
-      app.admitOperator(operator, "ops:view");
+    .handle(async ({ app, input }, operator) => {
+      await app.admitOperator(operator, "ops:view");
 
       return app.getOutboxAttempts(input);
     })
@@ -185,8 +185,8 @@ export const opsProcessTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsPr
     .procedure("processReleaseLapsedLease")
     .withFacts(opsOperatorFact)
     .serviceAuthorized(OPS_MANAGE)
-    .handle(({ app, input, actor }, operator) => {
-      app.admitOperator(operator, "ops:manage");
+    .handle(async ({ app, input, actor }, operator) => {
+      await app.admitOperator(operator, "ops:manage");
 
       const { messageId, ...ref } = input;
 

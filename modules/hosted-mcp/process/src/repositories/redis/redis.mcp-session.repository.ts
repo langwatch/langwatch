@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 
 import { nowInstant } from "@langwatch/time";
+import type { Cluster, Redis } from "ioredis";
 import { z } from "zod";
 
-import type { HostedMcpRedis } from "../../app/hosted-mcp.members.ts";
 import {
   McpSessionRepository,
   type McpSessionRecordLookup,
@@ -31,14 +31,14 @@ function hashApiKey(apiKey: string): string {
 
 /** Session records in Redis. With no Redis every write is dropped and every read is missing. */
 export class RedisMcpSessionRepository extends McpSessionRepository {
-  readonly #redis: HostedMcpRedis | null;
+  readonly #redis: Redis | Cluster | null;
 
-  private constructor({ redis }: { redis: HostedMcpRedis | null }) {
+  private constructor({ redis }: { redis: Redis | Cluster | null }) {
     super();
     this.#redis = redis;
   }
 
-  static create({ redis }: { redis: HostedMcpRedis | null }): RedisMcpSessionRepository {
+  static create({ redis }: { redis: Redis | Cluster | null }): RedisMcpSessionRepository {
     return new RedisMcpSessionRepository({ redis });
   }
 

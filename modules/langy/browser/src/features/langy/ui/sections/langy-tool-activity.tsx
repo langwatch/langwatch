@@ -11,13 +11,14 @@ import {
   keyframes,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { readCliErrorDocument } from "@langwatch/handled-error/langwatch-handled-error";
-import { useLangyStore, useReducedMotion } from "@langwatch/langy-browser-kit";
 import { cliToolResultPayload, cliToolResultSchema, parseCliJson } from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import { AlertCircle, Braces, Check, ChevronRight, Layers3 } from "lucide-react";
 import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
 
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
 import { useLangyDevMode } from "../../../../behavior/use-langy-dev-mode.ts";
 import {
   type CapabilityCommand,

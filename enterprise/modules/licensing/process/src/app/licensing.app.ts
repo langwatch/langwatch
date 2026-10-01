@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,
@@ -63,9 +63,9 @@ import {
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import type { FeatureSetup } from "@langwatch/process";
 import {
   type Encryption,
   type MembersRead,
@@ -210,12 +210,12 @@ type LicensingProcessMembers = Readonly<{ isSaas: boolean; serviceVersion: strin
   );
 
 type LicensingSetup = FeatureSetup<
-  typeof LicensingApp.dependencies,
+  typeof LicensingModule.dependencies,
   LicensingProcessMembers,
   LicensingServerConfig
 >;
 
-export class LicensingApp implements LicensingApiContract {
+export class LicensingModule implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies = {
     /** Where an install's hosted provider slot is kept: a gateway fact licensing writes. */
@@ -307,16 +307,16 @@ export class LicensingApp implements LicensingApiContract {
     this.#refresh = install.refresh;
   }
 
-  static async create(setup: LicensingSetup): Promise<LicensingApp> {
+  static async create(setup: LicensingSetup): Promise<LicensingModule> {
     const instanceLicenseKey = await setup.secrets.into(
-      LicensingApp.secrets.instanceLicenseKey,
+      LicensingModule.secrets.instanceLicenseKey,
       (value) => value,
     );
     const licensePrivateKey = await setup.secrets.into(
-      LicensingApp.secrets.licensePrivateKey,
+      LicensingModule.secrets.licensePrivateKey,
       (value) => value,
     );
-    return LicensingApp.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
+    return LicensingModule.#assemble(setup, { instanceLicenseKey, licensePrivateKey });
   }
 
   static #assemble(
@@ -325,7 +325,7 @@ export class LicensingApp implements LicensingApiContract {
       instanceLicenseKey,
       licensePrivateKey,
     }: { instanceLicenseKey: string | undefined; licensePrivateKey: string | undefined },
-  ): LicensingApp {
+  ): LicensingModule {
     const cryptography = NodeLicenseCryptographyService.create({ publicKey: config.publicKey });
     // The variable takes a signed key or an activation code. A code is not a
     // license: it is redeemed at start and stored on an organization.
@@ -396,7 +396,7 @@ export class LicensingApp implements LicensingApiContract {
             instanceLicenseKey: signedInstanceKey,
           })
         : unavailableConnectInstall({ version: members.serviceVersion }));
-    const app = new LicensingApp({
+    const app = new LicensingModule({
       generation: LicenseGenerationService.create(cryptography),
       service,
       runtime,
@@ -1030,7 +1030,7 @@ function licenseRegistryOverPrisma({
 /**
  * The hosted end of Connect composed from its owners, as main composed it on every deployment:
  * instant-eval judges, prices and records the spend, and the gateway keeps the budgets. The door
- * the family answers behind is the gateway's own, bound in licensing.server.ts.
+ * the family answers behind is the gateway's own, bound in licensing.module.ts.
  */
 function hostedServicesOverPeers({
   gateway,

@@ -1,12 +1,11 @@
 /**
- * The relay route over a LangyApp composed the way a process composes it.
+ * The relay route over a LangyModule composed the way a process composes it.
  * @vitest-environment node
  * @see modules/langy/specs/langy-internal-relay.feature
  */
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -27,12 +26,13 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import { LangyApp } from "../../app/langy.app.ts";
+import { LangyModule } from "../../app/langy.app.ts";
 import { MemoryLangyRepositories } from "../../repositories/memory/memory.langy.repositories.ts";
 import { langyInternalRest } from "../langy-internal.rest.ts";
 
@@ -51,13 +51,14 @@ function quietPresence(): PresenceApi {
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},
+    readHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };
 }
 
 async function relayRoute() {
-  const app = await LangyApp.create({
+  const app = await LangyModule.create({
     dependencies: {
       presence: quietPresence(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
@@ -102,7 +103,7 @@ async function relayRoute() {
   });
   const hono = createRestRuntime({
     identity: app.internalDoor,
-    doors: { internalSecret: app.internalDoor },
+    doors: { internal_secret: app.internalDoor },
   }).mount(langyInternalRest.router(), {
     app: () => app,
     onError: (error, context) => canonicalErrorResponse(error, context),

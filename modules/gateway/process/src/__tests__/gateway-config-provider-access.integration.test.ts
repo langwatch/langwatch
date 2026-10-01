@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 /**
  * @vitest-environment node
@@ -23,6 +23,7 @@ import {
 } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
+import { organizationApiOver } from "./support/prisma-organization-api.ts";
 import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
@@ -36,12 +37,30 @@ const prisma = connection?.client as PrismaClient;
 
 /** The destination reads the materialiser makes, answered from seeded rows. */
 class SuiteProjectService extends TestProjectApi {
+  override async listNamesByIds(
+    input: Parameters<ProjectApi["listNamesByIds"]>[0],
+  ): ReturnType<ProjectApi["listNamesByIds"]> {
+    const rows = await prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      include: { team: { select: { organizationId: true } } },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      organizationId: row.team.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+    }));
+  }
+
   override async findTraceDestination(
     projectId: string,
   ): ReturnType<ProjectApi["findTraceDestination"]> {
     return prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -50,7 +69,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 
@@ -102,6 +121,7 @@ const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
     scopeResolution: GatewayScopeResolutionService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects: new SuiteProjectService(),
     }),
     projects: new SuiteProjectService(),
     chRepo,
@@ -110,6 +130,7 @@ const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
     assembly: GatewayConfigAssemblyService.create({
       repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
       platformProviders: noPlatformProviders,
+      projects: new SuiteProjectService(),
     }),
   });
 
@@ -149,6 +170,7 @@ describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => 
   beforeAll(async () => {
     gateway = PrismaGatewayAdapter.create({
       database: prisma,
+      organizations: organizationApiOver(prisma),
       projects: new SuiteProjectService(),
       evaluators: {} as never,
       monitors: {} as never,

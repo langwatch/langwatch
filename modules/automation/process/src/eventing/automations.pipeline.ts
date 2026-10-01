@@ -4,11 +4,11 @@
  */
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
 
-import type { AutomationApp } from "../app/automation.app.ts";
+import type { AutomationModule } from "../app/automation.app.ts";
 
 export const automationsEventing = defineEventingModule({
   pipeline: "automations",
-  build: ({ app, processStore }: EventingSetup<never, AutomationApp>) =>
+  build: ({ app, processStore }: EventingSetup<never, AutomationModule>) =>
     app.eventingPipeline({ processStore }),
   connect: ({ app, commands }) => app.connectCommands(commands),
 });

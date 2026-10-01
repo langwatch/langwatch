@@ -4,8 +4,8 @@ import "@testing-library/jest-dom/vitest";
  * The picker that adds a column to an evaluation.
  * @see specs/experiments-v3/target-type-selector.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,12 +26,8 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 import { COMPARISON_EVALUATOR_TYPE } from "../../../../model/experiments-v3/types.ts";
 import { TargetTypeSelectorDrawer } from "../target-type-selector-drawer.tsx";
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 const renderDrawer = (props: Partial<React.ComponentProps<typeof TargetTypeSelectorDrawer>> = {}) =>
-  render(<TargetTypeSelectorDrawer open={true} {...props} />, { wrapper: Wrapper });
+  renderWithDesignSystem(<TargetTypeSelectorDrawer open={true} {...props} />);
 
 const clickCard = async (type: string) => {
   const user = userEvent.setup();

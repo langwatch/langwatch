@@ -1,4 +1,3 @@
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 // @vitest-environment jsdom
@@ -9,8 +8,9 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
  * Spec: specs/ai-governance/dashboard/governance-summary-strip.feature
  */
 import { Button } from "@langwatch/design-system/primitives";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import { Bot } from "lucide-react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -24,8 +24,7 @@ import {
 } from "../governance-summary-cards.tsx";
 import { GovernanceSummarySparkline } from "../governance-summary-sparkline.tsx";
 
-const renderInChakra = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+const renderInChakra = (element: ReactElement) => renderWithDesignSystem(element);
 
 afterEach(() => cleanup());
 

@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { BrowserSessionIdentity } from "../browser-session.ts";
-import { SessionReader } from "../credential.ts";
+import { SessionReader } from "../../hosting/session-reader.ts";
 
 const PUBLIC_BASE_URL = "https://app.example";
 const INTERNAL_URL = "http://127.0.0.1:6560/api/export/scenario-runs/download";
@@ -12,7 +12,7 @@ function identityOver({ publicBaseUrl = PUBLIC_BASE_URL }: { publicBaseUrl?: str
   const verify = vi.fn(async () => ({ userId: "user-1" }));
   const identity = BrowserSessionIdentity.create({
     sessions: SessionReader.create({ verify }),
-    authz: createApiFixture<Authorize>(),
+    authz: createApiDouble<Authorize>(),
     publicBaseUrl,
   });
 
@@ -91,7 +91,7 @@ describe("browser session identity", () => {
     it("answers a foreign write carrying no session as nobody, 401 where one is required", async () => {
       const identity = BrowserSessionIdentity.create({
         sessions: SessionReader.create({ verify: async () => null }),
-        authz: createApiFixture<Authorize>(),
+        authz: createApiDouble<Authorize>(),
         publicBaseUrl: PUBLIC_BASE_URL,
       });
 
@@ -128,7 +128,7 @@ describe("browser session identity", () => {
 
     const identity = BrowserSessionIdentity.create({
       sessions: SessionReader.create({ verify: async () => ({ userId: "user-1" }) }),
-      authz: createApiFixture<Authorize>({ getDecision }),
+      authz: createApiDouble<Authorize>({ getDecision }),
       publicBaseUrl: void 0,
     });
 
@@ -157,7 +157,7 @@ describe("browser session identity", () => {
   it("treats a missing session as absent only for optional authentication", async () => {
     const identity = BrowserSessionIdentity.create({
       sessions: SessionReader.unverified(),
-      authz: createApiFixture<Authorize>(),
+      authz: createApiDouble<Authorize>(),
       publicBaseUrl: void 0,
     });
 

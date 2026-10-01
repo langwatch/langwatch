@@ -1,14 +1,13 @@
+import type { Event, Projection } from "../domain/types.ts";
+import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
+import { ConfigurationError } from "../services/errorHandling.ts";
+import type { EventSourcedQueueProcessor } from "./../queues/queue.types.ts";
 /**
  * A module's event sourcing, as one declaration (ADR-144). `definePipeline`
  * already states the aggregate, events, projections, subscribers, process
  * managers and commands; this adds only the seam a module plugs into.
  */
-import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/kernel";
-
-import type { Event, Projection } from "../domain/types.ts";
-import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
-import { ConfigurationError } from "../services/errorHandling.ts";
-import type { EventSourcedQueueProcessor } from "./../queues/queue.types.ts";
+import type { FeatureEventing, FeatureEventingSetup } from "./feature-eventing.ts";
 import type {
   NoCommands,
   RegisteredCommand,
@@ -20,10 +19,11 @@ import type {
  * `app` are the module's own, the same instances the app was constructed with
  * rather than a second graph over the same rows.
  */
-export type EventingSetup<Repositories, App> = FeatureEventingSetup<
+export type EventingSetup<Repositories, App, Resources = unknown> = FeatureEventingSetup<
   Repositories,
   App,
-  ProcessStore
+  ProcessStore,
+  Resources
 >;
 
 /** One command's sender, as a registered pipeline answers with it. */
@@ -54,19 +54,19 @@ export interface EventingConnection<App, Definition> {
 }
 
 /** A module's event sourcing, declared once. */
-export interface EventingModule<Repositories, App, Definition> extends FeatureEventing<
+export interface EventingModule<
   Repositories,
   App,
-  ProcessStore,
-  Definition
-> {
+  Definition,
+  Resources = unknown,
+> extends FeatureEventing<Repositories, App, ProcessStore, Definition, Resources> {
   readonly pipeline: string;
-  build(setup: EventingSetup<Repositories, App>): Definition;
+  build(setup: EventingSetup<Repositories, App, Resources>): Definition;
   connect?(bound: EventingConnection<App, Definition>): void;
 }
 
 /**
- * Names one module's event sourcing. `Repositories` and `App` are read off the
+ * Names one module's event sourcing. `Repositories`, `App` and `Resources` are read off the
  * annotated `build` parameter, so a declaration written for another module's
  * app fails to compile where `.withEventing` takes it.
  */
@@ -76,13 +76,20 @@ export function defineEventingModule<
   EventType extends Event,
   Projections extends Record<string, Projection>,
   Commands extends RegisteredCommand,
+  Resources = unknown,
 >(
   declaration: EventingModule<
     Repositories,
     App,
-    StaticPipelineDefinition<EventType, Projections, Commands>
+    StaticPipelineDefinition<EventType, Projections, Commands>,
+    Resources
   >,
-): EventingModule<Repositories, App, StaticPipelineDefinition<EventType, Projections, Commands>> {
+): EventingModule<
+  Repositories,
+  App,
+  StaticPipelineDefinition<EventType, Projections, Commands>,
+  Resources
+> {
   const pipeline = declaration.pipeline.trim();
   if (!pipeline) {
     throw new ConfigurationError(

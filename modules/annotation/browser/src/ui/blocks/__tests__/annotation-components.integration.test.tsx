@@ -1,14 +1,13 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { AnnotationAvatarGroup } from "../../elements/annotation-avatar-group.tsx";
-import { AnnotationScoresChip } from "../../elements/annotation-scores-chip.tsx";
 
 afterEach(cleanup);
 
@@ -40,7 +39,7 @@ const annotation = ({
 });
 
 function withChakra(view: ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{view}</ChakraProvider>);
+  return renderWithDesignSystem(view);
 }
 
 describe("annotation presentation", () => {
@@ -58,26 +57,5 @@ describe("annotation presentation", () => {
 
     expect(screen.getAllByTestId("avatar-user-1")).toHaveLength(1);
     expect(screen.getByTestId("avatar-user-2")).toHaveTextContent("Sam");
-  });
-
-  it("counts score answers rather than reviewers", () => {
-    withChakra(
-      <AnnotationScoresChip
-        annotations={[
-          annotation({
-            id: "annotation-1",
-            userId: "user-1",
-            userName: "Alex",
-            scoreOptions: {
-              quality: { value: "good" },
-              safety: { value: "safe" },
-            },
-          }),
-        ]}
-        traceId="trace-1"
-      />,
-    );
-
-    expect(screen.getByLabelText("2 scores")).toHaveTextContent("2");
   });
 });

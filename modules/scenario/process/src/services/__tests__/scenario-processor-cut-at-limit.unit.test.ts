@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a simulated voice run that ran to the end records when LangWatch cut the call at the limit.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 
-import { buildAuthHeaders, isPersonalAccessToken, isUserScopedApiKey } from "../auth";
+import { buildAuthHeaders, isUserScopedApiKey } from "../auth";
 
 describe("isUserScopedApiKey", () => {
   describe("when given an old pat-lw- token", () => {
@@ -25,14 +25,6 @@ describe("isUserScopedApiKey", () => {
     it("returns false without throwing", () => {
       expect(isUserScopedApiKey("")).toBe(false);
     });
-  });
-});
-
-describe("isPersonalAccessToken (deprecated alias)", () => {
-  it("delegates to isUserScopedApiKey", () => {
-    expect(isPersonalAccessToken("pat-lw-abc_def")).toBe(true);
-    expect(isPersonalAccessToken("sk-lw-abc_def")).toBe(true);
-    expect(isPersonalAccessToken("sk-lw-legacykey123")).toBe(false);
   });
 });
 

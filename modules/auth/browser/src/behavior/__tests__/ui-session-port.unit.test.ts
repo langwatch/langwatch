@@ -34,6 +34,28 @@ function sessionWith({
   });
 }
 
+describe("given a screen changed who the reader is", () => {
+  describe("when it asks the session to be read again", () => {
+    it("re-reads through the shell's own session read", async () => {
+      let reads = 0;
+      const session = BrowserUiSession.create({
+        actor: null,
+        permissions: void 0,
+        settled: false,
+        flags: new Map(),
+        askFlag: () => void 0,
+        refresh: async () => {
+          reads += 1;
+        },
+      });
+
+      await session.refresh();
+
+      expect(reads).toBe(1);
+    });
+  });
+});
+
 describe("given the session port over a resolved scope", () => {
   describe("when a screen asks who is here", () => {
     it("answers with the reader it was built for", () => {

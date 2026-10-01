@@ -6,8 +6,7 @@
  */
 
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   type ExplorerInstantEvalEstimate,
   combineQueries,
@@ -17,6 +16,7 @@ import {
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef, useState } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";
 import { explainAnyError } from "../../errors/index.ts";

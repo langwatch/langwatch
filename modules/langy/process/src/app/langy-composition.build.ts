@@ -1,5 +1,5 @@
 /**
- * LangyApp infrastructure: built from redis, config and own classes. The model
+ * LangyModule infrastructure: built from redis, config and own classes. The model
  * and session-key members arrive built over peers; commands are supplied
  * externally (taken as dependency tokens).
  */
@@ -71,7 +71,7 @@ export function buildLangyInfrastructure(input: {
   redis: RedisConnection | null;
   config: LangyServerConfig;
   publicBaseUrl: string | undefined;
-  worker: LangyWorker;
+  worker: LangyWorker | null;
   repositories: LangyRepositories;
   models: LangyModel;
   sessionKeys: LangySessionKeyService;

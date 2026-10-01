@@ -1,9 +1,3 @@
-/**
- * Which existing person an admitted assertion signs in as, over the memory tier.
- * Specs: specs/identity/scim-sso-signin.feature, scim-connection-sync.feature and
- * sso-link-unconfirmed-local-account.feature.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import {
   emptySsoConnection,
@@ -13,6 +7,12 @@ import {
   type SsoUserResolutionInput,
 } from "@langwatch/identity-contract";
 import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+/**
+ * Which existing person an admitted assertion signs in as, over the memory tier.
+ * Specs: specs/identity/scim-sso-signin.feature, scim-connection-sync.feature and
+ * sso-link-unconfirmed-local-account.feature.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

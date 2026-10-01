@@ -1,7 +1,6 @@
 /**
  * The scope graph the browser resolves every page against: the caller's organizations,
- * teams and projects, narrowed to what they can open. The read is versioned: the tRPC host
- * hashes this answer and answers `unchanged` for a browser holding the current version (ADR-164).
+ * teams and projects, narrowed to what they can open.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationCaller, ScopeGraphOrganization } from "@langwatch/organization-contract";

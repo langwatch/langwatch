@@ -1,4 +1,4 @@
-import { Checkbox } from "@chakra-ui/react";
+import { RawCheckbox as Checkbox } from "@langwatch/design-system/checkbox";
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Play } from "lucide-react";

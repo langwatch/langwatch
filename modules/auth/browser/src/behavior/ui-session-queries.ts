@@ -22,13 +22,6 @@ const GRANTS_STALE_TIME_MS = 30_000;
 /** The server re-reads operator rows every few seconds; the browser holds its answer far longer. */
 const FEATURE_FLAG_STALE_TIME_MS = 5 * 60_000;
 
-/**
- * Off the HTTP batch: left in it, these shell-mounted queries wait behind
- * a page's slowest read (seconds, on a drawer-open burst) — the shell is
- * what the page needs FIRST, so it runs on its own connection instead.
- */
-const OFF_BATCH = { context: { skipBatch: true } } as const;
-
 export type UiEffectivePermissionsRead = { readonly permissions: readonly string[] };
 type UiFeatureFlagRead = { readonly enabled: boolean };
 
@@ -65,7 +58,6 @@ export function useUiEffectivePermissions({
       ) as Promise<UiEffectivePermissionsRead>,
     enabled: !!userId && (!!projectId || !!organizationId),
     staleTime: GRANTS_STALE_TIME_MS,
-    refetchOnWindowFocus: true,
   });
 }
 
@@ -93,11 +85,7 @@ export function useUiFeatureFlags({
       return {
         queryKey: trpcQueryKey(UI_FEATURE_FLAG_PROCEDURE, { input, type: "query" as const }),
         queryFn: () =>
-          transport.query(
-            UI_FEATURE_FLAG_PROCEDURE,
-            input,
-            OFF_BATCH,
-          ) as Promise<UiFeatureFlagRead>,
+          transport.query(UI_FEATURE_FLAG_PROCEDURE, input) as Promise<UiFeatureFlagRead>,
         enabled,
         staleTime: FEATURE_FLAG_STALE_TIME_MS,
         refetchOnWindowFocus: false,

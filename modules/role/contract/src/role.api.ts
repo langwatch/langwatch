@@ -3,7 +3,7 @@
  * catalog a definition is written from. A caller arrives as an argument, never
  * read from a session, so one operation serves every door.
  */
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { RolePermissionCatalog } from "./role-rest.schemas.ts";
 import type { Role, RoleCreate, RoleUpdate, RoleWriteAcknowledged } from "./role.ts";

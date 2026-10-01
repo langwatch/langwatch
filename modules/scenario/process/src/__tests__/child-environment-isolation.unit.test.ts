@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   buildChildEnvironment,
-  type ExecutionJobData,
   type ScenarioChildProcessConfig,
-} from "../index.ts";
+} from "../services/node-scenario-child.service.ts";
+import { type ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 const parentKeys = [
   "LANGWATCH_API_KEY",

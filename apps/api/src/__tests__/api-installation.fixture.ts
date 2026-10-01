@@ -1,17 +1,15 @@
-/** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { type TransportPeers } from "@langwatch/api";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
-import { serverModules } from "@langwatch/installed-server-modules";
+import { processModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
-  storesBackedMembers,
-  withMemoryRepositories,
   type ExposedSurface,
   type InstallableServerFeature,
-  type TransportPeers,
-} from "@langwatch/kernel";
-import { processConfig } from "@langwatch/process-server";
+  processConfig,
+  storesBackedMembers,
+  withMemoryRepositories,
+} from "@langwatch/process";
 import {
   aesEncryption,
   memoryStores,
@@ -26,6 +24,8 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const ROLE = "api";
 /** Every value is harmless and invented: nothing here is read from `.env`. */
@@ -47,7 +47,7 @@ function overMemory(module: InstallableServerFeature<never>): InstallableServerF
 export async function bootApi({
   surface,
 }: { surface?: (peers: TransportPeers) => ExposedSurface<unknown, unknown> } = {}) {
-  const owners = processConfig(serverModules, ROLE);
+  const owners = processConfig(processModules, ROLE);
   const config = parseProcessConfig({ owners, environment: SYNTHETIC_ENVIRONMENT });
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: SYNTHETIC_ENVIRONMENT }).withEnv(),
@@ -80,7 +80,7 @@ export async function bootApi({
   };
   const runtime = await bootInstalledProcess({
     role: ROLE,
-    modules: serverModules.map(overMemory),
+    modules: processModules.map(overMemory),
     ...(surface ? { surface } : {}),
     config,
     secrets: (owner, declared) => resolver.scopeTo(owner, declared),
@@ -101,7 +101,6 @@ export async function bootApi({
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-api",
         storageResolver: void 0,

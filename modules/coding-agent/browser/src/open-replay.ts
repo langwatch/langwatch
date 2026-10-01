@@ -38,8 +38,7 @@ export function sayNothingWasStored(toaster: CodingAgentToaster): void {
 
 /**
  * The trace explorer drawer's address, written as raw keys since `useDrawer`
- * is composition a feature-web package can't reach. KNOWN GAP: nothing opens
- * until the chrome layout route lands — the URL is the whole contract for now.
+ * is composition a feature-web package can't reach.
  */
 export function openReplayHere({
   turn,

@@ -223,7 +223,10 @@ export default function GatewayHostMount({ children }: { children?: ReactNode })
 
   // Shares the tRPC cache entry with every other reader of this procedure, so
   // the graph is fetched once per page however many hosts want it.
-  const graph = gatewayApi.organization.getAll.useQuery({ isDemo: false });
+  const graph = gatewayApi.organization.getScopeGraph.useQuery(
+    {},
+    { enabled: !!session.currentUser() },
+  );
   const organizations = useMemo(
     () => organizationsOf(graph.data ?? NO_ORGANIZATIONS),
     [graph.data],

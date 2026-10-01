@@ -4,19 +4,17 @@
  * specs/rbac/roles-and-access-ui.feature
  */
 
-import {
-  GrantRoleButton,
-  GrantsTable,
-  type GrantRow,
-  RevokeGrantDialog,
-} from "@langwatch/authz-browser-kit";
 import type { GrantScopeType, GrantStatus } from "@langwatch/authz-contract";
 import { Button, Card, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { useGrantList } from "../../behavior/use-grant-list.ts";
 import { useGrantRevoke } from "../../behavior/use-grant-mutations.ts";
+import { type GrantRow } from "../../model/grants/grants.ts";
 import { AccessGrantDialog } from "./access-grant-dialog.tsx";
+import { GrantRoleButton } from "./grants/grant-role-button.tsx";
+import { GrantsTable } from "./grants/grants-table.tsx";
+import { RevokeGrantDialog } from "./grants/revoke-grant-dialog.tsx";
 
 const SCOPE_FILTERS: readonly { label: string; value: GrantScopeType | undefined }[] = [
   { label: "All", value: void 0 },

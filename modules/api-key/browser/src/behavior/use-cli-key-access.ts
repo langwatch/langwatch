@@ -6,7 +6,7 @@ import {
   selectionsFromPermissions,
   type AccessLevel,
 } from "@langwatch/api-key-contract";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useMemo, useState } from "react";
 
 import {

@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -12,7 +12,7 @@ import {
   TAMPERED_LICENSE_KEY,
   TEST_LICENSING_CONFIG,
 } from "../../__tests__/testing.ts";
-import { LicensingApp, type LicensingInfrastructure } from "../licensing.app.ts";
+import { LicensingModule, type LicensingInfrastructure } from "../licensing.app.ts";
 import type { LicenseStorage } from "../licensing.members.ts";
 
 describe("the installed licensing application's plan operation", () => {
@@ -25,7 +25,7 @@ describe("the installed licensing application's plan operation", () => {
       licenseKey: keys.get(organizationId) ?? null,
     }));
     const repository = createApiFixture<LicenseStorage>({ getOrganizationLicense });
-    const app = await LicensingApp.create({
+    const app = await LicensingModule.create({
       dependencies: {
         instantEval: createApiFixture<InstantEvalApi>(),
         projects: createApiFixture<ProjectApi>(),

@@ -1,6 +1,5 @@
 import type { EvaluationCostRecord, EvaluationSlugMatch } from "@langwatch/evaluation-contract";
 
-import { type EvaluationCostRecorder } from "../app/evaluation.members.ts";
 import {
   EvaluationCostAlreadyRecordedError,
   type EvaluationCostRepository,
@@ -15,7 +14,7 @@ function costIdOf(idempotencyKey: string): string {
  * Writes what a completed evaluation run cost, once. A redelivery of the same
  * run reuses the row already there rather than billing the project twice.
  */
-export class EvaluationCostService implements EvaluationCostRecorder {
+export class EvaluationCostService {
   readonly #repository: EvaluationCostRepository;
 
   private constructor(repository: EvaluationCostRepository) {

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
@@ -11,7 +10,6 @@ import type { EventingCommandSender } from "@langwatch/eventing";
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
 import type { GatewayApi } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
@@ -21,15 +19,17 @@ import {
 } from "@langwatch/onboarding-contract";
 import type { OpsApi } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
 import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RecordGuidedOnboardingCommandData } from "../../eventing/guided-onboarding-lifecycle.events.ts";
-import { OnboardingApp } from "../onboarding.app.ts";
+import { OnboardingModule } from "../onboarding.app.ts";
 
 const ORGANIZATION_ID = "organization_1";
 const USER_ID = "user_1";
@@ -63,7 +63,7 @@ function buildApp(
   const initializeOrganization = vi.fn(async () => INITIALIZED);
   const recordIntegrationMethod = vi.fn();
 
-  const app = OnboardingApp.create({
+  const app = OnboardingModule.create({
     dependencies: {
       permissions: createApiFixture<AuthzApi>({ hasPermission }),
       organizations: createApiFixture<OrganizationApi>({
@@ -113,7 +113,7 @@ function buildApp(
   };
 }
 
-describe("OnboardingApp", () => {
+describe("OnboardingModule", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -264,7 +264,7 @@ describe("OnboardingApp", () => {
 });
 
 /** Records what the app sends on the lifecycle pipeline, as the queue would receive it. */
-function connectLifecycle(app: OnboardingApp): RecordGuidedOnboardingCommandData[] {
+function connectLifecycle(app: OnboardingModule): RecordGuidedOnboardingCommandData[] {
   const sent: RecordGuidedOnboardingCommandData[] = [];
   const sender: EventingCommandSender<RecordGuidedOnboardingCommandData> = {
     send: async (payload) => {
@@ -280,7 +280,7 @@ function connectLifecycle(app: OnboardingApp): RecordGuidedOnboardingCommandData
   return sent;
 }
 
-describe("OnboardingApp records its guided writes for peers", () => {
+describe("OnboardingModule records its guided writes for peers", () => {
   /** @scenario "a guided state write through the procedure reaches Customer.io" */
   it("records the picked paths, in order, for the person who picked them", async () => {
     const { app } = buildApp();

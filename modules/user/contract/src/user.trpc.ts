@@ -8,7 +8,7 @@ import {
  * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
  * `cliBootstrap` read through Enterprise governance, which is always installed.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import { userAvatarRestParamsSchema } from "./user-rest.schemas.ts";
 import {
@@ -74,7 +74,7 @@ export const userTrpc = defineTrpcContract("user")
 
   // Whether to render admin-only surfaces. NOT an authorization gate: every
   // operator route asks the same question again on the server.
-  .query("isAdmin", { cache: { tier: "session" } })
+  .query("isAdmin")
   .withInput(userApiEmptyInputSchema)
   .withOutput(userApiIsAdminSchema)
 

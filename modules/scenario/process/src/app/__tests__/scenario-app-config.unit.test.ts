@@ -1,24 +1,24 @@
 /**
- * ScenarioApp reads `publicBaseUrl` off the process's own member, the same
- * way SuiteApp does - see specs/scenarios/scenario-api.feature.
+ * ScenarioModule reads `publicBaseUrl` off the process's own member, the same
+ * way SuiteModule does - see specs/scenarios/scenario-api.feature.
  * @vitest-environment node
  */
 import { EventEmitter } from "node:events";
 
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { ResourceOwnership } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { ResourceOwnership } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { type SimulationService } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -31,10 +31,10 @@ import {
   scenarioTestConfig,
 } from "../../__tests__/support/scenario-app-setup.fixture.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
-import { ScenarioApp, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
+import { ScenarioModule, type ScenarioReadOnlyClickHouse } from "../scenario.app.ts";
 
 async function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
-  return ScenarioApp.create({
+  return ScenarioModule.create({
     repositories: MemoryScenarioRepositories.create(),
     dependencies: {
       agents: createApiFixture<AgentApi>(),
@@ -73,7 +73,7 @@ async function buildProductionApp(publicBaseUrl: string | undefined, emitter = n
   });
 }
 
-describe("ScenarioApp built the way production composes it", () => {
+describe("ScenarioModule built the way production composes it", () => {
   describe("given a deployment that configured a public base URL", () => {
     /** @scenario "A scenario's platform link answers when a public base URL is configured" */
     it("answers a platform link instead of refusing by name", async () => {

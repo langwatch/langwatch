@@ -111,3 +111,11 @@ Feature: Optimization studio execution on a per-project Lambda
     When one pod resolves a project's function
     Then every other pod reads that same function from the shared cache
     And a pod that composed no shared cache falls back to resolving on its own
+
+  @unit
+  Scenario: A staged oversized run body carries no readable secret
+    Given a studio run whose body, secrets included, is over the direct invoke limit
+    When the body is parked in object storage for the engine
+    Then the stored bytes are sealed under a key made for this run alone
+    And the key travels only in the invoke envelope and is stored nowhere
+    And the engine opens the body with that key after fetching it

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { type TraceSearchItem } from "../../../behavior/find-search-index.ts";
@@ -30,8 +30,8 @@ const traces: TraceSearchItem[] = [
 ];
 
 const renderFindBar = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
+  renderWithDesignSystem(
+    <>
       <table>
         <tbody data-trace-id="trace-1">
           <tr>
@@ -40,7 +40,7 @@ const renderFindBar = () =>
         </tbody>
       </table>
       <TraceFindBar traces={traces} renderShortcutKey={(label) => <kbd>{label}</kbd>} />
-    </ChakraProvider>,
+    </>,
   );
 
 describe("TraceFindBar", () => {

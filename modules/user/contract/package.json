@@ -20,14 +20,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

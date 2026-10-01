@@ -3,13 +3,12 @@
  * conversation view: a hairline with "TURN N" centered.
  */
 
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import { TRACE_QUERY_CONFIG } from "@langwatch/trace-browser-kit";
 import { LuListTree } from "react-icons/lu";
 
 import { TracePreviewHoverCard } from "../../../behavior/lent-trace.tsx";
-import { api } from "../../../behavior/scenario-api.ts";
-import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useTurnTrace } from "../../../behavior/simulations/use-turn-trace.ts";
 import { useTraceDetailsDrawer } from "../../../behavior/use-trace-details-drawer.ts";
 
 /**
@@ -74,13 +73,7 @@ export function RunTurnSeparator({ index, traceId }: { index: number; traceId: s
   // Same guarded fetch the old View Trace button used: traces land a beat
   // after the message snapshot, so retry quietly and only advertise the
   // affordance once the trace actually exists.
-  const traceQuery = api.traces.getById.useQuery(
-    { projectId: project?.id ?? "", traceId },
-    {
-      enabled: !!project && !!traceId,
-      ...TRACE_QUERY_CONFIG,
-    },
-  );
+  const traceQuery = useTurnTrace({ projectId: project?.id, traceId });
   const hasTrace = !!traceQuery.data;
 
   const separator = (

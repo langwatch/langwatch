@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
@@ -9,6 +8,7 @@ import {
 import type { ScimApi } from "@langwatch/enterprise-scim-contract";
 import type { OrganizationApi, User } from "@langwatch/organization-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

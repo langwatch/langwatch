@@ -3,8 +3,8 @@
  * Spec: specs/navigation/project-scoped-destinations.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -20,12 +20,10 @@ import { MainMenuSections } from "../main-menu.tsx";
 const PROJECT = { id: "project-1", slug: "demo", name: "Demo" };
 
 function renderMenu(readings: Partial<StubNavigationReadings> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WithStubNavigationHost readings={{ pathname: "/[project]", ...readings }}>
-        <MainMenuSections showExpanded />
-      </WithStubNavigationHost>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WithStubNavigationHost readings={{ pathname: "/[project]", ...readings }}>
+      <MainMenuSections showExpanded />
+    </WithStubNavigationHost>,
   );
 }
 

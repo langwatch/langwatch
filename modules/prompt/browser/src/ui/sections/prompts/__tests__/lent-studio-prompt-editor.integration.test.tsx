@@ -15,7 +15,7 @@ vi.mock("../prompt-editor-drawer.tsx", () => ({
     return null;
   },
 }));
-vi.mock("../../../../behavior/prompts/llm-prompt-config-utils.ts", () => ({
+vi.mock("../../../../model/prompt-node-conversion.ts", () => ({
   nodeDataToLocalPromptConfig: fallbackFor,
 }));
 

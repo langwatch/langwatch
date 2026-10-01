@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { isAccessHeld } from "../../rules/lwql-catalogue.rules.ts";
@@ -34,8 +34,8 @@ const MEMBER = { type: "user", id: "user-1" } as const;
 /** Grants exactly the listed `permission@scopeType:scopeId` entries. */
 const granting =
   (grants: readonly string[]) =>
-  (check: AuthzCheck): boolean =>
-    grants.includes(`${check.permission}@${check.scope.type}:${check.scope.id}`);
+  ({ permission, scope }: AuthzCheck): boolean =>
+    scope.type !== "platform" && grants.includes(`${permission}@${scope.type}:${scope.id}`);
 
 function serviceGranting(grants: readonly string[]) {
   const { authz, checks } = authzGranting({ grants: granting(grants) });

@@ -1,7 +1,6 @@
 /**
- * What the address says the charts are filtered to. Deliberately missing:
- * the saved-view fallback — a governed screen can't touch browser storage,
- * and has no `SavedViewsBar` chrome above it to read one from anyway.
+ * What the charts are filtered to: the address's filters, or, when the
+ * address narrows nothing, the selected saved view's cached filters.
  */
 
 import { availableFilters } from "./analytics-filter-catalogue.ts";
@@ -78,3 +77,46 @@ export const isFilterQueryKey = (key: string): boolean =>
   Object.values(availableFilters).some(
     (definition) => key === definition.urlKey || key.startsWith(`${definition.urlKey}.`),
   );
+
+const isFilterField = (field: string): field is FilterField =>
+  Object.hasOwn(availableFilters, field);
+
+/**
+ * The selected saved view's filters, for an address that narrows nothing: no
+ * filter key, search or date. Layout keys (project, view, group_by) do not
+ * block it. Storage that is missing or corrupt reads as no view.
+ */
+export const readSavedViewFilters = ({
+  queryParams,
+  projectId,
+  readStorage,
+}: {
+  queryParams: Readonly<Record<string, unknown>>;
+  projectId: string | undefined;
+  readStorage: (key: string) => string | undefined;
+}): Partial<Record<FilterField, FilterParam>> => {
+  const addressNarrows =
+    Object.values(availableFilters).some(
+      (definition) => queryParams[definition.urlKey] !== void 0,
+    ) ||
+    !!queryParams.query ||
+    !!queryParams.startDate ||
+    !!queryParams.endDate;
+  if (addressNarrows || !projectId) return {};
+  try {
+    const viewId =
+      readStorage(`langwatch-saved-views-selected-${projectId}`) ??
+      readStorage(`langwatch-selected-view-${projectId}`);
+    const raw = readStorage(`langwatch-saved-views-cache-${projectId}`);
+    if (!viewId || viewId === "all-traces" || !raw) return {};
+    const cached: { id: string; filters?: Record<string, FilterParam> }[] = JSON.parse(raw);
+    const stored = cached.find((view) => view.id === viewId)?.filters ?? {};
+    const filters: Partial<Record<FilterField, FilterParam>> = {};
+    for (const [field, value] of Object.entries(stored)) {
+      if (isFilterField(field)) filters[field] = value;
+    }
+    return filters;
+  } catch {
+    return {};
+  }
+};

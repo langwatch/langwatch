@@ -1,18 +1,15 @@
-import type {
-  AutomationGraphNotifier,
-  AutomationRunawayNotice,
-  AutomationRunawaySignals,
-} from "../index.ts";
+import type { AutomationRunawaySignals } from "../app/automation.members.ts";
 import {
   AutomationDispatchError,
-  AutomationEmailCapService,
   AutomationLogger,
   AutomationHeartbeat,
-  AutomationRunawayRepository,
-  AutomationTestFire,
-  SlackDestinationService,
-} from "../index.ts";
+} from "../app/automation.members.ts";
+import type { AutomationGraphNotifier, AutomationRunawayNotice } from "../index.ts";
+import { AutomationTestFire } from "../index.ts";
+import { AutomationRunawayRepository } from "../repositories/automation-runaway.repository.ts";
 import { AutomationSlackConnectionService } from "../services/automation-slack-connection.service.ts";
+import { AutomationEmailCapService } from "../services/email-cap.service.ts";
+import { SlackDestinationService } from "../services/slack-destination.service.ts";
 
 /** A cipher that stores what it is given, for fixtures that never read a real secret. */
 const PLAIN_CRYPTO = { encrypt: (value: string) => value, decrypt: (value: string) => value };

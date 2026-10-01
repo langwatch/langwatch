@@ -5,17 +5,12 @@
  * @see specs/analytics/chart-grid-resize.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS, ChartGrid } from "../chart-grid";
-
-const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const GRID_WIDTH_PX = 800;
 /** (800 - 7 * 16) / 8 */
@@ -59,14 +54,13 @@ function mount({
   withIframe?: boolean;
 }) {
   const onPlacementsCommit = vi.fn<(placements: ChartGridPlacement[]) => void>();
-  const view = render(
+  const view = renderWithDesignSystem(
     <ChartGrid
       placements={placements}
       onPlacementsCommit={onPlacementsCommit}
       width={GRID_WIDTH_PX}
       renderCard={({ graphId }) => <Card id={graphId} withIframe={withIframe} />}
     />,
-    { wrapper: Wrapper },
   );
   return { ...view, onPlacementsCommit };
 }

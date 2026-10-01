@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 /**
  * Unit coverage for the CLI login key mint mechanics: re-login and racing logins never

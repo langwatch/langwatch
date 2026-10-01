@@ -1,4 +1,3 @@
-import type { BatchResultRow } from "@langwatch/experiment-browser-kit";
 /**
  * Per-variant cost/duration aggregation for the Comparison leaderboard's cost/duration
  * tradeoff chart (#5103) — how much a candidate typically costs and how long it takes,
@@ -7,6 +6,7 @@ import type { BatchResultRow } from "@langwatch/experiment-browser-kit";
 import { computeMetricStats, type MetricStats } from "@langwatch/experiment-contract";
 
 import { bootstrapMeanCI } from "../../model/batch-evaluation-results.bootstrap-ci.ts";
+import type { BatchResultRow } from "./batch-evaluation-results.types.ts";
 
 export type VariantMetrics = {
   variantId: string;

@@ -9,6 +9,7 @@ import type {
   BrowserSessionVerification,
 } from "@langwatch/auth-contract";
 import type * as observabilityModule from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { IdTokenIssuerRefusalChannel } from "../../channels/http/http.id-token-issuer-refusal.channel.ts";
@@ -61,6 +62,10 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     revokeBrowserSession,
     idTokenIssuerRefusals: IdTokenIssuerRefusalChannel.create(),
     connectionIssuers: { findIssuersForConnection: async () => [] },
+    deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
+      `key-for-${sessionId}-${impersonatorId}-${epoch}`,
+    // Two epochs and a day in: the server's clock alone names the epoch.
+    now: () => Temporal.Instant.fromEpochMilliseconds(15 * 24 * 60 * 60 * 1000),
     ...overrides,
   });
 
@@ -207,18 +212,30 @@ describe("AuthDoorService", () => {
   });
 
   describe("when the browser polls its session", () => {
-    it("publishes the resolved session's document", async () => {
+    /** @scenario "The session read carries this epoch's key and the last" */
+    it("publishes the resolved session's document with its user's keys for this epoch and the last", async () => {
       const world = door();
 
       await expect(world.service.getSessionByCookie({ cookie: SESSION_COOKIE })).resolves.toEqual({
         document: {
           session: { expiresAt: "2026-01-01T00:00:00.000Z" },
           user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
+          cacheKey: "key-for-session-1-undefined-2",
+          previousCacheKey: "key-for-session-1-undefined-1",
         },
       });
       expect(world.verifyBrowserSession.mock.calls[0]![0].headers.get("cookie")).toBe(
         SESSION_COOKIE,
       );
+    });
+
+    /** @scenario "A revoked session's key is gone" */
+    it("publishes no document, so no key, for a session whose row was revoked", async () => {
+      const world = door({ resolveBrowserSession: async () => ({ kind: "anonymous" }) });
+
+      await expect(world.service.getSessionByCookie({ cookie: SESSION_COOKIE })).resolves.toEqual({
+        document: null,
+      });
     });
 
     it("publishes null for a caller Better Auth does not know", async () => {

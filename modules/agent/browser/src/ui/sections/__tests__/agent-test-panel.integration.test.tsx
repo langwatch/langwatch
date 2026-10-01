@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * @see specs/agents/agent-test-run.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 
@@ -48,16 +48,14 @@ afterAll(() => {
 const { AgentTestPanel } = await import("../agent-test-panel.tsx");
 
 function renderPanel() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AgentTestPanel
-        agentId="agent_1"
-        projectId="project_1"
-        parameters={[
-          { name: "model", type: "string", options: ["gpt-4", "gpt-5"], defaultValue: "gpt-4" },
-        ]}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AgentTestPanel
+      agentId="agent_1"
+      projectId="project_1"
+      parameters={[
+        { name: "model", type: "string", options: ["gpt-4", "gpt-5"], defaultValue: "gpt-4" },
+      ]}
+    />,
   );
 }
 
