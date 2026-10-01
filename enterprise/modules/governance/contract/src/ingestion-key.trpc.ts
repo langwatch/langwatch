@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every `ingestionKey.*` procedure, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import type { GovernanceCallSurface } from "./governance-audit.ts";

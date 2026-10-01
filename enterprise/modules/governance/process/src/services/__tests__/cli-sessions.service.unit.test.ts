@@ -66,6 +66,7 @@ describe("the governance CLI session inventory", () => {
     ]);
   });
 
+  /** @scenario Revoking a device from the devices tab retires its login key and its ingest keys */
   it("revokes one session by asking auth for exactly its tokens", async () => {
     const { service, revokeCliTokens } = inventory();
 
@@ -87,6 +88,7 @@ describe("the governance CLI session inventory", () => {
     expect(revokeCliTokens).not.toHaveBeenCalled();
   });
 
+  /** @scenario Revoking a device from the devices tab retires its login key and its ingest keys */
   it("retires the session's login key through api-key, as main's revoke did", async () => {
     const { service, loginKeyRevoke } = inventory();
 

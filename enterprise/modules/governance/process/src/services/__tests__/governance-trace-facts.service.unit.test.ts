@@ -184,6 +184,7 @@ describe("GovernanceTraceFactsService", () => {
     });
   });
 
+  /** @scenario An actor the trace names by an opaque id is exported as a user id, never as an email */
   it("places a user.email that is no address in the user id column, as main did", async () => {
     const { ocsf, record } = setup();
     await record([withAttributes({ "user.email": "dana-hoffman" })]);
@@ -198,6 +199,17 @@ describe("GovernanceTraceFactsService", () => {
       actorUserId: "user-1",
       actorEmail: "dana@acme.test",
     });
+  });
+
+  /** @scenario An opaque email attribute beside a user id attribute is dropped, not exported as an email */
+  it("keeps the user id attribute and writes the opaque email to neither actor field", async () => {
+    const { ocsf, record } = setup();
+    await record([withAttributes({ "user.email": "dana-hoffman", "langwatch.user_id": "user-1" })]);
+
+    const row = ocsf.rows.get("project-1:trace-1");
+
+    expect(row).toMatchObject({ actorUserId: "user-1", actorEmail: "" });
+    expect(row?.rawOcsfJson).not.toContain("dana-hoffman");
   });
 
   /** @scenario "A governance trace whose row write fails is written again without duplicate rows" */

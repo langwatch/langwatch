@@ -2,7 +2,7 @@
 // MCP governance toolset: mirrors the REST shape, dispatches in-process through the app.
 // RBAC at the tool layer; OAuth for writes, a project apiKey is enough for reads.
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   type GovernanceRestApi,
   TemplateNotFoundError,

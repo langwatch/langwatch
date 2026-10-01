@@ -24,6 +24,9 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/authorization/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/authz/browser-kit/tsconfig.build.json"
     },
     {

@@ -13,8 +13,12 @@ import {
   createRestRuntime,
   type CliTokenHolder,
 } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import {
+  NoEligibleProvidersError,
+  PersonalVirtualKeyAlreadyExistsError,
+  type EnterpriseGatewayApi,
+} from "@langwatch/enterprise-gateway-contract";
 import {
   IngestionKeyNotFoundError,
   IngestionKeySourceNotAllowedError,
@@ -423,6 +427,148 @@ describe("the CLI governance plane", () => {
       expect(ingestionKeyIssueForPersonalProject).toHaveBeenCalledWith(
         expect.objectContaining({ createdByDeviceLabel: "laptop", fromCliSession: true }),
       );
+    });
+  });
+
+  describe("when the CLI asks for a personal virtual key", () => {
+    const workspace = {
+      team: { id: "team-personal" },
+      project: { id: "project-personal", slug: "personal-bob", name: "Bob", apiKey: "pk" },
+    };
+
+    /** @scenario A second machine asks for a key of its own */
+    it("issues a further key named after the device once the default exists", async () => {
+      const personalVirtualKeyIssue = vi.fn().mockResolvedValue({
+        virtualKey: { id: "vk_desktop", displayPrefix: "lw_vk_desk" },
+        secret: "lw_vk_desk_secret",
+      });
+      const api = mountCli({
+        personalKeys: {
+          personalVirtualKeyEnsureDefault: vi
+            .fn()
+            .mockRejectedValue(new PersonalVirtualKeyAlreadyExistsError("vk_default")),
+          personalVirtualKeyIssue,
+        },
+        ensurePersonalWorkspace: async () => workspace,
+      });
+
+      const response = await api.post("/api/auth/cli/virtual-key", { device_label: "desktop" });
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        id: "vk_desktop",
+        secret: "lw_vk_desk_secret",
+        prefix: "lw_vk_desk",
+      });
+      expect(personalVirtualKeyIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: USER_ID, label: "device-desktop" }),
+      );
+    });
+
+    /** @scenario Asking for a personal virtual key with no providers configured is refused */
+    it("answers 409 no_eligible_providers and issues no key", async () => {
+      const personalVirtualKeyIssue = vi.fn();
+      const api = mountCli({
+        personalKeys: {
+          personalVirtualKeyEnsureDefault: vi
+            .fn()
+            .mockRejectedValue(new NoEligibleProvidersError("org_1")),
+          personalVirtualKeyIssue,
+        },
+      });
+
+      const response = await api.post("/api/auth/cli/virtual-key", {});
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toMatchObject({ error: "no_eligible_providers" });
+      expect(personalVirtualKeyIssue).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the CLI mints an ingestion key for a named project", () => {
+    const issued = { token: "ik-lw-abc_secret", prefix: "ik-lw-abc" };
+    const mintFor = (project: string) => ({ source_type: "internal_codex", project });
+
+    /** @scenario The CLI mints an ingestion key for a project named by id */
+    it("answers 201 with the token, endpoint and resolved project, bound to that project", async () => {
+      const issueForProject = vi.fn().mockResolvedValue(issued);
+      const api = mountCli({ ingestionKeys: { issueForProject } });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.id),
+      );
+
+      expect(response.status).toBe(201);
+      await expect(response.json()).resolves.toEqual({
+        ...issued,
+        endpoint: "https://app.test/api/otel",
+        project: { id: PROJECT.id, slug: PROJECT.slug, name: PROJECT.name },
+      });
+      expect(issueForProject).toHaveBeenCalledWith(
+        expect.objectContaining({ projectId: PROJECT.id, ownerUserId: null }),
+      );
+    });
+
+    /** @scenario The CLI mints an ingestion key for a project named by slug */
+    it("resolves the reference inside the caller's organization, so a slug works too", async () => {
+      const findLiveByRef = vi.fn().mockResolvedValue([PROJECT]);
+      const api = mountCli({
+        ingestionKeys: { issueForProject: vi.fn().mockResolvedValue(issued) },
+        projects: { findLiveByRef },
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.slug),
+      );
+
+      expect(response.status).toBe(201);
+      expect(findLiveByRef).toHaveBeenCalledWith({
+        projectRef: PROJECT.slug,
+        organizationId: ORGANIZATION_ID,
+      });
+    });
+
+    /** @scenario Minting into a project the caller cannot write to is refused */
+    it("answers 403 forbidden and mints nothing without traces:create on it", async () => {
+      const issueForProject = vi.fn();
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        permittedOnProject: vi.fn().mockResolvedValue(false),
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor(PROJECT.slug),
+      );
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "forbidden" });
+      expect(api.permittedOnProject).toHaveBeenCalledWith({
+        userId: USER_ID,
+        projectId: PROJECT.id,
+        permission: "traces:create",
+      });
+      expect(issueForProject).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A project in another organization is not found */
+    it("answers 404 project_not_found for a project its organization does not hold", async () => {
+      const issueForProject = vi.fn();
+      const api = mountCli({
+        ingestionKeys: { issueForProject },
+        projects: { findLiveByRef: vi.fn().mockResolvedValue([]) },
+      });
+
+      const response = await api.post(
+        "/api/auth/cli/governance/ingestion-key",
+        mintFor("other-co-api"),
+      );
+
+      expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ error: "project_not_found" });
+      expect(issueForProject).not.toHaveBeenCalled();
     });
   });
 

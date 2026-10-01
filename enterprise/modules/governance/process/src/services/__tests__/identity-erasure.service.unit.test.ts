@@ -141,6 +141,33 @@ describe("given a provider-named person an organization has asked us to erase", 
       expect(links.every((link) => link.userId === null)).toBe(true);
     });
 
+    /** @scenario "Erasing a person removes the department the directory gave them" */
+    it("keeps the row's spend key but carries no department afterwards", async () => {
+      const { service, repositories, personId } = await buildWorld();
+      await repositories.discoveredPeople.recordDirectorySighting({
+        organizationId: ORG,
+        provider: "anthropic_admin",
+        rawActorId: EMAIL,
+        displayText: "Leaver Person",
+        department: "Engineering",
+        seenAt: NOW.subtract({ hours: 24 }),
+      });
+      const before = await repositories.discoveredPeople.findById({
+        id: personId,
+        organizationId: ORG,
+      });
+      expect(before?.department).toBe("Engineering");
+
+      await service.erase({ organizationId: ORG, discoveredPersonId: personId });
+
+      const after = await repositories.discoveredPeople.findById({
+        id: personId,
+        organizationId: ORG,
+      });
+      expect(after?.department).toBeNull();
+      expect(after?.erasedAt).not.toBeNull();
+    });
+
     it("also suppresses the displayed name, which is a second identifier", async () => {
       const { service, repositories, personId } = await buildWorld();
 

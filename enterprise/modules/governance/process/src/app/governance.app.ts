@@ -26,7 +26,8 @@ import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-cont
  * That is what lets one operation serve a browser session, an API key and the
  * CLI without knowing which it is serving.
  */
-import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import {
