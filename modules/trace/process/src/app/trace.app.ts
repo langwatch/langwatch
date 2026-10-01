@@ -21,6 +21,7 @@ import type {
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
 import { generate } from "@langwatch/ksuid";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -168,6 +169,12 @@ import {
   TRACE_NAME_MIN_LENGTH,
   type TraceMetadataUpdate,
   type TracePreconditionSampleInput,
+  type AiActionResult,
+  type AiQueryResult,
+  type KnownProjectSignals,
+  type RouteSearchInput,
+  type RouteSearchResult,
+  TraceAiQueryUnavailableError,
 } from "@langwatch/trace-contract";
 import type { ConversationView } from "@langwatch/trace-contract/conversation";
 import type { z } from "zod";
@@ -238,7 +245,9 @@ import { TraceExportDownloadService } from "../services/trace-export-download.se
 import { TraceExportService } from "../services/trace-export.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
+import { TraceAiQueryService } from "../services/trace-ai-query.service.ts";
 import { TraceInstantEvalRunService } from "../services/trace-instant-eval-run.service.ts";
+import { TraceSearchRouterService } from "../services/trace-search-router.service.ts";
 import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
@@ -612,6 +621,8 @@ export interface TraceAppDependencies {
    * operations refuse by name rather than answering an empty run.
    */
   instantEvals?: InstantEvalApi;
+  /** The model seam the AI search composer calls; absent, the three AI operations refuse by name. */
+  models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
   codingAgents: CodingAgentApi;
   presence?: PresenceApi;
   share: ShareApi;
@@ -651,6 +662,9 @@ export interface TraceAppDependencies {
   /** trace_processing's assignTopic sender; absent, a topic assignment refuses. */
   topicAssignment?: TraceTopicAssignment | undefined;
 }
+
+/** Main's cap on each known-signal list the search router's context line names. */
+const KNOWN_SIGNALS_LIMIT = 20;
 
 /**
  * The partition-pruning hint: present or absent, never undefined. Omitting the value scans every
@@ -851,6 +865,8 @@ export class TraceModule implements TraceApi, CollectorApp {
   #legacyFilterMatching: LegacyFilterMatchingService;
   #dependencies: TraceAppDependencies;
   #explorerEvals: TraceInstantEvalRunService | null;
+  #aiQuery: TraceAiQueryService | null;
+  #searchRouter: TraceSearchRouterService | null;
   #sharedRead: TraceSharedReadService | null;
   #transcriptRead: TraceTranscriptReadService;
   #exportProgress: TraceExportProgressService;
@@ -875,6 +891,24 @@ export class TraceModule implements TraceApi, CollectorApp {
         : null;
     this.#explorerEvals = dependencies.instantEvals
       ? TraceInstantEvalRunService.create({ instantEvals: dependencies.instantEvals })
+      : null;
+    const ai = dependencies.models
+      ? TraceAiQueryService.create({ models: dependencies.models, facets: this })
+      : null;
+    const instantEvals = dependencies.instantEvals;
+    this.#aiQuery = ai;
+    this.#searchRouter = ai
+      ? TraceSearchRouterService.create({
+          classifier: instantEvals ?? null,
+          buildFilter: (input) => ai.generateTraceAction(input),
+          buildQuestion: (input) => ai.generateInstantEvalQuestion(input),
+          routeWithModel: (input) => ai.generateSearchRoute(input),
+          listKnownSignals: (input) => this.#listKnownSignals(input),
+          isInstantEvalReleased: async ({ projectId }) =>
+            instantEvals ? instantEvals.isReleased({ projectId }) : false,
+          // Main counted langwatch.trace_search.routes; the Prometheus name is pending a ruling.
+          recordDecision: () => {},
+        })
       : null;
     this.#contentReader = ConcreteTraceContentReadService.create(dependencies.traces.read);
     this.#scenarioEventMedia = TraceScenarioEventMediaService.create(dependencies.storedObjects);
@@ -938,6 +972,59 @@ export class TraceModule implements TraceApi, CollectorApp {
       projectId: input.projectId,
       references,
     });
+  }
+
+  /** A sentence to a trace query, on the project's `traces.ai_search` model. */
+  aiQuery(input: {
+    projectId: string;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiQueryResult> {
+    return this.#ai().generateTraceQueryFromPrompt(input);
+  }
+
+  /** A sentence to an applied query or a new lens. */
+  aiAction(input: {
+    projectId: string;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiActionResult> {
+    return this.#ai().generateTraceAction(input);
+  }
+
+  /** Enter on a sentence: a filter, a judgement, a phrase or the assistant. */
+  routeSearch(input: RouteSearchInput): Promise<RouteSearchResult> {
+    if (!this.#searchRouter) throw new TraceAiQueryUnavailableError();
+    return this.#searchRouter.route(input);
+  }
+
+  #ai(): TraceAiQueryService {
+    if (!this.#aiQuery) throw new TraceAiQueryUnavailableError();
+    return this.#aiQuery;
+  }
+
+  /** Evaluator and event names in the window; a slow facet costs one list, never the search. */
+  async #listKnownSignals({
+    projectId,
+    timeRange,
+  }: {
+    projectId: string;
+    timeRange: { from: number; to: number };
+  }): Promise<KnownProjectSignals> {
+    const [evaluators, events] = await Promise.allSettled(
+      ["evaluator", "event"].map((facetKey) =>
+        this.readFacetValues({
+          tenantId: projectId,
+          timeRange,
+          facetKey,
+          limit: KNOWN_SIGNALS_LIMIT,
+          offset: 0,
+        }),
+      ),
+    );
+    const names = (settled?: PromiseSettledResult<FacetValuesResult>): string[] =>
+      settled?.status === "fulfilled" ? settled.value.values.map((entry) => entry.value) : [];
+    return { evaluators: names(evaluators), events: names(events) };
   }
 
   #instantEvals(): TraceInstantEvalRunService {
