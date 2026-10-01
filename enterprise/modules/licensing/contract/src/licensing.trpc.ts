@@ -2,7 +2,7 @@
  * Every `license.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the settings page has always called.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { licenseRefreshOutcomeSchema } from "./connect-install.ts";
