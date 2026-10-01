@@ -102,6 +102,10 @@
       "types": "./dist/use-drawer.d.ts",
       "default": "./src/use-drawer.ts"
     },
+    "./global-store": {
+      "types": "./dist/global-store.d.ts",
+      "default": "./src/global-store.ts"
+    },
     "./upgrade-modal-store": {
       "types": "./dist/upgrade-modal-store.d.ts",
       "default": "./src/upgrade-modal-store.ts"
@@ -177,6 +181,18 @@
     "./lent": {
       "types": "./dist/lent.d.ts",
       "default": "./src/lent.ts"
+    },
+    "./sse-subscription": {
+      "types": "./dist/sse-subscription.d.ts",
+      "default": "./src/sse-subscription.ts"
+    },
+    "./page-visibility": {
+      "types": "./dist/page-visibility.d.ts",
+      "default": "./src/page-visibility.ts"
+    },
+    "./model-error": {
+      "types": "./dist/model-error.d.ts",
+      "default": "./src/model-error.ts"
     }
   },
   "scripts": {

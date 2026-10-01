@@ -411,3 +411,57 @@ describe("clearPersistedUiQueries", () => {
     });
   });
 });
+
+describe("persistUiQueries refusal and teardown", () => {
+  const orgRow = storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) });
+
+  describe("given a persisted read is answered 403", () => {
+    /** @scenario "A forbidden read removes its persisted row" */
+    it("removes that read's row from disk", async () => {
+      const store = memoryStore();
+      await session({
+        store,
+        userId: "alice",
+        write: (qc) => qc.setQueryData(orgGraph, ["acme"]),
+      });
+      expect(store.entries.has(orgRow)).toBe(true);
+
+      await session({
+        store,
+        userId: "alice",
+        write: (qc) =>
+          void qc
+            .fetchQuery({
+              queryKey: orgGraph,
+              queryFn: () => Promise.reject({ data: { httpStatus: 403 } }),
+              retry: false,
+            })
+            .catch(() => void 0),
+      });
+
+      expect(store.entries.has(orgRow)).toBe(false);
+    });
+  });
+
+  describe("given the mirror is detached before its restore finishes", () => {
+    /** @scenario "A session change starts a fresh cache" */
+    it("installs nothing from the old restore", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
+      const queryClient = new QueryClient();
+
+      const { unsubscribe, restored } = persistUiQueries({
+        queryClient,
+        plan,
+        userId: "alice",
+        buildId: "build-1",
+        store: sealedUiQueryStore({ store, cacheKey: KEY_1, previousCacheKey: undefined }),
+        sessionQueryKey: sessionRead,
+      });
+      unsubscribe();
+      await restored;
+
+      expect(queryClient.getQueryData(orgGraph)).toBeUndefined();
+    });
+  });
+});

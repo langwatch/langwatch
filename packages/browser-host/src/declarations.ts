@@ -501,6 +501,8 @@ export type UiHttpConfigEditorProps = {
   onHeadersChange: (headers: HttpHeader[]) => void;
   onTest: (templateVariables: Record<string, unknown>) => Promise<HttpTestResult>;
   paddingX?: number | string;
+  /** The saved agent's credentials are shown as "Stored on the agent" and cannot be edited. */
+  credentialsReadOnly?: boolean;
 };
 
 /** One declared output of a prompt, code or agent node. */

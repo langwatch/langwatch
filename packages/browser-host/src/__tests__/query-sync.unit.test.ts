@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 
 import { cachePlanFor } from "../cache-tiers.ts";
 import { sealedUiQueryStore, storedQueryKey, type UiQueryStore } from "../query-persistence.ts";
-import { startUiQuerySync } from "../query-sync.ts";
+import { digestOf, startUiQuerySync, uiQuerySyncChannelName } from "../query-sync.ts";
 
 const plan = cachePlanFor({
   contracts: [
@@ -194,5 +194,32 @@ describe("startUiQuerySync", () => {
       focusManager.setFocused(undefined);
       stop();
     });
+  });
+});
+
+describe("the sync digest and channel", () => {
+  /** @scenario "A fetch in the focused tab announces its version, never its data" */
+  it("broadcasts an opaque digest of an unversioned read, never its body", async () => {
+    const { queryClient, channel, stop } = tab();
+
+    await queryClient.fetchQuery({ queryKey: graphKey, queryFn: async () => ["acme-ltd"] });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(JSON.stringify(channel.sent)).not.toContain("acme-ltd");
+    expect(channel.sent).toEqual([
+      { key: graphHash, version: digestOf({ text: hashKey([["acme-ltd"]]) }) },
+    ]);
+    stop();
+  });
+
+  it("gives equal data an equal digest and different data a different one", () => {
+    expect(digestOf({ text: "a" })).toBe(digestOf({ text: "a" }));
+    expect(digestOf({ text: "a" })).not.toBe(digestOf({ text: "b" }));
+  });
+
+  it("names the channel per user", () => {
+    expect(uiQuerySyncChannelName({ userId: "alice" })).not.toBe(
+      uiQuerySyncChannelName({ userId: "bob" }),
+    );
   });
 });

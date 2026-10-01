@@ -20,6 +20,7 @@ import {
   type UiCachePlan,
   type UiQueryVersions,
 } from "./cache-tiers.ts";
+import { isForbiddenAnswer } from "./session-version.ts";
 
 const STORE_KEY_PREFIX = "lw-query:";
 const LEGACY_STORE_KEY_PREFIX = "lw-query-cache:";
@@ -493,6 +494,12 @@ function mirrorQuery({
     store.touch(storedQueryKey({ userId, queryHash: query.queryHash }));
     return;
   }
+  if (event.type === "updated" && event.action.type === "error") {
+    if (isForbiddenAnswer(event.action.error)) {
+      void store.delete(storedQueryKey({ userId, queryHash: query.queryHash })).catch(() => void 0);
+    }
+    return;
+  }
   if (event.type !== "updated" || event.action.type !== "success") return;
   if (restoredAt.get(query.queryHash) === query.state.dataUpdatedAt) return;
   const version = versions.get(query.queryHash);
@@ -535,17 +542,23 @@ export function persistUiQueries({
   const isPersisted = (query: Query) =>
     query.queryHash !== sessionHash && plan.persisted.has(procedurePathOf(query.queryKey) ?? "");
   const restoredAt = restoredAtOf(queryClient);
-  const unsubscribe = queryClient
+  let stopped = false;
+  const stopMirroring = queryClient
     .getQueryCache()
     .subscribe((event) =>
       mirrorQuery({ event, isPersisted, restoredAt, versions, store, userId, buildId }),
     );
+  const unsubscribe = () => {
+    stopped = true;
+    stopMirroring();
+  };
 
   const restore = async () => {
     const prefix = storedQueryKey({ userId, queryHash: "" });
     const owned = (await store.keys()).filter((key) => key.startsWith(prefix));
     const entries = await Promise.all(owned.map((key) => readStoredQuery({ store, key, buildId })));
     for (const entry of entries) {
+      if (stopped) return;
       if (entry) {
         await restoreStoredQuery({ entry, queryClient, plan, userId, store, versions, restoredAt });
       }
@@ -554,7 +567,7 @@ export function persistUiQueries({
 
   const restored = clearPersistedUiQueries({ store, keepUserId: userId })
     .then(restore)
-    .then(() => queryClient.invalidateQueries({ predicate: isPersisted }));
+    .then(() => (stopped ? void 0 : queryClient.invalidateQueries({ predicate: isPersisted })));
 
   return { unsubscribe, restored };
 }

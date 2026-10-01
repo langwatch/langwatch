@@ -21,6 +21,7 @@
     "./src/testing.ts",
     "./src/link.tsx",
     "./src/use-drawer.ts",
+    "./src/global-store.ts",
     "./src/upgrade-modal-store.ts",
     "./src/use-organization-team-project.ts",
     "./src/format-time-ago.ts",

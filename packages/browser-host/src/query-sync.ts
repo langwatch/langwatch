@@ -17,6 +17,27 @@ import { readStoredQuery, storedQueryKey, type UiQueryStore } from "./query-pers
 
 export const UI_QUERY_SYNC_CHANNEL = "langwatch:query-versions";
 
+/** One channel per signed-in user, so a tab of another login never hears this one. */
+export const uiQuerySyncChannelName = ({ userId }: { userId: string }) =>
+  `${UI_QUERY_SYNC_CHANNEL}:${userId}`;
+
+/**
+ * A short opaque digest of a read's data; the data itself never leaves the tab.
+ * ponytail: 53-bit non-cryptographic mix, enough to tell versions apart across tabs.
+ */
+export function digestOf({ text }: { text: string }): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    h1 = Math.imul(h1 ^ code, 2654435761);
+    h2 = Math.imul(h2 ^ code, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
 type UiQuerySyncMessage = { key: string; version: string };
 
 function isSyncMessage(value: unknown): value is UiQuerySyncMessage {
@@ -31,10 +52,10 @@ function isSyncMessage(value: unknown): value is UiQuerySyncMessage {
 }
 
 /** Some browsers refuse a channel (opaque origins, privacy modes); the tab then syncs on focus. */
-function openChannel(): BroadcastChannel | undefined {
+function openChannel({ userId }: { userId: string }): BroadcastChannel | undefined {
   if (typeof BroadcastChannel === "undefined") return;
   try {
-    return new BroadcastChannel(UI_QUERY_SYNC_CHANNEL);
+    return new BroadcastChannel(uiQuerySyncChannelName({ userId }));
   } catch {
     return;
   }
@@ -61,7 +82,7 @@ function isTracked({ plan, query }: { plan: UiCachePlan; query: Query }): boolea
 }
 
 function versionOf({ versions, query }: { versions: UiQueryVersions; query: Query }): string {
-  return versions.get(query.queryHash) ?? hashKey([query.state.data]);
+  return versions.get(query.queryHash) ?? digestOf({ text: hashKey([query.state.data]) });
 }
 
 function markStale({ queryClient, query }: { queryClient: QueryClient; query: Query }) {
@@ -130,12 +151,13 @@ async function refreshOnFocus(context: SyncContext): Promise<void> {
 
 /**
  * Starts this tab's half of the sync; returns the stop. A read without a server
- * version is compared by a hash of its data.
+ * version is compared by an opaque digest of its data.
  */
 export function startUiQuerySync({
-  channel = openChannel(),
+  channel,
   ...options
 }: Omit<SyncContext, "announced"> & { channel?: SyncChannel | undefined }): () => void {
+  channel ??= openChannel({ userId: options.userId });
   const context: SyncContext = { ...options, announced: new Map() };
   const stopAnnouncing = options.queryClient
     .getQueryCache()

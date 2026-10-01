@@ -1,5 +1,6 @@
 import type { LimitType } from "@langwatch/enterprise-licensing-contract";
-import { create } from "zustand";
+
+import { defineSlice } from "./global-store.ts";
 
 /** Modal opened by license enforcement when a limit is reached. */
 type LimitVariant = {
@@ -68,55 +69,59 @@ interface UpgradeModalState {
   close: () => void;
 }
 
-export const useUpgradeModalStore = create<UpgradeModalState>((set) => ({
-  isOpen: false,
-  variant: null,
-  limitType: null,
-  current: null,
-  max: null,
+/** The upgrade modal, held in the global UI store under `shell:`. */
+export const useUpgradeModalStore = defineSlice<UpgradeModalState>({
+  name: "shell:upgrade-modal",
+  create: (set) => ({
+    isOpen: false,
+    variant: null,
+    limitType: null,
+    current: null,
+    max: null,
 
-  open: (limitType, current, max) =>
-    set({
-      isOpen: true,
-      variant: { mode: "limit", limitType, current, max },
-      // Populate legacy fields so existing callers (GlobalUpgradeModal, etc.) keep working.
-      limitType,
-      current,
-      max,
-    }),
+    open: (limitType, current, max) =>
+      set({
+        isOpen: true,
+        variant: { mode: "limit", limitType, current, max },
+        // Populate legacy fields so existing callers (GlobalUpgradeModal, etc.) keep working.
+        limitType,
+        current,
+        max,
+      }),
 
-  openSeats: ({ organizationId, currentSeats, newSeats, onConfirm }) =>
-    set({
-      isOpen: true,
-      variant: {
-        mode: "seats",
-        organizationId,
-        currentSeats,
-        newSeats,
-        onConfirm,
-      },
-      // Clear legacy fields since seats mode does not use them.
-      limitType: null,
-      current: null,
-      max: null,
-    }),
+    openSeats: ({ organizationId, currentSeats, newSeats, onConfirm }) =>
+      set({
+        isOpen: true,
+        variant: {
+          mode: "seats",
+          organizationId,
+          currentSeats,
+          newSeats,
+          onConfirm,
+        },
+        // Clear legacy fields since seats mode does not use them.
+        limitType: null,
+        current: null,
+        max: null,
+      }),
 
-  openLiteMemberRestriction: ({ resource }) =>
-    set({
-      isOpen: true,
-      variant: { mode: "liteMemberRestriction", resource },
-      // Clear legacy fields since lite member restriction mode does not use them.
-      limitType: null,
-      current: null,
-      max: null,
-    }),
+    openLiteMemberRestriction: ({ resource }) =>
+      set({
+        isOpen: true,
+        variant: { mode: "liteMemberRestriction", resource },
+        // Clear legacy fields since lite member restriction mode does not use them.
+        limitType: null,
+        current: null,
+        max: null,
+      }),
 
-  close: () =>
-    set({
-      isOpen: false,
-      variant: null,
-      limitType: null,
-      current: null,
-      max: null,
-    }),
-}));
+    close: () =>
+      set({
+        isOpen: false,
+        variant: null,
+        limitType: null,
+        current: null,
+        max: null,
+      }),
+  }),
+});
