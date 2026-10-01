@@ -60280,6 +60280,12 @@ When using the Helm chart, you rarely need to set environment variables directly
 Never commit secrets to version control. In production, use a secrets manager (AWS Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
 </Warning>
 
+## License
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_LICENSE_KEY` | An activation code (`LW-XXXX-XXXX-XXXX-XXXX`, redeemed once at startup over outbound HTTPS to `connect.langwatch.ai`) or a signed license key (works offline), told apart by shape. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license). | - |
+
 ## Authentication
 
 | Variable | Description | Default |
@@ -60593,6 +60599,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
@@ -61539,7 +61546,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -61552,19 +61559,26 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | The signed license key, the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
-A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+A fresh install starts on the open source baseline with no account and no license. LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+- An **activation code**, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default. The install redeems it over outbound HTTPS to `connect.langwatch.ai`, so it needs outbound access to that host.
+- A **signed license key**, a long base64 string also delivered as a `.langwatch-license` file. It works offline.
+
+Both go in the same `LANGWATCH_LICENSE_KEY` variable or `app.license.key` Helm value. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for the full comparison.
 
 1. Open **Settings, License**.
-2. Choose **Enter activation code**, paste the code, and confirm.
+2. Choose **Enter activation code**, paste the code, and choose **Activate License**.
 3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
 
-The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems it once at startup. See [An activation code in the variable](/self-hosting/licensing#an-activation-code-in-the-variable).
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch and never opens a connection.
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+An air-gapped install receives a signed license key instead, enters it with **Enter license key** or **Upload license file**, and never opens a connection. The page detects the form, so a value pasted under the other option is still accepted.
 
 ## Endpoints and variables
 
@@ -61632,7 +61646,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its signed license key, its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 
@@ -61673,7 +61687,7 @@ Your own providers are untouched: a model spelled without the prefix goes to you
 
 An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 
-The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+The signed license key is where you check it: decode it and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
 For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
 
@@ -61732,7 +61746,7 @@ You can read the exact report your install sends on **Settings, Checkup**, copy 
 | Channel | Who sends it | Where it goes | What it carries | How to stop it |
 |---|---|---|---|---|
 | Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The signed license key, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
 
@@ -61897,6 +61911,7 @@ Topic-specific configuration pages:
 - [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
 - [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
 - [SSO](/self-hosting/configuration/sso) for OIDC / SAML wiring
+- [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for `app.license.key`, which takes an activation code (needs outbound access to `connect.langwatch.ai`) or a signed license key (works offline)
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
 - [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
 
@@ -62034,9 +62049,14 @@ Edit `platform/app/.env` to customize your deployment. Key variables:
 API_TOKEN_JWT_SECRET=your-jwt-secret
 CREDENTIALS_SECRET=your-encryption-key
 NEXTAUTH_SECRET=your-session-secret
+
+# Optional: an Enterprise license, either an activation code
+# (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
+# or a signed license key (works offline)
+LANGWATCH_LICENSE_KEY=
 ```
 
-See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -62346,6 +62366,21 @@ workers:
 ```
 
 Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+
+### License
+
+An Enterprise license goes in `app.license.key`, inline or from a Secret. It takes either an activation code (`LW-XXXX-XXXX-XXXX-XXXX`), which needs outbound HTTPS to `connect.langwatch.ai`, or a signed license key, which works offline:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for what happens at startup with each form.
 
 ## Low-Resources Deployment
 
@@ -62833,6 +62868,7 @@ For clusters without internet access:
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
 3. Set `imagePullSecrets` if your registry requires authentication
+4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`
 
 ---
 
@@ -64433,20 +64469,31 @@ Those accounts have no password, so the door back in is **Forgot password**, and
 If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
+## Two forms of license
+
+LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+| Form | Looks like | Network |
+|---|---|---|
+| **Activation code** | `LW-XXXX-XXXX-XXXX-XXXX` | The install redeems it over outbound HTTPS to `connect.langwatch.ai` for a signed license and stores that on the organization. It works only with outbound access to that host. |
+| **Signed license key** | A long base64 string, also delivered as a `.langwatch-license` file | Verified locally. It works offline. |
+
+In configuration, one setting takes both: the `LANGWATCH_LICENSE_KEY` variable or the Helm value `app.license.key`. There is no separate variable for activation codes. On **Settings → License**, choose **Enter activation code** for a code, and **Enter license key** or **Upload license file** for a signed license key. The page detects the form, so a value pasted under the other option is still accepted. See [Connect](/self-hosting/connect#activate-with-a-code) for what redemption sends.
+
 ## Activating a license
 
 <Steps>
 <Step title="Get a license">
-Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key.
 </Step>
 
 <Step title="Activate it">
-In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+In the platform, go to **Settings → License**, choose **Enter activation code** and paste the code, or choose **Enter license key** or **Upload license file** for a signed license key, then choose **Activate License**.
 
-Prefer configuration over a UI step? Set the key as an environment variable instead:
+Prefer configuration over a UI step? Set the code or key as an environment variable instead:
 
 ```bash
-LANGWATCH_LICENSE_KEY=<your signed license key>
+LANGWATCH_LICENSE_KEY=<your activation code or signed license key>
 ```
 
 On Helm, the chart takes it inline or from a Secret you already manage:
@@ -64460,13 +64507,23 @@ app:
         key: license
 ```
 
-Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+A signed license key set through configuration entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
 <Step title="Restart the deployment">
 The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
 </Step>
 </Steps>
+
+## An activation code in the variable
+
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+
+- If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
+- On a fresh install with no organization yet, the code is redeemed when the first organization is created. Restart the app after that to turn on SSO.
+- If redemption is refused, the app logs the reason and still starts. Causes: an unknown, expired or already used code, a code bound to another install, no outbound access to `connect.langwatch.ai`, or `LANGWATCH_CONNECT_DISABLED` set.
+
+The startup log names the form it found in the variable and what it did with it.
 
 ## Expiry
 

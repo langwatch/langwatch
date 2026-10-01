@@ -607,12 +607,18 @@ app:
   # security surface (SSO, SCIM provisioning, audit logs) and support.
   # See https://docs.langwatch.ai/self-hosting/licensing
   #
-  # The alternative to setting it here is activating the same key per
+  # app.license.key takes either form LangWatch issues, detected by shape:
+  # an activation code (LW-XXXX-XXXX-XXXX-XXXX), redeemed once at startup over
+  # outbound HTTPS to connect.langwatch.ai and stored on the oldest
+  # organization, or a signed license key, which works offline and applies to
+  # the whole instance.
+  #
+  # The alternative to setting it here is entering the same code or key per
   # organization in Settings > License, which suits a single-tenant install
   # but has to be repeated for every organization the instance hosts.
   ## @extra app.license Enterprise license configuration.
-  ## @param app.license.key.value [string] License key issued by LangWatch.
-  ## @param app.license.key.secretKeyRef [object] Secret ref holding the license key.
+  ## @param app.license.key.value [string] Signed license key or activation code issued by LangWatch.
+  ## @param app.license.key.secretKeyRef [object] Secret ref holding the signed license key or activation code.
   ## @param app.license.publicKey.value [string] Verification key, only for a private signing chain.
   ## @param app.license.publicKey.secretKeyRef [object] Secret ref holding the verification key.
   license:

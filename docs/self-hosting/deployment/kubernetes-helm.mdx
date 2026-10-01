@@ -62,6 +62,21 @@ workers:
 
 Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
 
+### License
+
+An Enterprise license goes in `app.license.key`, inline or from a Secret. It takes either an activation code (`LW-XXXX-XXXX-XXXX-XXXX`), which needs outbound HTTPS to `connect.langwatch.ai`, or a signed license key, which works offline:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for what happens at startup with each form.
+
 ## Low-Resources Deployment
 
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
@@ -548,3 +563,4 @@ For clusters without internet access:
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
 3. Set `imagePullSecrets` if your registry requires authentication
+4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`
