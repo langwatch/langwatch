@@ -24,7 +24,7 @@
     "build": "pnpm run build:types && nx run-many -t build --exclude @langwatch/server,tag:go --outputStyle=static",
     "build:app": "nx run @langwatch/ui:build --outputStyle=static",
     "build:cli": "nx run @langwatch/server:build --outputStyle=static",
-    "test": "pnpm -r --filter \"./packages/*\" --filter \"./modules/*/*\" --filter \"./enterprise/modules/*/*\" --filter \"./enterprise/packages/composition/*\" test",
+    "test": "pnpm -r --filter \"./packages/*\" --filter \"./modules/*/*\" --filter \"./enterprise/modules/*/*\" test",
     "test:unit": "pnpm --filter @langwatch/platform-api --filter @langwatch/worker --filter @langwatch/ui test",
     "test:component": "node -e \"console.error('No component lane outside the monolith yet: apps/{api,worker,ui} each ship one vitest.config.ts and no jsdom lane. Run pnpm test:unit, or the package suite you mean.'); process.exit(1)\"",
     "test:integration": "node -e \"console.error('No datastore lane outside the monolith yet: only @langwatch/coding-agent-process declares test:integration. Run that package directly, or pnpm test:unit.'); process.exit(1)\"",

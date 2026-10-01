@@ -44,7 +44,7 @@ on:
       - "sdks/go/**"
       - "infra/docker/Dockerfile.langyagent"
       - "sdks/typescript/**"
-      - "packages/langy/**"
+      - "modules/langy/contract/**"
       - "skills/**"
       - "feature-map.json"
       - "modules/trace/contract/src/trace-format.schemas.ts"
@@ -122,7 +122,7 @@ jobs:
               - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
-              - 'packages/langy/**'
+              - 'modules/langy/contract/**'
               - 'skills/**'
               - 'feature-map.json'
               - 'modules/trace/contract/src/trace-format.schemas.ts'

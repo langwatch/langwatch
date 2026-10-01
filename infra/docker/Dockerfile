@@ -87,8 +87,8 @@ COPY sdks/typescript ./sdks/typescript
 # model-provider contracts and packages/redaction arrive with `COPY packages`
 # above, the langevals catalogue and feature-map.json with their own lines, and
 # the skills bundle with `COPY skills`. Its one remaining application input —
-# apps/api/src/features/discovery/openapi-document.json, from which
-# `generate:openapi-types` derives the REST client — arrives with `COPY apps/api`
+# specs/api-reference/openapi-document.json, from which
+# `generate:openapi-types` derives the REST client — arrives with its own COPY
 # below, ahead of the build that runs the generator.
 #
 # The four monolith source files that used to be copied here are gone from the

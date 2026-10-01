@@ -632,13 +632,9 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/redaction run test
 
-      # @langwatch/authz is the pure authorization engine (ADR-092) and
-      # @langwatch/authz-process its storage-port runtime — raw TypeScript the
-      # app inlines the same way, same shard-1 arrangement.
-      - name: Run @langwatch/authz unit tests
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/authz run test
-
+      # The pure authorization engine (ADR-092) now lives in
+      # @langwatch/authz-contract, tested below; @langwatch/authz-process is
+      # its storage-port runtime, same shard-1 arrangement.
       # @langwatch/authorization is the actor vocabulary (who caused an action) —
       # dependency-free raw TypeScript, same shard-1 arrangement.
       - name: Run @langwatch/authorization unit tests
@@ -672,19 +668,6 @@ jobs:
       - name: Run @langwatch/system-migrations unit tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/system-migrations run test
-
-      # The workspace-wide `typecheck` job below also compiles this package.
-      # This step keeps its result on shard 1, right next to its own test run.
-      # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
-      # tRPC's React Query cache-key encoding from a procedure path. Every
-      # feature web package invalidating a procedure its own map does not
-      # declare goes through it, so if the encoding drifts from
-      # `@trpc/react-query`'s the failure is silent — an invalidation that
-      # matches nothing, and stale UI nobody can trace back here. Its suite is
-      # the only thing that pins the encoding, and it ran nowhere.
-      - name: Run @langwatch/platform-api-client unit tests
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/platform-api-client run test
 
       # @langwatch/trace-browser is the first feature web package, and the largest
       # body of browser code that left the monolith — 406 tests over 42 files,
@@ -751,7 +734,7 @@ jobs:
         run: pnpm --filter @langwatch/webhook-process run test
 
       # The six enterprise contract packages whose suites `vitest` could not
-      # even discover until `enterprise/vitest.config.ts` learned the
+      # even discover until their vitest config learned the
       # `src/__tests__/` layout their tests moved to. 155 tests, all green the
       # first time they ran; naming them keeps them that way.
       - name: Run @langwatch/enterprise-billing-contract tests

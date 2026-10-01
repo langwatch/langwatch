@@ -17,9 +17,9 @@ name: gateway-matrix
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
 #   - pkg/**                         (shared HTTP/health helpers)
-#   - modules/gateway/  (control plane)
-#   - enterprise/modules/governance/process/src/eventing/gateway-debit.process.ts
-#     (the sole writer of gateway budget debits)
+#   - modules/gateway/  (control plane, including
+#     process/src/eventing/gateway-debit.process.ts, the sole writer of
+#     gateway budget debits)
 # Triggers:
 #   - PR push (path-filtered to gateway-relevant files only — doc-only
 #     PRs don't pay the ~$0.07 cost)
@@ -54,8 +54,6 @@ on:
       - "*/go.mod"
       - "*/go.sum"
       - "modules/gateway/**"
-      - "enterprise/modules/governance/process/src/eventing/gateway-debit.process.ts"
-      - "apps/api/src/app/api-gateway*.composition.ts"
       - "charts/gateway/**"
       - ".github/workflows/gateway-matrix.yaml"
   schedule:
@@ -139,7 +137,8 @@ jobs:
       LW_GATEWAY_INTERNAL_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_INTERNAL_SECRET }}
       LW_GATEWAY_JWT_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_JWT_SECRET }}
       LW_VIRTUAL_KEY_PEPPER: ${{ secrets.MATRIX_LW_VIRTUAL_KEY_PEPPER }}
-      # VK secrets minted by `node scripts/seed-governance-refactor-dogfood.ts`
+      # VK secrets minted by the governance dogfood seed (not yet ported to
+      # this tree)
       # against the long-lived matrix project — capture the script's
       # final block once + paste into GH org secrets, not regenerate
       # per-run (the seed mints fresh VKs only on first invocation per
@@ -158,8 +157,8 @@ jobs:
       VOYAGE_API_KEY: ${{ secrets.MATRIX_VOYAGE_API_KEY }}
       # Audio cells (live_audio): ElevenLabs VK + a voice id for TTS. The
       # audio_test.go cells t.Skip when unset, so this stays inert until
-      # the secrets are provisioned (seed with
-      # scripts/dogfood/audio/seed-audio-vk.ts).
+      # the secrets are provisioned (by the audio VK seed, not yet ported to
+      # this tree).
       TEST_VK_ELEVENLABS: ${{ secrets.MATRIX_TEST_VK_ELEVENLABS }}
       ELEVENLABS_VOICE_ID: ${{ secrets.MATRIX_ELEVENLABS_VOICE_ID }}
       LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
