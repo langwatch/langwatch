@@ -234,6 +234,24 @@ describe("RedisConnectionService", () => {
       expect(seen).toEqual([["[redacted]"]]);
     });
 
+    it("redacts a password the server echoes in the message", () => {
+      const connection = new RedisConnectionService().connect({
+        url: "redis://localhost:6379",
+      }) as unknown as FakeConnection;
+      const error = Object.assign(
+        new Error(
+          "ERR unknown command 'AUTH', with args beginning with: 's3cret-redis-password' ",
+        ),
+        { command: { name: "auth", args: ["s3cret-redis-password"] } },
+      );
+      connection.on("error", () => {});
+
+      connection.emit("error", error);
+
+      expect(error.message).not.toContain("s3cret-redis-password");
+      expect(error.stack).not.toContain("s3cret-redis-password");
+    });
+
     it("redacts node errors on a cluster", () => {
       const connection = new RedisConnectionService().connect({
         clusterEndpoints: "one:6379",

@@ -49,10 +49,32 @@ const SHARED_OPTIONS = {
 const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
 
 /**
+ * The credential values among a command's arguments: every string argument of
+ * AUTH (user and password), and those after the AUTH token of HELLO.
+ */
+function credentialValues(name: string, args: unknown): string[] {
+  if (!Array.isArray(args)) return [];
+  const strings = (list: unknown[]) =>
+    list.filter((a): a is string => typeof a === "string" && a.length > 0);
+  if (name === "auth") return strings(args);
+  const at = args.findIndex(
+    (a) => typeof a === "string" && a.toLowerCase() === "auth",
+  );
+  return at < 0 ? [] : strings(args.slice(at + 1));
+}
+
+/** Replaces every credential value in a text, such as an error message. */
+function maskValues(text: unknown, values: string[]): unknown {
+  if (typeof text !== "string") return text;
+  return values.reduce((out, value) => out.split(value).join("[redacted]"), text);
+}
+
+/**
  * ioredis attaches the failed command to a reply error as
  * `command: { name, args }`, so a rejected AUTH carries the password in
- * `args`. The same object rejects every queued command and can end up in a
- * crash log, so the arguments are replaced on the error itself.
+ * `args`, and a server that renamed AUTH echoes it in the message too. The
+ * same object rejects every queued command and can end up in a crash log, so
+ * the values are replaced on the error itself.
  */
 function redactCommandCredentials(error: unknown): void {
   if (!error || typeof error !== "object") return;
@@ -62,6 +84,10 @@ function redactCommandCredentials(error: unknown): void {
   if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
     return;
   }
+  const values = credentialValues(name.toLowerCase(), args);
+  const target = error as { message?: unknown; stack?: unknown };
+  target.message = maskValues(target.message, values);
+  target.stack = maskValues(target.stack, values);
   (command as { args: unknown }).args = Array.isArray(args)
     ? args.map(() => "[redacted]")
     : "[redacted]";

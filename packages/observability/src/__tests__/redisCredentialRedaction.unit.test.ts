@@ -70,6 +70,25 @@ describe("Redis credentials in logged errors", () => {
     });
   });
 
+  describe("when the server renamed AUTH and echoes its arguments", () => {
+    it("redacts the password from the message and the stack", () => {
+      const error = Object.assign(
+        new Error(
+          "ERR unknown command 'AUTH', with args beginning with: 's3cret-redis-password' ",
+        ),
+        { command: { name: "auth", args: ["s3cret-redis-password"] } },
+      );
+      const [line] = captureLines((logger) =>
+        logger.error({ error }, "redis error"),
+      );
+
+      expect(line).not.toContain("s3cret-redis-password");
+      expect(JSON.parse(line ?? "{}").error.message).toContain(
+        "unknown command 'AUTH'",
+      );
+    });
+  });
+
   describe("when HELLO carries AUTH", () => {
     it("redacts every argument", () => {
       const error = Object.assign(new Error("WRONGPASS"), {
