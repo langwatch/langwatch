@@ -77,7 +77,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/mcp-server..."
+          install: "@langwatch/mcp-server... @langwatch/prisma-client"
 
       # Restored after install so pnpm can't clobber it; keyed rolling
       # per-SHA with a prefix fallback, mirroring the app CI tsbuildinfo

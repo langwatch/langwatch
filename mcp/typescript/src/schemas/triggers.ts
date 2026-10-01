@@ -187,7 +187,7 @@ export function validateActionParamsForAction({
 export const TRIGGER_FILTERS_DESCRIPTION = [
   "Trace conditions as a JSON object string.",
   'Unkeyed fields take a list of values: {"traces.error":["true"]}.',
-  'Keyed fields nest a key above the list. evaluations.* is keyed by the MONITOR id (the `id` from `platform_list_monitors` / GET /api/monitors, not its evaluatorId): {"evaluations.passed":{"<monitorId>":["false"]}}.',
+  'Keyed fields nest a key above the list. evaluations.* is keyed by the MONITOR id (the `id` from `platform_list_monitors` / GET /api/v1/monitors, not its evaluatorId): {"evaluations.passed":{"<monitorId>":["false"]}}.',
   'metadata.value is keyed by the metadata key: {"metadata.value":{"<key>":["true"]}}.',
   "A keyed field sent as a bare list, or keyed by anything but a monitor id, is refused.",
 ].join(" ");
