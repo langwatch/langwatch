@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/kernel": "workspace:*",
@@ -41,6 +40,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
