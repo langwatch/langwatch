@@ -13,16 +13,13 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { X } from "lucide-react";
 import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
-import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 import type { ModelTier } from "../../model/model-tier-presets.ts";

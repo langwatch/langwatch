@@ -24,6 +24,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import type {
   AiToolEntry,
   AiToolStarterTileChoice,
@@ -37,7 +38,6 @@ import {
   useGovernanceToaster,
   useShowErrorToast,
 } from "../../../../behavior/governance-feedback.ts";
-import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
 import { TileIcon } from "../elements/tile-icon.tsx";
 import { useAiToolCatalog } from "./use-ai-tool-catalog.ts";
 

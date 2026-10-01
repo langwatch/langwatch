@@ -1,7 +1,4 @@
-import type {
-  AvailableScopes,
-  ScopeFilterValue,
-} from "../../../ui/sections/authz/scope-picker/scope-filter.tsx";
+import type { AvailableScopes, ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 
 // Scope filter as address and predicate; pure shared function; stale link reads all.
 

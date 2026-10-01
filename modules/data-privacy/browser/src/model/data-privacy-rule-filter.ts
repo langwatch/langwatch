@@ -1,6 +1,5 @@
 import type { DataPrivacyRule, DataPrivacyScopeAvailable } from "@langwatch/data-privacy-contract";
-
-import type { ScopeFilterValue } from "../ui/sections/authz/scope-picker/scope-filter.tsx";
+import type { ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 
 /** Whether a rule sits at the scope the page's filter names. */
 export function ruleMatchesScopeFilter({

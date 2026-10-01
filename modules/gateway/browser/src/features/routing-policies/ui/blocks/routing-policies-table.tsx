@@ -7,10 +7,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Plus } from "lucide-react";
 
-import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
-import type { ScopeTriadEntry } from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { isModelTier } from "../../model/model-tier-presets.ts";
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";
 

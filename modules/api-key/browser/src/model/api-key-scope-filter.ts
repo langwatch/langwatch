@@ -1,6 +1,8 @@
 // API Keys scope filter: URL contract from authz-web. This family's part: fan over rows with
 // multiple scopes (keys with multiple bindings). Second copy; model-provider-web has the first.
 
+import type { ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+
 import {
   isScopeInFilter,
   resolveScopeFilter,
@@ -8,7 +10,6 @@ import {
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ResolvedScopeFilter,
-  type ScopeFilterValue,
   type ScopeHierarchy,
 } from "./authz/scope-picker/scope-filter-address.ts";
 

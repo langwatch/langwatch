@@ -1,3 +1,6 @@
+import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
 import {
   Box,
   Button,
@@ -8,13 +11,10 @@ import {
   Text,
   VStack,
   Wrap,
-} from "@langwatch/design-system/primitives";
-import { Select } from "@langwatch/design-system/select";
-import { SmallLabel } from "@langwatch/design-system/small-label";
-import { Boxes, Building2, CheckCheck, Folder, Search, UserLock, Users } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-
+} from "../primitives.ts";
 import { ProviderScopeChips } from "./provider-scope-chips.tsx";
+import { Select } from "./select.tsx";
+import { SmallLabel } from "./small-label.tsx";
 
 /**
  * ORGANIZATION/TEAM/PROJECT mirror Prisma's `ModelProviderScopeType`.

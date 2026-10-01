@@ -1,12 +1,12 @@
-import { cleanup, screen, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 /**
  * @vitest-environment jsdom
  * @see specs/model-providers/custom-model-display-name.feature
  */
-import type * as actualModule from "../authz/scope-picker/scope-chip-picker.tsx";
+import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
+import { cleanup, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { FakeModelProviderHost, renderWithModelProviderHost } from "../../../testing.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 
 const mockCloseDrawer = vi.fn();
@@ -29,9 +29,9 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 }));
 
 // Orthogonal to display-name threading and pulls in its own data hooks.
-vi.mock("../authz/scope-picker/scope-chip-picker.tsx", async () => {
+vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
   const actual = await vi.importActual<typeof actualModule>(
-    "../authz/scope-picker/scope-chip-picker.tsx",
+    "@langwatch/design-system/scope-chip-picker",
   );
   return {
     ...actual,

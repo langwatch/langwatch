@@ -4,7 +4,8 @@
  * that carry several scopes, which a provider row and a default-model config both do.
  */
 
-import { type ScopeFilterValue } from "../ui/sections/authz/scope-picker/scope-filter.tsx";
+import { type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
+
 import {
   isScopeInFilter,
   resolveScopeFilter,

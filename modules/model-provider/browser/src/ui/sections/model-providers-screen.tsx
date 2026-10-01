@@ -20,6 +20,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { buildCustomModelDisplayNames } from "@langwatch/model-provider-contract";
@@ -48,8 +50,6 @@ import {
   sortProvidersForTable,
 } from "../../model/provider-catalogue.ts";
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
-import { ProviderScopeChips } from "./authz/scope-picker/provider-scope-chips.tsx";
-import { ScopeFilter, type ScopeFilterValue } from "./authz/scope-picker/scope-filter.tsx";
 import { CodexCodingDefaultsAskHost } from "./codex-coding-defaults-ask.tsx";
 import { DefaultModelsSection } from "./default-models-section.tsx";
 

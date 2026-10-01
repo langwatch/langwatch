@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { nowInstant } from "@langwatch/time";
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -44,7 +45,6 @@ import {
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
 import { StatusCard } from "../blocks/status-card.tsx";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 import { CliAuthContainer } from "./cli-auth-container.tsx";
 import { FirstTraceRedirect } from "./first-trace-redirect.tsx";
 

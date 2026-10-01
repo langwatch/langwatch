@@ -1,10 +1,10 @@
 import { Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
 import { Link } from "../../../../ui/elements/gateway-link.tsx";
-import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
 import {
   buildScopeHierarchy,
   type EligibleModelProvider,

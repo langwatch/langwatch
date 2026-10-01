@@ -286,6 +286,18 @@
       "types": "./dist/components/segmented-control.d.ts",
       "default": "./src/components/segmented-control.tsx"
     },
+    "./provider-scope-chips": {
+      "types": "./dist/components/provider-scope-chips.d.ts",
+      "default": "./src/components/provider-scope-chips.tsx"
+    },
+    "./scope-chip-picker": {
+      "types": "./dist/components/scope-chip-picker.d.ts",
+      "default": "./src/components/scope-chip-picker.tsx"
+    },
+    "./scope-filter": {
+      "types": "./dist/components/scope-filter.d.ts",
+      "default": "./src/components/scope-filter.tsx"
+    },
     "./select": {
       "types": "./dist/components/select.d.ts",
       "default": "./src/components/select.tsx"

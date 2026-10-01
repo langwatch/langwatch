@@ -11,6 +11,7 @@ import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
 } from "@langwatch/design-system/provider-model-selector";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   buildCustomModelDisplayNames,
@@ -28,7 +29,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
-import { ScopeChipPicker, type ScopeTriadEntry } from "./authz/scope-picker/scope-chip-picker.tsx";
 
 /** The snapshot as the browser holds one: its instants are ISO strings. */
 type Payload = WireOf<ModelDefaultSnapshot>;

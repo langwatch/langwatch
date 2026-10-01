@@ -1,14 +1,11 @@
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Badge, Button, HStack, Text, VStack, Wrap } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { Building2, Folder, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";
 
-import { ProviderScopeChips } from "../../../../ui/sections/authz/scope-picker/provider-scope-chips.tsx";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-} from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { ViewTracesButton } from "../elements/view-traces-button.tsx";
 
 /**

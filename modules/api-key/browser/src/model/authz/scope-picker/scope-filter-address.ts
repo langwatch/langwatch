@@ -1,25 +1,4 @@
-/** The organization, teams and projects a reader may narrow the page to. */
-export interface AvailableScopes {
-  organization?: { id: string; name: string } | null;
-  teams: { id: string; name: string }[];
-  projects: { id: string; name: string; teamId?: string | null }[];
-}
-
-/**
- * The active filter. `team-current` and `project-current` are deliberately
- * not the same as a `specific` pick: they follow the reader's ambient
- * scope, so one still means "wherever I am" after a project switch.
- */
-export type ScopeFilterValue =
-  | { kind: "all" }
-  | { kind: "team-current" }
-  | { kind: "project-current" }
-  | {
-      kind: "specific";
-      scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId: string;
-      name: string;
-    };
+import type { AvailableScopes, ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 
 // Scope filter as address and predicate; pure shared function; stale link reads all.
 

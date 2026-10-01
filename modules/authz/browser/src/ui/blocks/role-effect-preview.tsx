@@ -2,6 +2,11 @@
 // lens, since organization-tier grants do nothing from a team (ADR-021; main's RoleEffectPreview).
 
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  ScopeChipPicker,
+  type ScopeTriadEntry,
+  type ScopeTriadType,
+} from "@langwatch/design-system/scope-chip-picker";
 import { useMemo } from "react";
 
 import {
@@ -10,11 +15,6 @@ import {
   permissionTakesEffectAt,
 } from "../../model/role-permissions.ts";
 import { PermissionToken } from "../elements/permission-token.tsx";
-import {
-  ScopeChipPicker,
-  type ScopeTriadEntry,
-  type ScopeTriadType,
-} from "../sections/scope-picker/scope-chip-picker.tsx";
 
 export function RoleEffectPreview({
   permissions,

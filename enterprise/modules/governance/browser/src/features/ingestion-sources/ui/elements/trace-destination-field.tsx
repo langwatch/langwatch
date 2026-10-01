@@ -34,9 +34,9 @@
 
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 
-import { ScopeChipPicker } from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import { routesConversations, type SourceType } from "../../model/ingestion-source-catalog.ts";
 
 /**

@@ -48,11 +48,11 @@ vi.mock("../../../../ui/sections/gateway-layout.tsx", () => ({
 // One surface, one mock: the picker and the read-only chips travel together
 // because the picker renders the chips, and two `vi.mock` calls for the same
 // specifier would leave whichever ran last as the whole module.
-vi.mock("../../authz/scope-picker/scope-chip-picker.tsx", () => ({
+vi.mock("@langwatch/design-system/scope-chip-picker", () => ({
   ScopeChipPicker: () => <div data-testid="scope-chip-picker" />,
 }));
 
-vi.mock("../../authz/scope-picker/provider-scope-chips.tsx", () => ({
+vi.mock("@langwatch/design-system/provider-scope-chips", () => ({
   ProviderScopeChips: () => <div data-testid="provider-scope-chips" />,
 }));
 

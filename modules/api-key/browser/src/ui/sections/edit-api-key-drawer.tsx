@@ -14,6 +14,7 @@ import {
 import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Button, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -35,7 +36,6 @@ import {
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
 import { StatusCard } from "../blocks/status-card.tsx";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;

@@ -5,13 +5,13 @@
  * Binds specs/model-providers/role-based-default-models.feature.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
 import { featuresByRole } from "@langwatch/model-provider-contract";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ModelProviderHostProvider } from "../../../model/model-provider-host.ts";
 import { FakeModelProviderHost } from "../../../testing.tsx";
-import type * as actualModule from "../authz/scope-picker/scope-chip-picker.tsx";
 import { DefaultModelOverrideDrawer } from "../default-model-override-drawer.tsx";
 
 const mockCloseDrawer = vi.fn();
@@ -36,9 +36,9 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
 // The picker stub exposes one button that picks the organization scope,
 // so create-mode tests can drive the scope selection without the real
 // multi-select dropdown.
-vi.mock("../authz/scope-picker/scope-chip-picker.tsx", async () => {
+vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
   const actual = await vi.importActual<typeof actualModule>(
-    "../authz/scope-picker/scope-chip-picker.tsx",
+    "@langwatch/design-system/scope-chip-picker",
   );
   return {
     ...actual,

@@ -1,4 +1,5 @@
 import { Field, Text, VStack } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 
 import {
   maskedSecret,
@@ -6,7 +7,6 @@ import {
   usedByLabel,
 } from "../../model/slack-connection-copy.ts";
 import { type SlackConnection } from "../../model/slack-connection-types.ts";
-import { ProviderScopeChips } from "../sections/authz/scope-picker/provider-scope-chips.tsx";
 
 /**
  * A connection the reader may use but not change: everything it says, no inputs, and who can

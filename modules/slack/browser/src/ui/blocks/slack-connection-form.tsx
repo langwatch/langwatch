@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker } from "@langwatch/design-system/scope-chip-picker";
 import type { SlackConnectionKind, SlackConnectionScopeType } from "@langwatch/slack-contract";
 import type { ReactNode } from "react";
 
@@ -25,7 +26,6 @@ import {
 import { type SlackConnection } from "../../model/slack-connection-types.ts";
 import { SlackAppSetupCallout } from "../elements/slack-app-setup-callout.tsx";
 import { SlackErrorAlert } from "../elements/slack-error-alert.tsx";
-import { ScopeChipPicker } from "../sections/authz/scope-picker/scope-chip-picker.tsx";
 
 type NamedScope = { id: string; name?: string };
 

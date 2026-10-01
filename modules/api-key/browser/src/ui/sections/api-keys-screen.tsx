@@ -20,6 +20,8 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
+import { ScopeFilter } from "@langwatch/design-system/scope-filter";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { Key, MoreVertical, Plus } from "lucide-react";
@@ -40,7 +42,6 @@ import { readableDate } from "../../model/display-formatters.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
 import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
-import { ProviderScopeChips, ScopeFilter } from "../elements/scope-picker.tsx";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";

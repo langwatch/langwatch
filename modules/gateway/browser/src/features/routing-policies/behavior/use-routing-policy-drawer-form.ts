@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
@@ -9,7 +10,6 @@ import { api } from "../../../behavior/gateway-api.ts";
  * problems worth telling the operator before they save. Never JSX.
  */
 import { readableDate } from "../../../model/readable-date.ts";
-import type { ScopeTriadEntry } from "../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 import type { ProviderCredentialOption } from "../model/provider-credential-option.ts";
 import {
   emptyRoutingPolicyForm,

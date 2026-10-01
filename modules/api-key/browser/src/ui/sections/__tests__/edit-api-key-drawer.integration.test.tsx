@@ -13,13 +13,13 @@ import { renderWithApiKeyHost } from "../../../testing.tsx";
 import { EditApiKeyDrawer } from "../edit-api-key-drawer.tsx";
 
 // The picker has its own suite in authz; this file pins what the drawer sends.
-vi.mock("../authz/scope-picker/scope-chip-picker.tsx", () => ({ ScopeChipPicker: () => null }));
+vi.mock("@langwatch/design-system/scope-chip-picker", () => ({ ScopeChipPicker: () => null }));
 
-vi.mock("../authz/scope-picker/provider-scope-chips.tsx", () => ({
+vi.mock("@langwatch/design-system/provider-scope-chips", () => ({
   ProviderScopeChips: () => null,
 }));
 
-vi.mock("../authz/scope-picker/scope-filter.tsx", () => ({ ScopeFilter: () => null }));
+vi.mock("@langwatch/design-system/scope-filter", () => ({ ScopeFilter: () => null }));
 
 vi.mock("../../blocks/permission-category-list.tsx", () => ({
   PermissionCounter: ({ count }: { count: number }) => <span data-testid="counter">{count}</span>,

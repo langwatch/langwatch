@@ -1,23 +1,19 @@
 /** @vitest-environment jsdom */
 // Guards quick-picks against bypassing allowedScopeTypes.
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ScopeChipPicker } from "../scope-chip-picker.tsx";
-
-function renderPicker(node: ReactNode) {
-  return render(<ChakraProvider value={defaultSystem}>{node}</ChakraProvider>);
-}
+import { collapseRedundantScopes, ScopeChipPicker } from "../src/components/scope-chip-picker.tsx";
+import { renderWithDesignSystem } from "../src/testing/index.tsx";
 
 describe("ScopeChipPicker quick-picks", () => {
   afterEach(cleanup);
 
   describe("given allowedScopeTypes restricts to org + department", () => {
     it("omits the team and project quick-picks even when their ids are set", () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[]}
           onChange={vi.fn()}
@@ -38,7 +34,7 @@ describe("ScopeChipPicker quick-picks", () => {
 
   describe("given the default model-provider triad", () => {
     it("offers org, team and project quick-picks", () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[]}
           onChange={vi.fn()}
@@ -64,7 +60,7 @@ describe("ScopeChipPicker multi-select zero-state", () => {
     describe("when the picker renders", () => {
       /** @scenario zero selected reads "None selected", never "Multiple" */
       it("labels the active chip None selected, never Multiple", () => {
-        renderPicker(
+        renderWithDesignSystem(
           <ScopeChipPicker
             value={[]}
             onChange={vi.fn()}
@@ -87,7 +83,7 @@ describe("ScopeChipPicker multi-select zero-state", () => {
   describe("given two scopes selected", () => {
     describe("when the picker renders", () => {
       it("keeps the Multiple label for a real multi-scope selection", () => {
-        renderPicker(
+        renderWithDesignSystem(
           <ScopeChipPicker
             value={[
               { scopeType: "TEAM", scopeId: "team-1" },
@@ -128,7 +124,7 @@ describe("ScopeChipPicker single-select variant", () => {
 
   describe("given a project is already selected", () => {
     it("shows the picked project in the trigger and hides the scope summary", () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           variant="single-select"
           allowedScopeTypes={["PROJECT"]}
@@ -153,7 +149,7 @@ describe("ScopeChipPicker single-select variant", () => {
     it("resolves the trigger to the personal option, not the plain scope", () => {
       // The personal variant shares scopeType+scopeId with the plain scope,
       // so the selection lookup must compare the personalOnly flag too.
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           variant="single-select"
           allowedScopeTypes={["ORGANIZATION"]}
@@ -174,7 +170,7 @@ describe("ScopeChipPicker single-select variant", () => {
 
   describe("given nothing is selected yet", () => {
     it("shows the placeholder and offers no chips or quick-picks", () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           variant="single-select"
           allowedScopeTypes={["PROJECT"]}
@@ -230,7 +226,7 @@ describe("ScopeChipPicker search and team grouping", () => {
   describe("given projects across two teams", () => {
     /** @scenario Projects group under their team name */
     it("lists each project under a group header carrying its team name", async () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[]}
           onChange={vi.fn()}
@@ -264,7 +260,7 @@ describe("ScopeChipPicker search and team grouping", () => {
 
   describe("given more than eight scopes", () => {
     function renderCrowdedPicker(onChange = vi.fn()) {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[]}
           onChange={onChange}
@@ -299,7 +295,7 @@ describe("ScopeChipPicker search and team grouping", () => {
     /** @scenario Searching does not drop scopes already selected */
     it("keeps the selected scopes when a search picks another one", async () => {
       const onChange = vi.fn();
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[
             { scopeType: "PROJECT", scopeId: "p-qa-0" },
@@ -338,7 +334,7 @@ describe("ScopeChipPicker search and team grouping", () => {
     /** @scenario The single-select dropdown searches the same way */
     it("narrows by team name and takes the picked project", async () => {
       const onChange = vi.fn();
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           variant="single-select"
           value={[]}
@@ -380,7 +376,7 @@ describe("ScopeChipPicker search and team grouping", () => {
   describe("given eight scopes or fewer", () => {
     /** @scenario A short scope list has no search field */
     it("offers no search field", async () => {
-      renderPicker(
+      renderWithDesignSystem(
         <ScopeChipPicker
           value={[]}
           onChange={vi.fn()}
@@ -404,7 +400,7 @@ describe("ScopeChipPicker summary line", () => {
   afterEach(cleanup);
 
   const renderWithProject = (subjectNoun?: string) =>
-    renderPicker(
+    renderWithDesignSystem(
       <ScopeChipPicker
         value={[{ scopeType: "PROJECT", scopeId: "proj-1" }]}
         onChange={vi.fn()}
@@ -431,6 +427,44 @@ describe("ScopeChipPicker summary line", () => {
       renderWithProject("connection");
 
       expect(screen.getByText("Only this project can use this connection.")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("given a selection that already names a team and a project", () => {
+  describe("when the whole organization is then picked", () => {
+    it("keeps the organization and drops what it already implies", () => {
+      const previous = [
+        { scopeType: "TEAM" as const, scopeId: "team_1" },
+        { scopeType: "PROJECT" as const, scopeId: "project_1" },
+      ];
+
+      const collapsed = collapseRedundantScopes(
+        [...previous, { scopeType: "ORGANIZATION", scopeId: "org_1" }],
+        previous,
+        {
+          organizationId: "org_1",
+          availableProjects: [{ id: "project_1", teamId: "team_1" }],
+        },
+      );
+
+      expect(collapsed).toEqual([{ scopeType: "ORGANIZATION", scopeId: "org_1" }]);
+    });
+  });
+
+  describe("when nothing new was picked", () => {
+    it("leaves the selection exactly as it was", () => {
+      const previous = [
+        { scopeType: "TEAM" as const, scopeId: "team_1" },
+        { scopeType: "PROJECT" as const, scopeId: "project_1" },
+      ];
+
+      expect(
+        collapseRedundantScopes(previous, previous, {
+          organizationId: "org_1",
+          availableProjects: [{ id: "project_1", teamId: "team_1" }],
+        }),
+      ).toEqual(previous);
     });
   });
 });

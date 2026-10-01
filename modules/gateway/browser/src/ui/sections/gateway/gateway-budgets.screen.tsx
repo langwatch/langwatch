@@ -16,6 +16,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import {
+  ProviderScopeChips,
+  type ProviderScopeType,
+} from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
@@ -32,10 +36,6 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import {
-  ProviderScopeChips,
-  type ProviderScopeType,
-} from "../authz/scope-picker/provider-scope-chips.tsx";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
 

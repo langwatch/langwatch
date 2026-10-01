@@ -10,6 +10,11 @@ import type {
 } from "@langwatch/data-privacy-contract";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import {
+  ScopeChipPicker,
+  type ScopeChipPickerScopeType,
+} from "@langwatch/design-system/scope-chip-picker";
+import { ScopeFilter, type ScopeFilterValue } from "@langwatch/design-system/scope-filter";
 import { useMemo } from "react";
 
 import { dataPrivacyApi } from "../../behavior/data-privacy-api.ts";
@@ -33,11 +38,6 @@ import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { NoPrivacyRules } from "../blocks/no-privacy-rules.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
 import { PrivacyRulesTable } from "../blocks/privacy-rules-table.tsx";
-import {
-  ScopeChipPicker,
-  type ScopeChipPickerScopeType,
-} from "./authz/scope-picker/scope-chip-picker.tsx";
-import { ScopeFilter, type ScopeFilterValue } from "./authz/scope-picker/scope-filter.tsx";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();

@@ -1,7 +1,8 @@
-import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Building2, ChevronDown, Folder, Users } from "lucide-react";
 import { useState } from "react";
+
+import { Box, Button, HStack, Text } from "../primitives.ts";
+import { Menu } from "./menu.tsx";
 
 // Read-side scope filter; read-only twin of picker; presentational only.
 

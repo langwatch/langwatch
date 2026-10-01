@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { format } from "@langwatch/time";
 import { Pencil, Trash2 } from "lucide-react";
@@ -21,7 +22,6 @@ import type { GrantScope, Holder } from "../../model/role-holders.ts";
 import { permissionsNeedingOrganizationScope } from "../../model/role-permissions.ts";
 import { PermissionTokenList } from "../elements/permission-token.tsx";
 import { PrincipalAvatar } from "../elements/principal-avatar.tsx";
-import { ProviderScopeChips } from "../sections/scope-picker/provider-scope-chips.tsx";
 
 const TIER_COLOUR = { ADMIN: "red", MEMBER: "blue", VIEWER: "gray" } as const;
 

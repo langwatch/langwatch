@@ -19,6 +19,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { FaSlack } from "react-icons/fa";
 import { LuChevronRight, LuPlus } from "react-icons/lu";
 
@@ -30,7 +31,6 @@ import {
   usedByLabel,
 } from "../../model/slack/slack-connection-copy.ts";
 import { type SlackConnection } from "../../model/slack/slack-connection-types.ts";
-import { ProviderScopeChips } from "./authz/scope-picker/provider-scope-chips.tsx";
 
 export function SlackCard() {
   const { project } = useOrganizationTeamProject();

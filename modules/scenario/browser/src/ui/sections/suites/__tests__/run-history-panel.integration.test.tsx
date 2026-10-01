@@ -71,6 +71,7 @@ const toInfinite = vi.hoisted(() => {
 const mockScenariosQuery = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
+// Stands in for suite, the owner of the slice, which this package only reads.
 function installRunHistoryStore() {
   defineSlice<RunHistoryState>({
     name: RUN_HISTORY_SLICE,

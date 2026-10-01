@@ -16,6 +16,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs } from "@langwatch/time";
@@ -58,7 +59,6 @@ import { readableDate } from "../../../model/readable-date.ts";
 import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
-import { ProviderScopeChips } from "../authz/scope-picker/provider-scope-chips.tsx";
 
 /** Deep link from a key's spend to its Usage view over the same window. */
 function usageHrefForKey(virtualKeyId: string): string {

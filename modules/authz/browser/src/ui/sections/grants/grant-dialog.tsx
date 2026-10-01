@@ -13,6 +13,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import type { Instant } from "@langwatch/time";
 import { useState } from "react";
 
@@ -25,7 +26,6 @@ import {
   permissionsBeyondReader,
   rolePermissionsAt,
 } from "../../../model/grants/grants.ts";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../scope-picker/index.ts";
 
 const SCOPE_OF_TIER = { ORGANIZATION: "organization", TEAM: "team", PROJECT: "project" } as const;
 

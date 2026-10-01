@@ -16,6 +16,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
 import type { Instant } from "@langwatch/time";
@@ -40,7 +41,6 @@ import {
   type PermissionSelection,
 } from "../blocks/permission-category-list.tsx";
 import { StatusCard } from "../blocks/status-card.tsx";
-import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.tsx";
 
 type MyBindings = {
   data: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;

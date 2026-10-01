@@ -37,6 +37,10 @@ export function renderWithDesignSystem(
       },
     });
   }
+  if (typeof window !== "undefined" && !Element.prototype.scrollTo) {
+    // jsdom has no Element.scrollTo; a Select scrolls its content to the top on open.
+    Element.prototype.scrollTo = () => undefined;
+  }
   return render(element, {
     // No colour-mode provider: its style and theme script would render into the container.
     wrapper: ({ children }) => <ChakraProvider value={system}>{children}</ChakraProvider>,

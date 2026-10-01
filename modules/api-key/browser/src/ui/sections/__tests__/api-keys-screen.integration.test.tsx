@@ -5,6 +5,8 @@
  * Specs: specs/api-keys/{unified-api-keys,scope-filter,project-key-rotation}.feature
  */
 
+import type * as scopeChipPickerModule from "@langwatch/design-system/scope-chip-picker";
+import type * as scopeFilterModule from "@langwatch/design-system/scope-filter";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -13,8 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { API_KEY_SCOPE_QUERY_KEY } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
 import ApiKeysScreen from "../api-keys-screen.tsx";
-import type * as scopeChipPickerModule from "../authz/scope-picker/scope-chip-picker.tsx";
-import type * as scopeFilterModule from "../authz/scope-picker/scope-filter.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -93,9 +93,9 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // The picker and the filter are `@langwatch/authz-browser`'s and have their own
 // suites; what this file is about is what the SCREEN does with the value they
 // hand back, so the filter is replaced by buttons that call `onChange`.
-vi.mock("../authz/scope-picker/scope-chip-picker.tsx", async () => {
+vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
   const actual = await vi.importActual<typeof scopeChipPickerModule>(
-    "../authz/scope-picker/scope-chip-picker.tsx",
+    "@langwatch/design-system/scope-chip-picker",
   );
   return {
     ...actual,
@@ -109,9 +109,9 @@ vi.mock("../authz/scope-picker/scope-chip-picker.tsx", async () => {
   };
 });
 
-vi.mock("../authz/scope-picker/scope-filter.tsx", async () => {
+vi.mock("@langwatch/design-system/scope-filter", async () => {
   const actual = await vi.importActual<typeof scopeFilterModule>(
-    "../authz/scope-picker/scope-filter.tsx",
+    "@langwatch/design-system/scope-filter",
   );
   return {
     ...actual,

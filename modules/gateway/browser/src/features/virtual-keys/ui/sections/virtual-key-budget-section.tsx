@@ -9,11 +9,11 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { SmallLabel } from "@langwatch/design-system/small-label";
 import { formatBudgetUsd } from "@langwatch/gateway-contract";
 
 import { api } from "../../../../behavior/gateway-api.ts";
-import type { ScopeTriadEntry } from "../../../../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 
 export type VirtualKeyBudgetWindow = "DAY" | "WEEK" | "MONTH";
 

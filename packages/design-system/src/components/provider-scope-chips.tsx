@@ -1,5 +1,3 @@
-import { Badge, HStack, Link, Text } from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   Boxes,
   Building2,
@@ -11,6 +9,9 @@ import {
   Users,
   UsersRound,
 } from "lucide-react";
+
+import { Badge, HStack, Link, Text } from "../primitives.ts";
+import { Tooltip } from "./tooltip.tsx";
 
 // Scope kinds chip renders; mirrors Prisma enum or picker/badge-only.
 export type ProviderScopeType =
