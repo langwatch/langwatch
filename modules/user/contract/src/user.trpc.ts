@@ -1,14 +1,14 @@
-/**
- * Every `user.*` procedure and the one `identity.*` procedure this module owns.
- * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
- * `cliBootstrap` read through Enterprise governance, which is always installed.
- */
-import { defineTrpcContract } from "@langwatch/api/contract";
 import {
   cliBootstrapResultSchema,
   governanceBudgetOverviewForUserSchema,
   personalUsageRollupSchema,
 } from "@langwatch/enterprise-governance-contract";
+/**
+ * Every `user.*` procedure and the one `identity.*` procedure this module owns.
+ * The names are the browser's cache keys. `personalUsage`, `budgetOverview` and
+ * `cliBootstrap` read through Enterprise governance, which is always installed.
+ */
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import { userAvatarRestParamsSchema } from "./user-rest.schemas.ts";
 import {
