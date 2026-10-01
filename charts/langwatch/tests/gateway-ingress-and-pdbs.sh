@@ -194,6 +194,16 @@ test_gateway_host_without_ingress_is_refused() {
   fi
 }
 
+# @scenario "a gateway host without a gateway in the release is refused"
+test_gateway_host_without_gateway_is_refused() {
+  render nogateway "${APP_INGRESS[@]}" --set gateway.chartManaged=false
+  if grep -q 'gateway.chartManaged is false' "$tmp/nogateway.err"; then
+    ok "gateway host without gateway" "render refused, naming gateway.chartManaged"
+  else
+    fail "gateway host without gateway" "ingress.gateway.host with gateway.chartManaged=false rendered: $(cat "$tmp/nogateway.err")"
+  fi
+}
+
 # @scenario "retired gateway ingress values are refused"
 test_retired_gateway_ingress_values_are_refused() {
   local entry
@@ -298,6 +308,7 @@ test_default_install_has_no_ingress
 test_gateway_host_on_the_app_ingress
 test_nginx_settings_on_the_gateway_host
 test_gateway_host_without_ingress_is_refused
+test_gateway_host_without_gateway_is_refused
 test_retired_gateway_ingress_values_are_refused
 test_gateway_pdb_under_the_umbrella
 test_pass_through_pdb_over_one_pod_is_skipped

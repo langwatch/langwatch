@@ -48,6 +48,12 @@ Feature: Helm install routing and disruption budgets
       Then the render fails naming ingress.enabled
 
     @unit
+    Scenario: a gateway host without a gateway in the release is refused
+      Given ingress.gateway.host is set and gateway.chartManaged is false
+      When the chart renders
+      Then the render fails naming gateway.chartManaged
+
+    @unit
     Scenario: retired gateway ingress values are refused
       Given a values file that still sets gateway.ingress.enabled true or gateway.ingress.host
       When the chart renders
