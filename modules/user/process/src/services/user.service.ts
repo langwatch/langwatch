@@ -258,6 +258,11 @@ export class UserService {
 
     const updated = await this.repository.updateProfile(update);
 
+    // Sessions cache the email (invite accept compares it), so a changed one ends them all.
+    if (current && normalizedEmail !== (current.email ?? "").toLowerCase()) {
+      await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
+    }
+
     return updated;
   }
 

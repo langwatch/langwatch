@@ -266,17 +266,24 @@ describe("UserService", () => {
     });
   });
 
-  it("normalizes a changed email", async () => {
-    const { service, repository } = createService();
+  it("normalizes a changed email, then ends every one of the user's sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
     await service.updateProfile({ id: "user-1", email: "NEW@Example.com " });
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
       email: "new@example.com",
     });
+    expect(revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: "user-1" });
   });
 
-  it("updates a name without changing email", async () => {
-    const { service, repository } = createService();
+  it("updates a name without changing email or ending sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
 
     await service.updateProfile({ id: "user-1", name: "Ada Lovelace" });
 
@@ -284,12 +291,17 @@ describe("UserService", () => {
       id: "user-1",
       name: "Ada Lovelace",
     });
+    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
   });
 
-  it("normalizes an email case-only update", async () => {
-    const { service, repository } = createService();
+  it("normalizes an email case-only update without ending sessions", async () => {
+    const revokeAllBrowserSessions = vi.fn(async () => undefined);
+    const { service, repository } = createService({
+      auth: createApiFixture<AuthApi>({ revokeAllBrowserSessions }),
+    });
 
     await service.updateProfile({ id: "user-1", email: "ADA@EXAMPLE.COM" });
+    expect(revokeAllBrowserSessions).not.toHaveBeenCalled();
 
     expect(repository.updateProfile).toHaveBeenCalledWith({
       id: "user-1",
