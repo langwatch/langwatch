@@ -4,6 +4,7 @@
  * Adapted from BatchEvaluationV2EvaluationSummary with cleaner styling.
  */
 
+import { formatCost } from "@langwatch/design-system/metric-value-formatters";
 import {
   Box,
   Button,
@@ -20,7 +21,6 @@ import numeral from "numeral";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import type { BatchRunSummary } from "./batch-runs-sidebar.tsx";
-import { formatCost } from "./presentation.tsx";
 
 type BatchSummaryFooterProps = {
   /** Run summary data */

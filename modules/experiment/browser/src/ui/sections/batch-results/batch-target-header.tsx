@@ -1,3 +1,4 @@
+import { formatCost } from "@langwatch/design-system/metric-value-formatters";
 /**
  * BatchTargetHeader - Header component for target columns in batch results table.
  *
@@ -16,14 +17,13 @@ import {
   LuTriangleRight,
 } from "react-icons/lu";
 
+import { MetricStatsTooltip } from "../../elements/batch-results/metric-stats-tooltip.tsx";
 import type { BatchTargetAggregate } from "../batch-evaluation-results.aggregates.ts";
 import type { BatchTargetColumn } from "../batch-evaluation-results.types.ts";
 import {
-  formatCost,
   formatLatency,
   formatScore,
   getPassRateGradientColor,
-  MetricStatsTooltip,
   PassRateCircle,
   useInteractiveTooltip,
 } from "./presentation.tsx";

@@ -3,19 +3,19 @@
  * results table
  */
 
+import { formatCost } from "@langwatch/design-system/metric-value-formatters";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
 
+import { formatTargetOutput } from "../../../model/format-target-output.ts";
 import type { BatchEvaluatorResult, BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 import {
   type BatchCellFailure,
   type DescribeBatchCellFailure,
-  formatCost,
   formatLatency,
-  formatTargetOutput,
   type RenderBatchEvaluatorResult,
   type RenderTracePeek,
   useEscapeKey,

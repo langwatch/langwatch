@@ -15,12 +15,14 @@ import {
   YAxis,
 } from "recharts";
 
+import { RUN_COLORS } from "../../../behavior/batch-evaluation-results/use-multi-run-data.ts";
 import {
   axisLabelProps,
   buildAxisLabels,
   chartHeightFor,
   truncateLabel,
 } from "../../../model/batch-evaluation-results.chart-axis.ts";
+import { ChartTooltip } from "../../elements/analytics/chart-tooltip.tsx";
 import {
   type BatchComparisonColumn,
   type BatchEvaluationData,
@@ -30,7 +32,6 @@ import {
 } from "../batch-evaluation-results.types.ts";
 import { useResultsGrouping } from "../use-results-grouping.ts";
 import { ComparisonLeaderboardChart } from "./comparison-leaderboard-chart.tsx";
-import { ChartTooltip, RUN_COLORS } from "./presentation.tsx";
 import { WinRateChart } from "./win-rate-chart.tsx";
 
 /** Metric types that can be displayed */

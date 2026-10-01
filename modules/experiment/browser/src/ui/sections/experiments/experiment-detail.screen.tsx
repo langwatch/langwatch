@@ -8,7 +8,6 @@ import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useLegacyBatchEvaluations } from "../../../behavior/experiments/use-legacy-batch-evaluations.ts";
 import { ExperimentType } from "../../../model/prisma-types.ts";
 import BatchEvaluation from "../../../ui/elements/experiments/batch-evaluation.tsx";
-// BatchEvaluationV2 kept for reference but no longer used.
 import { DSPyExperiment } from "../../../ui/elements/experiments/ds-py-experiment.tsx";
 import { BatchEvaluationResults } from "../../../ui/sections/batch-evaluation-results/index.ts";
 import { HandledErrorAlert } from "../../elements/workflow/studio-host/errors.tsx";

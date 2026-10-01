@@ -200,7 +200,6 @@ const useSelectedRunData = ({
     { projectId: projectId ?? "", experimentId: experimentId ?? "", runId: selectedRunId ?? "" },
     {
       enabled: !!projectId && !!experimentId && !!selectedRunId,
-      // needs a read hint: batch evaluation run result recorded
     },
   );
   const transformedData: BatchEvaluationData | null = useMemo(
@@ -338,7 +337,6 @@ export function BatchEvaluationResults({
     },
     {
       enabled: !!project && !!experiment,
-      // needs a read hint: batch evaluation run started or finished
     },
   ) as { data?: { runs: BatchRunSummary[] }; error?: unknown; isLoading: boolean };
 
