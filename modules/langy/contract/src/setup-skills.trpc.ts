@@ -3,7 +3,7 @@
  * for a coding agent, kept server-side (~100 kB of markdown) until a reader opens the menu.
  * Spec: specs/skills/empty-state-skill-setup.feature
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 export const setupSkillsTrpc = defineTrpcContract("setupSkills")

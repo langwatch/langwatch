@@ -1,8 +1,5 @@
-import {
-  AUTHZ_RESOURCES,
-  bindingScopeCanGrantPermission,
-  type AuthzPermission,
-} from "@langwatch/authz-contract";
+import { AUTHZ_RESOURCES, type AuthzPermission } from "@langwatch/authorization";
+import { bindingScopeCanGrantPermission } from "@langwatch/authz-contract";
 
 /**
  * Partition of authz permissions: full access (ceiling), auth-scope

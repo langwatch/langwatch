@@ -1,6 +1,7 @@
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   LangyApiRequestInvalidError,
   LangyUiNoBrowserError,
