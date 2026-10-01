@@ -9,7 +9,7 @@ import { z } from "zod";
 
 /** A project's trace milestones, decided by the project-metadata subscriber from folded state. */
 export const TRACE_PROJECT_MILESTONES_PIPELINE_NAME = "trace_project_milestones" as const;
-export const TRACE_PROJECT_AGGREGATE_TYPE = "project" as const;
+export const TRACE_PROJECT_AGGREGATE_TYPE = "trace_project_milestone" as const;
 export const TRACE_PROJECT_MILESTONES_EVENT_VERSION = "2026-10-01" as const;
 
 export const RECORD_FIRST_TRACE_COMMAND_TYPE = "lw.trace.record_first_trace" as const;
