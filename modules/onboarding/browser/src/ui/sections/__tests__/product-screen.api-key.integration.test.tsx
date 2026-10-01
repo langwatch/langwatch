@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  * The manual setup card mints a personal access token on the project resolved from
  * `projectSlug` only when the reader asks: no key is on the page before.
- * Spec: specs/features/onboarding/manual-setup-api-key.feature and specs/api-keys/api-keys-v2.feature
+ * Spec: specs/features/onboarding/manual-setup-api-key.feature, specs/api-keys/api-keys-v2.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
