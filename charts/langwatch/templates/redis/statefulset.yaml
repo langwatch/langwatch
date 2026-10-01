@@ -108,8 +108,13 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: {{ .Values.redis.scratchSizeLimit }}
+  # apiVersion and kind are spelled out: the API server stores them on every
+  # claim template, so a GitOps controller diffing with server-side apply
+  # reports the StatefulSet as out of sync forever when they are left off.
   volumeClaimTemplates:
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: redis-data
       spec:
         accessModes: ["ReadWriteOnce"]

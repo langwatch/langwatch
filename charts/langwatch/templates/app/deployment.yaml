@@ -231,12 +231,12 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_INTERNAL_SECRET
+                  key: {{ include "langwatch.gatewayInternalSecretKey" . }}
             - name: LW_GATEWAY_JWT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ include "langwatch.appSecretName" . }}
-                  key: LW_GATEWAY_JWT_SECRET
+                  key: {{ include "langwatch.gatewayJwtSecretKey" . }}
             {{- end }}
 
             {{- if (index .Values "langyagent").chartManaged }}

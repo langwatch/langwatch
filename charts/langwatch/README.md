@@ -279,6 +279,11 @@ without an access model); add `--wait-for-jobs` so the release itself fails on a
 bad render, or confirm the `<release>-lwql-access-render` Job reached `Complete`
 before treating the install as done.
 
+Missing LangWatchQL passwords do not fail the Job. It logs which keys are
+missing, writes an empty access model, and ClickHouse starts with LangWatchQL
+off. The Job is named `<release>-lwql-access-render-<hash>` from its spec, so
+Argo CD keeps the completed Job in sync and a changed spec gets a new Job.
+
 | Prerequisite | Why | How chart-managed ClickHouse already satisfies it |
 | --- | --- | --- |
 | `custom_settings_prefixes` includes `custom_` | The `<database>_profile` settings profile (`langwatch_profile` by default) carries a `custom_api_key_hash` setting for the per-query tenant. Without this, every LWQL statement fails with `UNKNOWN_SETTING` (115). | Rendered unconditionally by `renderCustomSettingsPrefixes` in `infra/clickhouse-serverless/internal/render/access.go`. |
@@ -389,6 +394,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `secrets.secretKeys.cronApiKey`               | Key name for cron API key.                           | `""`  |
 | `secrets.secretKeys.nextAuthSecret`           | Key name for NextAuth secret.                        | `""`  |
 | `secrets.secretKeys.virtualKeyPepper`         | Key name for AI Gateway virtual-key pepper.          | `""`  |
+| `secrets.secretKeys.lwqlClickhousePassword` | Key name for the LangWatchQL ClickHouse password. | `LWQL_CLICKHOUSE_PASSWORD` |
+| `secrets.secretKeys.lwqlPostgresReaderPassword` | Key name for the LangWatchQL PostgreSQL reader password. | `LWQL_POSTGRES_READER_PASSWORD` |
 
 ### Container images
 
@@ -991,6 +998,8 @@ npx @bitnami/readme-generator-for-helm --readme ./README.md --values values.yaml
 | `gateway.internalUrl`                          | URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.                                                                                                           | `""`                             |
 | `gateway.controlPlane.baseUrl`                 | URL the gateway uses to reach the app. Empty resolves to this install's own app Service, `<release>-app:5560`. Set it for a control plane outside this install, or an app served on another port.                                                                                                                                                                                                                                                                                         | `""`                             |
 | `gateway.secrets.existingSecretName`           | Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it. | `langwatch-app-secrets`          |
+| `gateway.secrets.internalSecretKey` | Key in that Secret holding the gateway internal secret. The app and the gateway pod both read this key. | `LW_GATEWAY_INTERNAL_SECRET` |
+| `gateway.secrets.jwtSecretKey` | Key in that Secret holding the gateway JWT secret. The app and the gateway pod both read this key. | `LW_GATEWAY_JWT_SECRET` |
 | `gateway.security.blockLocalHTTPCalls`         | Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.                                                                                                                                                                                                                                                    | `false`                          |
 | `gateway.security.requireHTTPSCustomEndpoints` | Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.                                                                                                                                                                                                                                                                                                                                                      | `false`                          |
 | `gateway.security.allowedProxyHosts`           | ] Exact private endpoint hostnames allowed when blockLocalHTTPCalls is enabled. Cloud metadata remains blocked.                                                                                                                                                                                                                                                                                                                                                                           | `""`                             |

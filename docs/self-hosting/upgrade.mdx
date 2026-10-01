@@ -235,6 +235,15 @@ A values file that still sets `gateway.ingress.*` fails to render with a message
 
 The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
 
+### Helm installs with autogen off and Argo CD
+
+With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis.auth.existingSecret` and `postgresql.auth.existingSecret` (or a password value). The chart used to generate these passwords, and under Argo CD a generated password changed on every sync. A plain `helm upgrade` of a release that already has the chart's own `<release>-redis` and `<release>-postgresql` Secrets keeps them.
+Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
+
+The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
+
+The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
+
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 
 The upgrade keeps existing accounts working with no manual step, apart from the cases below. A Helm upgrade from 3.16.0 with email and password users, an Okta-configured deployment and domain SSO was tested end to end; the Azure AD account move is covered by tests only:

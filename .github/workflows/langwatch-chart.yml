@@ -144,6 +144,9 @@ jobs:
           render hosted-prod -f examples/values-hosted-prod.yaml
           render scalable-prod -f examples/values-scalable-prod.yaml
 
+          # autogen off, every Secret operator-owned: the Argo CD posture
+          render autogen-off -f tests/values-autogen-off.yaml
+
           if [ "${#failed[@]}" -gt 0 ]; then
             echo
             echo "presets that failed to render: ${failed[*]}"
@@ -224,6 +227,14 @@ jobs:
       - name: "assert ingress is opt-in and disruption budgets allow drains"
         if: "!cancelled()"
         run: ./tests/gateway-ingress-and-pdbs.sh
+
+      # Argo CD renders with no cluster access and as revision 1 every time.
+      # With autogen off and operator Secrets the render must be stable, take
+      # remapped key names, never block ClickHouse on LangWatchQL, and keep
+      # every StatefulSet in sync under server-side diff.
+      - name: "assert autogen-off installs converge under Argo CD"
+        if: "!cancelled()"
+        run: ./tests/autogen-off-and-argocd.sh
 
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing

@@ -130,6 +130,13 @@ secrets:
     # Key for AI Gateway virtual-key pepper (used by app only)
     ## @param secrets.secretKeys.virtualKeyPepper [string] Key name for AI Gateway virtual-key pepper.
     virtualKeyPepper: "virtualKeyPepper"
+    # LangWatchQL passwords, read from secrets.existingSecret (or the app Secret
+    # you create with autogen off). Remap them when your secret store cannot use
+    # these names, for example Azure Key Vault through ExternalSecret dataFrom.
+    ## @param secrets.secretKeys.lwqlClickhousePassword [string] Key name for the LangWatchQL ClickHouse password.
+    lwqlClickhousePassword: "LWQL_CLICKHOUSE_PASSWORD"
+    ## @param secrets.secretKeys.lwqlPostgresReaderPassword [string] Key name for the LangWatchQL PostgreSQL reader password.
+    lwqlPostgresReaderPassword: "LWQL_POSTGRES_READER_PASSWORD"
 
 # =============================================================================
 # Container Image Configurations
@@ -2247,8 +2254,12 @@ gateway:
     baseUrl: ""
 
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-app-secrets] Name of the Secret the gateway pod mounts for LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET. this release collapsed gateway-auth into the umbrella's app Secret so both langwatch-app and the gateway pod mount the SAME Secret. Default matches the autogen app-secret name when release name is `langwatch`. If you override the release name OR set `autogen.secretNames.app` / `secrets.existingSecret`, set this to the same Secret name so the gateway subchart bridges to it.
+  ## @param gateway.secrets.internalSecretKey [string, default: LW_GATEWAY_INTERNAL_SECRET] Key in that Secret holding the gateway internal secret. The app and the gateway pod both read this key.
+  ## @param gateway.secrets.jwtSecretKey [string, default: LW_GATEWAY_JWT_SECRET] Key in that Secret holding the gateway JWT secret. The app and the gateway pod both read this key.
   secrets:
     existingSecretName: langwatch-app-secrets
+    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET
 
   ## @param gateway.security.blockLocalHTTPCalls [default: false] Reject tenant-supplied provider endpoints resolving to local/private networks. Keep false for local/self-hosted installs that intentionally use private services; set true for SaaS together with a restrictive gateway NetworkPolicy.
   ## @param gateway.security.requireHTTPSCustomEndpoints [default: false] Require HTTPS for customer-configured provider endpoints. Hosted-cloud hardening; disabled by default for self-hosted compatibility.

@@ -478,7 +478,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 
-{{/* Redis secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
+{{/* Chart-managed Redis and PostgreSQL generate their passwords only with
+     autogen.enabled=true; with it off, templates/redis/secret.yaml and
+     templates/postgresql/secret.yaml require an existingSecret or a password. */}}
 
 {{- if not .Values.redis.chartManaged }}
   {{- if .Values.redis.external.connectionString.secretKeyRef.name }}
@@ -498,7 +500,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- else if empty .Values.postgresql.external.connectionString.value }}
     {{- $errors = append $errors "postgresql.chartManaged is false but connectionString is not configured" }}
   {{- end }}
-{{/* PostgreSQL secret template auto-generates its password via lookup/randAlphaNum — no autogen gate needed */}}
 {{- end }}
 
 {{- if not .Values.prometheus.chartManaged }}
@@ -610,7 +611,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- if eq $langySecretName (include "langwatch.appSecretName" .) }}
     {{- $reserved := list "credentialsEncryptionKey" "cronApiKey" "nextAuthSecret" "virtualKeyPepper" }}
     {{- if (.Values.gateway).chartManaged }}
-      {{- $reserved = concat $reserved (list "LW_GATEWAY_INTERNAL_SECRET" "LW_GATEWAY_JWT_SECRET") }}
+      {{- $reserved = concat $reserved (list (include "langwatch.gatewayInternalSecretKey" .) (include "langwatch.gatewayJwtSecretKey" .)) }}
     {{- end }}
     {{- if has $langyKey $reserved }}
       {{- $errors = append $errors (printf "langyagent.secrets.internalSecretKey is %q, which is already a key of the app Secret %q. Langy would overwrite that credential with its own value. Pick a distinct key name (the default is LANGY_INTERNAL_SECRET), or point langyagent.secrets.existingSecretName at a separate Secret." $langyKey $langySecretName) }}
@@ -946,18 +947,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
      LangWatchQL simply stays unprovisioned (fail-closed refusals) instead of
      the pod dying in CreateContainerConfigError. */}}
 {{- if .Values.lwql.enabled }}
-{{- $lwqlPwSecret := .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) }}
+{{- $lwqlPwSecret := include "langwatch.lwql.passwordSecret" . }}
 - name: LWQL_CLICKHOUSE_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $lwqlPwSecret }}
-      key: LWQL_CLICKHOUSE_PASSWORD
+      key: {{ include "langwatch.lwql.clickhousePasswordKey" . }}
       optional: true
 - name: LWQL_POSTGRES_READER_PASSWORD
   valueFrom:
     secretKeyRef:
       name: {{ $lwqlPwSecret }}
-      key: LWQL_POSTGRES_READER_PASSWORD
+      key: {{ include "langwatch.lwql.postgresReaderPasswordKey" . }}
       optional: true
 {{- end }}
 
@@ -1292,6 +1293,46 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   `tpl .Values.lwqlAccess.secretName $`, so `$` is the parent context and the
   helper resolves there — one source of truth, no literal to keep in sync.
 */}}
+{{/* Key names in the app Secret for the AI Gateway shared-auth values. The
+     gateway pod reads gateway.secrets.internalSecretKey / jwtSecretKey from the
+     same Secret, so the app reads (and autogen writes) the same names. */}}
+{{- define "langwatch.gatewayInternalSecretKey" -}}
+{{- ((.Values.gateway).secrets).internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" -}}
+{{- end -}}
+
+{{- define "langwatch.gatewayJwtSecretKey" -}}
+{{- ((.Values.gateway).secrets).jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" -}}
+{{- end -}}
+
+{{/* Whether the LangWatchQL passwords come from the chart-owned passwords
+     Secret (autogen with no secrets.existingSecret). That Secret always uses
+     the default key names; an operator-owned Secret uses
+     secrets.secretKeys.lwqlClickhousePassword / lwqlPostgresReaderPassword. */}}
+{{- define "langwatch.lwql.passwordsChartOwned" -}}
+{{- if and .Values.autogen.enabled (not .Values.secrets.existingSecret) }}true{{ end -}}
+{{- end -}}
+
+{{/* The Secret the LangWatchQL passwords are read from. */}}
+{{- define "langwatch.lwql.passwordSecret" -}}
+{{- .Values.secrets.existingSecret | default (ternary (include "langwatch.lwql.passwordSecretName" .) (include "langwatch.appSecretName" .) .Values.autogen.enabled) -}}
+{{- end -}}
+
+{{- define "langwatch.lwql.clickhousePasswordKey" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+LWQL_CLICKHOUSE_PASSWORD
+{{- else -}}
+{{- .Values.secrets.secretKeys.lwqlClickhousePassword | default "LWQL_CLICKHOUSE_PASSWORD" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "langwatch.lwql.postgresReaderPasswordKey" -}}
+{{- if include "langwatch.lwql.passwordsChartOwned" . -}}
+LWQL_POSTGRES_READER_PASSWORD
+{{- else -}}
+{{- .Values.secrets.secretKeys.lwqlPostgresReaderPassword | default "LWQL_POSTGRES_READER_PASSWORD" -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "langwatch.lwql.accessSecretName" -}}
   {{- printf "%s-lwql-clickhouse-access" (include "langwatch.fullname" .) -}}
 {{- end -}}

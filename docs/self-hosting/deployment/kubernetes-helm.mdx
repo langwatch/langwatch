@@ -104,6 +104,8 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | `LANGY_INTERNAL_SECRET` | `langyagent.chartManaged: true` (default) |
 | `LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD` | Optional, see LangWatchQL below |
 
+Every key name can be changed to match your secret store, for example the dashed names Azure Key Vault produces through `dataFrom`: `secrets.secretKeys.*` for the app and LangWatchQL keys, `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey` for the gateway keys (the app and the gateway pod both read them), and `langyagent.secrets.internalSecretKey` for Langy.
+
 **ClickHouse Secret**: chart-managed ClickHouse only (skip it with `clickhouse.chartManaged: false`). Referenced by `clickhouse.auth.existingSecret`, and the name must differ from the default `<release>-clickhouse`, since the deployment composes `CLICKHOUSE_URL` from the password key at runtime.
 
 | Key | Needed when |
@@ -111,14 +113,16 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | `password` | Always |
 | `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
 
-A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead.
+**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords. With `autogen.enabled=false` the render fails without them, because a generated password would change on every Argo CD sync.
+
+A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead. Argo CD renders without cluster access, so under Argo CD only the pod error shows it.
 
 <Note>
-`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse credentials. Chart-managed PostgreSQL and Redis generate their passwords regardless of this setting. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
+`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse, PostgreSQL and Redis credentials. Use it with plain `helm` only: it reads existing values back from the cluster, which Argo CD cannot do, so under Argo CD the generated values change on every sync. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
 </Note>
 
 <Note>
-**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
+**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely. To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again, then restart the ClickHouse StatefulSet.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
 </Note>
@@ -459,7 +463,7 @@ Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
-   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 

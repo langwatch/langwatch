@@ -262,9 +262,8 @@ backend for you:
 ──────────────────────────────────────────────────────────────────────
 Each chart bump may introduce new required keys on the umbrella's app
 Secret. When upgrading, verify these are present in the Secret the app
-+ gateway pods mount, otherwise the pods crashloop at boot with a
-CreateContainerConfigError that hides the missing key behind a generic
-message.
++ gateway pods mount, otherwise the pods stay in
+CreateContainerConfigError; `kubectl describe pod` names the missing key.
 
   {{ include "langwatch.appSecretName" . }} keys (always required):
     - credentialsEncryptionKey
@@ -272,12 +271,12 @@ message.
     - nextAuthSecret
     - virtualKeyPepper
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
-    - LW_GATEWAY_INTERNAL_SECRET      (gateway.chartManaged=true)
-    - LW_GATEWAY_JWT_SECRET           (gateway.chartManaged=true)
+    - {{ include "langwatch.gatewayInternalSecretKey" . }}      (gateway.chartManaged=true)
+    - {{ include "langwatch.gatewayJwtSecretKey" . }}           (gateway.chartManaged=true)
 {{- end }}
 {{- if .Values.lwql.enabled }}
-    - LWQL_CLICKHOUSE_PASSWORD         (lwql.enabled=true; app-Secret keys ONLY
-    - LWQL_POSTGRES_READER_PASSWORD     when you own this Secret — existingSecret
+    - {{ include "langwatch.lwql.clickhousePasswordKey" . }}         (lwql.enabled=true; app-Secret keys ONLY
+    - {{ include "langwatch.lwql.postgresReaderPasswordKey" . }}     when you own this Secret — existingSecret
                                         or autogen off. With autogen the chart
                                         generates them into its own
                                         {{ include "langwatch.lwql.passwordSecretName" . }} Secret
@@ -303,9 +302,10 @@ message.
   When autogen.enabled=true the chart materialises this Secret on
   first install via per-key lookup-or-rand and heals missing keys
   on subsequent renders. When autogen.enabled=false the operator
-  pre-creates the Secret out-of-band and the preflight Job validates
-  the required keys are present before pods roll. The
-  operator-provided path is the only one that works cleanly under
+  pre-creates the Secret out-of-band. Plain helm checks that it holds
+  the Langy key at render time; Argo CD renders without cluster
+  access, so there a missing key shows up only as the pod error
+  above. The operator-provided path is the only one that works cleanly under
   GitOps controllers whose render step has no cluster access (ArgoCD
   repo-server, etc.) because the chart never renders the Secret for
   the controller to reconcile against. See
@@ -319,12 +319,12 @@ message.
       --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
       --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
 {{- if and .Values.gateway .Values.gateway.chartManaged }}
-      --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-      --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
+      --from-literal={{ include "langwatch.gatewayInternalSecretKey" . }}="$(openssl rand -hex 32)" \
+      --from-literal={{ include "langwatch.gatewayJwtSecretKey" . }}="$(openssl rand -hex 32)"{{ if or .Values.lwql.enabled (and $langy.chartManaged (not $langyOwnSecret)) }} \{{ end }}
 {{- end }}
 {{- if .Values.lwql.enabled }}
-      --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
-      --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
+      --from-literal={{ include "langwatch.lwql.clickhousePasswordKey" . }}="$(openssl rand -hex 32)" \
+      --from-literal={{ include "langwatch.lwql.postgresReaderPasswordKey" . }}="$(openssl rand -hex 32)"{{ if and $langy.chartManaged (not $langyOwnSecret) }} \{{ end }}
 {{- end }}
 {{- if and $langy.chartManaged (not $langyOwnSecret) }}
       --from-literal={{ $langyKey }}="$(openssl rand -hex 32)"
@@ -376,7 +376,7 @@ ClickHouse depends on the posture:
 {{- if .Values.clickhouse.chartManaged }}
 
   Chart-managed ClickHouse (this release): RENDERED delivery. A deploy-time
-  Job ({{ .Release.Name }}-lwql-access-render-<revision>) runs the app image,
+  Job ({{ .Release.Name }}-lwql-access-render-<spec hash>) runs the app image,
   renders the access model, and writes it into the Secret
   {{ .Release.Name }}-lwql-clickhouse-access. Every ClickHouse pod mounts it at
   users.d/lwql-access.yaml and config.d/lwql-named-collection.yaml, so the
@@ -392,7 +392,17 @@ ClickHouse depends on the posture:
   and the ClickHouse mount of that Secret is REQUIRED, so if the render Job fails
   the ClickHouse pods stay ContainerCreating instead of coming up accessless.
   With `--wait-for-jobs` the release fails on a bad render; otherwise confirm the
-  {{ .Release.Name }}-lwql-access-render-<revision> Job reached Complete yourself.
+  {{ .Release.Name }}-lwql-access-render-<spec hash> Job reached Complete yourself.
+
+  Missing passwords do not block ClickHouse. When
+  {{ include "langwatch.lwql.passwordSecret" . }} has no {{ include "langwatch.lwql.clickhousePasswordKey" . }} or
+  {{ include "langwatch.lwql.postgresReaderPasswordKey" . }} key, the Job logs which one is missing and
+  writes an empty access model, so ClickHouse starts and LangWatchQL stays off.
+  To turn it on later: add both keys to that Secret, delete the
+  {{ .Release.Name }}-lwql-access-render-<spec hash> Job (helm upgrade or the Argo CD
+  sync runs it again), then
+  restart the ClickHouse pods so they mount the new access model:
+  kubectl -n {{ .Release.Namespace }} rollout restart statefulset {{ include "langwatch.clickhouse.serviceName" . }}
 {{- else }}
 
   External / bring-your-own ClickHouse: SQL DDL (`sql` mode). The chart cannot
