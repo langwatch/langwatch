@@ -1656,7 +1656,10 @@ ingress:
   # separate object because controllers such as ingress-nginx apply
   # annotations per Ingress, and the gateway needs streaming settings the app
   # does not. With className nginx the chart adds proxy buffering off,
-  # 3600s read/send timeouts and a 32m body size to it.
+  # 3600s read/send timeouts and a 32m body size to it. The match is on the
+  # value of className: an empty className on a cluster whose default
+  # IngressClass is ingress-nginx gets none of them, so set nginx explicitly
+  # (or put the annotations in ingress.gateway.annotations).
   gateway:
     ## @param ingress.gateway.host [string, default: ""] Hostname for the AI Gateway, e.g. gateway.your-corp.com. Empty renders no gateway Ingress. Requires ingress.enabled.
     host: ""

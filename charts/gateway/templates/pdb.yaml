@@ -18,12 +18,12 @@
 {{- end }}
 {{- $useMin := not (or (kindIs "invalid" $minAvailable) (eq (toString $minAvailable) "")) }}
 {{- if $useMin }}
-{{- if and (not (kindIs "string" $minAvailable)) (ge (int $minAvailable) $replicas) }}
-{{- fail (printf "podDisruptionBudget.minAvailable is %v with %d gateway pods, so no pod may ever be evicted and every node drain hangs. Use a value below %d, or podDisruptionBudget.maxUnavailable." $minAvailable $replicas $replicas) }}
+{{- if ge (include "gateway.pdbPods" (dict "value" $minAvailable "replicas" $replicas) | int) $replicas }}
+{{- fail (printf "podDisruptionBudget.minAvailable is %v with %d gateway pods, so no pod may ever be evicted and every node drain hangs. Use a value that keeps fewer than %d pods required, or podDisruptionBudget.maxUnavailable." $minAvailable $replicas $replicas) }}
 {{- end }}
 {{- else }}
-{{- if and (not (kindIs "string" $maxUnavailable)) (lt (int $maxUnavailable) 1) }}
-{{- fail "podDisruptionBudget.maxUnavailable must be at least 1; 0 blocks every node drain." }}
+{{- if lt (include "gateway.pdbPods" (dict "value" $maxUnavailable "replicas" $replicas) | int) 1 }}
+{{- fail (printf "podDisruptionBudget.maxUnavailable is %v, so no pod may ever be evicted and every node drain hangs. Use 1 or more." $maxUnavailable) }}
 {{- end }}
 {{- end }}
 apiVersion: policy/v1

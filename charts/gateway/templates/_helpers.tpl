@@ -64,3 +64,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- fail (printf "terminationGracePeriodSeconds is %d, too short for the configured drain: shutdown.preDrainWaitSeconds (%d) + shutdown.timeoutSeconds (%d) + %ds of slack needs at least %d. Raise terminationGracePeriodSeconds to %d or more, or lower the drain timing." $granted $drain $timeout $slack $required $required) }}
 {{- end }}
 {{- end }}
+
+{{/*
+A PodDisruptionBudget field as a pod count, the way Kubernetes resolves it:
+an integer as written, a percentage of `replicas` rounded up (Kubernetes
+rounds both minAvailable and maxUnavailable percentages up).
+Usage: {{ include "gateway.pdbPods" (dict "value" $v "replicas" $replicas) | int }}
+*/}}
+{{- define "gateway.pdbPods" -}}
+{{- $v := toString .value -}}
+{{- if hasSuffix "%" $v -}}
+{{- $pct := int (trimSuffix "%" $v) -}}
+{{- div (add (mul $pct (int .replicas)) 99) 100 -}}
+{{- else -}}
+{{- int $v -}}
+{{- end -}}
+{{- end -}}

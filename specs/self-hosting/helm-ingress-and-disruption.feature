@@ -76,3 +76,4 @@ Feature: Helm install routing and disruption budgets
       Given a component PodDisruptionBudget with minAvailable equal to replicaCount, minAvailable 100%, or maxUnavailable 0
       When the chart renders
       Then the render fails naming the component and the field
+      And percentages are resolved the way Kubernetes rounds them, so minAvailable 75% of 2 pods and maxUnavailable 0% are refused too

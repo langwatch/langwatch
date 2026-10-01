@@ -102,14 +102,18 @@ test_pdb_never_blocks_a_drain() {
   fi
 
   render pdb-single --set autoscaling.enabled=false --set replicaCount=1
-  if grep -q '^kind: PodDisruptionBudget$' "$tmp/pdb-single.yaml"; then
+  if [ -s "$tmp/pdb-single.err" ] || ! grep -q '^kind: Deployment$' "$tmp/pdb-single.yaml"; then
+    fail "pdb single replica" "the single-replica render failed: $(cat "$tmp/pdb-single.err")"
+  elif grep -q '^kind: PodDisruptionBudget$' "$tmp/pdb-single.yaml"; then
     fail "pdb single replica" "a PDB rendered over a single gateway pod"
   else
     ok "pdb single replica" "no PDB with replicaCount 1"
   fi
 
   render pdb-hpa-one --set autoscaling.minReplicas=1
-  if grep -q '^kind: PodDisruptionBudget$' "$tmp/pdb-hpa-one.yaml"; then
+  if [ -s "$tmp/pdb-hpa-one.err" ] || ! grep -q '^kind: Deployment$' "$tmp/pdb-hpa-one.yaml"; then
+    fail "pdb hpa floor 1" "the HPA floor 1 render failed: $(cat "$tmp/pdb-hpa-one.err")"
+  elif grep -q '^kind: PodDisruptionBudget$' "$tmp/pdb-hpa-one.yaml"; then
     fail "pdb hpa floor 1" "a PDB rendered with an HPA floor of 1"
   else
     ok "pdb hpa floor 1" "no PDB with autoscaling.minReplicas 1"
@@ -130,8 +134,24 @@ test_pdb_never_blocks_a_drain() {
     fail "pdb minAvailable = pods" "minAvailable equal to the pod count rendered"
   fi
 
+  local entry
+  for entry in "minAvailable=100%" "minAvailable=75%" "maxUnavailable=0%"; do
+    render "pdb-pct-${entry%%=*}" --set-string "podDisruptionBudget.$entry"
+    if grep -q 'no pod may ever be evicted' "$tmp/pdb-pct-${entry%%=*}.err"; then
+      ok "pdb $entry" "render refused (75% of 2 pods rounds up to 2)"
+    else
+      fail "pdb $entry" "a percentage budget with no evictable pod rendered"
+    fi
+  done
+  render pdb-pct-ok --set-string podDisruptionBudget.minAvailable=50%
+  if grep -q 'minAvailable: 50%' "$tmp/pdb-pct-ok.yaml"; then
+    ok "pdb minAvailable=50%" "an evictable percentage renders"
+  else
+    fail "pdb minAvailable=50%" "50% of 2 pods was refused: $(cat "$tmp/pdb-pct-ok.err")"
+  fi
+
   render pdb-max-zero --set podDisruptionBudget.maxUnavailable=0
-  if grep -q 'maxUnavailable must be at least 1' "$tmp/pdb-max-zero.err"; then
+  if grep -q 'no pod may ever be evicted' "$tmp/pdb-max-zero.err"; then
     ok "pdb maxUnavailable 0" "render refused"
   else
     fail "pdb maxUnavailable 0" "maxUnavailable 0 rendered"

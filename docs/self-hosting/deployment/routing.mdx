@@ -68,6 +68,8 @@ ingress:
 
 With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
 
+The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+
 On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
 
 ## Gateway API (Envoy Gateway)

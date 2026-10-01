@@ -130,7 +130,7 @@ test_gateway_host_on_the_app_ingress() {
   else
     ok "gateway no nginx" "no ingress-nginx annotations on an envoy class"
   fi
-  if printf '%s\n' "$doc" | grep -q 'name: lw-gateway$' && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
+  if [ "$(printf '%s\n' "$doc" | grep -A2 'service:$' | grep -c 'name: lw-gateway$')" = "2" ] && printf '%s\n' "$doc" | grep -q 'path: /v1$' \
       && printf '%s\n' "$doc" | grep -q 'path: /health$'; then
     ok "gateway backend" "/v1 and /health route to the lw-gateway Service"
   else
@@ -224,7 +224,9 @@ test_gateway_pdb_under_the_umbrella() {
     fail "umbrella gateway pdb" "gateway PDB is not maxUnavailable: 1: ${doc:-<absent>}"
   fi
   render gw-pdb-single --set gateway.autoscaling.enabled=false --set gateway.replicaCount=1
-  if [ -n "$(doc_of gw-pdb-single langwatch/charts/gateway/templates/pdb.yaml)" ]; then
+  if [ -s "$tmp/gw-pdb-single.err" ] || ! grep -q '# Source: langwatch/charts/gateway/templates/deployment.yaml' "$tmp/gw-pdb-single.yaml"; then
+    fail "umbrella gateway pdb single" "the single-replica render failed: $(cat "$tmp/gw-pdb-single.err")"
+  elif [ -n "$(doc_of gw-pdb-single langwatch/charts/gateway/templates/pdb.yaml)" ]; then
     fail "umbrella gateway pdb single" "a gateway PDB rendered over one pod"
   else
     ok "umbrella gateway pdb single" "no gateway PDB over one pod"
@@ -271,10 +273,24 @@ test_blocking_pass_through_pdb_is_refused() {
   fi
   render nlp-percent --set langwatch_nlp.replicaCount=2 \
     --set-string 'langwatch_nlp.podDisruptionBudget.minAvailable=100%'
-  if grep -q 'langwatch_nlp.podDisruptionBudget.minAvailable is "100%"' "$tmp/nlp-percent.err"; then
+  if grep -q 'langwatch_nlp.podDisruptionBudget.minAvailable is 100%' "$tmp/nlp-percent.err"; then
     ok "nlp minAvailable 100%" "render refused"
   else
     fail "nlp minAvailable 100%" "minAvailable 100% rendered: $(cat "$tmp/nlp-percent.err")"
+  fi
+  render app-pct --set app.replicaCount=2 --set app.storedObjects.localFilesystem.enabled=false \
+    --set-string 'app.podDisruptionBudget.minAvailable=75%'
+  if grep -q 'app.podDisruptionBudget.minAvailable is 75%' "$tmp/app-pct.err"; then
+    ok "app minAvailable 75%" "render refused (75% of 2 rounds up to 2)"
+  else
+    fail "app minAvailable 75%" "minAvailable 75% of 2 pods rendered: $(cat "$tmp/app-pct.err")"
+  fi
+  render workers-pct --set workers.replicaCount=3 --set app.storedObjects.localFilesystem.enabled=false \
+    --set-string 'workers.podDisruptionBudget.maxUnavailable=0%'
+  if grep -q 'workers.podDisruptionBudget.maxUnavailable is 0%' "$tmp/workers-pct.err"; then
+    ok "workers maxUnavailable 0%" "render refused"
+  else
+    fail "workers maxUnavailable 0%" "maxUnavailable 0% rendered: $(cat "$tmp/workers-pct.err")"
   fi
 }
 

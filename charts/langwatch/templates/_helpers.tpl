@@ -1830,8 +1830,8 @@ budget that blocks node drains.
 Prints "true" when the component runs more than one pod. A budget over a
 single pod can never let a drain evict it, so node upgrades and autoscaler
 scale-downs hang; the PDB is skipped there. With more pods, a budget that
-leaves none evictable (minAvailable at or above replicaCount or 100%, or
-maxUnavailable 0) is refused, since it hangs drains the same way and
+leaves none evictable (minAvailable that resolves to replicaCount or more,
+or maxUnavailable that resolves to 0; percentages round up as in Kubernetes) is refused, since it hangs drains the same way and
 admission policies reject it.
 
 Usage: {{- if include "langwatch.pdbRenders" (dict "name" "app" "spec" .Values.app.podDisruptionBudget "replicas" .Values.app.replicaCount) }}
@@ -1842,20 +1842,32 @@ Usage: {{- if include "langwatch.pdbRenders" (dict "name" "app" "spec" .Values.a
 {{- if and $spec (gt $replicas 1) -}}
   {{- $min := get $spec "minAvailable" -}}
   {{- $max := get $spec "maxUnavailable" -}}
-  {{- if not (kindIs "invalid" $min) -}}
-    {{- if kindIs "string" $min -}}
-      {{- if eq (trimSuffix "%" $min) "100" -}}
-        {{- fail (printf "%s.podDisruptionBudget.minAvailable is %q, so no pod may ever be evicted and every node drain hangs. Use a lower value, or maxUnavailable: 1." .name $min) -}}
-      {{- end -}}
-    {{- else if ge (int $min) $replicas -}}
-      {{- fail (printf "%s.podDisruptionBudget.minAvailable is %v with replicaCount %d, so no pod may ever be evicted and every node drain hangs. Use a value below %d, or maxUnavailable: 1." .name $min $replicas $replicas) -}}
+  {{- if and (hasKey $spec "minAvailable") (ne (toString $min) "") -}}
+    {{- if ge (include "langwatch.pdbPods" (dict "value" $min "replicas" $replicas) | int) $replicas -}}
+      {{- fail (printf "%s.podDisruptionBudget.minAvailable is %v with replicaCount %d, so no pod may ever be evicted and every node drain hangs. Use a value that keeps fewer than %d pods required, or maxUnavailable: 1." .name $min $replicas $replicas) -}}
     {{- end -}}
   {{- end -}}
-  {{- if not (kindIs "invalid" $max) -}}
-    {{- if or (and (kindIs "string" $max) (eq (trimSuffix "%" $max) "0")) (and (not (kindIs "string" $max)) (lt (int $max) 1)) -}}
+  {{- if and (hasKey $spec "maxUnavailable") (ne (toString $max) "") -}}
+    {{- if lt (include "langwatch.pdbPods" (dict "value" $max "replicas" $replicas) | int) 1 -}}
       {{- fail (printf "%s.podDisruptionBudget.maxUnavailable is %v, so no pod may ever be evicted and every node drain hangs. Use 1 or more." .name $max) -}}
     {{- end -}}
   {{- end -}}
 true
+{{- end -}}
+{{- end -}}
+
+{{/*
+A PodDisruptionBudget field as a pod count, the way Kubernetes resolves it:
+an integer as written, a percentage of `replicas` rounded up (Kubernetes
+rounds both minAvailable and maxUnavailable percentages up).
+Usage: {{ include "langwatch.pdbPods" (dict "value" $v "replicas" $replicas) | int }}
+*/}}
+{{- define "langwatch.pdbPods" -}}
+{{- $v := toString .value -}}
+{{- if hasSuffix "%" $v -}}
+{{- $pct := int (trimSuffix "%" $v) -}}
+{{- div (add (mul $pct (int .replicas)) 99) 100 -}}
+{{- else -}}
+{{- int $v -}}
 {{- end -}}
 {{- end -}}
