@@ -88,7 +88,7 @@ describe("Feature: automations over the public API express what the dashboard ex
         graphAlert: rule,
         alertType: "WARNING",
       });
-      expect(await response.json()).toEqual({ error: "graph_not_found" });
+      expect(await response.json()).toMatchObject({ code: "graph_not_found" });
     });
   });
 
@@ -124,7 +124,7 @@ describe("Feature: automations over the public API express what the dashboard ex
         filterQuery: "((",
       });
       const body = await response.json();
-      expect(body).toEqual({ error: "trigger_filter_query_invalid" });
+      expect(body).toMatchObject({ code: "trigger_filter_query_invalid" });
       expect(JSON.stringify(body)).not.toContain("traces.attributes");
     });
   });
@@ -145,7 +145,7 @@ describe("Feature: automations over the public API express what the dashboard ex
       const response = await rig.api.patch("/api/triggers/trigger_r", {
         actionParams: { members: ["b@example.com"] },
       });
-      expect(await response.json()).toEqual({ error: "report_incomplete" });
+      expect(await response.json()).toMatchObject({ code: "report_incomplete" });
     });
   });
 
@@ -158,7 +158,7 @@ describe("Feature: automations over the public API express what the dashboard ex
         actionParams: { members: ["a@example.com"], slackWebhook: SECRETS.webhookUrl },
         filters: conditions,
       });
-      expect(await response.json()).toEqual({ error: "trigger_action_params_unknown_fields" });
+      expect(await response.json()).toMatchObject({ code: "trigger_action_params_unknown_fields" });
     });
 
     /** @scenario "Another channel's field cannot be parked on this one" */
@@ -167,7 +167,7 @@ describe("Feature: automations over the public API express what the dashboard ex
       const response = await rig.api.patch("/api/triggers/trigger_1", {
         actionParams: { members: ["a@example.com"], url: "https://r.example.com" },
       });
-      expect(await response.json()).toEqual({ error: "trigger_action_params_unknown_fields" });
+      expect(await response.json()).toMatchObject({ code: "trigger_action_params_unknown_fields" });
       expect(rig.rows.get("trigger_1")?.actionParams).toEqual(emailRow.actionParams);
     });
   });
@@ -189,7 +189,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           actionParams: { members: ["a@example.com"], threshold: 9 },
         },
       );
-      expect(await response.json()).toEqual({ error: "trigger_rule_fields_misplaced" });
+      expect(await response.json()).toMatchObject({ code: "trigger_rule_fields_misplaced" });
     });
 
     /** @scenario "The read states the rule where a write states it" */
@@ -221,7 +221,7 @@ describe("Feature: automations over the public API express what the dashboard ex
       rig.limits.count.mockResolvedValueOnce({ allowed: false, resetAt: Date.now() + 30_000 });
       const response = await rig.api.post("/api/triggers/trigger_1/test-fire");
 
-      expect(await response.json()).toEqual({ error: "trigger_test_fire_rate_limited" });
+      expect(await response.json()).toMatchObject({ code: "trigger_test_fire_rate_limited" });
       expect(rig.limits.count).toHaveBeenCalledWith(
         expect.objectContaining({ key: "testfire:project:project_1", max: 10 }),
       );
@@ -268,9 +268,11 @@ describe("Feature: automations over the public API express what the dashboard ex
           }),
         ],
       });
-      expect(await (await rig.api.post("/api/triggers/trigger_ds/test-fire")).json()).toEqual({
-        error: "test_fire_unavailable",
-      });
+      expect(await (await rig.api.post("/api/triggers/trigger_ds/test-fire")).json()).toMatchObject(
+        {
+          code: "test_fire_unavailable",
+        },
+      );
     });
   });
 
@@ -354,7 +356,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           },
         },
       );
-      expect(await response.json()).toEqual({ error: "webhook_header_values_required" });
+      expect(await response.json()).toMatchObject({ code: "webhook_header_values_required" });
     });
 
     /** @scenario "Retargeting while keeping the stored signing secret is refused" */
@@ -365,7 +367,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           actionParams: { url: "https://new.example.com/hook", signingSecret: "[redacted]" },
         },
       );
-      expect(await response.json()).toEqual({ error: "invalid_action_params" });
+      expect(await response.json()).toMatchObject({ code: "invalid_action_params" });
     });
   });
 
@@ -378,7 +380,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           action: "SEND_SLACK_MESSAGE",
         },
       );
-      expect(await response.json()).toEqual({ error: "trigger_action_immutable" });
+      expect(await response.json()).toMatchObject({ code: "trigger_action_immutable" });
     });
   });
 
@@ -391,7 +393,7 @@ describe("Feature: automations over the public API express what the dashboard ex
           graphAlert: rule,
         },
       );
-      expect(await response.json()).toEqual({ error: "trigger_kind_immutable" });
+      expect(await response.json()).toMatchObject({ code: "trigger_kind_immutable" });
     });
   });
 });

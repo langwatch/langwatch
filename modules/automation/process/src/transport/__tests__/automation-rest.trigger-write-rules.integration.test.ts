@@ -14,7 +14,7 @@ describe("Feature: the API is held to the dashboard's write rules", () => {
       actionParams: { datasetId: "", datasetMapping: { mapping: {} } },
       filters: conditions,
     });
-    expect(await response.json()).toEqual({ error: "invalid_action_params" });
+    expect(await response.json()).toMatchObject({ code: "invalid_action_params" });
   });
 
   /** @scenario "A destination that is not https is refused" */
@@ -25,7 +25,7 @@ describe("Feature: the API is held to the dashboard's write rules", () => {
       actionParams: { url: "http://r.example.com/hook" },
       filters: conditions,
     });
-    expect(await response.json()).toEqual({ error: "invalid_action_params" });
+    expect(await response.json()).toMatchObject({ code: "invalid_action_params" });
   });
 
   /** @scenario "An automation whose only conditions are unsupported is refused" */
@@ -36,7 +36,7 @@ describe("Feature: the API is held to the dashboard's write rules", () => {
       actionParams: { members: ["a@example.com"] },
       filters: { "legacy.field": ["x"] },
     });
-    expect(await response.json()).toEqual({ error: "trigger_filters_unsupported" });
+    expect(await response.json()).toMatchObject({ code: "trigger_filters_unsupported" });
   });
 
   /** @scenario "A keyed condition written without its key is refused" */
@@ -47,7 +47,7 @@ describe("Feature: the API is held to the dashboard's write rules", () => {
       actionParams: { members: ["a@example.com"] },
       filters: { "evaluations.passed": ["false"] },
     });
-    expect(await response.json()).toEqual({ error: "trigger_filter_key_required" });
+    expect(await response.json()).toMatchObject({ code: "trigger_filter_key_required" });
   });
 
   /** @scenario "An evaluation condition keyed by an evaluator names its monitors" */
@@ -62,6 +62,6 @@ describe("Feature: the API is held to the dashboard's write rules", () => {
       actionParams: { members: ["a@example.com"] },
       filters: { "evaluations.passed": { evaluator_1: ["false"] } },
     });
-    expect(await response.json()).toEqual({ error: "trigger_filter_monitor_required" });
+    expect(await response.json()).toMatchObject({ code: "trigger_filter_monitor_required" });
   });
 });

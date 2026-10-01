@@ -90,8 +90,7 @@ drift from the answer it stands in for. Declaring it without the port fails the
 build, as does declaring it on a read. `preflight` names the read-only
 authorization a create needs beyond its endpoint permission, and it runs outside
 the ledger, on a replay too, because a receipt must not answer for a grant the
-caller has since lost. `registerSse` takes `policy()` the same way a route does,
-because the chain type was widened to `DefaultsChain`. Request-lifetime abort is
+caller has since lost. Request-lifetime abort is
 deliberately not new mechanism: a handler already has `c.req.raw.signal`.
 
 **Reading the scope without depending on Hono.** `projectOf(c)` and
