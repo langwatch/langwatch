@@ -17,6 +17,7 @@ import { useCreateWorkflowAgent } from "../../behavior/use-create-workflow-agent
 import { useRoutedCodeAgent } from "../../behavior/use-routed-code-agent.ts";
 import { useRoutedDrawer } from "../../behavior/use-routed-drawer.ts";
 import { useRoutedHttpAgent } from "../../behavior/use-routed-http-agent.ts";
+import { useRoutedWorkflowAgent } from "../../behavior/use-routed-workflow-agent.ts";
 import { getRandomWorkflowIcon } from "../../model/workflow/random-workflow-icon.ts";
 import {
   WorkflowCodeEditorModal,
@@ -25,6 +26,8 @@ import {
 import { AgentCodeEditorDrawer } from "./agent-code-editor-drawer.tsx";
 import { AgentHttpEditorDrawer } from "./agent-http-editor-drawer.tsx";
 import { AgentTestPanel } from "./agent-test-panel.tsx";
+import { AgentWorkflowEditorDrawer } from "./agent-workflow-editor-drawer.tsx";
+import { AgentWorkflowTargetEditorDrawer } from "./agent-workflow-target-editor-drawer.tsx";
 import { ConnectFromCodeDrawer } from "./connect-from-code-drawer.tsx";
 import { ConnectedAgentDrawer } from "./connected-agent-drawer.tsx";
 import { WorkflowSelectorDrawer } from "./workflow-selector-drawer.tsx";
@@ -143,6 +146,35 @@ export function RoutedAgentCodeEditorDrawer({ agentId, onSave }: UiAgentEditorDr
       renderOutputs={() => null}
       renderMappings={() => null}
       renderTestPanel={(panel) => <AgentTestPanel {...panel} />}
+    />
+  );
+}
+
+// ponytail: mapping sections and the workflow card live in other modules' browsers; until one is
+// lent as a capability these drawers draw no mapping editor (saved mappings keep their defaults).
+export function RoutedAgentWorkflowEditorDrawer({ agentId, onSave }: UiAgentEditorDrawerProps) {
+  const { close, goBack } = useRoutedDrawer();
+  const workflow = useRoutedWorkflowAgent({ agentId, close, ...(onSave ? { onSave } : {}) });
+  return (
+    <AgentWorkflowEditorDrawer
+      {...workflow.options}
+      {...(goBack ? { onGoBack: goBack } : {})}
+      renderMappings={() => null}
+    />
+  );
+}
+
+export function RoutedAgentWorkflowTargetEditorDrawer({ agentId }: { agentId?: string }) {
+  const { close, goBack } = useRoutedDrawer();
+  const workflow = useRoutedWorkflowAgent({ agentId, close });
+  return (
+    <AgentWorkflowTargetEditorDrawer
+      open
+      isLoading={workflow.options.isLoading}
+      hasLookupFailed={workflow.hasLookupFailed}
+      mappings={null}
+      onClose={close}
+      {...(goBack ? { onGoBack: goBack } : {})}
     />
   );
 }

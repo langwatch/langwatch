@@ -71,14 +71,14 @@ export const agentWeb = defineBrowserModule("agent")
     },
     agentWorkflowEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-workflow-editor-drawer.tsx"))
-          .AgentWorkflowEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentWorkflowEditorDrawer,
       }),
     },
     agentWorkflowTargetEditor: {
       load: async () => ({
-        default: (await import("./ui/sections/agent-workflow-target-editor-drawer.tsx"))
-          .AgentWorkflowTargetEditorDrawer,
+        default: (await import("./ui/sections/routed-agent-drawers.tsx"))
+          .RoutedAgentWorkflowTargetEditorDrawer,
       }),
     },
     workflowSelector: {

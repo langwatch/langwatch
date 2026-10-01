@@ -11,7 +11,6 @@ import type {
   UiAgentEditorDrawerProps,
   UiAgentListDrawerProps,
   UiAgentTypeSelectorDrawerProps,
-  UiAgentWorkflowEditorDrawerProps,
   UiWorkflowSelectorDrawerProps,
 } from "./agent-drawers.ts";
 import type { UiAutomationDrawerProps } from "./automation-drawers.ts";
@@ -39,7 +38,7 @@ export type UiDrawerMap = {
   agentList: UiAgentListDrawerProps;
   agentTestingCaseEditor: UiAgentTestingCaseEditorDrawerProps;
   agentTypeSelector: UiAgentTypeSelectorDrawerProps;
-  agentWorkflowEditor: UiAgentWorkflowEditorDrawerProps;
+  agentWorkflowEditor: UiAgentEditorDrawerProps;
   automation: UiAutomationDrawerProps;
   codeEvaluatorEditor: UiCodeEvaluatorEditorDrawerProps;
   evaluatorCategorySelector: UiEvaluatorCategorySelectorDrawerProps;

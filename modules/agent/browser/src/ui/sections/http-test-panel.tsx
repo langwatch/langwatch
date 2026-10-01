@@ -50,8 +50,6 @@ export function renderTemplate(template: string, variables: Record<string, strin
   return result;
 }
 
-export { formatDuration, getStatusColor } from "../blocks/http-test-response-display.tsx";
-
 export function HttpTestPanel({
   onTest,
   disabled = false,
