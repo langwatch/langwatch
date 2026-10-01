@@ -42,7 +42,7 @@ export const INSTANT_EVALS_FLAG = "release_instant_evals";
  * The product decision alone: whether the flag is on for the project or its
  * organization switched Instant Evals on itself, whatever the deployment has
  * configured. The search router reads this one, because a released project
- * with no classifier still gets the "configure a model" primer, while an
+ * with no classifier still gets the "can't run right now" popover, while an
  * unreleased one is never offered a judgement at all.
  *
  * The flag is asked first: it is cached and answers for the operator, and an

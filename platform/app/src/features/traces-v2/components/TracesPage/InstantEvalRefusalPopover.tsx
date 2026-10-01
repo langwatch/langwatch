@@ -79,6 +79,8 @@ interface InstantEvalRefusalPopoverProps {
 export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   title: string;
   body: string;
+  /** A phrase set in bold where it first appears in the body. */
+  emphasis?: string;
   action?: { label: string; href?: string };
   /** A second, quieter link beside the action, when the copy has one. */
   more?: { label: string; href: string };
@@ -96,10 +98,12 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
     };
   }
   if (refusal.kind === "model") {
+    // The deployment has no judge, or its judge is down. The reader's own
+    // model settings cannot fix either, so the way out is a word with us.
     return {
-      title: "Configure a model to judge results",
-      body: `${what} Configure a model to run it. ${meanwhile}`,
-      action: { label: "Configure a model", href: MODEL_PROVIDERS_HREF },
+      title: "Instant Evals can't run right now",
+      body: `${meanwhile} Contact us if this keeps happening.`,
+      action: { label: "Contact us", href: CONTACT_US_HREF },
       dismiss: "Skip",
     };
   }
@@ -125,9 +129,31 @@ export function instantEvalRefusalCopy(refusal: InstantEvalRefusal): {
   return {
     title: "Instant Evals aren't enabled for this project yet",
     body: "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+    emphasis: "Instant Evals",
     action: { label: "Contact us", href: CONTACT_US_HREF },
     dismiss: "Not now",
   };
+}
+
+/** The body, with its emphasis phrase in bold where it first appears. */
+function EmphasizedBody({
+  body,
+  emphasis,
+}: {
+  body: string;
+  emphasis?: string;
+}) {
+  const at = emphasis ? body.indexOf(emphasis) : -1;
+  if (!emphasis || at < 0) return <>{body}</>;
+  return (
+    <>
+      {body.slice(0, at)}
+      <Text as="strong" fontWeight="semibold" color="fg">
+        {emphasis}
+      </Text>
+      {body.slice(at + emphasis.length)}
+    </>
+  );
 }
 
 /**
@@ -157,9 +183,9 @@ export const InstantEvalRefusalPopover: React.FC<
   InstantEvalRefusalPopoverProps
 > = ({ refusal, onClose, onEnable, isEnabling, children }) => {
   const copy = refusal ? instantEvalRefusalCopy(refusal) : null;
-  const useSupportChat =
-    refusal?.kind === "unreleased" && isSupportChatAvailable();
   const action = copy?.action;
+  const useSupportChat =
+    action?.href === CONTACT_US_HREF && isSupportChatAvailable();
   const actionHref = action?.href;
   const isSwitch = action !== undefined && actionHref === undefined;
   return (
@@ -198,7 +224,7 @@ export const InstantEvalRefusalPopover: React.FC<
                 </Text>
               </HStack>
               <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-                {copy.body}
+                <EmphasizedBody body={copy.body} emphasis={copy.emphasis} />
               </Text>
               <HStack gap={2}>
                 {action && (isSwitch || useSupportChat) && (

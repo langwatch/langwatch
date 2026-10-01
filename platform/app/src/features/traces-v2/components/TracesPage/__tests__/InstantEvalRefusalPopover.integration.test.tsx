@@ -73,16 +73,17 @@ describe("given the organization has spent its free Instant Evals budget", () =>
 describe("given the deployment has no classifier", () => {
   describe("when the popover opens", () => {
     /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
-    it("says to configure a model and links to the providers page", () => {
+    it("says Instant Evals can't run and offers Contact us, not model settings", () => {
       const copy = instantEvalRefusalCopy({ kind: "model" });
-      expect(copy.title).toBe("Configure a model to judge results");
+      expect(copy.title).toBe("Instant Evals can't run right now");
       expect(copy.body).toBe(
-        "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do. Configure a model to run it. The words are searched as a phrase in the meantime.",
+        "The words are searched as a phrase in the meantime. Contact us if this keeps happening.",
       );
       expect(copy.action).toEqual({
-        label: "Configure a model",
-        href: MODEL_PROVIDERS_HREF,
+        label: "Contact us",
+        href: CONTACT_US_HREF,
       });
+      expect(copy.action?.href).not.toBe(MODEL_PROVIDERS_HREF);
     });
   });
 });
@@ -215,11 +216,10 @@ describe("given Instant Evals are off for an enterprise organization", () => {
       expect(
         screen.getByText("Instant Evals aren't enabled for this project yet"),
       ).toBeInTheDocument();
-      expect(
-        screen.getByText(
-          "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
-        ),
-      ).toBeInTheDocument();
+      const bold = screen.getByText("Instant Evals", { selector: "strong" });
+      expect(bold.parentElement).toHaveTextContent(
+        "Instant Evals are a powerful new tool that turns plain language questions into native filters. Contact us so we can activate it for you.",
+      );
       expect(screen.getByRole("link", { name: "Contact us" })).toHaveAttribute(
         "href",
         CONTACT_US_HREF,
