@@ -9,6 +9,8 @@ Feature: A read served from projections answers by cursor
   the cache. A hint carries
   its event id; the tab treats an answer as fresh by the rule below and otherwise asks again until the
   settle window ends. The window only bounds how long the tab keeps asking; it never blocks a match.
+  An event id is identity, not a "caught up" watermark: only the hint's own aggregate cursor can
+  prove its event applied, and an answer carrying the tenant cursor is at best approximately fresh.
 
   Background:
     Given a pipeline "run_processing" with a fold projection "runState" keyed by run id
@@ -120,7 +122,7 @@ Feature: A read served from projections answers by cursor
     When the api and the worker restart with nothing applied in between
     Then the cached answer's key still matches
 
-  # Library: freshness
+  # Library: freshness (the scenarios below compare the hint's own aggregate cursor)
 
   @unit
   Scenario: An answer a second or more past the hint is fresh
@@ -157,6 +159,20 @@ Feature: A read served from projections answers by cursor
   Scenario: An id that is not a KSUID is never fresh
     When an answer or a hint carries an id that does not parse
     Then the answer is not fresh
+
+  @unit
+  Scenario: A tenant-wide answer past the hint is only approximately fresh
+    Given a hint for event "H" accepted in second 100
+    When a "runs.list" answer carries the tenant cursor from second 101, or "H" itself
+    Then the answer is approximately fresh, never fresh
+
+  @unit
+  Scenario: A slow run's event is never reported caught up by another run's later event
+    Given run "run_A"'s event "H" in second 100 waits behind a slow fold
+    And run "run_B"'s event "J" in second 101 has applied and moved the tenant cursor to "J"
+    When the tab compares answers with the hint for "H"
+    Then the "runs.list" answer is not fresh
+    And the "runs.get" answer for "run_A" is stale until its own cursor holds "H"
 
   # Framework: the check, in order
 
