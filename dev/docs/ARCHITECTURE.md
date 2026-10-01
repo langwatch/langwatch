@@ -49,17 +49,17 @@ one.
 
 Named by one rule: **where the code runs, or what it declares.**
 
-|          | core                | runs + declares      | reads                       | wire                      | shares               |
-| -------- | ------------------- | -------------------- | --------------------------- | ------------------------- | -------------------- |
-| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`          | contracts            |
-| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/ui-kernel`    | `<name>-browser-kit` |
+|          | core                | runs + declares      | reads                       | wire                   | shares          |
+| -------- | ------------------- | -------------------- | --------------------------- | ---------------------- | --------------- |
+| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`       | contracts       |
+| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/ui-kernel` | `<name>-client` |
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
 imported the rest of the way down, never from the top.
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
-  the `moduleApi` token factory, supply tokens, module ids, UI tokens and
+  the `moduleApi` token factory, module ids, UI tokens and
   release-flag tokens (§10.1; Alex, 2026-10-01). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
@@ -67,8 +67,8 @@ imported the rest of the way down, never from the top.
   ever enters a contract's (or the browser's) graph from the top.
 - **`@langwatch/process`** — the Node runtime AND the process-half
   vocabulary: `Server` (signals, fatal handlers, ordered teardown, hosted
-  components, `/healthz`, `/metrics`), `GracefulShutdown`, `createApp` with
-  the whole supply chain, boot and transport hosting — plus
+  components, `/healthz`, `/metrics`), `GracefulShutdown`, the container
+  (§4), boot and transport hosting — plus
   `defineProcessModule`, `defineRepositories`, `FeatureSetup`,
   `definePipeline` and the channel registry types. A module's process half
   imports its vocabulary from the thing that installs it. Depends on
@@ -81,16 +81,17 @@ imported the rest of the way down, never from the top.
 - **`@langwatch/browser`** — the browser runtime AND the browser-half
   vocabulary: `createUi`, the browser supply, `render`, plus
   `defineBrowserModule`. Used by `apps/ui` and every module's browser half.
-- **`@langwatch/browser-host`** — the capabilities a screen reads: session,
-  navigation, storage, feature flags, toasts, **drawers**. The browser
-  analogue of the closed members. Capabilities only — components live in the
-  design system or in kits.
-- **`@langwatch/ui-kernel`** owns the browser's wire: the transport (batching,
-  the SSE subscription link), the browser RPC and the query
-  client. A kit cannot import it, so a kit cannot fetch. The client types are
+- **`@langwatch/browser-host`** — the host services a screen reads: session,
+  navigation, storage, toasts, **drawers**. The browser analogue of the
+  closed members. Host services only — components live in the design system;
+  release flags come from feature-flag (§10.1).
+- **`@langwatch/ui-kernel`** owns the browser's wire: the transport (the SSE
+  subscription link), the browser RPC and the query
+  client. Only a `<name>-client` package and a screen's behaviour import it; design-system components
+  fetch nothing. The client types are
   derived from contracts by `@langwatch/api/web`; the browser calls no REST.
 - **`@langwatch/design-system`** — components (Chakra v3 underneath). Only this package imports
-  `@chakra-ui/*` or `@emotion/*` (Alex, 2026-10-01): kits, feature browsers, apps and tests import
+  `@chakra-ui/*` or `@emotion/*` (Alex, 2026-10-01): feature browsers, apps and tests import
   `@langwatch/design-system/<subpath>`; `./primitives` re-exports Chakra's primitives and raw parts
   unchanged until real components replace them, wrapped parts come from their wrapper subpath, and
   tests mount `renderWithDesignSystem`. ADR-001 amended; enforced by `no-direct-chakra` (wave 4).
@@ -101,27 +102,28 @@ imported the rest of the way down, never from the top.
   `getRawColorValue` / `useColorRawValue` (a literal for the current mode). Enforced by `no-raw-color`.
 - Support packages: `handled-error` (the error contract), `secrets`
   (ADR-132), `config` (generic config machinery), `observability` (logger +
-  OTel), `test-harness` (fixtures and doubles), `installed-modules`
+  OTel), `test-harness` (fixtures and doubles), `installed-server-modules` and `installed-web-modules`
   (generated lists — never edited by hand), and the raw clients
   (`prisma-client`, `clickhouse-client`, `redis-client`, `eventing`).
 
 A package earns existence by being framework, not feature. Feature code in
 `packages/` is a defect. The boundary is prefix-checkable: nothing `browser-*`
 in a server graph; no `process*` package in a web graph.
-Trace's query language and content dispatchers are `modules/trace/query-language`, a trace-owned package,
-portable and framework-free, which trace's process, the server and any browser import; they sit in
-neither the contract nor a kit (Alex, 2026-09-29). Trace and analytics read the same trace data: that
+Trace's query language and content dispatchers are to be a trace-owned package, portable and
+framework-free, which trace's process, the server and any browser import, in neither the contract nor
+a shared browser package (Alex, 2026-09-29). It is not extracted yet: no `modules/trace/query-language`
+exists, and the field metadata sits in trace's contract (`trace-query-metadata.ts`). Trace and analytics read the same trace data: that
 relationship is an open design item, and neither side takes an exemption meanwhile (Alex, 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
-terms; analytics' browser-kit and automation's process import it (Alex, 2026-09-30).
+terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
 
 ---
 
 ## 3. A module
 
 A module is one folder owning up to four workspace packages, plus any portable, framework-free library its
-process and browser both import (`modules/trace/query-language`; Alex, 2026-09-29).
+process and browser both import (`modules/analytics/filters` is one; Alex, 2026-09-29).
 `modules/catalogue.json` maps every subject to exactly one owning module.
 The owning module's process serves the subject's endpoints and runs its collection; another module's
 share crosses only as its `*Api` ops. Where main hosted a subject elsewhere (`traces.logCollection`),
@@ -129,7 +131,7 @@ the port moves it to its owner — main decides _what_, the record decides _wher
 A tRPC namespace belongs to one module: a procedure main hosted under another subject's namespace
 moves into its owner's namespace and the wire path moves with it (Alex, 2026-09-25).
 Enterprise is a licence, not a separate app: enterprise modules are always installed, and a core module
-may import an enterprise contract or kit like any peer's. The enterprise owner refuses per organization
+may import an enterprise contract or client like any peer's. The enterprise owner refuses per organization
 on entitlement; a core caller never re-checks (Alex, 2026-09-29). Operator views over enterprise subjects
 (license registry, self-hosted instances) live in an enterprise ops module that calls the owners' `*Api`s
 (Alex, 2026-09-25).
@@ -146,7 +148,7 @@ Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on owner
 owns the Slack connection subjects: the `SlackIntegration` table, its repositories and services,
 `SlackApi` (main's list, create, update and delete of a connection, plus the reads delivery needs), the
 `slackIntegration` tRPC namespace, `/api/slack-connections`, the `slackConnection` drawer and
-`slack-browser-kit`, which automation, integration and langy render. Automation reads a connection only
+`slack-client`, which automation, integration and langy read their connection data through. Automation reads a connection only
 through `SlackApi` and keeps its own delivery.
 A connection in use is claimed, not counted (Alex, 2026-09-30). Slack owns `slack_connection_claim`;
 automation claims a connection through `SlackApi.claimConnection` when it saves a trigger on it and
@@ -156,20 +158,21 @@ claimants), and the connection's dependent count is its claim count. Slack never
 triggers.
 `modules/integration` owns `/settings/integrations` (Alex, 2026-09-30). Its browser renders both cards:
 the GitHub card, which reads github through `GithubHostApi` and a client derived from github's contract,
-and the Slack card, over `slack-browser-kit`. Github lends no card and keeps no UI on the page;
-integration has no kit, since nothing outside it would use one.
+and the Slack card, over `slack-client` data. Github lends no card and keeps no UI on the page;
+integration has no client, since nothing outside it would read one.
 
 ```
 modules/trace/
-├── feature.json · specs/ · adrs/
+├── specs/ · adrs/
 ├── contract/       @langwatch/trace-contract       shared by everyone
 ├── process/        @langwatch/trace-process        the half createApp installs
 ├── browser/        @langwatch/trace-browser        PRIVATE — the half createUi installs
-└── browser-kit/    @langwatch/trace-browser-kit    the ONLY thing other browsers may import
+└── client/         @langwatch/trace-client         the data other browsers read, never a component
 ```
 
-A module has one `feature.json`, at its root; none sits inside a module (governance's browser
-`features/`). A sub-feature whose module and backend already exist is split out into that module;
+No module has a `feature.json` at its root, and nothing reads one. Five modules still carry
+per-feature `feature.json` files under `browser/src/features/` (governance's included): leftovers to
+delete, not a shape to copy. A sub-feature whose module and backend already exist is split out into that module;
 the rest stays contained, flattened, in its module (Alex, 2026-09-29).
 
 **Dependency direction, no exceptions:** apps → `*-process`/`*-browser` →
@@ -191,7 +194,7 @@ name, kind, input, output, declared once), **the module's config schema**
 
 ```ts
 export interface TraceApi { ingestSpan(...): ...; getById(...): ...; }
-export const TraceApi = moduleApi<TraceApi>("trace");
+export const TraceApi = moduleApi<TraceApi>()("trace");
 ```
 
 ### 3.2 The process half
@@ -200,6 +203,7 @@ export const TraceApi = moduleApi<TraceApi>("trace");
 // modules/trace/process/src/trace.module.ts — the installer
 export const traceProcessModule = defineProcessModule("trace")
   .withRepositories(traceRepositories) // registry: { live, memory }
+  .withChannels(traceChannels) // registry: { live, memory }; the kernel builds both (§5)
   .withApi(TraceModule) // the one class implementing TraceApi
   .withTransports(traceRest, traceTrpc) // inert declarations
   .withEventing(tracePipeline); // §9
@@ -260,10 +264,10 @@ ceremony threads its scope explicitly) (Alex, 2026-09-29).
 The caller's `Authorization` is such a parameter: `authorization` passes from route to `*Api` op to service to
 repository, never ambient (Alex, 2026-09-30; [ADR-166](adr/166-grant-scoped-data-access.md)).
 
-**An implementation never sees a raw client.** No prisma, no redis, no
-clickhouse in any `*Module` class. Raw clients cross into a module in exactly
-one place — a registry or channel factory's `create(members)` — and arrive as
-repositories and channels.
+**An implementation never sees a raw client** (Alex, 2026-10-01). No prisma, clickhouse, redis,
+objectStorage or rateLimiter in any `*Module` class or service. A store client crosses into a module
+in exactly one place: the `create(stores)` of one of its repository or channel registries, which the
+kernel calls. The module class receives built repositories and channels.
 
 ### 3.3 What a module may demand — the four-way rule
 
@@ -272,23 +276,27 @@ have it: deployment, availability, credentials and base URLs are the
 process's knowledge. Every dependency a module has resolves into exactly one
 of:
 
-1. **Derivable from supplied stores with no extra info** (a tenant resolver
+1. **Derivable from the opened stores with no extra info** (a tenant resolver
    over ClickHouse, an actor lookup over Prisma) → a repository or channel
-   **inside the module**. No demand exists.
+   **inside the module**, built by the kernel from the module's registry (§5). No demand exists.
 2. **Another module's capability** → a peer: the `*Api` token in
-   `static dependencies`. The process resolves tokens; modules receive each
-   other's implementations. A peer is never a member.
+   `static dependencies`. The container resolves tokens; modules receive each
+   other's implementations.
 3. **A deployment fact** (signing key, public base URL, admin list) → the
-   module's **declared config schema**; the process values the slice. Module
+   module's **declared config slice** or secret handle (§6). A process fact (`publicBaseUrl`,
+   `isSaas`) is a leaf the slice picks from the one shared process config. Module
    code never reads `process.env`. The test process's boot seam is `packages/vitest-config`,
    read like an app's `main.ts`/`config.ts` (Alex, 2026-09-27).
 4. **An availability decision** (a capability this deployment may not have) →
-   a **declared supply token** the process answers with one `.provide({...})`
-   line — or the seam dies with the dead capability. A module never defaults
-   its own availability.
+   the **module decides it** from its own config and secrets, and its public config projects the
+   answer to the browser (Alex, 2026-10-01). Off refuses by name with a stable code, or is a
+   visible state as mail's is (§6); never a silent absence. Nothing outside the module answers it.
 
-(Alex, 2026-09-29) A member exists only if a production process supplies it;
-test doubles go through the module's own test seams.
+**There are no members** (Alex, 2026-10-01): "member is just an abstraction over DI, and we
+already have the container". A module class receives `repositories`, `channels`,
+`dependencies`, `config`, `secrets`, `role` and `resources`, never a bag of clients or facts
+(what logger, clock and processName become is open, §16). There are no supply tokens and no
+`.provide`; a test stubs a peer through the module's own test seams (§13).
 
 One unowned service has one owning module: evaluation owns the langevals boundary — its endpoint,
 the S3 staging of large payloads and their config — and topic and workflow reach langevals through
@@ -296,10 +304,10 @@ the S3 staging of large payloads and their config — and topic and workflow rea
 Workflow owns the NLP engine boundary the same way. The per-project studio fleet
 (`LANGWATCH_NLP_LAMBDA_CONFIG`) is workflow's own declared `Secret.load` handle, parsed at boot;
 its shared ARN cache and its staged oversized payloads are workflow repositories over the `redis`
-and `objectStorage` members, as evaluation stages langevals payloads. Precedence is main's: a
+and `objectStorage` clients, as evaluation stages langevals payloads. Precedence is main's: a
 named fleet wins, a named fleet that cannot be used refuses every run by name rather than falling
 back, no fleet and an address runs at the address, and neither refuses by name (Alex, 2026-09-30).
-Notification owns mail outright: its config, its provider and its sending. There is no mail member;
+Notification owns mail outright: its config, its provider and its sending. No other module holds mail;
 auth, identity, user, automation and billing send through `NotificationApi.sendEmail`, which takes
 intent (`undisclosedRecipients`, `unsubscribe: { url }`, `replyless: { tag }`, which notification
 writes as `no-reply+<tag>@<its sender domain>` with the recipients in bcc), never raw headers (Alex, 2026-09-29).
@@ -307,6 +315,9 @@ Presence is a generic project-event fan-out: `PresenceApi.publishProjectEvent` a
 `subscribeProjectEvents` carry any channel, and each publisher owns its channel's name and schema; the
 contract carries no `EventEmitter`. Scenario and trace publish through it and keep no Redis broadcast of
 their own, notification's copy is deleted, and the memory tier emits locally (Alex, 2026-09-29).
+Presence is the only writer of the browser-facing `broadcast:*` wire: trace, discover, simulation, experiment
+and Langy signals stay presence data channels with their own SSE procedures, and the framework's read hints
+arrive on eventing's own `eventing:read_invalidated` channel, which presence subscribes to and relays (Alex, 2026-10-01).
 Langy owns its mirror project id: it stamps the mirror tier on the Langy key it creates through gateway,
 and gateway stores it on the key; no composition supplies the value (Alex, 2026-09-29).
 
@@ -320,7 +331,7 @@ Model provider asks the enterprise `ManagedProviderApi` whether LangWatch suppli
 for a managed call's parameters, naming the project's organization itself so managed-provider holds no project
 peer and closes no cycle (Alex, 2026-09-29).
 
-### 3.4 The browser half and the kit
+### 3.4 The browser half; no kits
 
 `trace-browser` layers: flat public entries → `model/` (pure) → `behavior/`
 (hooks, api bindings, stores) → `ui/elements|blocks|sections`. Elements and
@@ -332,7 +343,7 @@ look as before; a `div` given a role is not (Alex, 2026-09-24).
 A screen reads host services directly, typed by tokens: `useLent`, `openDrawer`,
 `useReleaseFlag` (Alex, 2026-10-01). A `*HostApi` keeps only a module's own
 host needs, which the shell implements from `browser-host` capabilities. The half is declared with
-`defineBrowserModule` — screens, drawers, publications, mounts, flags — and
+`defineBrowserModule` — screens (each may name the release `flags:` it sits behind, §10.1), drawers, publications, host mounts — and
 exported at `./declaration`; the generated `browserModules` list installs it.
 
 **One layout, nested** (ruled 2026-09-18). Those layers are the whole
@@ -358,6 +369,12 @@ every feature reaches into — that bucket is how `behavior/` became a junk
 drawer in the packages that have one. A feature that is one component is a
 section, not a feature.
 
+A folder over 30 source files is grouped into features, not left flat; a process nests the same
+way, `process/src/features/<concern>/` holding that concern's services, rules and the rest
+(Alex, 2026-10-01).
+
+**Process and contract nest the same way** (Alex, 2026-10-01): a folder past 30 source files is grouped into concern features of small, single-responsibility classes, never a pile of loose root-level functions. `process/src/features/<concern>/` repeats `services/`, `rules/`, `repositories/` and `eventing/`; `contract/src/features/<concern>/` holds that concern's schemas, events and commands. What every concern shares stays at the top level; a concern's pieces move together. A lint budget on files per folder and lines per file keeps it from growing back. Nesting is one level: a module takes as many concerns as keep each folder at 30 or under, never `features/<a>/features/<b>/`. A framework package groups its files into plain folders behind unchanged `package.json` export subpaths.
+
 **A browser package exports `./declaration` and nothing else** (ruled
 2026-09-18):
 
@@ -382,78 +399,38 @@ section, not a feature.
 }
 ```
 
-Rule 4 below stops a KIT being a subpath; nothing stopped an OWNER growing
-them, and that is the hole the tree fell through — 23 packages opened
+Nothing stopped an OWNER growing
+subpaths, and that is the hole the tree fell through — 23 packages opened
 `./surfaces/*` entries and 626 cross-module import lines walked in, none of
 them a dependency-graph edge any baseline could hold. The exports map IS the
 enforcement: what is not exported cannot be reached, so closure is structural
-rather than a lint the next refactor forgets. Rule 1 never needed a new rule,
+rather than a lint the next refactor forgets. Closure never needed a new rule,
 only a door that shuts. `surfaces/` and `screens/` are deleted spellings
-(§15), and a kit answers the same way with one entry:
+(§15).
 
-```jsonc
-// modules/trace/browser-kit/package.json
-"exports": { ".": "./src/index.ts" }   // no subpaths: inside a kit is unreachable
-```
+**No kits; data through clients** (Alex, 2026-10-01). There are no kits and no shared browser
+packages. Code repeated within one module stays in that module; repeated across modules it goes to
+the design system, which takes props or a query RESULT (never a hook, never fetches); pure domain
+logic goes to the owner's contract; framework hooks go to `browser-host`. Modules share data, not code: every
+module with tRPC has a `<name>-client` package (`modules/<name>/client`) holding the hooks
+`createModuleApi` derives from its own contract and at most a few thin convenience hooks, never a
+component. A client imports only its contract and `@langwatch/api/web`, never another client; a
+hook combining two modules lives in the screen that needs it. Kits and their law existed until
+2026-10-01 and are gone; what remains of them is that browser packages are closed.
 
-**The kit law** — each rule earned by a measured failure:
+**A screen expects its data to be missing** (Alex, 2026-10-01). The frame (header, tabs, actions)
+renders at once; each block loads on its own behind a skeleton in its final shape. Data already
+held stays on screen while it reloads (a shimmer at most, never hidden, never a skeleton). An error
+shows inline in its block with Retry, and Retry shows the loader or skeleton at once. Empty,
+loading and error never look alike. A full-page spinner is for the first boot only.
 
-1. **`trace-browser` is closed.** Nothing else imports it, ever. The moment
-   another module needs a trace hook, store or component, that thing moves to
-   `trace-browser-kit`. Sharing is declared by moving, never observed by
-   reaching in. Closed to values only: an `import type` / `export type` of a browser package
-   crosses, because types are erased (Alex, 2026-09-27).
-2. **A kit is a leaf.** It may import contracts (any module's),
-   `design-system` and `browser-host`, and nothing else in `@langwatch/*`. It may not import its own
-   module's browser package (the rule that broke the nine cyclic web pairs), any other `*-browser`,
-   or another kit. It may import a module's portable library (§2), which is no kit (Alex, 2026-09-30).
-   **Amended 2026-09-30** to match the `browser-kit-dependencies` policy, which outranks this record:
-   `@langwatch/api/web` is not a kit dependency. A kit component that needs data takes it as props
-   and each consumer fetches its own: analytics' `LwqlEditor` takes `schema` and `markers`.
-3. **A kit owns its module's store and UI for one concept** (Alex, 2026-09-29;
-   its client clause withdrawn 2026-09-30, the linter wins). It holds no client: its
-   components take data as props and each consumer derives its own client from the
-   owner's contract; the owner's browser package imports the store from the kit
-   rather than holding a second copy, and consumers render the kit. It never calls a peer's
-   procedure and never reads a `*HostApi`; a component that needs either stays
-   in its owner (rule 7). Rule 2 keeps it a leaf. The case: identity's kit holds the
-   two-step requirement UI (user, organization and ops render it, each through its
-   own client), while the passkey, two-step and sign-in-method ceremonies call
-   auth's endpoints and so live in auth (Alex, 2026-09-29). Kits that still hold a
-   client (identity, user, stored-object) are findings of rule 2, moved as touched.
-   A kit may hold its owner's UI tokens (§10.1).
-4. **A kit is a package, not a subpath** — a subpath is invisible to the
-   dependency graph, so it cannot break a cycle or be budgeted. A package
-   makes every cross-module browser edge a visible, lintable manifest line.
-5. **A kit exists only where sharing is real** — three or more consumers. One
-   consumer is not enough to MINT a kit: that is bilateral coupling, and the
-   answer is to inline or duplicate it. The published tier is shrink-only.
-   (What an already-existing kit may hold is rule 6.) **Amended 2026-09-18:**
-   three is the default, and two consumers mint a kit where the alternative is
-   duplicating a large surface. The case that forced it: `suite` is reached
-   for by two consumers across 56 import lines — run cards, dialogs,
-   formatters, history store, form and pickers. Dissolving that copies six
-   surfaces twice to honour a number. The floor exists to stop premature kits,
-   not to force copy-paste where sharing is plainly already real. One consumer
-   is still never enough, and two with a thin surface still dissolves.
-   Recount the consumers before calling anything one-consumer (Alex, 2026-09-29).
-6. **The floor gates a kit's EXISTENCE, not its contents** (ruled 2026-09-18).
-   Once a kit is warranted and exists, it may hold a symbol with one consumer;
-   creating a NEW kit still needs three. The case that forced the ruling: all
-   three legs of the `agent -> scenario -> workflow` browser cycle bottom out
-   in one React component or context with exactly one external consumer —
-   below the floor, and not contract-portable because a contract imports no
-   framework. Reading the floor as gating contents left the cycle with no
-   sanctioned fix at all. A cycle is broken by moving that symbol into the
-   owner's existing kit; where the owner has no kit, the three-consumer rule
-   decides whether one is warranted, and if it is not, rule 5 still applies.
-7. **Lend only what a kit cannot hold, never copy it** (Alex, 2026-09-23; narrowed
-   2026-09-29 by rule 3). A component that fetches a peer's data or reads a
-   `*HostApi` is lent by its owner's token (§10.1), as `joinOffer` is, and the
-   consumer renders what it is handed; one that fetches only its
-   owner's data moves to the owner's kit. A flow opens as the owner's drawer by
-   name: ops' SSO import opens sso's register-connection drawer (Alex, 2026-09-29).
-   Rule 5's duplicate is for thin, non-fetching surfaces only.
+**A browser package is closed.** Nothing else imports it, ever; sharing is by data through
+`<name>-client`, or by the design system, the owner's contract and `browser-host`, as the paragraph
+above rules. Closed to values only: an `import type` / `export type` of a browser package crosses,
+because types are erased (Alex, 2026-09-27). A component that fetches a peer's data or reads a
+`*HostApi` is lent by its owner's token (§10.1) and the consumer renders what it is handed. A flow
+opens as the owner's drawer by name: ops' SSO import opens sso's register-connection drawer
+(Alex, 2026-09-29).
 
 ### 3.5 Can this be used here? Four capability layers (Alex, 2026-09-29)
 
@@ -462,7 +439,7 @@ decides it, and no layer, projection or screen re-derives another's answer.
 
 | Layer                   | Question                                                                   | Owner and where it is answered                                                                                                          | How the browser learns it                                                                                                               |
 | ----------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployment availability | Does this install have it (email, object storage, langevals, the gateway)? | The owning module's process member, which holds the config and the secrets, answered once through a declared supply token (§3.3 rule 4) | A public-config boolean projected from that same answer after members are built; never recomputed from config leaves or secret presence |
+| Deployment availability | Does this install have it (email, object storage, langevals, the gateway)? | The owning module, from its own config and secrets, answered once inside the module (§3.3 rule 4; Alex, 2026-10-01) | A public-config boolean projected from that same answer after the module is built; never recomputed from config leaves or secret presence |
 | Entitlement             | May this organization use it (plan, licence)?                              | `EntitlementApi`; routes stay mounted and refuse per organization (§11)                                                                 | An entitlement read through the owner's `*Api`                                                                                          |
 | Permission              | May this user do it?                                                       | authz; the service checks before acting                                                                                                 | The session's `hasPermission` / `hasOrganizationPermission`                                                                             |
 | Release flag            | Is it rolled out here yet?                                                 | Feature flags                                                                                                                           | The flags host service                                                                                                                  |
@@ -530,8 +507,9 @@ packages/process-server/src/         # boot, lifecycle and peer composition
 ```
 
 The application declares what it serves through `exposeTransports`.
-Framework classes implement hosting, and the process container resolves
-their peer dependencies. Authentication policy stays in the API runtime. auth
+Framework classes implement hosting. **The container** (`server.container(role)`) installs the
+modules, opens the stores and boots. Nothing more (Alex, 2026-10-01): it holds no members, answers
+no supply and takes no `.provide` or `withMember`. Authentication policy stays in the API runtime. auth
 binds the one API door (sessions, key credentials, plan gate, audit sinks) from
 the peers it already holds, in its own transport facts; the process opens it
 before its hosts and builds both over it. A process with no door, or two,
@@ -539,14 +517,17 @@ refuses boot by name, and process-server names no module contract but ops (its
 admin edge). This keeps transport machinery out of `main.ts` without making
 the API framework import the feature implementations which depend on it.
 
-There is no app config file (ruled 2026-09-18): config comes from the
+There is no per-app config schema (ruled 2026-09-18): config comes from the
 installed server modules' own declared schemas, composed by the generated
-parse (§6). A hand-maintained per-app config module is a defect.
+parse (§6). An app's `config.ts` holds none of it: api's and worker's is only
+`processEnvironment`, the one place `process.env` reaches the preamble; tasks' names its
+own runner controls and connections, and scenario-child's reads what its parent stated.
+A hand-maintained per-app config of what modules own is a defect.
 
 ```ts
 // apps/api/src/main.ts
 import "@langwatch/time/polyfill";
-import { serverModules as processModules } from "@langwatch/installed-modules/server";
+import { serverModules as processModules } from "@langwatch/installed-server-modules";
 import { processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server } from "@langwatch/process-server";
 
@@ -580,7 +561,7 @@ await server.run(app);
 `.trpc()`, `.rest()` and `.browserBundle()`, plus `.framedDocument({ path,
 document })` for a module-built document that answers on the app origin
 under the sandbox frame policy (a fresh nonce per answer, its own CSP, never
-the app's); it carries no members, logger, stores, credentials or paths. Required slots derive from the installed
+the app's); it carries no logger, stores, credentials or paths. Required slots derive from the installed
 module declarations: an omitted declared transport refuses boot by name.
 The bundle is explicit, including an explicit opt-out for deployments
 without one. There is no `withModules` and no `withPipelines` in an app: a container takes its
@@ -633,8 +614,8 @@ asset returns 404 rather than the SPA shell. Other browser document paths
 resolve to the shell with its public config injected.
 
 **Transport mounts consume their prefix once.** Public URLs remain stable;
-inside the tRPC mount, `/api/trpc/getBatch` routes as `/getBatch`. A REST
-version mount can route `/api/v1/roles` as `/roles`; version selection stays
+inside the tRPC mount, `/api/trpc/getById` routes as `/getById`. A REST
+version mount can route `/api/roles`, or its optional `/api/v1/roles`, as `/roles` (§8); version selection stays
 with the REST host, preserving dated versions and existing aliases. Module
 handlers never strip prefixes themselves. Routing uses a relative path
 while retaining the original request URL for signature checks, auth
@@ -730,7 +711,7 @@ readings and publishes them to shared state; each process's gauge reads that sta
 never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
-`hostedMembers(stores)` from process-stores, `hostedRuntime({ name, runtime,
+`hostedStores(stores)` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
@@ -742,9 +723,9 @@ serving. Auth verifiers are constructed by their owner from declared config
 and secrets; the process entry point supplies neither credentials nor
 transport internals.
 
-**Deployment-choice modules are one line in the main.** A module whose
-implementation is a deployment choice is composed by one line in the
-container chain, no conditional wiring. The audit log is **not** one (Alex,
+**There are no deployment-choice lines.** The container chain names no module and wires
+nothing conditionally (Alex, 2026-10-01): a module whose behaviour depends on the deployment decides
+it from its own config and secrets (§3.3 rule 4). The audit log follows the same rule (Alex,
 2026-09-24): every module is always installed and entitlement refuses per
 organization (§11), so the generated list installs audit-log in every
 deployment, as main recorded in every deployment. No app names it.
@@ -771,8 +752,8 @@ repositories, dependencies }) => [task])` builds it over the booted App in the t
 directly (Prisma, ClickHouse, Redis): the dev/CI storage seed is such a task, and no module Api
 grows a seeding operation for it (Alex, 2026-09-27).
 
-**A test passes no server** — `createApp({ role: "api" })` registers nothing
-anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
+**A test passes no server** — `bootInstalledProcess({ role: "api", ... })` registers nothing
+anywhere and returns the runtime; the test drives `stop`.
 
 ---
 
@@ -780,15 +761,16 @@ anywhere; `boot()` returns the runtime and the test drives `start`/`stop`.
 
 ```
 server.container(role)            # modules from the owners handed to withConfig
-  │  collect installers, order by peer dependencies (tokens, never imports)
+  │  open the stores (§7); order installers by peer dependencies (tokens, never imports)
   ▼  for each module:
-  1. pick the repository tier from the supplied stores (§7)
-  2. validate the chosen factory's requires against what was supplied
-     — refusal at boot, BY NAME ("webhook needs clickhouse; none supplied")
-  3. build repositories:  live.create({ prisma, clickhouse, encryption })
+  1. pick the tier from the opened stores (§7)
+  2. check each registry's requires against the opened stores
+     — refusal at boot, BY NAME ("webhook needs clickhouse; none opened")
+  3. build repositories and channels from the module's registries:
+        live.create({ prisma, clickhouse, encryption, config, secrets })
   4. resolve peers: each token → the implementation built earlier in the order
-  5. slice config: config.<name>, already validated by the module's own schema
-  6. TraceModule.create({ repositories, dependencies, config, supplies })
+  5. slice config: config.<name>, already parsed from the module's own declaration
+  6. TraceModule.create({ repositories, channels, dependencies, config, secrets, role, resources })
   7. collect what the module declared for THIS role:
         role api    → REST families + tRPC namespaces + SSE + command senders
         role worker → jobs + subscriptions + projections + process managers
@@ -796,46 +778,31 @@ server.container(role)            # modules from the owners handed to withConfig
 register everything on the server; return the runtime
 ```
 
-`boot()` takes no arguments beyond what the chain supplied and is **callable
-only when everything the installed modules declared has been supplied**. An
-absent supply is a compile refusal — `MissingSupply<...>` names the whole
-outstanding set at once — never a runtime fallback, never a logged absence,
-never an absence class.
+`boot()` takes no arguments beyond what the chain supplied. The container answers nothing but
+stores and peers (Alex, 2026-10-01): a store a registry requires and the deployment did not open
+refuses boot by name, and every other "is it here?" is the module's own answer (§3.3 rule 4).
+Never a runtime fallback nobody sees, never a logged absence, never an absence class.
 
-**The vocabulary is dependencies, in two kinds** (ruled 2026-09-18; the
-"members" wording above is the interim spelling and dies with the kernel).
-**Process dependencies** are global — `prisma`, `clickhouse`, `redis`,
-`logger`, `clock`, `rateLimiter` — one instance for the whole process; if a
-process uses Prisma it uses it everywhere. **Module dependencies** are what
-only that module needs. A module **registers** process dependencies by name
-(strings: `registerProcessDependencies`); the app **adds** them as objects
-(`addProcessDependencies`); `createProcessApp(role, config)` resolves both
-kinds from config. The code override also comes in two, one per kind —
-`withProcessDependencies({...})` and `withModuleDependencies({...})` (exact
-spellings settle with the wave) — and an override always takes precedence
-over what config resolved. Delivery is **registry-based**: a module declares what it needs
-or supports in a registry (the `defineRepositories({ live, memory })`
-pattern generalised — the module says "for this I support these", the app
-chooses which), and every `create()` **arrives with its things already
-resolved**. Passing a hand-assembled composition object into anything is
-banned as a shape — nothing receives a bag it has to pick apart.
+**Two inputs, each with one receiver** (Alex, 2026-10-01; supersedes the 2026-09-18 "two kinds of
+dependencies", `registerProcessDependencies` and `createProcessApp`). **Stores** (`prisma`,
+`clickhouse`, `redis`, `objectStorage`, `rateLimiter`, and the clients the stores build over them)
+go only to a module's repository and channel registries. **Peers** (`*Api` tokens) go only to the
+module class. Config and secrets are declarations (§6), not dependencies. Delivery is
+**registry-based**: a module declares `{ live, memory }` registries for its repositories and its
+channels, the installer names both (`.withRepositories(...)`, `.withChannels(...)`), and the kernel
+picks the tier and calls `create`. Every `create()` **arrives with its things already resolved**.
+Passing a hand-assembled composition object into anything is banned as a shape: nothing receives a
+bag it has to pick apart.
 
-**The application half extends `ProcessModuleApp`** (ruled 2026-09-18) —
-the base class in `@langwatch/module` that carries the declaration statics,
-the setup-type inference and the graph contract. The name says all three
-words on purpose: the **app** of the **module**'s **process** half — the
-module also has a browser half this class has nothing to do with. The
-class keeps its `<Name>App` name: "module" stays reserved for the whole
-`{contract, process, browser}` unit. Both dependency declarations
-are **string tuples** against a closed vocabulary — the process names, and
-the generated module-name map — so a typo is a compile error and `create()`
-receives exact typed picks. The graph resolves transitively (a dependency's
+**The module class is the process half's implementation** (§3.2): `static contract`,
+`static dependencies` (peer tokens), `static config`, `static secrets` and `static create`. Peers
+are tokens, so a typo is a compile error and `create()` receives exact typed peers. The graph resolves transitively (a dependency's
 dependencies are its own business — only its API travels), cycles refuse at
 boot by name, and an instance bound at create may not be invoked until
 after boot.
 
-**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today it
-reaches only supply tokens: the kernel hands every `*Api` token a proxy before any module installs and
+**Peer cycles shrink to zero, then refuse** (Alex, 2026-09-29). Refusal stays the rule, but today
+nothing reaches it: the kernel hands every `*Api` token a proxy before any module installs and
 orders modules without them, so two modules naming each other's `*Api` in `static dependencies` boot.
 The transition is a shrink-only list. The `peer-cycles` policy reports every declared peer edge whose
 peer reaches back, and `packages/architecture-enforcer/tests/boundary-ratchets.unit.test.ts` refuses an
@@ -852,19 +819,21 @@ revisited later.
 through `DataPrivacyApi.getPiiRedactionLevel`/`setPiiRedactionLevel`, which merge the level into the
 project-scope rule and read `custom` as `STRICT`.
 
-**Registry resolution ends at `ModuleApp.create`.** Inside the module,
+**Registry resolution ends at `TraceModule.create`.** Inside the module,
 `create()` is the composition root: internal services are built explicitly
-— `LicensingCapService.create({ prisma: process.prisma, graceDays:
+from what it was handed — `LicensingCapService.create({ caps: repositories.caps, graceDays:
 config.graceDays })` — each receiving the narrowest slice that answers its
 question. Internal services never declare dependencies and are never
 auto-built; a `create()` that gets painful is a module doing too much, not
-a reason for a container.
+a reason for more container.
 A factory under `repositories/` or `services/` that assembles collaborators is
 composition in the wrong folder: it moves into `create()`, and another process
 reaches the module through its API, never through its factories (2026-09-23).
+So are `*-composition.build.ts` and `*.members.ts` beside the module class: store wiring moves into
+the registries, the rest into `create()` (Alex, 2026-10-01).
 
 The `processModules` list is generated from `modules/catalogue.json`
-(`pnpm generate:modules` → `@langwatch/installed-modules`). **Installing a
+(`pnpm generate:modules` → `@langwatch/installed-server-modules` and `@langwatch/installed-web-modules`). **Installing a
 module edits the catalogue, never a root.** A process composes the whole
 list by asking for its container — `server.container(role)` takes the modules
 `withConfig(processConfig(processModules))` named (Alex, 2026-09-29) — and that is also the cheap shape: one call over all 49 modules costs ~88k type
@@ -895,7 +864,7 @@ export const githubSecrets = {
 } as const;
 export type GithubConfig = ConfigOf<typeof githubConfig>;
 
-// modules/github/process/src/app/github.app.ts — the process half attaches them
+// modules/github/process/src/github.module.ts — the module class attaches them
 static readonly config = githubConfig;
 static readonly secrets = githubSecrets;
 
@@ -914,9 +883,9 @@ declaration rather than each writing their own:
   `Config.define`, whose `c.env` leaves), the secret handles (`Secret.load`), the inferred `ConfigOf<…>`
   type, and the browser projection schema plus its `project` function. This
   is the only file that names an environment variable.
-- **process** — the App class attaches them as `static readonly config` and
-  `static readonly secrets`; `create()` receives the parsed slice and a
-  scoped `secrets`, and resolves through `secrets.into(handle, build)`.
+- **process** — the module class attaches them as `static readonly config` and
+  `static readonly secrets`; `create()` and the module's registries receive the parsed slice and
+  a scoped `secrets`, and resolve through `secrets.into({ key: handles.key }, build)`.
   Nothing in the process half names an env var or re-declares a schema.
 - **browser** — `defineBrowserModule` validates the contract's projection
   slice before first render; the browser never sees a handle or a leaf.
@@ -949,26 +918,30 @@ and "platform-health"` — and the process does not boot. The owner that
 declares a value passes it down; nobody re-declares it to get a copy.
 
 This is what makes **a process fact not a module fact** enforceable rather
-than advisory. Two worked cases, both declared once on the process owner
-(`packages/process-server/src/owner.ts`) and handed to every module as a
-member:
+than advisory. **Process facts live in ONE shared config** (Alex, 2026-10-01): `processFacts` in
+`@langwatch/config`, one leaf each for `publicBaseUrl`, `isSaas`, `nodeEnvironment`,
+`outboundProxy`, `serviceVersion` and `rawSocketPort`. Each module's `Config.define` **picks** the
+leaves it needs; it never re-declares one, and no fact travels as a member:
 
-- `BASE_HOST` → the `publicBaseUrl` member (optional; blank and absent both
-  mean the deployment named none). The eight modules that link back to the
-  product read it; none names the variable.
-- `NODE_ENV` → the `nodeEnvironment` member, carried as the raw string. The
-  `http` owner no longer declares it either — it **derives** `production` from
-  the process slice, because a derived value is not a second claim. A module
-  wanting a boolean derives it the same way.
-- `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → the
-  `outboundProxy` member, raw by env name; notification and webhook parse it.
+```ts
+export const billingConfig = Config.define((c) => ({
+  publicBaseUrl: processFacts.publicBaseUrl, // picked: same leaf, same env var, one claim
+  isSaas: processFacts.isSaas,
+  hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
+}));
+```
 
-The same holds for `processName` and anything else the process, not the
-deployment's module, knows.
+- `BASE_HOST` → `publicBaseUrl` (optional; blank and absent both mean the deployment named none).
+- `NODE_ENV` → `nodeEnvironment`, the raw string. The `http` owner **derives** `production` from it,
+  because a derived value is not a second claim. A module wanting a boolean derives it the same way.
+- `HTTPS_PROXY`/`HTTP_PROXY`/`NO_PROXY` and their lower-case spellings → `outboundProxy`, raw by env
+  name; notification and webhook parse it.
+
+Framework owners (process-server, observability) pick from the same object.
 
 When the single owner is a **module** rather than the process, it passes the
 value down as a capability on its own `*Api`, never as a shared variable and
-never as a member the composition has to remember (ruled 2026-09-18):
+never as a value the composition has to remember (ruled 2026-09-18):
 
 - `PASSKEYS_ENABLED` is auth's. `user` asks `AuthApi.offersPasskeys()`.
 - `DEMO_PROJECT_ID`/`DEMO_PROJECT_USER_ID` are authz's. `organization` asks
@@ -978,25 +951,22 @@ This is the four-way rule's second way, and it is why a config fact two modules
 both want is not evidence that the fact should be process-wide — it is usually
 evidence that one of them owns it and the other should be asking.
 
-**One member vocabulary** (Alex, 2026-10-01): every module declares the raw literal
-`static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates the member shapes
-in its own `Readonly<{…}>` type — a module depends on contracts, never on the stores package's
-types. The `reads(...)` helper from `@langwatch/process-stores/members` is deleted (§15);
-`modules/platform-health` and `modules/project` are the exemplars.
+**No members** (Alex, 2026-10-01; supersedes the same day's "one member vocabulary"). There is
+no `static reads`, no `setup.members` and no restated member type. A registry declares the stores
+it `requires`; the module class declares only peers, config and secrets.
 
 **A credential's owner builds what others need from it** (ruled 2026-09-24,
 ADR-132 applied). The stores own `CLICKHOUSE_URL` and `DATABASE_URL`, and a
-second `Secret.load` of either is refused. So the stores answer two members
-more, fifteen in all, built inside the closure that resolves the URL:
+second `Secret.load` of either is refused. So the stores open two clients
+more, built inside the closure that resolves the URL:
 `clickhouseAdmin` (the credential-free server origin and database, plus an
 untenanted statement client for DDL) and `databaseTarget` (the credential-free
 Postgres endpoint). Each answers `{ configured: false }` rather than refusing.
 A module never re-derives them from `process.env`.
 
-**A module builds its own objects from the store members it already reads;
-`main.ts` wires none of them** (Alex, 2026-09-28; superseding the 2026-09-24
-supply-function form). LangWatchQL is one: analytics reads `clickhouseAdmin`,
-`databaseTarget` and `prisma` and builds its connection bundle itself. Its
+**A module builds its own objects in its registries; `main.ts` wires none of them** (Alex,
+2026-09-28; Alex, 2026-10-01). LangWatchQL is one: analytics' registry requires `clickhouseAdmin`,
+`databaseTarget` and `prisma` and builds its connection bundle there. Its
 passwords stay the module's own `static readonly secrets`. No password means
 LangWatchQL answers "unavailable" and every query is refused (ADR-159).
 Data-privacy's directory is another: its repository registry builds it over
@@ -1006,9 +976,9 @@ Data-privacy's directory is another: its repository registry builds it over
 static — an App-level Zod schema re-parsed per feature and fed by the deleted
 `apps/api/src/config.ts` — held four different kinds of thing at once, and
 only the first is config: a module deployment fact (→ the contract slice), a
-process fact (→ the owning process, drilled as a member), an availability
-decision (→ a declared supply the process answers, never an env var), and a
-role decision (→ the composition's word). Sorting those four is the port; the
+process fact (→ a leaf the slice picks from `processFacts`), an availability
+decision (→ the module's own answer from its config and secrets), and a
+role decision (→ `setup.role`). Sorting those four is the port; the
 static, its `*AppConfigSchema` const, its inferred type and the kernel's
 `withConfig(app.configSchema)` parse branch all go. A module with no
 deployment facts of its own declares no `config` static at all and its
@@ -1023,8 +993,8 @@ guard type-checks nothing while still compiling green.
 
 **Secrets are the sibling package, and a secret is a value you may only
 pass through** (approved 2026-09-18). A module declares its handles beside
-its config — `Secret.define({ privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY") })`
-— where **`Secret.load(id)` takes ONE identifier every adapter interprets
+its config as a plain record — `{ privateKey: Secret.load("GITHUB_APP_PRIVATE_KEY") } as const`
+(there is no `Secret.define`) — where **`Secret.load(id)` takes ONE identifier every adapter interprets
 for itself**: the env adapter reads the variable of that name, the
 1Password adapter reads that key in the vault's dictionary (config, by
 contrast, always reads the environment). **1Password addressing is
@@ -1053,7 +1023,9 @@ scopes the resolver per module: a `create()` can resolve only the handles
 its own module declared, each resolve validates against the handle's
 schema and hands the value to a closure —
 `secrets.into(handle, (key) => Cipher.create(key))` — so only the
-constructed collaborator escapes and travels. There is no `get()` that
+constructed collaborator escapes and travels. **`into` takes a record of handles** (Alex,
+2026-10-01): `secrets.into({ key: h.stripeKey, signups: h.slackSignups }, ({ key, signups }) =>
+…)` resolves them together, so no `into` nests inside another. There is no `get()` that
 returns a string to keep. When the last `create()` returns, the resolver
 SEALS: a post-boot resolve refuses by name. Declarations live on modules
 and framework packages; the server carries only the mechanism; the app
@@ -1093,45 +1065,45 @@ both, naming both owners — `ConfigClaimsSecretError`. Connection strings
 are secrets, so they belong at the dependency-construction seam, never in
 a config object a module reads. Every refusal in both packages is a
 `HandledError` with a stable code.
-There is one cipher: stored secrets are encrypted through the encryption member, and
+There is one cipher: stored secrets are encrypted through the stores' `encryption` client, and
 `AesGcmSecretEncryptionService` is deleted (Alex, 2026-09-29).
 
 **Three layers, and which one a value belongs to** (ruled 2026-09-18):
 
 1. **Store connections are process-global and invisible to modules.**
    `DATABASE_URL`, `CLICKHOUSE_URL`, `REDIS_URL` are declared once, in the
-   process's stores config; a module declares `reads("prisma")` and receives
-   an opened client. Which tier that client is — Postgres or memory — is the
-   process's config, and the module cannot tell.
+   process's stores config; a module's registry declares `requires: ["prisma"]` and receives
+   an opened client, which the module class never sees. Which tier that client is — Postgres or
+   memory — is the process's config, and the module cannot tell.
 2. **Module-shaped values live on the module's own schema** (github's
    signing key, monitor thresholds, retention days). The global object is
    **domain-driven** (`stores`, `deployment`, …; mail is notification's own, Alex 2026-09-29); a module-named
    slice exists only when a module truly has its own values — most have none.
-3. **Shared deployment facts are canonical leaves.** A fact several schemas
-   legitimately read (`BASE_HOST`, `IS_SAAS`) is ONE exported `ConfigValue`
-   in `@langwatch/config` (`deployment-facts.ts`), imported by instance. The
+3. **Process facts are canonical leaves.** A fact several schemas
+   legitimately read (`BASE_HOST`, `IS_SAAS`) is ONE leaf in `processFacts` (`@langwatch/config`),
+   picked by instance (Alex, 2026-10-01). A feature's leaves and secret handles live in their
+   owner's contract, never in `packages/config` or `packages/secrets` (Alex, 2026-10-01). The
    compiler admits a re-bound env var only when the claimants are literally
    that same leaf — one meaning shared N ways passes, a second meaning for
    the same variable still refuses at boot (that refusal caught a real bug
    the night it landed).
    A shared secret follows the same rule: one exported `Secret.load` handle, and a double claim
    passes only when every claimant holds that same handle (Alex, 2026-09-25).
-   A fallback between secrets is declared, not configured: the owner declares each handle and nests
-   `into`, first answer wins. The API-key pepper is `API_KEY_PEPPER ?? CREDENTIALS_SECRET ??
+   A fallback between secrets is declared, not configured: the owner declares each handle and
+   resolves them in one record `into`, first answer wins. The API-key pepper is `API_KEY_PEPPER ?? CREDENTIALS_SECRET ??
 NEXTAUTH_SECRET`, and the boot refuses when none answers (Alex, 2026-09-28).
 
-**Config is drilled, never ambient.** There is no async context and no
-dependency-injection container. The process config is one object composed of
+**Config is drilled, never ambient.** There is no async context, and the container (§4) hands
+each module only its own slice. The process config is one object composed of
 smaller objects; every function receives the narrowest slice that answers
 its question, as an argument. Deep nesting paying for itself in signatures
 is the intended pressure.
 
-**A module maps its own config to its dependency state.** Whether a seam is
-configured is derived _inside_ the module from its declared slice plus its
-closed members — never defaulted invisibly, never hand-supplied by the
-process. An unconfigured seam refuses by name with a stable error code. This
-is the completion of §3.3's fourth case: what remains for the process to
-`.provide` is only what no slice and no member can answer.
+**A module decides its own availability** (Alex, 2026-10-01). Whether a seam is
+configured is derived _inside_ the module from its declared slice and secrets — never defaulted
+invisibly, never supplied by the process. An unconfigured seam refuses by name with a stable error
+code, and the module's public config projects the same answer (§3.3 rule 4). Nothing is left for
+the process to provide.
 
 **Browser config is a declared projection.** A module's contract names which
 of its values are browser-safe (a schema plus a `project` function — by
@@ -1142,7 +1114,8 @@ first render**, so a missing value is a boot refusal naming the module, not
 an `undefined` deep in a component. The same drilling rule applies on the
 browser: screens receive values as props, nothing reads the injected blob
 directly. The contract exports `xBrowserConfig = defineBrowserConfig({ schema: xWebConfigSchema,
-project })`; the App attaches `static readonly publicConfig = xBrowserConfig.project`. The process
+project })`; the module class attaches `static readonly publicConfig = xBrowserConfig.project`. The
+dev UI reads the api's projection too and keeps no copy of the leaves (Alex, 2026-10-01). The process
 owner's slice is `process` (address, mode, deployment, nlp); rum owns the browser tracing
 switch and projects `rum` (enabled, sampleRatio) (Alex, 2026-09-27). A browser module reads
 any owner's slice by that owner's name: `withConfig({ process: schema })` (2026-09-25).
@@ -1171,8 +1144,8 @@ drawer disables the email channel with the tooltip "Email is not configured. Ask
 mail provider.", read from the deployment's `hasEmailProvider`. That tooltip is the ruled exception to §3.5's "off is
 opaque" (Alex, 2026-09-30).
 Email is a capability notification answers from its own config and secrets, never a config leaf
-guess: a SendGrid-only install has it. Notification owns mail outright and there is no mail member
-(§3.3; Alex, 2026-09-29). Where it is off, password reset by email is disabled
+guess: a SendGrid-only install has it. Notification owns mail outright and no other module holds
+mail (§3.3; Alex, 2026-09-29). Where it is off, password reset by email is disabled
 without saying why; the screen tells the user to contact support (SaaS) or their admin (self-hosted)
 (Alex, 2026-09-29).
 
@@ -1278,6 +1251,16 @@ media keep main's shapes; each moves to createUpload, PUT and confirmUpload only
 ruling. main's signal-focused home (`release_ui_home_signal_focused_enabled`) is not ported;
 automation email previews render in the browser, as on main.
 
+**Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). Redis stays one
+instance running `noeviction`, because queues, the outbox and locks must never be evicted. So every key a
+cache repository (`redis.<subject>-cache.repository.ts`) writes carries a short TTL in the same atomic
+command (`SET … EX|PX`, `SETEX`, a `MULTI` or Lua script that expires the key it writes; never a write then
+a separate `EXPIRE`), named as a constant beside the repository, and nothing sweeps them but Redis's own
+expiry. The classes: at most 60 s for anything that authorises or identifies a request (auth session, share,
+GitHub token, gateway agent); 5 minutes for folds, analytics, billing and data retention; never longer than
+the source's own expiry (a GitHub token caches for min(its expiry − 60 s, 60 s)); an existing shorter TTL
+stays. `packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts` refuses a write without one.
+
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
 local filesystem. It routes per project inside the client, as the ClickHouse
@@ -1380,6 +1363,30 @@ when })`), so authz never asks entitlement. `/api/role-bindings`, `/api/organiza
 EntitlementApi (api-surface.ts); a module never hand-rolls a plan middleware.
 **Grants are the only read** (Alex, 2026-10-01): main's genesis import made Grant complete, so no module reads
 the RoleBinding compatibility table; access is read through `AuthzApi` listings, ended grants excluded.
+**Platform operators are a grant** (Alex, 2026-10-01; ADR-092): `ADMIN_EMAILS` is gone. A built-in
+`platform-operator` role (`ops:view`, `ops:manage`) is granted to users at the PLATFORM tier and asked via
+`AuthzApi.can({ scope: platform })`; `ops:*` counts only from PLATFORM grants. Nobody grants it to themselves;
+the last holder cannot be revoked; user erasure revokes as `system` with reason `user-erased`, the only
+revoke that may remove the last holder. ops owns the seed, bootstrap, recovery task and page. `AuthzApi` carries them as three operations,
+`grantPlatformOperator`, `revokePlatformOperator` and `listPlatformOperators`; the org-scoped grant
+operations never take a platform scope (Alex, 2026-10-01).
+Only ops and identity grant or revoke; listing takes no caller, and user reads it to refuse deactivating the last active operator. The
+seed runs once behind a marker, never again because the live list is empty. Authz learns who is
+deactivated or erased from user's and identity's facts into its own table, never from the User table
+(Alex, 2026-10-01). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
+`grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the
+install has no users (Alex, 2026-10-01).
+**Billing staff read with `ops:view`, write with `ops:manage`** (Alex, 2026-10-01): the connected-billing
+overview and the impersonation limit override take `ops:view`; onboard, addCommit, renew, completeRenewal and
+markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused on every write.
+**Operator bootstrap** (Alex, 2026-10-01): a one-time upgrade migration grants users named by a still-set
+`ADMIN_EMAILS`, else the oldest active org admin on a one-organization install, else nobody (logged; recovery
+task). Cloud never bootstraps: staff are seeded at cutover. A set `ADMIN_EMAILS` after that only warns.
+A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
+user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
+user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
+difference from main (Alex, 2026-10-01).
 
 ---
 
@@ -1403,6 +1410,8 @@ the RoleBinding compatibility table; access is read through `AuthzApi` listings,
   `{id}` included: a semantic rename of a main route is drift and is reverted (Alex, 2026-09-25).
   The rest-route rule reads that docs copy as it stands after a spec sync; drift against main is
   apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
+- `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
+  published docs (Alex, 2026-09-25).
 - A handler never sets a header to refuse: a `HandledError` carrying `meta.retryAfterMs` is rendered by
   the REST runtime with `Retry-After` (2026-09-23).
 - An action that takes no body declares an empty input schema from its contract; the runtime reads an
@@ -1443,10 +1452,11 @@ the RoleBinding compatibility table; access is read through `AuthzApi` listings,
 - A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
-  one, and a new project gets no customer-facing project key (Alex, 2026-09-30). Internal callers (scenario child,
-  workflows and nlpgo, gateway trace export, health probe) keep reading `Project.apiKey` until ADR-166's system
-  `Authorization` is built; the column goes after (Alex, 2026-09-30). The key row menu is Revoke only, and a new key
-  expires in 90 days by default, "never" allowed (Alex, 2026-09-30). `modules/api-key/adrs/002-project-keys-are-hidden.md`
+  one, and a new project gets no customer-facing project key (Alex, 2026-09-30). No engine and no internal caller
+  reads `Project.apiKey`: a run calls back with the key minted for it (§10), any other platform caller with a minted,
+  ownerless, project-bound key holding only what it needs, and the column goes once nothing reads it
+  (Alex, 2026-10-01). The key row menu is Revoke only, and a new key expires in 90 days by default, "never"
+  allowed (Alex, 2026-09-30). `modules/api-key/adrs/002-project-keys-are-hidden.md`
 - A socket is declared like a route: a module declares its `WebSocketProtocol`, and the process opens one upgrade router
   and mounts every installed module's protocols, as it mounts REST (coordinator, 2026-09-25; main's connect gateway, pending Alex's review).
 - `publicRoute`/raw results only for genuinely non-JSON protocols
@@ -1507,14 +1517,28 @@ close() }`. The api's `serve()` answers a claimed request ahead of every route, 
 The module declares its whole pipeline once:
 
 ```ts
-// modules/trace/process/src/eventing/trace.pipeline.ts
-export const tracePipeline = definePipeline("trace")
-  .withEvents(traceEvents) // zod-typed, versioned
-  .withCommands({ ingestSpan }) // validate → append
-  .withProjections({ traceSummary }) // fold → read model      (worker-only)
-  .withSubscribers({ onSpanIngested }) // reactions, idempotent  (worker-only)
-  .withProcessManager("retentionSweep", (pm) => pm.schedule({ everyMs }).onWake(…)); // (worker-only)
+// modules/trace/process/src/eventing/trace-processing-projections.pipeline.ts (abridged)
+definePipeline({ name: "trace_processing", aggregate: defineAggregate({ type: "trace" }) })
+  .withEvents([spanReceivedEventSchema, …]) // zod schemas, one per event type
+  .withClickHouseFoldProjection(TraceSummaryFoldProjection.create({ store, … })) // fold → read model
+  .withClickHouseMapProjection(SpanStorageMapProjection.create({ store, … })) // one row per event
+  .withPostgresProjection(stateProjection) // load / evolve / store (scim-sync.pipeline.ts)
+  .withCommand("assignTopic", EventingTraceTopicAdapter) // validate → append
+  .withCommandInstance({ name: "recordSpan", handlerClass, instance, options }) // constructor DI
+  .withEventSubscriber("name", { events: [TYPE], handler }) // reaction, no projection state
+  .withProjectionSubscriber("name", { fold: "traceSummary", events, handler }) // or `map: "spanStorage"`
+  .withPeerSubscriber("name", { eventType, data: schema, handle }) // a peer pipeline's event
+  .withProcessManager("retentionSweep", (pm) =>
+    pm.state(schema, initial).schedule({ everyMs }).onWake(wake).intent("pass", schema, run),
+  )
+  .build();
 ```
+
+Projections, subscribers and process managers run in the worker only.
+`modules/trace/process/src/eventing/trace-processing.pipeline.ts` shows a full set of
+subscribers, and `enterprise/modules/billing/process/src/eventing/connected-billing.pipeline.ts` a
+scheduled process manager. The module installs the result through `defineEventingModule({ pipeline, build,
+connect })` and `.withEventing(...)`.
 
 Background work is a scheduled process manager on the module's pipeline, installed with it through
 `.withEventing` (Alex, 2026-09-23): `.schedule({ everyMs })` arms a wake on the instance row, the worker
@@ -1791,25 +1815,40 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
-**A read opts into the disk mirror on its contract; there are no per-read tiers** (Alex, 2026-09-30, amended 2026-10-01): `.query(name, { cache: { persist: true } })` marks a read for the sealed IndexedDB mirror, and an undeclared read is memory only. A newer `x-lw-session-version` marks every read stale; no call site sets a `staleTime`. ADR-164, specs/ui/browser-query-caching.feature.
+**There are no per-read cache tiers** (Alex, 2026-09-30, amended 2026-10-01): a newer `x-lw-session-version` marks every read stale; no call site sets a `staleTime`. Every read is mirrored to disk by default (§10.2). ADR-170, specs/ui/browser-query-caching.feature.
 
-**The session version is authz's, per user, and a contract's cache policy travels with its browser Api** (Alex, 2026-09-30): `AuthzApi.getSessionVersion({ userId })` backs `x-lw-session-version`, and a browser declaration states `.withApi(api, { contracts })`. ADR-164.
+**The session version is authz's, per user** (Alex, 2026-09-30): `AuthzApi.getSessionVersion({ userId })` backs `x-lw-session-version`, and a browser declaration states `.withApi(api, { contracts })`. A grant or role event bumps only the users it reaches (a role's holders come from its live grants, directly or through a group or team), a holder set that cannot be computed, or that passes 500 principals, bumps the whole organisation (Alex, 2026-10-01), and the tRPC host reads the version once per request (modules/authz/specs/session-version-holders.feature). ADR-170.
 
-**The server never answers `unchanged`; it always sends the full answer** (Alex, 2026-10-01): no content-hash ETag, 304 or `{ unchanged }` envelope. The browser caches: memory, plus an opt-in sealed IndexedDB mirror per read; staleness comes from SSE read hints and a 5-minute safety refetch. Reads backed by event-sourced projections will later answer by cursor: the browser sends the last event id it saw and the server compares it with the projection's last applied event id, answering `unchanged` without running the read (not built yet; the transport's `since` send and envelope unwrap stay in place, unused, for it). A contract drives hints with `.query(name, { invalidatedBy: [EVENT_TYPE] })`; `NotificationService.readHints` streams them on `notification.onReadHints`, which takes the organisation and project as input and the user from the session, never from the request (Alex, 2026-10-01). packages/api/specs/read-hints.feature.
+**A query never returns a credential** (Alex, 2026-10-01): every tRPC query may be cached, in memory and on the browser's disk, so no query output carries a secret (S3 secret key, project API key, LangWatchQL key, tokens, passwords). A credential comes back only from a mutation, and a mutation is never cached. A form that writes a secret never reads it back: blank means unchanged. A blank secret where none is stored yet is refused. A legacy project key is never read or rotated: its one action, `project.revokeProjectApiKey`, ends it for good and shows no new key; personal access tokens replace it, the CLI included (Alex, 2026-10-01). Admins only (`project:manage`), offered by a deprecation banner with a two-step confirm; `project.getLegacyKeyStatus` answers `{ present }`, same permission. The revoke overwrites the column with `lw-revoked-<ksuid>`, a value that never authenticates, until the column is dropped at sunset; the api-key answer cache may honour it for 5 s. Platform paths never hand the legacy key to an engine. A run that calls LangWatch gets a virtual key minted like Langy's, FOR the starting user: it acts as them and is bound to the project. Its permissions are what this run needs (derived from the graph or run kind at mint time) intersected with what the user holds, never an unused one, and it expires after 15 minutes. A user lacking a needed permission is refused before the run starts (Alex, 2026-10-01). The key is reused per (user, project, permission set) while 5 minutes remain, so long runs re-mint and experiments don't mint per cell; expiry is the only end, with no revoke op. A run nobody started (monitors, online evaluations) acts as the system actor, never as the monitor's creator (that would let a creator's grants leak into unattended runs): its key has no owner, is bound to its project and holds only what that run needs (Alex, 2026-10-01). A third party's token typed into an HTTP node becomes a project secret on save; the node keeps only the `{{ secrets.NAME }}` reference. A secret records the origin it was saved for and fills only a request to that origin; any other destination is refused (Alex, 2026-10-01). The token is never readable through any query and never enters any cache: the browser mirror, any server cache, or Redis and queue payloads (Alex, 2026-10-01). A header is a credential when it is `Authorization`, `X-Api-Key`, `Cookie` or `Proxy-Authorization`, or its name contains key, token, secret, auth or password, case-insensitive; one test decides it for save, read and trace (Alex, 2026-10-01). A copy into another project arrives with every HTTP credential blank for the user to re-enter, and an agent's secrets are named from its id, so names never collide (Alex, 2026-10-01). The CLI, Langy and the hosted MCP sign in with the CLI's existing OAuth device grant, extended with no new routes. The exchange answers access and refresh tokens and the project, never a key; `/refresh` takes an optional project to re-scope; the API door accepts those access tokens as the person, capped at that project. MCP connections re-authorise once (Alex, 2026-10-01). `login --project` writes the CLI key the exchange already mints into the app's `.env`, bound to that one project: there is no separate "ingestion" key kind, only the same personal access token with narrower scope. It is named after the machine, revocable, and allowed to never expire (Alex, 2026-10-01). A token minted from a setup snippet holds ingestion only (`traces:create`), and the screen says so (Alex, 2026-10-01). The deleted CLI project-key path answers 410 Gone with an upgrade hint for a few releases (Alex, 2026-10-01).
 
-**Reads are mirrored, not shared** (Alex, 2026-10-01): each tab keeps its own React Query cache, mirrored per query to IndexedDB as structured-clone objects keyed by user and query hash and discarded by build (memory where IndexedDB is unavailable). A tab gaining focus reads IndexedDB first and goes to the network only when it is behind.
+**Query outputs are checked for credentials** (Alex, 2026-10-01): no read is marked "never on disk"; a framework test fails any tRPC query output with a secret-looking field.
 
-**The mirror is sealed per session and the seal expires** (Alex, 2026-10-01): every row the browser mirrors to IndexedDB is sealed whole with AES-GCM: a fresh 96-bit IV per write and the row's IndexedDB key as associated data. The key comes from the session read (`GET /api/auth/session`): HKDF-SHA256 of the session secret over `lw-query-cache|sessionId|impersonator|epoch`, where the session id is the one the server resolved from the cookie, never one the browser sent. It is derived on every read and never stored. The epoch is seven days on the server's clock (`QUERY_CACHE_EPOCH_MS`); the browser never computes one. The read carries this epoch's key and the last one, both kept in memory only, and the session read itself is never mirrored. A row opens under this epoch's key; failing that, under last epoch's key, and is then re-sealed in the background, which bounds a long sliding session. Otherwise it is a miss: dropped and refetched, as is a row tampered with or moved. A refresh or a new tab in the same session restores. A new session, such as a re-login after expiry, gets a new key, so the old mirror is a miss that is refetched and overwritten; that is accepted. A revoked or ended session derives no key again, so its disk copy is dead. An explicit sign-out also wipes `lw-query:*`. A device-bound key would add nothing: whoever holds the disk also holds the session cookie while it is valid. Each user's mirror is bounded (25 MB, 500 rows, 2 MB a row), and the least recently read rows go first. `useReadFreshness` tells a screen when a read was fetched and whether the network has confirmed a restored copy since.
+**There is no shared server read cache** (Alex, 2026-10-01): none is built until a hot read is measured to need one, and that one is keyed per actor, after authz. ClickHouse stores behind cursor reads flush inserts before acknowledging (`wait_for_async_insert: 1`); the settle window is a per-projection option (default 5 s); session versions are stored durably beside the cursors.
 
-**Only the focused tab talks to the server** (Alex, 2026-10-01): a tab is focused when it is visible and its window holds focus; it alone polls and refetches, and hidden tabs make no calls. A BroadcastChannel carries `{ key, version }` only, never data, after a focused fetch lands; a receiver whose version differs marks the key stale without fetching. A read without a server version is compared by a hash of its data. There is no leader. specs/ui/browser-query-caching.feature.
+**No request batching** (Alex, 2026-10-01): the browser sends one tRPC call per request and the server refuses batched calls, with no grace window.
+
+**A write makes reads stale through the key** (Alex, 2026-10-01): a cursor-backed read's cache key carries its projection cursor, so a write changes the key and no call site invalidates by hand; a read with no cursor falls back to SSE hints and the 5-minute refetch.
+
+**No timer polling** (Alex, 2026-10-01): screens that polled on a timer, ops' 37 included, follow events instead. The 5-minute "safety refetch" below is not polling: it is the query client's `staleTime`, so a read older than five minutes refetches when a tab is shown, on mount or on reconnect, and nothing runs on an interval (`packages/ui-kernel/src/query-client.ts`).
+
+**One tRPC call per request over `httpLink`** (Alex, 2026-10-01): each answer carries its own status, session version and schema hash; a slow call never holds another back.
+
+**Projection cursor reads** (Alex, 2026-10-01): a read declared `fromProjection` always answers in full; its cursor decides freshness and keys the cache, never a short answer. The cursor is the event id alone: event ids are KSUIDs, k-sortable with the timestamp first, so a plain string compare orders them and max-wins keeps the larger. It is stored durably in the Postgres process store per (projection, tenant) and per (projection, key). A hint carries its event id; every read answer carries the newest event id its projection has applied. An answer is fresh when its id is at or past the hint's; otherwise the tab asks again. KSUIDs order only to the second (then by writer instance), so an answer whose id shares the hint's second is fresh only when it equals the hint's id (Alex, 2026-10-01). Authz, scope and entitlement run first; the caller's session version is folded into the cache key. The settle window (5 s, configurable) only bounds how long the tab keeps asking. Stale hints stay a subscriber on the committed event; the cursor closes the race with a slow projection (Alex, 2026-10-01). A projection that applies events out of id order can leave a cursor past an event it has not applied yet; that gap is accepted as too unlikely to engineer for, and the 5-minute refetch covers it (Alex, 2026-10-01). A cursor read touches only its projections, guarded in tests and dev. Hints are sent from the cursor advance; erasure and retention go through events the projection applies; only projections a read names advance a cursor; time-relative reads stay off this path. packages/eventing/specs/projection-cursor-reads.feature.
+
+**The server never answers `unchanged`; it always sends the full answer** (Alex, 2026-10-01): no content-hash ETag, 304 or `{ unchanged }` envelope. The browser caches: memory, plus a sealed IndexedDB mirror (every read by default, §10.2); staleness comes from SSE read hints and a 5-minute safety refetch. No shared server-side read cache is built until a measurement asks for one (Alex, 2026-10-01). Reads backed by event-sourced projections answer in full too; their cursor only decides freshness and keys the cache. A contract drives hints with `.query(name, { invalidatedBy: [EVENT_TYPE] })`; `PresenceApi.readHints` streams them on `presence.onOrganizationReadHints` (`organization:view`) and `presence.onProjectReadHints` (`project:view`), which take the organisation (and project) as input and the user from the session, never from the request (Alex, 2026-10-01). The read-hints pipeline publishes on the framework's own channel `eventing:read_invalidated`, never on `broadcast:*`; presence subscribes and fans the hints out to browsers (Alex, 2026-10-01). packages/api/specs/read-hints.feature.
+
+**The mirror is sealed per session and the seal expires** (Alex, 2026-10-01): every row the browser mirrors to IndexedDB is sealed whole with AES-GCM: a fresh 96-bit IV per write and the row's IndexedDB key as associated data. The key comes from the session read (`GET /api/auth/session`): HKDF-SHA256 of the session secret over `lw-query-cache|sessionId|impersonator|epoch`, where the session id is the one the server resolved from the cookie, never one the browser sent. It is derived on every read and never stored. The epoch is seven days on the server's clock (`QUERY_CACHE_EPOCH_MS`); the browser never computes one. The read carries this epoch's key and the last one, both kept in memory only, and the session read itself is never mirrored. A row opens under this epoch's key; failing that, under last epoch's key, and is then re-sealed in the background, which bounds a long sliding session. Otherwise it is a miss: dropped and refetched, as is a row tampered with or moved. A refresh or a new tab in the same session restores. A new session, such as a re-login after expiry, gets a new key, so the old mirror is a miss that is refetched and overwritten; that is accepted. A revoked or ended session derives no key again, so its disk copy is dead. An explicit sign-out also wipes `lw-query:*`. A device-bound key would add nothing: whoever holds the disk also holds the session cookie while it is valid. `useReadFreshness` tells a screen when a read was fetched and whether the network has confirmed a restored copy since.
+
+**Visible tabs talk to the server** (Alex, 2026-10-01): a visible tab is live (hint stream, refetches) whether or not its window holds focus; a hidden tab makes no calls and catches up when shown. A BroadcastChannel carries `{ key, version }` only, never data, after a fetch lands; a receiver whose version differs marks the key stale without fetching. A read without a server version is compared by a hash of its data. There is no leader. specs/ui/browser-query-caching.feature.
 
 **Server events say when a read is stale** (Alex, 2026-10-01): a browser read is cached and refetched when
-an SSE event its contract names arrives, with a 5-minute safety refetch; modules pick no per-read tier.
-There is no universal `unchanged`: only a cursor-backed read may answer it (above). Event-sourced progress (experiment runs,
+an SSE event its contract names arrives, with a 5-minute staleness bound (a refetch on focus, mount or reconnect once a read is older, never a timer); modules pick no per-read tier.
+There is no `unchanged` answer on any read. Event-sourced progress (experiment runs,
 scenarios) follows its events, never a timer. A heavy read is split by fetching the entity and loading its
 people when needed, not by a summary procedure. A user-chosen dashboard auto-refresh is the one caller-set
 interval. A read refused with 403 refetches the session read once and invalidates nothing else; the
-session read's own 403 never does (Alex, 2026-10-01).
+session read's own 403 never does (Alex, 2026-10-01). The browser cache needs no audience in its keys:
+its mirror is sealed per session and reads carry their organization or project.
 
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook
@@ -1872,20 +1911,20 @@ invented:
   deleted. The three above it are the opposite case and stay: their consumers
   are built and waiting, and what they lack is declarers. `withSlots` has
   since gone too: slots are deleted, and a core screen renders the
-  enterprise kit (§11; Alex, 2026-09-29). That
+  enterprise module's lent component (§11; Alex, 2026-09-29). That
   `withFailureInterceptors` has none is its own finding — the shell runs every
   installed interceptor over each failed mutation so that "a failure a feature
   answers application-wide is reported once, rather than by every screen that
   happens to trip it", and no feature answers one.
 
-  **`publishSurfaces` is superseded by the kit** (ruled 2026-09-18). It is the
+  **`publishSurfaces` is superseded by the closed browser package** (ruled 2026-09-18). It is the
   declaration-side twin of the `./surfaces/*` exports entries §3.4 just closed:
   `organization` publishes `surfaces/department-picker` and
   `surfaces/personal-workspace-features` — the same names its exports map
   opened. Both halves answered the same question, "how does another module
-  reach into mine", and the kit is now the whole answer. 13 modules declare it
+  reach into mine", and the closed package is now the whole answer. 13 modules declare it
   and nothing reads it at runtime, so no behaviour depends on the removal; the
-  surfaces travel to the owner's kit, or they dissolve. Found while correcting
+  surfaces travel to the design system or the owner's contract, or they dissolve. Found while correcting
   this table for the third time — it was missed because a census of the
   builder's `with*` methods does not match a method named `publish*`.
 
@@ -2019,7 +2058,7 @@ invented:
   export const organizationWeb = defineWebModule("organization")
     .withScreens({/* … */})
     // "Where they are standing" is organization's to answer, and its one
-    // consumer is the composition root, so it is declared, not a kit.
+    // consumer is the composition root, so it is declared, not shared.
     .withCapabilities({
       scope: { load: () => import("./behavior/scope-capability.ts") },
     });
@@ -2032,23 +2071,19 @@ invented:
   ```
 
   The gap that forced it: a capability implementation had no legal home once a
-  browser package closed. It could not be a kit, since its only consumer is the
-  composition root (rule 5), and it cannot be reached directly, because that
+  browser package closed. It could not be shared code, since its only consumer is the
+  composition root, and it cannot be reached directly, because that
   is the side door §3.4 just shut. Exempting the composition root was
   rejected: "composition root" is a door, and doors get claimed by whoever can
   argue they are composing. Declaring it instead completes the sentence this
   section already starts: capabilities are composed by the shell and reach
-  modules through a declared `*HostApi`. The 2026-09-18 reading that "a kit
-  that may fetch is a browser package with a nicer name" is overturned: a kit
-  fetches its own module's data, and rule 2 keeps it a leaf (§3.4 rule 3;
-  Alex, 2026-09-29).
+  modules through a declared `*HostApi`. Data a module's screens fetch comes through that module's `<name>-client` (§3.4).
 
   **The slot is "what the composition root installs from this module", whether
-  or not it fetches** (ruled 2026-09-18). Fetching is what makes a capability
-  ineligible for a KIT; it was never what makes it a capability. Reading the
+  or not it fetches** (ruled 2026-09-18). Fetching never decided whether
+  something is a capability. Reading the
   slot as fetch-only stranded a whole class: a PURE symbol whose only consumer
-  is `apps/ui` could not be a kit (rule 5 — one consumer never mints one), nor
-  a capability, nor a subpath (§3.4), and rule 5's usual remedy — inline or
+  is `apps/ui` could not be a capability or a subpath (§3.4), and the usual remedy — inline or
   duplicate into the consumer — assumes the consumer may hold code, which
   §10.1 says `apps/ui` may not. Measured before ruling: **9 such specifiers
   across 6 modules** (auth, langy, navigation, organization, scenario, trace),
@@ -2057,9 +2092,9 @@ invented:
   the split costs nothing.
 
   A theme config still is NOT a capability. It is pure data with consumers
-  besides the composition root, so it belongs in a kit — `apps/ui` keeps the
+  besides the composition root, so it belongs in the design system — `apps/ui` keeps the
   skin, and `langy-theme` travelling as theme data is the shape. The test is
-  the consumer, not the purity: **many consumers → kit; the composition root
+  the consumer, not the purity: **many consumers → design system; the composition root
   → the slot.**
 
   **Replicate targets are one capability organization lends** (Alex,
@@ -2084,9 +2119,8 @@ invented:
   one any module may lend, read as a list. `createUi` refuses two lenders of any other token, naming
   both. `withCapabilities` keeps only what the composition root installs.
 
-  **A token lives in its owner's contract, or its kit when the contract cannot hold it**: props
-  naming a framework type, or a contract whose graph reaches the owner's, put the token in the
-  owner's kit. An owner with neither makes the props data-only. A drawer only its owner opens keeps
+  **A token lives in its owner's contract**: props naming a framework type, or a contract whose
+  graph reaches the owner's, are not allowed in it, so the owner makes the props data-only. A drawer only its owner opens keeps
   its token in its own `model/`; an extension token lives with the page that hosts it.
 
   **Release flags are a host service feature-flag provides.** browser-host holds `UiFlags` (on, off
@@ -2136,8 +2170,8 @@ invented:
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
   case by case. The unit of browser sharing is the **published hook** — the
-  owner publishes hooks through its kit; shared mutable-state packages are
-  not a tier.
+  owner publishes hooks through its `<name>-client`; shared mutable-state packages are
+  not a tier, and client state lives in the one global UI store (§10.2).
 - **apps/ui holds NOTHING but its composition** (amended 2026-09-18):
   `main.tsx` + `styles/`, and nothing else. The browser app obeys the same rule
   §2 gives the process apps — an app is a main and a config, the product lives
@@ -2177,16 +2211,62 @@ invented:
 **Four tiers, one home each** (Alex, 2026-10-01). (1) Server state lives in React Query
 through the tRPC client and is never copied into `useState` or a store (`query-data-in-state`).
 (2) Address-bar state (filters, tabs, drawers) lives in the router. (3) Shared client state
-is one zustand store per feature, under `behavior/`, actions as named functions.
+is a module's namespaced slice of the one global UI store (below), actions as named functions.
+A persisted slice keeps preferences only (panel sizes, toggles, selected tabs), never server
+data, keyed to the signed-in reader and forgotten at sign-out (Alex, 2026-10-01).
 (4) Local state is `useState`; derive during render, never sync in an effect (`effect-derives-state`).
 
-**The store is module-private** (`browser-store-containment`). `create(` from zustand appears
-only under `behavior/`; the package's `<name>.web.ts` exports no store and no other module
-imports one. A browser-kit may own the store for its one concept (§10.1 rule 3). What another
-module needs is a contract answer or a `*HostApi` action.
+**One global UI store, namespaced like Redis keys** (Alex, 2026-10-01; supersedes the
+module-private store). `browser-host` holds one zustand store. Each module keeps its client state
+under its own prefix (`trace:`, `langy:`) and writes only there; any module may read any prefix, so
+state is shared without wiring, and data only flows down. App-wide UI state (the Langy panel, the
+upgrade modal, the drawer stack, theme) sits under `shell:`. Server data never enters it (tier 1).
+A module's host actions another module calls are a slice too (`workflow:host`). A context whose
+provider and every consumer sit in one module stays a context.
+Redux is still not imported (`no-redux`).
 
-**Redux and any global store are refused** (`no-redux`): `redux`, `react-redux` and
-`@reduxjs/toolkit` are not imported in browser code.
+**One entity, one key** (Alex, 2026-10-01). Each entity has one canonical id and one detail read;
+hints (time window, `full`, `occurredAt`) never enter a key; a list seeds the detail entries of
+the rows it returns; a mutation writes the entity in place with `setData`.
+
+The canonical reads are chosen for security (Alex, 2026-10-01): every read takes the opaque id plus
+the tenant scope it is authorised against (`projectId` or `organizationId`), never a slug, handle or
+other guessable name, and never an id alone. A slug or handle in a URL is resolved to the id once,
+at the route, by a read scoped and authorised the same way. Trace `traces.header({ projectId,
+traceId })`, with `occurredAtMs` sent outside the key; span `spanDetail({ projectId, traceId,
+spanId })`; scenario run `getRunState({ projectId, scenarioRunId })`; experiment
+`experiments.get({ projectId, experimentId })` and run `getRun({ projectId, experimentId, runId })`;
+prompt `prompts.get({ projectId, promptId })`; dataset `dataset.get` plus `datasetRecord.list({
+projectId, datasetId, page })`; evaluator `getById({ projectId, id })`; project: the scope graph;
+members `members({ organizationId })` for active members, with deactivated ones in a second key
+that needs `organization:manage`; user `user.me()`.
+
+**Reads are mirrored to disk by default** (Alex, 2026-09-30, amended 2026-10-01; supersedes opt-in
+persistence and the build-id discard). Each tab keeps its own React Query cache, and every declared
+query is mirrored, one sealed row per query keyed by user and query hash (sealing in §10; memory
+where IndexedDB is unavailable). A read stays in memory only when it is over the per-row cap or on
+the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED` in
+`@langwatch/browser-host/cache-tiers`); there is no opt-in. Each user's mirror is LRU-bounded
+(25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
+A row carries its read's schema hash: a digest of the contract's input and output schemas and an
+optional `revision: n`, bumped when a read's meaning changes and its shape does not
+(`schemaHashOf`, `@langwatch/kernel/contract`). The browser takes the hash from the contract it was
+built with and drops a row whose hash differs before painting it; the server's `x-lw-schema`
+header on every query answer is the backstop for a tab whose bundle is older. No build id or age
+decides it. A mirrored read is restored when first asked for, never all at start-up; the first
+page of a paged read is mirrored too, restored as stale and refetched at once. A tab gaining focus
+reads IndexedDB first and goes to the network only when it is behind. Not built yet: the lazy
+restore (rows restore at start-up) and the browser's read of `x-lw-schema`. ADR-170 (in part),
+specs/ui/browser-query-caching.feature.
+`CachedView` ships.
+
+**Browser telemetry** (Alex, 2026-10-01). RUM is on by default wherever a collector is configured.
+Console errors, uncaught errors and rejected promises go out as `browser.error` spans through our
+RUM endpoint, which forwards them to every configured destination: the RUM collector over OTLP
+(Grafana, the main one) and PostHog when PostHog is configured. Design-system components restate
+contract types structurally, since the design system imports no contract. The global store's typed
+read holds its one cast inside `browser-host`. A boot reader needing fields the scope graph lacks
+gets its own small read. `no-direct-chakra` turns on once Chakra waves 2-3 are green.
 
 ---
 
@@ -2205,9 +2285,9 @@ a tier may do lives in the **enterprise module that holds the gate**, which may
 depend on `@langwatch/enterprise-licensing-contract` and
 `@langwatch/feature-flag-contract` and asks a core module for facts through its
 `*Api` only — a core module never grows a supply token for a tier context.
-Enterprise is a licence, not a separate app (§3): a core module imports an enterprise contract or kit
+Enterprise is a licence, not a separate app (§3): a core module imports an enterprise contract or client
 like any peer's, the enterprise owner refuses per organization, and a core caller never re-checks
-entitlement before calling. There are no slots: a core screen renders the enterprise kit directly, and
+entitlement before calling. There are no slots: a core screen renders the enterprise module's lent component directly, and
 the shell's upgrade modal (`globalUpgradeModal`) is licensing's declared mount (Alex, 2026-09-29).
 
 **Seat limits are organization's to answer** (Alex, 2026-09-28).
@@ -2248,8 +2328,10 @@ person with no organization back to their own account; the browser-host scope ho
 ## 12. Errors
 
 Throw `HandledError` only when the cause is known **and** the caller can act;
-register the `code` in `packages/handled-error/src/app-codes.ts` and its
-customer copy in the presentation registry. Everything else stays a plain
+declare the `code` on the subclass in the module's contract and register it in
+`packages/error-presentation/src/app-codes.ts` (`APP_ERROR_CODES`, sorted). Its customer copy goes in the
+presentation registry (`packages/error-presentation/src/presentation.ts`), and its tips and docs link in the
+remediation registry (`packages/handled-error/src/remediation.ts`, spread in as `remediation(code)`). Everything else stays a plain
 `Error` and degrades to "unknown" + trace id at the boundary — deliberately.
 `message` is customer-safe, never internals; the tRPC wire message is the
 code slug, so clients render from the registry and never toast
@@ -2294,14 +2376,17 @@ fixtures instead (Alex, 2026-09-29).
 A scenario bound from a package's tests counts toward feature parity like one bound from a module's
 (Alex, 2026-09-29).
 
-The installation test is the same chain as production:
+The installation test boots the installed list over memory members, with no server
+(`apps/api/src/__tests__/api-installation.fixture.ts`; the worker and tasks have the same):
 
 ```ts
-const runtime = await createApp({ role: "api" }) // no server: nothing to tear down
-  .withModules([annotationProcessModule, traceProcessModule, presenceProcessModule])
-  .withConfig({ annotation: {}, trace: {}, presence: {} })
-  .withStores(memoryStores()) // branded → memory tier everywhere
-  .boot();
+const runtime = await bootInstalledProcess({
+  role: "api", // from @langwatch/kernel; no server: nothing to tear down
+  modules: serverModules.map(overMemory), // memory twins for every repository registry
+  config: parseProcessConfig({ owners: processConfig(serverModules, "api"), environment }),
+  secrets: (owner, declared) => resolver.scopeTo(owner, declared),
+  members: { ...storesBackedMembers(memoryStores(), stores), close: async () => void 0 },
+});
 
 const traces = runtime.service(TraceApi);
 await traces.ingestSpan({ projectId, span });
@@ -2345,21 +2430,21 @@ conversion debt:
 
 `createProcess` · `withProvided` · `withMemoryRepositories` · `membersFrom` ·
 `reads(...)` statics · the `members:` option on `createApp` ·
-`withInfrastructure` · `withPersistence` · process-side `withTransports` ·
+`withInfrastructure` · `withPersistence` · `.withTransports(hosts)` on the `createApp(...)` process chain
+(a process states what it serves through `.expose(...)`; the module installer's own
+`.withTransports(...declarations)`, §3.2, is a different call and stays) ·
 per-store supply calls (`withRelational`/`withAnalytical`/`withKeyvalue` —
 collapsed into `withStores`) · absence classes (`Logged*Absence`, `Absent*`) ·
 `ApplicationBuilder`'s public surface · per-process host files · per-module
 composition files under `apps/*` · hand-projected per-module config · bespoke
-member bags · `*App` classes inside modules · `defineServerModule` /
-`defineWebModule` (renamed) · `RestErrorHandler` · error envelopes in
+member bags · `*App` classes inside modules · `RestErrorHandler` · error envelopes in
 transports · re-exports for backwards compatibility · the ops "backoffice" (now Ops instance admin or Cloud admin, §3.5) · `refusing*` twins ·
 `try*`/`require*` method names · `T | null` returns in new code (`find*` =
 array; `get*` = one or throws; `list*` = a page, Alex 2026-09-24) · `static readonly configSchema` and its
 `*AppConfigSchema`/`*ServerConfigSchema` consts · a module declaring an env
-var another owner already declares (`BASE_HOST` outside the process owner) ·
+var another owner already declares (`BASE_HOST` anywhere but `processFacts`) ·
 `surfaces/` and `screens/` browser folders · any `exports` entry on a browser
-package other than `./declaration` · any `exports` entry on a kit other than
-`.` · a kit importing another kit · `*-openapi.rules.ts` files hand-writing a
+package other than `./declaration` · any kit: a `*-browser-kit` package or a shared browser package · `*-openapi.rules.ts` files hand-writing a
 route's REST response schema (§8) — migrate the summary/description/tags
 into the route's own `.withDocs()` call and drop any hand-written success
 body outright; an error keeps only its status and a sentence via `errors`,
@@ -2367,7 +2452,7 @@ and a response that truly needs its own schema goes through
 `documentedResponses()`, never raw JSON. · the eventing `ScheduledJob` scheduler
 (`PrismaScheduledJobStore`, `computeNextRunAt` on `Date`): a keyed process manager (§9). · slots:
 `withSlots`, `UiSlots`/`uiSlots`, `useUiSlot`/`useUiSlots`, `<UiSlot>` and the `slots` host service: a
-core screen renders the enterprise kit, and a shell-wide surface is its owner's declared mount (§11;
+core screen renders the enterprise module's lent component, and a shell-wide surface is its owner's declared mount (§11;
 Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6) ·
 `composeProcess` / `*ProcessComposition` (renamed `container` / `*ProcessContainer`, Alex 2026-09-29).
 · `UiDeclaredCapabilities` / `UiDeclaredName` / `UiDeclared` and `declared("<name>")` · `UiDrawerMap`,
@@ -2375,35 +2460,53 @@ Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSec
 files · `useDrawer<Map>()` and a drawer opened, or its flow callbacks set, by a bare name
 (`navigateToDrawer` is the address door) · `withCapabilities` for a peer lend · `useFeatureFlag` and
 per-module `use-feature-flag.ts` copies · `UiSession.featureFlag` / `isFeatureEnabled` (§10.1; Alex,
-2026-10-01). While the migration runs the string spellings coexist with their tokens.
+2026-10-01) · `TrpcCachePolicy` and `cache: { persist }` on a tRPC read (the browser mirrors every read
+to disk by default, minus a named exclusion list). While the migration runs the string spellings coexist with their tokens.
+· members, every spelling (Alex, 2026-10-01; §3.3): `static readonly reads` in any form,
+`setup.members`, `MembersRead`, `ProcessMembers`, `MemberName`, `MEMBER_NAMES`, `MemberSource`,
+`storesBackedMembers`, `noMembers`, the generated `serverModuleMembers`, `*.members.ts` files, a
+restated member type, and a process fact passed as a member · the `secrets`, `cache` and `telemetry`
+members (the Redis cache client itself stays until the Redis TTL work lands) ·
+`*-composition.build.ts` files (§5) · `withMember`, supply tokens (`SupplyToken`, `MissingSupply`)
+and `.provide` (§4) · a channel registry's `.live.create`/`.memory.create` called by hand in
+`create()` or a service (§5) · nested `into` (§6) · `Secret.define` (§6) · a feature leaf or handle
+in `packages/config` or `packages/secrets` (§6) · the dev UI's copy of public-config leaves
+(`public-app-config.projection.ts`, §6) · `ProcessModuleApp`, `registerProcessDependencies`,
+`addProcessDependencies`, `withProcessDependencies`/`withModuleDependencies` and `createProcessApp`,
+targets that never landed and are superseded by the container (§5).
 
 ---
 
 ## 16. Renames in flight
 
 This document names the target. **Landed 2026-09-18:** the tree rename
-(`modules/*/process`, `*/browser`, `*/browser-kit`; package names
-`*-process`/`*-browser`/`*-browser-kit`), `@langwatch/process-stores`,
+(`modules/*/process`, `*/browser`; package names
+`*-process`/`*-browser`; `*/browser-kit` was later removed, see §3.4), `@langwatch/process-stores`,
 `@langwatch/browser-host` (+drawer), plan-gate
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
-chain. New code uses the left column only.
+chain. The rows below have not landed: the tree still uses the right column (`defineServerModule`,
+`serverModules`, `.withApp`), so code spells the right column until its row lands, and this
+record's prose names the left, the target.
 
 | Target                                                                                   | Today                                                              |
 | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `@langwatch/module` (light core)                                                         | `@langwatch/kernel`'s token half                                   |
 | `@langwatch/process`                                                                     | `@langwatch/process-server` + kernel's boot AND declaration halves |
 | `@langwatch/browser`                                                                     | `@langwatch/ui-kernel` (boot half)                                 |
-| `createProcessApp(role)`                                                                 | none — apps compose directly (see note below)                      |
 | `openStores(config)`                                                                     | `openProcessStores({ config })`                                    |
 | `defineProcessModule` / `defineBrowserModule`                                            | `defineServerModule` / `defineWebModule`                           |
 | `traceProcessModule` / `processModules`                                                  | `traceServer` / `serverModules`                                    |
 | `TraceModule` + `.withApi(...)`                                                          | `TraceApp` + `.withApp(...)`                                       |
 | `<f>.module.ts` / `<f>.web.ts` file stems                                                | `<f>.server.ts` / `<f>.web.ts`                                     |
-| `definePipeline(...).withEvents(schemas)`                                                | `defineAggregate({ events: defineEvents([...type strings]) })`     |
 | host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers) | "capabilities" (§3.5 reserves the word for the four layers)        |
 | `enterprise/modules/audit-log` (§4)                                                      | `modules/audit-log`                                                |
+| `processFacts` in `@langwatch/config`, picked by each slice (§6)                         | `deployment-facts.ts`, process-server `owner.ts` (`baseHost`, `nodeEnvironment`, `outboundProxy`), observability's `serviceVersion`, `rawSocketPort`; handed out as members |
+| store clients reach registries only; `.withChannels(registry)` on the installer (§5)     | `static reads` + `setup.members`; channel registries built by hand in `create()` |
+| `secrets.into({ … }, build)` (§6)                                                        | nested `secrets.into(handle, …)`                                   |
+| `hostedStores(stores)` (§4)                                                              | `hostedMembers(stores)`                                            |
+| "store client" (`the clickhouse client`)                                                 | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })` |
 
-`createProcessApp` stays the target shape. Its previous implementation, the
+`createProcessApp` is no longer a target: the container is (Alex, 2026-10-01). Its previous implementation, the
 generated `createServerApp` and its `serverModuleChunk0..9`,
 `coreServerModules` and `enterpriseServerModules` lists, was **removed
 2026-09-18 as dead code** — nothing outside the generator imported it, yet it
@@ -2414,10 +2517,13 @@ instantiations (107.2s of checking) to 13.9M (2.3s). Build it again once
 `modules/` can emit a `.d.ts`; today it cannot
 (`TS7056` — the composed type exceeds what the compiler will serialize, and
 ~50 `TS2883`s name module repositories the composed type should not expose).
-Until then a process composes `serverModules` directly.
+A process composes `serverModules` through its container.
 
-Also open, each a worklist: the config-defined dependency state migration
-(§6 — deletes the remaining bespoke member tail); eventing member composition for both roles; `browserModules` is
+Homes for the no-members migration (coordinator, 2026-10-01): the logger is `createLogger("<module>")` inside the module; the clock is `@langwatch/time`, and memory twins take one in their registry; `processName` is deleted, and refusals name the module and role; `operatorReads` goes to registries like any store client; tests call `XModule.create(setup)` with `createApiFixture` peers and memory registries, and installation tests boot the installed list over memory; a reader takes the owner contract's exported leaf, which supersedes the 2026-09-18 ask-the-owner's-Api rule; `CREDENTIALS_SECRET` and `NEXTAUTH_SECRET` stay shared as `processSecrets` beside `processFacts`; the egress fence and the OTEL endpoint are process facts, and voice loopback is scenario's; the dev UI lifts the config meta tag from the api's own rendered shell; the names `processFacts`, `defineChannels`, `.withChannels` and `hostedStores` stand.
+
+Also open, each a worklist: the no-members migration (process facts, store clients into
+registries, kernel-installed channels, record `into`, owner-held handles, the dev UI projection);
+eventing's client for both roles; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
@@ -2480,3 +2586,12 @@ the applications, the SDK and the e2e suites, so the two are not the same set.
 
 The cache is local. No Nx Cloud account is configured and `nxCloudId` is
 absent, so no source or task metadata leaves the machine.
+
+## 19. The dev runtime and the sims
+
+Where the local stack lives; this record does not restate it.
+
+- **The stack** (haven, the one dev process, the no-container setup): `dev/docs/LOCAL_STACK.md`.
+- **The sims** (llmsim, mailsim, storagesim, analyticssim, voicesim): the `.claude/skills/sims` skill.
+- **haven** (`make haven up`, the orchestrator that names each stack): `tools/thuishaven`.
+- **`apps/server`**: the published `npx @langwatch/server` CLI that runs the whole stack locally.
