@@ -195,7 +195,10 @@ describe("startUiQuerySync", () => {
         staleTime: 60_000,
         queryFn: async () => ({ fetch: ++fetches }),
       }).subscribe(() => void 0);
-      await vi.waitFor(() => expect(fetches).toBe(1));
+      // Wait for the fetch to land: a success clears an invalidation made while in flight.
+      await vi.waitFor(() =>
+        expect(queryClient.getQueryState(projectsKey)?.status).toBe("success"),
+      );
 
       focusManager.setFocused(false);
       await queryClient.invalidateQueries({ queryKey: projectsKey, refetchType: "none" });
