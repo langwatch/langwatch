@@ -12,10 +12,13 @@ export {
   type TrpcContractMember,
   type TrpcContractMembers,
   type TrpcContractOutputBuilder,
+  type TrpcContractRequiredOutputBuilder,
   type TrpcProjectionSource,
   type TrpcReadInvalidation,
   type TrpcReadOptions,
 } from "./trpc-contract.ts";
+
+export { SCHEMA_HASH_HEADER, schemaHashOf, schemaHashesOf } from "./schema-hash.ts";
 
 export { defineRestMiddleware, type RestTransportMiddleware } from "./rest-middleware.ts";
 

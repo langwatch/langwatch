@@ -6,6 +6,7 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 
+import { BatchingNotSupportedError } from "../errors.ts";
 import { ClientAddress } from "../policy/client-address.ts";
 import type { SecurityHeaders } from "../policy/security-headers.ts";
 import type { RestHost } from "../rest/host.ts";
@@ -77,6 +78,7 @@ export const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAn
  */
 function trpcLanes(trpc: TrpcHost): Hono {
   const app = new Hono();
+  app.onError((failure) => answerApiFailure(failure));
 
   app.all(`${TrpcHost.path}/*`, async (context) => {
     const request = context.req.raw;
@@ -87,13 +89,23 @@ function trpcLanes(trpc: TrpcHost): Hono {
       return resolved;
     };
 
-    // The session version rides every answer.
-    const versionHeaders = await trpc.sessionVersionHeaders({ context: createContext });
+    const { pathname, searchParams } = new URL(request.url);
+    const path = pathname.slice(TrpcHost.path.length + 1);
+    if (searchParams.has("batch") || /,|%2c/i.test(path)) {
+      throw new BatchingNotSupportedError();
+    }
+
+    // The session version and, on a query, the schema hash ride every answer.
+    const versionHeaders = {
+      ...(await trpc.sessionVersionHeaders({ context: createContext })),
+      ...trpc.schemaHashHeaders({ path }),
+    };
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: request,
       router: trpc.router,
       createContext,
+      allowBatching: false,
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
 

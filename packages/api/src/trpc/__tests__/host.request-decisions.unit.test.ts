@@ -54,12 +54,10 @@ function served() {
   const application: ReviewApi = { read: ({ id }) => ({ id }) };
   trpc.mount(composeTrpcRouters("review", [reads]), () => application);
 
-  const batch = async (ids: readonly string[]) => {
+  const call = async (id: string) => {
     const request = new Request(
-      `http://api.test${TrpcHost.path}/${ids.map(() => "review.getById").join(",")}?batch=1&input=${encodeURIComponent(
-        JSON.stringify(
-          Object.fromEntries(ids.map((id, index) => [index, { projectId: "p1", id }])),
-        ),
+      `http://api.test${TrpcHost.path}/review.getById?input=${encodeURIComponent(
+        JSON.stringify({ projectId: "p1", id }),
       )}`,
     );
     let context: ReturnType<TrpcHost["context"]> | undefined;
@@ -70,11 +68,11 @@ function served() {
       createContext: () => (context ??= trpc.context({ request })),
     });
 
-    return (await response.json()) as { result?: unknown; error?: unknown }[];
+    return (await response.json()) as { result?: unknown; error?: unknown };
   };
 
   return {
-    batch,
+    call,
     decisions,
     lineages,
     revoke: () => {
@@ -83,14 +81,14 @@ function served() {
   };
 }
 
-describe("given a batched request whose procedures need the same permission on one project", () => {
-  /** @scenario "A batch asking the same permission decides it once" */
-  it("asks authorization once for the whole batch", async () => {
-    const { batch, decisions, lineages } = served();
+describe("given a request whose procedure needs a permission on one project", () => {
+  /** @scenario "A request decides its permission once" */
+  it("asks authorization once", async () => {
+    const { call, decisions, lineages } = served();
 
-    const answers = await batch(["a", "b", "c"]);
+    const answer = await call("a");
 
-    expect(answers.every((answer) => answer.result !== undefined)).toBe(true);
+    expect(answer.result).toBeDefined();
     expect(decisions).toHaveBeenCalledTimes(1);
     expect(lineages).toHaveBeenCalledTimes(1);
   });
@@ -100,14 +98,14 @@ describe("given one request was allowed", () => {
   describe("when the permission is removed before the next request", () => {
     /** @scenario "Two requests never share a decision" */
     it("refuses the next request", async () => {
-      const { batch, decisions, revoke } = served();
-      const [allowed] = await batch(["a"]);
-      expect(allowed?.result).toBeDefined();
+      const { call, decisions, revoke } = served();
+      const allowed = await call("a");
+      expect(allowed.result).toBeDefined();
 
       revoke();
-      const [refused] = await batch(["a"]);
+      const refused = await call("a");
 
-      expect(refused?.error).toBeDefined();
+      expect(refused.error).toBeDefined();
       expect(decisions).toHaveBeenCalledTimes(2);
     });
   });

@@ -1,5 +1,5 @@
 /**
- * The session version on every tRPC answer (dev/docs/adr/164-browser-query-cache-tiers.md).
+ * The session version on every tRPC answer (dev/docs/adr/170-browser-query-cache-tiers.md).
  * Spec: specs/ui/browser-query-caching.feature.
  */
 
@@ -56,6 +56,8 @@ const OWN = query("profile.own");
 describe("given a tRPC surface reading session versions from authz", () => {
   let names: Map<string, string>;
   let app: ReturnType<typeof composeApiApplication>;
+  let trpc: TrpcHost;
+  let reads: number;
 
   beforeEach(() => {
     names = new Map([
@@ -63,10 +65,14 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_bo", "Bo"],
     ]);
     const authz = createApiFixture<Authorize & TrpcSessionVersions>({
-      getSessionVersion: async () => 7,
+      getSessionVersion: async () => {
+        reads += 1;
+        return 7;
+      },
       checkScopeLineage: async () => ({ kind: "consistent" }),
     });
-    const trpc = TrpcHost.create({
+    reads = 0;
+    trpc = TrpcHost.create({
       sessions: SessionReader.create({
         verify: async (request) => {
           const userId = request.headers.get("x-test-user");
@@ -112,6 +118,23 @@ describe("given a tRPC surface reading session versions from authz", () => {
       const response = await app.request(OWN);
 
       expect(response.headers.get("x-lw-session-version")).toBeNull();
+    });
+  });
+
+  describe("when one request asks for the version more than once", () => {
+    it("reads the store once for that request, and again for the next", async () => {
+      const request = new Request("http://localhost/api/trpc/profile.own", {
+        headers: { "x-test-user": "user_ada" },
+      });
+      const context = trpc.context({ request });
+      const stamp = () => trpc.sessionVersionHeaders({ context: () => context });
+
+      await stamp();
+      const second = await stamp();
+      await ask(OWN, "user_ada");
+
+      expect(second["x-lw-session-version"]).toBe("7");
+      expect(reads).toBe(2);
     });
   });
 });

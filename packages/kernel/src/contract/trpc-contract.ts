@@ -31,8 +31,10 @@ export type TrpcContractMember<
   readonly cache?: TrpcCachePolicy;
   /** Committed events that make this read stale; the framework hints on each. */
   readonly invalidatedBy?: readonly TrpcReadInvalidation[];
-  /** Projections this read is served from; the host answers `unchanged` by their cursors. */
+  /** Projections this read is served from; their cursors decide freshness and key the cache. */
   readonly fromProjection?: readonly TrpcProjectionSource[];
+  /** Bumped by hand when a read's meaning changes but not its shape; part of its schema hash. */
+  readonly revision?: number;
 }>;
 
 /**
@@ -52,6 +54,7 @@ export type TrpcReadOptions = Readonly<{
   cache?: TrpcCachePolicy;
   invalidatedBy?: readonly TrpcReadInvalidation[];
   fromProjection?: readonly TrpcProjectionSource[];
+  revision?: number;
 }>;
 
 /** The procedures of one namespace, keyed by the wire name. */
@@ -90,7 +93,8 @@ export interface TrpcContractBuilder<
 > {
   /**
    * A read; `cache` declares whether the browser mirrors it, `invalidatedBy` its stale events,
-   * `fromProjection` the projections whose cursors answer it (never beside `invalidatedBy`).
+   * `fromProjection` the projections whose cursors answer it (never beside `invalidatedBy`),
+   * `revision` a hand-bumped number folded into its schema hash.
    */
   query<Name extends string>(
     name: Name,
@@ -117,22 +121,18 @@ export interface TrpcContractInputBuilder<
   /** The request parser. Its OUTPUT is what a handler is handed. */
   withInput<Input extends z.ZodType>(
     schema: Input,
-  ): TrpcContractOutputBuilder<Namespace, Members, Name, Kind, Input>;
+  ): Kind extends "query"
+    ? TrpcContractRequiredOutputBuilder<Namespace, Members, Name, Kind, Input>
+    : TrpcContractOutputBuilder<Namespace, Members, Name, Kind, Input>;
 }
 
-/**
- * A declared member. `withOutput` states the answer; omitting it declares a
- * procedure that answers nothing, and a handler returning data then refuses.
- */
-export interface TrpcContractOutputBuilder<
+/** A declared member owing its answer: a query without `withOutput` does not build. */
+export interface TrpcContractRequiredOutputBuilder<
   Namespace extends string,
   Members extends TrpcContractMembers,
   Name extends string,
   Kind extends TrpcContractKind,
   Input extends z.ZodType,
-> extends TrpcContractBuilder<
-  Namespace,
-  WithMember<Members, Name, TrpcContractMember<Kind, Input, undefined>>
 > {
   withOutput<Output extends z.ZodType>(
     schema: Output,
@@ -141,6 +141,24 @@ export interface TrpcContractOutputBuilder<
     WithMember<Members, Name, TrpcContractMember<Kind, Input, Output>>
   >;
 }
+
+/**
+ * A declared write or stream. `withOutput` states the answer; omitting it declares a
+ * procedure that answers nothing, and a handler returning data then refuses.
+ */
+export interface TrpcContractOutputBuilder<
+  Namespace extends string,
+  Members extends TrpcContractMembers,
+  Name extends string,
+  Kind extends TrpcContractKind,
+  Input extends z.ZodType,
+>
+  extends
+    TrpcContractRequiredOutputBuilder<Namespace, Members, Name, Kind, Input>,
+    TrpcContractBuilder<
+      Namespace,
+      WithMember<Members, Name, TrpcContractMember<Kind, Input, undefined>>
+    > {}
 
 type MutableMembers = Record<string, TrpcContractMember>;
 
@@ -159,6 +177,7 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
         ...(read.cache ? { cache: read.cache } : {}),
         ...(read.invalidatedBy ? { invalidatedBy: read.invalidatedBy } : {}),
         ...(read.fromProjection ? { fromProjection: read.fromProjection } : {}),
+        ...(read.revision === void 0 ? {} : { revision: read.revision }),
       };
       const declared = { ...members, [name]: { kind, input, output: undefined, ...cached } };
 
@@ -174,13 +193,24 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
     query: (name: string, options?: TrpcReadOptions) => member(name, "query", options),
     mutation: (name) => member(name, "mutation"),
     subscription: (name) => member(name, "subscription"),
-    build: () => ({ namespace, members: Object.freeze({ ...members }) as Members }),
+    build: () => {
+      assertQueriesAnswer(namespace, members);
+      return { namespace, members: Object.freeze({ ...members }) as Members };
+    },
   } as TrpcContractBuilder<Namespace, Members>;
 }
 
 function assertUndeclared(namespace: string, name: string, members: MutableMembers): void {
   if (name in members) {
     throw new Error(`tRPC contract "${namespace}" declares procedure "${name}" twice`);
+  }
+}
+
+function assertQueriesAnswer(namespace: string, members: MutableMembers): void {
+  for (const [name, member] of Object.entries(members)) {
+    if (member.kind === "query" && member.output === undefined) {
+      throw new Error(`tRPC contract "${namespace}" declares query "${name}" without withOutput`);
+    }
   }
 }
 

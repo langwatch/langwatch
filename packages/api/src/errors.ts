@@ -98,6 +98,14 @@ export class EndpointWithdrawnError extends HandledError {
   }
 }
 
+/** The tRPC door answers one call per request; the browser sends no batch. */
+export class BatchingNotSupportedError extends HandledError {
+  constructor() {
+    super("batching_not_supported", "Send one tRPC call per request", { httpStatus: 400 });
+    this.name = "BatchingNotSupportedError";
+  }
+}
+
 /**
  * The body passed the cap the route declared. The caller can act on it — send
  * less — and the cap itself is documented on the operation, so nothing about

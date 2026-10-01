@@ -13,7 +13,13 @@ import type {
   FeatureTrpcMountOptions,
   MountableTransport,
 } from "@langwatch/kernel";
-import type { TrpcContract, TrpcContractKind } from "@langwatch/kernel/contract";
+import {
+  SCHEMA_HASH_HEADER,
+  schemaHashOf,
+  type TrpcContract,
+  type TrpcContractKind,
+  type TrpcContractMember,
+} from "@langwatch/kernel/contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
@@ -128,7 +134,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       | undefined;
     /** What the process knows about a caller on every namespace at once. */
     facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
-    /** The caller's session version (ADR-164). Absent, answers carry no version and no tag. */
+    /** The caller's session version (ADR-170). Absent, answers carry no version and no tag. */
     sessionVersions?: TrpcSessionVersions | undefined;
     /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
     entitlements?: Entitlements | undefined;
@@ -143,9 +149,13 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
   readonly #namespaces: Record<string, TrpcNamespace> = {};
   /** Each mounted procedure's declared kind, by its dotted path. */
   readonly #procedureKinds = new Map<string, TrpcContractKind>();
+  /** Each mounted query's declaration, by its dotted path; its schema hash is read from it. */
+  readonly #queries = new Map<string, TrpcContractMember>();
   readonly #options: Parameters<typeof TrpcHost.create>[0];
   /** One request's decisions, by the request itself: never shared with the next one. */
   readonly #decisions = new WeakMap<TrpcRequestLike, Authorize>();
+  /** One request's session version, by its context: read once however often it is asked. */
+  readonly #sessionVersionReads = new WeakMap<TrpcRequestContext, Promise<number>>();
   #composed: AnyTRPCRouter | undefined;
 
   private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
@@ -217,15 +227,15 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     this.#namespaces[namespace] = mounted;
     for (const [name, member] of Object.entries(trpcDeclaration.contract.members)) {
       this.#procedureKinds.set(`${namespace}.${name}`, member.kind);
+      if (member.kind === "query") this.#queries.set(`${namespace}.${name}`, member);
     }
 
     return mounted;
   }
 
   /**
-   * The root over every namespace, composed on first read. Composing then
-   * rather than at each mount is what makes a batched call spanning two
-   * namespaces work: every namespace has mounted by the time anything asks.
+   * The root over every namespace, composed on first read: every namespace
+   * has mounted by the time anything asks.
    */
   get router(): AnyTRPCRouter {
     this.#composed ??= this.#runtime.router(this.#namespaces) as AnyTRPCRouter;
@@ -242,17 +252,30 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     return this.#procedureKinds.get(path);
   }
 
+  /** The schema hash header of the query at a dotted path; none for anything else. */
+  schemaHashHeaders(input: { path: string }): Readonly<Record<string, string>> {
+    const query = this.#queries.get(input.path);
+
+    return query ? { [SCHEMA_HASH_HEADER]: schemaHashOf(query) } : {};
+  }
+
   /** The caller's session version header; none for an anonymous caller or an unreadable store. */
   async sessionVersionHeaders(input: {
     context: () => Promise<TrpcRequestContext>;
   }): Promise<Readonly<Record<string, string>>> {
     const versions = this.#options.sessionVersions;
     if (!versions) return {};
-    const userId = await this.#userOf(input.context);
-    if (!userId) return {};
+    // A context that fails is the procedure's failure to answer, never the stamp's.
+    const context = await input.context().catch(() => void 0);
+    const userId = context?.tryActor()?.id;
+    if (!context || !userId) return {};
     try {
-      const version = await versions.getSessionVersion({ userId });
-      return { [SESSION_VERSION_HEADER]: String(version) };
+      let read = this.#sessionVersionReads.get(context);
+      if (!read) {
+        read = versions.getSessionVersion({ userId });
+        this.#sessionVersionReads.set(context, read);
+      }
+      return { [SESSION_VERSION_HEADER]: String(await read) };
     } catch (error) {
       this.#logger.warn(
         { error },
@@ -260,12 +283,6 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       );
       return {};
     }
-  }
-
-  /** A context that fails is the procedure's failure to answer, never the stamp's. */
-  async #userOf(context: () => Promise<TrpcRequestContext>): Promise<string | undefined> {
-    const resolved = await context().catch(() => void 0);
-    return resolved?.tryActor()?.id;
   }
 
   /** One request, resolved into the context every procedure reads. */

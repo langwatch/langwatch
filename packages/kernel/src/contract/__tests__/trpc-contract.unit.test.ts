@@ -61,9 +61,11 @@ describe("defineTrpcContract", () => {
       expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
       expect(valueImports(sourceOf("ui-tokens.ts"))).toEqual([]);
       expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("schema-hash.ts"))).toEqual(["zod"]);
 
       expect(valueImports(sourceOf("index.ts"))).toEqual([
         "./trpc-contract.ts",
+        "./schema-hash.ts",
         "./rest-middleware.ts",
         "./ui-tokens.ts",
         "./release-flags.ts",
@@ -77,12 +79,34 @@ describe("defineTrpcContract", () => {
         defineTrpcContract("annotation")
           .query("getById")
           .withInput(z.object({ id: z.string() }))
+          .withOutput(z.unknown())
 
           .mutation("getById" as never)
           .withInput(z.object({ id: z.string() }));
 
       expect(twice).toThrow(/declares procedure "getById" twice/);
     });
+  });
+});
+
+describe("given a query declared without an output", () => {
+  /** @scenario "A query declared without an output is refused at build" */
+  it("refuses to build, naming the query", () => {
+    const declared = defineTrpcContract("annotation").query("getById").withInput(z.object({}));
+    // @ts-expect-error a query owes its output, so the builder offers no build() before withOutput.
+    const build = () => declared.build();
+
+    expect(build).toThrow(/declares query "getById" without withOutput/);
+  });
+
+  /** @scenario "A query declared without an output is refused at build" */
+  it("still builds a write declared without one", () => {
+    const contract = defineTrpcContract("annotation")
+      .mutation("remove")
+      .withInput(z.object({ id: z.string() }))
+      .build();
+
+    expect(contract.members.remove.output).toBeUndefined();
   });
 });
 
@@ -95,6 +119,7 @@ describe("defineTrpcContract cache policy", () => {
 
       .query("getMemberById")
       .withInput(z.object({ id: z.string() }))
+      .withOutput(z.string())
       .build();
 
     it("carries the declared policy on the member", () => {
