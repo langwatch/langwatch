@@ -20,7 +20,7 @@ export type OfflineCachePaths = {
 	tiktokenCache: string;
 };
 
-export function offlineCachePaths(
+function offlineCachePaths(
 	paths: Pick<LangwatchPaths, "root">,
 ): OfflineCachePaths {
 	return {
@@ -72,7 +72,7 @@ export function langevalsOfflineEnv({
  * The encoding files named in tiktoken's registry that `dir` does not hold
  * yet, by the basename the app's tokenizer reads them under.
  */
-export function missingTiktokenEncodings({
+function missingTiktokenEncodings({
 	dir,
 	registryPath,
 }: {
