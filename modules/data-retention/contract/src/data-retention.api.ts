@@ -18,8 +18,8 @@ import type {
 
 /**
  * The signed-in person a governed retention operation is decided for. Only the
- * id travels: the address the platform-operator allow-list is written in is
- * resolved server-side from it, never taken from the caller.
+ * id travels: the profile is resolved server-side from it, never taken from the
+ * caller.
  */
 export type RetentionCallerInput = { userId: string };
 
