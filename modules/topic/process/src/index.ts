@@ -5,15 +5,9 @@ export type {
 } from "./eventing/topic-clustering-run-history.projection.ts";
 export type { TopicClusteringRunStatusData } from "./eventing/topic-clustering-run-status.projection.ts";
 export type { ProjectedTopic, TopicModelData } from "./eventing/topic-model.projection.ts";
-export { TopicModule } from "./app/topic.app.ts";
 export { topicProcessModule, createTopicClusteringMetrics } from "./topic.module.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
-export {
-  OtelTopicClusteringMetricsService,
-  TOPIC_CLUSTERING_PAGE_DURATION_METRIC_NAME,
-  TOPIC_CLUSTERING_PAGE_TOTAL_METRIC_NAME,
-} from "./services/topic-clustering-metrics.service.ts";
 export {
   classifyClusteringError,
   TOPIC_CLUSTERING_MAX_ATTEMPTS,
@@ -53,5 +47,4 @@ export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.inte
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";
 export type { TopicClusteringProcessState } from "./eventing/topic-clustering.process.ts";
-export { TOPIC_CLUSTERING_PROCESS_NAME } from "./rules/topic-clustering-process.rules.ts";
 export { topicTrpcTransport } from "./transport/topic.trpc.ts";

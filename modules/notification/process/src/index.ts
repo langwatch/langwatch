@@ -20,11 +20,3 @@ export {
   type MailerConfiguration,
 } from "./channels/email-delivery.channel.ts";
 export type { SesAwsClientConfiguration } from "./channels/ses/ses.email-gateway.channel.ts";
-
-/*
- * Private runtime surface, kept until importers call the factories above
- * (`private-runtime-export` baseline, expires 2026-10-01). The one non-obvious
- * mapping: EmailProviderService below is what `resolveDefaultFrom` wraps.
- */
-export { EmailDeliveryService } from "./services/email-delivery.service.ts";
-export { EmailProviderService } from "./services/email-provider.service.ts";

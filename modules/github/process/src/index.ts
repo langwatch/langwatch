@@ -1,4 +1,3 @@
-export { PostgresGithubRepositories } from "./repositories/prisma/prisma.github.repositories.ts";
 export type { GithubRepositories } from "./repositories/github.repositories.ts";
 export type { PrismaGithubInstallationsDatabase } from "./repositories/prisma/prisma.github-installations.repository.ts";
 export type { PrismaGithubPullRequestsDatabase } from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
@@ -13,7 +12,6 @@ export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
   GITHUB_BRANCH_RECHECK_PROCESS_NAME,
 } from "./eventing/github-branch-recheck.process.ts";
-export { GithubModule } from "./app/github.app.ts";
 export {
   githubProcessModule,
   composeGithubApi,
