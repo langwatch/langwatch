@@ -7,6 +7,8 @@ import {
 } from "@langwatch/authz-contract";
 import { vi } from "vitest";
 
+type AttachBindingsInput = Parameters<AuthzGrantsService["attachBindings"]>[0];
+
 export class GrantsFake extends AuthzGrantsService {
   readonly attach = vi.fn();
   readonly update = vi.fn();
@@ -27,10 +29,12 @@ export class GrantsFake extends AuthzGrantsService {
     },
     needsHumanDecision: { ownedApiKeys: [], personalTeams: [] },
   }));
-  readonly attachBindings = vi.fn(async (): Promise<AuthzAttachBindingsOutput> => ({
-    attached: [],
-    duplicates: [],
-  }));
+  readonly attachBindings = vi.fn(
+    async (_input: AttachBindingsInput): Promise<AuthzAttachBindingsOutput> => ({
+      attached: [],
+      duplicates: [],
+    }),
+  );
   readonly attachResourceGrant = vi.fn();
   readonly revokeResourceGrants = vi.fn();
   readonly changeBindingRole = vi.fn();
