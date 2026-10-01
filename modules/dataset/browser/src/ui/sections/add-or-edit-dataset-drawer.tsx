@@ -247,8 +247,8 @@ export function AddOrEditDatasetDrawer({
               invalid={!!problems.name || (slugInfo?.hasConflict ?? false)}
             >
               <Input
+                name="name"
                 value={name}
-                aria-label="Dataset name"
                 data-testid="dataset-name-input"
                 onChange={(event) => setName(event.target.value)}
               />
@@ -272,6 +272,7 @@ export function AddOrEditDatasetDrawer({
                 {columnTypes.map((column, index) => (
                   <HStack key={index} width="full" gap={2}>
                     <Input
+                      name={`columnTypes.${index}.name`}
                       value={column.name}
                       placeholder="Column name"
                       aria-label={`Column ${index + 1} name`}
@@ -280,6 +281,7 @@ export function AddOrEditDatasetDrawer({
                     />
                     <NativeSelect.Root>
                       <NativeSelect.Field
+                        name={`columnTypes.${index}.type`}
                         value={column.type}
                         aria-label={`Column ${index + 1} type`}
                         onChange={(event) =>
