@@ -198,7 +198,6 @@ export class DataRetentionApp implements DataRetentionApiContract {
         entitlement: dependencies.entitlement,
         isSaas: config.isSaas,
       }),
-      administrators: dependencies.users,
     });
 
     return new DataRetentionApp({
@@ -341,7 +340,7 @@ export class DataRetentionApp implements DataRetentionApiContract {
       retentionDays: input.retentionDays,
     });
     if (input.retentionDays === INDEFINITE_RETENTION_DAYS) {
-      this.#policy.assertCanDisableRetention({ actor });
+      await this.#policy.assertCanDisableRetention({ actor });
     }
 
     // `ScopeTargetNotFoundError` is a handled 404: the runtime maps its status
@@ -395,8 +394,8 @@ export class DataRetentionApp implements DataRetentionApiContract {
   }
 
   /**
-   * The address the platform-operator allow-list is written in, resolved from
-   * the caller's id rather than read off the request.
+   * The caller's profile, resolved from the id rather than read off the
+   * request.
    */
   async #actor(userId: string): Promise<RetentionActor> {
     const user = await this.#users.findById({ id: userId });

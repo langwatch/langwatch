@@ -77,16 +77,19 @@ import { RedisSuiteRunProcessingRepository } from "../repositories/redis/redis.s
 import type { SuiteRepositories } from "../repositories/suite.repositories.ts";
 import { suitePlatformUrl } from "../rules/suite-platform-url.rules.ts";
 import { AgentOwnerNamesService } from "../services/agent-owner-names.service.ts";
-import { ConnectedTargetService } from "../services/connected-target.service.ts";
+import {
+  ConnectedTargetService,
+  type ConnectedPresenceReader,
+} from "../services/connected-target.service.ts";
 import { RunPlanReadService } from "../services/run-plan-read.service.ts";
+import { SuiteExecutionService } from "../services/suite-execution.service.ts";
 import { SuitePlatformLinkService } from "../services/suite-platform-link.service.ts";
 import { SuiteRunItemCommandsService } from "../services/suite-run-item-commands.service.ts";
-import { SuiteRunModelsService } from "../services/suite-run-models.service.ts";
-import { SuiteService } from "../services/suite.service.ts";
 import {
-  buildSuiteInfrastructure,
-  type SuiteAppInfrastructure,
-} from "./suite-composition.build.ts";
+  SuiteRunModelsService,
+  type SuiteRunModelsResolver,
+} from "../services/suite-run-models.service.ts";
+import { SuiteService } from "../services/suite.service.ts";
 
 /**
  * What a lookup by id found. A test suite IS a suite of kind "test_suite", but the two
@@ -130,6 +133,13 @@ type SuiteSetup = FeatureSetup<
   SuiteRepositories
 >;
 
+/** What `SuiteApp` builds for itself, over its own reads and its peers. */
+interface SuiteAppInfrastructure {
+  execution: SuiteExecution;
+  connectedPresence: ConnectedPresenceReader;
+  publicBaseUrl: string | undefined;
+}
+
 export class SuiteApp implements SuiteApi {
   static readonly contract = SuiteApi;
   static readonly dependencies = {
@@ -151,7 +161,7 @@ export class SuiteApp implements SuiteApi {
   static create(setup: SuiteSetup): SuiteApp {
     const { members, dependencies, repositories } = setup;
     const runItems = SuiteRunItemCommandsService.create();
-    const infrastructure = buildSuiteInfrastructure({
+    const infrastructure = SuiteApp.infrastructureOver({
       agents: dependencies.agents,
       scenarios: dependencies.scenarios,
       commands: runItems,
@@ -241,6 +251,28 @@ export class SuiteApp implements SuiteApi {
     });
   }
 
+  /**
+   * A run starts on `suite_run_processing` and each of its scenario runs is
+   * queued by the scenario owner. The agent directory answers presence directly.
+   */
+  private static infrastructureOver(input: {
+    agents: Pick<AgentApiType, "getPresence">;
+    scenarios: Pick<ScenarioApiType, "resolveRunParametersForScenarios" | "queueSimulationRun">;
+    commands: SuiteRunCommands;
+    resolveRunModels?: SuiteRunModelsResolver;
+    publicBaseUrl: string | undefined;
+  }): SuiteAppInfrastructure {
+    return {
+      execution: SuiteExecutionService.create({
+        commands: input.commands,
+        scenarios: input.scenarios,
+        ...(input.resolveRunModels ? { resolveRunModels: input.resolveRunModels } : {}),
+      }),
+      connectedPresence: (presenceInput) => input.agents.getPresence(presenceInput),
+      publicBaseUrl: input.publicBaseUrl,
+    };
+  }
+
   // Test-only construction with overridable collaborators and in-memory run projection.
   static createForTesting(setup: {
     repositories: SuiteRepositories;
@@ -251,7 +283,7 @@ export class SuiteApp implements SuiteApi {
     now?: () => Instant;
   }): SuiteApp {
     const runItems = SuiteRunItemCommandsService.create();
-    const defaults = buildSuiteInfrastructure({
+    const defaults = SuiteApp.infrastructureOver({
       agents: setup.dependencies.agents,
       scenarios: setup.dependencies.scenarios,
       commands: runItems,

@@ -1,8 +1,8 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringClaimRepository } from "../repositories/topic-clustering-claim.repository.ts";
+import type { EventingTopicClusteringCommandsService } from "./topic-clustering-commands.service.ts";
 
 const logger = createLogger("langwatch:topic-clustering:bootstrap-gate");
 
@@ -15,12 +15,12 @@ export const BOOTSTRAP_CLAIM_TTL_SECONDS = 60 * 60;
 export class TopicClusteringBootstrapService {
   private constructor(
     private readonly claims: TopicClusteringClaimRepository,
-    private readonly commands: Pick<TopicClusteringCommands, "requestClustering">,
+    private readonly commands: Pick<EventingTopicClusteringCommandsService, "requestClustering">,
   ) {}
 
   static create(options: {
     claims: TopicClusteringClaimRepository;
-    commands: Pick<TopicClusteringCommands, "requestClustering">;
+    commands: Pick<EventingTopicClusteringCommandsService, "requestClustering">;
   }): TopicClusteringBootstrapService {
     return new TopicClusteringBootstrapService(options.claims, options.commands);
   }

@@ -5,6 +5,7 @@
 import { generateKeyPairSync } from "node:crypto";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import type { Instant } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -13,7 +14,6 @@ import { unansweredRedisRepositories } from "../../__tests__/support/github-unan
 import { GithubApp } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
-import type { GithubProjectActivity } from "../github.members.ts";
 
 const { privateKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
@@ -79,7 +79,10 @@ function database() {
   };
 }
 
-class RecordingProjectActivity implements GithubProjectActivity {
+class RecordingProjectActivity implements Pick<
+  ProjectApi,
+  "getOrganizationId" | "touchCodingAgentPullRequestSeen"
+> {
   readonly resolved: string[] = [];
   readonly stamped: { projectId: string; at: Instant }[] = [];
 
@@ -106,7 +109,10 @@ function githubApi() {
   return paths;
 }
 
-function demand(client: PrismaClient, project: GithubProjectActivity) {
+function demand(
+  client: PrismaClient,
+  project: Pick<ProjectApi, "getOrganizationId" | "touchCodingAgentPullRequestSeen">,
+) {
   return GithubApp.composeBranchDemand({
     repositories: {
       ...unansweredRedisRepositories(),

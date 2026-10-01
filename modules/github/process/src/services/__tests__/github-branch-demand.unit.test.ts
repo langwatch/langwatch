@@ -5,9 +5,9 @@ import { Temporal } from "@langwatch/time";
  */
 import { describe, expect, it } from "vitest";
 
-import type { GithubHost } from "../../app/github.members.ts";
 import { GithubBranchDemandService } from "../github-branch-demand.service.ts";
 import type { BranchMappingTarget } from "../github-branch-mapping.service.ts";
+import type { GithubHost } from "../github-host.service.ts";
 import { TestProjectService } from "./fixtures/github-services.fixture.ts";
 
 const REQUEST = {

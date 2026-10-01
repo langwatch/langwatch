@@ -1,16 +1,9 @@
-import {
-  langWatchQLKeyReach,
-  type AnalyticsEvaluationReadMetrics,
-  type AnalyticsService,
-  type AnalyticsTripwire,
-} from "@langwatch/analytics-contract";
+import { langWatchQLKeyReach } from "@langwatch/analytics-contract";
 import { bindRestMiddleware, keyCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 
-import { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 import { AnalyticsApp } from "./app/analytics.app.ts";
 import { lwqlReconvergenceEventing } from "./eventing/analytics-lwql-reconvergence.pipeline.ts";
-import type { EvaluationAnalyticsClickHouseClient } from "./repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
@@ -37,28 +30,6 @@ export const analyticsServer = defineServerModule("analytics")
   ])
   // Worker-hosted: the access-model reconvergence watch (ADR-159) and the key-map row (§9).
   .withEventing(lwqlReconvergenceEventing);
-
-/**
- * The tenant-bound session analytics' ClickHouse reads run through. It opens
- * the seams below: thin factories over the private services and rules, so a
- * composition root never names one directly.
- */
-export type AnalyticsClickHouseClientResolver = (
-  tenantId: string,
-) => Promise<EvaluationAnalyticsClickHouseClient | null>;
-
-export type AnalyticsServiceCompositionInput = {
-  resolveClient: AnalyticsClickHouseClientResolver;
-  clickhouseEnabled: boolean;
-  tripwire?: AnalyticsTripwire;
-  defaultRetentionDays?: () => number;
-  evaluationReadMetrics?: AnalyticsEvaluationReadMetrics;
-};
-
-/** The one Analytics read API a process serves, over its own ClickHouse session. */
-export function createAnalyticsService(input: AnalyticsServiceCompositionInput): AnalyticsService {
-  return AnalyticsAdapter.create(input);
-}
 
 /** Where the window immediately before a requested period begins. */
 export function createAnalyticsComparisonWindow(): AnalyticsComparisonWindowService {

@@ -37,21 +37,18 @@ import { parsePullRequestEvent } from "../rules/github-pull-request-event.rules.
 import { GithubAppTokenService } from "../services/github-app-token.service.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
-import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";
+import {
+  GithubBranchMaintenanceService,
+  type GithubBranchMaintenance,
+} from "../services/github-branch-maintenance.service.ts";
 import { GithubBranchMappingService } from "../services/github-branch-mapping.service.ts";
-import { GithubHostService } from "../services/github-host.service.ts";
+import { GithubHostService, type GithubHost } from "../services/github-host.service.ts";
 import { GithubInstallStateService } from "../services/github-install-state.service.ts";
 import { GithubInstallationAccessService } from "../services/github-installation-access.service.ts";
 import { GithubInstallationsService } from "../services/github-installations.service.ts";
 import { GithubPullRequestMappingService } from "../services/github-pull-request-mapping.service.ts";
 import { GithubPullRequestStatusService } from "../services/github-pull-request-status.service.ts";
 import { GithubFeatureService } from "../services/github.service.ts";
-import {
-  type GithubProjectActivity,
-  type GithubHost,
-  type GithubBranchDemand,
-  type GithubBranchMaintenance,
-} from "./github.members.ts";
 
 export type GithubInstallationToken = {
   token: string;
@@ -146,7 +143,7 @@ type GithubSetup = FeatureSetup<
 export type GithubComposition = Readonly<{
   repositories: GithubRepositories;
   organization: OrganizationApiContract;
-  project: GithubProjectActivity;
+  project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
   config: {
     appId: string;
     privateKey: string;
@@ -169,7 +166,7 @@ export type GithubBranchDemandComposition = Readonly<{
   repositories: GithubRepositories;
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
-  project: GithubProjectActivity;
+  project: Pick<ProjectApiContract, "getOrganizationId" | "touchCodingAgentPullRequestSeen">;
 }>;
 
 /**
@@ -177,7 +174,7 @@ export type GithubBranchDemandComposition = Readonly<{
  * `GithubService` answers the host question from the same `GithubHostApi`
  * this composition resolved and routes into the same demand service.
  */
-class ComposedGithubBranchDemand implements GithubBranchDemand {
+class ComposedGithubBranchDemand {
   static create(parts: {
     demand: GithubBranchDemandService;
     host: GithubHost;
@@ -198,6 +195,11 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
     return this.demand.request(input);
   }
 }
+
+export type GithubBranchDemand = Pick<
+  ComposedGithubBranchDemand,
+  "canMapRepositoryHost" | "requestBranchMapping"
+>;
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {

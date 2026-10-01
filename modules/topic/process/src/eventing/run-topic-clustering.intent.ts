@@ -1,16 +1,16 @@
-import type { TopicClusteringCommands } from "../app/topic.members.ts";
+import type { EventingTopicClusteringCommandsService } from "../services/topic-clustering-commands.service.ts";
 
 /** A manual trigger enters Topic through its durable Eventing command. */
 export class RequestTopicClusteringTask {
   static create(options: {
-    commands: TopicClusteringCommands;
+    commands: Pick<EventingTopicClusteringCommandsService, "requestClustering">;
     now?: () => number;
   }): RequestTopicClusteringTask {
     return new RequestTopicClusteringTask(options.commands, options.now ?? Date.now);
   }
 
   private constructor(
-    private readonly commands: TopicClusteringCommands,
+    private readonly commands: Pick<EventingTopicClusteringCommandsService, "requestClustering">,
     private readonly now: () => number,
   ) {}
 

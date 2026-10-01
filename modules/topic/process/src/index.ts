@@ -49,7 +49,6 @@ export {
   LegacyImportTopicClusteringMigration,
   type TopicClusteringBackfillSummary,
 } from "./migrations/legacy-import.topic-clustering.migration.ts";
-export type { TopicClusteringCommands } from "./app/topic.members.ts";
 export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";

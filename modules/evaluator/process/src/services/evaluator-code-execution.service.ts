@@ -59,6 +59,19 @@ export class EvaluatorCodeExecutionService implements EvaluatorCodeExecution {
     return new EvaluatorCodeExecutionService(nlp);
   }
 
+  /** Refuses by name when no deployment supplies this module an NLP runtime. */
+  static withoutNlpRuntime(): EvaluatorCodeExecutionService {
+    return new EvaluatorCodeExecutionService({
+      dispatch() {
+        return Promise.reject(
+          new Error(
+            "This deployment did not supply the evaluator module an NLP runtime, so a code evaluator cannot run",
+          ),
+        );
+      },
+    });
+  }
+
   private constructor(private readonly nlp: EvaluatorNlpDispatcher) {}
 
   async execute(input: {

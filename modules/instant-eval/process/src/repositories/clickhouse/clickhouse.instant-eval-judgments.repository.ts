@@ -2,7 +2,6 @@ import { createLogger } from "@langwatch/observability";
 import { Temporal, toDate } from "@langwatch/time";
 import { z } from "zod";
 
-import type { InstantEvalClickHouseResolver } from "../../app/instant-eval.members.ts";
 import type {
   InstantEvalJudgment,
   InstantEvalJudgmentPage,
@@ -17,6 +16,7 @@ import {
   type JudgmentRow,
   toJudgment,
 } from "./clickhouse.instant-eval-judgments.mapper.ts";
+import type { InstantEvalClickHouseResolver } from "./clickhouse.instant-eval-session.store.ts";
 
 const TABLE_NAME = "instant_eval_judgments" as const;
 

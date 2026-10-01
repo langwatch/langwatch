@@ -92,7 +92,8 @@ export function scimTestApp(
     webhookSecret?: string | undefined;
     planType?: string;
     oversight?: ScimOversightService;
-    operators?: Parameters<typeof ScimApp.createWithService>[0]["operators"];
+    /** The users the platform-operator grant answers yes for. */
+    platformOperators?: readonly string[];
     activity?: ScimSyncActivityEntry[];
     /** What authz answers a token minter lacks of an organization admin's permissions. */
     minterLacks?: string[];
@@ -149,7 +150,17 @@ export function scimTestApp(
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),
     minting: ScimTokenMintService.create({ findPermissionsBeyondCaller }),
     ...(options.oversight ? { oversight: options.oversight } : {}),
-    ...(options.operators ? { operators: options.operators } : {}),
+    ...(options.platformOperators
+      ? {
+          platformOperators: {
+            can: async ({ principal, permission, scope }) =>
+              scope.type === "platform" &&
+              permission.startsWith("ops:") &&
+              principal.type === "user" &&
+              !!options.platformOperators?.includes(principal.id),
+          },
+        }
+      : {}),
   });
 
   return { app, scim, audited, findPermissionsBeyondCaller };

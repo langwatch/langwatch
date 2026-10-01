@@ -42,7 +42,7 @@ export function createSuiteTestRepositories(database?: MemorySuiteDatabase): Sui
 
 /**
  * `SuiteApp` now builds `execution` itself in production
- * (`suite-composition.build.ts`); this fixture uses `createForTesting`
+ * (`SuiteApp.create`); this fixture uses `createForTesting`
  * instead, which still takes an `execution` override to observe a scheduled run.
  */
 export function createSuiteTestApp(

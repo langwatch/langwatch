@@ -5,7 +5,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
-import type { ScimRemovalOperation, ScimSyncLifecycle } from "../app/scim.members.ts";
+import type { ScimRemovalOperation, ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 const logger = createLogger("langwatch:scim:deprovision");
 const SCIM_ACTOR = { type: "system", name: "scim" } as const;

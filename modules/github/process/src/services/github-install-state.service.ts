@@ -6,7 +6,6 @@ import {
 } from "@langwatch/github-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { type GithubInstallState } from "../app/github.members.ts";
 import type { GithubInstallNonceRepository } from "../repositories/github-install-nonce.repository.ts";
 
 const STATE_TTL_MS = 10 * 60 * 1000;
@@ -17,7 +16,12 @@ const STATE_MAX_FUTURE_SKEW_MS = 60 * 1000;
  * a ten-minute window, and the one-shot nonce beside it that a replayed Setup
  * URL cannot spend twice.
  */
-export class GithubInstallStateService implements GithubInstallState {
+export type GithubInstallState = Pick<
+  GithubInstallStateService,
+  "getTtlMs" | "registerNonce" | "consumeNonce" | "sign" | "parse"
+>;
+
+export class GithubInstallStateService {
   static create(options: {
     signingKey: string;
     nonces: GithubInstallNonceRepository;

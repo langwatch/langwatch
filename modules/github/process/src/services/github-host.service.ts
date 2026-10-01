@@ -1,12 +1,15 @@
-import { type GithubHost } from "../app/github.members.ts";
-
 const GITHUB_DOT_COM = "github.com";
 
 export type GithubHostConfig = {
   host?: string;
 };
 
-export class GithubHostService implements GithubHost {
+export type GithubHost = Pick<
+  GithubHostService,
+  "getHost" | "getApiBase" | "getWebBase" | "getAppInstallUrl" | "isMappable" | "normalize"
+>;
+
+export class GithubHostService {
   static create(config: GithubHostConfig = {}): GithubHostService {
     return new GithubHostService(config);
   }

@@ -10,11 +10,29 @@ import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/c
 import { addDays, differenceInCalendarDays, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import { AnalyticsAdapter } from "../../index.ts";
 import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
+import {
+  ClickHouseAnalyticsEvaluationRepository,
+  type EvaluationAnalyticsClickHouseClient,
+} from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
+import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
+
+const serviceOver = (options: {
+  resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+  clickhouseEnabled: boolean;
+}): AnalyticsService =>
+  AnalyticsService.create({
+    repository: ClickHouseAnalyticsRepository.create({ resolveClient: options.resolveClient }),
+    evaluationRepository: options.clickhouseEnabled
+      ? ClickHouseAnalyticsEvaluationRepository.create({
+          resolveClient: options.resolveClient,
+          defaultRetentionDays: () => 30,
+        })
+      : NullAnalyticsEvaluationRepository.create(),
+  });
 
 const input = (overrides: Partial<AnalyticsTimeseriesInput> = {}): AnalyticsTimeseriesInput => ({
   projectId: "project-1",
@@ -187,7 +205,7 @@ describe("AnalyticsService", () => {
 
   it("validates and decodes ClickHouse JSONEachRow results", async () => {
     const calls: Parameters<ClickHouseClient["query"]>[0][] = [];
-    const service = AnalyticsAdapter.create({
+    const service = serviceOver({
       clickhouseEnabled: true,
       resolveClient: async () =>
         clickHouseClientDouble({
@@ -280,7 +298,7 @@ describe("AnalyticsService", () => {
   /** @scenario "Top-document reads preserve their existing result shape" */
   it("preserves legacy feedback decoding and document ordering", async () => {
     const calls: Parameters<ClickHouseClient["query"]>[0][] = [];
-    const service = AnalyticsAdapter.create({
+    const service = serviceOver({
       clickhouseEnabled: true,
       resolveClient: async () =>
         clickHouseClientDouble({
@@ -365,7 +383,7 @@ describe("AnalyticsService", () => {
     const resolveClient = vi.fn(async () => {
       throw new Error("ClickHouse must not be resolved when disabled");
     });
-    const service = AnalyticsAdapter.create({
+    const service = serviceOver({
       resolveClient,
       clickhouseEnabled: false,
     });

@@ -15,5 +15,5 @@ export type {
   ScimSyncLifecycle,
   ScimRemovalOperation,
   ScimUserPushOperation,
-} from "./app/scim.members.ts";
+} from "./services/scim-sync-lifecycle.service.ts";
 export type { ScimUserProvisioning } from "./services/scim-provisioning.service.ts";

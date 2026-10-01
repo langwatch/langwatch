@@ -1,10 +1,6 @@
-export { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 export {
   analyticsServer,
-  type AnalyticsClickHouseClientResolver,
-  type AnalyticsServiceCompositionInput,
   createAnalyticsComparisonWindow,
-  createAnalyticsService,
   createLegacyFilterMatching,
   createPreconditionTraceData,
 } from "./analytics.server.ts";

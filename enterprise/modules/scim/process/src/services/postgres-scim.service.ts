@@ -5,9 +5,9 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { UserApi } from "@langwatch/user-contract";
 
-import type { ScimSyncLifecycle } from "../app/scim.members.ts";
 import type { ScimRepository } from "../repositories/scim.repository.ts";
 import type { ScimOrganizationAdministration } from "./scim-deprovision.service.ts";
+import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 import { ScimService } from "./scim.service.ts";
 
 /** Composition-only service factory: one build creates the process-owned SCIM service. */

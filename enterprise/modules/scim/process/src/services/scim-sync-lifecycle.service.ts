@@ -50,8 +50,6 @@ import {
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 
-import { type ScimSyncLifecycle } from "../app/scim.members.ts";
-
 /** The directory-sync guards and ledger this service drives, named by their shape. */
 export interface ScimSyncLifecycleGuards {
   issueScimToken(data: IssueScimTokenCommandData): Promise<ScimSyncFactInput[]>;
@@ -82,7 +80,17 @@ interface ScimSyncLifecycleAdapterDeps {
   now?: () => number;
 }
 
-export class ScimSyncLifecycleService implements ScimSyncLifecycle {
+export type ScimUserPushOperation = "create" | "update" | "deactivate";
+
+export type ScimRemovalOperation = "delete_user" | "deactivate_user";
+
+/** Durable directory-sync history, which `ScimApp` builds over its own guards and ledger. */
+export type ScimSyncLifecycle = Pick<
+  ScimSyncLifecycleService,
+  "tokenIssued" | "userPushed" | "groupMapped" | "applyFailed" | "applyRedriven" | "revoked"
+>;
+
+export class ScimSyncLifecycleService {
   private readonly guards: ScimSyncLifecycleGuards;
   private readonly ledger: ScimSyncLifecycleLedger;
   private readonly newCommandId: () => string;

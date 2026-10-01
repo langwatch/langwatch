@@ -7,10 +7,11 @@ export type {
 } from "./services/subsystem-probe.service.ts";
 export {
   SubsystemProbeRunService,
+  type SubsystemProbe,
   type SubsystemProbeCredential,
+  type SubsystemProbeResult,
   type SubsystemProbeRunner,
 } from "./services/subsystem-probe-run.service.ts";
-export { type SubsystemProbe, type SubsystemProbeResult } from "./app/platform-health.members.ts";
 export {
   platformHealthAuthorization,
   platformHealthRest,

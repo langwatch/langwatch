@@ -51,7 +51,6 @@ import { EvaluatorHistoryService } from "../services/evaluator-history.service.t
 import { EvaluatorLinkedRowsService } from "../services/evaluator-linked-rows.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
-import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts";
 
 /** The workflow and monitor rows an evaluator is entangled with, read through their owners. */
 export interface EvaluatorGraph {
@@ -155,7 +154,7 @@ export class EvaluatorApp implements EvaluatorApi {
           auditLog: dependencies.auditLog,
           users: dependencies.users,
         }),
-        codeExecution: EvaluatorCodeExecutionService.create(refusingEvaluatorNlpDispatcher()),
+        codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
         generateId: (kind: string) => generate(kind).toString(),
       }),
       modelProviders: dependencies.modelProviders,

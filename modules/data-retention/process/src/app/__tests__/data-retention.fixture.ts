@@ -181,8 +181,12 @@ export function createDataRetentionTestOrganizations(
 }
 
 /** Every permission answers `permitted`, so a gate test states one thing. */
-export function createDataRetentionTestAuthz(permitted = true): AuthzApi {
+export function createDataRetentionTestAuthz(permitted = true, platformOperator = false): AuthzApi {
   return createApiFixture<AuthzApi>({
+    can: vi.fn(
+      async ({ permission, scope }) =>
+        platformOperator && permission === "ops:manage" && scope.type === "platform",
+    ),
     hasPermission: vi.fn(async () => permitted),
     canBatchByIds: vi.fn(async (input: AuthzCanBatchByIdsInput) => ({
       teams: new Map(input.teams.map((team) => [team.teamId, permitted])),
@@ -193,7 +197,7 @@ export function createDataRetentionTestAuthz(permitted = true): AuthzApi {
 }
 
 export function createDataRetentionTestUsers(
-  input: Readonly<{ email?: string | null; platformAdministrator?: boolean }> = {},
+  input: Readonly<{ email?: string | null }> = {},
 ): UserApi {
   const profile: UserProfile = {
     id: "user-1",
@@ -210,7 +214,6 @@ export function createDataRetentionTestUsers(
 
   return createApiFixture<UserApi>({
     findById: vi.fn(async ({ id }: { id: string }) => ({ ...profile, id })),
-    isAdmin: vi.fn(() => input.platformAdministrator === true),
   });
 }
 

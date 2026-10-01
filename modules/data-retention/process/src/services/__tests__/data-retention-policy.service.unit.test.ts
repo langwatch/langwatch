@@ -10,12 +10,9 @@ import {
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "../../app/data-retention.app.ts";
-import type {
-  DataRetentionPlanResolver,
-  DataRetentionPlan,
-} from "../../app/data-retention.members.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
 import { RetentionPermissionsService } from "../retention-permissions.service.ts";
+import type { DataRetentionPlan, RetentionPlanService } from "../retention-plan.service.ts";
 
 const ACTOR = { userId: "user_alice", email: "alice@example.com" };
 
@@ -41,7 +38,7 @@ class StubDirectory implements DataRetentionDirectoryReader {
   }
 }
 
-class StubPlans implements DataRetentionPlanResolver {
+class StubPlans implements Pick<RetentionPlanService, "getPlan"> {
   constructor(private readonly plan: DataRetentionPlan) {}
   async getPlan(): Promise<DataRetentionPlan> {
     return this.plan;
@@ -59,10 +56,9 @@ function policy(options: {
       "organizationId" in options ? (options.organizationId ?? null) : "org_1",
     ),
     permissions: RetentionPermissionsService.create({
-      authz: createDataRetentionTestAuthz(options.allow ?? true),
+      authz: createDataRetentionTestAuthz(options.allow ?? true, options.admin ?? false),
     }),
     plans: new StubPlans(options.plan ?? { free: false, uncapped: false }),
-    administrators: { isAdmin: () => options.admin ?? false },
   });
 }
 
@@ -207,18 +203,18 @@ describe("given a value a plan may or may not persist", () => {
 describe("given a request to disable retention entirely", () => {
   describe("when the caller is not a platform administrator", () => {
     /** @scenario "A request to keep data forever is refused by name" */
-    it("refuses by name", () => {
-      expect(
-        refusalOf(() => policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR })),
-      ).toMatchObject({ code: "data_retention_disable_forbidden", httpStatus: 403 });
+    it("refuses by name", async () => {
+      await expect(
+        policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR }),
+      ).rejects.toMatchObject({ code: "data_retention_disable_forbidden" });
     });
   });
 
   describe("when the caller is one", () => {
-    it("allows it", () => {
-      expect(() =>
+    it("allows it", async () => {
+      await expect(
         policy({ admin: true }).assertCanDisableRetention({ actor: ACTOR }),
-      ).not.toThrow();
+      ).resolves.toBeUndefined();
     });
   });
 });

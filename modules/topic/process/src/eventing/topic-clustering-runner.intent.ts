@@ -18,8 +18,8 @@ import {
 } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 
-import type { TopicClusteringCommands } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
+import type { EventingTopicClusteringCommandsService } from "../services/topic-clustering-commands.service.ts";
 import {
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS,
   type TopicClusteringPageOutcome,
@@ -88,7 +88,7 @@ export interface TopicClusteringRunnerDeps {
   repository: TopicClusteringRepository;
   /** The legacy import, for the write-path topic-model seed guard. */
   migration: TopicClusteringWritePathSeed;
-  commands: TopicClusteringCommands;
+  commands: Pick<EventingTopicClusteringCommandsService, "recordTopics" | "requestClustering">;
   /** Payload-size histogram observation per langevals call kind. */
   observePayloadSize: (
     kind: (typeof PAYLOAD_KIND)[keyof typeof PAYLOAD_KIND],

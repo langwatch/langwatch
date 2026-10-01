@@ -14,6 +14,11 @@ type GithubBranchMaintenanceDeps = {
   now?: () => number;
 };
 
+export type GithubBranchMaintenance = Pick<
+  GithubBranchMaintenanceService,
+  "recheckDueBranches" | "pruneStaleBranchLinkage"
+>;
+
 export class GithubBranchMaintenanceService {
   static create(deps: GithubBranchMaintenanceDeps): GithubBranchMaintenanceService {
     return new GithubBranchMaintenanceService(deps);

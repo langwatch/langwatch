@@ -16,14 +16,10 @@ import {
   ScopeWriteForbiddenError,
 } from "@langwatch/data-retention-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
-import type { UserApi } from "@langwatch/user-contract";
 
 import type { DataRetentionDirectoryReader } from "../app/data-retention.app.ts";
-import type {
-  DataRetentionPlan,
-  DataRetentionPlanResolver,
-} from "../app/data-retention.members.ts";
 import type { RetentionPermissionsService } from "./retention-permissions.service.ts";
+import type { DataRetentionPlan, RetentionPlanService } from "./retention-plan.service.ts";
 
 /** The caller a gate is decided for, resolved once per request by the app. */
 export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
@@ -31,9 +27,7 @@ export type RetentionActor = Readonly<{ userId: string; email: string | null }>;
 export type DataRetentionPolicyServiceOptions = Readonly<{
   directory: DataRetentionDirectoryReader;
   permissions: RetentionPermissionsService;
-  plans: DataRetentionPlanResolver;
-  /** The platform-operator allow-list, which is an address list rather than a grant. */
-  administrators: Pick<UserApi, "isAdmin">;
+  plans: Pick<RetentionPlanService, "getPlan">;
 }>;
 
 /**
@@ -167,8 +161,8 @@ export class DataRetentionPolicyService {
    * platform-level capability, NOT a customer tier. The UI hides the option
    * from everyone else; this is the matching server-side enforcement.
    */
-  assertCanDisableRetention(input: { actor: RetentionActor }): void {
-    if (this.options.administrators.isAdmin({ email: input.actor.email })) {
+  async assertCanDisableRetention(input: { actor: RetentionActor }): Promise<void> {
+    if (await this.options.permissions.isPlatformOperator({ userId: input.actor.userId })) {
       return;
     }
 

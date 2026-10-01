@@ -8,8 +8,8 @@ import {
   type GithubComposition,
   type GithubBranchMaintenanceComposition,
   type GithubBranchDemandComposition,
+  type GithubBranchDemand,
 } from "./app/github.app.ts";
-import type { GithubBranchMaintenance, GithubBranchDemand } from "./app/github.members.ts";
 import {
   buildGithubMaintenancePipeline,
   githubMaintenanceEventing,
@@ -28,6 +28,7 @@ import {
 import { GithubInstallNonceRedisRepository } from "./repositories/redis/redis.github-install-nonce.repository.ts";
 import { GithubPullRequestStatusCacheRedisRepository } from "./repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { GithubTokenCacheRedisRepository } from "./repositories/redis/redis.github-token-cache.repository.ts";
+import type { GithubBranchMaintenance } from "./services/github-branch-maintenance.service.ts";
 import { githubInstallRest } from "./transport/github-install.rest.ts";
 import { githubTrpcTransport } from "./transport/github.trpc.ts";
 

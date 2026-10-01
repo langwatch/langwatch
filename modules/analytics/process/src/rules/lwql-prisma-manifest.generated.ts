@@ -1484,6 +1484,12 @@ export interface LwqlPrismaRows {
     readonly groupId: "String";
     readonly createdAt: "DateTime";
   };
+  readonly AuthzUserStanding: {
+    readonly userId: "String";
+    readonly deactivatedAt: "DateTime?";
+    readonly erasedAt: "DateTime?";
+    readonly standingChangedAt: "DateTime";
+  };
   readonly RoleBinding: {
     readonly id: "String";
     readonly organizationId: "String";

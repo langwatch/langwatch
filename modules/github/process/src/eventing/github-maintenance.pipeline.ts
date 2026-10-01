@@ -14,8 +14,8 @@ import {
 } from "@langwatch/eventing";
 
 import type { GithubApp } from "../app/github.app.ts";
-import type { GithubBranchMaintenance } from "../app/github.members.ts";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
+import type { GithubBranchMaintenance } from "../services/github-branch-maintenance.service.ts";
 import { runGithubBranchRecheck, runGithubRetentionPrune } from "./github-branch-recheck.intent.ts";
 import {
   GITHUB_BRANCH_RECHECK_INITIAL_STATE,

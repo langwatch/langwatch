@@ -5,10 +5,9 @@ export type { PrismaGithubPullRequestsDatabase } from "./repositories/prisma/pri
 export type {
   GithubBranchMaintenanceComposition,
   GithubBranchDemandComposition,
+  GithubBranchDemand,
 } from "./app/github.app.ts";
-export type { GithubBranchMaintenance } from "./app/github.members.ts";
-export type { GithubBranchDemand } from "./app/github.members.ts";
-export type { GithubProjectActivity } from "./app/github.members.ts";
+export type { GithubBranchMaintenance } from "./services/github-branch-maintenance.service.ts";
 export type { BranchMappingRequest } from "./services/github-branch-demand.service.ts";
 export {
   GITHUB_BRANCH_RECHECK_INTERVAL_MS,
