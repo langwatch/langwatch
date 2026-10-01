@@ -1,42 +1,33 @@
+import { modelProviderIcons as designSystemIcons } from "@langwatch/design-system/provider-icons";
 import type { modelProviders } from "@langwatch/model-provider-contract";
 // biome-ignore lint/style/useImportType: React needed at runtime for non-jsdom JSX
 import React from "react";
 
 import { IconGlyph } from "../../elements/icon-glyph.tsx";
 import { Anthropic } from "../../elements/icons/anthropic.tsx";
-import { AWS } from "../../elements/icons/aws.tsx";
 import { Azure } from "../../elements/icons/azure.tsx";
-import { Cerebras } from "../../elements/icons/cerebras.tsx";
 import { Codex } from "../../elements/icons/codex.tsx";
-import { Custom } from "../../elements/icons/custom.tsx";
 import { DeepSeek } from "../../elements/icons/deep-seek.tsx";
-import { ElevenLabs } from "../../elements/icons/eleven-labs.tsx";
-import { Gemini } from "../../elements/icons/gemini.tsx";
-import { GoogleCloud } from "../../elements/icons/google-cloud.tsx";
-import { Groq } from "../../elements/icons/groq.tsx";
-import { OpenAI } from "../../elements/icons/open-ai.tsx";
-import { Voyage } from "../../elements/icons/voyage.tsx";
-import { Xai } from "../../elements/icons/xai.tsx";
 
 export const modelProviderIcons: Record<keyof typeof modelProviders, React.ReactNode> = {
-  openai: <OpenAI />,
+  openai: designSystemIcons.openai,
   openai_codex: <Codex />,
   azure: <Azure />,
   anthropic: <Anthropic />,
-  elevenlabs: <ElevenLabs />,
-  twilio: <Custom />,
-  groq: <Groq />,
-  vertex_ai: <GoogleCloud />,
-  gemini: <Gemini />,
+  elevenlabs: designSystemIcons.elevenlabs,
+  twilio: designSystemIcons.custom,
+  groq: designSystemIcons.groq,
+  vertex_ai: designSystemIcons.vertex_ai,
+  gemini: designSystemIcons.gemini,
   // Deprecated fold-window provider (see registry.ts): stored rows still
   // render in the providers table until the migration folds them.
-  google_agent_platform: <GoogleCloud />,
-  bedrock: <AWS />,
+  google_agent_platform: designSystemIcons.google_agent_platform,
+  bedrock: designSystemIcons.bedrock,
   deepseek: <DeepSeek />,
-  custom: <Custom />,
-  xai: <Xai />,
-  cerebras: <Cerebras />,
-  voyage: <Voyage />,
+  custom: designSystemIcons.custom,
+  xai: designSystemIcons.xai,
+  cerebras: designSystemIcons.cerebras,
+  voyage: designSystemIcons.voyage,
   azure_safety: <Azure />,
 };
 
