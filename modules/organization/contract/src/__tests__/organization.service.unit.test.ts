@@ -50,6 +50,7 @@ describe("OrganizationService contract", () => {
         teamId: "team",
         userId: "user",
         role: "MEMBER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).toMatchObject({ teamId: "team", role: "MEMBER" });
@@ -59,6 +60,7 @@ describe("OrganizationService contract", () => {
         teamId: "team",
         userId: "user",
         role: "OWNER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).toThrow(z.ZodError);
@@ -84,6 +86,7 @@ describe("OrganizationService contract", () => {
             scopeId: "project",
           },
         ],
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).toMatchObject({ name: "Reviewers" });

@@ -177,6 +177,7 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
         teamId: personalTeamId,
         userId: colleagueUserId,
         role: "MEMBER",
+        caller: { type: "user", id: ownerUserId },
         actor: { type: "user", id: ownerUserId },
       });
 

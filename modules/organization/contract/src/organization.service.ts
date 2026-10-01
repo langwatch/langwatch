@@ -3,6 +3,7 @@ import type { GuidedOnboardingRecord } from "@langwatch/onboarding-contract";
 import type {
   AddOrganizationGroupGrantInput,
   ApplyOrganizationGroupEditsInput,
+  AddOrganizationGroupMemberInput,
   ChangeOrganizationGroupMemberInput,
   CreateOrganizationGroupInput,
   DeleteOrganizationGroupInput,
@@ -154,7 +155,7 @@ export abstract class OrganizationService {
   abstract createGroup(input: CreateOrganizationGroupInput): Promise<OrganizationGroup>;
   abstract renameGroup(input: RenameOrganizationGroupInput): Promise<OrganizationGroup>;
   abstract deleteGroup(input: DeleteOrganizationGroupInput): Promise<void>;
-  abstract addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
+  abstract addGroupMember(input: AddOrganizationGroupMemberInput): Promise<void>;
   abstract removeGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void>;
   abstract listGroupBindings(input: GetOrganizationGroupInput): Promise<OrganizationGroupGrant[]>;
   abstract addGroupGrant(input: AddOrganizationGroupGrantInput): Promise<OrganizationGroupGrant>;

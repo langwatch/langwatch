@@ -2,7 +2,13 @@
  * Built-in roles declared as differences (viewer base, member = viewer +
  * additions, etc); parity-tested against legacy bags (ADR-092 §1).
  */
-import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authorization";
+import {
+  ALL_PERMISSIONS,
+  type AuthzPermission,
+  permissionSatisfiedBy,
+} from "@langwatch/authorization";
+
+import type { GrantScopeTier, TeamUserRole } from "./authz.ts";
 
 export type BuiltinRoleKey =
   | "admin"
@@ -219,4 +225,22 @@ export function roleKeyForTeamRole(role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM
     case "CUSTOM":
       return "viewer";
   }
+}
+
+/** What a binding confers, read the way the engine's matcher reads it. */
+export function permissionsConferred({
+  role,
+  scopeType,
+  customPermissions,
+}: {
+  role: TeamUserRole;
+  scopeType: GrantScopeTier;
+  customPermissions: readonly string[];
+}): readonly string[] {
+  if (role === "CUSTOM") return customPermissions;
+  if (scopeType === "ORGANIZATION") {
+    return role === "ADMIN" ? ALL_PERMISSIONS : [...builtinRolePermissions("org-member")];
+  }
+
+  return [...builtinRolePermissions(roleKeyForTeamRole(role))];
 }

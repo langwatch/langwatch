@@ -30,6 +30,7 @@ import { TestAuthzApi } from "./support/test-authz-api.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   CREDENTIAL,
+  KEY_ID,
   ORGANIZATION_ID,
   USER_ID,
   VIEWER_PERMISSIONS,
@@ -246,6 +247,7 @@ function application() {
     sessions: unreachableSessions,
     grantCache: unreachableGrantCache,
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
+    ceiling: { assertWithinCaller: async () => {} },
     admissions: {
       attachBindings: () => Promise.reject(new Error("no admission expected")),
       completeAdmission: () => Promise.reject(new Error("no admission expected")),
@@ -623,6 +625,33 @@ describe("given the teams REST family over the application the composition build
       expect(response.status).toBe(201);
       await expect(response.json()).resolves.toEqual({ success: true });
       expect(permissions.teamMemberIds(SHARED_TEAM_ID)).toContain(COLLEAGUE_ID);
+    });
+
+    /** @scenario A service key grants through the organization doors, bounded by its own grants */
+    it("adds a member for a service key, answering as the key itself", async () => {
+      const { app, permissions } = application();
+      const { send } = mountTeamsRestApplication(app, { actor: null });
+
+      const response = await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
+        method: "POST",
+        body: { userId: COLLEAGUE_ID, role: "MEMBER" },
+      });
+
+      expect(response.status).toBe(201);
+      expect(permissions.attachCallers).toEqual([{ type: "apiKey", id: KEY_ID }]);
+    });
+
+    /** @scenario A personal key is bounded by the key, not by its owner */
+    it("bounds a personal key's grant by the key, not by the member who owns it", async () => {
+      const { app, permissions } = application();
+      const { send } = mountTeamsRestApplication(app, { actor: { type: "user", id: USER_ID } });
+
+      await send(`/api/teams/${SHARED_TEAM_ID}/members`, {
+        method: "POST",
+        body: { userId: COLLEAGUE_ID, role: "MEMBER" },
+      });
+
+      expect(permissions.attachCallers).toEqual([{ type: "apiKey", id: KEY_ID }]);
     });
 
     /** @scenario Adding somebody who is not in the organization names the code */

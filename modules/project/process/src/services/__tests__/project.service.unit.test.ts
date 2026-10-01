@@ -161,6 +161,10 @@ class StubOrganizationService extends OrganizationServiceContract {
   >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+  readonly staffedTeams: {
+    input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
+    by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
+  }[] = [];
 
   getOrganizationMembers(): Promise<string[]> {
     return Promise.resolve([]);
@@ -291,6 +295,15 @@ class StubOrganizationService extends OrganizationServiceContract {
     throw new Error("not used by this test");
   }
 
+  /** What `OrganizationApi.createTeamWithMembers` answers: the team, staffed as asked. */
+  staffNewTeam(
+    input: Parameters<OrganizationApi["createTeamWithMembers"]>[0],
+    by: Parameters<OrganizationApi["createTeamWithMembers"]>[1],
+  ): Promise<OrganizationTeam> {
+    this.staffedTeams.push({ input, by });
+    return this.createTeam({ organizationId: input.organizationId, name: input.name });
+  }
+
   updateTeamWithMembers(): Promise<never> {
     throw new Error("not used by this test");
   }
@@ -374,6 +387,7 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
         if (!team) throw new TeamNotFoundError(input.teamId);
@@ -646,13 +660,15 @@ describe("ProjectService", () => {
     });
 
     expect(organizations.createdTeams).toEqual([{ organizationId: "org", name: "New Team" }]);
-    expect(organizations.addedTeamMembers).toEqual([
+    // The creator answers for it: Organization makes them the new team's ADMIN.
+    expect(organizations.staffedTeams).toEqual([
       {
-        organizationId: "org",
-        teamId: "team_new",
-        userId: "user",
-        role: "ADMIN",
-        actor: { type: "user", id: "user" },
+        input: {
+          organizationId: "org",
+          name: "New Team",
+          members: [{ userId: "user", role: "ADMIN" }],
+        },
+        by: { id: "user" },
       },
     ]);
     expect(repository.create).toHaveBeenCalledWith(expect.objectContaining({ teamId: "team_new" }));

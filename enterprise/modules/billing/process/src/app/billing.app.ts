@@ -41,7 +41,7 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { OrganizationApi, type OrganizationCaller } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { fromDate, Temporal, type Instant } from "@langwatch/time";
 import Stripe from "stripe";
@@ -620,6 +620,7 @@ export class BillingApp
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     invites: readonly SubscriptionInvite[];
+    invitedBy: OrganizationCaller;
   }): Promise<{ url: string | null }> {
     return this.#subscriptionDoor.subscriptions.createSubscriptionWithInvites(input);
   }

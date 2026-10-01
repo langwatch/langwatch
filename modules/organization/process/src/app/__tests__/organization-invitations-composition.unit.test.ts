@@ -382,6 +382,7 @@ function doorWithFullSeats(seatsFull: Readonly<{ members: number; membersLite: n
     creationThrottle: createApiFixture<InviteCreationThrottleService>({
       assertCreationAllowed: async () => {},
     }),
+    ceiling: { assertWithinCaller: async () => {} },
     ensurePersonalWorkspace: async () => undefined,
   });
   return { door, recorded };

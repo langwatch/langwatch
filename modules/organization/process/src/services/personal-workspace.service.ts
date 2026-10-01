@@ -98,6 +98,7 @@ export class PersonalWorkspaceService {
             scopeId: grant.teamId,
           },
         ],
+        caller: { type: "system" },
         actor: { type: "system", id: SYSTEM_ACTORS.personalWorkspace },
         source: "grants-service",
         onDuplicate: "skip",

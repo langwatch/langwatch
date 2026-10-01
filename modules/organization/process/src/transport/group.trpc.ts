@@ -40,8 +40,8 @@ export const groupTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof g
 
     .procedure("addMember")
     .withPermission("organization:manage")
-    .handle(async ({ app, input }) => {
-      await app.addGroupMember(input);
+    .handle(async ({ app, input, actor }) => {
+      await app.addGroupMember(input, { id: actor.id });
 
       return { success: true as const };
     })

@@ -206,6 +206,7 @@ describe("OrganizationInvitationDoorService.create", () => {
         signals: { trackServerEvent: () => {} } as never,
         lifecycle: { membersInvited: () => {}, inviteAccepted: () => {} },
         creationThrottle: throttle,
+        ceiling: { assertWithinCaller: async () => {} },
         ensurePersonalWorkspace: async () => undefined,
       });
 

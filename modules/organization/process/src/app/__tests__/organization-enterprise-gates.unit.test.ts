@@ -137,6 +137,7 @@ describe("given a team member list that names only built-in roles", () => {
         teamId: TEAM.id,
         name: "Engineering",
         members: [{ userId: "u1", role: "ADMIN" }],
+        caller: { type: "user", id: CALLER.id },
         actor: { type: "user", id: CALLER.id },
       });
     });

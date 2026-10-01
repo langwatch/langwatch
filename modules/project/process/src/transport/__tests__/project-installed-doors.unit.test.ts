@@ -68,7 +68,8 @@ function installed(peers: Peers) {
     .withObservability((observability) => observability.withLogging({ error: () => undefined }))
     .provide({
       organization: createApiFixture<OrganizationApi>({
-        createTeam: async (input) => ({
+        // A new team is created already staffed by its creator.
+        createTeamWithMembers: async (input) => ({
           id: "team-new",
           name: input.name,
           slug: "new-team",
@@ -79,7 +80,6 @@ function installed(peers: Peers) {
           createdAt: CREATED_AT,
           updatedAt: CREATED_AT,
         }),
-        addTeamMember: async () => undefined,
       }),
       "api-key": createApiFixture<ApiKeyApi>({
         regenerateLegacyProjectKey: async () => ROTATED_KEY,

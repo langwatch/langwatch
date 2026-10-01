@@ -133,10 +133,7 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
     return removed;
   }
 
-  attach = unsupported<AuthzGrantsService["attach"]>("attach");
-  update = unsupported<AuthzGrantsService["update"]>("update");
   revoke = unsupported<AuthzGrantsService["revoke"]>("revoke");
-  replace = unsupported<AuthzGrantsService["replace"]>("replace");
   offboard = unsupported<AuthzGrantsService["offboard"]>("offboard");
   invalidateOrganization =
     unsupported<AuthzGrantsService["invalidateOrganization"]>("invalidateOrganization");

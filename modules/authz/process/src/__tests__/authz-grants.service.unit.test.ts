@@ -712,6 +712,10 @@ type CompatibilityInvokers = {
   [M in CompatibilityMethod]: (input: CompatibilityInputs[M]) => Promise<unknown>;
 };
 
+function withoutCaller(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([key]) => key !== "caller"));
+}
+
 function invokeCompatibility<M extends CompatibilityMethod>(
   service: AuthzGrantsService,
   call: { method: M; input: CompatibilityInputs[M] },
@@ -745,6 +749,7 @@ const COMPATIBILITY_CALLS: readonly CompatibilityCall[] = [
           scopeId: TEAM,
         },
       ],
+      caller: { type: "system" },
       actor: WRITE_ACTOR,
       source: "read-through-mint",
       onDuplicate: "skip",
@@ -792,6 +797,7 @@ const COMPATIBILITY_CALLS: readonly CompatibilityCall[] = [
       bindingId: "rb-ledger",
       role: "CUSTOM",
       customRoleId: "role-ops",
+      caller: { type: "system" },
       actor: WRITE_ACTOR,
     },
     output: undefined,
@@ -866,7 +872,8 @@ describe("AuthzGrantsService compatibility operations", () => {
     const { service } = makeService(makeRepository(), ledger);
     await expect(invokeCompatibility(service, call)).resolves.toBe(output);
     expect(ledger[method]).toHaveBeenCalledOnce();
-    expect(ledger[method]).toHaveBeenCalledWith(input);
+    // The caller bounds the write inside authz; the ledger below the ceiling never sees it.
+    expect(ledger[method]).toHaveBeenCalledWith(withoutCaller(input));
   });
 
   it.each(COMPATIBILITY_CALLS)("$method preserves the adapter's exact error", async (call) => {
@@ -967,5 +974,130 @@ describe("BindingPrincipalWhere", () => {
     const group: BindingPrincipalWhere = { groupId: "group-1" };
     const apiKey: BindingPrincipalWhere = { apiKeyId: "key-1" };
     expect([user, group, apiKey]).toHaveLength(3);
+  });
+});
+
+describe("AuthzGrantsService central caller ceiling", () => {
+  const TEAM_ADMIN = {
+    bindingId: "rb-new",
+    principal: { userId: "mallory" },
+    role: "ADMIN",
+    customRoleId: null,
+    scopeType: "TEAM",
+    scopeId: TEAM,
+  } as const;
+
+  function ceilingService(missing: string[]) {
+    const ledger = makeLedger({
+      attachBindings: vi.fn().mockResolvedValue({ attached: ["rb-new"], duplicates: [] }),
+      changeBindingRole: vi.fn().mockResolvedValue(undefined),
+    });
+    const findPermissionsBeyondCaller = vi.fn(async () => missing);
+    const bindings = new StubAuthzManagedGrantRepository();
+    bindings.findBinding.mockResolvedValue({
+      id: "rb-existing",
+      organizationId: ORG,
+      userId: "mallory",
+      groupId: null,
+      apiKeyId: null,
+      role: "VIEWER",
+      customRoleId: null,
+      scopeType: "TEAM",
+      scopeId: TEAM,
+    });
+    const service = AuthzGrantsService.create({
+      permissions: { ...permissiveGrantGuards, findPermissionsBeyondCaller },
+      repository: makeRepository(),
+      ledger,
+      epoch: new StubAuthzEpoch(),
+      newBindingId: () => "rb_test_ksuid",
+      bindings,
+    });
+    return { service, ledger, findPermissionsBeyondCaller };
+  }
+
+  /** @scenario "Adding a team member with a role above the caller is refused" */
+  it("refuses an attach beyond what the caller holds and writes nothing", async () => {
+    const { service, ledger } = ceilingService(["team:manage"]);
+
+    await expect(
+      service.attachBindings({
+        organizationId: ORG,
+        bindings: [TEAM_ADMIN],
+        caller: { type: "user", id: "mallory" },
+        actor: WRITE_ACTOR,
+        onDuplicate: "attach",
+      }),
+    ).rejects.toMatchObject({
+      code: "grant_exceeds_caller_permissions",
+      meta: { missingPermissions: ["team:manage"] },
+    });
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Saving a team's members with a role above the caller is refused" */
+  it("refuses a role change beyond what the caller holds at the binding's scope", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService(["team:manage"]);
+
+    await expect(
+      service.changeBindingRole({
+        organizationId: ORG,
+        bindingId: "rb-existing",
+        role: "ADMIN",
+        customRoleId: null,
+        caller: { type: "user", id: "mallory" },
+        actor: WRITE_ACTOR,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(findPermissionsBeyondCaller).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { type: "team", id: TEAM } }),
+    );
+    expect(ledger.changeBindingRole).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A grant write nobody answers for is refused" */
+  it("refuses an anonymous caller without asking what it holds", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService([]);
+
+    await expect(
+      service.attachBindings({
+        organizationId: ORG,
+        bindings: [TEAM_ADMIN],
+        caller: { type: "anonymous" },
+        actor: WRITE_ACTOR,
+        onDuplicate: "attach",
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Granting at or below the caller's own level still succeeds" */
+  it("writes a grant the caller holds", async () => {
+    const { service, ledger } = ceilingService([]);
+
+    await service.attachBindings({
+      organizationId: ORG,
+      bindings: [TEAM_ADMIN],
+      caller: { type: "user", id: "alice" },
+      actor: WRITE_ACTOR,
+      onDuplicate: "attach",
+    });
+    expect(ledger.attachBindings).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "A write that follows from an act already authorized is not bounded by a caller" */
+  it("lets a system write through without asking", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService(["team:manage"]);
+
+    await service.attachBindings({
+      organizationId: ORG,
+      bindings: [TEAM_ADMIN],
+      caller: { type: "system" },
+      actor: WRITE_ACTOR,
+      onDuplicate: "attach",
+    });
+    expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
+    expect(ledger.attachBindings).toHaveBeenCalledOnce();
   });
 });

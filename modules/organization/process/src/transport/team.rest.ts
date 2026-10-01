@@ -1,4 +1,3 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
@@ -26,12 +25,13 @@ import {
   organizationTeamRestSuccessSchema,
   organizationTeamRestUpdateSchema,
   type OrganizationApi,
-  type OrganizationCaller,
   type OrganizationTeam,
   type OrganizationTeamRest,
   type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
 import type { z } from "zod";
+
+import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
 
 /**
  * What the `/api/teams` family reaches, as flat operations the organization's
@@ -60,15 +60,6 @@ export interface TeamManagementApi
 }
 
 export const TeamManagementApi = moduleApi<TeamManagementApi>()("organization");
-
-/**
- * Who a write is attributed to: the member the credential acts as, or the
- * management API itself for a service key, which acts as nobody.
- */
-const callerOf = (actor: { type: string; id?: string } | null): OrganizationCaller =>
-  actor && actor.type === "user" && actor.id
-    ? { id: actor.id }
-    : { id: SYSTEM_ACTORS.managementApi };
 
 /**
  * The team's response shape: the stored shape omits the personal flag and owner,
@@ -245,7 +236,8 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Add a member to a team",
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(organizationKeyFacts)
+  .handle(async ({ app, input, scope, actor }, key) => {
     const ledgerActor =
       actor && actor.type === "user"
         ? { type: "user" as const, id: actor.id ?? null }
@@ -256,6 +248,8 @@ export const teamsRest: Readonly<{
       organizationId: scope.id,
       userId: input.userId,
       role: input.role,
+      // The key bounds what it grants, never its owner (authz.server.ts rules the same).
+      caller: { type: "apiKey", id: key.apiKeyId },
       actor: ledgerActor,
     });
 
@@ -270,14 +264,15 @@ export const teamsRest: Readonly<{
     tags: ["Teams"],
     description: "Remove a member from a team",
   })
-  .handle(async ({ app, input, scope, actor }) => {
+  .withMiddleware(organizationKeyFacts)
+  .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeTeamMember(
       {
         teamId: input.teamId,
         organizationId: scope.id,
         userId: input.userId,
       },
-      callerOf(actor),
+      keyCallerOf({ actor, key }),
     );
 
     return { success: true };

@@ -10,6 +10,7 @@
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   ScimService,
   type ScimDirectoryOwnership,
@@ -32,6 +33,7 @@ import {
 import { ScimDirectoryExternalIdsService } from "../../../services/scim-directory-external-ids.service.ts";
 import type { ScimOversightService } from "../../../services/scim-oversight.service.ts";
 import { ScimReconciliationService } from "../../../services/scim-reconciliation.service.ts";
+import { ScimTokenMintService } from "../../../services/scim-token-mint.service.ts";
 
 export class ScimServiceFake extends ScimService {
   readonly verifyToken = vi.fn(
@@ -92,8 +94,14 @@ export function scimTestApp(
     oversight?: ScimOversightService;
     operators?: Parameters<typeof ScimApp.createWithService>[0]["operators"];
     activity?: ScimSyncActivityEntry[];
+    /** What authz answers a token minter lacks of an organization admin's permissions. */
+    minterLacks?: string[];
   } = {},
 ) {
+  const findPermissionsBeyondCaller = vi.fn(
+    async (_input: Parameters<AuthzApi["findPermissionsBeyondCaller"]>[0]) =>
+      options.minterLacks ?? [],
+  );
   const scim = options.scim ?? new ScimServiceFake();
   const offered = options.connections ?? [];
   const identity: ScimConnectionReads = {
@@ -139,9 +147,10 @@ export function scimTestApp(
     entitlements,
     auditLog,
     webhookSecret: () => ("webhookSecret" in options ? options.webhookSecret : undefined),
+    minting: ScimTokenMintService.create({ findPermissionsBeyondCaller }),
     ...(options.oversight ? { oversight: options.oversight } : {}),
     ...(options.operators ? { operators: options.operators } : {}),
   });
 
-  return { app, scim, audited };
+  return { app, scim, audited, findPermissionsBeyondCaller };
 }

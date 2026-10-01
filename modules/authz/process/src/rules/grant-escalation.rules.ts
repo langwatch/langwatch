@@ -3,32 +3,8 @@
  * new, tRPC, custom-role edits) reaches through the binding writer or
  * `AuthzApi.findPermissionsBeyondCaller`. specs/rbac/grants-rest-api.feature.
  */
-import { ALL_PERMISSIONS, permissionSatisfiedBy } from "@langwatch/authorization";
-import {
-  builtinRolePermissions,
-  roleKeyForTeamRole,
-  type AuthzManagedOrganizationBinding,
-  type GrantScopeTier,
-  type TeamUserRole,
-} from "@langwatch/authz-contract";
-
-/** What a binding confers, read the way the engine's matcher reads it. */
-export function permissionsConferred({
-  role,
-  scopeType,
-  customPermissions,
-}: {
-  role: TeamUserRole;
-  scopeType: GrantScopeTier;
-  customPermissions: readonly string[];
-}): readonly string[] {
-  if (role === "CUSTOM") return customPermissions;
-  if (scopeType === "ORGANIZATION") {
-    return role === "ADMIN" ? ALL_PERMISSIONS : [...builtinRolePermissions("org-member")];
-  }
-
-  return [...builtinRolePermissions(roleKeyForTeamRole(role))];
-}
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { type AuthzManagedOrganizationBinding } from "@langwatch/authz-contract";
 
 /** The requested permissions the held set does not satisfy, `manage` implying its actions. */
 export function findPermissionsBeyondHeld({

@@ -108,7 +108,11 @@ export class TestAuthzApi implements AuthzApi {
     return byTeam;
   }
 
+  /** Who each attach answered as, in order: the door's caller, never the ledger actor. */
+  readonly attachCallers: AuthzAttachBindingsInput["caller"][] = [];
+
   async attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachOutcome> {
+    this.attachCallers.push(args.caller);
     const attached: string[] = [];
     const duplicates: string[] = [];
 
@@ -231,10 +235,7 @@ export class TestAuthzApi implements AuthzApi {
   isOnEngine = unsupported<AuthzApi["isOnEngine"]>("isOnEngine");
   findEngineCutoverAt = unsupported<AuthzApi["findEngineCutoverAt"]>("findEngineCutoverAt");
   getSessionVersion = unsupported<AuthzApi["getSessionVersion"]>("getSessionVersion");
-  attach = unsupported<AuthzApi["attach"]>("attach");
-  update = unsupported<AuthzApi["update"]>("update");
   revoke = unsupported<AuthzApi["revoke"]>("revoke");
-  replace = unsupported<AuthzApi["replace"]>("replace");
   offboard = unsupported<AuthzApi["offboard"]>("offboard");
   invalidateOrganization =
     unsupported<AuthzApi["invalidateOrganization"]>("invalidateOrganization");

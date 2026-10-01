@@ -80,6 +80,7 @@ describe.skipIf(!DB_URL)(
       sessions,
       grantCache,
       testArrivals: { standingFor: async () => ({ testing: false }) as const },
+      ceiling: { assertWithinCaller: async () => {} },
       admissions: {
         attachBindings: () => Promise.reject(new Error("no admission expected")),
         completeAdmission: () => Promise.reject(new Error("no admission expected")),
@@ -213,6 +214,7 @@ describe.skipIf(!DB_URL)(
       beforeAll(async () => {
         roleChanges.length = 0;
         await memberships.changeMemberRole({
+          caller: { type: "system" },
           organizationId,
           userId: seatUserId,
           role: OrganizationUserRole.EXTERNAL,

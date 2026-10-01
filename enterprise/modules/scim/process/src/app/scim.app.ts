@@ -49,6 +49,7 @@ import {
   type ScimDeliveryReceipt,
   type ScimDirectoryConnection,
   type ScimTokenAuditEntry,
+  type ScimTokenCaller,
   type ScimTokenEntitlement,
   type ScimTokenSummary,
   type ScimUser,
@@ -107,6 +108,7 @@ import { ScimReconciliationService } from "../services/scim-reconciliation.servi
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
+import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 
 type ScimSetup = FeatureSetup<
   typeof ScimApp.dependencies,
@@ -242,6 +244,8 @@ type ScimAppOptions = {
   /** Absent in a test that exercises only the protocol doors. */
   oversight?: ScimOversightService;
   operators?: ScimOperatorGate;
+  /** Only a full organization admin may mint a directory token. */
+  minting: Pick<ScimTokenMintService, "assertMayMint">;
 };
 
 export class ScimApp implements ScimApiContract {
@@ -271,6 +275,7 @@ export class ScimApp implements ScimApiContract {
   readonly #reconciliation: ScimReconciliationService;
   readonly #oversight: ScimOversightService | undefined;
   readonly #operators: ScimOperatorGate | undefined;
+  readonly #minting: Pick<ScimTokenMintService, "assertMayMint">;
   #directoryMove: ScimDirectoryMoveService | undefined;
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
@@ -284,6 +289,7 @@ export class ScimApp implements ScimApiContract {
     this.#reconciliation = options.reconciliation;
     this.#entitlements = options.entitlements;
     this.#auditLog = options.auditLog;
+    this.#minting = options.minting;
     this.#retirement = ScimConnectionRetirementService.create({
       connections: options.connections,
       tokens: options.scim,
@@ -347,6 +353,7 @@ export class ScimApp implements ScimApiContract {
       entitlements: dependencies.entitlements,
       auditLog: dependencies.auditLog,
       webhookSecret: () => auth0WebhookSecret,
+      minting: ScimTokenMintService.create(dependencies.authorization),
       oversight: ScimOversightService.create({
         syncs,
         organizations: dependencies.organization,
@@ -438,11 +445,16 @@ export class ScimApp implements ScimApiContract {
     return this.#directoryExternalIds.findDirectoryConnectionsForUser(input);
   }
 
-  generateToken(input: {
-    organizationId: string;
-    connectionId?: string | undefined;
-    description?: string | undefined;
-  }): Promise<IssuedScimToken> {
+  async generateToken(
+    input: {
+      organizationId: string;
+      connectionId?: string | undefined;
+      description?: string | undefined;
+    },
+    by: ScimTokenCaller,
+  ): Promise<IssuedScimToken> {
+    await this.#minting.assertMayMint({ organizationId: input.organizationId, by });
+
     return this.#scim.generateToken(input);
   }
 

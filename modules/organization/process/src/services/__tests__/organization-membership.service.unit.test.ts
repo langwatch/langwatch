@@ -1,3 +1,4 @@
+import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
 import { MemberNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
 import { OrganizationUserRole, TeamUserRole } from "@langwatch/prisma-client/generated";
 /**
@@ -117,6 +118,7 @@ describe("OrganizationMembershipService", () => {
       sessions,
       grantCache,
       testArrivals,
+      ceiling: { assertWithinCaller: async () => {} },
       admissions,
     });
     attached.length = 0;
@@ -234,6 +236,7 @@ describe("OrganizationMembershipService", () => {
       it("refuses with validation_error", async () => {
         await expect(
           service.updateMemberRole({
+            caller: { type: "system" },
             ...baseParams,
             teamRoleUpdates: [
               {
@@ -251,6 +254,7 @@ describe("OrganizationMembershipService", () => {
       it("refuses with validation_error", async () => {
         await expect(
           service.updateMemberRole({
+            caller: { type: "system" },
             ...baseParams,
             teamRoleUpdates: [
               {
@@ -267,6 +271,7 @@ describe("OrganizationMembershipService", () => {
     describe("when inputs are valid", () => {
       it("delegates to the repository with effective team role updates", async () => {
         await service.updateMemberRole({
+          caller: { type: "system" },
           ...baseParams,
           teamRoleUpdates: [{ teamId: "team-1", userId: "user-456", role: TeamUserRole.ADMIN }],
         });
@@ -318,6 +323,7 @@ describe("OrganizationMembershipService", () => {
 
       await expect(
         service.changeMemberRole({
+          caller: { type: "system" },
           organizationId: "org-123",
           userId: "user-456",
           role: OrganizationUserRole.MEMBER,
@@ -330,6 +336,70 @@ describe("OrganizationMembershipService", () => {
         expect.objectContaining({ organizationId: "org-123", teamRoleUpdates }),
       );
       expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a caller who lacks what a role change would confer", () => {
+    const assertWithinCaller = vi.fn(async () => {
+      throw new GrantExceedsCallerPermissionsError(["organization:manage"]);
+    });
+    const refusing = () =>
+      OrganizationMembershipService.create({
+        repository: mockRepo,
+        prompts: mockPrompts,
+        seats,
+        sessions,
+        grantCache,
+        testArrivals,
+        ceiling: { assertWithinCaller },
+        admissions,
+      });
+
+    /** @scenario "Changing a member's organization role above the caller is refused before the seat changes" */
+    it("refuses an organization role change before any write", async () => {
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+      } as never);
+
+      await expect(
+        refusing().changeMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          userId: "manager-1",
+          role: OrganizationUserRole.ADMIN,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_exceeds_caller_permissions",
+        meta: { missingPermissions: ["organization:manage"] },
+      });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org-123" }],
+      });
+      expect(mockAssertRoleChangeAllowed).not.toHaveBeenCalled();
+      expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Changing a member's team role above the caller is refused before anything is written" */
+    it("refuses a team role change before any write", async () => {
+      await expect(
+        refusing().updateTeamMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          teamId: "team-1",
+          userId: "manager-1",
+          role: TeamUserRole.ADMIN,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [expect.objectContaining({ role: "ADMIN", scopeType: "TEAM", scopeId: "team-1" })],
+      });
+      expect(mockRepo.updateTeamMemberRole).not.toHaveBeenCalled();
     });
   });
 
@@ -507,6 +577,7 @@ describe("OrganizationMembershipService", () => {
           },
           grantCache,
           testArrivals,
+          ceiling: { assertWithinCaller: async () => {} },
           admissions,
         });
         vi.mocked(mockRepo.getMembership).mockResolvedValue(activeMember);
@@ -764,6 +835,8 @@ describe("OrganizationMembershipService", () => {
       it("refuses with validation_error", async () => {
         await expect(
           service.updateTeamMemberRole({
+            caller: { type: "system" },
+            organizationId: "org-1",
             teamId: "team-1",
             userId: "user-456",
             role: "custom:some-role",
@@ -777,6 +850,8 @@ describe("OrganizationMembershipService", () => {
     describe("when role is a custom role and customRoleId is provided", () => {
       it("delegates to the repository with customRoleId", async () => {
         await service.updateTeamMemberRole({
+          caller: { type: "system" },
+          organizationId: "org-1",
           teamId: "team-1",
           userId: "user-456",
           role: "custom:some-role",
@@ -793,6 +868,8 @@ describe("OrganizationMembershipService", () => {
     describe("when role is a built-in role", () => {
       it("delegates to the repository without customRoleId", async () => {
         await service.updateTeamMemberRole({
+          caller: { type: "system" },
+          organizationId: "org-1",
           teamId: "team-1",
           userId: "user-456",
           role: TeamUserRole.ADMIN,

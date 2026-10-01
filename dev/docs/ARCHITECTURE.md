@@ -1350,8 +1350,25 @@ uniqueness at all, so the same principal, role and scope may be bound twice with
 re-assertion that must stay idempotent asks the ledger to `skip` rather than being refused.
 `/api/grants` succeeds `/api/role-bindings` (deprecated, same rows): nobody grants or writes into a role more than they hold at that scope, one authz rule every door reaches (Alex, 2026-09-30).
 Only that REST family says "role binding": every other name, type, file, tRPC route and UI string
-is a grant or a role, and the wire codes and the store keep their names (Alex, 2026-09-30). Granting
-is on every plan; creating a custom role is the Enterprise capability.
+is a grant or a role, and the wire codes and the store keep their names (Alex, 2026-09-30).
+**The ceiling runs centrally** (Alex, 2026-10-01): `AuthzApi.attachBindings` and `changeBindingRole` take a
+required `caller: AuthzGrantCaller`; authz refuses `grant_exceeds_caller_permissions` beyond what that person
+or key holds, an anonymous caller holds nothing, and only `{ type: "system" }` (a consequence of an act already
+checked: invite acceptance, SCIM, sign-up) skips it. A door that writes its own rows first (a group, an
+invitation, a seat) asks the same rule before writing; adding a group member is bounded by the group's grants.
+An organization-key request is bounded by the key itself (service or personal), never by its owner.
+Seat-checkout invitations carry who invited (`createPaymentPendingInvites(input, by)`) and are bounded before
+they are held; acceptance after payment stays `system` (Alex, 2026-10-01).
+Minting a SCIM token is a grant door: only a caller holding everything an organization ADMIN holds may mint
+(Alex, 2026-10-01).
+Creating a team passes the real caller, never `system`: the creator becoming its own new team's ADMIN is the
+one consequence written as `system`; every other initial member is bounded by the creator (Alex, 2026-10-01).
+**Plans** (Alex, 2026-10-01): built-in roles grant on every plan; any write that assigns a custom role needs
+Enterprise on every door, decided once in authz's central check. `/api/role-bindings`, `/api/organization`,
+`/api/roles` and `/api/groups` answer 402 `enterprise_plan_required` below Enterprise, as main, through the
+framework entitlement check: authz does not depend on entitlement.
+**Grants are the only read** (Alex, 2026-10-01): main's genesis import made Grant complete, so no module reads
+the RoleBinding compatibility table; access is read through `AuthzApi` listings, ended grants excluded.
 
 ---
 

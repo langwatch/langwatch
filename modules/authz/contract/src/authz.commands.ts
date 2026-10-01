@@ -10,7 +10,12 @@ import {
   legacyBindingRoleSchema,
   resourceGrantTermsSchema,
 } from "./authz-grant.events.ts";
-import { grantableAuthzScopeRefSchema, grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
+import {
+  authzPrincipalRefSchema,
+  grantableAuthzScopeRefSchema,
+  grantScopeTierSchema,
+  teamUserRoleSchema,
+} from "./authz.ts";
 
 export const ATTACH_GRANT_COMMAND_TYPE = "lw.authz_grant.attach" as const;
 export const CHANGE_GRANT_ROLE_COMMAND_TYPE = "lw.authz_grant.change_role" as const;
@@ -236,10 +241,22 @@ export const authzAttachOutcomeSchema = z
   .strict();
 export type AuthzAttachOutcome = z.infer<typeof authzAttachOutcomeSchema>;
 
+/**
+ * Whose holdings bound a grant write: a person or key is refused anything beyond what it holds
+ * there; `system` is a consequence of an already-authorized act (an accepted invite, SCIM,
+ * sign-up).
+ */
+export const authzGrantCallerSchema = z.union([
+  authzPrincipalRefSchema,
+  z.object({ type: z.literal("system") }).strict(),
+]);
+export type AuthzGrantCaller = z.infer<typeof authzGrantCallerSchema>;
+
 export const authzAttachBindingsInputSchema = z
   .object({
     organizationId: z.string().min(1),
     bindings: z.array(authzLedgerBindingAttachSchema),
+    caller: authzGrantCallerSchema,
     actor: grantsLedgerActorSchema,
     source: authzLedgerWriteSourceSchema.optional(),
     /** `attach` writes every binding, identical ones included (bindings are
@@ -333,6 +350,7 @@ export const authzChangeBindingRoleInputSchema = z
     bindingId: z.string().min(1),
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).nullable(),
+    caller: authzGrantCallerSchema,
     actor: grantsLedgerActorSchema,
   })
   .strict();

@@ -51,6 +51,29 @@ export const organizationManagementEnterpriseGate = defineRestMiddleware(
 const deriveCaller = (actor: { type: string; id?: string } | null): OrganizationCaller | null =>
   actor && actor.type === "user" && actor.id ? { id: actor.id } : null;
 
+/** The organization key a request arrived on, bound from its credential at boot. */
+export const organizationKeyFacts = defineRestMiddleware(
+  "organizationKeyFacts",
+  z.object({ apiKeyId: z.string() }),
+);
+
+/**
+ * Who a write on an organization key answers as: the member behind a personal key, else `nobody`.
+ * The key itself bounds what it may grant, never its owner (as authz.server.ts rules).
+ */
+export const keyCallerOf = ({
+  actor,
+  key,
+  nobody = SYSTEM_ACTORS.managementApi,
+}: {
+  actor: { type: string; id?: string } | null;
+  key: { apiKeyId: string };
+  nobody?: string;
+}): OrganizationCaller => ({
+  id: actor?.type === "user" && actor.id ? actor.id : nobody,
+  apiKeyId: key.apiKeyId,
+});
+
 const memberWire = (member: {
   userId: string;
   role: string;
@@ -254,8 +277,9 @@ export const organizationManagementRest: Readonly<{
     description:
       "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
   })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(organizationManagementEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) =>
+  .handle(async ({ app, input, scope, actor }, key) =>
     updatedMemberWire(
       await app.updateMember(
         {
@@ -264,7 +288,7 @@ export const organizationManagementRest: Readonly<{
           role: input.role,
           disabled: input.disabled,
         },
-        deriveCaller(actor),
+        keyCallerOf({ actor, key }),
       ),
     ),
   )
@@ -310,10 +334,9 @@ export const organizationManagementRest: Readonly<{
     description:
       "Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.",
   })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(organizationManagementEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
-    const caller: OrganizationCaller | null = deriveCaller(actor);
-
+  .handle(async ({ app, input, scope, actor }, key) => {
     const created = await app.createInvitations(
       {
         organizationId: scope.id,
@@ -333,7 +356,7 @@ export const organizationManagementRest: Readonly<{
       },
       // A service key acts as nobody; invites it creates are attributed to
       // the organization feature itself for the analytics event this raises.
-      caller ?? { id: SYSTEM_ACTORS.organizationService },
+      keyCallerOf({ actor, key, nobody: SYSTEM_ACTORS.organizationService }),
     );
 
     return {

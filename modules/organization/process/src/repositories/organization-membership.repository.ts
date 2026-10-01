@@ -1,6 +1,6 @@
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
 
-import type { AuthzCustomRole, GrantScopeTier } from "@langwatch/authz-contract";
+import type { AuthzCustomRole, AuthzGrantCaller, GrantScopeTier } from "@langwatch/authz-contract";
 import type {
   CustomRole,
   EnrichedAuditLog as ContractEnrichedAuditLog,
@@ -239,6 +239,8 @@ export interface UpdateMemberRoleInput {
    * member, so null simply keeps every self branch closed.
    */
   currentUserId: string | null;
+  /** Whose holdings bound the grants this change writes (authz refuses anything beyond them). */
+  caller: AuthzGrantCaller;
 }
 
 /**
@@ -257,6 +259,7 @@ export interface UpdateTeamMemberRoleInput {
   role: TeamUserRole;
   customRoleId?: string;
   currentUserId: string;
+  caller: AuthzGrantCaller;
 }
 
 export abstract class OrganizationMembershipRepository {

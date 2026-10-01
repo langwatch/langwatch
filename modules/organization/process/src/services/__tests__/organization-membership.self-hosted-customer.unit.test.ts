@@ -39,6 +39,7 @@ function installed() {
     sessions,
     grantCache,
     testArrivals: { standingFor: async () => ({ testing: false }) },
+    ceiling: { assertWithinCaller: async () => {} },
     admissions: {
       attachBindings: () => Promise.reject(new Error("no admission expected")),
       completeAdmission: () => Promise.reject(new Error("no admission expected")),

@@ -210,6 +210,7 @@ describe("given an admin being demoted to member", () => {
 
       await expect(
         repository.updateMemberRole({
+          caller: { type: "system" },
           organizationId: "org_1",
           userId: "user_a",
           role: OrganizationUserRole.MEMBER,

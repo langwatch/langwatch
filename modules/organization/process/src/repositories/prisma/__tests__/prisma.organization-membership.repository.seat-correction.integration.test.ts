@@ -206,6 +206,7 @@ describe.skipIf(!DB_URL)(
 
       beforeAll(async () => {
         result = await repository.updateMemberRole({
+          caller: { type: "system" },
           organizationId,
           userId: memberUserId,
           role: OrganizationUserRole.EXTERNAL,

@@ -1,3 +1,4 @@
+import { authzGrantCallerSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { organizationIdSchema } from "./organization.ts";
@@ -114,6 +115,7 @@ export const createOrganizationGroupInputSchema = z
     name: z.string().trim().min(1).max(100),
     grants: z.array(organizationGroupGrantInputSchema).optional(),
     memberIds: z.array(z.string().min(1)).optional(),
+    caller: authzGrantCallerSchema,
     actor: organizationLedgerActorSchema,
   })
   .strict();
@@ -137,8 +139,14 @@ export type ChangeOrganizationGroupMemberInput = z.infer<
   typeof changeOrganizationGroupMemberInputSchema
 >;
 
+/** Joining a group confers its grants, so the caller's ceiling bounds who may be added. */
+export const addOrganizationGroupMemberInputSchema =
+  changeOrganizationGroupMemberInputSchema.safeExtend({ caller: authzGrantCallerSchema });
+export type AddOrganizationGroupMemberInput = z.infer<typeof addOrganizationGroupMemberInputSchema>;
+
 export const addOrganizationGroupGrantInputSchema = getOrganizationGroupInputSchema.safeExtend({
   grant: organizationGroupGrantInputSchema,
+  caller: authzGrantCallerSchema,
   actor: organizationLedgerActorSchema,
 });
 export type AddOrganizationGroupGrantInput = z.infer<typeof addOrganizationGroupGrantInputSchema>;
@@ -165,6 +173,7 @@ export const applyOrganizationGroupEditsInputSchema = getOrganizationGroupInputS
   grantsToCreate: z.array(organizationGroupGrantInputSchema),
   memberUserIdsToAdd: z.array(z.string().min(1)),
   memberUserIdsToRemove: z.array(z.string().min(1)),
+  caller: authzGrantCallerSchema,
   actor: organizationLedgerActorSchema,
 });
 export type ApplyOrganizationGroupEditsInput = z.infer<

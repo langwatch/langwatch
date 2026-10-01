@@ -2,6 +2,7 @@ import {
   newAuthzGrantId,
   type AuthzApi,
   type AuthzBindingForSynthesis,
+  type AuthzGrantCaller,
   type GrantsLedgerActor,
   GrantScopeTier,
 } from "@langwatch/authz-contract";
@@ -51,6 +52,7 @@ import type {
   OrganizationWithMembersAndTheirTeams,
 } from "../repositories/organization-membership.repository.ts";
 import { readSeatRefusal } from "../rules/seat-limit-refusal.rules.ts";
+import type { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
 
 /**
@@ -154,6 +156,8 @@ export class OrganizationMembershipService {
     grantCache: OrganizationGrantCache;
     testArrivals: OrganizationTestArrivals;
     admissions: OrganizationAdmissions;
+    /** Authz's escalation rule, asked before a role change writes anything. */
+    ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
   }): OrganizationMembershipService {
     return new OrganizationMembershipService(dependencies);
   }
@@ -167,6 +171,8 @@ export class OrganizationMembershipService {
       grantCache: OrganizationGrantCache;
       testArrivals: OrganizationTestArrivals;
       admissions: OrganizationAdmissions;
+      /** Authz's escalation rule, asked before a role change writes anything. */
+      ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
     },
   ) {
     this.roles = OrganizationMemberRoleService.create(dependencies);
@@ -595,6 +601,7 @@ export class OrganizationMembershipService {
           scopeId: organizationId,
         },
       ],
+      caller: { type: "system" },
       actor: admittedBy.actor,
       source: "join-request",
       onDuplicate: "skip",
@@ -655,6 +662,8 @@ export class OrganizationMembershipService {
     disabled?: boolean;
     /** The user the credential acts as; null for a service key. */
     actingUser: OrganizationPlanUser | null;
+    /** Whose holdings bound the grants a role change writes. */
+    caller: AuthzGrantCaller;
   }): Promise<
     OrganizationMemberSummary & {
       teams: MemberTeamBinding[];
@@ -671,6 +680,7 @@ export class OrganizationMembershipService {
           userId,
           role,
           currentUserId: actingUser?.id ?? null,
+          caller: params.caller,
           ...(actingUser ? { planUser: actingUser } : {}),
         });
         teamsLeftWithoutAdmin = [...result.teamsLeftWithoutAdmin];

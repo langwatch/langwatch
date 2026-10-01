@@ -328,7 +328,10 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     await this.options.epoch.bump({ organizationId });
   }
 
-  async attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
+  async attachBindings({
+    caller,
+    ...args
+  }: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput> {
     const nowMs = this.nowMs();
     for (const binding of args.bindings) {
       AuthzGrantGuardsService.assertExpiryInFuture({
@@ -337,6 +340,11 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
         meta: { scopeType: binding.scopeType, scopeId: binding.scopeId },
       });
     }
+    await this.bindingWriter.assertBindingsWithinCaller({
+      organizationId: args.organizationId,
+      caller,
+      bindings: args.bindings,
+    });
     return this.options.ledger.attachBindings(args);
   }
 
@@ -348,7 +356,8 @@ export class AuthzGrantsService extends AuthzGrantsServiceContract {
     return this.options.ledger.revokeResourceGrants(args);
   }
 
-  async changeBindingRole(args: AuthzChangeBindingRoleInput): Promise<void> {
+  async changeBindingRole({ caller, ...args }: AuthzChangeBindingRoleInput): Promise<void> {
+    await this.bindingWriter.assertRoleChangeWithinCaller({ ...args, caller });
     return this.options.ledger.changeBindingRole(args);
   }
 

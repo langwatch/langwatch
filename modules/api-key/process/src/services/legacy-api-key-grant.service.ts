@@ -118,6 +118,7 @@ export class LegacyApiKeyGrantService {
     await this.options.grants.attachBindings({
       organizationId: apiKey.organizationId,
       bindings: [binding],
+      caller: { type: "system" },
       actor: { type: "system", id: "system:read-through-mint" },
       source: "read-through-mint",
       onDuplicate: "skip",

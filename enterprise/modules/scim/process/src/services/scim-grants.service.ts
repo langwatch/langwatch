@@ -144,6 +144,7 @@ export class ScimGrantsService {
           ...grant,
           bindingId: `rolebinding_${nowInstant().epochMilliseconds}_${bindingSequence++}`,
         })),
+        caller: { type: "system" },
         actor: input.actor,
         source: "scim",
         onDuplicate: "skip",

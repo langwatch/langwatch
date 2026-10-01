@@ -612,6 +612,7 @@ describe("BillingSubscriptionService", () => {
             membersToAdd: 3,
             customerId: "cus_123",
             invites: [{ email: "alice@example.com", role: "MEMBER" as any }],
+            invitedBy: { id: "user_1" },
           }),
         ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
       });
@@ -643,6 +644,7 @@ describe("BillingSubscriptionService", () => {
             { email: "alice@example.com", role: "MEMBER" as any },
             { email: "bob@example.com", role: "ADMIN" as any },
           ],
+          invitedBy: { id: "user_1" },
         });
 
         expect(result.url).toBe("https://checkout.stripe.com/seat-session");
@@ -651,10 +653,13 @@ describe("BillingSubscriptionService", () => {
             organizationId: "org_123",
             customerId: "cus_123",
             membersToAdd: 2,
-            invites: [
-              { email: "alice@example.com", role: "MEMBER", teamIds: "team_1" },
-              { email: "bob@example.com", role: "ADMIN", teamIds: "team_1" },
-            ],
+            invitations: {
+              invites: [
+                { email: "alice@example.com", role: "MEMBER", teamIds: "team_1" },
+                { email: "bob@example.com", role: "ADMIN", teamIds: "team_1" },
+              ],
+              by: { id: "user_1" },
+            },
           }),
         );
       });

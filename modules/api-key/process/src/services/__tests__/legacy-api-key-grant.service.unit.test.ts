@@ -80,6 +80,7 @@ describe("LegacyApiKeyGrantService", () => {
           scopeId: "org-1",
         },
       ],
+      caller: { type: "system" },
       actor: { type: "system", id: "system:read-through-mint" },
       source: "read-through-mint",
       onDuplicate: "skip",

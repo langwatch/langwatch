@@ -188,6 +188,8 @@ describe("when seats are bought for people who are not members yet", () => {
       membersToAdd: 4,
       customerId: CUSTOMER,
       invites: [{ email: "bo@acme.com", role: "MEMBER" }],
+      // Who invited: organization bounds the invitations by what they hold.
+      invitedBy: { id: "user_ana" },
     });
   });
 });

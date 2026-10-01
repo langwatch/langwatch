@@ -45,7 +45,10 @@ export const scimServer = defineServerModule("scim")
       bindRestMiddleware(scimTokenRestActor, (context) => {
         const credential = organizationCredentialOfRequest(context.req.raw);
 
-        return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
+        return {
+          actorId: credential.userId ?? `apikey:${credential.apiKeyId}`,
+          apiKeyId: credential.apiKeyId,
+        };
       }),
       bindRestMiddleware(scimRestCredential, (context) => {
         const credential = scimCredentialOfRequest(context.req.raw);

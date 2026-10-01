@@ -302,19 +302,20 @@ export class ProjectService {
       });
     } else {
       const teamName = input.newTeamName as string;
-      const team = await this.organizations.createTeam({
-        organizationId: input.organizationId,
-        name: teamName,
-      });
-      if (input.userId) {
-        await this.organizations.addTeamMember({
-          teamId: team.id,
-          organizationId: input.organizationId,
-          userId: input.userId,
-          role: "ADMIN",
-          actor: { type: "user", id: input.userId },
-        });
-      }
+      // Organization makes the creator the new team's ADMIN, answering as the creator.
+      const team = input.userId
+        ? await this.organizations.createTeamWithMembers(
+            {
+              organizationId: input.organizationId,
+              name: teamName,
+              members: [{ userId: input.userId, role: "ADMIN" }],
+            },
+            { id: input.userId },
+          )
+        : await this.organizations.createTeam({
+            organizationId: input.organizationId,
+            name: teamName,
+          });
 
       teamId = team.id;
     }

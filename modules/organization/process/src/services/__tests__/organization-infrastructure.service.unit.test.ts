@@ -232,10 +232,7 @@ class RecordingGrants extends AuthzGrantsService {
   readonly revokedInputs: AuthzRevokeBindingsWhereInput[] = [];
   readonly revokedBindingInputs: AuthzRevokeBindingsInput[] = [];
   removed = 1;
-  readonly attach = unsupported<AuthzGrantsService["attach"]>();
-  readonly update = unsupported<AuthzGrantsService["update"]>();
   readonly revoke = unsupported<AuthzGrantsService["revoke"]>();
-  readonly replace = unsupported<AuthzGrantsService["replace"]>();
   readonly offboard = unsupported<AuthzGrantsService["offboard"]>();
   readonly attachResourceGrant = unsupported<AuthzGrantsService["attachResourceGrant"]>();
   readonly revokeResourceGrants = unsupported<AuthzGrantsService["revokeResourceGrants"]>();
@@ -609,6 +606,7 @@ describe("OrganizationService", () => {
         teamId: "team",
         userId: "user",
         role: "MEMBER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).rejects.toBeInstanceOf(PersonalTeamProtectedError);
@@ -623,11 +621,14 @@ describe("OrganizationService", () => {
       teamId: "team",
       userId: "user",
       role: "MEMBER",
+      caller: { type: "user", id: "actor" },
       actor: { type: "user", id: "actor" },
     });
+    // The door forwards its caller: authz bounds the write by what that caller holds.
     expect(grants.attachedInputs[0]).toMatchObject({
       organizationId: "org",
       bindings: [{ principal: { userId: "user" }, scopeId: "team" }],
+      caller: { type: "user", id: "actor" },
     });
     await service.removeTeamMember({
       organizationId: "org",
@@ -650,6 +651,7 @@ describe("OrganizationService", () => {
         teamId: "team",
         userId: "stranger",
         role: "VIEWER",
+        caller: { type: "user", id: "actor" },
         actor: { type: "user", id: "actor" },
       }),
     ).rejects.toBeInstanceOf(UserNotInOrganizationError);
@@ -713,6 +715,7 @@ describe("OrganizationService", () => {
             scopeId: "team",
           },
         ],
+        caller: { type: "system" },
         actor: { type: "system", id: "system:personal-workspace" },
         source: "grants-service",
         onDuplicate: "skip",

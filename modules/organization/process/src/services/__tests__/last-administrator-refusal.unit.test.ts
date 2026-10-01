@@ -43,6 +43,7 @@ beforeEach(() => {
     sessions: createApiFixture<OrganizationSessionRevocation>(),
     grantCache: createApiFixture<OrganizationGrantCache>(),
     testArrivals: { standingFor: async () => ({ testing: false }) as const },
+    ceiling: { assertWithinCaller: async () => {} },
     admissions: {
       attachBindings: () => Promise.reject(new Error("no admission expected")),
       completeAdmission: () => Promise.reject(new Error("no admission expected")),

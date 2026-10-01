@@ -1,6 +1,10 @@
 import type { LedgerActor } from "@langwatch/actor";
 import { ledgerActorFor } from "@langwatch/actor";
-import type { AuthzGrantsService, AuthzLedgerBindingAttach } from "@langwatch/authz-contract";
+import type {
+  AuthzGrantCaller,
+  AuthzGrantsService,
+  AuthzLedgerBindingAttach,
+} from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
@@ -230,11 +234,13 @@ async function emitScopeBindingPlans({
   writer,
   organizationId,
   plans,
+  caller,
   actor,
 }: {
   writer: AuthzGrantsService;
   organizationId: string;
   plans: ScopeBindingPlan[];
+  caller: AuthzGrantCaller;
   actor: LedgerActor;
 }): Promise<void> {
   const revokeIds = plans.flatMap((plan) => plan.revokeIds);
@@ -252,6 +258,7 @@ async function emitScopeBindingPlans({
       bindingId: plan.change.bindingId,
       role: plan.change.role,
       customRoleId: plan.change.customRoleId,
+      caller,
       actor,
     });
   }
@@ -260,6 +267,7 @@ async function emitScopeBindingPlans({
     await writer.attachBindings({
       organizationId,
       bindings: attaches,
+      caller,
       actor,
       onDuplicate: "skip",
     });
@@ -911,6 +919,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           scopeId: created.team.id,
         },
       ],
+      caller: { type: "system" },
       actor: ledgerActorFor({
         userId: input.userId,
         fallback: "organizationService",
@@ -1843,6 +1852,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         writer: this.writer,
         organizationId,
         plans,
+        caller: input.caller,
         actor: ledgerActorFor({
           userId: input.currentUserId,
           fallback: "organizationService",
@@ -1862,7 +1872,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
   }
 
   async updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void> {
-    const { teamId, userId, role, customRoleId, currentUserId } = input;
+    const { teamId, userId, role, customRoleId, currentUserId, caller } = input;
     const planned = await this.prisma.$transaction((tx) =>
       customRoleId
         ? planCustomTeamRole({ tx, teamId, userId, currentUserId, customRoleId })
@@ -1873,6 +1883,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       writer: this.writer,
       organizationId: planned.organizationId,
       plans: [planned.plan],
+      caller,
       actor: ledgerActorFor({
         userId: currentUserId,
         fallback: "organizationService",

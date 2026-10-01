@@ -78,6 +78,7 @@ describe.skipIf(!DB_URL)(
 
         await expect(
           repository.updateMemberRole({
+            caller: { type: "system" },
             organizationId,
             userId: adminUserId,
             role: OrganizationUserRole.MEMBER,

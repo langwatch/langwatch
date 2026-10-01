@@ -14,6 +14,7 @@ import {
   type SubscriptionInvite,
 } from "@langwatch/enterprise-billing-contract";
 import { moduleApi } from "@langwatch/kernel/module-api";
+import type { OrganizationCaller } from "@langwatch/organization-contract";
 
 /** The customer this checkout is opened for, as the provider knows them. */
 export type BillingSubscriber = Readonly<{ email?: string | null }>;
@@ -72,6 +73,8 @@ export interface BillingSubscriptionApi {
     currency?: Currency;
     billingInterval?: SubscriptionBillingInterval;
     invites: readonly SubscriptionInvite[];
+    /** Who invited them: organization refuses invitations above what they hold. */
+    invitedBy: OrganizationCaller;
   }): Promise<{ url: string | null }>;
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
 }
@@ -165,7 +168,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   .withFacts(billingCallerEmailFact)
   .withPermission("organization:manage")
   // Checkout and the invitations that motivated it, as one act.
-  .handle(async ({ app, input }, email) => {
+  .handle(async ({ app, input, actor }, email) => {
     const customerId = await app.getOrCreateCustomerId({
       user: { email },
       organizationId: input.organizationId,
@@ -177,6 +180,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
       membersToAdd: input.totalSeats,
       customerId,
       invites: input.invites,
+      invitedBy: { id: actor.id },
       ...(input.currency === undefined ? {} : { currency: input.currency }),
       ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
     });

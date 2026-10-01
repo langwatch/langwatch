@@ -15,6 +15,7 @@ import {
   INGEST_KEY_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
+import type { AuthzGrantCaller } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 
@@ -31,6 +32,11 @@ function publicApiKey(row: StoredApiKey): ApiKey {
   const { hashedSecret: _hashedSecret, ...key } = row;
 
   return key;
+}
+
+/** Who answers for a key's grants: the person creating or editing it, else the system act. */
+function grantCaller(userId: string | null | undefined): AuthzGrantCaller {
+  return userId ? { type: "user", id: userId } : { type: "system" };
 }
 
 function actor(userId: string | null | undefined): {
@@ -72,6 +78,7 @@ export class ApiKeyLifecycleService {
     });
     await this.validateCreateBindings({
       userId: parsed.userId ?? null,
+      createdByUserId: parsed.createdByUserId ?? null,
       organizationId: parsed.organizationId,
       bindings,
       permissions,
@@ -116,6 +123,7 @@ export class ApiKeyLifecycleService {
       bindings: effectiveBindings,
       permissions,
       actor: actor(parsed.createdByUserId ?? parsed.userId),
+      caller: grantCaller(parsed.createdByUserId ?? parsed.userId),
       roleId: `apikey:${row.id}`,
     });
 
@@ -166,9 +174,11 @@ export class ApiKeyLifecycleService {
         organizationId: input.organizationId,
         ownerUserId: existing.userId,
       });
-      if (existing.userId) {
+      // A personal key is bounded by its owner; a service key by whoever edits it.
+      const ceilingUserId = existing.userId ?? input.callerUserId;
+      if (ceilingUserId) {
         await this.grants.assertCeiling({
-          userId: existing.userId,
+          userId: ceilingUserId,
           organizationId: input.organizationId,
           bindings: input.bindings,
           permissions: permissions ?? [],
@@ -185,6 +195,7 @@ export class ApiKeyLifecycleService {
             bindings: input.bindings,
             permissions,
             actor: actor(input.callerUserId),
+            caller: grantCaller(input.callerUserId),
             replace: true,
           });
 
@@ -336,6 +347,7 @@ export class ApiKeyLifecycleService {
 
   private async validateCreateBindings(input: {
     userId: string | null;
+    createdByUserId: string | null;
     organizationId: string;
     bindings: ApiKeyScope[];
     permissions: string[] | undefined;
@@ -356,9 +368,11 @@ export class ApiKeyLifecycleService {
       organizationId: input.organizationId,
       ownerUserId: input.userId,
     });
-    if (input.userId) {
+    // A personal key is bounded by its owner; a service key by the person creating it.
+    const ceilingUserId = input.userId ?? input.createdByUserId;
+    if (ceilingUserId) {
       await this.grants.assertCeiling({
-        userId: input.userId,
+        userId: ceilingUserId,
         organizationId: input.organizationId,
         bindings: input.bindings,
         permissions: input.permissions ?? [],

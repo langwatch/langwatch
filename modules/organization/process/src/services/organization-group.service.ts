@@ -3,6 +3,7 @@ import {
   GroupBindingNotFoundError,
   ScimManagedGroupError,
   addOrganizationGroupGrantInputSchema,
+  addOrganizationGroupMemberInputSchema,
   applyOrganizationGroupEditsInputSchema,
   changeOrganizationGroupMemberInputSchema,
   createOrganizationGroupInputSchema,
@@ -14,6 +15,7 @@ import {
   renameOrganizationGroupInputSchema,
   type AddOrganizationGroupGrantInput,
   type ApplyOrganizationGroupEditsInput,
+  type AddOrganizationGroupMemberInput,
   type ChangeOrganizationGroupMemberInput,
   type CreateOrganizationGroupInput,
   type DeleteOrganizationGroupInput,
@@ -45,6 +47,7 @@ export type OrganizationGroupDependencies = {
   grants: AuthzApi;
 };
 
+import { OrganizationGrantCeilingService } from "./organization-grant-ceiling.service.ts";
 import { OrganizationGroupGrantService } from "./organization-group-grant.service.ts";
 
 export class OrganizationGroupService {
@@ -135,6 +138,11 @@ export class OrganizationGroupService {
     });
     const bindings = parsed.grants ?? [];
     await this.bindings.validateGroupBindings(parsed.organizationId, bindings);
+    await OrganizationGrantCeilingService.create(this.grants).assertWithinCaller({
+      organizationId: parsed.organizationId,
+      caller: parsed.caller,
+      grants: bindings,
+    });
     const baseSlug = this.groupIdentities.slugify(parsed.name);
     const slug = await this.groups.nextAvailableSlug({
       organizationId: parsed.organizationId,
@@ -151,6 +159,7 @@ export class OrganizationGroupService {
       await this.grants.attachBindings({
         organizationId: parsed.organizationId,
         bindings: bindings.map((binding) => this.bindings.groupBindingWrite(group.id, binding)),
+        caller: parsed.caller,
         actor: parsed.actor,
         onDuplicate: "skip",
       });
@@ -191,12 +200,17 @@ export class OrganizationGroupService {
     await this.groups.delete(parsed);
   }
 
-  async addGroupMember(input: ChangeOrganizationGroupMemberInput): Promise<void> {
-    const parsed = changeOrganizationGroupMemberInputSchema.parse(input);
+  async addGroupMember(input: AddOrganizationGroupMemberInput): Promise<void> {
+    const parsed = addOrganizationGroupMemberInputSchema.parse(input);
     const group = await this.groups.get(parsed);
     if (group.scimSource) {
       throw new ScimManagedGroupError(group.id);
     }
+    await OrganizationGrantCeilingService.create(this.grants).assertWithinCaller({
+      organizationId: parsed.organizationId,
+      caller: parsed.caller,
+      grants: await this.bindings.readGroupBindings(parsed),
+    });
 
     await this.teams.getOrganizationMembers({
       organizationId: parsed.organizationId,
@@ -232,6 +246,7 @@ export class OrganizationGroupService {
     await this.grants.attachBindings({
       organizationId: parsed.organizationId,
       bindings: [write],
+      caller: parsed.caller,
       actor: parsed.actor,
       onDuplicate: "attach",
     });
@@ -298,9 +313,22 @@ export class OrganizationGroupService {
       userIds: memberIdsToAdd,
     });
     await this.bindings.validateGroupBindings(parsed.organizationId, parsed.grantsToCreate);
+    await OrganizationGrantCeilingService.create(this.grants).assertWithinCaller({
+      organizationId: parsed.organizationId,
+      caller: parsed.caller,
+      grants: parsed.grantsToCreate,
+    });
     const currentBindings = await this.bindings.readGroupBindings(parsed);
     const deletedIds = new Set(parsed.grantIdsToRevoke);
     const bindingsToDelete = currentBindings.filter(({ id }) => deletedIds.has(id));
+    if (memberIdsToAdd.length > 0) {
+      // New members receive what the group keeps holding, so the caller must hold it too.
+      await OrganizationGrantCeilingService.create(this.grants).assertWithinCaller({
+        organizationId: parsed.organizationId,
+        caller: parsed.caller,
+        grants: currentBindings.filter(({ id }) => !deletedIds.has(id)),
+      });
+    }
     await this.bindings.assertGroupScopes(parsed.organizationId, bindingsToDelete);
     if (bindingsToDelete.length > 0) {
       await this.grants.revokeBindings({
@@ -337,6 +365,7 @@ export class OrganizationGroupService {
         bindings: parsed.grantsToCreate.map((binding) =>
           this.bindings.groupBindingWrite(parsed.groupId, binding),
         ),
+        caller: parsed.caller,
         actor: parsed.actor,
         onDuplicate: "skip",
       });

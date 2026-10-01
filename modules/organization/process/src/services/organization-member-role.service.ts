@@ -2,10 +2,10 @@
  * Changing what a member may do: enabling and disabling a seat, and the cascading role update
  * across the organization and its teams.
  */
-import { GrantScopeTier } from "@langwatch/authz-contract";
+import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
 import {
   TeamRoleUpdateRejectedError,
-  type OrganizationUserRole,
+  OrganizationUserRole,
   type TeamUserRole,
   CannotDisableSelfError,
   MemberSeatLimitReachedError,
@@ -24,8 +24,13 @@ import type {
   UpdateMemberRoleResult,
 } from "../repositories/organization-membership.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
+import type {
+  OrganizationGrantCeilingService,
+  OrganizationIntendedGrant,
+} from "./organization-grant-ceiling.service.ts";
 
 /**
  * The union of permissions granted by the custom roles behind these team bindings, empty
@@ -72,6 +77,7 @@ type OrganizationMemberRoleDependencies = {
   seats: OrganizationSeatLicense;
   sessions: OrganizationSessionRevocation;
   grantCache: OrganizationGrantCache;
+  ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
 };
 
 export class OrganizationMemberRoleService {
@@ -176,12 +182,13 @@ export class OrganizationMemberRoleService {
     }[];
     /** Null when the actor is a service credential; self checks never match. */
     currentUserId: string | null;
+    /** Whose holdings bound the grants the change writes. */
+    caller: AuthzGrantCaller;
     planUser?: OrganizationPlanUser;
   }): Promise<UpdateMemberRoleResult> {
-    const { organizationId, userId, role, teamRoleUpdates, currentUserId } = params;
+    const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
 
     const currentMember = await this.repo.getMembership({ organizationId, userId });
-
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
@@ -220,6 +227,30 @@ export class OrganizationMemberRoleService {
     });
     const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
 
+    // Asked before anything is written: the seat commits ahead of the grants it caps.
+    await this.dependencies.ceiling.assertWithinCaller({
+      organizationId,
+      caller,
+      grants: [
+        ...(role === OrganizationUserRole.EXTERNAL
+          ? []
+          : [
+              {
+                role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+                scopeType: GrantScopeTier.ORGANIZATION,
+                scopeId: organizationId,
+              },
+            ]),
+        ...(teamRoleUpdates ?? []).map((update) =>
+          intendedTeamGrant({
+            teamId: update.teamId,
+            role: update.role,
+            customRoleId: update.customRoleId,
+          }),
+        ),
+      ],
+    });
+
     await this.dependencies.seats.assertRoleChangeAllowed({
       organizationId,
       currentRole: currentMember.role,
@@ -237,6 +268,7 @@ export class OrganizationMemberRoleService {
       currentMemberships,
       organizationTeamIds,
       currentUserId,
+      caller,
     });
   }
 
@@ -258,6 +290,7 @@ export class OrganizationMemberRoleService {
     currentMemberships: { teamId: string; role: TeamUserRole }[];
     organizationTeamIds: string[];
     currentUserId: string | null;
+    caller: AuthzGrantCaller;
   }): Promise<UpdateMemberRoleResult> {
     const {
       organizationId,
@@ -267,6 +300,7 @@ export class OrganizationMemberRoleService {
       currentMemberships,
       organizationTeamIds,
       currentUserId,
+      caller,
     } = params;
 
     const organizationTeamIdSet = new Set(organizationTeamIds);
@@ -308,6 +342,7 @@ export class OrganizationMemberRoleService {
       role,
       effectiveTeamRoleUpdates,
       currentUserId,
+      caller,
     });
   }
 
@@ -322,8 +357,16 @@ export class OrganizationMemberRoleService {
     role: string;
     customRoleId?: string;
     currentUserId: string;
+    /** The team's organization, resolved by the caller of this door. */
+    organizationId: string;
+    caller: AuthzGrantCaller;
   }): Promise<void> {
-    const { teamId, userId, role, customRoleId, currentUserId } = params;
+    const { teamId, userId, role, customRoleId, currentUserId, organizationId, caller } = params;
+    await this.dependencies.ceiling.assertWithinCaller({
+      organizationId,
+      caller,
+      grants: [intendedTeamGrant({ teamId, role, customRoleId })],
+    });
 
     if (isCustomRole(role)) {
       if (!customRoleId) {
@@ -338,6 +381,7 @@ export class OrganizationMemberRoleService {
         role: role as TeamUserRole,
         customRoleId,
         currentUserId,
+        caller,
       });
     } else {
       await this.repo.updateTeamMemberRole({
@@ -346,6 +390,7 @@ export class OrganizationMemberRoleService {
         role: role as TeamUserRole,
         customRoleId: undefined,
         currentUserId,
+        caller,
       });
     }
   }
@@ -353,4 +398,25 @@ export class OrganizationMemberRoleService {
   /**
    * Returns paginated, enriched audit log entries for an organization.
    */
+}
+
+/** The team grant a requested role resolves to: a built-in role, or `custom:<id>` with its id. */
+function intendedTeamGrant({
+  teamId,
+  role,
+  customRoleId,
+}: {
+  teamId: string;
+  role: string;
+  customRoleId?: string;
+}): OrganizationIntendedGrant {
+  if (role === "ADMIN" || role === "MEMBER" || role === "VIEWER") {
+    return { role, scopeType: GrantScopeTier.TEAM, scopeId: teamId };
+  }
+  return {
+    role: "CUSTOM",
+    customRoleId: customRoleId ?? null,
+    scopeType: GrantScopeTier.TEAM,
+    scopeId: teamId,
+  };
 }

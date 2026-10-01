@@ -266,6 +266,7 @@ describe("when an end date is not in the future", () => {
       service.attachBindings({
         organizationId: ORG,
         bindings: [binding],
+        caller: { type: "system" },
         actor: { type: "user", id: "admin_1" },
         onDuplicate: "attach",
       }),

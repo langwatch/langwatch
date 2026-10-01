@@ -261,6 +261,7 @@ export class RoleApp implements RoleApi {
       teamId: input.teamId,
       organizationId,
       customRoleId: input.customRoleId,
+      caller: callerOf(by),
       actor: actorOf(by),
     });
 
@@ -279,6 +280,7 @@ export class RoleApp implements RoleApi {
       teamId: input.teamId,
       organizationId,
       customRoleId: null,
+      caller: callerOf(by),
       actor: actorOf(by),
     });
 
@@ -488,6 +490,7 @@ export class RoleApp implements RoleApi {
     teamId: string;
     organizationId: string;
     customRoleId: string | null;
+    caller: AuthzPrincipalRef;
     actor: LedgerActor;
   }): Promise<void> {
     const role = input.customRoleId ? "CUSTOM" : "VIEWER";
@@ -508,6 +511,7 @@ export class RoleApp implements RoleApi {
         bindingId: existing.id,
         role,
         customRoleId: input.customRoleId,
+        caller: input.caller,
         actor: input.actor,
       });
 
@@ -526,6 +530,7 @@ export class RoleApp implements RoleApi {
           scopeId: input.teamId,
         },
       ],
+      caller: input.caller,
       actor: input.actor,
       onDuplicate: "skip",
     });

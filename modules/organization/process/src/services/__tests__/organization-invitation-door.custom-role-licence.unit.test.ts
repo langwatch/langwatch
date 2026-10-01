@@ -1,4 +1,5 @@
 import { createApiFixture } from "@langwatch/api-fixture";
+import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 /**
  * @vitest-environment node
@@ -30,7 +31,7 @@ class CustomRolesUnavailableError extends HandledError {
   }
 }
 
-function door(options: { customRolesAllowed: boolean }) {
+function door(options: { customRolesAllowed: boolean; beyondCaller?: string[] }) {
   const create = vi.fn(async () => ({
     organization: { id: ORGANIZATION_ID, members: [] },
     invites: [],
@@ -39,12 +40,19 @@ function door(options: { customRolesAllowed: boolean }) {
     if (!options.customRolesAllowed) throw new CustomRolesUnavailableError();
   });
 
-  const invitations = createApiFixture<OrganizationInvitations>({ create });
+  const createPaymentPending = vi.fn(async () => undefined);
+  const invitations = createApiFixture<OrganizationInvitations>({ create, createPaymentPending });
   const plans = createApiFixture<OrganizationPlanGate>({ assertCustomRolesAllowed });
   const signals = createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() });
 
+  const assertWithinCaller = vi.fn(async () => {
+    if (options.beyondCaller) throw new GrantExceedsCallerPermissionsError(options.beyondCaller);
+  });
+
   return {
     create,
+    createPaymentPending,
+    assertWithinCaller,
     assertCustomRolesAllowed,
     service: OrganizationInvitationDoorService.create({
       invitations,
@@ -53,6 +61,7 @@ function door(options: { customRolesAllowed: boolean }) {
       signals,
       lifecycle: { membersInvited: vi.fn(), inviteAccepted: vi.fn() },
       creationThrottle: { assertCreationAllowed: async () => {} },
+      ceiling: { assertWithinCaller },
       ensurePersonalWorkspace: vi.fn(async () => undefined),
     }),
   };
@@ -146,5 +155,93 @@ describe("given every invitation in the batch names a built-in team role", () =>
       expect(assertCustomRolesAllowed).not.toHaveBeenCalled();
       expect(create).toHaveBeenCalled();
     });
+  });
+});
+
+describe("given an inviter who lacks what the invitation would grant", () => {
+  /** @scenario "Inviting someone to a role above the inviter is refused and stores no invitation" */
+  it("refuses the batch before storing an invitation", async () => {
+    const { service, create, assertWithinCaller } = door({
+      customRolesAllowed: true,
+      beyondCaller: ["organization:manage"],
+    });
+
+    await expect(
+      service.create(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "lenient",
+          invites: [{ email: "accomplice@acme.test", role: "ADMIN", teams: [] }],
+        },
+        CALLER,
+      ),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(assertWithinCaller).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      caller: { type: "user", id: CALLER.id },
+      grants: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID }],
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("given an invitation that names its teams by the legacy team id list", () => {
+  /** @scenario "Inviting by legacy team ids is bounded by the inviter's own team access" */
+  it("asks the inviter's ceiling for each listed team at the default team role", async () => {
+    const { service, create, assertWithinCaller } = door({
+      customRolesAllowed: true,
+      beyondCaller: ["team:view"],
+    });
+
+    await expect(
+      service.create(
+        {
+          organizationId: ORGANIZATION_ID,
+          validation: "lenient",
+          invites: [{ email: "accomplice@acme.test", role: "MEMBER", teamIds: "team-1, team-2" }],
+        },
+        CALLER,
+      ),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(assertWithinCaller).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      caller: { type: "user", id: CALLER.id },
+      grants: [
+        { role: "MEMBER", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID },
+        { role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
+        { role: "MEMBER", scopeType: "TEAM", scopeId: "team-2" },
+      ],
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
+describe("given a seat checkout that carries invitations", () => {
+  /** @scenario Inviting through a seat checkout is bounded by the inviter */
+  it("asks the inviter's ceiling before holding any invitation for payment", async () => {
+    const { service, createPaymentPending, assertWithinCaller } = door({
+      customRolesAllowed: true,
+      beyondCaller: ["organization:manage"],
+    });
+
+    await expect(
+      service.createPaymentPending(
+        {
+          organizationId: ORGANIZATION_ID,
+          subscriptionId: "subscription-1",
+          invites: [{ email: "accomplice@acme.test", role: "ADMIN", teamIds: "team-1" }],
+        },
+        CALLER,
+      ),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(assertWithinCaller).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION_ID,
+      caller: { type: "user", id: CALLER.id },
+      grants: [
+        { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: ORGANIZATION_ID },
+        { role: "ADMIN", scopeType: "TEAM", scopeId: "team-1" },
+      ],
+    });
+    expect(createPaymentPending).not.toHaveBeenCalled();
   });
 });

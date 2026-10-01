@@ -3,7 +3,6 @@
  * credential, clearing the Enterprise plan gate SCIM groups require; writes
  * attribute to the grants ledger as the credential's own member.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   defineRestMiddleware,
   defineRestRouter,
@@ -28,11 +27,12 @@ import {
   organizationGroupRestRenameSchema,
   organizationGroupRestRenamedSchema,
   organizationRestSuccessSchema,
-  type OrganizationCaller,
   type OrganizationGroupGrant,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
 import { z } from "zod";
+
+import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
 
 /**
  * Whether the credential's organization holds the Enterprise plan groups
@@ -43,16 +43,6 @@ export const groupsRestEnterpriseGate = defineRestMiddleware(
   "groupsRestEnterpriseGate",
   z.object({}),
 );
-
-/**
- * Who a write is attributed to in the grants ledger (ADR-092): the member the
- * credential acts as, or the management API itself for a service key, which
- * acts as nobody.
- */
-const callerOf = (actor: { type: string; id?: string } | null): OrganizationCaller =>
-  actor && actor.type === "user" && actor.id
-    ? { id: actor.id }
-    : { id: SYSTEM_ACTORS.managementApi };
 
 /** One binding, as every route that reports one answers it. */
 const bindingWire = (binding: OrganizationGroupGrant) => ({
@@ -114,8 +104,9 @@ export const groupsRest: Readonly<{
   .withOutput(organizationGroupRestCreatedSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Create a new group" })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(groupsRestEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
+  .handle(async ({ app, input, scope, actor }, key) => {
     const group = await app.createGroup(
       {
         organizationId: scope.id,
@@ -123,7 +114,7 @@ export const groupsRest: Readonly<{
         ...(input.bindings ? { grants: input.bindings } : {}),
         ...(input.memberIds ? { memberIds: input.memberIds } : {}),
       },
-      callerOf(actor),
+      keyCallerOf({ actor, key }),
     );
 
     return {
@@ -177,9 +168,13 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Delete a group" })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(groupsRestEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
-    await app.deleteGroup({ groupId: input.groupId, organizationId: scope.id }, callerOf(actor));
+  .handle(async ({ app, input, scope, actor }, key) => {
+    await app.deleteGroup(
+      { groupId: input.groupId, organizationId: scope.id },
+      keyCallerOf({ actor, key }),
+    );
 
     return { success: true };
   })
@@ -203,13 +198,13 @@ export const groupsRest: Readonly<{
   .withOutput(organizationRestSuccessSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a member to a group" })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(groupsRestEnterpriseGate)
-  .handle(async ({ app, input, scope }) => {
-    await app.addGroupMember({
-      groupId: input.groupId,
-      organizationId: scope.id,
-      userId: input.userId,
-    });
+  .handle(async ({ app, input, scope, actor }, key) => {
+    await app.addGroupMember(
+      { groupId: input.groupId, organizationId: scope.id, userId: input.userId },
+      keyCallerOf({ actor, key }),
+    );
 
     return { success: true };
   })
@@ -252,12 +247,13 @@ export const groupsRest: Readonly<{
   .withOutput(organizationGroupRestBindingSchema)
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a role binding to a group" })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(groupsRestEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
+  .handle(async ({ app, input, scope, actor }, key) => {
     const { groupId: id, ...binding } = input;
     const created = await app.addGroupGrant(
       { groupId: id, organizationId: scope.id, grant: binding },
-      callerOf(actor),
+      keyCallerOf({ actor, key }),
     );
 
     return {
@@ -273,11 +269,12 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestBindingParamsSchema)
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Remove a role binding from a group" })
+  .withMiddleware(organizationKeyFacts)
   .withMiddleware(groupsRestEnterpriseGate)
-  .handle(async ({ app, input, scope, actor }) => {
+  .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeGroupGrant(
       { groupId: input.groupId, grantId: input.bindingId, organizationId: scope.id },
-      callerOf(actor),
+      keyCallerOf({ actor, key }),
     );
 
     return { success: true };

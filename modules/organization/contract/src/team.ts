@@ -1,3 +1,4 @@
+import { authzGrantCallerSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { organizationIdSchema } from "./organization.ts";
@@ -88,6 +89,7 @@ export const changeOrganizationTeamMemberInputSchema = z
 export const addOrganizationTeamMemberInputSchema =
   changeOrganizationTeamMemberInputSchema.safeExtend({
     role: organizationTeamRoleSchema,
+    caller: authzGrantCallerSchema,
   });
 export type AddOrganizationTeamMemberInput = z.infer<typeof addOrganizationTeamMemberInputSchema>;
 
@@ -208,6 +210,7 @@ export const createOrganizationTeamWithMembersInputSchema = z
     organizationId: organizationIdSchema,
     name: z.string().trim().min(1).max(255),
     members: z.array(organizationTeamMemberInputSchema),
+    caller: authzGrantCallerSchema,
     actor: organizationLedgerActorSchema,
   })
   .strict();
@@ -220,6 +223,7 @@ export const updateOrganizationTeamWithMembersInputSchema = z
     teamId: z.string().min(1),
     name: z.string().trim().min(1).max(255),
     members: z.array(organizationTeamMemberInputSchema),
+    caller: authzGrantCallerSchema,
     actor: organizationLedgerActorSchema,
   })
   .strict();

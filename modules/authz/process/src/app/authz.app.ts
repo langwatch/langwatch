@@ -46,10 +46,12 @@ import {
  * behind AuthzGrantsService and is never exported from the package root.
  */
 export interface AuthzCompatibilityLedger {
-  attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
+  attachBindings(
+    args: Omit<AuthzAttachBindingsInput, "caller">,
+  ): Promise<AuthzAttachBindingsOutput>;
   attachResourceGrant(args: AuthzAttachResourceGrantInput): Promise<void>;
   revokeResourceGrants(args: AuthzRevokeResourceGrantsInput): Promise<void>;
-  changeBindingRole(args: AuthzChangeBindingRoleInput): Promise<void>;
+  changeBindingRole(args: Omit<AuthzChangeBindingRoleInput, "caller">): Promise<void>;
   revokeBindings(args: AuthzRevokeBindingsInput): Promise<void>;
   revokeBindingsWhere(args: AuthzRevokeBindingsWhereInput): Promise<AuthzRevokeBindingsWhereOutput>;
   offboardMember(args: AuthzOffboardMemberInput): Promise<void>;
@@ -307,10 +309,7 @@ export class AuthzApp implements AuthzApi {
    * is a function of the grant's own content.
    */
   deriveGrantId: AuthzApi["deriveGrantId"] = (a) => this.#grantIdentity.deriveGrantId(a);
-  attach: AuthzApi["attach"] = (a) => this.#grants.attach(a);
-  update: AuthzApi["update"] = (a) => this.#grants.update(a);
   revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);
-  replace: AuthzApi["replace"] = (a) => this.#grants.replace(a);
   offboard: AuthzApi["offboard"] = (a) => this.#grants.offboard(a);
   invalidateOrganization: AuthzApi["invalidateOrganization"] = (a) =>
     this.#grants.invalidateOrganization(a);

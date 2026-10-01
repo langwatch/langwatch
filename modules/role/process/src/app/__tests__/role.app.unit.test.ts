@@ -1,6 +1,9 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzApi, AuthzDefineRoleInput } from "@langwatch/authz-contract";
-import { AuthzGrantNotConfirmedError } from "@langwatch/authz-contract";
+import {
+  AuthzGrantNotConfirmedError,
+  GrantExceedsCallerPermissionsError,
+} from "@langwatch/authz-contract";
 import { OrganizationNotFoundForTeamError } from "@langwatch/organization-contract";
 import {
   OrgExclusivePermissionScopeError,
@@ -215,6 +218,41 @@ describe("given a role that carries an organization-exclusive permission", () =>
       ).rejects.toBeInstanceOf(OrgExclusivePermissionScopeError);
       expect(attachBindings).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("given a caller assigning a custom role above what it holds", () => {
+  /** @scenario "The role bindings door and the grants door refuse escalation alike" */
+  it("hands authz the key it arrived on as the caller, and authz's refusal stands", async () => {
+    const changeBindingRole = vi.fn(async () => {
+      throw new GrantExceedsCallerPermissionsError(["traces:view"]);
+    });
+    const roles = MemoryRoleRepository.create();
+    roles.save(role());
+    const { app } = createRoleTestApp({
+      roles,
+      organizations: { getOrganizationIdByTeamId: async () => ORGANIZATION_ID },
+      permissions: {
+        listUserBindings: async () => [testBinding({ userId: "user-2", scopeId: "team-1" })],
+        changeBindingRole,
+      },
+    });
+
+    await expect(
+      app.assignRoleToUser(
+        { userId: "user-2", teamId: "team-1", customRoleId: "role-1" },
+        { id: "user-1", apiKeyId: "key-1" },
+      ),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(changeBindingRole).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORGANIZATION_ID,
+        bindingId: "binding-1",
+        role: "CUSTOM",
+        customRoleId: "role-1",
+        caller: { type: "apiKey", id: "key-1" },
+      }),
+    );
   });
 });
 

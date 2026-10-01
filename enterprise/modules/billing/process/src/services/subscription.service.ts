@@ -17,6 +17,7 @@ import {
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
 import { createLogger } from "@langwatch/observability";
+import type { OrganizationCaller } from "@langwatch/organization-contract";
 import type Stripe from "stripe";
 
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
@@ -288,6 +289,7 @@ export class BillingSubscriptionService {
     currency,
     billingInterval,
     invites,
+    invitedBy,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -296,6 +298,8 @@ export class BillingSubscriptionService {
     currency?: Currency;
     billingInterval?: BillingInterval;
     invites: readonly SubscriptionInvite[];
+    /** Who invited them: organization refuses invitations above what they hold. */
+    invitedBy: OrganizationCaller;
   }): Promise<{ url: string | null }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
@@ -312,11 +316,14 @@ export class BillingSubscriptionService {
       billingInterval: billingInterval ?? "monthly",
       membersToAdd,
       isUpgradeFromTiered: pricingModel === "TIERED",
-      invites: invites.map((invite) => ({
-        email: invite.email,
-        role: invite.role,
-        teamIds: teamId,
-      })),
+      invitations: {
+        invites: invites.map((invite) => ({
+          email: invite.email,
+          role: invite.role,
+          teamIds: teamId,
+        })),
+        by: invitedBy,
+      },
     });
   }
 

@@ -4,6 +4,7 @@
  * asks of the application and how it answers.
  * @see specs/groups/groups-rest-api.feature
  */
+import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
@@ -19,9 +20,12 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { groupsRest, groupsRestEnterpriseGate } from "../group.rest.ts";
+import { organizationKeyFacts } from "../organization-management.rest.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const CREDENTIAL = "organization-credential";
+const KEY_ID = "key-1";
+const OWNER_CALLER = { id: "user-owner", apiKeyId: KEY_ID };
 const CREATED_AT = new Date("2026-09-01T00:00:00.000Z");
 
 const onError = createCanonicalFamilyErrorHandler({
@@ -29,13 +33,17 @@ const onError = createCanonicalFamilyErrorHandler({
   label: "Groups API Error",
 });
 
-function mount(app: Partial<OrganizationApi>) {
+/** `owner: null` is a service key: the runtime hands over no actor (api-surface.ts keyOwner). */
+function mount(
+  app: Partial<OrganizationApi>,
+  { owner = "user-owner" }: { owner?: string | null } = {},
+) {
   const admit = (request: Request) => {
     if (request.headers.get("Authorization") !== `Bearer ${CREDENTIAL}`) {
       throw new UnauthorizedError("Invalid credential");
     }
     return {
-      actor: { type: "user" as const, id: "user-owner" },
+      actor: owner ? { type: "user" as const, id: owner } : null,
       scope: { tier: "organization" as const, id: ORGANIZATION_ID },
     };
   };
@@ -49,7 +57,10 @@ function mount(app: Partial<OrganizationApi>) {
   const hono = runtime.mount(groupsRest.router(), {
     app: () => createApiFixture<OrganizationApi>(app),
     onError,
-    facts: [bindRestMiddleware(groupsRestEnterpriseGate, () => ({}))],
+    facts: [
+      bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID })),
+      bindRestMiddleware(groupsRestEnterpriseGate, () => ({})),
+    ],
   });
 
   return (
@@ -193,7 +204,7 @@ describe("given the /api/groups family", () => {
           grants: bindings,
           memberIds: ["alice-user-id"],
         },
-        { id: "user-owner" },
+        OWNER_CALLER,
       );
     });
 
@@ -283,7 +294,7 @@ describe("given the /api/groups family", () => {
       await expect(response.json()).resolves.toEqual({ success: true });
       expect(deleteGroup).toHaveBeenCalledWith(
         { groupId: "group_temp", organizationId: ORGANIZATION_ID },
-        { id: "user-owner" },
+        OWNER_CALLER,
       );
     });
 
@@ -325,11 +336,11 @@ describe("given the /api/groups family", () => {
       });
 
       expect(response.status).toBe(201);
-      expect(addGroupMember).toHaveBeenCalledWith({
-        groupId: "group_1",
-        organizationId: ORGANIZATION_ID,
-        userId: "charlie",
-      });
+      expect(addGroupMember).toHaveBeenCalledWith(
+        { groupId: "group_1", organizationId: ORGANIZATION_ID, userId: "charlie" },
+        // Who asked: the key's own grants bound who it may add to the group.
+        OWNER_CALLER,
+      );
     });
 
     /** @scenario DELETE /api/groups/:id/members/:userId removes a member */
@@ -376,8 +387,25 @@ describe("given the /api/groups family", () => {
           organizationId: ORGANIZATION_ID,
           grant: { role: "MEMBER", scopeType: "TEAM", scopeId: "frontend-team-id" },
         },
-        { id: "user-owner" },
+        OWNER_CALLER,
       );
+    });
+
+    /** @scenario A service key grants through the organization doors, bounded by its own grants */
+    it("hands a service key's grant on as the key itself, not as nobody", async () => {
+      const addGroupGrant = vi.fn(async () => binding);
+      const send = mount({ addGroupGrant }, { owner: null });
+
+      const response = await send("/api/groups/group_1/bindings", {
+        method: "POST",
+        body: { role: "MEMBER", scopeType: "TEAM", scopeId: "frontend-team-id" },
+      });
+
+      expect(response.status).toBe(201);
+      expect(addGroupGrant).toHaveBeenCalledWith(expect.anything(), {
+        id: SYSTEM_ACTORS.managementApi,
+        apiKeyId: KEY_ID,
+      });
     });
 
     /** @scenario DELETE /api/groups/:id/bindings/:bindingId removes a binding */
@@ -390,7 +418,7 @@ describe("given the /api/groups family", () => {
       expect(response.status).toBe(200);
       expect(removeGroupGrant).toHaveBeenCalledWith(
         { groupId: "group_1", grantId: "rb_123", organizationId: ORGANIZATION_ID },
-        { id: "user-owner" },
+        OWNER_CALLER,
       );
     });
 

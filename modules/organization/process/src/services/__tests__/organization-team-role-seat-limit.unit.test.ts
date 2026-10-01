@@ -33,6 +33,7 @@ function serviceWhere(options: {
     sessions: { revokeAllBrowserSessions: vi.fn() },
     grantCache: { invalidateOrganization: vi.fn() },
     testArrivals: { standingFor: async (): Promise<{ testing: false }> => ({ testing: false }) },
+    ceiling: { assertWithinCaller: async () => {} },
     admissions: { attachBindings: vi.fn(), completeAdmission: vi.fn() },
   });
 

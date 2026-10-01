@@ -60,6 +60,9 @@ export type ScimTokenAuditEntry = Readonly<{
   args: Readonly<Record<string, unknown>>;
 }>;
 
+/** Who mints a token: the member, and the organization key the call arrived on (which bounds it). */
+export type ScimTokenCaller = Readonly<{ id: string; apiKeyId?: string | null }>;
+
 export interface ScimApi {
   // ── The organization's provisioning tokens ───────────────────────────────
 
@@ -84,12 +87,15 @@ export interface ScimApi {
    * Mints a token for one directory connection. `connectionId` is the whole of
    * the token's write authority, so it is named rather than defaulted.
    */
-  generateToken(input: {
-    organizationId: string;
-    connectionId?: string | undefined;
-    description?: string | undefined;
-    secret?: string | undefined;
-  }): Promise<IssuedScimToken>;
+  generateToken(
+    input: {
+      organizationId: string;
+      connectionId?: string | undefined;
+      description?: string | undefined;
+      secret?: string | undefined;
+    },
+    by: ScimTokenCaller,
+  ): Promise<IssuedScimToken>;
   /** Retires one token. Idempotent from the caller's side. */
   revokeToken(input: { organizationId: string; tokenId: string }): Promise<{ success: true }>;
   /**

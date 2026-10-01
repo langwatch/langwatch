@@ -32,13 +32,17 @@ export const scimTokenTrpcTransport: TrpcRouterDeclaration<ScimApi, typeof scimT
 
     .procedure("generate")
     .withPermission("sso:manage")
-    .handle(({ app, input }) =>
-      app.generateToken({
-        organizationId: input.organizationId,
-        connectionId: input.connectionId,
-        description: input.description,
-        secret: input.secret,
-      }),
+    .handle(({ app, input, actor }) =>
+      app.generateToken(
+        {
+          organizationId: input.organizationId,
+          connectionId: input.connectionId,
+          description: input.description,
+          secret: input.secret,
+        },
+        // Only a full organization admin may mint: the token hands on directory group grants.
+        { id: actor.id },
+      ),
     )
 
     .procedure("revoke")

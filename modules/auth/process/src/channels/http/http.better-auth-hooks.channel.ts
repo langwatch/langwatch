@@ -90,6 +90,7 @@ const grantDefaultOrgMembership = ({
     ],
     // The signup is the product acting on a domain rule, not an
     // administrator granting access.
+    caller: { type: "system" },
     actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
     onDuplicate: "skip",
   });

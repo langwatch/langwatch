@@ -12,6 +12,7 @@ import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
 import { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 import { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
 import {
+  organizationKeyFacts,
   organizationManagementEnterpriseGate,
   organizationManagementRest,
 } from "./transport/organization-management.rest.ts";
@@ -53,6 +54,10 @@ export const organizationServer = defineServerModule("organization")
     };
 
     return [
+      // Escalation is bounded by the key itself, never by its owner's wider standing.
+      bindRestMiddleware(organizationKeyFacts, (context) => ({
+        apiKeyId: organizationCredentialOfRequest(context.req.raw).apiKeyId,
+      })),
       bindRestMiddleware(groupsRestEnterpriseGate, requireEnterprise),
       bindRestMiddleware(organizationManagementEnterpriseGate, requireEnterprise),
     ];
