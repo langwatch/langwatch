@@ -12,7 +12,7 @@ import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
  */
 
 /** Source files a folder may hold before it is a filing cabinet rather than a module. */
-export const FOLDER_BUDGET = 12;
+export const FOLDER_BUDGET = 30;
 
 /** Below this many lines a file is suspected of being a paragraph of another file. */
 export const FRAGMENT_FLOOR = 20;
