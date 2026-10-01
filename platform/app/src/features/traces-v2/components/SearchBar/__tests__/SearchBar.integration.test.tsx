@@ -432,8 +432,10 @@ describe("<SearchBar /> ask affordance", () => {
   });
 });
 
-// `isInstantEvalAvailable = instantEvalsReleased || instantEvalsFlagLoading`
-// (SearchBar.tsx) is the gate every eval-chip submit runs through before it
+// `useInstantEvalAccess` (read by SearchBar.tsx) is the gate: the release
+// flag read or the organization's access read, either one released or still
+// loading, which the suite drives through `featureFlagMock` and `accessMock`. It is
+// the gate every eval-chip submit runs through before it
 // is allowed to reach the estimate. These tests drive a real submit through
 // `useSearchSubmitRequestStore` — the same door a page button uses — since
 // jsdom cannot type into TipTap (see the file banner). That store's request
