@@ -55,11 +55,6 @@ export function useActiveScope(): UiActiveScopeReading {
   return useUiSessionSnapshot().scope;
 }
 
-/** Reads fail-closed grants from the application's one capability publisher. */
-export function usePermissions(): UiPermissionsReading {
-  return useUiSessionSnapshot().permissions;
-}
-
 function useUiSessionSnapshot(): UiSessionSnapshot {
   const { session } = useUiCapabilities();
   return session.snapshot();

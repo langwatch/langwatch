@@ -83,7 +83,7 @@ const UiScopeHostContext = createContext<UiScopeHost | undefined>(void 0);
 export const UiScopeHostProvider = UiScopeHostContext.Provider;
 
 /** The scope host above this screen, or undefined where none is mounted. */
-export function useOptionalUiScopeHost(): UiScopeHost | undefined {
+function useOptionalUiScopeHost(): UiScopeHost | undefined {
   return useContext(UiScopeHostContext);
 }
 

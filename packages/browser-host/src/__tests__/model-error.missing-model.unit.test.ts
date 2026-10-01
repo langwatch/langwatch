@@ -4,11 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
-  extractMissingModelInfo,
-  isHandledByMissingModelHandler,
-  markAsHandledByMissingModelHandler,
-} from "../model-error.ts";
+import { extractMissingModelInfo } from "../model-error.ts";
 
 /** The serialised envelope a failed call carries, whatever raised it. */
 function buildError(cause: Record<string, unknown> | undefined, code = "BAD_REQUEST"): Error {
@@ -78,17 +74,5 @@ describe("extractMissingModelInfo()", () => {
       expect(extractMissingModelInfo(null)).toBeNull();
       expect(extractMissingModelInfo(undefined)).toBeNull();
     });
-  });
-});
-
-describe("isHandledByMissingModelHandler()", () => {
-  it("returns true for an error previously marked", () => {
-    const err = new Error("Model not configured");
-    markAsHandledByMissingModelHandler(err);
-    expect(isHandledByMissingModelHandler(err)).toBe(true);
-  });
-
-  it("returns false for an unmarked error", () => {
-    expect(isHandledByMissingModelHandler(new Error("plain"))).toBe(false);
   });
 });

@@ -51,12 +51,7 @@ interface UpgradeModalState {
   isOpen: boolean;
   variant: UpgradeModalVariant | null;
 
-  // Legacy fields kept for backward compatibility with existing callers.
-  limitType: LimitType | null;
-  current: number | null;
-  max: number | null;
-
-  /** Open the modal in limit enforcement mode. Backward-compatible signature. */
+  /** Open the modal in limit enforcement mode. */
   open: (limitType: LimitType, current: number, max: number) => void;
 
   /** Open the modal in seats confirmation mode. */
@@ -75,18 +70,10 @@ export const useUpgradeModalStore = defineSlice<UpgradeModalState>({
   create: (set) => ({
     isOpen: false,
     variant: null,
-    limitType: null,
-    current: null,
-    max: null,
-
     open: (limitType, current, max) =>
       set({
         isOpen: true,
         variant: { mode: "limit", limitType, current, max },
-        // Populate legacy fields so existing callers (GlobalUpgradeModal, etc.) keep working.
-        limitType,
-        current,
-        max,
       }),
 
     openSeats: ({ organizationId, currentSeats, newSeats, onConfirm }) =>
@@ -99,29 +86,18 @@ export const useUpgradeModalStore = defineSlice<UpgradeModalState>({
           newSeats,
           onConfirm,
         },
-        // Clear legacy fields since seats mode does not use them.
-        limitType: null,
-        current: null,
-        max: null,
       }),
 
     openLiteMemberRestriction: ({ resource }) =>
       set({
         isOpen: true,
         variant: { mode: "liteMemberRestriction", resource },
-        // Clear legacy fields since lite member restriction mode does not use them.
-        limitType: null,
-        current: null,
-        max: null,
       }),
 
     close: () =>
       set({
         isOpen: false,
         variant: null,
-        limitType: null,
-        current: null,
-        max: null,
       }),
   }),
 });

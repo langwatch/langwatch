@@ -35,16 +35,8 @@ function readRole(role: string | undefined): ModelErrorRole | null {
   return role !== undefined && MODEL_ERROR_ROLES.includes(role) ? (role as ModelErrorRole) : null;
 }
 
-// --- Missing-model (ModelNotConfiguredError) dedup ---
-const handledMissingModelErrors = new WeakSet<Error>();
-
 export function markAsHandledByMissingModelHandler(error: Error): void {
-  handledMissingModelErrors.add(error);
   markHandledGlobally(error);
-}
-
-export function isHandledByMissingModelHandler(error: unknown): boolean {
-  return error instanceof Error && handledMissingModelErrors.has(error);
 }
 
 export interface MissingModelExtracted {
@@ -75,16 +67,8 @@ export function extractMissingModelInfo(error: unknown): MissingModelExtracted |
   };
 }
 
-// --- Provider-disabled (ModelProviderDisabledError) dedup ---
-const handledProviderDisabledErrors = new WeakSet<Error>();
-
 export function markAsHandledByProviderDisabledHandler(error: Error): void {
-  handledProviderDisabledErrors.add(error);
   markHandledGlobally(error);
-}
-
-export function isHandledByProviderDisabledHandler(error: unknown): boolean {
-  return error instanceof Error && handledProviderDisabledErrors.has(error);
 }
 
 export interface ProviderDisabledExtracted {

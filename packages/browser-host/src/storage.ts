@@ -27,11 +27,6 @@ export function writeUiStorage(key: string, value: string): void {
   installed?.write(key, value);
 }
 
-/** Forgets a value on this device. */
-export function removeUiStorage(key: string): void {
-  installed?.remove(key);
-}
-
 /**
  * The browser's own store, for the shell and for tests wanting the same
  * behavior. Every accessor can throw, so a refusal reads as "nothing

@@ -76,7 +76,7 @@ export function useUiSlots(): UiSlots {
 }
 
 /** The component filling one slot, for a screen that needs the element itself. */
-export function useUiSlot<Name extends UiSlotName>(name: Name): UiSlotComponent<Name> | undefined {
+function useUiSlot<Name extends UiSlotName>(name: Name): UiSlotComponent<Name> | undefined {
   return useUiSlots().filled(name);
 }
 

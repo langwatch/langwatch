@@ -158,14 +158,6 @@
       "types": "./dist/posthog.d.ts",
       "default": "./src/posthog.ts"
     },
-    "./gtag-readiness": {
-      "types": "./dist/gtag-readiness.d.ts",
-      "default": "./src/gtag-readiness.ts"
-    },
-    "./poll-for-global": {
-      "types": "./dist/poll-for-global.d.ts",
-      "default": "./src/poll-for-global.ts"
-    },
     "./browser-tracing": {
       "types": "./dist/browser-tracing.d.ts",
       "default": "./src/browser-tracing.ts"
