@@ -47,3 +47,5 @@ Feature: The oxlint built-ins the repository enables workspace-wide
       When its workspace-wide rules are read
       Then vitest/valid-expect and vitest/valid-title are at error
       And vitest/require-mock-type-parameters is off
+
+  Rule: `react/error-boundaries`, `react/globals`, `react/immutability`, `react/incompatible-library`, `react/preserve-manual-memoization`, `react/purity`, `react/refs`, `react/set-state-in-effect`, `react/set-state-in-render`, `react/static-components`, `react/use-memo` and `react/void-use-memo` are registered at off until the React Compiler findings are fixed
