@@ -44,7 +44,7 @@ kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
 ```
 
 <Warning>
-`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. See [Production Deployment](#production-deployment) below.
+`autogen.enabled=true` generates random secrets on each install. This is fine for testing but not for production, secrets change on reinstall and invalidate sessions. Under Argo CD it is worse: Argo renders without cluster access, so the secrets rotate on **every sync**. See [Production Deployment](#production-deployment) below.
 </Warning>
 
 ### Operator access and feature flags
@@ -101,10 +101,28 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
   --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
   --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
   --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
+  --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"
 ```
 
-If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines.
+If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines. With `langyagent.chartManaged: false`, skip `LANGY_INTERNAL_SECRET`; otherwise the app and worker pods will not start without it. The two `LWQL_*` keys are optional: without them LangWatchQL stays unprovisioned.
+
+<Note>
+`autogen.enabled` is one switch for every Secret the chart generates (app, gateway, Langy, LangWatchQL and ClickHouse credentials). It has nothing to do with which databases are chart-managed. To bring your own PostgreSQL, Redis or ClickHouse, set that database's `chartManaged: false`. External PostgreSQL needs a user that can `CREATE ROLE`, or a pre-created `lwql_ro` role (see the chart README).
+</Note>
+
+<Note>
+**Clusters that forbid root pods** (Pod Security `restricted`, Kyverno/Gatekeeper `runAsNonRoot` policies): the Langy assistant pod runs as UID 0 with a small set of added capabilities, which it needs to isolate each session under its own UID. If your policy blocks that, turn Langy off. Everything else runs unchanged:
+
+```yaml
+langyagent:
+  chartManaged: false
+```
+
+This removes the pod and every reference to it, and `LANGY_INTERNAL_SECRET` is no longer needed. See [Langy](/self-hosting/langy/overview) for running it under a sandboxed runtime instead.
+</Note>
 
 For chart-managed ClickHouse (the default), create the credentials Secret too. With `autogen.enabled=false` the chart does not materialise this Secret itself. The deployment composes `CLICKHOUSE_URL` at runtime from the password key:
 
@@ -435,7 +453,7 @@ Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
-   The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+   The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
