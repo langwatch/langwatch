@@ -1,4 +1,3 @@
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
@@ -22,7 +21,6 @@ const USER_METHODS_REFUSED = new Set(["updateMany", "delete", "deleteMany"]);
 export interface AdminBackofficeServiceOptions {
   repository: AdminBackofficeRepository;
   users: UserApi;
-  auth: AuthApi;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -50,20 +48,17 @@ type UserSideEffectAudit = { action: string; payload: Record<string, unknown> };
 export class AdminBackofficeService {
   private readonly repository: AdminBackofficeRepository;
   private readonly users: UserApi;
-  private readonly auth: AuthApi;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
 
   private constructor(deps: {
     repository: AdminBackofficeRepository;
     users: UserApi;
-    auth: AuthApi;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
   }) {
     this.repository = deps.repository;
     this.users = deps.users;
-    this.auth = deps.auth;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
   }
@@ -72,7 +67,6 @@ export class AdminBackofficeService {
     return new AdminBackofficeService({
       repository: options.repository,
       users: options.users,
-      auth: options.auth,
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
     });
@@ -185,7 +179,7 @@ export class AdminBackofficeService {
     return { action: "update/user", payload: { id: userId, deactivate: true } };
   }
 
-  /** Saves the normalised email; a real change signs the user out of every browser. */
+  /** Saves the normalised email; user signs the user out of every browser on a real change. */
   private async applyEmailChange({
     userId,
     email: rawEmail,
@@ -194,11 +188,7 @@ export class AdminBackofficeService {
     email: string;
   }): Promise<UserSideEffectAudit> {
     const email = rawEmail.trim().toLowerCase();
-    const previous = await this.users.findById({ id: userId });
-    const updated = await this.users.updateProfile({ id: userId, email });
-    if (previous && (previous.email ?? "").toLowerCase() !== updated.email) {
-      await this.auth.revokeAllBrowserSessions({ userId });
-    }
+    await this.users.updateProfile({ id: userId, email });
     return { action: "update/user", payload: { id: userId, email } };
   }
 

@@ -1,20 +1,12 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`AdminBackofficeService user update > changes the email and revokes sessions 1`] = `
+exports[`AdminBackofficeService user update > changes the email through user 1`] = `
 {
   "log": [
-    [
-      "users.findById",
-      "user-1",
-    ],
     [
       "users.updateProfile",
       "user-1",
       "new@example.com",
-    ],
-    [
-      "auth.revokeAllBrowserSessions",
-      "user-1",
     ],
     [
       "audit.record",
@@ -49,17 +41,9 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
       },
     ],
     [
-      "users.findById",
-      "user-1",
-    ],
-    [
       "users.updateProfile",
       "user-1",
       "a@b.c",
-    ],
-    [
-      "auth.revokeAllBrowserSessions",
-      "user-1",
     ],
     [
       "audit.record",
@@ -169,13 +153,9 @@ exports[`AdminBackofficeService user update > deactivates through user, as the o
 }
 `;
 
-exports[`AdminBackofficeService user update > keeps sessions when the email is unchanged 1`] = `
+exports[`AdminBackofficeService user update > normalises the email before handing it to user 1`] = `
 {
   "log": [
-    [
-      "users.findById",
-      "user-1",
-    ],
     [
       "users.updateProfile",
       "user-1",

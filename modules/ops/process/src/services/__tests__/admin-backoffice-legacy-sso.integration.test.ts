@@ -4,7 +4,6 @@
  * the presentation registry. Spec: specs/identity/sso-onboarding-tiers.feature
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
@@ -43,7 +42,6 @@ function backoffice(connectionDecides = true) {
     auditLog: createApiFixture<AuditLogApi>(),
     authz: createApiFixture<AuthzApi>(),
     users: new TestUserApi(),
-    auth: createApiFixture<AuthApi>(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
     scheduler: {
       schedules: createApiFixture<AutomationApi>(),

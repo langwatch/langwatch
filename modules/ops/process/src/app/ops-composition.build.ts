@@ -1,5 +1,4 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   type EventSourcing,
@@ -285,7 +284,6 @@ export function buildOpsInfrastructure(input: {
         audit: new UnauditedOpsAuditSink(members.logger),
         auditLog: dependencies.auditLog,
         users: dependencies.users,
-        auth: dependencies.auth,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -377,7 +375,6 @@ export interface OpsOperationsOptions {
   redis?: IORedis | Cluster | undefined;
   queuePayloads?: QueuePayloadDecoder | undefined;
   users: UserApi;
-  auth: AuthApi;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -419,7 +416,6 @@ export class OpsOperations {
       adminBackoffice: AdminBackofficeService.create({
         repository: PrismaAdminBackofficeRepository.create(this.options.database),
         users: this.options.users,
-        auth: this.options.auth,
         audit: this.options.audit,
         ssoRouting: this.options.ssoRouting,
       }),

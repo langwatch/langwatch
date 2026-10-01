@@ -1,6 +1,4 @@
-import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { AdminBackofficeRepository } from "../../repositories/admin-backoffice.repository.ts";
@@ -48,18 +46,9 @@ async function updateUser(data: Record<string, unknown>) {
         log.push(["users.deactivate", id, actor]);
         return { ...backofficeOperator, id };
       },
-      findById: async ({ id }) => {
-        log.push(["users.findById", id]);
-        return { ...backofficeOperator, id, email: "same@example.com" };
-      },
       updateProfile: async ({ id, email }) => {
         log.push(["users.updateProfile", id, email]);
         return { ...backofficeOperator, id, email: email ?? null };
-      },
-    }),
-    auth: createApiFixture<AuthApi>({
-      revokeAllBrowserSessions: async ({ userId }) => {
-        log.push(["auth.revokeAllBrowserSessions", userId]);
       },
     }),
     audit: new RecordingAudit(log),
@@ -86,8 +75,8 @@ describe("AdminBackofficeService user update", () => {
       "deactivates on an unreadable picked date as on a readable one",
       { deactivatedAt: "not a date" },
     ],
-    ["changes the email and revokes sessions", { email: " New@Example.com " }],
-    ["keeps sessions when the email is unchanged", { email: "SAME@example.com" }],
+    ["changes the email through user", { email: " New@Example.com " }],
+    ["normalises the email before handing it to user", { email: "SAME@example.com" }],
     ["saves plain fields only", { name: "Only" }],
     ["combines every side effect", { deactivatedAt: null, email: "a@b.c", name: "N" }],
   ])("%s", async (_label, data) => {
@@ -99,7 +88,6 @@ describe("AdminBackofficeService user update", () => {
     const service = AdminBackofficeService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
-      auth: createApiFixture<AuthApi>({}),
       audit: new RecordingAudit(log),
     });
     const params = { id: "user-1", data: { deactivatedAt: 5, name: "X" } };
@@ -128,7 +116,6 @@ describe("AdminBackofficeService user writes past the user module", () => {
     const service = AdminBackofficeService.create({
       repository: new RecordingRepository(log),
       users: new TestUserApi({}),
-      auth: createApiFixture<AuthApi>({}),
       audit: new RecordingAudit(log),
     });
 
@@ -148,7 +135,6 @@ describe("AdminBackofficeService user create", () => {
       const service = AdminBackofficeService.create({
         repository: new RecordingRepository(log),
         users: new TestUserApi({}),
-        auth: createApiFixture<AuthApi>({}),
         audit: new RecordingAudit(log),
       });
       const params = { data: { email: "new@example.com", deactivatedAt } };

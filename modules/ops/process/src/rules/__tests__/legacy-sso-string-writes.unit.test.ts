@@ -1,5 +1,3 @@
-import type { AuthApi } from "@langwatch/auth-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -19,7 +17,6 @@ function backoffice(connectionDecides: boolean) {
   const service = AdminBackofficeService.create({
     repository,
     users: new TestUserApi(),
-    auth: createApiFixture<AuthApi>(),
     audit: new AuditStub(),
     ssoRouting: { connectionDecides: async () => connectionDecides },
   });
