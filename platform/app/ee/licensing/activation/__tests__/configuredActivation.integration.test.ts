@@ -12,7 +12,10 @@ import { TEST_PUBLIC_KEY } from "../../__tests__/fixtures/testKeys";
 import { VALID_LICENSE_KEY } from "../../__tests__/fixtures/testLicenses";
 import { LicenseHandler } from "../../licenseHandler";
 import { validateLicense } from "../../validation";
-import { activateConfiguredLicense } from "../configuredActivation";
+import {
+  activateConfiguredLicense,
+  type ConfiguredActivationDependencies,
+} from "../configuredActivation";
 
 const TEST_ORG_SLUG = "configured-activation-test-org";
 
@@ -42,7 +45,7 @@ describe("activateConfiguredLicense against the database", () => {
     if (org) await prisma.organization.delete({ where: { id: org.id } });
   });
 
-  const boot = (activate: ReturnType<typeof vi.fn>) =>
+  const boot = (activate: ConfiguredActivationDependencies["activate"]) =>
     activateConfiguredLicense({
       value: "LW-A1B2-C3D4-E5F6-G7H8",
       connectPermitted: true,
