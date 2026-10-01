@@ -17747,6 +17747,15 @@
           "documentation": ""
         },
         {
+          "name": "simulationRunCount",
+          "columnName": "simulationRunCount",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
           "name": "updatedAt",
           "columnName": "updatedAt",
           "type": "DateTime",

@@ -1577,6 +1577,7 @@ export interface LwqlPrismaRows {
     readonly adminUserId: "String?";
     readonly seeded: "Boolean";
     readonly evaluationCount: "Int";
+    readonly simulationRunCount: "Int";
     readonly updatedAt: "DateTime";
   };
   readonly BillingMeterCheckpoint: {
