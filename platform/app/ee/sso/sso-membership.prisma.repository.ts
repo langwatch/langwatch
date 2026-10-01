@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import { normalizeIdentifierValue, readJoinerRole } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -10,7 +10,6 @@ import {
   DEVELOPER_ADMISSION_AUDIT_ACTION,
   type DeveloperAdmissionVia,
 } from "~/server/app-layer/identity/admission-audit";
-import { readJoinerRole } from "~/server/app-layer/identity/join-request-adapters";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   PendingSsoAdmission,

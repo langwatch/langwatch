@@ -11,10 +11,16 @@
 export const DEVELOPER_ADMISSION_AUDIT_ACTION =
   "organization.member.admitted" as const;
 
+/**
+ * The routes a Developer admission can arrive by, recorded as `via` on the
+ * audit row: a domain join, an approved join request, single sign-on, or an
+ * accepted invitation.
+ */
 export const DEVELOPER_ADMISSION_VIA = [
   "domain-join",
   "join-request-approved",
   "sso",
   "invite",
 ] as const;
+/** One of the admission routes in `DEVELOPER_ADMISSION_VIA`. */
 export type DeveloperAdmissionVia = (typeof DEVELOPER_ADMISSION_VIA)[number];

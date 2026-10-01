@@ -404,10 +404,13 @@ function getRedis() {
 }
 
 /** Whether the caller holds a Developer seat in the organization this project belongs to. */
-async function isDeveloperSeat(
-  userId: string,
-  projectId: string,
-): Promise<boolean> {
+async function isDeveloperSeat({
+  userId,
+  projectId,
+}: {
+  userId: string;
+  projectId: string;
+}): Promise<boolean> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { team: { select: { organizationId: true } } },
@@ -461,7 +464,10 @@ async function refuseProjectKeyHandout(
     project.isPersonal && project.ownerUserId === session.user.id;
   if (
     !ownsPersonalProject &&
-    (await isDeveloperSeat(session.user.id, project.id))
+    (await isDeveloperSeat({
+      userId: session.user.id,
+      projectId: project.id,
+    }))
   ) {
     return c.json(
       {

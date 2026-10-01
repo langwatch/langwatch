@@ -353,6 +353,7 @@ export {
   organizationAdmitsDomain,
   organizationAdmitsDomainAutomatically,
   PUBLIC_EMAIL_DOMAINS,
+  readJoinerRole,
   resolveJoinLookup,
 } from "./join-matching";
 export {

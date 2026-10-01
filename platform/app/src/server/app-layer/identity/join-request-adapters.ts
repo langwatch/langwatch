@@ -1,11 +1,10 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   DEFAULT_DOMAIN_JOIN_SETTING,
-  DEFAULT_JOINER_ROLE,
   type DomainJoinSetting,
-  JOINER_ROLES,
   type JoinerRole,
   JoinRequestNotFoundError,
+  readJoinerRole,
 } from "@langwatch/identity";
 import { newJoinRequestCommandId } from "@langwatch/identity-server";
 import { generate } from "@langwatch/ksuid";
@@ -276,17 +275,6 @@ export class PrismaJoinSettings implements JoinSettingPort {
       data: { domainJoin, joinDomains, joinerRole },
     });
   }
-}
-
-/**
- * The stored joiner seat, narrowed to the two values the setting allows. The
- * column is the whole organisation role enum, but a joiner is only ever a
- * Full member or a Developer (ADR-143); anything else reads as the default.
- */
-export function readJoinerRole(stored: string | null | undefined): JoinerRole {
-  return (JOINER_ROLES as readonly string[]).includes(stored ?? "")
-    ? (stored as JoinerRole)
-    : DEFAULT_JOINER_ROLE;
 }
 
 /**

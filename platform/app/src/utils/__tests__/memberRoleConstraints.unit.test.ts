@@ -25,24 +25,40 @@ describe("memberRoleConstraints", () => {
   });
 
   describe("holdsOrganizationBinding()", () => {
-    it("is true for the two Full seats only", () => {
-      expect(holdsOrganizationBinding(OrganizationUserRole.ADMIN)).toBe(true);
-      expect(holdsOrganizationBinding(OrganizationUserRole.MEMBER)).toBe(true);
-      expect(holdsOrganizationBinding(OrganizationUserRole.EXTERNAL)).toBe(
-        false,
-      );
-      expect(holdsOrganizationBinding(OrganizationUserRole.DEVELOPER)).toBe(
-        false,
-      );
+    describe("when the seat is a Full seat", () => {
+      it("returns true", () => {
+        expect(holdsOrganizationBinding(OrganizationUserRole.ADMIN)).toBe(true);
+        expect(holdsOrganizationBinding(OrganizationUserRole.MEMBER)).toBe(
+          true,
+        );
+      });
+    });
+
+    describe("when the seat is Lite or Developer", () => {
+      it("returns false", () => {
+        expect(holdsOrganizationBinding(OrganizationUserRole.EXTERNAL)).toBe(
+          false,
+        );
+        expect(holdsOrganizationBinding(OrganizationUserRole.DEVELOPER)).toBe(
+          false,
+        );
+      });
     });
   });
 
   describe("holdsSharedAccess()", () => {
-    it("is false for a Developer and true for every other seat", () => {
-      expect(holdsSharedAccess(OrganizationUserRole.DEVELOPER)).toBe(false);
-      expect(holdsSharedAccess(OrganizationUserRole.ADMIN)).toBe(true);
-      expect(holdsSharedAccess(OrganizationUserRole.MEMBER)).toBe(true);
-      expect(holdsSharedAccess(OrganizationUserRole.EXTERNAL)).toBe(true);
+    describe("when the seat is Developer", () => {
+      it("returns false", () => {
+        expect(holdsSharedAccess(OrganizationUserRole.DEVELOPER)).toBe(false);
+      });
+    });
+
+    describe("when the seat is any other seat", () => {
+      it("returns true", () => {
+        expect(holdsSharedAccess(OrganizationUserRole.ADMIN)).toBe(true);
+        expect(holdsSharedAccess(OrganizationUserRole.MEMBER)).toBe(true);
+        expect(holdsSharedAccess(OrganizationUserRole.EXTERNAL)).toBe(true);
+      });
     });
   });
 
