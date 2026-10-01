@@ -9,7 +9,7 @@ import {
   type RawHttpHost,
   type WebSocketHost,
 } from "@langwatch/api";
-import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { Entitlements } from "@langwatch/api/access";
 import {
   answerApiFailure,
@@ -37,6 +37,7 @@ import {
   type RestAuditSink,
   type IdempotentRunner,
   type RestIdentity,
+  type RestResolvedProjectCredential,
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
 import {
@@ -55,10 +56,6 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import type { ExposedSurface, TransportPeers } from "@langwatch/kernel";
-import {
-  ModelNotConfiguredError,
-  ModelProviderDisabledError,
-} from "@langwatch/model-provider-contract";
 import type { Logger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -148,7 +145,7 @@ class ApiSurface {
     });
   }
 
-  readonly #projectCredentials = new WeakMap<Request, ResolvedApiKeyCredential>();
+  readonly #projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
   readonly #callerCredentials = new WeakMap<
     RestCaller,
     Awaited<ReturnType<ApiRestCredentials["authenticateOrganization"]>>["resolved"]
@@ -366,27 +363,12 @@ class ApiSurface {
         unsubscribeCallerAddress,
         (context) => ClientAddress.resolvedFor(context.req.raw) ?? null,
       ),
-      bindRestMiddleware(experimentInitCaller, async (context) => {
-        const credential = await this.credentials.authenticate({
-          request: context.req.raw,
-          permission: "experiments:manage",
-        });
-
-        return { projectId: credential.project.id, projectSlug: credential.project.slug };
-      }),
-      bindRestMiddleware(dspyStepsCaller, async (context) => {
-        const credential = await this.credentials.authenticate({
-          request: context.req.raw,
-          permission: "experiments:manage",
-        });
-
-        return { projectId: credential.project.id };
-      }),
 
       // Main's hidden 404 for anyone not on the staff list, answered before the body is read.
       bindRestMiddleware(adminActor, async (context) => {
         const operator = await this.#adminActor(context.req.raw);
-        if (ops?.operatorScope(operator).kind !== "platform") throw new AdminSurfaceHiddenError();
+        const scope = await ops?.operatorScope(operator);
+        if (scope?.kind !== "platform") throw new AdminSurfaceHiddenError();
         return operator;
       }),
       bindRestMiddleware(adminAuthSession, async (context) => {
@@ -537,33 +519,14 @@ function keyOwner(userId: string | null): Actor | null {
   return userId ? { type: "user", id: userId } : null;
 }
 
-function actorIdOf(resolved: ResolvedApiKeyCredential): string {
+function actorIdOf(resolved: RestResolvedProjectCredential): string {
   if (resolved.type !== "apiKey") return resolved.project.id;
 
   return resolved.userId ?? resolved.apiKeyId;
 }
 
+/** A cause with no body of its own (`toResponseBody`, read by TrpcHost) that names a limit. */
 function browserCausePayload(cause: unknown): Record<string, unknown> | null {
-  if (cause instanceof ModelNotConfiguredError) {
-    return {
-      code: cause.cause,
-      featureKey: cause.featureKey,
-      featureDisplayName: cause.featureDisplayName,
-      role: cause.role,
-      projectId: cause.projectId,
-    };
-  }
-  if (cause instanceof ModelProviderDisabledError) return cause.toResponseBody();
-  const aiFailure = aiFailureSchema.safeParse(cause);
-  if (aiFailure.success) {
-    const cause = aiFailure.data;
-    return {
-      code: cause.cause,
-      featureKey: cause.featureKey,
-      featureDisplayName: cause.featureDisplayName,
-      role: cause.role,
-    };
-  }
   const limit = cause as { limitType?: string; current?: number; max?: number } | undefined;
 
   return limit?.limitType
@@ -574,16 +537,6 @@ function browserCausePayload(cause: unknown): Record<string, unknown> | null {
 const unsubscribeCallerAddress = defineRestMiddleware(
   "unsubscribeCallerAddress",
   z.string().nullable(),
-);
-
-const experimentInitCaller = defineRestMiddleware(
-  "experimentInitCaller",
-  z.object({ projectId: z.string(), projectSlug: z.string() }),
-);
-
-const dspyStepsCaller = defineRestMiddleware(
-  "dspyStepsCaller",
-  z.object({ projectId: z.string() }),
 );
 
 const operatorImpersonator = z.object({
@@ -624,13 +577,6 @@ const shareViewerFact = defineTrpcFact(
   "shareViewer",
   z.object({ userId: z.string().nullable(), userAgent: z.string().nullable() }),
 );
-const aiFailureSchema = z.object({
-  code: z.literal("ai_call_failed"),
-  cause: z.string(),
-  featureKey: z.string(),
-  featureDisplayName: z.string(),
-  role: z.string(),
-});
 
 function restAudit(audit: AuditLogApi): RestAuditSink {
   return {

@@ -1724,6 +1724,14 @@ function isInheritedFromCause(message: string, cause: unknown): boolean {
   return current !== null && current !== undefined;
 }
 
+/** A handled error that renders its own `data.cause` body (`toResponseBody`), read by shape. */
+function ownCauseBody(handled: HandledError | null): unknown {
+  if (!handled || !("toResponseBody" in handled)) return null;
+  const render: unknown = handled.toResponseBody;
+
+  return typeof render === "function" ? render.call(handled) : null;
+}
+
 export function createTrpcErrorFormatter(
   members: Readonly<{
     causePayload: TrpcErrorCausePayload;
@@ -1764,7 +1772,7 @@ export function createTrpcErrorFormatter(
       message,
       data: {
         ...shapeData,
-        cause: members.causePayload.payloadFor(error.cause),
+        cause: ownCauseBody(handled) ?? members.causePayload.payloadFor(error.cause),
         error: handled?.serialize() ?? null,
         authored: isAuthoredMessage,
         traceId: members.traceIds.find(error),

@@ -14,10 +14,13 @@ import {
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
   type ApiKeyApi,
-  type ResolvedApiKeyCredential,
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
-import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
+import type {
+  RestKeyCredentialPrincipal,
+  RestProjectIdentity,
+  RestResolvedProjectCredential,
+} from "@langwatch/api/rest";
 import type { AuthzPermission, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
@@ -26,8 +29,8 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 
 export type ApiProjectCredential = Readonly<{
-  project: ResolvedApiKeyCredential["project"];
-  resolved: ResolvedApiKeyCredential;
+  project: RestProjectIdentity;
+  resolved: RestResolvedProjectCredential;
   markUsed: () => void;
 }>;
 
@@ -232,7 +235,7 @@ export class ApiRestCredentials {
   }
 
   private isWithinCeiling(input: {
-    resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>;
+    resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>;
     permission: AuthzPermission;
   }): Promise<boolean> {
     const { resolved, permission } = input;
@@ -247,7 +250,7 @@ export class ApiRestCredentials {
 }
 
 export function apiKeyCeilingRefusal(
-  resolved: Extract<ResolvedApiKeyCredential, { type: "apiKey" }>,
+  resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>,
   permission: AuthzPermission,
   logger: Pick<Logger, "error">,
 ): HandledError {

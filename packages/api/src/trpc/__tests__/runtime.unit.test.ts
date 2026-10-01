@@ -496,6 +496,34 @@ describe("the tRPC error formatter", () => {
       expect(JSON.stringify(formatted)).not.toContain("prose no one reviewed");
     });
   });
+
+  describe("given a handled error that renders its own cause body", () => {
+    /** @scenario "A handled error that renders its own body carries it on data.cause" */
+    it("puts that body on data.cause without the process naming the error", () => {
+      class FeatureRefusal extends HandledError {
+        constructor() {
+          super("validation_error", "no model for this feature", { httpStatus: 400 });
+        }
+
+        toResponseBody() {
+          return { code: "MODEL_NOT_CONFIGURED", featureKey: "traces.ai_search" };
+        }
+      }
+
+      expect(format(new FeatureRefusal()).data.cause).toEqual({
+        code: "MODEL_NOT_CONFIGURED",
+        featureKey: "traces.ai_search",
+      });
+    });
+
+    it("leaves a handled error with no body of its own to the process's payload", () => {
+      const formatted = format(
+        new NotFoundError("evaluation_not_found", { resource: "Evaluation", id: "eval-1" }),
+      );
+
+      expect(formatted.data.cause).toBeNull();
+    });
+  });
 });
 
 // ───────────────────────────────────────────────────────────────────────────── The four
