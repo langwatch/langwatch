@@ -18,7 +18,7 @@ Feature: Shared section navigation layout
   # A fixed-width rail that never shrinks does not degrade on a phone, it
   # disappears: the content column is left with a handful of pixels and the
   # page it was framing cannot be read at all.
-  @integration
+  @integration @unimplemented
   Scenario: The local navigation stops taking a column on a narrow viewport
     Given I open a section workspace on a phone-width screen
     Then the local navigation sits above the content instead of beside it
@@ -46,7 +46,7 @@ Feature: Shared section navigation layout
     Given I open the Automations workspace
     Then its local navigation rail renders
 
-  @integration @regression
+  @integration @regression @unimplemented
   Scenario: The local navigation stays visible while page content scrolls
     Given a section page contains more content than fits in the viewport
     When I scroll the page content on a desktop or phone

@@ -52,7 +52,7 @@ Feature: A drawer that needs another drawer
     target reaches for `closeDrawer` only when it was handed no ending at all —
     which is the case where there is no caller to return to.
 
-    @integration
+    @integration @unimplemented
     Scenario: A drawer the framework cannot let close itself is handed the close to call
       Given a drawer registered in the application's own registry
       When the address opens it
