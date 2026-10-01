@@ -86,8 +86,14 @@ Feature: The package-boundaries lint rule
     Then it reports nothing
 
   @unit
-  Scenario: Process, browser, kit and application code may import any module's library
-    Given a service, a browser module, a browser kit and an application file that import another module's library
+  Scenario: A module client may take react for generic hooks and nothing else of the browser
+    Given a module's client file that imports react, and another that imports react-dom or chakra
+    When the package-boundaries rule runs over them
+    Then react is allowed and the others are reported as libraryRuntime
+
+  @unit
+  Scenario: Process, browser and application code may import any module's library
+    Given a service, a browser module and an application file that import another module's library
     When the package-boundaries rule runs over them
     Then it reports nothing
 

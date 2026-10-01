@@ -10,8 +10,8 @@ const workspace = createFixtureWorkspace({
         contract: {},
         process: {},
         browser: { exports: ["./declaration"] },
-        "browser-kit": {},
         "query-language": {},
+        client: {},
       },
     },
     project: {
@@ -211,10 +211,19 @@ describe("given package-boundaries", () => {
         "@langwatch/process-server",
         "@langwatch/agent-process",
         "@langwatch/agent-browser/declaration",
-        "@langwatch/agent-browser-kit",
         "@langwatch/project-contract",
       ]) {
         expect(ids(LIBRARY, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
+      }
+    });
+
+    /** @scenario "A module client may take react for generic hooks and nothing else of the browser" */
+    it("lets a module client import react, and still reports react-dom and chakra", () => {
+      const client = "modules/agent/client/src/use-agents.ts";
+      expect(ids(client, 'import { useMemo } from "react";')).toEqual([]);
+      expect(ids(LIBRARY, 'import { useMemo } from "react";')).toEqual(["libraryRuntime"]);
+      for (const specifier of ["react-dom", "@chakra-ui/react", "@langwatch/ui-kernel"]) {
+        expect(ids(client, `import { x } from "${specifier}";`)).toEqual(["libraryRuntime"]);
       }
     });
 

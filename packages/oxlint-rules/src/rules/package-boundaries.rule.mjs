@@ -130,12 +130,17 @@ function runtimeFinding(file, specifier) {
   const server = SERVER_RUNTIME.test(specifier);
   const browser = BROWSER_RUNTIME.test(specifier);
   if (file.role === "contract" && (node || server || browser)) return "contractRuntime";
-  if (BROWSER_ROLES.has(file.role) && (node || server)) return "browserImportsProcess";
+  if (file.role === "browser" && (node || server)) return "browserImportsProcess";
   if (file.role === "process" && browser) return "processImportsBrowser";
-  if (file.role === "browser-kit" && KIT_FETCH.test(specifier)) return "kitFetches";
-  if (file.role === "library" && (node || server || browser)) return "libraryRuntime";
+  const runtime = node || server || browser;
+  if (file.role === "library" && runtime && !isClientHook(file, specifier)) return "libraryRuntime";
 
   return undefined;
+}
+
+/** A module client may take `react` for generic hooks, nothing else browser (Alex, 2026-10-01). */
+function isClientHook(file, specifier) {
+  return specifier === "react" && /(?:^|\/)modules\/[^/]+\/client\//.test(file.filename);
 }
 
 /** A library takes its own module's contract and other libraries, nothing else (§2). */
