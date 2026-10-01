@@ -19,7 +19,7 @@ flows:
           text: AI Governance
       - action: expect
         with:
-          text: Every AI tool, agent, licence and dollar across the organization.
+          text: Every AI tool, agent, license and dollar across the organization.
       - action: expect
         with:
           text: Add department
@@ -326,7 +326,7 @@ flows:
           value: VD Tool {uid}
       - action: fill
         with:
-          selector: textarea
+          selector: 'textarea[placeholder^="Microsoft"]'
           value: VD tool description {uid}
       - action: fill
         with:
@@ -384,7 +384,7 @@ flows:
           value: VD Tool E {uid}
       - action: fill
         with:
-          selector: textarea
+          selector: 'textarea[placeholder^="Microsoft"]'
           value: VD tool description {uid}
       - action: fill
         with:
@@ -464,7 +464,7 @@ flows:
           text: Connect
       - action: expect
         with:
-          text: The LangWatch-hosted services this install may call, what each one sends, and what they cost.
+          text: Which LangWatch-hosted services this install may call, what they send and what they cost.
       - action: expect
         with:
           testId: connect-services

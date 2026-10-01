@@ -76,4 +76,12 @@ export const governanceWeb = defineWebModule("governance")
       path: "/governance/users/:id",
       load: () => import("./ui/sections/governance/governance-user.screen.tsx"),
     },
+  })
+  /** The agents page opens it by address: `?drawer.open=addAgent`. */
+  .withDrawers({
+    addAgent: {
+      load: async () => ({
+        default: (await import("./features/agents/register-agent-drawer.tsx")).RegisterAgentDrawer,
+      }),
+    },
   });
