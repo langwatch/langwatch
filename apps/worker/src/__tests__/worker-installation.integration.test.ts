@@ -123,7 +123,6 @@ async function bootWorker({ live = false, saas = false }: { live?: boolean; saas
         isSaas: config.process.isSaas ?? false,
         nlpServiceUrl: config.process.nlpServiceUrl,
         nlpCodeBlockTimeoutSeconds: config.process.nlpCodeBlockTimeoutSeconds,
-        adminEmails: config.process.adminEmails,
         outboundProxy: config.process.outboundProxy,
         processName: "langwatch-worker",
         storageResolver: void 0,
