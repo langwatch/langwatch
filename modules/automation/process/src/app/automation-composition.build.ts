@@ -13,6 +13,7 @@ import {
   type GraphTriggerEvaluationResult,
   type GraphTriggerSweepCandidate,
   type SlackChannelListing,
+  TriggerFilterQueryInvalidError,
 } from "@langwatch/automation-contract";
 import {
   mapTraceToDatasetEntry,
@@ -32,7 +33,12 @@ import type { Logger } from "@langwatch/observability";
 import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
-import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-contract";
+import {
+  FilterParseError,
+  traceSchema,
+  type TraceApi,
+  type TraceRecord,
+} from "@langwatch/trace-contract";
 import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
@@ -119,6 +125,8 @@ type AutomationInfrastructureInput = Readonly<{
   notifications: Pick<NotificationService, "sendEmail" | "getMailDelivery">;
   /** Where a webhook action's attempt is sent and logged (ADR-167). */
   webhooks: Pick<WebhookApi, "sendRequest">;
+  /** Where a saved filter query is dry-run: trace owns the query grammar. */
+  traces: Pick<TraceApi, "translateTraceFilter">;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
@@ -167,7 +175,7 @@ export function buildAutomationInfrastructure(
     persistCaps: input.repositories.persistCaps,
     providers,
     slackChannels: new UnavailableAutomationSlackDirectory(),
-    traceFilters: new UnwiredAutomationTraceFilterCompiler(),
+    traceFilters: new TraceApiFilterCompiler(input.traces, members.logger),
     limits: input.repositories.callCounter,
     audit: new AuditLogAutomationAuditSink(input.auditLog),
     publicBaseUrl: members.publicBaseUrl,
@@ -453,13 +461,31 @@ class UnavailableAutomationSlackDirectory implements AutomationSlackDirectory {
 }
 
 /**
- * ADR-043's filter-query dry run, absent: no compiler for this facet exists
- * yet on either process, so a non-empty `filterQuery` cannot be saved until
- * one is built. A real gap, not a parity loss.
+ * ADR-043's filter-query dry run, over trace's own translator as main's
+ * readFilterQuery used it. The translator's account can name internal
+ * columns, so it goes to the log and the author gets the handled error.
  */
-class UnwiredAutomationTraceFilterCompiler implements AutomationTraceFilterCompiler {
-  assertCompiles(): void {
-    throw new ApiAutomationUnavailableError("validate a trace filter query");
+class TraceApiFilterCompiler implements AutomationTraceFilterCompiler {
+  constructor(
+    private readonly traces: Pick<TraceApi, "translateTraceFilter">,
+    private readonly logger: Logger,
+  ) {}
+
+  assertCompiles({ query, projectId }: Readonly<{ query: string; projectId: string }>): void {
+    try {
+      this.traces.translateTraceFilter({
+        query,
+        tenantId: projectId,
+        timeRange: { from: 0, to: 0 },
+      });
+    } catch (error) {
+      if (!(error instanceof FilterParseError)) throw error;
+      this.logger.warn(
+        { projectId, error: error.message },
+        "trace query refused by the translator",
+      );
+      throw new TriggerFilterQueryInvalidError();
+    }
   }
 }
 

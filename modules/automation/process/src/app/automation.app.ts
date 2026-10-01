@@ -357,6 +357,7 @@ export class AutomationApp implements AutomationApi {
         slackConnections,
         notifications: setup.dependencies.notifications,
         webhooks: setup.dependencies.webhooks,
+        traces: setup.dependencies.traces,
         auditLog: setup.dependencies.auditLog,
         verifier: HmacUnsubscribeTokenAdapter.create({ secret: unsubscribeSigningSecret }),
         unsubscribeSigningSecret,
