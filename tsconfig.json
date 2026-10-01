@@ -43,9 +43,6 @@
       "path": "modules/analytics/browser/tsconfig.json"
     },
     {
-      "path": "modules/analytics/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/analytics/contract/tsconfig.test.json"
     },
     {
@@ -77,6 +74,9 @@
     },
     {
       "path": "modules/api-key/browser/tsconfig.json"
+    },
+    {
+      "path": "modules/api-key/client/tsconfig.json"
     },
     {
       "path": "modules/api-key/contract/tsconfig.json"
@@ -112,9 +112,6 @@
       "path": "modules/authz/browser/tsconfig.json"
     },
     {
-      "path": "modules/authz/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/authz/contract/tsconfig.json"
     },
     {
@@ -143,9 +140,6 @@
     },
     {
       "path": "modules/coding-agent/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/coding-agent/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/coding-agent/contract/tsconfig.json"
@@ -187,7 +181,7 @@
       "path": "modules/dataset/browser/tsconfig.json"
     },
     {
-      "path": "modules/dataset/browser-kit/tsconfig.json"
+      "path": "modules/dataset/client/tsconfig.json"
     },
     {
       "path": "modules/dataset/contract/tsconfig.json"
@@ -322,7 +316,7 @@
       "path": "modules/evaluator/browser/tsconfig.json"
     },
     {
-      "path": "modules/evaluator/browser-kit/tsconfig.json"
+      "path": "modules/evaluator/client/tsconfig.json"
     },
     {
       "path": "modules/evaluator/contract/tsconfig.json"
@@ -338,9 +332,6 @@
     },
     {
       "path": "modules/experiment/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/experiment/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/experiment/contract/tsconfig.json"
@@ -439,9 +430,6 @@
       "path": "modules/langy/browser/tsconfig.json"
     },
     {
-      "path": "modules/langy/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/langy/contract/tsconfig.json"
     },
     {
@@ -475,9 +463,6 @@
       "path": "modules/model-provider/browser/tsconfig.json"
     },
     {
-      "path": "modules/model-provider/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/model-provider/contract/tsconfig.json"
     },
     {
@@ -509,9 +494,6 @@
     },
     {
       "path": "modules/onboarding/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/onboarding/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/onboarding/contract/tsconfig.json"
@@ -586,7 +568,7 @@
       "path": "modules/prompt/browser/tsconfig.json"
     },
     {
-      "path": "modules/prompt/browser-kit/tsconfig.json"
+      "path": "modules/prompt/client/tsconfig.json"
     },
     {
       "path": "modules/prompt/contract/tsconfig.json"
@@ -628,6 +610,9 @@
       "path": "apps/scenario-child/tsconfig.json"
     },
     {
+      "path": "modules/scenario/client/tsconfig.json"
+    },
+    {
       "path": "modules/scenario/contract/tsconfig.json"
     },
     {
@@ -664,9 +649,6 @@
       "path": "modules/slack/browser/tsconfig.json"
     },
     {
-      "path": "modules/slack/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/slack/contract/tsconfig.json"
     },
     {
@@ -676,9 +658,6 @@
       "path": "apps/storagesim-web/tsconfig.json"
     },
     {
-      "path": "modules/stored-object/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/stored-object/contract/tsconfig.json"
     },
     {
@@ -686,9 +665,6 @@
     },
     {
       "path": "modules/suite/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/suite/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/suite/contract/tsconfig.json"
@@ -724,9 +700,6 @@
       "path": "modules/trace/browser/tsconfig.json"
     },
     {
-      "path": "modules/trace/browser-kit/tsconfig.json"
-    },
-    {
       "path": "modules/trace/contract/tsconfig.json"
     },
     {
@@ -743,9 +716,6 @@
     },
     {
       "path": "modules/user/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/user/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/user/contract/tsconfig.json"
@@ -773,9 +743,6 @@
     },
     {
       "path": "modules/workflow/browser/tsconfig.json"
-    },
-    {
-      "path": "modules/workflow/browser-kit/tsconfig.json"
     },
     {
       "path": "modules/workflow/contract/tsconfig.json"
