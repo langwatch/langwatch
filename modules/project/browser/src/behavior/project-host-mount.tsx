@@ -10,6 +10,7 @@ import {
   useUiScope,
 } from "@langwatch/browser-host/capabilities";
 import type { UiProjectSwitcherProps } from "@langwatch/browser-host/declarations";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
 import { lazy, Suspense, useMemo, type ComponentType, type ReactNode } from "react";
 
@@ -38,6 +39,7 @@ class CapabilityProjectHost extends ProjectHostApi {
   private readonly succeededOf: (notice: ProjectSuccessNotice) => void;
   private readonly failedOf: (failure: ProjectFailureNotice) => void;
   private readonly Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+  private readonly openOverlayOf: (name: string, props?: Record<string, unknown>) => void;
 
   constructor(options: {
     organization: ProjectHostOrganization | undefined;
@@ -48,6 +50,7 @@ class CapabilityProjectHost extends ProjectHostApi {
     succeededOf: (notice: ProjectSuccessNotice) => void;
     failedOf: (failure: ProjectFailureNotice) => void;
     Switcher: ComponentType<UiProjectSwitcherProps> | undefined;
+    openOverlayOf: (name: string, props?: Record<string, unknown>) => void;
   }) {
     super();
     this.organization_ = options.organization;
@@ -58,6 +61,7 @@ class CapabilityProjectHost extends ProjectHostApi {
     this.succeededOf = options.succeededOf;
     this.failedOf = options.failedOf;
     this.Switcher = options.Switcher;
+    this.openOverlayOf = options.openOverlayOf;
   }
 
   organization(): ProjectHostOrganization | undefined {
@@ -91,9 +95,9 @@ class CapabilityProjectHost extends ProjectHostApi {
     );
   }
 
-  /** No drawer-opener capability exists here either; a no-op is the honest reading. */
-  openOverlay(): void {
-    return void 0;
+  /** Opens a declared drawer by name, e.g. organization's `createProject`. */
+  openOverlay(name: string, props?: Record<string, unknown>): void {
+    this.openOverlayOf(name, props);
   }
 
   succeeded(notice: ProjectSuccessNotice): void {
@@ -116,6 +120,7 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
   const { organizationId, projectId } = scope.activeScope();
   const scopeHost = scope.scopeHost();
   const declarations = useUiDeclarations();
+  const { openDrawer } = useDrawer();
   // `lazy` once per declaration, never per render, so the switcher is not remounted.
   const Switcher = useMemo(() => {
     const [lent] = declarations.declared("projectSwitcher");
@@ -155,8 +160,9 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
         succeededOf: (notice) => feedback.succeeded(notice),
         failedOf: (notice) => feedback.failed(notice),
         Switcher,
+        openOverlayOf: (name, props) => openDrawer(name, props),
       }),
-    [organization, project, session, scopeHost, feedback, Switcher],
+    [organization, project, session, scopeHost, feedback, Switcher, openDrawer],
   );
   return <ProjectHostProvider value={host}>{children}</ProjectHostProvider>;
 }

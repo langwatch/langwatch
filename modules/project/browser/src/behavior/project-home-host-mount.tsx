@@ -18,6 +18,7 @@ import {
   type ProjectHomeProject,
   type ProjectHomeUser,
 } from "../model/project-home-host.ts";
+import { homeApi } from "./home-api.ts";
 
 /** The two Langy grants, and the rollout that reveals it at all. */
 const LANGY_VIEW_PERMISSION = "langy:view";
@@ -136,6 +137,15 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
   const organizationName = scopeOrg?.name;
   const actorId = actor?.id;
   const actorName = actor?.name;
+  // The scope carries no `firstMessage`; the shell's own graph read does (same cache entry).
+  const organizations = homeApi.organization.getAll.useQuery(
+    { isDemo: false },
+    { enabled: actorId !== void 0 },
+  );
+  const firstMessage = organizations.data
+    ?.flatMap((organization) => organization.teams)
+    .flatMap((team) => team.projects)
+    .find((candidate) => candidate.id === projectId)?.firstMessage;
 
   // Primitive dependencies only, so the host stays the SAME object across
   // renders that carry the same reading — `lazy()` resolved this mount once,
@@ -145,7 +155,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
       new CapabilityProjectHomeHost({
         project:
           projectId !== void 0
-            ? { id: projectId, name: projectName ?? "", slug: projectSlug ?? "" }
+            ? { id: projectId, name: projectName ?? "", slug: projectSlug ?? "", firstMessage }
             : void 0,
         organization:
           organizationName !== void 0 && organizationId !== void 0
@@ -173,6 +183,7 @@ export default function ProjectHomeHostMount({ children }: { children?: ReactNod
       projectId,
       projectName,
       projectSlug,
+      firstMessage,
       organizationId,
       organizationName,
       actorId,

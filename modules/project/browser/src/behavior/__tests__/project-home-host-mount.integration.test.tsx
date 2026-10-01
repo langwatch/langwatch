@@ -32,6 +32,10 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
   };
 });
 
+vi.mock("../home-api.ts", () => ({
+  homeApi: { organization: { getAll: { useQuery: () => ({ data: void 0 }) } } },
+}));
+
 vi.mock("../../model/langy/langy-demo-project.ts", () => ({ isLangyDemoProject: () => false }));
 
 vi.mock("@langwatch/design-system/use-reduced-motion", () => ({ useReducedMotion: () => false }));
