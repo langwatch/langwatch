@@ -151,7 +151,10 @@ class MemoryExperimentRepository implements ExperimentRepository {
     workbenchState: SaveExperimentInput["workbenchState"];
   }) {
     const value = await this.findById(input);
-    if (value) value.workbenchState = input.workbenchState;
+    if (!value) return { version: 0 };
+    value.workbenchState = input.workbenchState;
+    value.workbenchVersion += 1;
+    return { version: value.workbenchVersion };
   }
   async archiveActive(input: {
     projectId: string;

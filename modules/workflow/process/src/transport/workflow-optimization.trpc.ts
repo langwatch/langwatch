@@ -6,6 +6,8 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { WorkflowApi, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
 
+import { publishedWorkflowWithoutSecrets } from "../rules/workflow-published-secrets.rules.ts";
+
 export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
   WorkflowApi,
   typeof workflowOptimizationTrpc
@@ -35,7 +37,7 @@ export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
   .withPermission("workflows:view")
   .handle(async ({ app, input }) => {
     const answer = await app.getPublishedWorkflow(input);
-    return answer.published ? answer.workflow : null;
+    return answer.published ? publishedWorkflowWithoutSecrets(answer.workflow) : null;
   })
 
   .procedure("disableAsComponent")

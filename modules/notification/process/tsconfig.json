@@ -15,9 +15,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/aws-client/tsconfig.build.json"
     },
     {
@@ -36,9 +33,6 @@
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
-      "path": "../../presence/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
@@ -46,9 +40,6 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

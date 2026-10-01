@@ -87,3 +87,32 @@ func resolveAuthSecrets(a *httpblock.Auth, secrets map[string]string) *httpblock
 	a.Password = resolveSecretRefs(a.Password, secrets)
 	return a
 }
+
+// sentSecretTexts is every value an HTTP node resolves secrets into before
+// sending: the URL, each header value and each credential field of its auth.
+func sentSecretTexts(rawURL string, headers map[string]string, auth *httpblock.Auth) []string {
+	texts := []string{rawURL}
+	for _, v := range headers {
+		texts = append(texts, v)
+	}
+	if auth != nil {
+		texts = append(texts, auth.Token, auth.Value, auth.Username, auth.Password)
+	}
+	return texts
+}
+
+// sendsBoundSecretElsewhere reports whether any text references a secret
+// bound to an origin other than the one url, secrets resolved, calls.
+func sendsBoundSecretElsewhere(texts []string, url string, origins map[string]string) bool {
+	if len(origins) == 0 {
+		return false
+	}
+	for _, text := range texts {
+		for _, m := range secretRefRE.FindAllStringSubmatch(text, -1) {
+			if origin, ok := origins[m[1]]; ok && !httpblock.SameOrigin(url, origin) {
+				return true
+			}
+		}
+	}
+	return false
+}

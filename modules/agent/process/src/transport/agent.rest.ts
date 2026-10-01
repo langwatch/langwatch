@@ -30,6 +30,8 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
+import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+
 export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";
 
 /** The W3C trace context header a call carries, bound by the process from the request. */
@@ -70,7 +72,7 @@ function response(
     id: agent.id,
     name: agent.name,
     type: agent.type,
-    config: agent.config,
+    config: agentConfigWithoutSecrets(agent),
     environment: agent.environment,
     ownerUserId: agent.ownerUserId,
     hostLabel: agent.hostLabel,

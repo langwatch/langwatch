@@ -17,6 +17,7 @@ import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { AgentRepository, AgentCopyRecord } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
+import { configForCopy } from "../rules/agent-secrets.rules.ts";
 
 export class AgentCopyService {
   #repository: AgentRepository;
@@ -82,7 +83,7 @@ export class AgentCopyService {
         projectId: input.targetProjectId,
         name: source.name,
         type: source.type,
-        config: source.config,
+        config: configForCopy({ source, targetProjectId: input.targetProjectId }),
         workflowId,
         copiedFromAgentId: source.id,
       })
@@ -122,11 +123,15 @@ export class AgentCopyService {
     if (selected.length === 0) throw new AgentCopySelectionError(input.sourceAgentId);
 
     for (const copy of selected) {
+      const current = await this.#repository.getByIdIncludingArchived({
+        id: copy.id,
+        projectId: copy.projectId,
+      });
       await this.#repository.updateNameAndConfig({
         id: copy.id,
         projectId: copy.projectId,
         name: source.name,
-        config: source.config,
+        config: configForCopy({ source, targetProjectId: copy.projectId, current }),
       });
     }
 
@@ -142,11 +147,12 @@ export class AgentCopyService {
 
   async syncFromSource(input: AgentReferenceInput): Promise<AgentSyncFromSource> {
     const source = await this.getSourceOfCopy(input);
+    const current = await this.#repository.getById({ id: input.agentId, projectId: input.projectId });
     await this.#repository.updateNameAndConfig({
       id: input.agentId,
       projectId: input.projectId,
       name: source.name,
-      config: source.config,
+      config: configForCopy({ source, targetProjectId: input.projectId, current }),
     });
 
     return { ok: true as const };

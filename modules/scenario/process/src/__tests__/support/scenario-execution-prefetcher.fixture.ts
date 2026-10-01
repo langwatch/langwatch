@@ -446,6 +446,7 @@ export function createTestScenarioExecutionPrefetcherService(
     secrets: fakeService<SecretApi>({
       getValues: ({ projectId }: { projectId: string }) =>
         deps.projectSecretsFetcher.getSecrets(projectId),
+      list: async () => [],
     }),
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>

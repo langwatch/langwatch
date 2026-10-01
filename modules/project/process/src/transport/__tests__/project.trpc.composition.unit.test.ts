@@ -10,7 +10,6 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { ResourceScope } from "@langwatch/kernel";
-import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -160,7 +159,6 @@ function application(
         { record: options.record ?? (async () => ({ id: "audit", occurredAt: 0 })) },
         "auditLog",
       ),
-      langy: createApiFixture<LangyApi>({}, "langy"),
       dataPrivacy: createApiFixture<DataPrivacyApi>({}, "dataPrivacy"),
     },
     repositories: { projects: MemoryProjectRepository.create({ memory: database }) },
@@ -198,7 +196,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const { app } = built;
 
   const getFieldProtections = vi.fn(async () => ({}));
-  const provisionLangyVirtualKey = vi.fn(async () => {});
 
   const browser: ProjectBrowserApi = {
     projects: () => app.projects(),
@@ -209,7 +206,6 @@ function mount(options: Parameters<typeof application>[0] = {}) {
     getLegacyKeyStatus: (input) => app.getLegacyKeyStatus(input),
     triggerTopicClustering: (input) => app.triggerTopicClustering(input),
     getFieldProtections,
-    provisionLangyVirtualKey,
   };
 
   const trpc = initTRPC.context<ProjectTrpcTestContext>().create();

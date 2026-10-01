@@ -94,6 +94,7 @@ describe("langySessionKeyReap process", () => {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
+          virtualKeyProvisioning: { provisionCreated: async () => undefined },
         }).buildProcessing();
 
         const pm = pipeline.processManagers.get(LANGY_SESSION_KEY_REAP_PROCESS_NAME);
@@ -121,6 +122,7 @@ describe("the Langy maintenance pipeline's frozen twin", () => {
             reap: async () => 0,
             deleteDispatchedBefore: async () => 0,
           },
+          virtualKeyProvisioning: { provisionCreated: async () => undefined },
         }).buildProcessing();
 
         expect(pipeline.metadata.name).toBe("langy_maintenance");

@@ -11,12 +11,10 @@ import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 async function recordScopeName({
   binding,
-  resolvedOrganizationId,
   options,
   names,
 }: {
   binding: ApiKeyBinding;
-  resolvedOrganizationId: string | undefined;
   options: ApiKeyDependencies;
   names: {
     orgName: Map<string, string>;
@@ -30,14 +28,6 @@ async function recordScopeName({
       organizationId: binding.scopeId,
     });
     names.orgName.set(binding.scopeId, organization.name);
-  }
-
-  if (binding.scopeType === "TEAM" && resolvedOrganizationId) {
-    const team = await options.organizations.getTeam({
-      organizationId: resolvedOrganizationId,
-      teamId: binding.scopeId,
-    });
-    names.teamName.set(binding.scopeId, team.name);
   }
 
   if (binding.scopeType === "PROJECT") {
@@ -91,10 +81,18 @@ export class ApiKeyEnrichmentService {
       customRoleName.set(role.id, role.name);
     }
 
+    // One read names every team; a grant on a team the list omits (archived) stays unnamed.
+    if (resolvedOrganizationId && bindings.some((binding) => binding.scopeType === "TEAM")) {
+      for (const team of await this.catalog.getOrgTeams({
+        organizationId: resolvedOrganizationId,
+      })) {
+        teamName.set(team.id, team.name);
+      }
+    }
+
     for (const binding of bindings) {
       await recordScopeName({
         binding,
-        resolvedOrganizationId,
         options: this.options,
         names: { orgName, teamName, projectName, activeProjectIds },
       });

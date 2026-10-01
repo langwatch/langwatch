@@ -58,16 +58,6 @@ export interface ProjectBrowserApi {
     projectId: string;
     by: Readonly<{ id: string }>;
   }): Promise<ProjectFieldProtections>;
-  /**
-   * Mints Langy's gateway virtual key for a freshly created project. Best
-   * effort by contract: a failure is reported and never fails the creation,
-   * because the credential service re-attempts on the first chat call.
-   */
-  provisionLangyVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void>;
   /** Archives a project other than the one the caller is in, after probing it on its own. */
   archiveOtherProject(input: {
     projectId: string;
@@ -127,12 +117,6 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
         actor,
       );
 
-      await app.provisionLangyVirtualKey({
-        projectId: project.id,
-        organizationId: input.organizationId,
-        actorUserId: actor.id,
-      });
-
       return { success: true as const, projectSlug: project.slug };
     })
 
@@ -176,9 +160,14 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
         userLinkTemplate: input.userLinkTemplate,
         s3Endpoint: input.s3Endpoint ? app.encryptProjectSecret(input.s3Endpoint) : null,
         s3AccessKeyId: input.s3AccessKeyId ? app.encryptProjectSecret(input.s3AccessKeyId) : null,
-        s3SecretAccessKey: input.s3SecretAccessKey
-          ? app.encryptProjectSecret(input.s3SecretAccessKey)
-          : null,
+        // A blank secret beside an endpoint leaves the stored one unchanged.
+        ...(input.s3SecretAccessKey || !input.s3Endpoint
+          ? {
+              s3SecretAccessKey: input.s3SecretAccessKey
+                ? app.encryptProjectSecret(input.s3SecretAccessKey)
+                : null,
+            }
+          : {}),
         s3Bucket: input.s3Bucket,
       });
 

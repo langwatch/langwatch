@@ -1,6 +1,7 @@
 import {
   AgentAlreadyExistsError,
   AgentRegisterOnlyError,
+  AgentStoredCredentialsDestinationError,
   voiceAgentIdentityKey,
   type VoiceAgentConfig,
   type VoiceTransport,
@@ -29,6 +30,7 @@ import {
 
 import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
 import { nextAgentId } from "../rules/agent-id.rules.ts";
+import { httpSecretsKeepingStored, movesStoredSecrets } from "../rules/agent-secrets.rules.ts";
 
 export class AgentService {
   #repository: AgentRepository;
@@ -113,7 +115,14 @@ export class AgentService {
       config: parsed.data.config ?? existing.config,
     });
     if (!checked.success) throw new InvalidAgentConfigError(type, checked.error.issues);
-    const config = checked.data.config;
+    let config = checked.data.config;
+    if (checked.data.type === "http" && existing.type === "http") {
+      const stored = existing.config;
+      if (movesStoredSecrets({ stored, incoming: checked.data.config })) {
+        throw new AgentStoredCredentialsDestinationError();
+      }
+      config = httpSecretsKeepingStored({ stored, incoming: checked.data.config });
+    }
 
     return this.#repository.update({ ...parsed.data, type, config });
   }

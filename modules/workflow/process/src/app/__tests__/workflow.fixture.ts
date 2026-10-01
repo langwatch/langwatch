@@ -8,7 +8,11 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
 
-import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
+import type {
+  WorkflowAgentMapping,
+  WorkflowHttpSecrets,
+  WorkflowStudioDsl,
+} from "../../app/workflow.app.ts";
 import { buildWorkflowLifecyclePipeline } from "../../eventing/workflow-lifecycle.pipeline.ts";
 import {
   WorkflowRowRepository,
@@ -30,6 +34,13 @@ import type {
 /** A Studio graph prepared by doing nothing to it. */
 class UnchangedStudioDsl implements WorkflowStudioDsl {
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
+    return Promise.resolve(input.dsl);
+  }
+}
+
+/** A graph whose HTTP credentials are left where they are. */
+class UnchangedHttpSecrets implements WorkflowHttpSecrets {
+  store<Dsl extends { nodes?: unknown }>(input: { dsl: Dsl }): Promise<Dsl> {
     return Promise.resolve(input.dsl);
   }
 }
@@ -117,6 +128,7 @@ export function createWorkflowTestInfrastructure(
     evaluators: createApiFixture<EvaluatorApi>({}, "EvaluatorApi"),
     datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
     studioDsl: new UnchangedStudioDsl(),
+    httpSecrets: new UnchangedHttpSecrets(),
     agentMappings: new UnrecordedAgentMappings(),
     workflowRows: new RecordingWorkflowRows(),
     execution: createApiFixture<WorkflowInfrastructure["execution"]>(),

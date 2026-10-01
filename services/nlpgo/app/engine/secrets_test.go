@@ -58,3 +58,29 @@ func TestResolveAuthSecrets(t *testing.T) {
 		assert.Nil(t, resolveAuthSecrets(nil, secrets))
 	})
 }
+
+func TestSendsBoundSecretElsewhere(t *testing.T) {
+	origins := map[string]string{"HTTP_AGENT_TOKEN": "https://agent.test"}
+	auth := &httpblock.Auth{Type: "bearer", Token: "{{ secrets.HTTP_AGENT_TOKEN }}"}
+
+	t.Run("when a bound secret is sent to another origin it reports so", func(t *testing.T) {
+		texts := sentSecretTexts("https://other.test/chat", nil, auth)
+		assert.True(t, sendsBoundSecretElsewhere(texts, "https://other.test/chat", origins))
+	})
+
+	t.Run("when the address resolves to another host through a secret it reports so", func(t *testing.T) {
+		texts := sentSecretTexts("https://{{ secrets.HOST }}@agent.test/", nil, auth)
+		assert.True(t, sendsBoundSecretElsewhere(texts, "https://other.test/x#@agent.test/", origins))
+	})
+
+	t.Run("when a bound secret is sent to its own origin it allows it", func(t *testing.T) {
+		texts := sentSecretTexts("https://AGENT.test:443/v2", nil, auth)
+		assert.False(t, sendsBoundSecretElsewhere(texts, "https://AGENT.test:443/v2", origins))
+	})
+
+	t.Run("when the secret is unbound it is sent anywhere", func(t *testing.T) {
+		headers := map[string]string{"X-Api-Key": "{{ secrets.PARTNER_TOKEN }}"}
+		texts := sentSecretTexts("https://other.test/", headers, nil)
+		assert.False(t, sendsBoundSecretElsewhere(texts, "https://other.test/", origins))
+	})
+}

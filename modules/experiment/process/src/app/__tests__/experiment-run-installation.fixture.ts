@@ -31,6 +31,7 @@ import { createApp } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -292,6 +293,7 @@ function peersOf(overrides: PeerOverrides) {
     evaluator: createApiFixture<EvaluatorApi>({}),
     prompt: createApiFixture<PromptApi>({}),
     authz: createApiFixture<AuthzApi>({}),
+    presence: createApiFixture<PresenceApi>({}),
     project: createApiFixture<ProjectApi>({
       getOrganizationId: async () => "organization_1",
       findOrganizationId: async () => "organization_1",

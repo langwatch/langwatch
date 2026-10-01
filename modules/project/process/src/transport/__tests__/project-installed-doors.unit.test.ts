@@ -10,7 +10,6 @@ import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-co
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { LangyApi } from "@langwatch/langy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -35,18 +34,7 @@ const CALLER_PROTECTIONS: Protections = {
 type Peers = Readonly<{
   auditLog: AuditLogApi;
   trace: TraceApi;
-  langy: LangyApi;
 }>;
-
-type LangyMint = Parameters<LangyApi["provisionVirtualKey"]>[0];
-
-function recordingLangy(minted: LangyMint[]): LangyApi {
-  return createApiFixture<LangyApi>({
-    provisionVirtualKey: async (input) => {
-      minted.push(input);
-    },
-  });
-}
 
 function recordingAuditLog(recorded: RecordAuditLogCommand[]): AuditLogApi {
   return createApiFixture<AuditLogApi>({
@@ -86,7 +74,6 @@ function installed(peers: Peers) {
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
       trace: peers.trace,
       "audit-log": peers.auditLog,
-      langy: peers.langy,
       "data-privacy": createApiFixture<DataPrivacyApi>({}),
     })
     .boot();
@@ -104,7 +91,6 @@ async function doors(overrides: Partial<Peers> = {}) {
         resolveViewerProtections: async (input) =>
           input.projectId === PROJECT_ID && input.userId === ACTOR.id ? CALLER_PROTECTIONS : {},
       }),
-    langy: overrides.langy ?? recordingLangy([]),
   });
   const provided = () => runtime.module(projectServer).provided;
   const host = TrpcHost.create({
@@ -169,9 +155,8 @@ describe("given the project module installed over memory repositories", () => {
 
   describe("when a project is created into a new team", () => {
     /** @scenario "creating a project answers with the new project's slug" */
-    it("answers with the slug of the project it created and mints its Langy key", async () => {
-      const minted: LangyMint[] = [];
-      const { runtime, host } = await doors({ langy: recordingLangy(minted) });
+    it("answers with the slug of the project it created", async () => {
+      const { runtime, host } = await doors();
 
       try {
         expect(
@@ -192,13 +177,6 @@ describe("given the project module installed over memory repositories", () => {
             result: { data: { success: true, projectSlug: expect.stringMatching(/^my-project-/) } },
           },
         });
-        expect(minted).toEqual([
-          {
-            projectId: expect.any(String),
-            organizationId: ORGANIZATION_ID,
-            actorUserId: ACTOR.id,
-          },
-        ]);
       } finally {
         await runtime.stop();
       }

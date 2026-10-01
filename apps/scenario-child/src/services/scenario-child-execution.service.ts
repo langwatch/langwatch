@@ -195,11 +195,9 @@ async function executeScenarioChildValue({
 
   const { langwatchEndpoint, langwatchApiKey, logger } = runtime;
 
-  // The platform API key rides the same telemetry channel every child
-  // process already gets (buildChildProcessEnv in scenario.processor.ts
-  // sets LANGWATCH_API_KEY from the prefetched project telemetry key —
-  // no need to duplicate it onto the job payload. The workflow/code
-  // factories consume it as workflow.api_key; prompt and http ignore it.
+  // The run's minted key rides LANGWATCH_API_KEY, the telemetry channel every
+  // child already gets, so the job payload never carries it. The workflow and
+  // code factories send it as workflow.api_key; prompt and http ignore it.
   const adapter = SerializedAgentChannelRegistry.create({
     nlpTimeouts: runtime.nlpTimeouts,
     voiceAgents: runtime.voiceAgents,

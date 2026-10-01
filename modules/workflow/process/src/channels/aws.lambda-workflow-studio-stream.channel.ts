@@ -11,12 +11,14 @@ import {
   readLwaPreludeStatus,
 } from "../rules/lambda-web-adapter-stream.rules.ts";
 import { STUDIO_STAGING_PREFIX } from "../rules/nlp-lambda-config.rules.ts";
+import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";
 import {
   type NlpLambdaFunctionReader,
   type NlpLambdaStreamInvoke,
   type NlpLambdaStreamChunk,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
+  STAGED_PAYLOAD_KEY_HEADER,
   type StagedNlpPayload,
   type WorkflowStudioStream,
   type WorkflowStudioStreamInput,
@@ -54,15 +56,22 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
       "X-LangWatch-Origin": input.origin,
     };
     const body = JSON.stringify(input.body);
-    const staged = await this.stageIfOversized({
+    const parked = await this.stageIfOversized({
       projectId: input.projectId,
       body,
       headers,
     });
+    const staged = parked?.payload;
     const payload = JSON.stringify({
       rawPath: STUDIO_EXECUTE_PATH,
       requestContext: { http: { method: "POST" } },
-      headers: staged ? { ...headers, [STAGED_PAYLOAD_HEADER]: staged.url } : headers,
+      headers: parked
+        ? {
+            ...headers,
+            [STAGED_PAYLOAD_HEADER]: parked.payload.url,
+            [STAGED_PAYLOAD_KEY_HEADER]: parked.key,
+          }
+        : headers,
       body: staged ? "" : body,
     });
 
@@ -90,7 +99,7 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
     projectId: string;
     body: string;
     headers: Record<string, string>;
-  }): Promise<StagedNlpPayload | undefined> {
+  }): Promise<{ payload: StagedNlpPayload; key: string } | undefined> {
     const bytes = Buffer.byteLength(input.body, "utf-8");
     if (bytes <= this.options.stagingThresholdBytes) return undefined;
 
@@ -107,10 +116,11 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
       });
     }
 
-    const staged = await staging.stage({
+    const { sealed, key } = sealStagedPayload(Buffer.from(input.body, "utf-8"));
+    const payload = await staging.stage({
       projectId: input.projectId,
       keyPrefix: `${STUDIO_STAGING_PREFIX}/${input.projectId}`,
-      serialized: Buffer.from(input.body, "utf-8"),
+      serialized: sealed,
       ttlSeconds: this.options.stagingTtlSeconds,
     });
     logger.info(
@@ -118,7 +128,7 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
       "staged an oversized studio invoke payload",
     );
 
-    return staged;
+    return { payload, key };
   }
 }
 

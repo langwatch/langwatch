@@ -17,7 +17,10 @@ import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
@@ -55,9 +58,12 @@ async function postRun({ repositories }: { repositories: WorkflowRepositories })
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
       apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
+      projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),
+      secrets: createApiFixture<SecretApi>({}, "SecretApi"),
+      organizations: createApiFixture<OrganizationApi>({}, "OrganizationApi"),
     },
     config: {
       stagingThresholdBytes: void 0,

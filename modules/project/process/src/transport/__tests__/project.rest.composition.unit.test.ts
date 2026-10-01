@@ -13,7 +13,6 @@ import type {
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
 import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
-import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi, TeamNotFoundError } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
@@ -45,7 +44,6 @@ function unreachablePeers() {
   apis.declare(AuthzApi);
   apis.declare(TraceApi);
   apis.declare(AuditLogApi);
-  apis.declare(LangyApi);
 
   return {
     organizations: apis.reference(OrganizationApi),
@@ -54,7 +52,6 @@ function unreachablePeers() {
     authorization: apis.reference(AuthzApi),
     trace: apis.reference(TraceApi),
     auditLog: apis.reference(AuditLogApi),
-    langy: apis.reference(LangyApi),
   };
 }
 

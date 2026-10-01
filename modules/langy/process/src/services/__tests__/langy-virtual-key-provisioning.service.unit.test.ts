@@ -2,28 +2,56 @@
  * @vitest-environment node
  * @see specs/projects/projects-browser-door.feature
  */
+import type { ProjectCreatedEventData } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { LangyVirtualKeyProvisioningService } from "../langy-virtual-key-provisioning.service.ts";
 
-const REQUEST = { projectId: "project_1", organizationId: "organization-1", actorUserId: "user-1" };
+const CREATED: ProjectCreatedEventData = {
+  tenantId: "project_1",
+  projectId: "project_1",
+  organizationId: "organization-1",
+  occurredAt: 0,
+  createdByUserId: "user-1",
+};
+
+type Minted = { projectId: string; organizationId: string; actorUserId: string };
+
+function recording(asked: Minted[]) {
+  return LangyVirtualKeyProvisioningService.create({
+    virtualKeys: {
+      provision: async (input) => {
+        asked.push(input);
+        return "vk-secret";
+      },
+    },
+  });
+}
 
 describe("LangyVirtualKeyProvisioningService", () => {
-  describe("when the key is minted", () => {
-    it("asks the gateway for the project's key on the caller's behalf", async () => {
-      const asked: (typeof REQUEST)[] = [];
-      const provisioning = LangyVirtualKeyProvisioningService.create({
-        virtualKeys: {
-          provision: async (input) => {
-            asked.push(input);
-            return "vk-secret";
-          },
-        },
-      });
+  describe("when project records a project somebody created", () => {
+    /** @scenario "creating a project provisions Langy's virtual key from Langy's side" */
+    it("asks the gateway for the project's key on the creator's behalf", async () => {
+      const asked: Minted[] = [];
 
-      await provisioning.provision(REQUEST);
+      await recording(asked).provisionCreated(CREATED);
 
-      expect(asked).toEqual([REQUEST]);
+      expect(asked).toEqual([
+        { projectId: "project_1", organizationId: "organization-1", actorUserId: "user-1" },
+      ]);
+    });
+  });
+
+  describe("when the project had no creator or was backfilled", () => {
+    /** @scenario "a project with no creator or recorded by a backfill gets no Langy key on creation" */
+    it("mints nothing", async () => {
+      const asked: Minted[] = [];
+      const provisioning = recording(asked);
+
+      await provisioning.provisionCreated({ ...CREATED, createdByUserId: null });
+      await provisioning.provisionCreated({ ...CREATED, backfilled: true });
+
+      expect(asked).toEqual([]);
     });
   });
 
@@ -38,7 +66,7 @@ describe("LangyVirtualKeyProvisioningService", () => {
         },
       });
 
-      await expect(provisioning.provision(REQUEST)).resolves.toBeUndefined();
+      await expect(provisioning.provisionCreated(CREATED)).resolves.toBeUndefined();
     });
   });
 });

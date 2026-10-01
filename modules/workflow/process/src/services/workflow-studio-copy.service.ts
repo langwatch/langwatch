@@ -6,13 +6,13 @@
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import {
-  parseStudioWorkflow,
   WorkflowVersionRequiredError,
   type CopyStudioWorkflowCommand,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
+import { cloneDslForCopy } from "../rules/workflow-copy-version.rules.ts";
 
 export type WorkflowStudioCopyServiceOptions = {
   datasets: DatasetApi;
@@ -57,8 +57,12 @@ export class WorkflowStudioCopyService {
       throw new WorkflowVersionRequiredError();
     }
 
-    // Deep clone so the graph this returns is the caller's to mutate.
-    const dsl = parseStudioWorkflow(JSON.parse(JSON.stringify(sourceDsl)));
+    // A clone the caller may mutate; into another project, every HTTP credential is blank.
+    const dsl = cloneDslForCopy({
+      dsl: sourceDsl,
+      sourceProjectId: input.sourceProjectId,
+      targetProjectId: input.targetProjectId,
+    });
 
     if (input.copyDatasets) {
       await this.copyDatasetReferences({

@@ -11,8 +11,8 @@ export type WorkflowProjectEnvironmentDatabase = {
   projectSecret: {
     findMany(input: {
       where: { projectId: string };
-      select: { name: true; encryptedValue: true };
-    }): Promise<{ name: string; encryptedValue: string }[]>;
+      select: { name: true; encryptedValue: true; boundOrigin: true };
+    }): Promise<{ name: string; encryptedValue: string; boundOrigin: string | null }[]>;
   };
 };
 
@@ -30,7 +30,7 @@ export class WorkflowProjectEnvironmentPrismaRepository extends WorkflowProjectE
   async findEnvironment(input: { projectId: string }): Promise<StoredProjectEnvironment> {
     const projectSecrets = await this.database.projectSecret.findMany({
       where: { projectId: input.projectId },
-      select: { name: true, encryptedValue: true },
+      select: { name: true, encryptedValue: true, boundOrigin: true },
     });
 
     return { secrets: projectSecrets };

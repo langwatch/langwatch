@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import type { HttpAuth } from "@langwatch/agent-contract";
+import { isCredentialHeader, type HttpAuth } from "@langwatch/agent-contract";
 import { nowInstant } from "@langwatch/time";
 import type { CustomMetadata, Span } from "@langwatch/trace-contract";
 
@@ -10,10 +10,6 @@ export type TraceTestContext = {
   has_auth: boolean;
   output_path?: string;
 };
-
-// Match credential words without hiding ordinary headers such as X-Api-Version.
-const CREDENTIAL_HEADER_WORD =
-  /(^|[-_])(authorization|auth|cookie2?|api[-_]?key|token|secret|password|credential)s?([-_]|$)/i;
 
 const REDACTED = "[REDACTED]";
 
@@ -38,7 +34,7 @@ export function sanitizeHeadersForTrace({
       continue;
     }
 
-    if (lower === customLower || CREDENTIAL_HEADER_WORD.test(lower)) {
+    if (lower === customLower || isCredentialHeader(key)) {
       sanitized[key] = REDACTED;
     }
   }

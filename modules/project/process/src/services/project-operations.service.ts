@@ -2,6 +2,7 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   ProjectNotFoundError,
+  ProjectS3SecretRequiredError,
   type Project,
   type TopicClusteringRequest,
   type UpdateProjectInput,
@@ -76,6 +77,9 @@ export class ProjectOperationsService {
     if (!project) {
       throw new ProjectNotFoundError();
     }
+    if (input.s3Endpoint && input.s3SecretAccessKey === undefined && !project.s3SecretAccessKey) {
+      throw new ProjectS3SecretRequiredError();
+    }
 
     const data: UpdateProjectInput = {
       ...(input.name !== undefined && { name: input.name }),
@@ -89,7 +93,7 @@ export class ProjectOperationsService {
       presenceEnabled: input.presenceEnabled,
       s3Endpoint: input.s3Endpoint ?? null,
       s3AccessKeyId: input.s3AccessKeyId ?? null,
-      s3SecretAccessKey: input.s3SecretAccessKey ?? null,
+      ...(input.s3SecretAccessKey !== undefined && { s3SecretAccessKey: input.s3SecretAccessKey }),
       s3Bucket: input.s3Bucket,
     };
     const updated = await this.dependencies.projects.update({

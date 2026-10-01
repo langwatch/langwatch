@@ -7,7 +7,7 @@ import type { Workflow, WorkflowProjectPath, WorkflowVersion } from "@langwatch/
 
 /** A project's stored run environment, as the memory tier holds it. */
 export type StoredEnvironmentRow = {
-  secrets: { name: string; encryptedValue: string }[];
+  secrets: { name: string; encryptedValue: string; boundOrigin: string | null }[];
 };
 
 export class WorkflowMemoryStore {

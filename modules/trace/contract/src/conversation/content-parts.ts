@@ -24,7 +24,7 @@ const asString = (value: unknown): string | undefined =>
  * not through `visitContentPart`, because these carry the ids the
  * result-pairing pass needs, which the visitor's branches don't surface.
  */
-export function readToolBlock({
+export function extractToolBlock({
   item,
   context: { id, traceId, index },
 }: {
@@ -65,7 +65,7 @@ export function readToolBlock({
  * extraction, or a `/api/files/<id>` reference after. Each branch builds
  * its whole part since `MediaPartData` splits on `source.type`.
  */
-function audioPart({
+function toAudioPart({
   audio,
   context: { id, role, traceId, index },
 }: {
@@ -104,7 +104,7 @@ function audioPart({
   return undefined;
 }
 
-/** The visitor branches for everything `readToolBlock` did not claim. */
+/** The visitor branches for everything `extractToolBlock` did not claim. */
 function partVisitor(context: PartContext): ContentPartVisitor<DisplayPart | undefined> {
   const { id, role, traceId, index } = context;
 
@@ -163,7 +163,7 @@ function partVisitor(context: PartContext): ContentPartVisitor<DisplayPart | und
       role,
       traceId,
     }),
-    inputAudio: (audio) => audioPart({ audio, context }),
+    inputAudio: (audio) => toAudioPart({ audio, context }),
   };
 }
 
@@ -176,7 +176,7 @@ export function decodeContentPart({
   context: PartContext;
 }): DisplayPart | undefined {
   return (
-    readToolBlock({ item, context }) ??
+    extractToolBlock({ item, context }) ??
     visitContentPart<DisplayPart | undefined>(item, partVisitor(context))
   );
 }

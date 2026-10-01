@@ -365,6 +365,10 @@ type Workflow struct {
 	EnableTracing   *bool             `json:"enable_tracing,omitempty"`
 	WorkflowType    *string           `json:"workflow_type,omitempty"`
 	Secrets         map[string]string `json:"secrets,omitempty"`
+	// SecretOrigins names the one origin (scheme://host:port) each secret
+	// minted from an HTTP credential may be sent to; an HTTP node sending it
+	// anywhere else is refused. A secret absent here resolves anywhere.
+	SecretOrigins map[string]string `json:"secret_origins,omitempty"`
 	// Params are the run's user-defined parameters. Unlike secrets they keep
 	// their JSON types, so a number stays a number and a boolean stays a
 	// boolean by the time user code reads params.NAME.

@@ -121,6 +121,8 @@ export const HttpAgentDataSchema = z.object({
    * http targets still parses.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /** The one origin each secret minted from an HTTP credential may be sent to. */
+  secretOrigins: z.record(z.string(), z.string()).optional(),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -201,6 +203,8 @@ export const WorkflowAgentDataSchema = z.object({
    * `secrets.NAME` aligned with Workflow Studio preparation.
    */
   secrets: z.record(z.string(), z.string()).default({}),
+  /** The one origin each secret minted from an HTTP credential may be sent to. */
+  secretOrigins: z.record(z.string(), z.string()).optional(),
 });
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 

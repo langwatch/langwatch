@@ -6,6 +6,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { Temporal, toDate } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -38,6 +39,34 @@ export function agentFixture(overrides: Partial<Agent> = {}): Agent {
   });
 }
 
+/** Project secrets kept in memory, for agents whose typed tokens become secrets on save. */
+export function secretStoreFixture(initial: Record<string, string> = {}) {
+  const values: Record<string, string> = { ...initial };
+  const origins: Record<string, string> = {};
+  const rowOf = (input: { projectId: string; name: string }) => ({
+    id: input.name,
+    projectId: input.projectId,
+    name: input.name,
+    boundOrigin: origins[input.name] ?? null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    createdBy: { name: null },
+    updatedBy: { name: null },
+  });
+  const secrets = createApiFixture<SecretApi>({
+    getValues: async () => ({ ...values }),
+    list: async ({ projectId }) => Object.keys(values).map((name) => rowOf({ projectId, name })),
+    create: async (input) => {
+      values[input.name] = input.value;
+      if (input.boundOrigin) origins[input.name] = input.boundOrigin;
+
+      return rowOf(input);
+    },
+  });
+
+  return { secrets, values, origins };
+}
+
 export function createAgentAppFixture(
   options: {
     apiKeys?: ApiKeyApi;
@@ -45,6 +74,7 @@ export function createAgentAppFixture(
     permissions?: AuthzApi;
     projects?: ProjectApi;
     scenarios?: ScenarioApi;
+    secrets?: SecretApi;
     traces?: TraceApi;
     users?: UserApi;
     workflows?: WorkflowApi;
@@ -62,6 +92,7 @@ export function createAgentAppFixture(
       permissions: options.permissions ?? createApiFixture<AuthzApi>(),
       projects: options.projects ?? createApiFixture<ProjectApi>(),
       scenarios: options.scenarios ?? createApiFixture<ScenarioApi>(),
+      secrets: options.secrets ?? secretStoreFixture().secrets,
       traces: options.traces ?? createApiFixture<TraceApi>(),
       users: options.users ?? createApiFixture<UserApi>(),
       workflows: options.workflows ?? createApiFixture<WorkflowApi>(),

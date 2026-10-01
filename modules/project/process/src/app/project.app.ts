@@ -7,7 +7,6 @@ import {
   type DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { LangyApi } from "@langwatch/langy-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   ProjectApi,
@@ -87,7 +86,6 @@ type ProjectDependencies = Readonly<{
   authorization: typeof AuthzApi;
   trace: typeof TraceApi;
   auditLog: typeof AuditLogApi;
-  langy: typeof LangyApi;
   /** Owns the project's PII level, which `/api/projects` reads and writes by name. */
   dataPrivacy: typeof DataPrivacyApi;
 }>;
@@ -131,7 +129,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     authorization: AuthzApi,
     trace: TraceApi,
     auditLog: AuditLogApi,
-    langy: LangyApi,
     dataPrivacy: DataPrivacyApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
@@ -143,7 +140,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   readonly #apiKeys: ApiKeyApi;
   readonly #authorization: AuthzApi;
   readonly #trace: TraceApi;
-  readonly #langy: LangyApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #encryption: ProjectProcessMembers["encryption"];
   readonly #logger: ProjectProcessMembers["logger"];
@@ -160,7 +156,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     apiKeys,
     authorization,
     trace,
-    langy,
     dataPrivacy,
     encryption,
     logger,
@@ -171,7 +166,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     apiKeys: ApiKeyApi;
     authorization: AuthzApi;
     trace: TraceApi;
-    langy: LangyApi;
     dataPrivacy: DataPrivacyApi;
     encryption: ProjectProcessMembers["encryption"];
     logger: ProjectProcessMembers["logger"];
@@ -182,7 +176,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#apiKeys = apiKeys;
     this.#authorization = authorization;
     this.#trace = trace;
-    this.#langy = langy;
     this.#dataPrivacy = dataPrivacy;
     this.#encryption = encryption;
     this.#logger = logger;
@@ -215,7 +208,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
       apiKeys: dependencies.apiKeys,
       authorization: dependencies.authorization,
       trace: dependencies.trace,
-      langy: dependencies.langy,
       dataPrivacy: dependencies.dataPrivacy,
       encryption: members.encryption,
       logger: members.logger,
@@ -292,14 +284,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
       projectId: input.projectId,
       userId: input.by.id,
     });
-  }
-
-  provisionLangyVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void> {
-    return this.#langy.provisionVirtualKey(input);
   }
 
   /**

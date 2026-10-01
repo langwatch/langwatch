@@ -8,7 +8,11 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../app/workflow.app.ts";
+import type {
+  WorkflowAgentMapping,
+  WorkflowHttpSecrets,
+  WorkflowStudioDsl,
+} from "../app/workflow.app.ts";
 import type { WorkflowService } from "./workflow.service.ts";
 
 const logger = createLogger("langwatch:workflows:auto-compute");
@@ -16,6 +20,7 @@ const logger = createLogger("langwatch:workflows:auto-compute");
 export type WorkflowStudioVersionServiceOptions = {
   workflows: WorkflowService;
   studioDsl: WorkflowStudioDsl;
+  httpSecrets: WorkflowHttpSecrets;
   agentMappings: WorkflowAgentMapping;
 };
 
@@ -60,9 +65,10 @@ export class WorkflowStudioVersionService {
   }
 
   async saveOrCommit(input: SaveStudioWorkflowVersionInput): Promise<WorkflowVersion> {
-    const preparedDsl = await this.options.studioDsl.prepare({
+    const preparedDsl = await this.options.httpSecrets.store({
       projectId: input.projectId,
-      dsl: input.dsl,
+      dsl: await this.options.studioDsl.prepare({ projectId: input.projectId, dsl: input.dsl }),
+      authorId: input.authorId,
     });
 
     const version = await this.options.workflows.saveVersion({

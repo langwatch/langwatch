@@ -7,7 +7,7 @@ import { collapseAudioTranscript, decodeContentPart, type PartContext } from "./
 import type { ConversationTurn, DisplayPart } from "./display-part.ts";
 import { safeJsonParseOrStringFallback } from "./safe-json-parse.ts";
 
-/** A stored message keeps its provider-specific fields; the playground's chat messages fit it as they are. */
+/** A stored message keeps its provider-specific fields; playground chat messages fit it as is. */
 export type FlattenableMessage = {
   role?: string | undefined;
   content?: unknown;
@@ -30,7 +30,7 @@ const NO_CONTENT_SENTINEL = "None";
  * OpenAI's o-series uses `reasoning_content`, Anthropic `thinking`. Same
  * meaning to a reader, so they render the same way.
  */
-function readReasoning(msg: FlattenableMessage): string | undefined {
+function extractReasoning(msg: FlattenableMessage): string | undefined {
   const raw = msg as Record<string, unknown>;
   const reasoning = raw.reasoning_content ?? raw.thinking;
   return typeof reasoning === "string" && reasoning.trim() ? reasoning : undefined;
@@ -81,7 +81,7 @@ function flattenTypedParts({
   // content array has nowhere of its own to put it. It rides the first text
   // part, which is the reply the bubble draws it above — the same place the
   // untyped path puts it.
-  const reasoning = readReasoning(msg);
+  const reasoning = extractReasoning(msg);
   const firstText = collapsed.find((part) => part.kind === "text");
   if (reasoning && firstText?.kind === "text") {
     firstText.reasoning = reasoning;
@@ -110,7 +110,7 @@ function flattenContent({
       id: messageId,
       role: msg.role ?? "assistant",
       content: text,
-      reasoning: readReasoning(msg),
+      reasoning: extractReasoning(msg),
       traceId: msg.trace_id,
     },
   ];

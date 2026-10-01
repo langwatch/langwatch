@@ -19,7 +19,10 @@ import {
 } from "./secret.ts";
 
 /** The caller states the secret; the transport stamps who asked. */
-export const secretTrpcCreateInputSchema = createSecretInputSchema.omit({ actorId: true });
+export const secretTrpcCreateInputSchema = createSecretInputSchema.omit({
+  actorId: true,
+  boundOrigin: true,
+});
 export type SecretTrpcCreateInput = z.infer<typeof secretTrpcCreateInputSchema>;
 
 export const secretTrpcUpdateInputSchema = z

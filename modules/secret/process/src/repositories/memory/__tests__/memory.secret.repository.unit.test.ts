@@ -77,4 +77,29 @@ describe("MemorySecretRepository", () => {
       ]);
     });
   });
+
+  describe("when a secret is saved for one address", () => {
+    /** @scenario "A secret minted from an HTTP credential keeps the address it was saved for" */
+    it("keeps the address through a value replacement that names none", async () => {
+      const repository = MemorySecretRepository.create();
+      const bound = await repository.create({
+        ...stored("HTTP_AGENT_TOKEN"),
+        boundOrigin: "https://agent.example.com",
+      });
+      await repository.create(stored("OPENAI_API_KEY"));
+
+      await repository.update({
+        projectId: "project-1",
+        id: bound.id,
+        encryptedValue: "encrypted(rotated)",
+        actorId: "user-2",
+      });
+
+      const rows = await repository.findAll({ projectId: "project-1" });
+      expect(rows.map((row) => [row.name, row.boundOrigin])).toEqual([
+        ["HTTP_AGENT_TOKEN", "https://agent.example.com"],
+        ["OPENAI_API_KEY", null],
+      ]);
+    });
+  });
 });

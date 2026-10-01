@@ -19,7 +19,10 @@ import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
+import { ProjectApi } from "@langwatch/project-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -127,6 +130,7 @@ import { WorkflowCodeCompletionService } from "../services/workflow-code-complet
 import { WorkflowCommitMessageService } from "../services/workflow-commit-message.service.ts";
 import { WorkflowCopyLineageService } from "../services/workflow-copy-lineage.service.ts";
 import { ContractWorkflowDslMigrationService } from "../services/workflow-dsl-migration.service.ts";
+import { WorkflowHttpSecretsService } from "../services/workflow-http-secrets.service.ts";
 import { WorkflowLinkedRowsService } from "../services/workflow-linked-rows.service.ts";
 import { WorkflowNlpExecutionService } from "../services/workflow-nlp-execution.service.ts";
 import { WorkflowPermissionService } from "../services/workflow-permission.service.ts";
@@ -303,6 +307,8 @@ export interface WorkflowInfrastructure {
   datasets: DatasetApi;
   /** How a Studio graph is prepared before any version of it is written. */
   studioDsl: WorkflowStudioDsl;
+  /** Stores the tokens typed into a graph's HTTP nodes as project secrets. */
+  httpSecrets: WorkflowHttpSecrets;
   /** The agent mappings a saved Studio graph refreshes, best effort. */
   agentMappings: WorkflowAgentMapping;
   /** The bare row a Studio copy lands in, before its first version exists. */
@@ -347,6 +353,7 @@ export type WorkflowHostMembers = Omit<
   WorkflowInfrastructure,
   | "evaluators"
   | "studioDsl"
+  | "httpSecrets"
   | "agentMappings"
   | "workflowRows"
   | "workflows"
@@ -606,10 +613,16 @@ export class WorkflowApp implements WorkflowApi {
     authz: AuthzApi,
     /** Mints the key a run calls LangWatch back with. */
     apiKeys: ApiKeyApi,
+    /** The projects the HTTP-token backfill task walks. */
+    projects: ProjectApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
     monitors: MonitorApi,
+    /** Where the token typed into an HTTP node is stored, as a project secret. */
+    secrets: SecretApi,
+    /** Every organisation, for the task that moves old inline tokens into secrets. */
+    organizations: OrganizationApi,
   };
   static readonly config = workflowConfig;
   /**
@@ -639,6 +652,7 @@ export class WorkflowApp implements WorkflowApi {
     });
     const studioEvents = StudioEventPreparerService.create({
       datasets,
+      agents: setup.dependencies.agents,
       projectEnvironment,
       llmParameters,
       runKeys: setup.dependencies.apiKeys,
@@ -683,6 +697,7 @@ export class WorkflowApp implements WorkflowApi {
       studioDsl: ModelProviderWorkflowStudioDslService.create({
         modelProviders: setup.dependencies.modelProviders,
       }),
+      httpSecrets: WorkflowHttpSecretsService.create(setup.dependencies.secrets),
       agentMappings: WorkflowAgentMappingService.create({ agents: setup.dependencies.agents }),
       workflowRows: setup.repositories.workflowRows,
       evaluations: {
@@ -715,6 +730,7 @@ export class WorkflowApp implements WorkflowApi {
     this.#studioVersions = WorkflowStudioVersionService.create({
       workflows: members.workflows,
       studioDsl: members.studioDsl,
+      httpSecrets: members.httpSecrets,
       agentMappings: members.agentMappings,
     });
     this.#studioCopies = WorkflowStudioCopyService.create({
@@ -832,7 +848,12 @@ export class WorkflowApp implements WorkflowApi {
     input: Omit<CreateWorkflowCommand, "authorId">,
     by: WorkflowCaller,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
-    const created = await this.#members.workflows.create({ ...input, authorId: by.id });
+    const dsl = await this.#members.httpSecrets.store({
+      projectId: input.projectId,
+      dsl: input.dsl,
+      authorId: by.id,
+    });
+    const created = await this.#members.workflows.create({ ...input, dsl, authorId: by.id });
 
     this.#recordCreated({ workflowId: created.workflow.id, projectId: input.projectId, by });
 
@@ -1510,9 +1531,15 @@ export interface WorkflowDslMigration {
   migrate(dsl: WorkflowDsl): WorkflowDsl;
 }
 
+/** A run's decrypted secrets, and the one origin each HTTP-minted secret may be sent to. */
+export type WorkflowRunEnvironment = {
+  secrets: Record<string, string>;
+  secretOrigins: Record<string, string>;
+};
+
 /** Project credentials and decrypted secrets are application members. */
 export interface WorkflowProjectEnvironment {
-  get(input: { projectId: string }): Promise<{ secrets: Record<string, string> }>;
+  get(input: { projectId: string }): Promise<WorkflowRunEnvironment>;
 }
 
 export type WorkflowLlmParameterResolution = {
@@ -1537,6 +1564,18 @@ export interface WorkflowLlmParameters {
  */
 export interface WorkflowStudioDsl {
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
+}
+
+/**
+ * Stores the literal credentials of a Studio graph's HTTP nodes as project secrets and
+ * answers the graph holding their `{{ secrets.NAME }}` references.
+ */
+export interface WorkflowHttpSecrets {
+  store<Dsl extends { nodes?: unknown }>(input: {
+    projectId: string;
+    dsl: Dsl;
+    authorId: string | undefined;
+  }): Promise<Dsl>;
 }
 
 /**

@@ -1,4 +1,5 @@
 import {
+  experimentRowWithoutHttpCredentials,
   experimentSchema,
   ExperimentNotFoundError,
   ExperimentTypeMismatchError,
@@ -10,6 +11,7 @@ import {
   type WorkbenchActor,
   type WorkbenchStateView,
   type WorkbenchVersionSummary,
+  workbenchStateWithoutHttpCredentials,
 } from "@langwatch/experiment-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -30,7 +32,8 @@ export type ExperimentDatabase = Pick<
   "experiment" | "experimentVersion" | "$transaction"
 >;
 
-const mapExperiment = (row: unknown): Experiment => experimentSchema.parse(row);
+const mapExperiment = (row: unknown): Experiment =>
+  experimentSchema.parse(experimentRowWithoutHttpCredentials(row));
 
 export class PrismaExperimentRepository extends ExperimentRepository {
   static create(database: ExperimentDatabase): PrismaExperimentRepository {
@@ -244,16 +247,20 @@ export class PrismaExperimentRepository extends ExperimentRepository {
     projectId: string;
     id: string;
     workbenchState: SaveExperimentInput["workbenchState"];
-  }): Promise<void> {
-    await this.database.experiment.update({
+  }): Promise<{ version: number }> {
+    const updated = await this.database.experiment.update({
       where: { id: input.id, projectId: input.projectId },
       data: {
         workbenchState:
           input.workbenchState === null
             ? Prisma.JsonNull
             : (input.workbenchState as Prisma.InputJsonValue),
+        // The counter moves so a client holding the old version knows it is behind.
+        workbenchVersion: { increment: 1 },
       },
+      select: { workbenchVersion: true },
     });
+    return { version: updated.workbenchVersion };
   }
 
   async archiveActive(input: {
@@ -314,7 +321,9 @@ export class PrismaExperimentRepository extends ExperimentRepository {
       experimentId: row.id,
       slug: row.slug,
       name: row.name,
-      state: row.workbenchState as WorkbenchStateView["state"],
+      state: workbenchStateWithoutHttpCredentials(
+        row.workbenchState,
+      ) as WorkbenchStateView["state"],
       version: row.workbenchVersion,
       updatedAt: row.updatedAt,
       ...(author ? { actorLabel: author.authorLabel as "user" | "langy" | "api" } : {}),

@@ -1,7 +1,10 @@
+import { AgentNotFoundError, type AgentApi, type HttpAgentConfig } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
+  httpAgentIdsOf,
   llmConfigSchema,
+  nodesWithStoredHttpAgentSecrets,
   normalizeWorkflowLlmConfig,
   parseStudioWorkflow,
   runKeyPermissions,
@@ -23,6 +26,9 @@ const workflowLlmConfigSchema = llmConfigSchema.passthrough().nullish();
 type StudioWorkflowEventEnricherOptions = {
   projectEnvironment: WorkflowProjectEnvironment;
   llmParameters: WorkflowLlmParameters;
+  /** The saved HTTP agents a graph's nodes run, read for the credentials the graph
+   * does not carry. */
+  agents: Pick<AgentApi, "getById">;
   /** The key every run calls LangWatch with: its starter's, or an ownerless one. */
   runKeys: Pick<ApiKeyApi, "mintRunKey">;
   /** The life a dispatch's key must still have when handed out: the engine's own bound. */
@@ -117,15 +123,49 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
         api_key: apiKey,
         project_id: input.projectId,
         secrets: environment.secrets,
-        nodes: await this.enrichNodes(studioWorkflow.nodes, resolutions),
+        secret_origins: environment.secretOrigins,
+        nodes: await this.enrichNodes({
+          nodes: await this.withStoredAgentSecrets({
+            nodes: studioWorkflow.nodes,
+            projectId: input.projectId,
+          }),
+          resolutions,
+        }),
       },
     };
   }
 
-  private async enrichNodes(
-    nodes: StudioWorkflow["nodes"],
-    resolutions: readonly WorkflowLlmParameterResolution[],
-  ): Promise<StudioWorkflow["nodes"]> {
+  private async withStoredAgentSecrets(input: {
+    nodes: StudioWorkflow["nodes"];
+    projectId: string;
+  }): Promise<StudioWorkflow["nodes"]> {
+    const stored = new Map<string, HttpAgentConfig>();
+    await Promise.all(
+      httpAgentIdsOf(input.nodes).map(async (id) => {
+        const agent = await this.storedAgent({ id, projectId: input.projectId });
+        if (agent?.type === "http") stored.set(id, agent.config);
+      }),
+    );
+
+    return nodesWithStoredHttpAgentSecrets({ nodes: input.nodes, stored });
+  }
+
+  private async storedAgent(input: { id: string; projectId: string }) {
+    try {
+      return await this.options.agents.getById(input);
+    } catch (error) {
+      if (error instanceof AgentNotFoundError) return null;
+      throw error;
+    }
+  }
+
+  private async enrichNodes({
+    nodes,
+    resolutions,
+  }: {
+    nodes: StudioWorkflow["nodes"];
+    resolutions: readonly WorkflowLlmParameterResolution[];
+  }): Promise<StudioWorkflow["nodes"]> {
     return Promise.all(
       nodes.map(async (node) => {
         const parameters = await Promise.all(

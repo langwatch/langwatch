@@ -25,9 +25,9 @@ type NoticeDependencies = Readonly<{
 }>;
 
 /**
- * Where a new project is recorded as project's event, with the organization's admin at that
- * moment; analytics and nurturing react from their own side (§9). Best effort, as main's inline
- * sync was: a failed record is logged. The sender arrives once the pipeline registers.
+ * Where a new project is recorded as project's event, with the organization's admin and its
+ * creator; peers react from their own side (§9). Best effort, as main's inline sync was: a
+ * failed record is logged. The sender arrives once the pipeline registers.
  */
 export class ProjectCreatedNoticeService {
   static create(dependencies: NoticeDependencies): ProjectCreatedNoticeService {
@@ -48,9 +48,12 @@ export class ProjectCreatedNoticeService {
     await this.#send({ ...input, adminUserId: admin?.adminUserId ?? null });
   }
 
-  async created(input: Readonly<{ projectId: string; organizationId: string }>): Promise<void> {
+  async created(
+    input: Readonly<{ projectId: string; organizationId: string; createdByUserId: string | null }>,
+  ): Promise<void> {
     try {
-      await this.record(input);
+      const admin = await this.dependencies.projects.findWithOrgAdmin(input.projectId);
+      await this.#send({ ...input, adminUserId: admin?.adminUserId ?? null });
     } catch (error) {
       this.dependencies.logger.error(
         { projectId: input.projectId, error },
@@ -105,6 +108,7 @@ export class ProjectCreatedNoticeService {
       projectId: string;
       organizationId: string;
       adminUserId: string | null;
+      createdByUserId?: string | null;
       backfilled?: boolean;
     }>,
   ): Promise<void> {

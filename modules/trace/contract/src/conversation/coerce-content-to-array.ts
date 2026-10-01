@@ -31,7 +31,7 @@ function parseJson(value: string): unknown {
 /**
  * Convert a Python-repr-like string to a best-effort JSON string.
  */
-function readPythonHexEscape(
+function parsePythonHexEscape(
   input: string,
   offset: number,
 ): { json: string; consumed: number } | null {
@@ -79,7 +79,7 @@ function isWordChar(c: string | undefined): boolean {
 }
 
 /** None/True/False become JSON literals only at token boundaries. */
-function readPythonLiteral(input: string, offset: number): ReprStep | null {
+function parsePythonLiteral(input: string, offset: number): ReprStep | null {
   if (isWordChar(input[offset - 1])) return null;
   for (const [word, json] of PYTHON_LITERALS) {
     if (input.startsWith(word, offset) && !isWordChar(input[offset + word.length])) {
@@ -90,7 +90,7 @@ function readPythonLiteral(input: string, offset: number): ReprStep | null {
 }
 
 function readOutsideString(input: string, offset: number): ReprStep {
-  const literal = readPythonLiteral(input, offset);
+  const literal = parsePythonLiteral(input, offset);
   if (literal !== null) return literal;
   const c = input[offset] ?? "";
   if (c === "'") return { text: '"', consumed: 1, state: "single" };
@@ -102,7 +102,7 @@ function readOutsideString(input: string, offset: number): ReprStep {
 function readEscape(input: string, offset: number, state: ReprState): ReprStep {
   const next = input[offset + 1];
   if (state === "single" && next === "'") return { text: "'", consumed: 2, state };
-  const hex = readPythonHexEscape(input, offset);
+  const hex = parsePythonHexEscape(input, offset);
   if (hex !== null) return { text: hex.json, consumed: hex.consumed, state };
   if (next !== undefined) return { text: `\\${next}`, consumed: 2, state };
   return { text: "\\", consumed: 1, state };

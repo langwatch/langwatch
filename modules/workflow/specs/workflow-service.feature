@@ -251,6 +251,40 @@ Feature: Workflow service boundary
     Then the app receives that session's user rather than nobody
 
   @unit
+  Scenario: A run fills a saved HTTP agent's blank credentials from the agent
+    Given a graph has a node that runs a saved HTTP agent with its credentials blank
+    When Workflow enriches a Studio event for the project
+    Then the node carries the credentials the saved agent stores
+    And a credential the node already carries is kept
+
+  @unit
+  Scenario: A run whose saved HTTP agent no longer exists leaves the node as it is
+    Given a graph has a node that runs a saved HTTP agent which has since been deleted
+    When Workflow enriches a Studio event for the project
+    Then the event is enriched without a credential for that node
+
+  @unit
+  Scenario: Saving a graph leaves a saved HTTP agent's credentials with the agent
+    Given a graph has a node that runs a saved HTTP agent and carries a bearer token
+    When the graph is saved as a version
+    Then the stored version keeps the auth kind and the header names
+    And every credential value on that node is blank
+
+  @unit
+  Scenario: A workflow read never carries a saved HTTP agent's credentials
+    Given a stored version of a workflow embeds a saved HTTP agent's credentials
+    When the studio reads the workflow, its version history or a restored version
+    Then the answered graph has a blank value for every credential on that node
+    And a node that does not run a saved agent is answered as stored
+
+  @unit
+  Scenario: A published workflow read never carries a saved HTTP agent's credentials
+    Given the published version of a workflow embeds a saved HTTP agent's credentials
+    When the studio reads the published workflow
+    Then the answered graph has a blank value for every credential on that node
+    And the header names and the auth kind are kept
+
+  @unit
   Scenario: A workflow run calls LangWatch with a key minted for that run, never the project key
     Given a member who may run workflows in a project
     When the member starts a workflow run that calls LangWatch's own endpoints
@@ -343,3 +377,44 @@ Feature: Workflow service boundary
     When its run key is minted or reused
     Then the key has at least 900 seconds plus a minute left when handed out
     And a self-hosted dispatch's key has at least 15 minutes left
+
+  @unit
+  Scenario: A run fills a saved HTTP agent's credentials only at the agent's saved address
+    Given a graph has a node that runs a saved HTTP agent with its credentials blank
+    And the node calls another scheme, host or port than the agent's saved address
+    When Workflow enriches a Studio event for the project
+    Then the node carries none of the agent's stored credentials
+
+  @unit
+  Scenario: A graph copied into another project arrives with blank HTTP credentials
+    Given a graph whose HTTP nodes hold credentials or secret references
+    When it is copied, pushed or synced into another project
+    Then every HTTP credential in the copy is blank for the user to enter again
+
+  @unit
+  Scenario: A version saved while the backfill runs keeps that save
+    Given the credentials backfill has read a workflow version
+    When a user saves that version before the backfill writes it
+    Then the backfill skips the version and logs its id only
+
+  @unit
+  Scenario: A workflow run sends a saved credential only to the address it was saved for
+    Given a project secret was minted from an HTTP credential saved for one address
+    When Workflow enriches a Studio event for the project
+    Then the run tells the engine that address beside the secret's value
+    And the engine refuses an HTTP node that would send the secret anywhere else
+
+  @unit
+  Scenario: Saving an HTTP node's credential binds its secret to the node's address
+    Given a graph has an HTTP node with a credential typed in and a fixed address
+    When the graph is saved
+    Then the credential is stored as a project secret bound to that address
+    And a secret already holding the same value for another address is not reused
+
+  @unit
+  Scenario: The backfill binds each HTTP secret to the one address that sends it
+    Given a project secret minted from an HTTP credential, saved before secrets were bound
+    When the credentials backfill runs
+    Then the secret is bound to the one origin every agent and graph referencing it calls
+    And a secret sent to two origins, or to an address with no fixed origin, stays unbound and is logged by id only
+    And a secret created from the secrets screen is never bound

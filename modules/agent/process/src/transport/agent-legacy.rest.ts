@@ -22,6 +22,8 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
+import { agentConfigWithoutSecrets } from "../rules/agent-secrets.rules.ts";
+
 const legacyResponse = agentResponseSchema.pick({
   id: true,
   name: true,
@@ -45,7 +47,7 @@ function response(
     id: agent.id,
     name: agent.name,
     type: agent.type,
-    config: agent.config,
+    config: agentConfigWithoutSecrets(agent),
     createdAt: agent.createdAt,
     updatedAt: agent.updatedAt,
     platformUrl: app.platformUrl({ projectSlug, agentId: agent.id, agentType: agent.type }),

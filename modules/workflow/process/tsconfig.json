@@ -69,7 +69,19 @@
       "path": "../../../packages/process-stores/tsconfig.build.json"
     },
     {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/task/tsconfig.build.json"
     },
     {
       "path": "../../../packages/secrets/tsconfig.build.json"

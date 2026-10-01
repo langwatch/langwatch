@@ -45,7 +45,7 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
   private readonly config: WorkflowAgentData;
   private readonly nlpServiceUrl: string;
   /**
-   * The LangWatch platform API key (project.apiKey), sent as workflow.api_key.
+   * The run's own LangWatch key (minted for this run), sent as workflow.api_key.
    * Never an LLM provider credential, so it must not be sourced from litellm
    * params (issue #6634).
    */
@@ -181,6 +181,8 @@ export class HttpSerializedWorkflowAgentChannel extends SerializedAgentChannel {
       ...this.config.workflow,
       api_key: this.projectApiKey,
       secrets: { ...existingSecrets, ...this.config.secrets },
+      // Replaced, never merged: the engine refuses an HTTP node sending a bound secret elsewhere.
+      secret_origins: this.config.secretOrigins ?? {},
       params: this.turnParameters(),
     };
 

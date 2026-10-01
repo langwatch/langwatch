@@ -69,7 +69,7 @@ export function navigateSuggestion<Row extends SuggestionRow>({
   return { ...ui, selectedIndex: next };
 }
 
-export function highlightedRow<Row extends SuggestionRow>(ui: SuggestionUIState<Row>): Row | null {
+export function pickHighlightedRow<Row extends SuggestionRow>(ui: SuggestionUIState<Row>): Row | null {
   if (!ui.state.open || ui.items.length === 0) return null;
   return ui.items[ui.selectedIndex] ?? null;
 }

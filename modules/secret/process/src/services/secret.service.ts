@@ -85,6 +85,7 @@ export class SecretService {
       projectId: input.projectId,
       name: input.name,
       encryptedValue: this.options.encryption.encrypt(input.value),
+      boundOrigin: input.boundOrigin,
       actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }
@@ -96,6 +97,7 @@ export class SecretService {
       projectId: input.projectId,
       id: input.id,
       encryptedValue: this.options.encryption.encrypt(input.value),
+      boundOrigin: input.boundOrigin,
       actorId: await this.getAttributedUserId(input.projectId, by),
     });
   }

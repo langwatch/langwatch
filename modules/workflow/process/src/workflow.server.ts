@@ -9,7 +9,9 @@ import { WorkflowApp } from "#app/workflow.app";
 import { workflowLifecycleEventing } from "#eventing/workflow-lifecycle.pipeline";
 import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-cleanup.pipeline";
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
+import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.service";
 import { WorkflowPermissionService } from "#services/workflow-permission.service";
+import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
 import {
   workflowRunCallerKey,
@@ -32,6 +34,16 @@ export const workflowServer = defineServerModule("workflow")
   )
   .withEventing(workflowNlpLambdaCleanupEventing)
   .withEventing(workflowLifecycleEventing)
+  .withTasks(({ repositories, dependencies }) => [
+    WorkflowHttpCredentialsBackfillTask.create({
+      organizations: dependencies.organizations,
+      projects: dependencies.projects,
+      agents: dependencies.agents,
+      workflows: repositories.workflows,
+      httpSecrets: WorkflowHttpSecretsService.create(dependencies.secrets),
+      secrets: dependencies.secrets,
+    }),
+  ])
   .withTransportFacts(({ dependencies }) => [
     bindRestMiddleware(workflowRunCallerKey, (context) =>
       workflowRunCallerKeyOf(projectCredentialOfRequest(context.req.raw)),

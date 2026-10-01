@@ -16827,6 +16827,52 @@
       ]
     },
     {
+      "name": "AuthzUserStanding",
+      "tableName": "AuthzUserStanding",
+      "documentation": "Who authz treats as gone, from user's and identity's facts; authz never reads User (ARCHITECTURE.md, \"Platform operators are a grant\").",
+      "primaryKey": [
+        "userId"
+      ],
+      "fields": [
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "deactivatedAt",
+          "columnName": "deactivatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "erasedAt",
+          "columnName": "erasedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "standingChangedAt",
+          "columnName": "standingChangedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
       "name": "RoleBinding",
       "tableName": "RoleBinding",
       "documentation": "",
@@ -17607,6 +17653,15 @@
           "isList": false,
           "isOptional": true,
           "documentation": "Human label of the CLI device session that minted this ingestion key\n(e.g. \"Rogerio's MacBook Pro\"), snapshotted at mint time from the device\nflow's `client_info`. Denormalized so the org-wide API-keys settings page\ncan show which device a key came from without resolving another user's\nRedis-stored sessions. NULL for non-ingestion keys and for keys minted by\na CLI old enough to predate device metadata."
+        },
+        {
+          "name": "isSystemManaged",
+          "columnName": "isSystemManaged",
+          "type": "Boolean",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "True for a key LangWatch minted for itself (a run, the gateway's trace\nexport, a Langy session). Hides it from listings, refuses customer edits\nand revokes, and lets an ownerless run key act as the system. Never set\nby a customer create; rows before the column stay false."
         },
         {
           "name": "createdAt",
@@ -19971,6 +20026,52 @@
         {
           "name": "updatedAt",
           "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "GatewayTraceExportKey",
+      "tableName": "GatewayTraceExportKey",
+      "documentation": "",
+      "primaryKey": [
+        "projectId"
+      ],
+      "fields": [
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "apiKeyId",
+          "columnName": "apiKeyId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "encryptedToken",
+          "columnName": "encryptedToken",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
           "type": "DateTime",
           "kind": "scalar",
           "isList": false,

@@ -87,3 +87,10 @@ Feature: Canonical project-secret lifecycle
     When a caller lists, reads, updates, deletes, or creates that name
     Then listing omits it
     And direct access does not confirm that it exists
+
+  @unit
+  Scenario: A secret minted from an HTTP credential keeps the address it was saved for
+    Given a feature stores a credential as a project secret for one address
+    When the secret is listed, or its value is later replaced without naming an address
+    Then its metadata names that address
+    And a secret created from the secrets screen names no address

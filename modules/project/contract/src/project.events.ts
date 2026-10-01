@@ -14,6 +14,8 @@ export const projectCreatedEventDataSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
   /** The organization's live ADMIN member when recorded, as `resolveOrgAdmin` picks it. */
   adminUserId: z.string().min(1).nullish(),
+  /** The person who created it; absent for a personal workspace's project and a backfill. */
+  createdByUserId: z.string().min(1).nullish(),
   /** Set by project's backfill: the project existed before its creation was recorded. */
   backfilled: z.boolean().optional(),
 });

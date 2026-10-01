@@ -22,6 +22,7 @@ type Answers = {
   agent?: Agent | "missing" | "down";
   prompt?: Record<string, unknown> | null;
   projectSecrets?: Record<string, string>;
+  boundOrigins?: Record<string, string>;
 };
 
 function serviceAnswering(answers: Answers = {}) {
@@ -89,6 +90,17 @@ function serviceAnswering(answers: Answers = {}) {
 
   const secrets = createApiFixture<SecretApi>({
     getValues: async () => answers.projectSecrets ?? {},
+    list: async ({ projectId }) =>
+      Object.keys(answers.projectSecrets ?? {}).map((name) => ({
+        id: name,
+        projectId,
+        name,
+        boundOrigin: answers.boundOrigins?.[name] ?? null,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+        createdBy: { name: null },
+        updatedBy: { name: null },
+      })),
   });
 
   return ScenarioTargetPrefetchService.create({
@@ -238,6 +250,24 @@ describe("ScenarioTargetPrefetchService.getTargetAdapter", () => {
       await expect(fetchFor(service, "http", { TOKEN: "from-run" })).resolves.toMatchObject({
         secrets: { TOKEN: "from-run" },
       });
+    });
+
+    /** @scenario "A scenario run sends a saved credential only to the address it was saved for" */
+    it("carries the origin each bound project secret may reach, never for a run's own value", async () => {
+      const service = serviceAnswering({
+        agent,
+        projectSecrets: { HTTP_AGENT_TOKEN: "from-project", HTTP_OTHER_TOKEN: "other" },
+        boundOrigins: {
+          HTTP_AGENT_TOKEN: "https://acme.test",
+          HTTP_OTHER_TOKEN: "https://other.test",
+        },
+      });
+
+      await expect(
+        fetchFor(service, "http", { HTTP_OTHER_TOKEN: "from-run" }),
+      ).resolves.toMatchObject({ secretOrigins: { HTTP_AGENT_TOKEN: "https://acme.test" } });
+      const data = await fetchFor(service, "http", { HTTP_OTHER_TOKEN: "from-run" });
+      expect(data).not.toHaveProperty("secretOrigins.HTTP_OTHER_TOKEN");
     });
 
     it("keeps a project secret the run did not override", async () => {

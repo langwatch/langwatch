@@ -212,6 +212,14 @@ Feature: API key lifecycle
     Then its permissions are the private role's permissions, as main reports them
 
   @unit
+  Scenario: A key minted by someone holding a grant on an archived team keeps the minter's role
+    Given a member holding grants on a live team and on an archived team
+    When the member's grants are named for the create-key drawer
+    Then the read answers and names the live team
+    And the archived team's grant has no scope name
+    And the create-key drawer shows an error and disables Create when the read fails
+
+  @unit
   Scenario: Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in
     Given a personal workspace owned by one member
     When the platform mints a system-managed key with no owner bound to that workspace

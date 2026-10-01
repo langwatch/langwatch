@@ -178,4 +178,41 @@ describe("ProjectOperationsService", () => {
       expect(revokeAllTraceShares).not.toHaveBeenCalled();
     });
   });
+
+  describe("when the settings form saves an endpoint with a blank secret", () => {
+    const storage = {
+      projectId: "project_123",
+      s3Endpoint: "cipher(https://s3.example)",
+      s3AccessKeyId: "cipher(AKIA)",
+    };
+
+    /** @scenario A first-time storage setup with a blank secret is refused */
+    it("refuses it when no secret is stored yet", async () => {
+      const update = vi.fn(async () => characterizationProject(false));
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => characterizationProject(false), update },
+        revokeAllTraceShares: async () => {},
+      });
+
+      await expect(operations.updateSettings(storage)).rejects.toMatchObject({
+        code: "validation_error",
+        httpStatus: 400,
+      });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("keeps the stored secret when one is held", async () => {
+      const stored = { ...characterizationProject(false), s3SecretAccessKey: "cipher(shh)" };
+      const update = vi.fn(async () => stored);
+      const operations = characterizationOperations({
+        projects: { findWithTeam: async () => stored, update },
+        revokeAllTraceShares: async () => {},
+      });
+
+      await operations.updateSettings(storage);
+
+      expect(update).toHaveBeenCalledOnce();
+    });
+  });
 });

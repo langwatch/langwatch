@@ -1,9 +1,11 @@
 import { createLogger } from "@langwatch/observability";
 
+import { sealStagedPayload } from "../rules/staged-payload-seal.rules.ts";
 import {
   type NlpLambdaInvoke,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
+  STAGED_PAYLOAD_KEY_HEADER,
   type StagedNlpPayload,
 } from "./nlp-lambda.channel.ts";
 
@@ -139,12 +141,17 @@ export class NlpInvokeTransportAdapter {
     }
 
     let payload = JSON.stringify(envelope);
-    const staged = await this.stageIfOversized({ request, serialized: payload });
-    if (staged) {
+    const parked = await this.stageIfOversized({ request, serialized: payload });
+    const staged = parked?.payload;
+    if (parked) {
       payload = JSON.stringify({
         ...envelope,
         body: "",
-        headers: { ...envelope.headers, [STAGED_PAYLOAD_HEADER]: staged.url },
+        headers: {
+          ...envelope.headers,
+          [STAGED_PAYLOAD_HEADER]: parked.payload.url,
+          [STAGED_PAYLOAD_KEY_HEADER]: parked.key,
+        },
       });
     }
 
@@ -177,7 +184,7 @@ export class NlpInvokeTransportAdapter {
   private async stageIfOversized(input: {
     request: NlpInvokeRequest;
     serialized: string;
-  }): Promise<StagedNlpPayload | undefined> {
+  }): Promise<{ payload: StagedNlpPayload; key: string } | undefined> {
     const { projectId, body, path } = input.request;
     if (projectId === undefined || body === undefined) return undefined;
 
@@ -194,16 +201,17 @@ export class NlpInvokeTransportAdapter {
       );
     }
 
-    const staged = await staging.stage({
+    const { sealed, key } = sealStagedPayload(Buffer.from(body, "utf-8"));
+    const payload = await staging.stage({
       projectId,
       keyPrefix: `${INVOKE_STAGING_PREFIX}/${projectId}`,
-      serialized: Buffer.from(body, "utf-8"),
+      serialized: sealed,
       ttlSeconds: this.options.config.stagingTtlSeconds,
     });
     logger.info(
       { projectId, path, thresholdBytes: threshold },
       "staged oversized nlpgo invoke payload via presigned S3 URL",
     );
-    return staged;
+    return { payload, key };
   }
 }

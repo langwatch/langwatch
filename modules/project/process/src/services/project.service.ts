@@ -341,7 +341,11 @@ export class ProjectService {
         apiKey: this.credentials.generateApiKey(),
       }),
     );
-    await this.created.created({ projectId: project.id, organizationId: input.organizationId });
+    await this.created.created({
+      projectId: project.id,
+      organizationId: input.organizationId,
+      createdByUserId: input.userId ?? null,
+    });
 
     return project;
   }

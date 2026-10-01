@@ -349,6 +349,12 @@ export const CAPABILITY_CATALOG = {
     noun: { singular: "role binding", plural: "role bindings" },
     icon: "shieldCheck",
   },
+  grants: {
+    surface: "organization",
+    digestStrategy: "id-ref",
+    noun: { singular: "grant", plural: "grants" },
+    icon: "shieldCheck",
+  },
   "scim-tokens": {
     surface: "organization",
     digestStrategy: "id-ref",

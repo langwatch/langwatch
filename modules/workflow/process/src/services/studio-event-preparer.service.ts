@@ -1,3 +1,4 @@
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { StudioClientEvent, WorkflowRunPrincipal } from "@langwatch/workflow-contract";
@@ -22,6 +23,7 @@ export type StudioEventPreparer = {
 
 type StudioEventPreparerOptions = {
   datasets: DatasetApi;
+  agents: Pick<AgentApi, "getById">;
   projectEnvironment: WorkflowProjectEnvironment;
   llmParameters: WorkflowLlmParameters;
   runKeys: Pick<ApiKeyApi, "mintRunKey">;
@@ -37,6 +39,7 @@ export class StudioEventPreparerService implements StudioEventPreparer {
     this.enricher = StudioWorkflowEventEnricherService.create({
       projectEnvironment: options.projectEnvironment,
       llmParameters: options.llmParameters,
+      agents: options.agents,
       runKeys: options.runKeys,
       dispatchKeyFloorMs: options.dispatchKeyFloorMs,
     });

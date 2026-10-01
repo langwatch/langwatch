@@ -401,7 +401,10 @@ export class ApiKeyApp implements ApiKeyApi {
     });
 
     const { orgName, teamName, activeProjectIds, projectName, customRoleName } =
-      await this.#service.enrichBindingsWithNames({ bindings });
+      await this.#service.enrichBindingsWithNames({
+        bindings,
+        organizationId: input.organizationId,
+      });
 
     return bindings
       .filter((b) => b.scopeType !== "PROJECT" || activeProjectIds.has(b.scopeId))
@@ -454,6 +457,7 @@ export class ApiKeyApp implements ApiKeyApi {
     // custom-role half. Both come from the one call.
     const { orgName, teamName, projectName, customRoleName, customRoles } =
       await this.#service.enrichBindingsWithNames({
+        organizationId: input.organizationId,
         bindings: allBindings.map((rb): ApiKeyBinding => ({
           id: rb.id,
           role: rb.role,

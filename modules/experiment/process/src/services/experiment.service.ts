@@ -292,10 +292,18 @@ export class ExperimentService {
       workflowId: command.workflowId,
     });
     if (existing) {
-      await this.options.repository.updateWorkbenchState({
+      const refreshed = await this.options.repository.updateWorkbenchState({
         projectId: command.projectId,
         id: existing.id,
         workbenchState: command.workbenchState,
+      });
+      // An open workbench would otherwise sit on the old state until its next focus probe.
+      await this.updates.publish({
+        projectId: command.projectId,
+        experimentId: existing.id,
+        slug: existing.slug,
+        version: refreshed.version,
+        actorLabel: "api",
       });
 
       return { id: existing.id, slug: existing.slug };

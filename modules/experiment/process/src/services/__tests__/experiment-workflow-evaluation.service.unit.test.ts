@@ -328,6 +328,19 @@ describe("WorkflowEvaluationService.request", () => {
     });
   });
 
+  describe("given a graph whose HTTP node holds a secret reference", () => {
+    /** @scenario A run's queued payload never carries a resolved secret */
+    it("queues the version's id and parameters, never the graph or any secret", async () => {
+      const { service, sent } = buildService();
+
+      await service.request({ ...baseInput, parameters: { feature_flag: "on" } });
+
+      const queued = JSON.stringify(sent[0]);
+      expect(queued).not.toMatch(/dsl|nodes|secrets|api_key/);
+      expect(sent[0]).toMatchObject({ workflowVersionId: expect.any(String) });
+    });
+  });
+
   describe("given a worker that has not folded the request yet", () => {
     /** @scenario "A requested evaluation answers as soon as its request command is written" */
     it("answers at once with the run's start recorded for the poller", async () => {

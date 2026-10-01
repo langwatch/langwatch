@@ -4,6 +4,7 @@
  * threads.
  */
 
+import { AgentStoredCredentialsDestinationError } from "@langwatch/agent-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
 import type { AgentInput } from "@langwatch/scenario";
@@ -211,6 +212,7 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
         session: this.sessionOf(input.threadId),
       });
       const url = this.buildUrl(templateContext);
+      this.refuseBoundSecretsElsewhere(url);
       const headers = this.buildRequestHeaders(templateContext, propagationHeaders);
       const body = this.buildRequestBody(input, templateContext);
       const responseData = await this.executeHttpRequest(url, headers, body);
@@ -221,6 +223,16 @@ export class HttpSerializedHttpAgentChannel extends SerializedAgentChannel {
       return this.extractResponseContent(responseData);
     } catch (error) {
       throw this.scrubErrorChain(error);
+    }
+  }
+
+  /** A secret bound to the address it was saved for is never sent to another. */
+  private refuseBoundSecretsElsewhere(url: string): void {
+    const { headers, auth } = this.config;
+    const sent = { url: this.config.url, headers, auth };
+    const origins = this.config.secretOrigins ?? {};
+    if (ScenarioSecretReferenceAdapter.sendsBoundSecretElsewhere({ sent, url, origins })) {
+      throw new AgentStoredCredentialsDestinationError();
     }
   }
 

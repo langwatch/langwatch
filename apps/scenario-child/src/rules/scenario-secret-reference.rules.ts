@@ -6,6 +6,7 @@
 
 import { generate } from "@langwatch/ksuid";
 import type { AuthConfig } from "@langwatch/scenario-contract";
+import { isSameOrigin } from "@langwatch/workflow-contract";
 
 /**
  * A secret reference, with flexible internal whitespace. The name follows the
@@ -145,4 +146,26 @@ export function redact({
     redacted = redacted.split(value).join(REDACTED_PLACEHOLDER);
   }
   return redacted;
+}
+
+/**
+ * Whether the parts of a request that resolve secrets reference one bound to another origin
+ * than the one the rendered `url` calls. A secret absent from `origins` resolves anywhere.
+ */
+export function sendsBoundSecretElsewhere({
+  sent,
+  url,
+  origins,
+}: {
+  sent: unknown;
+  url: string;
+  origins: Record<string, string>;
+}): boolean {
+  const text = JSON.stringify(sent) ?? "";
+
+  return [...text.matchAll(SECRET_REFERENCE)].some(([, name]) => {
+    const bound = name && Object.hasOwn(origins, name) ? origins[name] : undefined;
+
+    return bound !== undefined && !isSameOrigin({ requested: url, saved: bound });
+  });
 }

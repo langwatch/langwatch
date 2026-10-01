@@ -23,6 +23,7 @@ import { ExperimentApi } from "@langwatch/experiment-contract";
 import { createApp } from "@langwatch/kernel";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -109,6 +110,7 @@ async function bootWorker(workflow = createApiFixture<WorkflowApi>({})) {
       evaluator: createApiFixture<EvaluatorApi>({}),
       prompt: createApiFixture<PromptApi>({}),
       authz: createApiFixture<AuthzApi>({}),
+      presence: createApiFixture<PresenceApi>({}),
       project: createApiFixture<ProjectApi>({}),
       entitlement: createApiFixture<EntitlementApi>({}),
       evaluation: createApiFixture<EvaluationApi>({}),

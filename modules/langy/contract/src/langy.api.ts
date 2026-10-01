@@ -340,12 +340,6 @@ export interface LangyApi {
   recordPlanUpdated(input: LangyRecordPlanUpdatedInput): Promise<void>;
   /** The usage report's figures (ADR-156, section 10). */
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount>;
-  /** Mints a new project's gateway key so it is listed from day one; best effort, never raises. */
-  provisionVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void>;
   /** The setup skill's prompt the empty states copy; an unknown skill throws `not_found`. */
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }>;
   /** Rollout gate, then the key's owner; an unowned or unentitled key throws. */

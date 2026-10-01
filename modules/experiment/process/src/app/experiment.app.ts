@@ -1,5 +1,3 @@
-import { on } from "node:events";
-
 /**
  * The experiment feature's application: what both of its doors call.
  */
@@ -87,6 +85,7 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
@@ -100,8 +99,6 @@ import {
   type WorkflowWithVersion,
 } from "@langwatch/workflow-contract";
 
-import type { ExperimentBroadcast } from "../channels/experiment-broadcast.channel.ts";
-import { MemoryExperimentBroadcastChannel } from "../channels/memory/memory.experiment-broadcast.channel.ts";
 import {
   buildExperimentLifecyclePipeline,
   type ExperimentLifecyclePipeline,
@@ -132,9 +129,14 @@ import {
 } from "../services/experiment-run.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
+  ExperimentUpdateStreamService,
+  type ExperimentUpdateEmitters,
+} from "../services/experiment-update-stream.service.ts";
+import {
   ExperimentWorkbenchObserverService,
   type ExperimentWorkbenchObserver,
 } from "../services/experiment-workbench-observer.service.ts";
+import { ExperimentWorkbenchPresenceUpdatesService } from "../services/experiment-workbench-presence-updates.service.ts";
 import {
   ExperimentWorkbenchRunService,
   type WorkbenchExecutionRequest,
@@ -165,7 +167,8 @@ export interface ExperimentAppDependencies {
   >;
   dataset: DatasetApi;
   monitors: Pick<MonitorApi, "deleteForExperiment" | "upsertForExperiment">;
-  broadcast: ExperimentBroadcast;
+  /** Presence's tenant fan-out, where `experiment_updated` arrives. */
+  broadcast: ExperimentUpdateEmitters;
   permissions: Pick<AuthzApi, "hasPermission">;
   people: ExperimentPeople;
   /** The project's own model cost rules, as the pricing cascade reads them. */
@@ -210,6 +213,8 @@ export class ExperimentApp implements ExperimentApi {
     evaluators: EvaluatorApi,
     prompts: PromptApi,
     permissions: AuthzApi,
+    /** The one publisher of the live-update wire; a workbench save's notice rides it. */
+    presence: PresenceApi,
     /** The directory that answers which organization a project belongs to. */
     projects: ProjectApi,
     /** The tier-effective row bound an execution's dataset must fit under. */
@@ -263,6 +268,10 @@ export class ExperimentApp implements ExperimentApi {
       slugify: slugifyExperimentName,
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
+      updates: ExperimentWorkbenchPresenceUpdatesService.create({
+        presence: dependencies.presence,
+        logger,
+      }),
     });
     const runs = ExperimentRunService.create({
       commands,
@@ -283,7 +292,7 @@ export class ExperimentApp implements ExperimentApi {
       workflows,
       dataset,
       monitors: dependencies.monitors,
-      broadcast: MemoryExperimentBroadcastChannel.create(),
+      broadcast: dependencies.presence,
       permissions: dependencies.permissions,
       people: PrismaExperimentPeopleRepository.create(prisma),
       modelCosts: runs.cost,
@@ -809,18 +818,9 @@ export class ExperimentApp implements ExperimentApi {
   async *watchUpdates(
     input: Readonly<{ projectId: string; signal?: AbortSignal | undefined }>,
   ): AsyncIterable<ExperimentUpdateFrame> {
-    const emitter = this.#dependencies.broadcast.getTenantEmitter(input.projectId);
-    try {
-      for await (const eventArgs of on(
-        emitter,
-        "experiment_updated",
-        input.signal ? { signal: input.signal } : {},
-      )) {
-        yield (eventArgs as unknown[])[0] as ExperimentUpdateFrame;
-      }
-    } finally {
-      this.#dependencies.broadcast.cleanupTenantEmitter(input.projectId);
-    }
+    yield* ExperimentUpdateStreamService.create({
+      emitters: this.#dependencies.broadcast,
+    }).watch(input);
   }
 
   // ── Studio writes ──────────────────────────────────────────────

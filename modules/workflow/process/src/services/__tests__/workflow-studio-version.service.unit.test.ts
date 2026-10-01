@@ -6,7 +6,11 @@ import {
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
-import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
+import type {
+  WorkflowAgentMapping,
+  WorkflowHttpSecrets,
+  WorkflowStudioDsl,
+} from "../../app/workflow.app.ts";
 import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
 
 const graph = (name: string): StudioWorkflow =>
@@ -29,6 +33,13 @@ class RenamingDsl implements WorkflowStudioDsl {
   prepare(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow> {
     this.seen.push(input);
     return Promise.resolve({ ...input.dsl, name: "prepared" });
+  }
+}
+
+/** Leaves the graph's credentials where they are. */
+class UnchangedHttpSecrets implements WorkflowHttpSecrets {
+  store<Dsl extends { nodes?: unknown }>(input: { dsl: Dsl }): Promise<Dsl> {
+    return Promise.resolve(input.dsl);
   }
 }
 
@@ -64,13 +75,16 @@ class RecordingWorkflowService {
   }
 }
 
-function build(options: { agentMappings?: RecordingAgentMapping } = {}) {
+function build(
+  options: { agentMappings?: RecordingAgentMapping; httpSecrets?: WorkflowHttpSecrets } = {},
+) {
   const workflows = new RecordingWorkflowService();
   const studioDsl = new RenamingDsl();
   const agentMappings = options.agentMappings ?? new RecordingAgentMapping();
   const service = WorkflowStudioVersionService.create({
     workflows: workflows as never,
     studioDsl,
+    httpSecrets: options.httpSecrets ?? new UnchangedHttpSecrets(),
     agentMappings,
   });
 
@@ -112,6 +126,26 @@ describe("WorkflowStudioVersionService", () => {
           setAsLatestVersion: workflows.saved[0]?.setAsLatestVersion,
           autoSaved: workflows.saved[0]?.autoSaved,
         }).toEqual({ authorId: "user-1", setAsLatestVersion: true, autoSaved: true });
+      });
+
+      /** @scenario A token typed into an HTTP node is stored as a project secret and never read back */
+      it("writes the graph the secret store answered, not the one holding the token", async () => {
+        const { service, workflows } = build({
+          httpSecrets: {
+            store: async (input) => ({ ...input.dsl, name: "token replaced by a reference" }),
+          },
+        });
+
+        await service.saveOrCommit({
+          projectId: "project-1",
+          workflowId: "wf-1",
+          dsl: graph("draft"),
+          autoSaved: true,
+          commitMessage: "autosave",
+          authorId: "user-1",
+        });
+
+        expect(workflows.saved[0]?.dsl.name).toBe("token replaced by a reference");
       });
 
       it("recomputes the agent mappings from the graph the caller sent, not the prepared one", async () => {

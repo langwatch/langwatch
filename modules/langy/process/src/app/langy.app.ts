@@ -554,6 +554,7 @@ export class LangyApp implements LangyApiContract {
         reap: () => this.dependencies.sessionKeyReap.reap(),
         deleteDispatchedBefore: deps.deleteDispatchedBefore,
       },
+      virtualKeyProvisioning: this.dependencies.virtualKeyProvisioning,
     }).buildProcessing();
   }
 
@@ -743,14 +744,6 @@ export class LangyApp implements LangyApiContract {
 
   countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<LangyUsageCount> {
     return this.dependencies.langy.countUsage(input);
-  }
-
-  provisionVirtualKey(input: {
-    projectId: string;
-    organizationId: string;
-    actorUserId: string;
-  }): Promise<void> {
-    return this.dependencies.virtualKeyProvisioning.provision(input);
   }
 
   getSetupSkillPrompt(input: { projectId: string; skill: string }): Promise<{ body: string }> {

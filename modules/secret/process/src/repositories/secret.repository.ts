@@ -22,6 +22,7 @@ export interface CreateStoredSecretInput {
   readonly projectId: string;
   readonly name: string;
   readonly encryptedValue: string;
+  readonly boundOrigin?: string;
   readonly actorId: string;
 }
 
@@ -29,6 +30,7 @@ export interface UpdateStoredSecretInput {
   readonly projectId: string;
   readonly id: string;
   readonly encryptedValue: string;
+  readonly boundOrigin?: string;
   readonly actorId: string;
 }
 

@@ -65,7 +65,6 @@ function mount({
    */
   permits?: (permission: string) => boolean;
 } = {}) {
-  const provisionLangyVirtualKey = vi.fn(async () => {});
   const reportTopicClusteringFailure = vi.fn();
   const encryptProjectSecret = vi.fn((value: string) => `encrypted(${value})`);
   const probe = vi.fn(probePermission);
@@ -87,7 +86,6 @@ function mount({
     encryptProjectSecret,
     probePermission: probe,
     getFieldProtections: async () => fieldProtections,
-    provisionLangyVirtualKey,
     archiveOtherProject: (input) => requests.archiveOtherProject(input),
     triggerTopicClustering: (input) => requests.triggerTopicClustering(input),
   };
@@ -101,7 +99,6 @@ function mount({
 
   return {
     router,
-    provisionLangyVirtualKey,
     reportTopicClusteringFailure,
     encryptProjectSecret,
     revokeProjectApiKey,
@@ -234,6 +231,40 @@ describe("the project tRPC namespace", () => {
           s3Bucket: "bucket",
         }),
       );
+    });
+
+    /** @scenario A blank storage secret leaves the stored secret unchanged */
+    it("leaves the stored secret alone when the form sends it blank beside an endpoint", async () => {
+      const update = vi.fn(async (_input: unknown) => ({ slug: "my-project" }) as never);
+      const { caller } = mount({ projects: { updateSettings: update } });
+
+      await caller.update({
+        projectId: "project_123",
+        s3Endpoint: "https://s3.example",
+        s3AccessKeyId: "AKIA",
+        s3SecretAccessKey: "",
+      });
+
+      expect(update.mock.calls[0]?.[0]).not.toHaveProperty("s3SecretAccessKey");
+    });
+
+    /** @scenario Clearing the storage settings clears the stored secret */
+    it("clears the stored secret when the whole storage block is blank", async () => {
+      const update = vi.fn(async (_input: unknown) => ({ slug: "my-project" }) as never);
+      const { caller } = mount({ projects: { updateSettings: update } });
+
+      await caller.update({ projectId: "project_123", s3SecretAccessKey: "" });
+
+      expect(update.mock.calls[0]?.[0]).toHaveProperty("s3SecretAccessKey", null);
+    });
+
+    /** @scenario A storage secret needs an endpoint and a key id */
+    it("refuses a secret with no endpoint or key id", async () => {
+      const { caller } = mount();
+
+      await expect(
+        caller.update({ projectId: "project_123", s3SecretAccessKey: "shh" }),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     });
 
     it("refuses a half-filled stored-object credential set", async () => {
@@ -390,9 +421,9 @@ describe("the project tRPC namespace", () => {
   });
 
   describe("when a project is created", () => {
-    it("mints Langy's virtual key alongside it and returns the slug", async () => {
+    it("returns the slug", async () => {
       const create = vi.fn(async () => ({ id: "project_new", slug: "new-project" }) as never);
-      const { caller, provisionLangyVirtualKey } = mount({ projects: { create } });
+      const { caller } = mount({ projects: { create } });
 
       await expect(
         caller.create({
@@ -410,11 +441,6 @@ describe("the project tRPC namespace", () => {
         expect.objectContaining({ organizationId: "org-1" }),
         expect.objectContaining({ id: ACTOR_ID }),
       );
-      expect(provisionLangyVirtualKey).toHaveBeenCalledWith({
-        projectId: "project_new",
-        organizationId: "org-1",
-        actorUserId: ACTOR_ID,
-      });
     });
 
     /**

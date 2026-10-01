@@ -4,6 +4,7 @@ import {
   MAX_SECRET_VALUE_LENGTH,
   secretNameSchema,
   secretPublicSchema,
+  secretTrpcCreateInputSchema,
   secretValueSchema,
 } from "../index.ts";
 
@@ -29,5 +30,15 @@ describe("Secret contract", () => {
     });
     expect(parsed).not.toHaveProperty("value");
     expect(parsed).not.toHaveProperty("encryptedValue");
+  });
+
+  /** @scenario "A secret minted from an HTTP credential keeps the address it was saved for" */
+  it("refuses an address on a create from the secrets screen", () => {
+    const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "value" };
+
+    expect(secretTrpcCreateInputSchema.validate(input)).toBe(true);
+    expect(
+      secretTrpcCreateInputSchema.validate({ ...input, boundOrigin: "https://agent.example.com" }),
+    ).toBe(false);
   });
 });
