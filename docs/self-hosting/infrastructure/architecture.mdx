@@ -133,6 +133,22 @@ Built-in evaluator library (Python):
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
 
+### AI Gateway (port 5563)
+
+A Go service (image `langwatch/ai-gateway`, subchart `gateway`) that terminates virtual-key traffic and forwards it to the model providers configured in LangWatch. It reads each key's configuration (providers, budgets, guardrails, routing) from the App over the cluster network and reports usage back to it.
+
+- Your LLM clients, coding agents and the Langy agent call it with a virtual key
+- It needs its own externally reachable hostname (`ingress.gateway.host`, or `gateway.publicUrl` behind your own route) when clients outside the cluster use it
+- `gateway.chartManaged: false` removes it
+
+### Langy Agent (port 8080, Service port 80)
+
+The worker manager behind the in-product assistant (image `langwatch/langyagent`, subchart `langyagent`). The App and Workers reach it over cluster DNS; it has no ingress. Each conversation runs in a worker with its own UID and credentials, and its model calls go through the AI Gateway.
+
+- On by default (`langyagent.chartManaged: true`); `false` removes the pod and every reference to it
+- Runs on the node's normal container runtime by default; a sandboxed RuntimeClass (gVisor, Kata) is opt-in, see [Langy setup](/self-hosting/langy/setup)
+- Its NetworkPolicy denies internet egress unless you turn it on, see [Langy networking and egress](/self-hosting/langy/networking-and-egress)
+
 ### PostgreSQL: Control Plane
 
 Stores users, teams, projects, configurations, prompt versions, evaluator definitions. Managed via Prisma ORM with auto-migrations on startup.
@@ -277,17 +293,19 @@ Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
 
 ## Network Topology
 
-Only the App is exposed externally. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
-| Component  | Service Type             | External |
-| ---------- | ------------------------ | -------- |
-| App        | Ingress, LoadBalancer    | Yes      |
-| Workers    | None (no Service needed) | No       |
-| NLP        | ClusterIP                | No       |
-| LangEvals  | ClusterIP                | No       |
-| PostgreSQL | ClusterIP                | No       |
-| ClickHouse | ClusterIP                | No       |
-| Redis      | ClusterIP                | No       |
+| Component | Service Type | External |
+|-----------|-------------|----------|
+| App | Ingress, LoadBalancer | Yes |
+| Workers | None (no Service needed) | No |
+| NLP | ClusterIP | No |
+| LangEvals | ClusterIP | No |
+| AI Gateway | ClusterIP, plus an Ingress when `ingress.gateway.host` is set | Optional, for clients outside the cluster |
+| Langy Agent | ClusterIP | No |
+| PostgreSQL | ClusterIP | No |
+| ClickHouse | ClusterIP | No |
+| Redis | ClusterIP | No |
 
 <Note>
   LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure

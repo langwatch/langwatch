@@ -704,6 +704,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Kubernetes (Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-helm.md): Production Kubernetes deployment with the LangWatch Helm chart
 - [Local Kubernetes (Kind + Helm)](https://langwatch.ai/docs/self-hosting/deployment/kubernetes-local.md): Run LangWatch locally on Kind for development and testing
 - [ArgoCD](https://langwatch.ai/docs/self-hosting/deployment/argocd.md): Deploy the LangWatch Helm chart via ArgoCD with operator-managed secrets and no GitOps-specific workarounds
+- [Routing and ingress controllers](https://langwatch.ai/docs/self-hosting/deployment/routing.md): The hosts, paths, Services, timeouts and body sizes to expose for LangWatch on any ingress controller or Gateway API implementation
 
 ## Infrastructure
 

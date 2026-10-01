@@ -10082,7 +10082,7 @@ description: Point a public hostname at the LangWatch AI Gateway and terminate T
 sidebarTitle: DNS & TLS
 ---
 
-Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the nginx ingress the chart renders, a cloud load balancer in front of the Service, and the checks that prove the endpoint works.
+Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the chart Ingress on ingress-nginx, a cloud load balancer in front of the Service, and the checks that prove the endpoint works. For Envoy Gateway and other Gateway API implementations, see [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Prerequisites
 
@@ -10093,33 +10093,33 @@ Give the gateway its own hostname, separate from the app. LLM clients and coding
 <Steps>
 <Step title="Set the ingress values">
 
-The chart renders one Ingress from these values:
+The gateway is published from the app Ingress settings. Set `ingress.gateway.host` next to the app hosts:
 
 ```yaml
-gateway:
-  ingress:
-    enabled: true
-    className: nginx
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
     host: gateway.acme.com
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true
-      path: /health
     tls:
-      enabled: true
       secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
-Replace `host`. The chart placeholder `gateway.langwatch.ai` is skipped when the control plane derives the public URL, so an install that keeps it hands CLI users no gateway URL.
+Replace both hosts. The chart renders a second Ingress, `<release>-gateway-ingress`, with the same `className` and `annotations`. It routes `/v1` and `/health` on the gateway host to the gateway Service. The control plane derives the public URL CLI users get from `ingress.gateway.host`.
 
-The four `nginx.ingress.kubernetes.io/proxy-*` annotations keep streamed responses unbuffered and let a stream run for an hour. Keep them.
+With `className: nginx` the chart adds annotations to the gateway Ingress only. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys in `ingress.gateway.annotations` override them.
 
 </Step>
 <Step title="Issue the certificate">
@@ -10186,22 +10186,20 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 
 ## What the ingress publishes
 
-| Path      | Match                                                 | Routes                                                                                                                                                     |
-| --------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/v1`     | `Prefix`                                              | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
-| `/health` | `Exact`, only with `ingress.healthPath.enabled: true` | The public status endpoint for uptime monitors                                                                                                             |
+| Path | Match | Routes |
+|---|---|---|
+| `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
+| `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the default ingress; `ingress.path: /` publishes every route, including the probes and `/metrics`.
+`/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` stay in-cluster. The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
-To terminate TLS on a cloud load balancer instead of the ingress, disable the ingress and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
+To terminate TLS on a cloud load balancer instead of the ingress, leave `ingress.gateway.host` empty and turn the Service into a `LoadBalancer`. On AWS with the Load Balancer Controller and an ACM certificate:
 
 ```yaml
 gateway:
-  ingress:
-    enabled: false
-  publicUrl: https://gateway.acme.com # no ingress host to derive it from
+  publicUrl: https://gateway.acme.com   # no ingress host to derive it from
   service:
     type: LoadBalancer
     port: 443
@@ -10242,20 +10240,27 @@ A Service of type `LoadBalancer` publishes every route, including `/metrics`, th
 
 ## Other ingress controllers
 
-Set `ingress.className` and replace the nginx annotations with the controller's equivalents. Two settings matter for every controller: response buffering off, and an idle or read timeout above the longest stream you allow. The gateway lets a provider call run up to 14 minutes.
+Set `ingress.className` for your controller. The ingress-nginx annotations are added only when `className` is `nginx`. Put the controller's equivalents in `ingress.gateway.annotations` so they apply to the gateway host only.
 
-AWS ALB example:
+Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
+
+AWS ALB example. The certificate comes from ACM rather than `ingress.gateway.tls.secretName`, so `gateway.publicUrl` states the https URL the CLI should use:
 
 ```yaml
-gateway:
-  ingress:
-    className: alb
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
+  gateway:
+    host: gateway.acme.com
     annotations:
-      alb.ingress.kubernetes.io/scheme: internet-facing
-      alb.ingress.kubernetes.io/target-type: ip
-      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
-      alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:<region>:<account>:certificate/<id>
       alb.ingress.kubernetes.io/load-balancer-attributes: idle_timeout.timeout_seconds=3600
+gateway:
+  publicUrl: https://gateway.acme.com
 ```
 
 ## Outbound endpoint policy
@@ -10272,13 +10277,13 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 
 ## Common failures
 
-| Symptom                                                         | Cause                                                     | Fix                                                                                 |
-| --------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `curl` reports an unknown certificate                           | cert-manager has not issued `gateway-tls` yet             | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
-| Streamed responses arrive all at once                           | Buffering is on at the proxy                              | Add the `proxy-buffering: "off"` annotation, or its equivalent on your controller   |
-| A long stream stops at 60 seconds                               | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout                                         |
-| CLI users get `http://localhost:5563` as the gateway URL        | The control plane has no `LW_GATEWAY_PUBLIC_URL`          | Set `gateway.ingress.host` to your hostname, or `gateway.publicUrl`                 |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on                            | Add the hostname to `ALLOWED_PROXY_HOSTS`                                           |
+| Symptom | Cause | Fix |
+|---|---|---|
+| `curl` reports an unknown certificate | cert-manager has not issued `gateway-tls` yet | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
+| Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
+| A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
+| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
 
@@ -10305,7 +10310,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics`             | Prometheus                           | Always. See [Observability](/ai-gateway/observability#metrics-prometheus)                                                                               |
 | `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
-None of these endpoints requires a key. With the chart's default ClusterIP Service and ingress, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 
@@ -10385,15 +10390,7 @@ The verdict flips to 503 after 60 seconds without a successful probe, and a new 
 
 The probe failure itself is logged on the gateway pod as `statusprobe_control_plane_unreachable`, with the underlying error.
 
-```yaml
-gateway:
-  ingress:
-    healthPath:
-      enabled: true # default
-      path: /health
-```
-
-Set `enabled: false` to keep the endpoint in-cluster.
+The chart Ingress for `ingress.gateway.host` publishes `/health` as an `Exact` path next to `/v1`. To keep the endpoint in-cluster, route the gateway with your own route and leave `/health` out.
 
 ## Graceful shutdown
 
@@ -10437,12 +10434,12 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment and Service next to `langwatch-app`. The gateway gets no Ingress of its own: publish it with `ingress.gateway.host` on the app Ingress. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
 ## Prerequisites
 
 - A Kubernetes cluster and `helm` 3.
-- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- An ingress controller or a Gateway API implementation. [Routing and ingress controllers](/self-hosting/deployment/routing) lists what to expose on each.
 - A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 - The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
@@ -10472,14 +10469,25 @@ kubectl -n langwatch create secret generic langwatch-app-secrets \
 </Step>
 <Step title="Write the gateway values">
 
-Add a `gateway` block to your umbrella `values.yaml`:
+Add a `gateway` block to your umbrella `values.yaml`, and the gateway host to the app `ingress` block:
 
 ```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com        # publishes /v1 and /health on this host
+    tls:
+      secretName: gateway-tls
+  # className nginx adds the streaming, timeout and body-size annotations
+  # to the gateway Ingress only.
+
 gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.host> from the ingress below.
+  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
   publicUrl: ""
 
   # Where the gateway reaches the control plane. Empty resolves to
@@ -10492,25 +10500,6 @@ gateway:
     internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
     jwtSecretKey: LW_GATEWAY_JWT_SECRET
     jwtSecretPreviousKey: "" # set only during a JWT secret rotation
-
-  ingress:
-    enabled: true
-    className: nginx
-    host: gateway.acme.com # your hostname, never the chart placeholder
-    path: /v1
-    pathType: Prefix
-    healthPath:
-      enabled: true # publishes GET /health for uptime monitors
-      path: /health
-    tls:
-      enabled: true
-      secretName: gateway-tls
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
   security:
     maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth
@@ -10720,7 +10709,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
+The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. To reach `/healthz` from outside, add your own route to the gateway Service for it, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## 3. The gateway reaches the control plane
 
@@ -10807,14 +10796,14 @@ Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_
 
 ## 8. The control plane knows the public URL
 
-The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host`.
+The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `ingress.gateway.host` when the app Ingress is enabled.
 
 ```bash
 kubectl -n langwatch get deploy langwatch-app \
   -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
 ```
 
-Expected: `https://gateway.acme.com`. An empty result means the ingress host is still the chart placeholder; set `gateway.ingress.host` or `gateway.publicUrl` and upgrade.
+Expected: `https://gateway.acme.com`. An empty result means the install has neither `ingress.gateway.host` nor `gateway.publicUrl`. Set one and upgrade.
 
 Members can then sign in from the CLI and get a [personal key](/ai-gateway/governance/personal-keys) bound to this gateway.
 
@@ -61748,6 +61737,12 @@ LangWatch is configured through environment variables. How you set them depends 
   Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
 </Warning>
 
+## License
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_LICENSE_KEY` | An activation code (`LW-XXXX-XXXX-XXXX-XXXX`, redeemed once at startup over outbound HTTPS to `connect.langwatch.ai`) or a signed license key (works offline), told apart by shape. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license). | - |
+
 ## Authentication
 
 | Variable            | Description                                                                                                                                                          | Default |
@@ -62072,6 +62067,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
@@ -63063,7 +63059,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: a license token derived from the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -63076,19 +63072,26 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
-| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
-A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+A fresh install starts on the open source baseline with no account and no license. LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+- An **activation code**, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default. The install redeems it over outbound HTTPS to `connect.langwatch.ai`, so it needs outbound access to that host.
+- A **signed license key**, a long base64 string also delivered as a `.langwatch-license` file. It works offline.
+
+Both go in the same `LANGWATCH_LICENSE_KEY` variable or `app.license.key` Helm value. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for the full comparison.
 
 1. Open **Settings, License**.
-2. Choose **Enter activation code**, paste the code, and confirm.
+2. Choose **Enter activation code**, paste the code, and choose **Activate License**.
 3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
 
-The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems it once at startup. See [An activation code in the variable](/self-hosting/licensing#an-activation-code-in-the-variable).
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch and never opens a connection.
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection. The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
 
 ## Endpoints and variables
 
@@ -63156,7 +63159,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: a license token derived from its signed license key (a hash, not the key itself), its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 
@@ -63197,7 +63200,7 @@ Your own providers are untouched: a model spelled without the prefix goes to you
 
 An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 
-The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+The signed license key is where you check it: decode it and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
 For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
 
@@ -63256,7 +63259,7 @@ You can read the exact report your install sends on **Settings, Checkup**, copy 
 | Channel | Who sends it | Where it goes | What it carries | How to stop it |
 |---|---|---|---|---|
 | Usage report | Every install: open source, offline license, or connected | `app.langwatch.ai/api/track_usage`, or `connect.langwatch.ai/v1/stats` once the license names a hosted service | The fields in the [dictionary](/self-hosting/usage-report-dictionary): counts, timestamps, the release, aggregated email domains | `DISABLE_USAGE_STATS=true`, or the two switches on the Checkup page |
-| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | The license token, the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch. An offline license never sends it |
+| License sync | Installs whose license names a hosted service | `connect.langwatch.ai/v1/license/sync` | A license token derived from the signed license key (a hash, not the key), the instance id, the release, and the member and lite member counts | It is a term of a license with hosted services and has no switch of its own. `LANGWATCH_CONNECT_DISABLED=true` stops it with everything else. An offline license never sends it |
 
 The two are separate on purpose. The usage report is optional and says so; the license sync is a contract term and says that. Keeping them apart is what lets both sentences stay true.
 
@@ -63421,6 +63424,7 @@ Topic-specific configuration pages:
 - [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
 - [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
 - [SSO](/self-hosting/configuration/sso) for OIDC / SAML wiring
+- [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for `app.license.key`, which takes an activation code (needs outbound access to `connect.langwatch.ai`) or a signed license key (works offline)
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
 - [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
 
@@ -63556,9 +63560,14 @@ Edit `.env` to customize your deployment. Key variables:
 API_TOKEN_JWT_SECRET=your-jwt-secret
 CREDENTIALS_SECRET=your-encryption-key
 NEXTAUTH_SECRET=your-session-secret
+
+# Optional: an Enterprise license, either an activation code
+# (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
+# or a signed license key (works offline)
+LANGWATCH_LICENSE_KEY=
 ```
 
-See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 
@@ -63878,6 +63887,21 @@ workers:
 
 Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
 
+### License
+
+An Enterprise license goes in `app.license.key`, inline or from a Secret. It takes either an activation code (`LW-XXXX-XXXX-XXXX-XXXX`), which needs outbound HTTPS to `connect.langwatch.ai`, or a signed license key, which works offline:
+
+```yaml
+app:
+  license:
+    key:
+      secretKeyRef:
+        name: langwatch-license
+        key: license
+```
+
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for what happens at startup with each form.
+
 ## Low-Resources Deployment
 
 The default install requests ~5 CPU and ~17 Gi RAM. For smaller clusters or evaluation purposes, use the dev overlay which requests approximately **~2.6 CPU and ~6.7 Gi RAM**:
@@ -63921,6 +63945,8 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | `LANGY_INTERNAL_SECRET` | `langyagent.chartManaged: true` (default) |
 | `LWQL_CLICKHOUSE_PASSWORD`, `LWQL_POSTGRES_READER_PASSWORD` | Optional, see LangWatchQL below |
 
+Every key name can be changed to match your secret store, for example the dashed names Azure Key Vault produces through `dataFrom`: `secrets.secretKeys.*` for the app and LangWatchQL keys, `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey` for the gateway keys (the app and the gateway pod both read them), and `langyagent.secrets.internalSecretKey` for Langy.
+
 **ClickHouse Secret**: chart-managed ClickHouse only (skip it with `clickhouse.chartManaged: false`). Referenced by `clickhouse.auth.existingSecret`, and the name must differ from the default `<release>-clickhouse`, since the deployment composes `CLICKHOUSE_URL` from the password key at runtime.
 
 | Key | Needed when |
@@ -63928,14 +63954,18 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | `password` | Always |
 | `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
 
-A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead.
+**Redis and PostgreSQL Secrets**: chart-managed Redis or PostgreSQL only. Set `redis.auth.existingSecret` and `postgresql.auth.existingSecret` to Secrets holding their passwords. With `autogen.enabled=false` the render fails without them, because a generated password would change on every Argo CD sync.
+
+A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead. Argo CD renders without cluster access, so under Argo CD only the pod error shows it.
 
 <Note>
-`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse credentials. Chart-managed PostgreSQL and Redis generate their passwords regardless of this setting. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
+`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse, PostgreSQL and Redis credentials. Use it with plain `helm` only: it reads existing values back from the cluster, which Argo CD cannot do, so under Argo CD the generated values change on every sync. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
 </Note>
 
 <Note>
 **LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
+
+To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again. Once it is `Complete`, restart the ClickHouse StatefulSet and the app and workers Deployments, which read the passwords at startup.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
 </Note>
@@ -64029,7 +64059,8 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS.
+# Ingress with TLS, on ingress-nginx. For Envoy Gateway, Gateway API or
+# another controller, see /self-hosting/deployment/routing.
 #
 # `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
 # so the private control plane is never internet-reachable. Blocked requests
@@ -64051,6 +64082,12 @@ ingress:
     - secretName: langwatch-tls
       hosts:
         - langwatch.example.com
+  # AI Gateway host. Renders a second Ingress with the settings above, plus
+  # the nginx streaming settings the gateway needs.
+  gateway:
+    host: gateway.langwatch.example.com
+    tls:
+      secretName: langwatch-gateway-tls
 
 # Prometheus monitoring
 prometheus:
@@ -64264,14 +64301,14 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `ingress.gateway.host` on the app Ingress, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
-   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (under plain `helm`, a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -64328,7 +64365,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
+If both installs enable an Ingress, give each its own `ingress.hosts` and `ingress.gateway.host`. Overlapping host and path rules conflict in the ingress controller.
 
 ### Custom StorageClass
 
@@ -64355,6 +64392,7 @@ For clusters without internet access:
 1. Push LangWatch images to your private registry
 2. Update `images.app.repository`, `images.langwatch_nlp.repository`, `images.langevals.repository`
 3. Set `imagePullSecrets` if your registry requires authentication
+4. License with a signed license key in `app.license.key`, not an activation code: redeeming a code needs outbound access to `connect.langwatch.ai`
 
 ---
 
@@ -64518,6 +64556,152 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 ---
 
+# FILE: ./self-hosting/deployment/routing.mdx
+
+---
+title: Routing and ingress controllers
+description: "The hosts, paths, Services, timeouts and body sizes to expose for LangWatch on any ingress controller or Gateway API implementation"
+sidebarTitle: Routing
+---
+
+A Helm install creates no Ingress by default. Turn on the chart Ingress, which can carry the AI Gateway host too, or write your own routes with Envoy Gateway, another Gateway API implementation, Traefik or a cloud load balancer. This page lists what those routes must expose.
+
+## What to expose
+
+LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and coding agents reach the LangWatch AI Gateway.
+
+| Host | Path | Match | Backend Service | Port |
+|---|---|---|---|---|
+| App, for example `langwatch.acme.com` | `/` | Prefix | `<release>-app` | `5560` |
+| App | `/api/internal` | Prefix | Do not route. Block it. | |
+| Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
+| Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+
+`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+
+`/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
+
+## Proxy settings
+
+| Setting | App | Gateway |
+|---|---|---|
+| Response buffering | Off, for Server-Sent Events under `/api/sse` and streamed runs | Off, for streamed completions |
+| Request buffering | Default | Off |
+| Idle or read timeout | Above 30 seconds. Streams send a keep-alive every 25 seconds and long polls wait up to 25 seconds. `120` is a good value. | At least 60 seconds. Non-streaming calls send a heartbeat every 45 seconds. The chart nginx default is `3600`. |
+| Total request timeout | Disabled, or longer than your longest stream | Disabled, or above 15 minutes. A provider call can run up to 14 minutes. |
+| Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
+| WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
+
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers request bodies by default, caps them at 1 MB, and turns on response buffering when the controller config does, so it needs annotations. On the gateway Ingress the chart sets both buffering annotations to off so a controller-wide setting cannot change them. The app Ingress keeps the controller defaults. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+
+## Chart Ingress
+
+The chart renders an Ingress for the app when `ingress.enabled` is `true`. Set `ingress.gateway.host` and it renders a second Ingress, `<release>-gateway-ingress`, for the gateway host. The second Ingress uses the same `className`, `labels` and `annotations` as the app Ingress. It is a separate object because ingress-nginx and similar controllers apply annotations to a whole Ingress, and the gateway needs streaming settings that the app routes do not.
+
+On ingress-nginx:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart adds these to the gateway Ingress only: `proxy-buffering: "off"`, `proxy-request-buffering: "off"`, `proxy-read-timeout: "3600"`, `proxy-send-timeout: "3600"` and `proxy-body-size: 32m`. They override the same keys from `ingress.annotations`. Keys in `ingress.gateway.annotations` override both.
+
+The chart matches on the value of `className`. If `className` is empty and the cluster default IngressClass is ingress-nginx, the gateway Ingress gets none of these settings. On ingress-nginx, set `className: nginx`.
+
+On another controller, set `className` to your IngressClass, or leave it empty for the cluster default. Put the gateway settings for that controller in `ingress.gateway.annotations`. Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
+
+## Gateway API (Envoy Gateway)
+
+Leave the chart Ingress off and attach HTTPRoutes to your Gateway. Set `gateway.publicUrl`, because the control plane cannot derive the gateway URL without `ingress.gateway.host`.
+
+```yaml
+# values.yaml
+ingress:
+  enabled: false
+gateway:
+  publicUrl: https://gateway.acme.com
+```
+
+These routes are for release `langwatch` in namespace `langwatch`, on a Gateway named `public` in namespace `envoy-gateway-system`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-app
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - langwatch.acme.com
+  rules:
+    # No backendRefs: requests to the private control plane get a 5xx.
+    - matches:
+        - path: { type: PathPrefix, value: /api/internal }
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: langwatch-app
+          port: 5560
+      timeouts:
+        request: 0s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-gateway
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - gateway.acme.com
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /v1 }
+        - path: { type: Exact, value: /health }
+      backendRefs:
+        - name: langwatch-gateway
+          port: 80
+      timeouts:
+        request: 0s
+```
+
+`request: 0s` turns off the total request timeout, so streams are not cut. You do not need to order the two app rules: Gateway API matches the longest prefix first, so `/api/internal` takes precedence over `/`. Check that your implementation answers that rule with a 5xx before you rely on it.
+
+If your Gateway is in a different namespace from the routes, set `allowedRoutes.namespaces` on its listener to admit the `langwatch` namespace. If you set idle timeouts in an Envoy Gateway `ClientTrafficPolicy` or `BackendTrafficPolicy`, keep them above the values in the table.
+
+## Network policies
+
+`gateway.networkPolicy.enabled` is off by default. When you turn it on, the default `gateway.networkPolicy.ingressFrom` admits only the `ingress-nginx` namespace and Prometheus. Change it to the namespace where your proxy pods run, for example `envoy-gateway-system`, or the gateway refuses that traffic.
+
+---
+
 # FILE: ./self-hosting/infrastructure/architecture.mdx
 
 ---
@@ -64654,6 +64838,22 @@ Built-in evaluator library (Python):
 - Format (exact match, BLEU, ROUGE, semantic similarity)
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
+
+### AI Gateway (port 5563)
+
+A Go service (image `langwatch/ai-gateway`, subchart `gateway`) that terminates virtual-key traffic and forwards it to the model providers configured in LangWatch. It reads each key's configuration (providers, budgets, guardrails, routing) from the App over the cluster network and reports usage back to it.
+
+- Your LLM clients, coding agents and the Langy agent call it with a virtual key
+- It needs its own externally reachable hostname (`ingress.gateway.host`, or `gateway.publicUrl` behind your own route) when clients outside the cluster use it
+- `gateway.chartManaged: false` removes it
+
+### Langy Agent (port 8080, Service port 80)
+
+The worker manager behind the in-product assistant (image `langwatch/langyagent`, subchart `langyagent`). The App and Workers reach it over cluster DNS; it has no ingress. Each conversation runs in a worker with its own UID and credentials, and its model calls go through the AI Gateway.
+
+- On by default (`langyagent.chartManaged: true`); `false` removes the pod and every reference to it
+- Runs on the node's normal container runtime by default; a sandboxed RuntimeClass (gVisor, Kata) is opt-in, see [Langy setup](/self-hosting/langy/setup)
+- Its NetworkPolicy denies internet egress unless you turn it on, see [Langy networking and egress](/self-hosting/langy/networking-and-egress)
 
 ### PostgreSQL: Control Plane
 
@@ -64799,17 +64999,19 @@ Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
 
 ## Network Topology
 
-Only the App is exposed externally. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
-| Component  | Service Type             | External |
-| ---------- | ------------------------ | -------- |
-| App        | Ingress, LoadBalancer    | Yes      |
-| Workers    | None (no Service needed) | No       |
-| NLP        | ClusterIP                | No       |
-| LangEvals  | ClusterIP                | No       |
-| PostgreSQL | ClusterIP                | No       |
-| ClickHouse | ClusterIP                | No       |
-| Redis      | ClusterIP                | No       |
+| Component | Service Type | External |
+|-----------|-------------|----------|
+| App | Ingress, LoadBalancer | Yes |
+| Workers | None (no Service needed) | No |
+| NLP | ClusterIP | No |
+| LangEvals | ClusterIP | No |
+| AI Gateway | ClusterIP, plus an Ingress when `ingress.gateway.host` is set | Optional, for clients outside the cluster |
+| Langy Agent | ClusterIP | No |
+| PostgreSQL | ClusterIP | No |
+| ClickHouse | ClusterIP | No |
+| Redis | ClusterIP | No |
 
 <Note>
   LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure
@@ -65862,20 +66064,31 @@ Those accounts have no password, so the door back in is **Forgot password**, and
 If you are already in this position, setting `LANGWATCH_LICENSE_KEY` and restarting is the recovery. It needs only the key, as long as the identity provider variables that were already working are still in place: the key licenses SSO, it does not configure it.
 </Warning>
 
+## Two forms of license
+
+LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+| Form | Looks like | Network |
+|---|---|---|
+| **Activation code** | `LW-XXXX-XXXX-XXXX-XXXX` | The install redeems it over outbound HTTPS to `connect.langwatch.ai` for a signed license and stores that on the organization. It works only with outbound access to that host. |
+| **Signed license key** | A long base64 string, also delivered as a `.langwatch-license` file | Verified locally. It works offline. |
+
+In configuration, one setting takes both: the `LANGWATCH_LICENSE_KEY` variable or the Helm value `app.license.key`. There is no separate variable for activation codes. On **Settings → License**, choose **Enter activation code** for a code, and **Enter license key** or **Upload license file** for a signed license key. The page detects the form, so a value pasted under the other option is still accepted. See [Connect](/self-hosting/connect#activate-with-a-code) for what redemption sends.
+
 ## Activating a license
 
 <Steps>
 <Step title="Get a license">
-Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive a signed license key.
+Email [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai) or [talk to sales](https://langwatch.ai/get-a-demo). You receive an activation code or a signed license key.
 </Step>
 
 <Step title="Activate it">
-In the platform, go to **Settings → License**, paste the key or upload the license file, and choose **Activate License**.
+In the platform, go to **Settings → License**, choose **Enter activation code** and paste the code, or choose **Enter license key** or **Upload license file** for a signed license key, then choose **Activate License**.
 
-Prefer configuration over a UI step? Set the key as an environment variable instead:
+Prefer configuration over a UI step? Set the code or key as an environment variable instead:
 
 ```bash
-LANGWATCH_LICENSE_KEY=<your signed license key>
+LANGWATCH_LICENSE_KEY=<your activation code or signed license key>
 ```
 
 On Helm, the chart takes it inline or from a Secret you already manage:
@@ -65889,14 +66102,25 @@ app:
         key: license
 ```
 
-Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
-
+A signed license key set through configuration entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
-<Step title="Restart the deployment">
-The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+<Step title="SSO turns on">
+Plan entitlements apply immediately. SSO turns on at once on the server that stored the license, and within a minute on every other replica, with no restart. The activation confirmation in the UI says so too.
+
+`LANGWATCH_LICENSE_KEY` and `app.license.key` are read at startup, so a change to the variable takes a restart.
 </Step>
 </Steps>
+
+## An activation code in the variable
+
+When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code and an organization exists, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
+
+- If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
+- On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.
+- If redemption is refused, the app logs the reason and still starts. Causes: an unknown, expired or already used code, a code bound to another install, no outbound access to `connect.langwatch.ai`, or `LANGWATCH_CONNECT_DISABLED` set.
+
+The startup log names the form it found in the variable and what it did with it.
 
 ## Expiry
 
@@ -68267,6 +68491,41 @@ docker compose up -d
 ```
 
 ## Breaking Changes
+
+### LangWatch AI Gateway Ingress moved to the app Ingress (Helm)
+
+The gateway sub-chart used to create its own Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now renders no Ingress. The `gateway.ingress.*` values are gone.
+
+To keep publishing the gateway through an Ingress, set its host on the app Ingress. The chart renders a second Ingress, `<release>-gateway-ingress`, with the app Ingress `className`, `labels` and `annotations`:
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  # ...your existing app hosts, tls and annotations
+  gateway:
+    host: gateway.acme.com
+    tls:
+      secretName: gateway-tls
+```
+
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+
+A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
+
+The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
+
+### Helm installs with autogen off and Argo CD
+
+With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis.auth.existingSecret` and `postgresql.auth.existingSecret` (or a password value). The chart used to generate these passwords, and under Argo CD a generated password changed on every sync. A plain `helm upgrade` of a release that already has the chart's own `<release>-redis` and `<release>-postgresql` Secrets keeps them.
+
+Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
+
+The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
+
+Keep Argo CD pruning on, so a new spec replaces the old Job; without it, delete old render Jobs before a rollback, or the rollback finds its Job already complete and does not render again.
+
+The app now reads the gateway keys named by `gateway.secrets.internalSecretKey` and `gateway.secrets.jwtSecretKey`, the same keys the gateway pod reads.
 
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 
