@@ -214,7 +214,6 @@ export class ProcessServer implements ProcessBoot {
               isSaas: this.settings.isSaas ?? false,
               nlpServiceUrl: this.settings.nlpServiceUrl,
               nlpCodeBlockTimeoutSeconds: this.settings.nlpCodeBlockTimeoutSeconds,
-              adminEmails: this.settings.adminEmails ?? [],
               // The proxy spellings, raw; each module's outbound calls parse and follow them.
               outboundProxy: this.settings.outboundProxy ?? {},
               // The raw-socket door's port, which a module tunnelling to that door reads.
@@ -321,7 +320,6 @@ const processSettings = z.object({
   isSaas: z.boolean().optional(),
   nlpServiceUrl: z.string().optional(),
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
-  adminEmails: z.array(z.string()).optional(),
   outboundProxy: z.record(z.string(), z.string().optional()).optional(),
   rawSocketPort: z.number().int().min(0).max(65535).default(3300),
 });

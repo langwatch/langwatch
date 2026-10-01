@@ -25,22 +25,6 @@ export const processOwner = {
      */
     isSaas,
     /**
-     * The platform-operator list, parsed once. Blank means none rather than
-     * refusing boot; several modules read it, so it has one owner here.
-     */
-    adminEmails: c.env(
-      "ADMIN_EMAILS",
-      z
-        .string()
-        .optional()
-        .transform((raw) =>
-          (raw ?? "")
-            .split(",")
-            .map((email) => email.trim())
-            .filter((email) => email.length > 0),
-        ),
-    ),
-    /**
      * The NLP engine's address. A deployment fact of the process, read by the
      * http surface and by every module that calls the engine.
      */
