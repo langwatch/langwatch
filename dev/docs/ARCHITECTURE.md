@@ -44,6 +44,8 @@ reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
 child protocol. Each runtime declares its input schema, executable artefact, resource class and
 cancel/drain behaviour. A host chooses which resource classes it consumes, independently of which
 APIs it installs, and admission uses weighted slots. The child stays a narrow runner.
+A worker admits only the resource classes it consumes, within a weighted slot budget (voice weighs 1),
+and each runtime declares its stop signal (Alex, 2026-10-01).
 
 `apps/*-web` are the internal consoles (haven hub and stack home, IdP
 simulator, mail sink): React bundles built by Vite and served by their Go
@@ -118,7 +120,7 @@ imported the rest of the way down, never from the top.
   `getRawColorValue` / `useColorRawValue` (a literal for the current mode). Enforced by `no-raw-color`.
 - Support packages: `handled-error` (the error contract and its presentation: `/presentation`,
   `/app-codes`, `/docs-url`, `/read-handled-error`; `error-views` stays its own package because it
-  depends on the design system), `authorization` (principals, grants and the one `ledgerActorSchema`), `secrets`
+  depends on the design system), `authorization` (principals, grants, the principal and credential types and the one `ledgerActorSchema`; no contract imports `@langwatch/api` for them, Alex, 2026-10-01), `secrets`
   (ADR-132), `config` (generic config machinery), `observability` (logger +
   OTel), `test-harness` (fixtures and doubles, including `./api-fixture`), and the raw clients
   (`prisma-client`, `clickhouse-client`, `redis-client`, `eventing`).
@@ -160,10 +162,13 @@ Enterprise-licensed subjects moving to their owner land in that owner's enterpri
 (`enterprise-gateway` owns routing policy and personal virtual keys), never relicensed into core (Alex, 2026-09-25).
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
 Usage is a module of its own and owns all counting: the counters, their enforcement, the warning
-thresholds, the billable-events meter projection and its table, and the trace count it takes itself.
+thresholds, the billable-events meter (SaaS only; a projection and its table), and the trace count it takes itself.
 Entitlement keeps plans and features only. Usage is events (Alex, 2026-10-01): limits travel as
 `limit_reached` and `limit_cleared`, the month's total as `month_counted`, and no module asks `UsageApi`
-for either, so no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Every limit is soft:
+for either, so no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). `UsageApi` exists with zero
+operations. Billing peer-subscribes to `month_counted`; a lower corrected total goes to Stripe as a negative
+meter event (Alex, 2026-10-01). Per-entity periodic work is a keyed process manager (§9, "Per-entity calendar
+work"), never `.schedule`. Every limit is soft:
 eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
 Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
 peer-cycle baseline until usage lands.
@@ -848,6 +853,8 @@ Online policy execution (guardrails) is a synchronous capability with an end-to-
 cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
 leaf, depending on none of gateway, monitor or run orchestration. Reporting follows the decision, and
 removing a cycle may not make a synchronous precondition eventual (Alex, 2026-10-01).
+A request guardrail answers within 800 ms through `EvaluationApi.checkGuardrail`, the gateway's only
+evaluation dependency; a fail-closed deadline answers the retryable 503 (Alex, 2026-10-01).
 
 `gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
@@ -1388,6 +1395,8 @@ Minting a SCIM token is a grant door: only a caller holding everything an organi
 (Alex, 2026-10-01).
 Creating a team passes the real caller, never `system`: the creator becoming its own new team's ADMIN is the
 one consequence written as `system`; every other initial member is bounded by the creator (Alex, 2026-10-01).
+A gateway virtual-key change needs the permission at every scope the key covers, not at one of them
+(Alex, 2026-10-01).
 **Plans** (Alex, 2026-10-01): built-in roles grant on every plan; any write that assigns a custom role needs
 Enterprise on every door, declared on each granting door (`withEntitlement("enterprise", { feature: "RBAC",
 when })`), so authz never asks entitlement. `/api/role-bindings`, `/api/organization`, `/api/roles` and
@@ -1472,7 +1481,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
 - A REST request is authenticated before its body is capped, parsed or validated: a missing or invalid credential
   answers 401/403, never 422 or 413. A door that signs over the body reads the capped raw bytes first. Which project
   the caller acts on is resolved after, from the parsed input (Alex, 2026-09-30).
-- The exception is a hidden family, whose 404 comes before the credential or the body: instance-admin with no key
+- The exception is a hidden family, whose 404 comes before the credential or the body: `instance_admin` with no key
   set or on SaaS, and `/api/admin/*` for a caller who is not an admin (as main, 2026-09-30).
 - REST runs in three steps: the credential and identity checks that read no body (the door, and a public route's
   credential facts), then the body is parsed and validated, then any authorisation that reads the parsed input.
@@ -1486,6 +1495,13 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   authentication, so no handler or module looks the owner up itself (Alex, 2026-09-25).
 - A minted session key (langy's local-control sessions) authenticates at its own door, which puts the actor and
   project on the request; no handler reads the key's headers (Alex, 2026-09-25).
+- No key, token or secret is minted while the actor carries an impersonator (Alex, 2026-10-01). An endpoint that mints
+  declares `.mintsCredential(permission)` and the tRPC and REST runtime refuses it before the handler; a service
+  guard per door stays for callers that are not a transport. Door names are the typed snake_case union `api_key`,
+  `scim_token`, `internal_secret`, `instance_admin`, `session_key`, `cli_token`.
+- The CLI token door hands a handler `session` beside `actor` (Alex, 2026-10-01): the route declares
+  `.withCredential("cli_token", { session: schema })`, the framework parses it (a mismatch answers 401) and types
+  the handler by `z.output`. The actor carries authz vocabulary only; logs redact `session.tokenKey` at a fixed path.
 - A legacy project key still authenticates but is never returned or displayed: no read, no rotation, no handout.
   It migrates to an `ApiKey` row, hashed and valid until revoked, listed masked and revoke-only under a
   replace-by-deadline banner. The CLI and MCP mint a fresh key instead, a CLI login replacing that device's previous
@@ -1496,6 +1512,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   minted once, stored encrypted in `GatewayTraceExportKey` and folded into the bundle ETag; it changes only on an
   explicit rotation (ruled 2026-10-01). The key row menu is Revoke only, and a new key expires in 90 days by default, "never"
   allowed (Alex, 2026-09-30). `modules/api-key/adrs/002-project-keys-are-hidden.md`
+- A run started by a service key carries that `apiKey` principal, and the run's key is capped by the starting key's
+  grants. Only a scheduler-started run acts as `system`; the absence of a person never supplies system authority
+  (Alex, 2026-10-01).
 - An API key or personal access token is checked in two tiers (Alex, 2026-10-01): Redis, shared by every pod,
   holds the answer for 5 s (an unknown token for 2 s), matched by the token's hash and holding no secret (a key's
   answer sits under its public lookup id, so a revoke can find it); Postgres is the truth. A failed check is never held. A revoke sets `revokedAt` and leaves a 5 s refusal in the held answer that a fill (written only when no entry exists) cannot replace, so the key is dead
@@ -1638,8 +1657,9 @@ the job envelope; `withEvents([])` types a pipeline's events as `never`; a comma
 validation, handed to `processCommand` (Alex, 2026-09-27).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
 registers with `.on(eventSchema, handler)` (or reads its `.toPayload(schema, map)` view); no cast (Alex, 2026-09-27).
-Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline; the
-eventing `ScheduledJob` scheduler is retired, its table dropped a release after its code (Alex, 2026-09-26).
+Per-entity calendar work (a report's cron) is a keyed process manager on its owner's pipeline, arming
+`nextWakeAt` per entity, not `.schedule` (Alex, 2026-10-01); the eventing `ScheduledJob` scheduler is retired,
+its table dropped a release after its code (Alex, 2026-09-26).
 Periodic work is a scheduled process manager (`.schedule({ everyMs }).onWake`) on its owner's pipeline;
 there are no cron routes. A route under `/api/cron` is refused by
 `packages/architecture-enforcer/tests/no-cron-routes.unit.test.ts` (Alex, 2026-09-29).
@@ -2591,7 +2611,8 @@ branch never starts, each to become a scheduled process manager.
 **Parked** (Alex, 2026-10-01; do not re-raise): the ingestion stage plan (Alex will redesign it later);
 erasure tombstones and owner-complete acknowledgement; deployment audience and subscription rollout
 (transport protocol versus audience, cutover and backfill for new durable subscriptions); tenant
-placement and regions (one execution region per deployment today).
+placement and regions (one execution region per deployment today); the personal-token "passport" (a frozen
+project ceiling), to be expressed through conditional grants (Alex's work in progress).
 
 ---
 
