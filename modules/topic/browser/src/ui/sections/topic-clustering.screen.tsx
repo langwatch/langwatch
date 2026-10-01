@@ -18,7 +18,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { nowInstant } from "@langwatch/time";
 import type {
   ClusteringErrorCode,
   TopicClusteringRunHistoryEntry,
@@ -26,7 +25,6 @@ import type {
   TopicClusteringRunMode,
   TopicClusteringSkipReason,
 } from "@langwatch/topic-contract";
-import { useState } from "react";
 
 import { topicApi } from "../../behavior/topic-api.ts";
 import {
@@ -94,12 +92,10 @@ export default function TopicClusteringScreen() {
 function TopicClusteringCard({ project }: { project: { id: string } }) {
   const host = useTopicHost();
   const utils = topicApi.useUtils();
-  const [lastTriggeredAt, setLastTriggeredAt] = useState<number | null>(null);
 
   const triggerClustering = topicApi.project.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
       if (result.started) {
-        setLastTriggeredAt(nowInstant().epochMilliseconds);
         host.succeeded({
           title: "Topic clustering started",
           description: "This can take several minutes.",
@@ -131,7 +127,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
 
   return (
     <VStack gap={6} width="full" align="start" paddingBottom={12}>
-      <ClusteringStatusCard projectId={project.id} lastTriggeredAt={lastTriggeredAt} />
+      <ClusteringStatusCard projectId={project.id} />
       <Card.Root width="full">
         <Card.Header>
           <Heading>Manual topic clustering</Heading>
@@ -270,14 +266,8 @@ function ClusteringStatusBody({
   );
 }
 
-function ClusteringStatusCard({
-  projectId,
-  lastTriggeredAt,
-}: {
-  projectId: string;
-  lastTriggeredAt: number | null;
-}) {
-  const status = useClusteringStatus({ projectId, lastTriggeredAt });
+function ClusteringStatusCard({ projectId }: { projectId: string }) {
+  const status = useClusteringStatus({ projectId });
 
   return (
     <Card.Root width="full">

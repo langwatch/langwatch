@@ -14,7 +14,6 @@ export function useSuiteSummaries({ projectId, startDate, endDate }: SummaryWind
     { projectId: projectId ?? "", startDate, endDate },
     {
       enabled: !!projectId,
-      // needs a read hint: scenario run progressed or finished
     },
   );
 }
@@ -25,7 +24,6 @@ export function useExternalSetSummaries({ projectId, startDate, endDate }: Summa
     { projectId: projectId ?? "", startDate, endDate },
     {
       enabled: !!projectId,
-      // needs a read hint: scenario run progressed or finished
     },
   );
 }

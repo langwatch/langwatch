@@ -68,7 +68,6 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
-      // needs a read hint: langy turn settled (the freshness signal can be lost)
     },
   );
 

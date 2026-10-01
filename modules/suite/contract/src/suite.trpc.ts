@@ -5,7 +5,7 @@
  */
 
 import { defineTrpcContract } from "@langwatch/module";
-import { scenarioTestSuiteSchema } from "@langwatch/scenario-contract";
+import { SIMULATION_RUN_EVENT_TYPES, scenarioTestSuiteSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
 
 import {
@@ -85,7 +85,14 @@ export const suiteTrpc = defineTrpcContract("suites")
   .withInput(runAllSuitesTrpcInputSchema)
   .withOutput(suiteRunAllReceiptSchema)
 
-  .query("getSummaries")
+  .query("getSummaries", {
+    invalidatedBy: [
+      SIMULATION_RUN_EVENT_TYPES.QUEUED,
+      SIMULATION_RUN_EVENT_TYPES.STARTED,
+      SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      SIMULATION_RUN_EVENT_TYPES.EVALUATED,
+    ],
+  })
   .withInput(suiteSummariesTrpcInputSchema)
   .withOutput(z.record(z.string(), suiteRunSummarySchema))
   .build();

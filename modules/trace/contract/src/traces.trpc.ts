@@ -13,6 +13,7 @@ import { evaluationSchema, traceSchema } from "./trace-format.schemas.ts";
 import { explorerInstantEvalRunsSchema } from "./trace-instant-eval.schemas.ts";
 import { discoverResultSchema, facetValuesResultSchema } from "./trace-list-view.ts";
 import { checkPreconditionsSchema } from "./trace-precondition.schemas.ts";
+import { FIRST_TRACE_RECORDED_EVENT_TYPE } from "./trace-project-milestones.events.ts";
 import {
   customersAndLabelsResultSchema,
   distinctFieldNamesResultSchema,
@@ -138,7 +139,9 @@ const spanReadHintShape = {
 } as const;
 
 export const tracesTrpc = defineTrpcContract("traces")
-  .query("getAllForProject")
+  .query("getAllForProject", {
+    invalidatedBy: [{ event: FIRST_TRACE_RECORDED_EVENT_TYPE, scope: "projectId" }],
+  })
   .withInput(traceListInputSchema)
   .withOutput(tracesForProjectResultSchema)
 

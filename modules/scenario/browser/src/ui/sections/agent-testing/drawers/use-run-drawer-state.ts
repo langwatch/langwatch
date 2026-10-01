@@ -150,7 +150,6 @@ function useResolvedScenarioRunId({ open }: { open: boolean }): {
     },
     {
       enabled: open && needsResolution && !!project?.id,
-      // needs a read hint: scenario run started in the batch
     },
   );
 

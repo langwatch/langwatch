@@ -36,7 +36,6 @@ export function WaitingForTracesChip(): React.ReactElement {
     },
     {
       enabled: !!project?.id && !detected,
-      // needs a read hint: first trace received for the project
       refetchOnWindowFocus: false,
     },
   );

@@ -37,7 +37,6 @@ export function useSuiteRunFreshness({
     },
     {
       enabled: !!project && enabled,
-      // needs a read hint: scenario suite run updated (the SSE fallback)
     },
   );
 

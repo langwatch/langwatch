@@ -179,7 +179,6 @@ function useResultsReads({
     { ...scope, groupBy: grouping },
     {
       enabled: isEnabled,
-      // needs a read hint: scenario results changed (the SSE fallback)
     },
   );
 
@@ -195,7 +194,6 @@ function useResultsReads({
     { ...drillScope, limit: ATOM_PAGE },
     {
       enabled: isEnabled && isDrilling,
-      // needs a read hint: scenario results changed (the SSE fallback)
     },
   );
 

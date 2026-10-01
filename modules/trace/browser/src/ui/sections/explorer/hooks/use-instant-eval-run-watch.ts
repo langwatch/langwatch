@@ -39,7 +39,6 @@ export function useInstantEvalRunWatch(): void {
         { projectId, runId },
         {
           enabled: !!projectId,
-          // needs a read hint: instant eval run progressed (a page judged)
         },
       );
     }),
