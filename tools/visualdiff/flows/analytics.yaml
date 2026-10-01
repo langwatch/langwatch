@@ -976,6 +976,9 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: wait
+        with:
+          millis: "3000"
       - action: click
         with:
           text: Add chart
@@ -1058,6 +1061,9 @@ flows:
       - action: go
         with:
           path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: wait
+        with:
+          millis: "3000"
       - action: click
         with:
           text: Add chart

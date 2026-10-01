@@ -3,7 +3,7 @@
 # release_langy_enabled on for the project, as langy.yaml. Unrun until a check.
 flows:
   - id: cv2-langy-dock-then-float-panel
-    title: Dock Langy to the side, then float it again, keeping the composer both times
+    title: Float the docked Langy panel, then dock it to the side again, keeping the composer both times
     steps:
       - action: go
         with:
@@ -15,12 +15,15 @@ flows:
       - action: expect
         with:
           label: Langy assistant
-      - action: click
-        with:
-          label: Dock to the side
       - action: expect
         with:
           label: Float the panel
+      - action: click
+        with:
+          label: Float the panel
+      - action: expect
+        with:
+          label: Dock to the side
       - action: expect
         with:
           count: "[data-langy-composer] textarea"
@@ -29,10 +32,10 @@ flows:
           url: /traces
       - action: click
         with:
-          label: Float the panel
+          label: Dock to the side
       - action: expect
         with:
-          label: Dock to the side
+          label: Float the panel
       - action: expect
         with:
           count: "[data-langy-composer] textarea"

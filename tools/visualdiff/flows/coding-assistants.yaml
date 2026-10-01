@@ -286,6 +286,9 @@ flows:
       - action: go
         with:
           path: /{slug}/traces/5c0d1a6e0000000000000000000000a1
+      - action: expect
+        with:
+          text: claude_code.llm_request
       - action: click
         with:
           text: /^\s*Usage\s*$/
