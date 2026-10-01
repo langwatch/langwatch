@@ -80,7 +80,7 @@ Feature: Prompt API snippet dialog
 
   @integration
   Scenario: The API key is hidden until the reader asks to see it
-    Given a project with an API key
+    Given I created a personal access token in the dialog
     When I open the API dialog for a prompt
     Then the key in the snippet is masked
     When I choose to show the key
@@ -88,14 +88,28 @@ Feature: Prompt API snippet dialog
 
   @integration
   Scenario: Copying always takes the working snippet
-    Given a project with an API key
+    Given I created a personal access token in the dialog
     And the key in the snippet is masked
     When I copy the snippet
     Then the clipboard holds the snippet with the real key, not the mask
 
   @integration
-  Scenario: Without an API key the dialog offers a route to create one
-    Given a project with no API key
+  Scenario: Without a token the dialog offers to create a personal access token
+    Given I have not created a token
     When I open the API dialog for a prompt
-    Then the dialog links to the API keys settings
+    Then the dialog offers to create a personal access token
     And the snippet cannot be copied, because it would not run
+
+  @integration
+  Scenario: A token created in the dialog expires in 90 days
+    Given I have not created a token
+    When I create a personal access token from the dialog
+    Then the token is created for this project and expires in 90 days
+    And it can only read prompts, and the dialog says so
+
+  @integration
+  Scenario: A failed creation tells the reader
+    Given I have not created a token
+    When creating the personal access token fails
+    Then the reader is told the token could not be created
+    And the snippet still carries the placeholder

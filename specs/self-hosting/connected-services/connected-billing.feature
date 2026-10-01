@@ -331,11 +331,11 @@ Feature: Billing a connected self-hosted customer
     When an operator opens the customer in the backoffice
     Then each change has its own line saying what finance needs to know
 
-  @unit
-  Scenario: The Billing section rereads until a seat change settles
+  @unit @unimplemented
+  Scenario: The Billing section updates when a seat change settles
     Given a seat change awaiting billing or the payment provider
-    When the Billing section is open
-    Then it rereads every five seconds until every change is settled
+    When the Billing section is open and the change settles
+    Then the section updates on its server event, with no timer
 
   @unit
   Scenario: The backoffice says so when live spend cannot be read

@@ -194,7 +194,7 @@ Rule: Integrate drawer hosts API key minting and setup paths
 # ─────────────────────────────────────────────────────────────────────────────
 
 Rule: Generate access token inside the Integrate drawer
-  `ApiKeyIntegrationInfoCard` mints a project-scoped API key and surfaces it
+  `ApiKeyIntegrationInfoCard` mints a project-scoped personal access token and surfaces it
   as a copyable env-var block. The token is lifted to the drawer so
   every setup tab can read it via `ActiveProjectProvider`.
 
@@ -202,13 +202,14 @@ Rule: Generate access token inside the Integrate drawer
     Given the Integrate drawer is open
 
   Scenario: Initial state shows the generate-token card
-    Then a card titled "Generate an access token" is visible
-    And a "Generate access token" button is enabled
+    Then the shared personal access token banner is visible
+    And a "Create a personal access token" button is enabled
 
-  Scenario: Generating creates a project-scoped API key
-    When the user clicks "Generate access token"
-    Then an API key is created via `apiKey.create`
-    And the API key name is "Initial API key"
+  Scenario: Generating creates a project-scoped personal access token
+    When the user clicks "Create a personal access token"
+    Then a token is created via `apiKey.create` with key type personal
+    And the token name is "Personal access token"
+    And the token expires 90 days from now
     And the binding is `{ role: MEMBER, scopeType: PROJECT, scopeId: projectId }`
     # TODO(traces-v2): Switch to a tracing-only custom role once one ships;
     # MEMBER is the closest preset that grants traces + prompts read/write.
@@ -223,13 +224,13 @@ Rule: Generate access token inside the Integrate drawer
 
   Scenario: A copy button sits next to the shown-once warning
     Given the user successfully generated a token
-    Then a copy button is rendered right after the "shown once" warning
+    Then a copy button is rendered right after the "Copy this token now." warning
     When the user clicks that copy button
     Then the raw token is copied to the clipboard
 
   Scenario: Token failure surfaces a toast
-    Given the `personalAccessToken.create` mutation fails
-    When the user clicks "Generate access token"
+    Given the `apiKey.create` mutation fails
+    When the user clicks "Create a personal access token"
     Then a toast surfaces the error message
     And the generate button returns to its enabled state
 

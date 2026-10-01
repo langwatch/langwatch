@@ -2,10 +2,59 @@ Feature: Canonical user lifecycle
 
   @unit
   Scenario: Deactivating a user invalidates every session family
-    When the User service deactivates an active user
+    When the User service deactivates an active user, by self-service or through the user operation an operator calls
     Then the user is marked deactivated
     And browser sessions are revoked
     And CLI tokens are revoked
+
+  @unit
+  Scenario: Deactivation ends access even when user's fact cannot be sent
+    Given user's lifecycle fact cannot be sent
+    When the User service deactivates an active user
+    Then the request fails
+    And browser sessions and CLI tokens were already revoked
+
+  @unit
+  Scenario: A user's lifecycle fact carries the time the database recorded
+    When the User service deactivates and then reactivates an account
+    Then the deactivation date and each fact's instant come from the database's clock
+    And never from the clock of the server that handled the request
+
+  @unit
+  Scenario: An operator authz has not yet heard is deactivated does not count as active
+    Given two platform operators, one already deactivated in user's own records
+    And authz still lists both
+    When the User service deactivates the other
+    Then it is refused with code user_last_platform_operator
+
+  @integration
+  Scenario: Two operators deactivated at once cannot leave none active
+    Given two active platform operators
+    When both are deactivated by concurrent requests
+    Then one is deactivated and the other is refused
+    And one active operator remains
+
+  @unit
+  Scenario: A lookup by address never guesses between case-twins
+    Given accounts whose addresses differ only in case
+    When an account is looked up by address
+    Then the account holding the address exactly is answered
+    And with no exact holder the lookup is refused with code user_email_ambiguous
+    And the address still counts as taken
+
+  @unit
+  Scenario: Deactivating the last active platform operator is refused
+    Given a user is the only active platform operator
+    When the User service deactivates them
+    Then it is refused with code user_last_platform_operator
+    And nothing is written or recorded
+    And an operator is deactivated while another active operator remains
+
+  @unit
+  Scenario: Deactivation and reactivation are recorded as user's facts
+    When the User service deactivates and then reactivates an account
+    Then each change is recorded on user's pipeline as "lw.user.deactivated" and "lw.user.reactivated"
+    And each fact is keyed by the user and its instant, so a redelivery records nothing new
 
   Scenario: Changing an email refreshes authenticated identity
     When an authorized transport changes a user's normalized email through the User service
@@ -72,20 +121,23 @@ Feature: Canonical user lifecycle
     Then that session alone is ended
     And the request names no account, so nobody else's session is reachable
 
-  # main's #7631 hardening: the personal context is readable with
-  # organization:view, so the project's API key needs project:manage.
+  # The personal context is a cached read, so it never carries a credential:
+  # the page mints a personal access token instead of revealing a key.
   @unit
-  Scenario: A caller who may manage their personal project reads its API key in the personal context
-    Given a member holding project:manage on their personal project
-    When they read their personal context in that organization
-    Then the personal project's API key is returned
-
-  @unit
-  Scenario: A caller who may not manage their personal project reads a blank API key in the personal context
-    Given a member without project:manage on their personal project
+  Scenario: The personal context never carries the personal project's API key
+    Given a member of the organization, with or without project:manage on their personal project
     When they read their personal context in that organization
     Then the personal project's API key is blank
     And the blank key is a valid personal context on the wire
+
+  @integration
+  Scenario: The personal OTLP panel offers a personal access token, shown once
+    Given a member opens the personal OTLP endpoint panel
+    Then the snippet shows "<YOUR_LANGWATCH_API_KEY>" and no key is read
+    When they choose "Create a personal access token"
+    Then an ingestion-only personal key on their personal project is minted
+    And the panel says the token can only send data to this project and cannot read or change anything
+    And the token fills the snippet while the panel is open and is held in memory only
 
   # main's user.personalContext and user.personalBudget read the gateway's
   # default routing policy, the caller's personal key and the budget check.
