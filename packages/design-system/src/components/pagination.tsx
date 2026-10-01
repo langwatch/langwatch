@@ -303,3 +303,5 @@ export function Pagination({
     </Grid>
   );
 }
+
+export { Pagination as RawPagination } from "@chakra-ui/react";

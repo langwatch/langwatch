@@ -40,3 +40,5 @@ export const SegmentedControl = React.forwardRef<HTMLDivElement, SegmentedContro
     );
   },
 );
+
+export { SegmentGroup as RawSegmentGroup } from "@chakra-ui/react";

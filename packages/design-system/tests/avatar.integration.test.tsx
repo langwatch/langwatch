@@ -3,10 +3,10 @@
  * Verify initials computed by the unit tests actually reach the DOM.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Avatar } from "../src/components/avatar.tsx";
+import { Avatar, UserAvatar } from "../src/components/avatar.tsx";
 
 afterEach(cleanup);
 
@@ -54,6 +54,45 @@ describe("given no name at all", () => {
     // Chakra's fallback icon, which it renders only when it is given neither
     // children nor a name it can read.
     expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
+function renderUserAvatar(props: { src?: string | null; name?: string | null }) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <UserAvatar {...props} />
+    </ChakraProvider>,
+  );
+}
+
+describe("UserAvatar", () => {
+  describe("given a photo URL", () => {
+    it("draws the photo as given", () => {
+      renderUserAvatar({ name: "Ada Lovelace", src: "https://sso.example/photo.png" });
+
+      expect(document.querySelector("img")?.getAttribute("src")).toBe(
+        "https://sso.example/photo.png",
+      );
+    });
+
+    it("falls back to the initials when the URL does not load", () => {
+      renderUserAvatar({ name: "Ada Lovelace", src: "https://sso.example/broken.png" });
+      const photo = document.querySelector("img");
+      if (!photo) throw new Error("the photo did not render");
+      fireEvent.error(photo);
+
+      expect(document.querySelector("img")).toBeNull();
+      expect(screen.getByText("AL")).toBeTruthy();
+    });
+  });
+
+  describe("given no URL", () => {
+    it("draws the initials", () => {
+      renderUserAvatar({ name: "Ada Lovelace", src: null });
+
+      expect(document.querySelector("img")).toBeNull();
+      expect(screen.getByText("AL")).toBeTruthy();
+    });
   });
 });
 

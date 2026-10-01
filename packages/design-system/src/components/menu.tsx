@@ -135,3 +135,5 @@ export const Menu = {
   CheckboxItem: MenuCheckboxItem,
   RadioItem: MenuRadioItem,
 };
+
+export { Menu as RawMenu } from "@chakra-ui/react";

@@ -34,3 +34,5 @@ export const Switch = React.forwardRef<HTMLInputElement, SwitchProps>(function S
     </ChakraSwitch.Root>
   );
 });
+
+export { Switch as RawSwitch } from "@chakra-ui/react";

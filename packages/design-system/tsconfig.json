@@ -28,6 +28,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
       "path": "../design-system-internal/tsconfig.build.json"
     }
   ]

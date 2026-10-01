@@ -77,3 +77,5 @@ export const Drawer = {
   Title: ChakraDrawer.Title,
   ActionTrigger: ChakraDrawer.ActionTrigger,
 };
+
+export { Drawer as RawDrawer } from "@chakra-ui/react";

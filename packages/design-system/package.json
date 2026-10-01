@@ -54,6 +54,14 @@
       "types": "./dist/components/avatar.d.ts",
       "default": "./src/components/avatar.tsx"
     },
+    "./presence": {
+      "types": "./dist/components/presence.d.ts",
+      "default": "./src/components/presence.tsx"
+    },
+    "./cached-view": {
+      "types": "./dist/components/cached-view.d.ts",
+      "default": "./src/components/cached-view.tsx"
+    },
     "./checkbox": {
       "types": "./dist/components/checkbox.d.ts",
       "default": "./src/components/checkbox.tsx"
@@ -101,6 +109,10 @@
     "./full-logo": {
       "types": "./dist/components/full-logo.d.ts",
       "default": "./src/components/full-logo.tsx"
+    },
+    "./personal-access-token-banner": {
+      "types": "./dist/components/personal-access-token-banner.d.ts",
+      "default": "./src/components/personal-access-token-banner.tsx"
     },
     "./generate-api-snippet-button": {
       "types": "./dist/components/generate-api-snippet-button.d.ts",
@@ -337,6 +349,46 @@
     "./section-navigation-frame": {
       "types": "./dist/components/section-navigation-frame.d.ts",
       "default": "./src/components/section-navigation-frame.tsx"
+    },
+    "./bubble-tones": {
+      "types": "./dist/components/bubble-tones.d.ts",
+      "default": "./src/components/bubble-tones.ts"
+    },
+    "./role-visuals": {
+      "types": "./dist/components/role-visuals.d.ts",
+      "default": "./src/components/role-visuals.tsx"
+    },
+    "./conversation-expand-context": {
+      "types": "./dist/components/conversation-expand-context.d.ts",
+      "default": "./src/components/conversation-expand-context.ts"
+    },
+    "./chip": {
+      "types": "./dist/components/chip.d.ts",
+      "default": "./src/components/chip.tsx"
+    },
+    "./suggestion-panel": {
+      "types": "./dist/components/suggestion-panel.d.ts",
+      "default": "./src/components/suggestion-panel.tsx"
+    },
+    "./provider-icons": {
+      "types": "./dist/components/provider-icons.d.ts",
+      "default": "./src/components/provider-icons.tsx"
+    },
+    "./no-models-configured-callout": {
+      "types": "./dist/components/no-models-configured-callout.d.ts",
+      "default": "./src/components/no-models-configured-callout.tsx"
+    },
+    "./provider-model-selector": {
+      "types": "./dist/components/provider-model-selector.d.ts",
+      "default": "./src/components/provider-model-selector.tsx"
+    },
+    "./history-icon": {
+      "types": "./dist/components/icons/history-icon.d.ts",
+      "default": "./src/components/icons/history-icon.tsx"
+    },
+    "./ai-sparkles-loader": {
+      "types": "./dist/components/icons/ai-sparkles-loader.d.ts",
+      "default": "./src/components/icons/ai-sparkles-loader.tsx"
     }
   },
   "scripts": {
@@ -346,6 +398,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/time": "workspace:*",
     "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
@@ -368,6 +421,7 @@
     "@storybook/addon-docs": "^10.5.10",
     "@storybook/react-vite": "^10.5.10",
     "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
     "@types/lodash-es": "catalog:",
     "@types/numeral": "catalog:",
     "@types/react": "catalog:",

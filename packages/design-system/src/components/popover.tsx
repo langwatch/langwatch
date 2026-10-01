@@ -95,3 +95,6 @@ export const Popover = {
   ArrowTip: PopoverArrowTip,
   Anchor: PopoverAnchor,
 };
+
+export { Popover as RawPopover, PopoverContent as RawPopoverContent } from "@chakra-ui/react";
+export type { PopoverRootProps } from "@chakra-ui/react";

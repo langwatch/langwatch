@@ -290,13 +290,7 @@ catalogs:
     '@slack/webhook':
       specifier: ^7.1.0
       version: 7.1.0
-    '@tanstack/query-async-storage-persister':
-      specifier: 5.101.4
-      version: 5.101.4
     '@tanstack/react-query':
-      specifier: 5.101.4
-      version: 5.101.4
-    '@tanstack/react-query-persist-client':
       specifier: 5.101.4
       version: 5.101.4
     '@tanstack/react-table':
@@ -1831,9 +1825,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../packages/browser-trpc
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -4710,9 +4701,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
@@ -5738,6 +5726,9 @@ importers:
       '@testing-library/user-event':
         specifier: 'catalog:'
         version: 14.6.1(@testing-library/dom@10.4.1)
+      '@trpc/client':
+        specifier: 'catalog:'
+        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2)
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -5814,6 +5805,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -5847,6 +5841,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/langy-contract':
+        specifier: workspace:*
+        version: link:../../langy/contract
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
@@ -7798,9 +7795,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
@@ -9700,9 +9694,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/dashboard-contract':
         specifier: workspace:*
         version: link:../../dashboard/contract
@@ -10350,9 +10341,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
@@ -12548,9 +12536,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/dataset-browser-kit':
         specifier: workspace:*
         version: link:../../dataset/browser-kit
@@ -12739,9 +12724,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../../../packages/browser-trpc
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -16381,9 +16363,6 @@ importers:
       '@langwatch/automation-contract':
         specifier: workspace:*
         version: link:../../modules/automation/contract
-      '@langwatch/browser-trpc':
-        specifier: workspace:*
-        version: link:../browser-trpc
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
@@ -16444,21 +16423,9 @@ importers:
       '@microsoft/fetch-event-source':
         specifier: ^2.0.1
         version: 2.0.1
-      '@tanstack/query-async-storage-persister':
-        specifier: 'catalog:'
-        version: 5.101.4
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
-      '@tanstack/react-query-persist-client':
-        specifier: 'catalog:'
-        version: 5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)
-      '@trpc/client':
-        specifier: 'catalog:'
-        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2)
-      '@trpc/server':
-        specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2)
       idb-keyval:
         specifier: 'catalog:'
         version: 6.3.0
@@ -16535,52 +16502,6 @@ importers:
       react-router:
         specifier: 'catalog:'
         version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/browser-trpc:
-    dependencies:
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/agent/contract
-      '@langwatch/api':
-        specifier: workspace:*
-        version: link:../api
-      '@langwatch/dataset-contract':
-        specifier: workspace:*
-        version: link:../../modules/dataset/contract
-      '@langwatch/evaluation-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluation/contract
-      '@langwatch/evaluator-contract':
-        specifier: workspace:*
-        version: link:../../modules/evaluator/contract
-      '@langwatch/feature-flag-contract':
-        specifier: workspace:*
-        version: link:../../modules/feature-flag/contract
-      '@langwatch/model-provider-contract':
-        specifier: workspace:*
-        version: link:../../modules/model-provider/contract
-      '@langwatch/prompt-contract':
-        specifier: workspace:*
-        version: link:../../modules/prompt/contract
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:../../modules/secret/contract
-      '@langwatch/workflow-contract':
-        specifier: workspace:*
-        version: link:../../modules/workflow/contract
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../vitest-config
-      '@types/react':
-        specifier: 'catalog:'
-        version: 19.2.18
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -16693,6 +16614,9 @@ importers:
 
   packages/design-system:
     dependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -16754,6 +16678,9 @@ importers:
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@testing-library/user-event':
+        specifier: 'catalog:'
+        version: 14.6.1(@testing-library/dom@10.4.1)
       '@types/lodash-es':
         specifier: 'catalog:'
         version: 4.17.12
@@ -17670,51 +17597,21 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
-      '@langwatch/api-key-contract':
-        specifier: workspace:*
-        version: link:../../modules/api-key/contract
-      '@langwatch/audit-log-contract':
-        specifier: workspace:*
-        version: link:../../modules/audit-log/contract
-      '@langwatch/auth-contract':
-        specifier: workspace:*
-        version: link:../../modules/auth/contract
-      '@langwatch/authorization':
-        specifier: workspace:*
-        version: link:../authorization
-      '@langwatch/authz-contract':
-        specifier: workspace:*
-        version: link:../../modules/authz/contract
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
-      '@langwatch/enterprise-scim-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/scim/contract
-      '@langwatch/entitlement-contract':
-        specifier: workspace:*
-        version: link:../../modules/entitlement/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
-      '@langwatch/langy-contract':
-        specifier: workspace:*
-        version: link:../../modules/langy/contract
-      '@langwatch/model-provider-contract':
-        specifier: workspace:*
-        version: link:../../modules/model-provider/contract
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../modules/ops/contract
-      '@langwatch/organization-contract':
-        specifier: workspace:*
-        version: link:../../modules/organization/contract
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../prisma-client
@@ -18065,6 +17962,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/api':
+        specifier: workspace:*
+        version: link:../api
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../browser-host
@@ -18077,6 +17977,12 @@ importers:
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.101.4(react@19.2.8)
+      '@trpc/client':
+        specifier: 'catalog:'
+        version: 11.18.0(@trpc/server@11.18.0(typescript@7.0.2))(typescript@7.0.2)
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.18.0(typescript@7.0.2)
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -22502,20 +22408,8 @@ packages:
   '@swc/helpers@0.5.23':
     resolution: {integrity: sha512-5lSsMOTXURePglDfvuAQUqkGek9Hg2kksOYay2m0+XR++b2NWYL/4sWyuvVBIs8oKnJaxkdi9whaL/sqN13afw==}
 
-  '@tanstack/query-async-storage-persister@5.101.4':
-    resolution: {integrity: sha512-ROenNOVvxIZ1zKsBAiIvvslLo2xD8Me/vFz/tChdmuI7ciU+ET63yRrQ01W899Tx1ayQXdsGQJqYqjjVZk+OBQ==}
-
   '@tanstack/query-core@5.101.4':
     resolution: {integrity: sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw==}
-
-  '@tanstack/query-persist-client-core@5.101.4':
-    resolution: {integrity: sha512-Bmu+RfWhwYEyYZEwSeKC0gX4+KTkiEB3yO8oz9BfAY/Jfe3ndz9EnYVhihIZPmWIr8NXayF7JuraNQcrXQQCCg==}
-
-  '@tanstack/react-query-persist-client@5.101.4':
-    resolution: {integrity: sha512-CY5i7PPKS/5B8OR2zAs9nCbLpgqI4jN8eBhtAxKRMNHyGcQhmyOy4PkkJrAAXT+ecGj++fBJTgQw6OpyCt/2SQ==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.101.4
-      react: ^19.2.7
 
   '@tanstack/react-query@5.101.4':
     resolution: {integrity: sha512-yRg2pfOCxIs4ZJW3XYYHU/WgtD04FHSnfHlpRT7h7pR77hwkdRG4wxbKe4aq6P0RvXUTBSQpQeadS1SUYUe+KA==}
@@ -33043,22 +32937,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  '@tanstack/query-async-storage-persister@5.101.4':
-    dependencies:
-      '@tanstack/query-core': 5.101.4
-      '@tanstack/query-persist-client-core': 5.101.4
-
   '@tanstack/query-core@5.101.4': {}
-
-  '@tanstack/query-persist-client-core@5.101.4':
-    dependencies:
-      '@tanstack/query-core': 5.101.4
-
-  '@tanstack/react-query-persist-client@5.101.4(@tanstack/react-query@5.101.4(react@19.2.8))(react@19.2.8)':
-    dependencies:
-      '@tanstack/query-persist-client-core': 5.101.4
-      '@tanstack/react-query': 5.101.4(react@19.2.8)
-      react: 19.2.8
 
   '@tanstack/react-query@5.101.4(react@19.2.8)':
     dependencies:

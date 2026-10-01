@@ -35,3 +35,5 @@ export const RadioGroup = React.forwardRef<
     </ChakraRadioGroup.Root>
   );
 });
+
+export { RadioGroup as RawRadioGroup } from "@chakra-ui/react";
