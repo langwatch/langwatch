@@ -1,10 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * The license registry surface (ADR-156), as the Backoffice reads and writes
- * it: every issue path writes a row here, so a signed license is shown
- * exactly once, when it is issued or reissued, and never read back.
- */
-import { defineTrpcContract } from "@langwatch/api/contract";
 import {
   activationCodePageSchema,
   activationCodeViewSchema,
@@ -26,6 +19,13 @@ import {
   signedIssuedLicenseSchema,
   updateLicenseTermsInputSchema,
 } from "@langwatch/enterprise-licensing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The license registry surface (ADR-156), as the Backoffice reads and writes
+ * it: every issue path writes a row here, so a signed license is shown
+ * exactly once, when it is issued or reissued, and never read back.
+ */
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")
