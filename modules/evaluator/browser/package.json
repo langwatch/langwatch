@@ -25,7 +25,6 @@
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",

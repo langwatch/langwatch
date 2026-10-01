@@ -4,9 +4,6 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it, vi } from "vitest";
-
 import {
   applyCacheTiers,
   CACHE_TIER_STALE_TIME,
@@ -14,14 +11,17 @@ import {
   invalidateSessionTier,
   PERSISTED_QUERY_MAX_AGE,
   procedurePathOf,
-} from "../cache-tiers.ts";
-import { createUiQueryClient } from "../query-client.ts";
+} from "@langwatch/browser-host/cache-tiers";
 import {
   isForbiddenAnswer,
   SESSION_VERSION_HEADER,
   SessionVersionWatch,
   sessionVersionFetch,
-} from "../session-version.ts";
+} from "@langwatch/browser-host/session-version";
+import { QueryClient } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
+
+import { createUiQueryClient } from "../query-client.ts";
 
 // The shape `defineTrpcContract(...).build()` produces, minus the schemas the plan never reads.
 const organizationTrpc = {

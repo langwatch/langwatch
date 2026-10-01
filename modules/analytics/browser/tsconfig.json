@@ -37,9 +37,6 @@
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
-    },
-    {
       "path": "../../dashboard/contract/tsconfig.build.json"
     },
     {

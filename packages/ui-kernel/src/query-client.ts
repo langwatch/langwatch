@@ -5,22 +5,21 @@
  */
 
 import {
+  applyCacheTiers,
+  invalidateSessionTier,
+  procedurePathOf,
+  type UiCachePlan,
+} from "@langwatch/browser-host/cache-tiers";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
+import {
   focusManager,
   MutationCache,
   type Query,
   QueryCache,
   QueryClient,
 } from "@tanstack/react-query";
-
-import {
-  applyCacheTiers,
-  invalidateSessionTier,
-  procedurePathOf,
-  type UiCachePlan,
-} from "./cache-tiers.ts";
-import { showErrorToast } from "./errors.ts";
-import { shouldRetryQuery } from "./query-retry.ts";
-import { isForbiddenAnswer } from "./session-version.ts";
 
 let focusGateInstalled = false;
 

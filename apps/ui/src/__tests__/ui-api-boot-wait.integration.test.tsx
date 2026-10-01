@@ -34,10 +34,10 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useUiApiWait, UI_API_WAIT_HINT_AFTER_MS } from "@langwatch/browser-host/navigation";
 import type * as navigationModule from "@langwatch/browser-host/navigation";
-import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import type { UiScopeOrganization, UiScopeTeam } from "@langwatch/organization-contract";
 import { UiApiWaitingScreen, UI_API_DEV_COMMAND } from "@langwatch/ui-kernel/api-waiting-screen";
 import { createUiFeatureShell } from "@langwatch/ui-kernel/feature-shell";
+import type { UiFeatureApiTransport } from "@langwatch/ui-kernel/transport";
 
 import { loadUiRootCapabilities } from "../shell/ui-root-capabilities";
 

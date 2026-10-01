@@ -4,8 +4,7 @@
  * be mounted, or its first hook throws "Unable to find tRPC Context".
  */
 
-import type { UiFeatureApiBinding } from "@langwatch/browser-host/transport";
-
+import type { UiFeatureApiBinding } from "./transport.ts";
 import type { SupplyModule } from "./web-module.ts";
 
 /**

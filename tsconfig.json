@@ -136,9 +136,6 @@
       "path": "packages/browser-host/tsconfig.json"
     },
     {
-      "path": "packages/browser-trpc/tsconfig.json"
-    },
-    {
       "path": "packages/clickhouse-client/tsconfig.json"
     },
     {

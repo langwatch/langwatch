@@ -13,6 +13,9 @@
 
   "references": [
     {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
       "path": "../browser-host/tsconfig.build.json"
     },
     {

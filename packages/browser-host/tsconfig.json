@@ -31,9 +31,6 @@
       "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../browser-trpc/tsconfig.build.json"
-    },
-    {
       "path": "../config/tsconfig.build.json"
     },
     {

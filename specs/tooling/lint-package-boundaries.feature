@@ -31,7 +31,7 @@ Feature: The package-boundaries lint rule
 
   @unit
   Scenario: A browser kit that fetches is reported as kitFetches
-    Given a browser kit that imports the browser tRPC client
+    Given a browser kit that imports the browser wire from ui-kernel
     When the package-boundaries rule runs over it
     Then it reports kitFetches
 

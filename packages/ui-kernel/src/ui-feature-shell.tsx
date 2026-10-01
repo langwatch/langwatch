@@ -2,7 +2,6 @@
  * What `apps/ui` mounts around every routed page.
  */
 
-import { BrowserUiRpc } from "@langwatch/browser-host/browser-rpc";
 import {
   cachePlanFor,
   createUiVersionedReads,
@@ -24,7 +23,6 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
-import { createUiQueryClient } from "@langwatch/browser-host/query-client";
 import {
   currentUiBuildId,
   indexedDbQueryStore,
@@ -35,11 +33,6 @@ import { startUiQuerySync } from "@langwatch/browser-host/query-sync";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
-import {
-  createUiFeatureApiClient,
-  type UiFeatureApiBinding,
-  type UiFeatureApiTransport,
-} from "@langwatch/browser-host/transport";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
 import { QueryClientContext, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import {
@@ -51,6 +44,13 @@ import {
   type ReactNode,
 } from "react";
 
+import { BrowserUiRpc } from "./browser-rpc.ts";
+import { createUiQueryClient } from "./query-client.ts";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "./transport.ts";
 import { UiApiWaitingGate } from "./ui-api-waiting-gate.tsx";
 import type { UiFailureHost, UiFailureInterceptor } from "./ui-feature-install.ts";
 import type { UiProviderShell } from "./ui-outer-providers.tsx";

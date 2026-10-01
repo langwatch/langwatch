@@ -52,7 +52,7 @@ Named by one rule: **where the code runs, or what it declares.**
 |          | core                | runs + declares      | reads                       | wire                      | shares               |
 | -------- | ------------------- | -------------------- | --------------------------- | ------------------------- | -------------------- |
 | **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api`          | contracts            |
-| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/browser-trpc` | `<name>-browser-kit` |
+| **Web**  | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host`   | `@langwatch/ui-kernel`    | `<name>-browser-kit` |
 
 The core is a contract's only framework import and is incredibly light;
 each runtime owns the declaration vocabulary for its own half, so weight is
@@ -85,9 +85,10 @@ imported the rest of the way down, never from the top.
   navigation, storage, feature flags, toasts, **drawers**. The browser
   analogue of the closed members. Capabilities only — components live in the
   design system or in kits.
-- **`@langwatch/browser-trpc`** — the browser's wire: the derived tRPC
-  client, batching, the SSE subscription link. All of it is tRPC-derived;
-  the browser calls no REST.
+- **`@langwatch/ui-kernel`** owns the browser's wire: the transport (batching,
+  versioned reads, the SSE subscription link), the browser RPC and the query
+  client. A kit cannot import it, so a kit cannot fetch. The client types are
+  derived from contracts by `@langwatch/api/web`; the browser calls no REST.
 - **`@langwatch/design-system`** — components (Chakra v3 underneath). Only this package imports
   `@chakra-ui/*` or `@emotion/*` (Alex, 2026-10-01): kits, feature browsers, apps and tests import
   `@langwatch/design-system/<subpath>`; `./primitives` re-exports Chakra's primitives and raw parts
@@ -324,7 +325,7 @@ peer and closes no cycle (Alex, 2026-09-29).
 `trace-browser` layers: flat public entries → `model/` (pure) → `behavior/`
 (hooks, api bindings, stores) → `ui/elements|blocks|sections`. Elements and
 blocks cannot fetch. The tRPC client is derived from the contract's
-declarations (`browser-trpc`), never hand-written, never from a router type.
+declarations (`@langwatch/api/web`), never hand-written, never from a router type.
 Its inputs and outputs are typed from those declarations, never `any` (Alex, 2026-09-24). An
 interactive element is the native one (`button`, `a`, `input`) styled through the design system to
 look as before; a `div` given a role is not (Alex, 2026-09-24).
@@ -2369,7 +2370,7 @@ per-module `use-feature-flag.ts` copies · `UiSession.featureFlag` / `isFeatureE
 This document names the target. **Landed 2026-09-18:** the tree rename
 (`modules/*/process`, `*/browser`, `*/browser-kit`; package names
 `*-process`/`*-browser`/`*-browser-kit`), `@langwatch/process-stores`,
-`@langwatch/browser-host` (+drawer), `@langwatch/browser-trpc`, plan-gate
+`@langwatch/browser-host` (+drawer), plan-gate
 dissolved into `entitlement-contract`, and `.withStores(stores)` on the
 chain. New code uses the left column only.
 

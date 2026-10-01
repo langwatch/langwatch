@@ -1,9 +1,12 @@
-import { api } from "@langwatch/browser-trpc/workflow-api";
+import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import {
+  type featureFlagTrpc,
   type FeatureFlagTargetId,
   type FrontendFeatureFlag,
   NOT_TARGETED,
 } from "@langwatch/feature-flag-contract";
+
+const api = createModuleApi<ContractApiMap<typeof featureFlagTrpc>>();
 
 // The service caches operator rows for five seconds. Refetching every mounted
 // hook at that cadence adds traffic without making a decision fresher, so the

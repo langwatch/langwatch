@@ -10,6 +10,11 @@ import {
   type RouterFromMap,
   trpcQueryKey,
 } from "@langwatch/api/web";
+import type {
+  CacheDeclaringContract,
+  UiQueryVersions,
+  UiVersionedReads,
+} from "@langwatch/browser-host/cache-tiers";
 import { hashKey, type QueryClient } from "@tanstack/react-query";
 import {
   createTRPCClient,
@@ -24,7 +29,6 @@ import type { AnyRouter } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import type { ComponentType, ReactNode } from "react";
 
-import type { CacheDeclaringContract, UiQueryVersions, UiVersionedReads } from "./cache-tiers.ts";
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./sse-subscription-link";
 import { logTrpcOperation } from "./trpc-request-log";
 

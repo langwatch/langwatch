@@ -1,5 +1,4 @@
 import { UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import type { UiFeatureApiTransport } from "@langwatch/browser-host/transport";
 import { createUiApplication, type UiApplicationInstall } from "@langwatch/ui-kernel/application";
 import {
   type UiFeatureInstall,
@@ -7,6 +6,7 @@ import {
   type UiPageLoaderRegistry,
 } from "@langwatch/ui-kernel/feature-install";
 import type { UiPublicTelemetry } from "@langwatch/ui-kernel/inner-providers";
+import type { UiFeatureApiTransport } from "@langwatch/ui-kernel/transport";
 import { render } from "@testing-library/react";
 import type { ComponentType, ReactNode } from "react";
 import { Outlet } from "react-router";

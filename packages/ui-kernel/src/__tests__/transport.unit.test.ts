@@ -1,9 +1,9 @@
 import { trpcQueryKey } from "@langwatch/api/web";
+import { isUiBatchRequest, uiBatchResponse } from "@langwatch/browser-host/testing";
 import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import { isUiBatchRequest, uiBatchResponse } from "../testing";
-import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../transport";
+import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../transport.ts";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";

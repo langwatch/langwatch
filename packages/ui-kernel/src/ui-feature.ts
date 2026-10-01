@@ -12,15 +12,15 @@ import type {
 } from "@langwatch/browser-host/capabilities";
 import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import type { SessionVersionWatch } from "@langwatch/browser-host/session-version";
-import type {
-  UiFeatureApiBinding,
-  UiFeatureApiProvider,
-  UiFeatureApiTransport,
-} from "@langwatch/browser-host/transport";
 import type { QueryClient } from "@tanstack/react-query";
 import type { ComponentType, ReactNode } from "react";
 import type { RouteObject } from "react-router";
 
+import type {
+  UiFeatureApiBinding,
+  UiFeatureApiProvider,
+  UiFeatureApiTransport,
+} from "./transport.ts";
 import type { UiModuleHostMount } from "./ui-host-mounts.ts";
 import type { UiPageLoaderRegistry } from "./ui-page-loaders.ts";
 import type { UiWebRouteParent } from "./ui-web-installation.ts";

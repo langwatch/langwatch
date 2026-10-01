@@ -4,6 +4,7 @@
  * screen asks ports instead. Missing ports refuse loudly, never silently.
  */
 
+import type { ModuleApiClient, ModuleApiMap } from "@langwatch/api/web";
 import { createContext, useContext } from "react";
 
 import type { UiAnalytics } from "./analytics.ts";
@@ -12,7 +13,6 @@ import { NO_UI_DECLARATIONS, type UiDeclarations } from "./declarations.ts";
 import { UiScope, type UiActiveScope } from "./scope.ts";
 import type { UiSessionSnapshot } from "./session.ts";
 import type { UiSlots } from "./slots.tsx";
-import type { UiFeatureApiTransport } from "./transport.ts";
 
 /** Scope is a capability of its own; this file stays the one ports barrel. */
 export { UiScope, type UiActiveScope };
@@ -478,7 +478,7 @@ export type UiSessionCapabilities = {
  * the reader navigates and the reads land.
  */
 export type UiSessionSource = (input: {
-  transport: UiFeatureApiTransport;
+  transport: ModuleApiClient<ModuleApiMap>;
   /** Where a refused session read is told, since nobody else sees it. */
   feedback: UiFeedback;
 }) => UiSessionCapabilities;

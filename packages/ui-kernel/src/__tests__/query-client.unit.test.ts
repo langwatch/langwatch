@@ -1,9 +1,9 @@
+import type { UiFailureNotice, UiSuccessNotice } from "@langwatch/browser-host/capabilities";
+import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
+import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { UiFailureNotice, UiSuccessNotice } from "../capabilities.ts";
 import { createUiQueryClient } from "../query-client.ts";
-import { shouldRetryQuery } from "../query-retry.ts";
-import { setUiFeedbackHost } from "../toaster.ts";
 
 function recordingHost() {
   const failed: UiFailureNotice[] = [];

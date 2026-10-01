@@ -108,8 +108,10 @@ describe("given package-boundaries", () => {
     });
 
     /** @scenario "A browser kit that fetches is reported as kitFetches" */
-    it("reports kitFetches for the tRPC client", () => {
-      expect(ids(KIT, 'import { client } from "@langwatch/browser-trpc";')).toEqual(["kitFetches"]);
+    it("reports kitFetches for the browser wire", () => {
+      expect(
+        ids(KIT, 'import { createUiFeatureApiClient } from "@langwatch/ui-kernel/transport";'),
+      ).toEqual(["kitFetches"]);
     });
   });
 

@@ -1,5 +1,6 @@
+import type { ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import { uiBatchResponse } from "@langwatch/browser-host/testing";
-import { createUiFeatureApiClient } from "@langwatch/browser-host/transport";
+import { createTRPCClient, getUntypedClient, httpBatchStreamLink } from "@trpc/client";
 
 import type { UiFeatureApiTransport } from "../ui-session-queries";
 
@@ -40,5 +41,9 @@ export function answeringTransport(answer: ProcedureAnswer): UiFeatureApiTranspo
       headers: { "content-type": "application/json" },
     });
   };
-  return createUiFeatureApiClient({ url: TEST_ENDPOINT, fetch });
+  return getUntypedClient(
+    createTRPCClient<RouterFromMap<ModuleApiMap>>({
+      links: [httpBatchStreamLink({ url: TEST_ENDPOINT, fetch })],
+    }),
+  );
 }

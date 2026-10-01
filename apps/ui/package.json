@@ -39,7 +39,6 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/automation-browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
-    "@langwatch/browser-trpc": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/data-privacy-browser": "workspace:*",
     "@langwatch/data-retention-browser": "workspace:*",

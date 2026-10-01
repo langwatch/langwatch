@@ -1,8 +1,12 @@
+import { isUiBatchRequest, uiBatchResponse } from "@langwatch/browser-host/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link";
-import { isUiBatchRequest, uiBatchResponse } from "../testing";
-import { createUiFeatureApiClient, UI_SSE_ENDPOINT_PREFIX, UI_TRPC_ENDPOINT } from "../transport";
+import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link.ts";
+import {
+  createUiFeatureApiClient,
+  UI_SSE_ENDPOINT_PREFIX,
+  UI_TRPC_ENDPOINT,
+} from "../transport.ts";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";

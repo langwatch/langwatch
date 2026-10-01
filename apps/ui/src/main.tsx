@@ -16,11 +16,6 @@ import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
-import {
-  createUiFeatureApiClient,
-  type UiFeatureApiBinding,
-  type UiFeatureApiTransport,
-} from "@langwatch/browser-host/transport";
 import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
 import { createUi } from "@langwatch/ui-kernel";
@@ -39,6 +34,11 @@ import { UiPageFailure } from "@langwatch/ui-kernel/page-fallbacks";
 import { readPublicAppConfig } from "@langwatch/ui-kernel/public-config";
 import { UiRuntime } from "@langwatch/ui-kernel/runtime";
 import { UiShell } from "@langwatch/ui-kernel/shell";
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "@langwatch/ui-kernel/transport";
 import posthog from "posthog-js";
 import type { ReactNode } from "react";
 import type { FallbackProps } from "react-error-boundary";

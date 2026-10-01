@@ -10,7 +10,7 @@ import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { BrowserUiRpc, type UiRpcTransport } from "../browser-rpc";
+import { BrowserUiRpc, type UiRpcTransport } from "../browser-rpc.ts";
 
 const PROCEDURE = "organization.getAll";
 const INPUT = { isDemo: false };

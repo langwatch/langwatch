@@ -5,9 +5,13 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
+import {
+  UiRpc,
+  type UiRpcSubscription,
+  type UiRpcSubscriptionHandlers,
+} from "@langwatch/browser-host/capabilities";
 import type { QueryClient } from "@tanstack/react-query";
 
-import { UiRpc, type UiRpcSubscription, type UiRpcSubscriptionHandlers } from "./capabilities";
 import type { UiFeatureApiTransport } from "./transport";
 
 /** The three lanes this dispatcher uses, so a caller hands the narrowest thing. */

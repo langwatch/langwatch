@@ -1,7 +1,7 @@
+import { uiBatchResponse } from "@langwatch/browser-host/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { uiBatchResponse } from "../testing";
-import { createUiFeatureApiClient } from "../transport";
+import { createUiFeatureApiClient } from "../transport.ts";
 
 const SECRET_INPUT = {
   headers: { Authorization: "Bearer sk-header-secret" },

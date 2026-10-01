@@ -2,11 +2,6 @@ import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/c
 import type { UiQueryStore } from "@langwatch/browser-host/query-persistence";
 import { SessionVersionWatch } from "@langwatch/browser-host/session-version";
 import {
-  createUiFeatureApiClient,
-  type UiFeatureApiBinding,
-  type UiFeatureApiTransport,
-} from "@langwatch/browser-host/transport";
-import {
   createUiScopeHost,
   useOrganizationTeamProject,
 } from "@langwatch/browser-host/use-organization-team-project";
@@ -21,6 +16,11 @@ import { createContext, useContext, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import {
+  createUiFeatureApiClient,
+  type UiFeatureApiBinding,
+  type UiFeatureApiTransport,
+} from "../transport.ts";
 import { createUiFeatureShell } from "../ui-feature-shell.tsx";
 import type { UiProviderShell } from "../ui-outer-providers.tsx";
 

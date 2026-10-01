@@ -21,6 +21,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
       "path": "../browser-host/tsconfig.build.json"
     },
     {

@@ -31,9 +31,6 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/browser-trpc/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/vitest-config/tsconfig.build.json"
     }
   ]

@@ -10,7 +10,7 @@ import { defineRule } from "../define-rule.mjs";
 const APPLICATION = /^apps\/[^/]+\//;
 const NODE_RUNTIME = /^node:/;
 const BROWSER_RUNTIME =
-  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|browser-trpc|design-system|ui-kernel)(?:\/|$))/;
+  /^(?:react|react-dom|@chakra-ui\/|@langwatch\/(?:browser-host|design-system|ui-kernel)(?:\/|$))/;
 const SERVER_RUNTIME =
   /^(?:hono|@trpc\/server|@langwatch\/(?:eventing|group-queue|process-server|process-stores)(?:\/|$))/;
 /** apps/tasks' pre-serve migration steps: its `*migrat*` files and the two LangWatchQL steps. */
@@ -19,7 +19,7 @@ const MIGRATION_RUNNER =
 /** The scenario child program and the one scenario-process subpath it may take. */
 const SCENARIO_CHILD_PROGRAM = "apps/scenario-child/src/main.ts";
 const SCENARIO_CHILD_SUBPATH = "./scenario-child";
-const KIT_FETCH = /^@langwatch\/browser-trpc(?:\/|$)/;
+const KIT_FETCH = /^@langwatch\/ui-kernel(?:\/|$)/;
 const SCHEMA_BINDING = new Set(["@hono/zod-validator", "hono-openapi/zod"]);
 const BROWSER_ROLES = new Set(["browser", "browser-kit"]);
 

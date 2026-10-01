@@ -3,6 +3,7 @@ import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import { lintApplicationBoundaries } from "./boundaries/application-boundaries.ts";
 import { lintArchitectureRecords } from "./boundaries/architecture-records.ts";
 import { lintCycles } from "./boundaries/cycles.ts";
+import { lintFrameworkModuleContracts } from "./boundaries/framework-module-contracts.ts";
 import { lintManifests } from "./boundaries/manifests.ts";
 import { lintPeerCycles } from "./boundaries/peer-cycles.ts";
 import { lintPlatformOperatorCalls } from "./boundaries/platform-operator-calls.ts";
@@ -194,6 +195,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "platform-operator-calls",
     spec: "specs/tooling/lint-platform-operator-calls.feature",
     run: lintPlatformOperatorCalls,
+  }),
+  definePolicy({
+    id: "framework-module-contracts",
+    spec: "specs/framework-module-contracts.feature",
+    run: lintFrameworkModuleContracts,
   }),
   definePolicy({
     id: "eventing-table-access",

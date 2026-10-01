@@ -127,6 +127,22 @@
       "types": "./dist/ui-module-apis.d.ts",
       "default": "./src/ui-module-apis.ts"
     },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "default": "./src/transport.ts"
+    },
+    "./browser-rpc": {
+      "types": "./dist/browser-rpc.d.ts",
+      "default": "./src/browser-rpc.ts"
+    },
+    "./query-client": {
+      "types": "./dist/query-client.d.ts",
+      "default": "./src/query-client.ts"
+    },
+    "./sse-subscription-link": {
+      "types": "./dist/sse-subscription-link.d.ts",
+      "default": "./src/sse-subscription-link.ts"
+    },
     "./module-hosts": {
       "types": "./dist/ui-host-mounts.d.ts",
       "default": "./src/ui-host-mounts.ts"
@@ -138,10 +154,13 @@
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
+    "@langwatch/api": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
     "lucide-react": "catalog:",
     "nprogress": "^0.2.0",
     "posthog-js": "catalog:",

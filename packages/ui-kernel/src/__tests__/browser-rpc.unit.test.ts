@@ -13,8 +13,8 @@ import { createTRPCUntypedClient } from "@trpc/client";
 import { observable } from "@trpc/server/observable";
 import { describe, expect, it } from "vitest";
 
-import { BrowserUiRpc } from "../browser-rpc";
-import type { UiFeatureApiTransport } from "../transport";
+import { BrowserUiRpc } from "../browser-rpc.ts";
+import type { UiFeatureApiTransport } from "../transport.ts";
 
 type SentOperation = { type: string; path: string; input: unknown };
 
