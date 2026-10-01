@@ -39,12 +39,14 @@ function seatReachesPage({
   pathname,
   organizationRole,
 }: {
-  pathname: string;
+  pathname: string | undefined;
   organizationRole: Parameters<
     typeof seatReachesProduct
   >[0]["organizationRole"];
 }): boolean {
-  const productId = productFromPathname(pathname);
+  // A page the router cannot place belongs to no product; the permission
+  // gate alone decides it.
+  const productId = pathname ? productFromPathname(pathname) : null;
   if (!productId) return true;
   return seatReachesProduct({
     product: productById(productId),
