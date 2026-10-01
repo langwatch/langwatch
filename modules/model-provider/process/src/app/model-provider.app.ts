@@ -192,6 +192,8 @@ export type ModelProviderBuildConfig = Readonly<{
   executionProxyBaseUrl: string;
   /** A system provider's fallback-credential env map. Always empty: see the handoff. */
   environment: Readonly<Record<string, string | undefined>>;
+  /** Per provider, the API root the credential probe uses in place of the vendor's own. */
+  probeBaseUrls: Readonly<Record<string, string | undefined>>;
   /** Hosted-deployment flag. OUT OF SCOPE (config-schema-nuke-batch-c handoff): hardcoded false. */
   isSaas: boolean;
 }>;
@@ -281,6 +283,7 @@ export class ModelProviderApp implements ModelProviderApi {
       },
       executionProxyBaseUrl,
       environment: {},
+      probeBaseUrls: config.probeBaseUrls,
       isSaas: false,
     };
     const infrastructure = buildModelProviderInfrastructure({

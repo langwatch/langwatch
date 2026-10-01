@@ -70,6 +70,7 @@ export function buildModelProviderInfrastructure(input: {
   const probe = HttpModelProviderCredentialProbeService.create({
     egress,
     environment: config.environment,
+    deployedBaseUrls: config.probeBaseUrls,
   });
 
   return {
