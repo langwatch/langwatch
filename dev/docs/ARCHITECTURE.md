@@ -1787,6 +1787,8 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **A session or reference read revalidates by a content ETag** (Alex, 2026-09-30): the tRPC host hashes an unbatched GET's 200 body into `"<userId>.<sha256>"` with `Cache-Control: private, no-cache` and `Vary: Cookie`, and answers a matching `If-None-Match` with a bodyless 304; no read opts in and no write bumps for it. ADR-164.
 
+**A versioned read answers `unchanged`** (Alex, 2026-10-01): a read declared `cache: { …, versioned: true }` takes an optional `since`; the tRPC host hashes the handler's answer with the same content hash and returns `{ unchanged: true }` when it matches, else `{ version, data }`. The handler never sees `since`; no write bumps anything. `organization.getScopeGraph` is the first. Contracts may also declare `invalidatedBy: [EVENT_TYPE]` to drive hints (approved, not yet built).
+
 A surface too wide for a typed hook calls a procedure by PATH through the
 shell's `UiRpc`, and the answer is published under the key the typed hook
 would have written, so the two never hold two versions of one read. **A
