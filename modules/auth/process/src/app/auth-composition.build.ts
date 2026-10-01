@@ -88,7 +88,9 @@ export class PrismaBetterAuthStorage extends BetterAuthStorage {
   }
 
   adapter(): unknown {
-    const engine = prismaAdapter(this.database, { provider: "postgresql" });
+    // The SSO plugin refuses every callback when a `resolveUser` is set and the
+    // adapter has no native transactions.
+    const engine = prismaAdapter(this.database, { provider: "postgresql", transaction: true });
     const cipher = this.providerConfig;
     return (options: BetterAuthOptions) =>
       openingSsoProviderConfigs({ adapter: engine(options), cipher });
