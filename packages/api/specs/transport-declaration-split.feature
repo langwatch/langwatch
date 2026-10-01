@@ -42,6 +42,13 @@ Feature: Transport declaration split
     And a handler that returns a value for a procedure declared without output does not compile
     And a handler whose return the output schema refuses does not compile
 
+  @unit @typecheck
+  Scenario: A query declared without an output is refused at build
+    Given a contract that declares a query with an input and no output
+    When the contract is built
+    Then the build throws naming the query, and the builder offers no build step before withOutput
+    And a write or a stream may still be declared without an output
+
   @unit
   Scenario: A tRPC call runs one execution path
     Given a mounted contract procedure with a permission
@@ -74,12 +81,12 @@ Feature: Transport declaration split
     And the feature's server and contract value-import no runtime
 
   @unit
-  Scenario: An output the declaration refuses is diagnosed without leaking the response
-    Given a procedure whose handler answers a shape its output schema refuses
-    When the process asks for outputs to be checked
+  Scenario: A procedure whose answer breaks its output schema refuses rather than answering
+    Given a procedure or a REST route whose handler answers a shape its output schema refuses
+    When the caller asks for it
     Then the failure is logged with the procedure name, the issue path and request metadata
     And the log carries no response contents
-    And the caller still receives the handler's answer
+    And the caller receives an internal error and never the handler's answer
 
   @unit @typecheck
   Scenario: The browser derives its client from the contract

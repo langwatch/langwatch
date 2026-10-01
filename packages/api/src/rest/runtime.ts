@@ -1810,7 +1810,9 @@ function respond({
       "REST handler response did not match its declared output schema",
     );
 
-    return context.json(result as never, route.status ?? 200);
+    throw new Error(
+      `REST ${context.req.method} ${context.req.path} answered a value its declared output schema refuses`,
+    );
   }
 
   // Reachable only for a `z.void()` output: a route that declared no answer
@@ -2006,10 +2008,6 @@ function respondDeclared({
 
   if (status === 204 || status === 304) return context.body(null, status);
 
-  // The declared status IS the answer, whatever its class, so the request
-  // record reads as one rather than as a server fault.
-  context.set(DECLARED_ANSWER, true);
-
   if (!validation.success) {
     outputLogger.error(
       {
@@ -2022,8 +2020,14 @@ function respondDeclared({
       "REST handler response did not match the answer its declaration named",
     );
 
-    return context.json(answer.body as never, status as ContentfulStatusCode);
+    throw new Error(
+      `REST ${route.operation} answered a body its declared ${String(status)} schema refuses`,
+    );
   }
+
+  // The declared status IS the answer, whatever its class, so the request
+  // record reads as one rather than as a server fault.
+  context.set(DECLARED_ANSWER, true);
 
   return context.json(validation.data as never, status as ContentfulStatusCode);
 }
