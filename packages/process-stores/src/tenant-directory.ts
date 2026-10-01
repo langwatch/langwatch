@@ -4,6 +4,7 @@
  * tier). A wrong route is a data-leak bug, not a slow query, so refuse.
  */
 import { PLATFORM_TENANT, type TenantDirectory } from "@langwatch/clickhouse-client";
+import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 
 export type { TenantDirectory };
 
@@ -24,12 +25,13 @@ export type TenantDirectoryRows = {
 /**
  * The three reads that place a tenant: a project by its team's organization,
  * an organization by itself, and a user nowhere in particular - they can be
- * in several organizations, and picking one would misplace their history.
+ * in several organizations. A scheduled singleton belongs to none: shared.
  */
 export function prismaTenantDirectory(prisma: TenantDirectoryRows): TenantDirectory {
   return {
     async organizationForTenant(tenantId: string): Promise<string | null> {
       if (tenantId === "") return null;
+      if (tenantId === SCHEDULED_SINGLETON_PROJECT_ID) return PLATFORM_TENANT;
 
       const project = await prisma.project.findUnique({
         where: { id: tenantId },

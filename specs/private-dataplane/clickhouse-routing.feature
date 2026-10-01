@@ -221,3 +221,10 @@ Feature: Private ClickHouse Routing
     When the routed client is resolved for that user as the tenant
     Then it answers the shared ClickHouse
     And their organization's private instance is not consulted
+
+  @integration
+  Scenario: A scheduled singleton is a tenant in its own right
+    Given the pseudo-tenant a scheduled process manager's single instance runs under
+    When the routed client is resolved for that tenant
+    Then it answers the shared ClickHouse
+    And no project, organization or user is looked up to get there

@@ -4,6 +4,7 @@
  * organization a tenant routes by, for all three kinds of tenant.
  */
 import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";
+import { SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 
 import { prismaTenantDirectory, type TenantDirectoryRows } from "../tenant-directory.ts";
@@ -77,6 +78,18 @@ describe("the tenant directory", () => {
 
       await expect(directory.organizationForTenant("user-1")).resolves.toBe(PLATFORM_TENANT);
       expect(asked).not.toContain("organization:org-private");
+    });
+  });
+
+  describe("given the scheduled singleton's pseudo-tenant", () => {
+    /** @scenario "A scheduled singleton is a tenant in its own right" */
+    it("answers the platform tenant without looking anything up", async () => {
+      const { asked, directory } = directoryOver({});
+
+      await expect(directory.organizationForTenant(SCHEDULED_SINGLETON_PROJECT_ID)).resolves.toBe(
+        PLATFORM_TENANT,
+      );
+      expect(asked).toEqual([]);
     });
   });
 
