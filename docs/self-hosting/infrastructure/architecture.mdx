@@ -3,7 +3,7 @@ title: Architecture & Infrastructure
 description: "How LangWatch components fit together, what you're deploying and how data flows through the system"
 ---
 
-A self-hosted LangWatch deployment runs the app, the workers, PostgreSQL, Redis, ClickHouse with S3 storage, and the NLP and evaluation services, connected by an event-sourcing pipeline.
+A self-hosted LangWatch deployment runs the app, the workers, the AI Gateway, the Langy agent, PostgreSQL, Redis, ClickHouse with S3 storage, and the NLP and evaluation services, connected by an event-sourcing pipeline. The `langwatch` Helm chart deploys all of them; the AI Gateway and the Langy agent come from its `gateway` and `langyagent` subcharts.
 
 ## System Overview
 
@@ -32,6 +32,8 @@ architecture-beta
 
     service nlp(server)[LangWatch NLP] in platform
     service langevals(server)[LangEvals] in platform
+    service gateway(server)[AI Gateway] in platform
+    service langy(server)[Langy Agent] in platform
 
     service llmProviders(cloud)[External LLMs]
     service notify(internet)[Slack Email Webhooks]
@@ -44,6 +46,9 @@ architecture-beta
     evalPipe:B --> T:langevals
     langevals:R --> L:llmProviders
     nlp:R --> L:llmProviders
+    gateway:R --> L:llmProviders
+    app:L --> R:langy
+    langy:B --> T:gateway
     reactionPipe:B --> T:notify
     clickhouse:R --> L:s3
 ```
@@ -52,7 +57,7 @@ architecture-beta
 <Card title="API Layer" icon="globe">
 **LangWatch App** (:5560)
 
-Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The only externally-exposed component.
+Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The main externally exposed component; the AI Gateway can have its own ingress.
 </Card>
 <Card title="Processing" icon="microchip">
 **LangWatch Workers**
@@ -62,7 +67,17 @@ Event sourcing pipeline via BullMQ, span ingestion, trace summarisation, cost en
 <Card title="Services" icon="flask">
 **LangWatch NLP** (:5561) and **LangEvals** (:5562)
 
-NLP workflows, topic clustering, built-in evaluators, guardrails. Call external LLMs for model-based operations.
+Workflow execution and built-in evaluators, guardrails. Call external LLMs for model-based operations.
+</Card>
+<Card title="AI Gateway" icon="route">
+**AI Gateway** (:5563)
+
+OpenAI-compatible proxy for virtual keys: routing, fallbacks, budgets, guardrails. Calls the model providers you configure.
+</Card>
+<Card title="Assistant" icon="robot">
+**Langy Agent** (:8080)
+
+Runs the in-product assistant's workers. Internal only, reached by the App and Workers.
 </Card>
 <Card title="Control Plane" icon="database">
 **PostgreSQL**
@@ -85,7 +100,7 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server, the single external entry point for all traffic:
+Next.js server, the external entry point for everything except AI Gateway traffic:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -103,11 +118,12 @@ Same `langwatch/langwatch` image, started with `pnpm start:workers`. Consumes jo
 
 ### LangWatch NLP (port 5561)
 
-Python service for:
+A Go binary (`nlpgo`, image `langwatch/langwatch_nlp`) for:
 
-- Workflow execution
-- Topic clustering algorithms
-- Custom evaluator execution
+- Optimization Studio workflow execution, synchronous and streamed
+- The prompt playground's model calls, proxied to the configured provider
+
+Topic clustering is not in this service: the Workers schedule it and send the clustering batches to LangEvals.
 
 ### LangEvals (port 5562)
 
@@ -120,6 +136,22 @@ Built-in evaluator library (Python):
 - Format (exact match, BLEU, ROUGE, semantic similarity)
 
 Both NLP and LangEvals make outbound calls to external LLM providers for model-based operations.
+
+### AI Gateway (port 5563)
+
+A Go service (image `langwatch/ai-gateway`, subchart `gateway`) that terminates virtual-key traffic and forwards it to the model providers configured in LangWatch. It reads each key's configuration (providers, budgets, guardrails, routing) from the App over the cluster network and reports usage back to it.
+
+- Your LLM clients, coding agents and the Langy agent call it with a virtual key
+- It needs its own externally reachable hostname (`gateway.ingress.host`, `gateway.publicUrl`) when clients outside the cluster use it
+- `gateway.chartManaged: false` removes it
+
+### Langy Agent (port 8080, Service port 80)
+
+The worker manager behind the in-product assistant (image `langwatch/langyagent`, subchart `langyagent`). The App and Workers reach it over cluster DNS; it has no ingress. Each conversation runs in a worker with its own UID and credentials, and its model calls go through the AI Gateway.
+
+- On by default (`langyagent.chartManaged: true`); `false` removes the pod and every reference to it
+- Runs on the node's normal container runtime by default; a sandboxed RuntimeClass (gVisor, Kata) is opt-in, see [Langy setup](/self-hosting/langy/setup)
+- Its NetworkPolicy denies internet egress unless you turn it on, see [Langy networking and egress](/self-hosting/langy/networking-and-egress)
 
 ### PostgreSQL: Control Plane
 
@@ -256,14 +288,11 @@ sequenceDiagram
     LW->>Browser: Real-time update
 ```
 
-Additionally, Kubernetes CronJobs trigger periodic tasks via HTTP on the App:
-- **Topic clustering**: daily at midnight, via the NLP service
-- **Alert triggers**: every 3 minutes, evaluates monitor conditions
-- **Retention cleanup**: daily at 01:00, removes data past retention period
+Periodic work (topic clustering, alert triggers, webhook delivery log pruning) is scheduled on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
 
 ## Network Topology
 
-Only the App is exposed externally. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway subchart renders its own Ingress by default (`gateway.ingress.enabled`), which serves clients outside the cluster once an Ingress controller routes `gateway.ingress.host` to it. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
@@ -271,12 +300,14 @@ Only the App is exposed externally. Everything else is cluster-internal:
 | Workers | None (no Service needed) | No |
 | NLP | ClusterIP | No |
 | LangEvals | ClusterIP | No |
+| AI Gateway | ClusterIP, plus its own Ingress | Optional, for clients outside the cluster |
+| Langy Agent | ClusterIP | No |
 | PostgreSQL | ClusterIP | No |
 | ClickHouse | ClusterIP | No |
 | Redis | ClusterIP | No |
 
 <Note>
-LangEvals and NLP make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure these pods have network egress to the relevant endpoints.
+LangEvals, NLP and the AI Gateway make outbound calls to external LLM providers (OpenAI, Azure, etc.). Ensure these pods have network egress to the relevant endpoints. For the full list of outbound hosts, see [Data and telemetry](/self-hosting/data-and-telemetry#every-outbound-connection).
 </Note>
 
 ### Connected agents
@@ -299,8 +330,10 @@ Without Redis, a mismatch fails in one of two ways. If `app.replicaCount` is abo
 | Image | Port | Purpose |
 |-------|------|---------|
 | `langwatch/langwatch` | 5560 | App + Workers (same image, different entrypoint) |
-| `langwatch/langwatch_nlp` | 5561 | NLP, workflows, topic clustering |
+| `langwatch/langwatch_nlp` | 5561 | NLP engine (Go): workflows, playground proxy |
 | `langwatch/langevals` | 5562 | Evaluators, guardrails |
+| `langwatch/ai-gateway` | 5563 | AI Gateway |
+| `langwatch/langyagent` | 8080 | Langy assistant agent |
 
 ## OpenTelemetry Integration
 
@@ -330,6 +363,6 @@ LangWatch manages the control plane in a dedicated, single-tenant environment. E
 
 ### Hybrid (Bring Your Own Storage)
 
-LangWatch manages compute (App, Workers, NLP, LangEvals). You bring your own ClickHouse + S3 in your VPC.
+LangWatch manages compute (App, Workers, NLP, LangEvals, AI Gateway). You bring your own ClickHouse + S3 in your VPC.
 
 For Cloud Enterprise or Hybrid, [contact the LangWatch team](https://langwatch.ai/get-a-demo).

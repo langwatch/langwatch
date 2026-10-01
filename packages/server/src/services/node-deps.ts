@@ -59,7 +59,7 @@ export function workspaceInstallArgs(
 export async function ensureLangwatchDeps(
 	ctx: { paths: LangwatchPaths },
 	bus: EventBus,
-): Promise<void> {
+): Promise<string> {
 	const langwatchDir = locateLangwatchDir();
 	if (!langwatchDir) throw new Error("langwatch app dir not found");
 
@@ -128,7 +128,7 @@ export async function ensureLangwatchDeps(
 		prismaClientGenerated(rootNodeModules, nodeModulesPath) &&
 		distAlreadyBuilt
 	) {
-		return;
+		return langwatchDir;
 	}
 
 	bus.emit({ type: "starting", service: "prepare:langwatch" as never });
@@ -292,6 +292,7 @@ export async function ensureLangwatchDeps(
 		service: "prepare:langwatch" as never,
 		durationMs: Date.now() - start,
 	});
+	return langwatchDir;
 }
 
 /**

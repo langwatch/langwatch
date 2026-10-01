@@ -250,7 +250,7 @@ In-cluster datastores satisfy read-only-root policies, but managed databases (th
 LangWatch includes a built-in PII redaction pipeline step that automatically detects and masks personally identifiable information in traces before storage.
 
 - **Enabled by default** in the Helm chart
-- Disable with `app.features.disablePiiRedaction: true` (not recommended)
+- `app.features.disableStrictPiiRedaction: true` skips only the strict pass (the Presidio analysis service). Secrets and essential PII redaction still run (not recommended)
 - Runs as part of the event sourcing pipeline in workers
 
 ## Multitenancy

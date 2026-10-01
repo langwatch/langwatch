@@ -22,9 +22,11 @@ The one boundary to understand before you rely on this in a regulated environmen
 
 ## Why egress is L7, not iptables
 
-The pod runs under gVisor. gVisor's user-space kernel implements no netfilter, so `iptables` and `nftables` fail in every mode. Any egress control based on iptables (REDIRECT, OWNER-match DROP, NAT) is off the table.
+By default the pod runs on the node's normal container runtime (`runtimeClassName: ""`). gVisor, or another sandboxed RuntimeClass, is an opt-in hardening step, see [Setup](/self-hosting/langy/setup#hardening-a-sandboxed-runtime).
 
-That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. See [The sandbox](/langy/security/sandbox).
+Egress control has to work on both runtimes. gVisor's network stack supports only part of `iptables` and `nftables`, so Langy does not rely on iptables-based controls (REDIRECT, OWNER-match DROP, NAT).
+
+That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy inside the manager, rather than in kernel firewall rules. The same controls apply whether or not you enable the sandbox. See [The sandbox](/langy/security/sandbox).
 
 ## What the agent needs to reach
 
