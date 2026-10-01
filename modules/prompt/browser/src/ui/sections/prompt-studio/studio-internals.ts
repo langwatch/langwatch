@@ -1,7 +1,7 @@
 /**
- * What the studio's own modules compose each other through, kept apart from
- * `index.ts` so the PUBLIC entry stays four names. A host reaching only the
- * port would otherwise pull heavy modules into its own (stricter) compile.
+ * What the studio's own modules compose each other through. The package's
+ * public entry is `prompt.web.ts` alone; nothing outside the studio imports
+ * this file.
  */
 
 export { PromptBrowserTab, type PromptBrowserTabProps } from "./prompt-browser-tab.tsx";

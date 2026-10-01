@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
-import { PromptScope } from "@langwatch/workflow-contract";
+import { PromptScope } from "@langwatch/prompt-contract";
 import { Building, Check, ChevronDown, Users } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";

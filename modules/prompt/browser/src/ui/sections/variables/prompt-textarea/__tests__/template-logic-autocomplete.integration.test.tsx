@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AvailableSource } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
-import { PromptTextAreaWithVariables } from "../index.ts";
+import { PromptTextAreaWithVariables } from "../prompt-textarea-with-variables.tsx";
 
 // Mock rich-textarea since jsdom doesn't support getBoundingClientRect properly
 vi.mock("rich-textarea", () => ({

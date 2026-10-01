@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getDisplayHandle, getPromptFolder, NEW_PROMPT_TITLE } from "../index.ts";
+import { getDisplayHandle, getPromptFolder, NEW_PROMPT_TITLE } from "../prompt-handle.ts";
 
 describe("getDisplayHandle", () => {
   describe("given a handle with a folder prefix", () => {
