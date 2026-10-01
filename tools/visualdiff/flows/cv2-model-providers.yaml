@@ -16,11 +16,11 @@ flows:
       - action: click
         with:
           selector: '[role="menuitem"]'
-          hasText: /^\s*Groq\s*$/
+          hasText: /^\s*ElevenLabs\s*$/
       - action: fill
         with:
           selector: 'input[type="password"]'
-          value: "gsk-vd-cv2-{uid}"
+          value: "elk-vd-cv2-{uid}"
       - action: click
         with:
           selector: button
@@ -51,18 +51,18 @@ flows:
           path: /settings/model-providers
       - action: expect
         with:
-          count: 'tr:has-text("Groq")'
+          count: 'tr:has-text("ElevenLabs")'
           min: "1"
           timeout: "20000"
       - action: expect
         with:
           api: /api/model-providers
-          field: groq.models
+          field: elevenlabs.models
           contains: "vd-cv2-model-{uid}"
           timeout: "20000"
       - action: click
         with:
-          selector: 'tr:has-text("Groq") button'
+          selector: 'tr:has-text("ElevenLabs") button'
       - action: click
         with:
           selector: '[role="menuitem"]'

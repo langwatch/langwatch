@@ -202,7 +202,7 @@ flows:
           anonymous: "true"
       - action: expect
         with:
-          testId: welcome-back
+          text: Welcome back
           timeout: "20000"
           anonymous: "true"
       - action: expect

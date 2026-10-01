@@ -860,6 +860,7 @@ flows:
 
   - id: dashboard-reorder-dashboards-reads-back
     title: Move a dashboard up in the sidebar and see the order again after a reload
+    isolated: true
     setup:
       - post: /api/dashboards
         body:
@@ -870,7 +871,7 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/analytics/reports
+          path: /{isolatedSlug}/analytics/reports
       - action: expect
         with:
           count: 'xpath=//a[normalize-space()="vd-reorder-first"]/following::a[normalize-space()="vd-reorder-second"]'
@@ -888,7 +889,7 @@ flows:
           equals: "1"
       - action: go
         with:
-          path: /{slug}/analytics/reports
+          path: /{isolatedSlug}/analytics/reports
       - action: expect
         with:
           count: 'xpath=//a[normalize-space()="vd-reorder-second"]/following::a[normalize-space()="vd-reorder-first"]'

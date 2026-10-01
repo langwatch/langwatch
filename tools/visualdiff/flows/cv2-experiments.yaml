@@ -11,17 +11,18 @@ flows:
           name: "vd-cv2-expdel-{uid}"
         as:
           expSlug: slug
+          expName: name
     steps:
       - action: go
         with:
           path: "/{slug}/experiments"
       - action: expect
         with:
-          text: "vd-cv2-expdel-{uid}"
+          text: "{expName}"
           timeout: "20000"
       - action: click
         with:
-          label: "Actions for vd-cv2-expdel-{uid}"
+          label: "Actions for {expName}"
       - action: click
         with:
           selector: '[role="menuitem"]'
@@ -42,7 +43,7 @@ flows:
           path: "/{slug}/experiments"
       - action: expect
         with:
-          text: "vd-cv2-expdel-{uid}"
+          text: "{expName}"
           equals: "0"
       - action: expect
         with:
@@ -57,17 +58,18 @@ flows:
           name: "vd-cv2-expcopy-{uid}"
         as:
           expSlug: slug
+          expName: name
     steps:
       - action: go
         with:
           path: "/{slug}/experiments"
       - action: expect
         with:
-          text: "vd-cv2-expcopy-{uid}"
+          text: "{expName}"
           timeout: "20000"
       - action: click
         with:
-          label: "Actions for vd-cv2-expcopy-{uid}"
+          label: "Actions for {expName}"
       - action: click
         with:
           selector: '[role="menuitem"]'

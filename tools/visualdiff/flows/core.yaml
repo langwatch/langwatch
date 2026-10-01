@@ -211,10 +211,10 @@ flows:
           testId: new-evaluator-button
       - action: click
         with:
-          testId: evaluator-category-expected_answer
+          testId: evaluator-category-quality
       - action: click
         with:
-          testId: evaluator-type-langevals-exact_match
+          testId: evaluator-type-lingua-language_detection
       - action: fill
         with:
           testId: evaluator-name-input

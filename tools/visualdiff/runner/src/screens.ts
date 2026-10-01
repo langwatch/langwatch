@@ -462,9 +462,10 @@ export const captureFlow = async ({
   const project = flowProject({ plan, flow, fixtures });
   const values: Record<string, string> = {
     ...fixtures,
+    uid: uidFor(flow.id),
+    // A flow with a setup names things from the setup's uid, so that one wins.
     ...flowValues({ fixtures, flowId: flow.id }),
     slug: project.slug,
-    uid: uidFor(flow.id),
   };
   const mailUrl = plan.sides.find((candidate) => candidate.name === side.name)?.mailUrl;
   const walk: FlowWalk = { plan, flow, side, collect, project, values, mailUrl, everyStep };

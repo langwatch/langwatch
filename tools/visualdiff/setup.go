@@ -95,7 +95,7 @@ func runSetup(ctx context.Context, request setupRequest, key string, flow Flow) 
 	if request.scimToken != "" {
 		values[FixtureScimToken] = request.scimToken
 	}
-	captured := map[string]string{}
+	captured := map[string]string{flow.ID + "/uid": values["uid"]}
 	for index, step := range flow.Setup {
 		body, err := fillBody(step.Body, values)
 		if err != nil {
