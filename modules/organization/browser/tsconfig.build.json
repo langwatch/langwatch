@@ -6,10 +6,8 @@
   },
   "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
   "files": [
-    "./src/behavior/personal-workspace-features-api.ts",
     "./src/behavior/scope-capability.ts",
     "./src/behavior/ui-organization-facts.ts",
-    "./src/department-picker.ts",
     "./src/organization.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],

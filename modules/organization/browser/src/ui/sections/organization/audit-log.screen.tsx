@@ -58,9 +58,6 @@ import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-foo
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
 
-/** The grant the plan read is gated on, matching what every plan reader asks. */
-const ORGANIZATION_VIEW_PERMISSION = "organization:view";
-
 function auditLogsView({
   isLoading,
   rowCount,
@@ -92,14 +89,7 @@ export default function AuditLogScreen() {
   );
   const [isExporting, setIsExporting] = useState(false);
 
-  const plan = organizationApi.plan.getActivePlan.useQuery(
-    { organizationId },
-    {
-      enabled: !!organizationId && host.hasPermission(ORGANIZATION_VIEW_PERMISSION),
-      retry: false,
-    },
-  );
-  const isEnterprise = plan.data?.type === "ENTERPRISE";
+  const isEnterprise = host.isEnterprise();
 
   const members = organizationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId, includeDeactivated: false },
@@ -125,7 +115,7 @@ export default function AuditLogScreen() {
 
   const utils = organizationApi.useUtils();
 
-  if (!organizationId || plan.isLoading) {
+  if (!organizationId || host.isPlanLoading()) {
     return <Skeleton width="full" height="200px" />;
   }
 

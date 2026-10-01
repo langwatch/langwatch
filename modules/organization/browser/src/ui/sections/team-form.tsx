@@ -39,10 +39,10 @@ import { ProjectAvatar } from "../elements/project-avatar.tsx";
  * serves a browser-shaped team (no accounting columns) plus its projects.
  */
 type TeamWithProjectsAndMembers = RouterOutputs["team"]["getTeamWithMembers"];
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Select } from "@langwatch/design-system/select";
 
 import { useOrganizationToaster } from "../../behavior/organization-feedback.ts";
-import { HorizontalFormControl } from "../elements/horizontal-form-control.tsx";
 import {
   TeamRoleSelect,
   type TeamUserRoleForm,

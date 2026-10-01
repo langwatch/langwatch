@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router";
 
-import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-organization-facts";
+import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-scope-queries";
 import { uiOrgQueryParamWrites } from "./ui-scope-resolution";
 import { UI_ORG_QUERY_PARAM, useUiRouteReading } from "./ui-scope-route";
 import { rememberUiScopeSelection, useUiScopeMemory } from "./ui-scope-storage";

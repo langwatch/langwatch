@@ -13,8 +13,12 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { useQuery } from "@tanstack/react-query";
 
+import { UI_ORGANIZATIONS_PROCEDURE } from "./ui-scope-queries.ts";
+
+/** Re-exported for the shell's `organizationFacts` declaration readers. */
+export { UI_ORGANIZATIONS_PROCEDURE };
+
 export const UI_ACTIVE_PLAN_PROCEDURE = "plan.getActivePlan";
-export const UI_ORGANIZATIONS_PROCEDURE = "organization.getScopeGraph";
 export const UI_PLATFORM_ADMIN_PROCEDURE = "user.isAdmin";
 
 /** The organization role that reads every settings page and writes none of them. */
