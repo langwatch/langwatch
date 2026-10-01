@@ -3,12 +3,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
-    "paths": {
-      "@langwatch/presence-browser": ["./src/index.ts"]
-    }
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/presence.web.ts"],
+  "files": ["./src/presence.web.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
