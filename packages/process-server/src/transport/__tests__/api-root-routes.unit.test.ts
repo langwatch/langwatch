@@ -9,12 +9,13 @@ import { createServer } from "node:http";
 import { RawHttpHost, WebSocketHost } from "@langwatch/api";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
 import { defineRestRouter } from "@langwatch/api/rest";
-import { moduleApi, transportPeersOf } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { peersWithDoor } from "../../__tests__/support/api-door.ts";
 import { apiSurface, bearerDoor } from "../api-surface.ts";
 
 interface ReceiverApi {
@@ -58,7 +59,7 @@ const surface = apiSurface({
   selection: TransportSelection.create().rest().browserBundle(false),
   sockets: WebSocketHost.create(),
   doors: RawHttpHost.create(),
-})(transportPeersOf(() => ({})));
+})(peersWithDoor({ resolve: () => ({}) }));
 const rest = surface.hosts.rest;
 if (!rest) throw new Error("the surface selected REST");
 rest.mount(rootFamily.router(), () => receiver);

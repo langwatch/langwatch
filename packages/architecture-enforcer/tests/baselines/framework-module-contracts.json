@@ -20,13 +20,6 @@
     "packages/clickhouse-migrations -> @langwatch/data-retention-contract": 1,
     "packages/group-queue -> @langwatch/stored-object-contract": 1,
     "packages/prisma-client -> @langwatch/api-key-contract": 1,
-    "packages/process-server -> @langwatch/api-key-contract": 1,
-    "packages/process-server -> @langwatch/audit-log-contract": 1,
-    "packages/process-server -> @langwatch/auth-contract": 1,
-    "packages/process-server -> @langwatch/authz-contract": 1,
-    "packages/process-server -> @langwatch/entitlement-contract": 1,
-    "packages/process-server -> @langwatch/langy-contract": 1,
-    "packages/process-server -> @langwatch/ops-contract": 1,
-    "packages/process-server -> @langwatch/organization-contract": 1
+    "packages/process-server -> @langwatch/ops-contract": 1
   }
 }

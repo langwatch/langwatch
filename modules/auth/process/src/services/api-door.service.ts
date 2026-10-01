@@ -1,0 +1,237 @@
+import type { Entitlements } from "@langwatch/api/access";
+import type { ApiDoor } from "@langwatch/api/hosting";
+import {
+  recordKeyCredential,
+  recordOrganizationCredential,
+  recordProjectCredential,
+  type RestAuditSink,
+  type RestCaller,
+  type RestIdentity,
+} from "@langwatch/api/rest";
+import type { TrpcAuditSink } from "@langwatch/api/trpc";
+import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import {
+  EnterprisePlanRequiredError,
+  isEnterpriseTier,
+  type EntitlementApi,
+} from "@langwatch/entitlement-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+
+import {
+  ApiRestCredentialsService,
+  type ApiRestCredentialPeers,
+  type ApiKeyDoorCredential,
+  type ApiOrganizationCredential,
+  type ApiProjectCredential,
+} from "./api-rest-credentials.service.ts";
+import { BrowserSessionVerificationService } from "./browser-session-verification.service.ts";
+
+export type ApiDoorPeers = Readonly<{
+  sessions: Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
+  apiKeys: ApiRestCredentialPeers["apiKeys"];
+  /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
+  authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"];
+  organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
+  entitlements: Pick<EntitlementApi, "getActivePlan">;
+  auditLog: Pick<AuditLogApi, "record">;
+}>;
+
+/** The API door auth binds for the process: who is calling, and what they may do (record §8). */
+export class ApiDoorService {
+  static create(peers: ApiDoorPeers): ApiDoorService {
+    return new ApiDoorService(peers);
+  }
+
+  readonly #peers: ApiDoorPeers;
+  readonly #credentials: ApiRestCredentialsService;
+  readonly #sessions: BrowserSessionVerificationService;
+  readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
+
+  private constructor(peers: ApiDoorPeers) {
+    this.#peers = peers;
+    this.#credentials = ApiRestCredentialsService.create({
+      apiKeys: peers.apiKeys,
+      authz: peers.authz,
+      organizations: peers.organizations,
+    });
+    this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });
+  }
+
+  door(): ApiDoor {
+    return {
+      sessions: async (request) => {
+        const answer = await this.#sessions.verify(request);
+        return answer.kind === "caller" ? answer.caller : null;
+      },
+      authz: this.#peers.authz,
+      identities: {
+        project: this.#projectDoor(),
+        organization: this.#organizationDoor(),
+        apiKey: this.#keyDoor(),
+      },
+      entitlements: this.#planEntitlements(),
+      audit: { rest: this.#restAudit(), trpc: this.#trpcAudit() },
+    };
+  }
+
+  #projectDoor(): RestIdentity {
+    return {
+      authenticate: async ({ request, permission }) =>
+        projectCaller(request, await this.#credentials.authenticate({ request, permission })),
+      identify: async ({ request }) =>
+        projectCaller(request, await this.#credentials.identify({ request })),
+    };
+  }
+
+  #organizationDoor(): RestIdentity {
+    return {
+      authenticate: async ({ request, permission }) =>
+        this.#organizationCaller(
+          request,
+          await this.#credentials.authenticateOrganization({ request, permission }),
+        ),
+      identify: async ({ request }) =>
+        this.#organizationCaller(
+          request,
+          await this.#credentials.identifyOrganization({ request }),
+        ),
+      authorize: ({ caller, permission, target }) => {
+        if (target.tier !== "project") {
+          throw new Error(
+            `The organization door answers a route-scoped permission at a project, and ` +
+              `"${permission}" was asked at a ${target.tier}`,
+          );
+        }
+        const credential = this.#callerCredentials.get(caller);
+        if (!credential) {
+          throw new Error("The organization door authorized a caller it did not resolve");
+        }
+
+        return this.#credentials.authorizeOrganizationRoute({
+          credential,
+          permission,
+          projectId: target.id,
+        });
+      },
+    };
+  }
+
+  #organizationCaller(request: Request, credential: ApiOrganizationCredential): RestCaller {
+    recordOrganizationCredential(request, credential.resolved);
+    const caller = ownedCaller({
+      userId: credential.resolved.userId,
+      scope: { tier: "organization", id: credential.resolved.organizationId },
+      markUsed: credential.markUsed,
+    });
+    this.#callerCredentials.set(caller, credential.resolved);
+
+    return caller;
+  }
+
+  /** Any API key, fanned out by the feature rather than pinned to a project here. */
+  #keyDoor(): RestIdentity {
+    return {
+      authenticate: () => {
+        throw new Error("The key door asks no permission: the feature decides what the key reads.");
+      },
+      identify: async ({ request }) =>
+        keyCaller(request, await this.#credentials.identifyKey({ request })),
+    };
+  }
+
+  /** Composed here because authz and organization cannot depend on entitlement without a cycle. */
+  #planEntitlements(): Entitlements {
+    const { entitlements: plans, organizations } = this.#peers;
+
+    return {
+      holds: async ({ scope }) => {
+        if (scope.tier === "project") {
+          throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
+        }
+        const organizationId =
+          scope.tier === "organization"
+            ? scope.id
+            : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+
+        return isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+      },
+      refusal: ({ feature }) =>
+        new EnterprisePlanRequiredError(feature ?? "This operation requires an Enterprise plan"),
+    };
+  }
+
+  #restAudit(): RestAuditSink {
+    const audit = this.#peers.auditLog;
+
+    return {
+      record: async (row) => {
+        await audit.record({
+          userId: row.actorId ?? "anonymous",
+          action: row.action,
+          args: { ...row.params, scope: row.scope },
+          projectId: typeof row.params.projectId === "string" ? row.params.projectId : void 0,
+          organizationId:
+            typeof row.params.organizationId === "string" ? row.params.organizationId : void 0,
+          targetId: row.resultId || void 0,
+          error: row.errorCode,
+        });
+      },
+    };
+  }
+
+  #trpcAudit(): TrpcAuditSink {
+    const audit = this.#peers.auditLog;
+
+    return {
+      record: async (entry) => {
+        let args: unknown;
+        if (entry.args !== void 0) args = JSON.parse(JSON.stringify(entry.args));
+        await audit.record(
+          recordAuditLogCommandSchema.parse({
+            userId: entry.userId,
+            action: entry.action,
+            args,
+            organizationId: entry.organizationId,
+            projectId: entry.projectId,
+            error: entry.error?.toString(),
+          }),
+        );
+      },
+    };
+  }
+}
+
+function projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
+  recordProjectCredential(request, credential.resolved);
+
+  return ownedCaller({
+    userId: credential.resolved.type === "apiKey" ? credential.resolved.userId : null,
+    scope: { tier: "project", id: credential.project.id },
+    markUsed: credential.markUsed,
+  });
+}
+
+function keyCaller(request: Request, credential: ApiKeyDoorCredential): RestCaller {
+  recordKeyCredential(request, credential.principal);
+  const { principal } = credential;
+
+  return ownedCaller({
+    userId: principal.kind === "apiKey" ? principal.userId : null,
+    scope: { tier: "organization", id: credential.organizationId },
+    markUsed: credential.markUsed,
+  });
+}
+
+/** A key door's caller: its actor is the key's owning user, or none for an unowned key (§8). */
+function ownedCaller({
+  userId,
+  scope,
+  markUsed,
+}: {
+  userId: string | null;
+  scope: RestCaller["scope"];
+  markUsed: () => void;
+}): RestCaller {
+  return { actor: userId ? { type: "user", id: userId } : null, scope, markUsed };
+}

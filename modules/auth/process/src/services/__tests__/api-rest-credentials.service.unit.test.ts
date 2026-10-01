@@ -11,7 +11,10 @@ import type {
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { ApiRestCredentials, type ApiRestCredentialPeers } from "../credentials.ts";
+import {
+  ApiRestCredentialsService,
+  type ApiRestCredentialPeers,
+} from "../api-rest-credentials.service.ts";
 
 const PROJECT = {
   id: "project-1",
@@ -52,7 +55,7 @@ class KeyStore implements Pick<
   }
 }
 
-function doorOver(store: KeyStore): ApiRestCredentials {
+function doorOver(store: KeyStore): ApiRestCredentialsService {
   const peers: ApiRestCredentialPeers = {
     apiKeys: store,
     authz: {
@@ -64,7 +67,7 @@ function doorOver(store: KeyStore): ApiRestCredentials {
     },
   };
 
-  return ApiRestCredentials.create(peers);
+  return ApiRestCredentialsService.create(peers);
 }
 
 function request(headers: Record<string, string>): Request {

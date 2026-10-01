@@ -5,6 +5,13 @@
  */
 import type { DependencyToken, TokenIdentity } from "./dependency-token.ts";
 import { tokenName } from "./dependency-token.ts";
+import type { TransportFactBinding } from "./transport-mounting.ts";
+
+/** What one installed module bound for the doors, by the module's name. */
+export type BoundTransportFacts = Readonly<{
+  feature: string;
+  facts: readonly TransportFactBinding[];
+}>;
 
 /** One module's App this build installed, reached by its contract token. */
 export interface TransportPeers {
@@ -19,6 +26,8 @@ export interface TransportPeers {
    * Only a door a deployment may legitimately run without asks this way.
    */
   find<Instance>(token: DependencyToken<Instance>): Instance | undefined;
+  /** Every installed module's fact bindings, for the door the process opens before its hosts. */
+  readonly facts: readonly BoundTransportFacts[];
 }
 
 /**
@@ -33,8 +42,12 @@ export class MissingTransportPeerError extends Error {
 }
 
 /** The peers a booting application hands its door factory. */
-export function transportPeersOf(resolve: (token: TokenIdentity) => unknown): TransportPeers {
+export function transportPeersOf(
+  resolve: (token: TokenIdentity) => unknown,
+  facts: readonly BoundTransportFacts[] = [],
+): TransportPeers {
   return {
+    facts,
     app: <Instance>(token: DependencyToken<Instance>): Instance => {
       const instance = resolve(token as TokenIdentity);
       if (instance === void 0)

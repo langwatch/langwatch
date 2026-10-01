@@ -531,9 +531,12 @@ packages/process-server/src/         # boot, lifecycle and peer composition
 
 The application declares what it serves through `exposeTransports`.
 Framework classes implement hosting, and the process container resolves
-their peer dependencies. Authentication policy stays in the API runtime;
-wiring installed peer APIs into that runtime belongs to the process
-container. This keeps transport machinery out of `main.ts` without making
+their peer dependencies. Authentication policy stays in the API runtime. auth
+binds the one API door (sessions, key credentials, plan gate, audit sinks) from
+the peers it already holds, in its own transport facts; the process opens it
+before its hosts and builds both over it. A process with no door, or two,
+refuses boot by name, and process-server names no module contract but ops (its
+admin edge). This keeps transport machinery out of `main.ts` without making
 the API framework import the feature implementations which depend on it.
 
 There is no app config file (ruled 2026-09-18): config comes from the
@@ -1478,6 +1481,9 @@ the RoleBinding compatibility table; access is read through `AuthzApi` listings,
   everything beneath it, and `open(app)` run once at mount returning `{ handle({ request, response }),
 close() }`. The api's `serve()` answers a claimed request ahead of every route, as main's listener did;
   `close` runs at shutdown, before the stores close (Alex, 2026-09-27).
+- The API door is bound once, by auth, with `bindApiDoor` in its `withTransportFacts`; the kernel
+  hands installed facts to the surface factory, which opens it ahead of REST and tRPC. None or two
+  binders refuse boot by name (`MissingApiDoorError`, `DuplicateApiDoorError`) (Alex, 2026-10-01).
 - The **process** mounts declarations; `boot()` opens the hosts. A module
   never mounts anything.
 - **A route's documentation lives on the route, in its own `.withDocs()`

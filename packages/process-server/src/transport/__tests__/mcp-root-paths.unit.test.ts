@@ -8,11 +8,11 @@ import { createServer, type Server } from "node:http";
 
 import { RawHttpHost, RawHttpProtocol, WebSocketHost } from "@langwatch/api";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
-import { transportPeersOf } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { peersWithDoor } from "../../__tests__/support/api-door.ts";
 import { apiSurface, bearerDoor } from "../api-surface.ts";
 
 type EndpointApp = Readonly<{ name: string }>;
@@ -85,7 +85,7 @@ function servedSurface({ doors }: { doors: RawHttpHost }): NodeHandler {
     selection: TransportSelection.create().rest().browserBundle(false),
     sockets: WebSocketHost.create(),
     doors,
-  })(transportPeersOf(() => ({})));
+  })(peersWithDoor({ resolve: () => ({}) }));
   surface.hosts.rawhttp?.mount(mcpDoor(), () => ({ name: "hosted-mcp" }));
   const handler = surface.serve();
   if (!isNodeHandler(handler)) throw new Error("the api surface composed no handler");

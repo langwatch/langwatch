@@ -62,7 +62,11 @@ import {
   type FeatureTransportHosts,
   type MountedTransports,
 } from "./transport-mounting.ts";
-import { transportPeersOf, type TransportPeers } from "./transport-peers.ts";
+import {
+  transportPeersOf,
+  type BoundTransportFacts,
+  type TransportPeers,
+} from "./transport-peers.ts";
 export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
@@ -519,7 +523,11 @@ export class ApplicationBuilder<
       // its own app gets the same instance every other caller holds.
       if (role === "api") {
         // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
-        const hosts = this.openDoors((token) => provided.get(token));
+        const facts = [...installed].map(([feature, state]) => ({
+          feature,
+          facts: state.facts ?? [],
+        }));
+        const hosts = this.openDoors((token) => provided.get(token), facts);
         if (
           hosts.rest !== void 0 ||
           hosts.trpc !== void 0 ||
@@ -563,13 +571,15 @@ export class ApplicationBuilder<
   }
 
   /**
-   * The doors this process opens, resolved once. A caller that named the hosts
-   * outright gets them back; one that named a factory has it run here, with
-   * every installed module's App reachable by its own contract token.
+   * The doors this process opens, resolved once: named hosts come back as they are; a factory
+   * runs here over every installed App, by contract token, and every module's bound facts.
    */
-  private openDoors(resolve: (token: TokenIdentity) => unknown): FeatureTransportHosts<Rest, Trpc> {
+  private openDoors(
+    resolve: (token: TokenIdentity) => unknown,
+    facts: readonly BoundTransportFacts[] = [],
+  ): FeatureTransportHosts<Rest, Trpc> {
     const source = this.state.hosts;
-    return typeof source === "function" ? source(transportPeersOf(resolve)) : source;
+    return typeof source === "function" ? source(transportPeersOf(resolve, facts)) : source;
   }
 
   /** Store peer instances as-is; declare module API tokens. */

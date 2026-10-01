@@ -8,8 +8,6 @@ import {
   ProjectInvalidCredentialsError,
   ProjectMissingCredentialsError,
 } from "@langwatch/api";
-// Resolves project and organization credentials. Reads peer Apps resolved
-// by the same boot that mounts the routes.
 import {
   ApiKeyPermissionDeniedError,
   ApiKeyPermissionNotDelegableError,
@@ -52,9 +50,10 @@ export type ApiRestCredentialPeers = Readonly<{
   logger?: Pick<Logger, "error">;
 }>;
 
-export class ApiRestCredentials {
-  static create(peers: ApiRestCredentialPeers): ApiRestCredentials {
-    return new ApiRestCredentials({
+/** Resolves project and organization API-key credentials for the API door (record §8). */
+export class ApiRestCredentialsService {
+  static create(peers: ApiRestCredentialPeers): ApiRestCredentialsService {
+    return new ApiRestCredentialsService({
       ...peers,
       logger: peers.logger ?? createLogger("langwatch:api:rest:credential"),
     });
@@ -249,7 +248,7 @@ export class ApiRestCredentials {
   }
 }
 
-export function apiKeyCeilingRefusal(
+function apiKeyCeilingRefusal(
   resolved: Extract<RestResolvedProjectCredential, { type: "apiKey" }>,
   permission: AuthzPermission,
   logger: Pick<Logger, "error">,
@@ -270,12 +269,12 @@ export function apiKeyCeilingRefusal(
   return new ApiKeyPermissionDeniedError(permission);
 }
 
-export type ApiKeyRequestCredentials = Readonly<{
+type ApiKeyRequestCredentials = Readonly<{
   token: string;
   projectId: string | null;
 }>;
 
-export function extractApiKeyRequestCredentials(request: Request): ApiKeyRequestCredentials | null {
+function extractApiKeyRequestCredentials(request: Request): ApiKeyRequestCredentials | null {
   const authorization = request.headers.get("authorization");
   const xAuthToken = request.headers.get("x-auth-token");
   const xProjectId = request.headers.get("x-project-id");

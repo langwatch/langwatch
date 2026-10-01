@@ -4,6 +4,13 @@
 
 export { answerApiFailure, apiRootPaths, composeApiApplication } from "./api-application.ts";
 export {
+  type ApiDoor,
+  bindApiDoor,
+  DuplicateApiDoorError,
+  MissingApiDoorError,
+  openApiDoor,
+} from "./api-door.ts";
+export {
   HttpMux,
   type HttpExchange,
   type HttpFailureAnswer,

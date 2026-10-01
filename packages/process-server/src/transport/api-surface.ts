@@ -1,6 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
 
-import type { Actor } from "@langwatch/actor";
 import {
   SurfaceBlankSecretError,
   SurfaceUnconfiguredError,
@@ -9,8 +8,6 @@ import {
   type RawHttpHost,
   type WebSocketHost,
 } from "@langwatch/api";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { Entitlements } from "@langwatch/api/access";
 import {
   answerApiFailure,
   apiRootPaths,
@@ -18,6 +15,8 @@ import {
   HttpMux,
   BrowserBundle,
   FramedDocument,
+  openApiDoor,
+  type ApiDoor,
   type NodeHandler,
   type TransportSelection,
 } from "@langwatch/api/hosting";
@@ -27,14 +26,11 @@ import {
   bindRestMiddleware,
   defineRestMiddleware,
   IdempotencyLedger,
+  projectCredentialOfRequest,
   projectRestFacts,
-  recordKeyCredential,
-  recordOrganizationCredential,
-  recordProjectCredential,
   RestHost,
   SessionReader,
   type RestCaller,
-  type RestAuditSink,
   type IdempotentRunner,
   type RestIdentity,
   type RestResolvedProjectCredential,
@@ -45,31 +41,14 @@ import {
   defineTrpcFact,
   TrpcHost,
   type TrpcRequestContext,
-  type TrpcAuditSink,
 } from "@langwatch/api/trpc";
-import { AuditLogApi, recordAuditLogCommandSchema } from "@langwatch/audit-log-contract";
-import { AuthApi } from "@langwatch/auth-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import {
-  EnterprisePlanRequiredError,
-  EntitlementApi,
-  isEnterpriseTier,
-} from "@langwatch/entitlement-contract";
 import type { ExposedSurface, TransportPeers } from "@langwatch/kernel";
 import type { Logger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { z } from "zod";
 
 import type { ApiUiBundle } from "./bundle-config.ts";
-import {
-  ApiRestCredentials,
-  type ApiKeyDoorCredential,
-  type ApiOrganizationCredential,
-  type ApiProjectCredential,
-} from "./credentials.ts";
-import { BetterAuthBrowserSessionTransportAdapter, composeSessionVerification } from "./session.ts";
 
 export type ApiSurfaceComposition = Readonly<{
   members: ProcessMemberSource;
@@ -103,24 +82,10 @@ export function apiSurface(
 
 class ApiSurface {
   static create(composition: ApiSurfaceComposition, peers: TransportPeers): ApiSurface {
-    const { members, logger, stores } = composition;
-    const authz = peers.app(AuthzApi);
-    const auth = peers.find(AuthApi);
-    const sessions = auth
-      ? SessionReader.create({
-          verify: composeSessionVerification({
-            sessions: BetterAuthBrowserSessionTransportAdapter.create({
-              api: {
-                getSession: async (input) => {
-                  const verification = await auth.verifyBrowserSession(input);
-                  return verification.kind === "verified" ? verification.verified : null;
-                },
-              },
-            }),
-            auth,
-          }),
-        })
-      : SessionReader.unverified();
+    const { members, stores } = composition;
+    // auth binds the one door; a process without it refuses here, by name (record §8).
+    const door = openApiDoor(peers);
+    const sessions = SessionReader.create({ verify: door.sessions });
     const idempotency = stores.database
       ? IdempotencyLedger.create({
           receipts: members.read("prisma"),
@@ -129,60 +94,37 @@ class ApiSurface {
       : void 0;
     const rateLimiter = stores.redis ? members.read("rateLimiter") : void 0;
 
-    return new ApiSurface({
-      composition,
-      peers,
-      authz,
-      sessions,
-      credentials: ApiRestCredentials.create({
-        apiKeys: peers.app(ApiKeyApi),
-        authz,
-        organizations: peers.app(OrganizationApi),
-        logger,
-      }),
-      idempotency,
-      rateLimiter,
-    });
+    return new ApiSurface({ composition, peers, door, sessions, idempotency, rateLimiter });
   }
-
-  readonly #projectCredentials = new WeakMap<Request, RestResolvedProjectCredential>();
-  readonly #callerCredentials = new WeakMap<
-    RestCaller,
-    Awaited<ReturnType<ApiRestCredentials["authenticateOrganization"]>>["resolved"]
-  >();
 
   readonly #rest: RestHost | undefined;
   readonly #trpc: TrpcHost | undefined;
 
   private readonly composition: ApiSurfaceComposition;
-  private readonly authz: AuthzApi;
+  private readonly door: ApiDoor;
   private readonly sessions: SessionReader;
-  private readonly credentials: ApiRestCredentials;
 
   private constructor({
     composition,
     peers,
-    authz,
+    door,
     sessions,
-    credentials,
     idempotency,
     rateLimiter,
   }: {
     composition: ApiSurfaceComposition;
     peers: TransportPeers;
-    authz: AuthzApi;
+    door: ApiDoor;
     sessions: SessionReader;
-    credentials: ApiRestCredentials;
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
   }) {
     this.composition = composition;
-    this.authz = authz;
+    this.door = door;
     this.sessions = sessions;
-    this.credentials = credentials;
     if (composition.selection.selected.rest)
       this.#rest = this.#restHost(peers, idempotency, rateLimiter);
-    if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(peers, rateLimiter);
+    if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
 
   #restHost(
@@ -192,9 +134,7 @@ class ApiSurface {
   ): RestHost {
     return RestHost.create({
       identities: {
-        project: this.#projectDoor(),
-        organization: this.#organizationDoor(),
-        apiKey: this.#keyDoor(),
+        ...this.door.identities,
         browser: this.#browserDoor(),
         scimToken: unboundDirectoryDoor(),
         "instance-admin": this.composition.instanceAdmin,
@@ -202,25 +142,25 @@ class ApiSurface {
       bearers: (namespace) =>
         this.composition.internalBearers.get(namespace) ??
         bearerDoor({ name: namespace, token: void 0 }),
-      audit: restAudit(peers.app(AuditLogApi)),
+      audit: this.door.audit.rest,
       idempotency,
       rateLimiter,
       facts: this.#restFacts(peers.find(OpsApi)),
-      entitlements: planEntitlements(peers),
+      entitlements: this.door.entitlements,
     });
   }
 
-  #trpcHost(peers: TransportPeers, rateLimiter: RateLimiter | undefined): TrpcHost {
+  #trpcHost(rateLimiter: RateLimiter | undefined): TrpcHost {
     return TrpcHost.create({
       sessions: this.sessions,
-      authz: this.authz,
+      authz: this.door.authz,
       logger: this.composition.logger,
       errorCausePayload: { payloadFor: browserCausePayload },
-      audit: trpcAudit(peers.find(AuditLogApi)),
+      audit: this.door.audit.trpc,
       throttle: rateLimiter ? { limiter: rateLimiter, policies: {} } : void 0,
       facts: this.#trpcFacts(),
-      sessionVersions: this.authz,
-      entitlements: planEntitlements(peers),
+      sessionVersions: this.door.authz,
+      entitlements: this.door.entitlements,
     });
   }
 
@@ -259,94 +199,10 @@ class ApiSurface {
     return composition.doors.ahead(mux.route("/", page).handler);
   }
 
-  #projectDoor(): RestIdentity {
-    return {
-      authenticate: async ({ request, permission }) =>
-        this.#projectCaller(request, await this.credentials.authenticate({ request, permission })),
-      identify: async ({ request }) =>
-        this.#projectCaller(request, await this.credentials.identify({ request })),
-    };
-  }
-
-  #projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
-    this.#projectCredentials.set(request, credential.resolved);
-    recordProjectCredential(request, credential.resolved);
-
-    return {
-      actor: keyOwner(credential.resolved.type === "apiKey" ? credential.resolved.userId : null),
-      scope: { tier: "project", id: credential.project.id },
-      markUsed: credential.markUsed,
-    };
-  }
-
-  #organizationDoor(): RestIdentity {
-    return {
-      authenticate: async ({ request, permission }) =>
-        this.#organizationCaller(
-          request,
-          await this.credentials.authenticateOrganization({ request, permission }),
-        ),
-      identify: async ({ request }) =>
-        this.#organizationCaller(request, await this.credentials.identifyOrganization({ request })),
-      authorize: ({ caller, permission, target }) => {
-        if (target.tier !== "project") {
-          throw new Error(
-            `The organization door answers a route-scoped permission at a project, and ` +
-              `"${permission}" was asked at a ${target.tier}`,
-          );
-        }
-        const credential = this.#callerCredentials.get(caller);
-        if (!credential) {
-          throw new Error("The organization door authorized a caller it did not resolve");
-        }
-
-        return this.credentials.authorizeOrganizationRoute({
-          credential,
-          permission,
-          projectId: target.id,
-        });
-      },
-    };
-  }
-
-  #organizationCaller(request: Request, credential: ApiOrganizationCredential): RestCaller {
-    recordOrganizationCredential(request, credential.resolved);
-    const caller: RestCaller = {
-      actor: keyOwner(credential.resolved.userId),
-      scope: { tier: "organization", id: credential.resolved.organizationId },
-      markUsed: credential.markUsed,
-    };
-    this.#callerCredentials.set(caller, credential.resolved);
-
-    return caller;
-  }
-
-  /** Any API key, fanned out by the feature rather than pinned to a project here. */
-  #keyDoor(): RestIdentity {
-    return {
-      authenticate: () => {
-        throw new Error("The key door asks no permission: the feature decides what the key reads.");
-      },
-      identify: async ({ request }) =>
-        this.#keyCaller(request, await this.credentials.identifyKey({ request })),
-    };
-  }
-
-  #keyCaller(request: Request, credential: ApiKeyDoorCredential): RestCaller {
-    recordKeyCredential(request, credential.principal);
-    const { principal } = credential;
-
-    return {
-      actor: keyOwner(principal.kind === "apiKey" ? principal.userId : null),
-      scope: { tier: "organization", id: credential.organizationId },
-      markUsed: credential.markUsed,
-    };
-  }
-
   #browserDoor(): RestIdentity {
     return BrowserSessionIdentity.create({
       sessions: this.sessions,
-      authz: this.authz,
+      authz: this.door.authz,
       publicBaseUrl: this.composition.publicBaseUrl,
     });
   }
@@ -385,10 +241,7 @@ class ApiSurface {
         return { headers };
       }),
       bindRestMiddleware(projectRestFacts, (context) => {
-        const credential = this.#projectCredentials.get(context.req.raw);
-        if (!credential) {
-          throw new Error("The project door resolved no credential for this request");
-        }
+        const credential = projectCredentialOfRequest(context.req.raw);
 
         return {
           projectSlug: credential.project.slug,
@@ -449,32 +302,6 @@ function sameSecret({ presented, configured }: { presented: string; configured: 
   );
 }
 
-/**
- * The plan every declared entitlement gate asks, read for the scope's organization. Composed
- * here because authz and organization cannot depend on entitlement without a peer cycle.
- */
-function planEntitlements(peers: TransportPeers): Entitlements | undefined {
-  const plans = peers.find(EntitlementApi);
-  if (!plans) return void 0;
-  const organizations = peers.app(OrganizationApi);
-
-  return {
-    holds: async ({ scope }) => {
-      if (scope.tier === "project") {
-        throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
-      }
-      const organizationId =
-        scope.tier === "organization"
-          ? scope.id
-          : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
-
-      return isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
-    },
-    refusal: ({ feature }) =>
-      new EnterprisePlanRequiredError(feature ?? "This operation requires an Enterprise plan"),
-  };
-}
-
 export function bearerDoor(options: { name: string; token: string | undefined }): RestIdentity {
   const { name, token } = options;
   const admit = (request: Request): RestCaller => {
@@ -512,11 +339,6 @@ function unboundDirectoryDoor(): RestIdentity {
     },
     identify: () => Promise.reject(new SurfaceUnverifiedError("scimToken")),
   };
-}
-
-/** Every key door's one actor: the key's owning user, or none for a key no person owns (§8). */
-function keyOwner(userId: string | null): Actor | null {
-  return userId ? { type: "user", id: userId } : null;
 }
 
 function actorIdOf(resolved: RestResolvedProjectCredential): string {
@@ -577,40 +399,3 @@ const shareViewerFact = defineTrpcFact(
   "shareViewer",
   z.object({ userId: z.string().nullable(), userAgent: z.string().nullable() }),
 );
-
-function restAudit(audit: AuditLogApi): RestAuditSink {
-  return {
-    record: async (row) => {
-      await audit.record({
-        userId: row.actorId ?? "anonymous",
-        action: row.action,
-        args: { ...row.params, scope: row.scope },
-        projectId: typeof row.params.projectId === "string" ? row.params.projectId : void 0,
-        organizationId:
-          typeof row.params.organizationId === "string" ? row.params.organizationId : void 0,
-        targetId: row.resultId || void 0,
-        error: row.errorCode,
-      });
-    },
-  };
-}
-
-function trpcAudit(audit: AuditLogApi | undefined): TrpcAuditSink | undefined {
-  if (!audit) return void 0;
-  return {
-    record: async (entry) => {
-      let args: unknown;
-      if (entry.args !== void 0) args = JSON.parse(JSON.stringify(entry.args));
-      await audit.record(
-        recordAuditLogCommandSchema.parse({
-          userId: entry.userId,
-          action: entry.action,
-          args,
-          organizationId: entry.organizationId,
-          projectId: entry.projectId,
-          error: entry.error?.toString(),
-        }),
-      );
-    },
-  };
-}

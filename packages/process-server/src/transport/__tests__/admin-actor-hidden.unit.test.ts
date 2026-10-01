@@ -6,21 +6,17 @@
 import { createServer } from "node:http";
 
 import { RawHttpHost, WebSocketHost } from "@langwatch/api";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { publicRoute } from "@langwatch/api/access";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
 import { defineRestMiddleware, defineRestRouter } from "@langwatch/api/rest";
-import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthApi } from "@langwatch/auth-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { moduleApi, transportPeersOf } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { OpsApi } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { inertApiDoor, peersWithDoor } from "../../__tests__/support/api-door.ts";
 import { apiSurface, bearerDoor } from "../api-surface.ts";
 
 const STAFF_EMAIL = "staff@example.com";
@@ -34,43 +30,22 @@ function userOf(headers: Headers) {
   return token ? users.get(token) : undefined;
 }
 
-const auth = {
-  verifyBrowserSession: async ({ headers }: { headers: Headers }) => {
-    const user = userOf(headers);
+/** auth's door, reading the session these tests' cookies name. */
+const door = inertApiDoor({
+  sessions: async (request) => {
+    const user = userOf(request.headers);
     return user
-      ? {
-          kind: "verified" as const,
-          verified: { session: { id: "s-1", expiresAt: new Date() }, user },
-        }
-      : { kind: "anonymous" as const };
+      ? { authSessionId: "s-1", sessionId: "live-1", userId: user.id, email: user.email }
+      : null;
   },
-  resolveBrowserSession: async ({
-    verified,
-  }: {
-    verified: { user: { id: string; email?: string | null } };
-  }) => ({
-    kind: "signed_in" as const,
-    session: {
-      user: { id: verified.user.id, email: verified.user.email ?? null },
-      expires: new Date().toISOString(),
-      sessionId: "live-1",
-    },
-  }),
-};
+});
 
 const ops = {
   operatorScope: (operator: { email?: string | null } | null) =>
     operator?.email === STAFF_EMAIL ? { kind: "platform" as const } : { kind: "none" as const },
 };
 
-const peers = new Map<unknown, unknown>([
-  [ApiKeyApi, {}],
-  [AuthzApi, {}],
-  [OrganizationApi, {}],
-  [AuditLogApi, {}],
-  [AuthApi, auth],
-  [OpsApi, ops],
-]);
+const peers = new Map<unknown, unknown>([[OpsApi, ops]]);
 
 const members: ProcessMemberSource = {
   order: [],
@@ -115,7 +90,7 @@ const surface = apiSurface({
   selection: TransportSelection.create().rest().browserBundle(false),
   sockets: WebSocketHost.create(),
   doors: RawHttpHost.create(),
-})(transportPeersOf((token) => peers.get(token)));
+})(peersWithDoor({ resolve: (token) => peers.get(token), door }));
 const rest = surface.hosts.rest;
 if (!rest) throw new Error("the surface selected REST");
 rest.mount(desk.router(), () => ({ run }));
