@@ -1,6 +1,6 @@
 /**
- * Drawer navigator address abstraction over react-router.
- * Provides query/asPath interface from the Next.js faked router.
+ * The drawer navigator's view of the SPA's react-router location: a flat
+ * query, the full address and one push.
  */
 
 import { useEffect, useMemo } from "react";
@@ -21,8 +21,8 @@ export type DrawerRouter = {
 
 /**
  * The router the last mounted `useDrawer` was inside, moved on by each write it
- * makes so a second write in the same tick builds on the first. `platform/app`
- * kept a module-scope `Router` singleton; module-level code still needs one.
+ * makes so a second write in the same tick builds on the first. Module-level
+ * code (outside any component) opens drawers through it.
  */
 export const drawerRouterRef: { current: DrawerRouter | undefined } = { current: void 0 };
 

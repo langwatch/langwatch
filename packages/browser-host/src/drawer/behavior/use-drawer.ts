@@ -22,6 +22,7 @@ import {
   drawerParamsOfQuery,
   readDrawerAncestors,
   readDrawerStack,
+  toRecord,
 } from "../model/drawer-stack.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import { drawerRouterRef, readDrawerLocation, useDrawerRouter } from "./drawer-router.ts";
@@ -418,13 +419,6 @@ function buildUrl(path: string, queryString: string, hash: string): string {
   return url;
 }
 
-/** The one-level object a drawer's `urlParams` is; anything else adds nothing. */
-function toRecord(value: unknown): Record<string, unknown> {
-  return typeof value === "object" && value !== null
-    ? Object.fromEntries(Object.entries(value))
-    : {};
-}
-
 function isUrlSerializable(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "function") return false;
@@ -570,7 +564,7 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
       const { path, queryString, hash } = splitAsPath(liveAsPath(readDrawerLocation().asPath));
       const currentQueryOnly = Object.fromEntries(
         Object.entries(qs.parse(queryString, URL_QS_PARSE_OPTIONS)).filter(
-          ([key]) => !key.startsWith("drawer"),
+          ([key]) => key !== "drawer",
         ),
       );
 
@@ -625,7 +619,7 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
     } = splitAsPath(liveAsPath(readDrawerLocation().asPath));
     const parsedQuery = qs.parse(currentQs, URL_QS_PARSE_OPTIONS);
     const cleanQuery = Object.fromEntries(
-      Object.entries(parsedQuery).filter(([key]) => !key.startsWith("drawer") && key !== "span"),
+      Object.entries(parsedQuery).filter(([key]) => key !== "drawer" && key !== "span"),
     );
     const newQueryString = qs.stringify(cleanQuery, {
       allowDots: true,

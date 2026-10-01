@@ -163,3 +163,29 @@ describe("given an address with a fragment", () => {
     });
   });
 });
+
+describe("given an address with a query key that only starts with drawer", () => {
+  describe("when a drawer is opened and then closed", () => {
+    it("keeps the unrelated key", async () => {
+      window.history.replaceState(null, "", "/acme/traces?drawerWidth=wide");
+      let drawers: ReturnType<typeof useDrawer> | undefined;
+      function Host() {
+        drawers = useDrawer();
+        return <Probe />;
+      }
+      render(
+        <MemoryRouter initialEntries={["/acme/traces?drawerWidth=wide"]}>
+          <Host />
+        </MemoryRouter>,
+      );
+
+      await act(async () => drawers?.openDrawer("first"));
+      expect(screen.getByTestId("address")).toHaveTextContent("drawerWidth=wide");
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.open=first");
+
+      await act(async () => drawers?.closeDrawer());
+      expect(screen.getByTestId("address")).toHaveTextContent("drawerWidth=wide");
+      expect(screen.getByTestId("address")).not.toHaveTextContent("drawer.open");
+    });
+  });
+});

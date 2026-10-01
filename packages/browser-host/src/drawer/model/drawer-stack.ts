@@ -9,8 +9,8 @@ export type DrawerStackEntry = {
   params: Record<string, unknown>;
 };
 
-/** The one-level object a drawer's params are; anything else adds nothing. */
-function toRecord(value: unknown): Record<string, unknown> {
+/** The one-level object a drawer's params are; anything else, arrays included, adds nothing. */
+export function toRecord(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? Object.fromEntries(Object.entries(value))
     : {};
