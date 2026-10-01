@@ -1576,6 +1576,11 @@ export class InviteService {
         ],
         skipDuplicates: true,
       });
+      // Inside the claim, not in the grant tail: the tail re-runs on every
+      // retry of an accepted invite, and the admission happens once.
+      if (invite.role === OrganizationUserRole.DEVELOPER) {
+        await this.auditDeveloperAdmission({ tx, userId, invite });
+      }
       return true;
     });
 
@@ -1627,16 +1632,19 @@ export class InviteService {
 
   /**
    * A Developer admission has no grant to reach the audit page through
-   * (ADR-143), so the row itself is audited, as the join paths do.
+   * (ADR-143), so the row itself is audited, as the join paths do. Written
+   * in the claim transaction so a retried acceptance never writes it twice.
    */
   private async auditDeveloperAdmission({
+    tx,
     userId,
     invite,
   }: {
+    tx: Prisma.TransactionClient;
     userId: string;
     invite: OrganizationInvite;
   }): Promise<void> {
-    await this.prisma.auditLog.create({
+    await tx.auditLog.create({
       data: {
         action: DEVELOPER_ADMISSION_AUDIT_ACTION,
         userId,
@@ -1674,10 +1682,6 @@ export class InviteService {
       userId: invite.requestedBy,
       fallback: "inviteService",
     });
-
-    if (invite.role === OrganizationUserRole.DEVELOPER) {
-      await this.auditDeveloperAdmission({ userId, invite });
-    }
 
     // No ORGANIZATION-scoped grant for a Lite Member (access comes from
     // their teams) nor for a Developer (ADR-143: personal team only).

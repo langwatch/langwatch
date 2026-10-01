@@ -507,6 +507,36 @@ describe("Invite router integration", () => {
         });
         await prisma.auditLog.delete({ where: { id: audit!.id } });
       });
+
+      describe("when the acceptance is retried after it landed", () => {
+        it("records the admission once", async () => {
+          const email = `invitee-${testNamespace}-developer-retry@acme.com`;
+          const invite = await createPendingInvite(email, {
+            role: OrganizationUserRole.DEVELOPER,
+            teamIds: "",
+            requestedBy: adminUserId,
+          });
+          const { user, caller } = await createInvitee(email);
+
+          await caller.invite.acceptInvite({ inviteCode: invite.inviteCode });
+          // A crash after the membership transaction re-runs the grant tail.
+          const landed = await prisma.organizationInvite.findUnique({
+            where: { id: invite.id },
+          });
+          await InviteService.create(prisma).applyInvite({
+            userId: user.id,
+            invite: landed!,
+          });
+
+          const where = {
+            organizationId,
+            userId: user.id,
+            action: "organization.member.admitted",
+          };
+          await expect(prisma.auditLog.count({ where })).resolves.toBe(1);
+          await prisma.auditLog.deleteMany({ where });
+        });
+      });
     });
 
     describe("when the organisation's joiner seat is Developer (ADR-143)", () => {
