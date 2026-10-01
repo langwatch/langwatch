@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { openSideBrowser, type Side, type SideBrowser } from "./capture.ts";
+import { keyed, passesFor, passPlan } from "./color-scheme.ts";
 import { DiffPool } from "./diff-pool.ts";
 import { Pairing, readReplay } from "./pairing.ts";
 import { awaitSide } from "./pending-side.ts";
@@ -153,18 +154,29 @@ const main = async (): Promise<void> => {
       live.map(async (waiting) => {
         const definition = await awaitSide(waiting);
         plan.sides = plan.sides.map((side) => (side.name === definition.name ? definition : side));
-        const browser = await openSideBrowser({
-          side: definition,
-          viewport: plan.viewport,
-          settle: plan.settle,
-          frozenTime: plan.frozenTime,
-          fast: plan.fast,
-        });
-        browsers.push(browser);
-        try {
-          await captureSide({ plan, browser, collect });
-        } finally {
-          await windDown({ step: `closing the ${definition.name} browser`, work: browser.close() });
+        // One pass per scheme, each in a browser of its own, so no pass sees the other's session.
+        for (const scheme of passesFor(plan.colorScheme)) {
+          const browser = await openSideBrowser({
+            side: definition,
+            viewport: plan.viewport,
+            settle: plan.settle,
+            frozenTime: plan.frozenTime,
+            fast: plan.fast,
+            colorScheme: scheme,
+          });
+          browsers.push(browser);
+          try {
+            await captureSide({
+              plan: passPlan({ plan, scheme }),
+              browser,
+              collect: keyed({ collect, plan, scheme }),
+            });
+          } finally {
+            await windDown({
+              step: `closing the ${definition.name} browser`,
+              work: browser.close(),
+            });
+          }
         }
       }),
     );

@@ -111,7 +111,9 @@ type baselineKeyInputs struct {
 	edition  Edition
 	config   *Config
 	viewport Viewport
-	root     string
+	// scheme is the colour scheme; light adds nothing, so existing slots keep their names.
+	scheme ColorScheme
+	root   string
 	// ui is how the sides' UI is served (uiMode): a dev-server base never
 	// replays against a built candidate.
 	ui string
@@ -124,6 +126,9 @@ func BaselineKey(inputs baselineKeyInputs) (string, error) {
 	fmt.Fprintf(digest, "format=%s\nviewport=%s\n", baselineFormat, inputs.viewport)
 	if inputs.ui != "" {
 		fmt.Fprintf(digest, "ui=%s\n", inputs.ui)
+	}
+	if !inputs.scheme.isLight() {
+		fmt.Fprintf(digest, "scheme=%s\n", inputs.scheme)
 	}
 	encoded, err := json.Marshal(struct {
 		Settle   Settle            `json:"settle"`
@@ -239,7 +244,7 @@ func resolveBaselines(ctx context.Context, inputs baselineInputs) (map[Edition]B
 		}
 		key, err := BaselineKey(baselineKeyInputs{
 			commit: commit, edition: edition, config: inputs.config,
-			viewport: options.Viewport, root: options.Root, ui: uiMode(options),
+			viewport: options.Viewport, scheme: options.ColorScheme, root: options.Root, ui: uiMode(options),
 		})
 		if err != nil {
 			return nil, err

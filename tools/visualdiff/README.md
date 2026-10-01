@@ -11,7 +11,7 @@ and quietly lost the endpoint behind it.
 
 ```text
 visualdiff run [-base REF] [-candidate REF] [-routes-only] [-routes /a,/b] [-flows a,b]
-               [-viewport 1440x900] [-config PATH] [-root DIR]
+               [-viewport 1440x900] [-color-scheme light|dark|both] [-config PATH] [-root DIR]
                [-base-port N] [-run-dir DIR] [-boot-timeout DUR]
                [-dry-run] [-keep] [-agent] [-no-haven]
                [-editions enterprise,free] [-no-baseline] [-refresh-baseline]
@@ -161,6 +161,26 @@ runner and its browsers are stopped, the captures so far are classified and
 written as usual, and it prints `visualdiff: stopping: N consecutive errors,
 most common cause: <cause> (xK)` and exits 3. `recapture` has no flag and uses
 the default; `flow` and `route` do not stop early.
+
+## Capturing in dark mode
+
+`-color-scheme light|dark|both` (default `light`) on `run` and `check` sets the
+colour scheme every page renders in. The plan carries it to the runner, which
+sets Playwright's `colorScheme` on each context. The branch's shell follows
+`prefers-color-scheme` (next-themes, default `system`), so that alone switches
+it; main reads the stored `chakra-ui-color-mode`, which the runner seeds with the
+same scheme. A stored `theme` is never written, so a flow's own toggle survives a
+reload.
+
+`both` runs two passes per side, light then dark, each in a browser of its own.
+The dark pass's captures carry the scheme in their key (`/traces@dark`,
+`some-flow@dark`) and write their screenshots under `shots/<edition>/dark/`, so a
+pass never shares a pairing, a baseline row or a file with the other. A dark flow
+gets a `{uid}` of its own; flows that mutate what their `setup` seeded (a delete
+flow) can fail a second time, so prefer `-routes` for a dark sweep of such
+screens. Baselines are keyed on the scheme: light keeps every existing slot,
+`dark` and `both` each get their own. `check` reports the dark pass of a flow as
+`<id>@dark`.
 
 ## Booting through haven
 

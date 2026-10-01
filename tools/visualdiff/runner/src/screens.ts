@@ -1,6 +1,7 @@
 import { join } from "node:path";
 
 import { captureMessage, type Side } from "./capture.ts";
+import { DARK_SUFFIX } from "./color-scheme.ts";
 import { DeadlineAlarm } from "./deadline-alarm.ts";
 import { fillPath, sideFixtures } from "./flows/context.ts";
 import { describeExpect } from "./flows/expect.ts";
@@ -462,7 +463,7 @@ export const captureFlow = async ({
   const project = flowProject({ plan, flow, fixtures });
   const values: Record<string, string> = {
     ...fixtures,
-    uid: uidFor(flow.id),
+    uid: uidFor(plan.colorScheme === "dark" ? `${flow.id}${DARK_SUFFIX}` : flow.id),
     // A flow with a setup names things from the setup's uid, so that one wins.
     ...flowValues({ fixtures, flowId: flow.id }),
     slug: project.slug,

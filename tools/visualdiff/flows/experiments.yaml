@@ -749,3 +749,31 @@ flows:
       - action: expect
         with:
           testId: compare-button
+
+  # The New Experiment button saves the browser's initial state (three sample rows in an inline dataset)
+  # and the workbench then loads it back, so the rows seen here survived save and load; main keeps them.
+  - id: experiment-create-from-button-shows-sample-rows
+    title: Create an experiment from the New Experiment button and see the inline dataset's sample rows after it loads
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: expect
+        with:
+          url: /experiments/workbench/
+          timeout: "30000"
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          text: billing information
+          timeout: "20000"

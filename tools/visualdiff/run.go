@@ -26,11 +26,13 @@ type Options struct {
 	RunDir       string
 	BasePort     int
 	Viewport     Viewport
-	RoutesOnly   bool
-	Agent        bool
-	DryRun       bool
-	Keep         bool
-	BootTimeout  time.Duration
+	// ColorScheme is light, dark or both; empty is light.
+	ColorScheme ColorScheme
+	RoutesOnly  bool
+	Agent       bool
+	DryRun      bool
+	Keep        bool
+	BootTimeout time.Duration
 	// Stall fails a boot whose logs and lanes do not move for this long;
 	// SmokeTimeout bounds each entrypoint's import smoke (watchdog.go, smoke.go).
 	Stall        time.Duration
@@ -784,8 +786,9 @@ func (run *session) capture(ctx context.Context, edition Edition, baseline Basel
 		fmt.Fprintf(run.streams.Err, "%s: base replayed from %s\n", edition, baseline.Dir)
 	}
 	runnerPlan := RunnerPlan{
-		Viewport: options.Viewport,
-		Settle:   config.Settle,
+		Viewport:    options.Viewport,
+		ColorScheme: options.ColorScheme,
+		Settle:      config.Settle,
 		Sides: []RunnerSide{base, {
 			Name: "candidate", BaseURL: plan.Candidate.URL(), MailURL: plan.Candidate.MailURL(), Fixtures: run.sideFixtures[plan.Candidate.Name],
 			StaticDir: run.staticDirs[plan.Candidate.Name],

@@ -16,6 +16,7 @@ import { isExpectedThrottle, isThrottleConsoleError } from "./noise.ts";
 import {
   note,
   type CaptureMessage,
+  type ColorScheme,
   type PlanSide,
   type SettleConfig,
   type Viewport,
@@ -46,13 +47,15 @@ export type StorageState = BrowserContextOptions["storageState"];
 export const contextOptions = ({
   viewport,
   storageState,
+  colorScheme = "light",
 }: {
   viewport: Viewport;
   storageState?: StorageState;
+  colorScheme?: ColorScheme;
 }) => ({
   viewport: { width: viewport.width, height: viewport.height },
   reducedMotion: "reduce" as const,
-  colorScheme: "light" as const,
+  colorScheme,
   deviceScaleFactor: 1,
   ...(storageState === undefined ? {} : { storageState }),
 });
@@ -490,6 +493,7 @@ export const openSideBrowser = async ({
   storageState,
   frozenTime,
   fast = false,
+  colorScheme = "light",
 }: {
   side: PlanSide;
   viewport: Viewport;
@@ -497,6 +501,7 @@ export const openSideBrowser = async ({
   storageState?: StorageState;
   frozenTime?: number;
   fast?: boolean;
+  colorScheme?: ColorScheme;
 }): Promise<SideBrowser> => {
   const args = ["--disable-dev-shm-usage"];
   if (side.staticDir !== undefined) args.push(FULFILLED_SHELL);
@@ -504,15 +509,19 @@ export const openSideBrowser = async ({
   const browser = await chromium.launch({ args });
   let serving: Promise<ServeBuiltUi | undefined> | undefined;
   const fresh = async (state?: StorageState): Promise<BrowserContext> => {
-    const context = await browser.newContext(contextOptions({ viewport, storageState: state }));
+    const context = await browser.newContext(
+      contextOptions({ viewport, storageState: state, colorScheme }),
+    );
     if (frozenTime !== undefined) await context.clock.setFixedTime(frozenTime);
-    await context.addInitScript(() => {
+    // The branch's next-themes follows prefers-color-scheme (the context's colorScheme); main
+    // reads this stored key. A stored `theme` is left alone so a flow's own toggle survives.
+    await context.addInitScript((mode: ColorScheme) => {
       try {
-        localStorage.setItem("chakra-ui-color-mode", "light");
+        localStorage.setItem("chakra-ui-color-mode", mode);
       } catch {
         // A context that refuses storage still renders; the colour mode just falls back.
       }
-    });
+    }, colorScheme);
     context.setDefaultTimeout(10_000);
     if (side.staticDir !== undefined) {
       serving ??= builtAssets({ context, side });
