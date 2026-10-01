@@ -16,8 +16,7 @@ import { api } from "../../../../behavior/ops-api.ts";
 /** Anomalous tenants: spiked enqueue rate or trace dominance (rate breaker, fingerprint
  * loop). Post-incident: surface tenant volume anomalies early. */
 export function AnomaliesCard() {
-  const query = api.ops.listAnomalies.useQuery(undefined, {
-  });
+  const query = api.ops.listAnomalies.useQuery(undefined, {});
   const dismiss = api.ops.dismissAnomaly.useMutation({
     onSuccess: () => query.refetch(),
   });

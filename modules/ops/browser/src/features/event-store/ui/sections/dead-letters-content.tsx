@@ -39,10 +39,7 @@ export function DeadLettersContent() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const actions = useDeadLetterActions();
 
-  const query = api.ops.listDeadLetters.useQuery(
-    { processName, page, pageSize: PAGE_SIZE },
-    {},
-  );
+  const query = api.ops.listDeadLetters.useQuery({ processName, page, pageSize: PAGE_SIZE }, {});
 
   if (query.isPending) {
     return (

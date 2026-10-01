@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { clusterGroups, middleEllipsis, splitIndexedSuffix } from "../../../index.ts";
+import {
+  clusterGroups,
+  middleEllipsis,
+  splitIndexedSuffix,
+} from "../../../model/queue-cluster-groups.ts";
 
 const TRACE =
   "project_LVYcVYGW1AJqvp2G8vcVd/command/recordSpan/trace:023eaa8bf3796bd67ac4e0498e984c2a";

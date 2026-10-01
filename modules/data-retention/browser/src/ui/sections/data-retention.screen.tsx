@@ -148,7 +148,7 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
     projectId,
     scope: storageScope,
   });
-  // Platform admin = an email in ADMIN_EMAILS, NOT an org admin. Only they may
+  // Platform admin = a holder of the platform-operator grant, NOT an org admin. Only they may
   // disable retention; the route enforces this independently. It decides
   // nothing here but whether the drawer offers the "No retention" option.
   const isPlatformAdmin = host.isPlatformAdmin();

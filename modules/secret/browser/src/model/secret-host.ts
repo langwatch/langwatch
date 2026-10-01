@@ -1,7 +1,7 @@
 /**
  * The port that the Secrets screen asks from its host application. Encapsulates browser
  * capabilities the host resolves (avoiding restricted imports like @langwatch/ui, router,
- * toast). Unique among host ports: includes switchProject for per-project scoping.
+ * toast). Unique among host ports: includes projectSwitcher for per-project scoping.
  */
 
 import { createContext, useContext } from "react";
@@ -9,14 +9,6 @@ import { createContext, useContext } from "react";
 /** The project the secrets on screen belong to. */
 export type SecretHostScope = {
   projectId: string | undefined;
-  projectName: string | undefined;
-};
-
-/** A short confirmation of something the reader just did. */
-export type SecretSuccessNotice = {
-  title: string;
-  description?: string;
-  id?: string;
 };
 
 /**
@@ -38,8 +30,6 @@ export abstract class SecretHostApi {
 
   /** Whether the reader holds a grant, answered synchronously and fail-closed. */
   abstract hasPermission(permission: string): boolean;
-
-  abstract succeeded(notice: SecretSuccessNotice): void;
 
   abstract failed(failure: SecretFailureNotice): void;
 

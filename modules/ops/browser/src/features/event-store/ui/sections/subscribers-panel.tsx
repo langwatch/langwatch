@@ -35,8 +35,7 @@ export function SubscribersCard() {
   const registry = api.ops.listProjections.useQuery(undefined, {
     staleTime: 10 * 60 * 1000,
   });
-  const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {
-  });
+  const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {});
   const actions = usePauseActions();
 
   const rows = useMemo(

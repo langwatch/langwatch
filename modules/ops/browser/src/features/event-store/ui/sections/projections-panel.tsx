@@ -8,8 +8,7 @@ export function ProjectionsCard() {
   const registry = api.ops.listProjections.useQuery(undefined, {
     staleTime: 10 * 60 * 1000,
   });
-  const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {
-  });
+  const dashboard = api.ops.getDashboardSnapshot.useQuery(undefined, {});
 
   const rows = useMemo(
     () =>

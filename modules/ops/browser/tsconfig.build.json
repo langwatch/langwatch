@@ -5,15 +5,11 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "paths": {
-      "@langwatch/ops-browser": ["./src/index.ts"],
       "@langwatch/identity-contract": ["../../identity/contract/src/index.ts"]
     }
   },
   "files": [
-    "./src/index.ts",
-    "./src/ui/sections/impersonation/index.ts",
-    "./src/ops.ts",
-    "./src/drawers.ts"
+    "./src/ui/sections/impersonation/index.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

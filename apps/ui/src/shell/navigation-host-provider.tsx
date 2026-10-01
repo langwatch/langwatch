@@ -123,6 +123,7 @@ function useNavigationHostReading({
     navigationHost,
     commandBar: palette,
     presenceMenuItem,
+    impersonationBanner,
   },
 }: {
   commandBar: boolean;
@@ -245,19 +246,31 @@ function useNavigationHostReading({
 
   const routePattern = routePatternOf(pathname, route.reading().params);
 
-  // THE ACCOUNT DROPDOWN'S ONE ADDITION: presence, offered only on the
-  // surface that broadcasts it. The switches come off the graph already read,
-  // so the row and the lens read the same two facts.
-  const accountMenu = useMemo<NavigationAccountMenu | null>(() => {
-    if (!offersPresenceMenuItem(routePattern)) return null;
+  // The header carries ops's impersonation banner whenever the session says so
+  // (specs/auth/impersonation-banner.feature). Presence is offered only on the
+  // surface that broadcasts it, its switches off the graph already read.
+  const accountMenu = useMemo<NavigationAccountMenu>(() => {
+    const ImpersonationBanner = impersonationBanner.default;
+    const headerBanner = currentUser?.impersonator ? (
+      <ImpersonationBanner user={currentUser} />
+    ) : null;
+    if (!offersPresenceMenuItem(routePattern)) return { headerBanner };
     const flags = presenceFlagsOf({
       read,
       organizationId: activeScope.organizationId,
       projectId: activeScope.projectId,
     });
     const PresenceMenuItem = presenceMenuItem.default;
-    return { presence: <PresenceMenuItem {...flags} /> };
-  }, [routePattern, read, activeScope.organizationId, activeScope.projectId, presenceMenuItem]);
+    return { headerBanner, presence: <PresenceMenuItem {...flags} /> };
+  }, [
+    routePattern,
+    read,
+    activeScope.organizationId,
+    activeScope.projectId,
+    presenceMenuItem,
+    impersonationBanner,
+    currentUser,
+  ]);
 
   const setDocumentTitle = useCallback(
     (title: string) => documentTitle.set(title),

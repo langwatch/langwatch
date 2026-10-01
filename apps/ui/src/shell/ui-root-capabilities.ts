@@ -1,10 +1,11 @@
 /**
- * What the composition root takes from auth, organization, navigation and trace, loaded through
- * their declarations before anything renders (ARCHITECTURE.md 10.1).
+ * What the composition root takes from auth, organization, navigation, trace and ops, loaded
+ * through their declarations before anything renders (ARCHITECTURE.md 10.1).
  */
 
 import { authWeb } from "@langwatch/auth-browser/declaration";
 import { navigationWeb } from "@langwatch/navigation-browser/declaration";
+import { opsWeb } from "@langwatch/ops-browser/declaration";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
 import { traceWeb } from "@langwatch/trace-browser/declaration";
 
@@ -12,6 +13,7 @@ const auth = authWeb.installation.capabilities;
 const organization = organizationWeb.installation.capabilities;
 const navigation = navigationWeb.installation.capabilities;
 const trace = traceWeb.installation.capabilities;
+const ops = opsWeb.installation.capabilities;
 
 export type UiRootCapabilities = {
   session: Awaited<ReturnType<typeof auth.session.load>>;
@@ -24,6 +26,7 @@ export type UiRootCapabilities = {
   navigationChrome: Awaited<ReturnType<typeof navigation.chrome.load>>;
   commandBar: Awaited<ReturnType<typeof navigation.commandBar.load>>;
   presenceMenuItem: Awaited<ReturnType<typeof trace.presenceMenuItem.load>>;
+  impersonationBanner: Awaited<ReturnType<typeof ops.impersonationBanner.load>>;
 };
 
 export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
@@ -38,6 +41,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     navigationChrome,
     commandBar,
     presenceMenuItem,
+    impersonationBanner,
   ] = await Promise.all([
     auth.session.load(),
     auth.frontDoorTheme.load(),
@@ -49,6 +53,7 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     navigation.chrome.load(),
     navigation.commandBar.load(),
     trace.presenceMenuItem.load(),
+    ops.impersonationBanner.load(),
   ]);
   return {
     session,
@@ -61,5 +66,6 @@ export async function loadUiRootCapabilities(): Promise<UiRootCapabilities> {
     navigationChrome,
     commandBar,
     presenceMenuItem,
+    impersonationBanner,
   };
 }

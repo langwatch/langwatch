@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { LeftPanel } from "../../../index.ts";
+import { LeftPanel } from "../ui/elements/deja-view-left-panel.tsx";
 
 const projection = {
   projectionName: "traceSummary",

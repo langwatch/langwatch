@@ -9,8 +9,7 @@ import { replayStateColor } from "../elements/replay-state-badge.tsx";
 
 export function ReplayHistoryTable() {
   const router = useRouter();
-  const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {
-  });
+  const historyQuery = api.ops.getReplayHistory.useQuery(undefined, {});
 
   const history = historyQuery.data;
   if (!history || history.length === 0) return null;

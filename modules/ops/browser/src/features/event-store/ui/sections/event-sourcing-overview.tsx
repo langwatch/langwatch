@@ -21,10 +21,8 @@ import { ProcessRecentActions } from "./process-recent-actions-panel.tsx";
 /** Landing page: "is anything wrong, and where?" Headlines/pointers only. Subsystem
  * tables separate (space proportional to trouble, per ops-dashboard.md). */
 export function EventSourcingOverview() {
-  const fleet = api.ops.listProcessFleet.useQuery(undefined, {
-  });
-  const dead = api.ops.listDeadLetterCounts.useQuery(undefined, {
-  });
+  const fleet = api.ops.listProcessFleet.useQuery(undefined, {});
+  const dead = api.ops.listDeadLetterCounts.useQuery(undefined, {});
 
   if (fleet.isPending) {
     return (

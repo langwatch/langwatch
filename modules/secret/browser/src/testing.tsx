@@ -12,11 +12,9 @@ import {
   SecretHostProvider,
   type SecretFailureNotice,
   type SecretHostScope,
-  type SecretSuccessNotice,
 } from "./model/secret-host.ts";
 
 export class FakeSecretHost extends SecretHostApi {
-  readonly successes: SecretSuccessNotice[] = [];
   readonly failures: SecretFailureNotice[] = [];
 
   constructor(
@@ -30,15 +28,11 @@ export class FakeSecretHost extends SecretHostApi {
   }
 
   scope(): SecretHostScope {
-    return { projectId: "proj-1", projectName: "Web App", ...this.options.scope };
+    return { projectId: "proj-1", ...this.options.scope };
   }
 
   hasPermission(permission: string): boolean {
     return (this.options.grants ?? new Set(["secrets:manage", "secrets:view"])).has(permission);
-  }
-
-  succeeded(notice: SecretSuccessNotice): void {
-    this.successes.push(notice);
   }
 
   failed(failure: SecretFailureNotice): void {

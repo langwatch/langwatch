@@ -15,10 +15,7 @@ export interface PausedSchedulesResult {
 /** Needs dedicated endpoint; filtering listScheduledJobs drops inactive rows (ordered
  * active DESC, so LIMIT hides them). listPausedSchedules filters in SQL. */
 export function usePausedSchedules(): PausedSchedulesResult {
-  const query = api.ops.listPausedSchedules.useQuery(
-    { limit: PAGE_SIZE },
-    {},
-  );
+  const query = api.ops.listPausedSchedules.useQuery({ limit: PAGE_SIZE }, {});
 
   const rows = query.data?.schedules;
   const schedules = useMemo<PausedSchedule[]>(

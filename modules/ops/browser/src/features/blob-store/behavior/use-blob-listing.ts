@@ -34,8 +34,7 @@ export function useBlobListing(): BlobListing {
   const [queueName, setQueueName] = useState<string | null>(null);
   const [sort, setSort] = useState<OpsBlobSort>("largest");
 
-  const queues = api.ops.listBlobQueues.useQuery(undefined, {
-  });
+  const queues = api.ops.listBlobQueues.useQuery(undefined, {});
   const selectedQueue = queueName ?? queues.data?.[0] ?? null;
 
   const blobs = api.ops.listBlobs.useInfiniteQuery(
