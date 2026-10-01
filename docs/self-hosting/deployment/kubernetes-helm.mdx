@@ -111,27 +111,27 @@ With `autogen.enabled: false` the chart creates no Secrets; it reads them from S
 | `password` | Always |
 | `clusterSecret` | `clickhouse.replicas > 1` (Keeper inter-node auth). Setting it upfront keeps a later move to replicated ClickHouse a one-line change |
 
-A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key.
+A missing required key leaves the pods that read it in `CreateContainerConfigError`, naming the key. When the Secret already exists without `LANGY_INTERNAL_SECRET`, `helm install` and `helm upgrade` stop at render time and name the key instead.
 
 <Note>
-`autogen.enabled` is one switch for every Secret the chart generates (app, gateway, Langy, LangWatchQL and ClickHouse credentials). It has nothing to do with which databases are chart-managed. To bring your own PostgreSQL, Redis or ClickHouse, set that database's `chartManaged: false`.
+`autogen.enabled` controls the app Secret (app, gateway and Langy keys), the LangWatchQL passwords and the chart-managed ClickHouse credentials. Chart-managed PostgreSQL and Redis generate their passwords regardless of this setting. Each database's `chartManaged` setting decides whether the chart runs that database: to bring your own PostgreSQL, Redis or ClickHouse, set its `chartManaged: false`.
 </Note>
 
 <Note>
-**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL simply stays unavailable; set `lwql.enabled: false` to turn it off entirely.
+**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
 
-With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable; nothing else is affected. See the chart README for the exact role statements.
+With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
 </Note>
 
 <Note>
-**Clusters that forbid root pods** (Pod Security `restricted`, Kyverno/Gatekeeper `runAsNonRoot` policies): the Langy assistant pod runs as UID 0 with a small set of added capabilities, which it needs to isolate each session under its own UID. If your policy blocks that, turn Langy off. Everything else runs unchanged:
+**Clusters that forbid root pods** (Kyverno/Gatekeeper `runAsNonRoot` policies): the Langy assistant pod runs as UID 0 with a small set of added capabilities, which it needs to isolate each session under its own UID. If your policy blocks that, turn Langy off. Every other LangWatch pod already runs as non-root:
 
 ```yaml
 langyagent:
   chartManaged: false
 ```
 
-This removes the pod and every reference to it, and `LANGY_INTERNAL_SECRET` is no longer needed. See [Langy](/self-hosting/langy/overview) for running it under a sandboxed runtime instead.
+This removes the pod and every reference to it, and `LANGY_INTERNAL_SECRET` is no longer needed. A sandboxed runtime (see [Langy](/self-hosting/langy/overview)) hardens Langy where root pods are allowed; it does not satisfy a `runAsNonRoot` policy. For Pod Security Admission `restricted`, which also rejects the bundled Prometheus, apply the [`strict-admission` overlay](/self-hosting/security#strict-admission-control) instead.
 </Note>
 
 For external databases, create additional secrets:
@@ -452,7 +452,7 @@ Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
-   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
+   The [Production Deployment](#production-deployment) section above lists the keys the Secret needs. With `autogen.enabled=false` and a required key missing, the pods that read it stay in `CreateContainerConfigError` naming the key (a missing `LANGY_INTERNAL_SECRET` in an existing Secret stops the render instead); under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
 2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
