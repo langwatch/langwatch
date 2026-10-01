@@ -142,7 +142,7 @@ Both NLP and LangEvals make outbound calls to external LLM providers for model-b
 A Go service (image `langwatch/ai-gateway`, subchart `gateway`) that terminates virtual-key traffic and forwards it to the model providers configured in LangWatch. It reads each key's configuration (providers, budgets, guardrails, routing) from the App over the cluster network and reports usage back to it.
 
 - Your LLM clients, coding agents and the Langy agent call it with a virtual key
-- It needs its own externally reachable hostname (`gateway.ingress.host`, `gateway.publicUrl`) when clients outside the cluster use it
+- It needs its own externally reachable hostname (`ingress.gateway.host`, or `gateway.publicUrl` behind your own route) when clients outside the cluster use it
 - `gateway.chartManaged: false` removes it
 
 ### Langy Agent (port 8080, Service port 80)
@@ -292,7 +292,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally. The AI Gateway subchart renders its own Ingress by default (`gateway.ingress.enabled`), which serves clients outside the cluster once an Ingress controller routes `gateway.ingress.host` to it. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway is exposed only when you set `ingress.gateway.host`, which renders a second Ingress for `/v1` and `/health` with the app Ingress class. See [Routing](/self-hosting/deployment/routing). Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
@@ -300,7 +300,7 @@ The App is exposed externally. The AI Gateway subchart renders its own Ingress b
 | Workers | None (no Service needed) | No |
 | NLP | ClusterIP | No |
 | LangEvals | ClusterIP | No |
-| AI Gateway | ClusterIP, plus its own Ingress | Optional, for clients outside the cluster |
+| AI Gateway | ClusterIP, plus an Ingress when `ingress.gateway.host` is set | Optional, for clients outside the cluster |
 | Langy Agent | ClusterIP | No |
 | PostgreSQL | ClusterIP | No |
 | ClickHouse | ClusterIP | No |
