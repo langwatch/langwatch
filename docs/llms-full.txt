@@ -61089,8 +61089,10 @@ response gives a different issuer, you get an error and the connection is not sa
 
 Check an issuer by fetching its discovery document:
 
+Replace `YOUR_TENANT_ID` with your tenant id, or set `ISSUER` to your provider's issuer:
+
 ```bash
-ISSUER="https://login.microsoftonline.com/<tenant id>/v2.0"
+ISSUER="https://login.microsoftonline.com/YOUR_TENANT_ID/v2.0"
 curl "$ISSUER/.well-known/openid-configuration"
 ```
 

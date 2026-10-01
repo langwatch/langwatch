@@ -113,7 +113,6 @@ export class InMemoryCredentials implements SsoCredentialStore {
     return ref;
   }
 
-  /** How many credential records were stored. */
   get count(): number {
     return this.held.size;
   }
