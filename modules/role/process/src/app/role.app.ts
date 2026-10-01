@@ -27,7 +27,7 @@ import {
   PersonalWorkspaceNotManagedHereError,
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   OrgExclusivePermissionScopeError,
   RoleApi,
@@ -72,7 +72,7 @@ export class RoleApp implements RoleApi {
     organizations: OrganizationApi,
     entitlement: EntitlementApi,
   };
-  static readonly reads = reads("prisma");
+  static readonly reads = ["prisma"] as const;
 
   #roles: RoleService;
   #permissions: AuthzApi;

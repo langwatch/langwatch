@@ -81,7 +81,7 @@ describe("given the checked-in module lists", () => {
       const root = moduleTree(`
         export class AnnotationApp {
           static readonly contract = AnnotationApi;
-          static readonly reads = reads("clock", "logger");
+          static readonly reads = ["clock", "logger"] as const;
         }
       `);
 

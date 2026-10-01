@@ -24,7 +24,7 @@ import {
   type AuthzScopeRef,
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
@@ -81,7 +81,7 @@ export class AuthzApp implements AuthzApi {
    * counter lives on it, and every process installing AuthZ opens Redis
    * anyway - this states the dependency instead of hiding it behind a null.
    */
-  static readonly reads = reads("prisma", "redis");
+  static readonly reads = ["prisma", "redis"] as const;
 
   #permissions: AuthzService;
   #grantIdentity = AuthzGrantIdentityService.create();

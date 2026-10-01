@@ -32,7 +32,7 @@ import {
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -135,7 +135,7 @@ export class EntitlementApp implements EntitlementApiContract {
   static readonly config = entitlementConfig;
   /** `logger` is the closed member; `isSaas`/`processName` are named raw so
    * `withMember`/`withMembers` can answer them (see {@link EntitlementMembers}). */
-  static readonly reads = [...reads("logger"), "isSaas", "processName"] as const;
+  static readonly reads = ["logger", "isSaas", "processName"] as const;
 
   #plans: EntitlementService;
   #usage: UsageStatsService;

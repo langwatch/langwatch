@@ -65,7 +65,7 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import type { MailSender } from "@langwatch/mail";
 import { NotificationService } from "@langwatch/notification-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import {
   internalSlackSignupsWebhook,
   Secret,
@@ -162,18 +162,18 @@ export interface AuthInviteDirectory {
 }
 
 /**
- * The closed members this module reads through {@link reads}, restated as a
+ * The closed members this module reads as a literal, restated as a
  * named tuple so `publicBaseUrl` (a process fact, not one of the fourteen)
  * can be appended to the runtime list below without losing this typing.
  */
-const AUTH_CLOSED_READS = reads(
+const AUTH_CLOSED_READS = [
   "encryption",
   "logger",
   "prisma",
   "redis",
   "rateLimiter",
   "secrets",
-);
+] as const;
 
 /**
  * Process-supplied infrastructure. Declared members required at boot;

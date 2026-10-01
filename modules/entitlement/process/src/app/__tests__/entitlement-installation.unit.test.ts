@@ -79,7 +79,7 @@ describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
    * @scenario "An organization's month volume is counted from its projects in its metering unit"
-   * `EntitlementApp` declares `reads("logger")` and no subscription
+   * `EntitlementApp` declares `reads = ["logger"]` and no subscription
    * dependency at all, and its declared `license` dependency is answered
    * here with a source that never grants — so a plain boot, with no
    * Enterprise billing composed and no active license, still resolves a

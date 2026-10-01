@@ -73,7 +73,7 @@ import { IdentityApi } from "@langwatch/identity-contract";
 import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
@@ -258,7 +258,7 @@ export class ScimApp implements ScimApiContract {
   };
   static readonly config = scimConfig;
   static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
-  static readonly reads = reads("eventing");
+  static readonly reads = ["eventing"] as const;
   static readonly operatorReads = scimOperatorReads;
 
   readonly #scim: ScimService;

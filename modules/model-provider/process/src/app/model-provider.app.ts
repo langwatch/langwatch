@@ -70,7 +70,7 @@ import {
   type ModelProviderCustomKeys,
 } from "@langwatch/model-provider-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 
@@ -242,7 +242,7 @@ export class ModelProviderApp implements ModelProviderApi {
     ...ModelProviderApp.platformCredentials,
     ...ModelProviderApp.operationalSecrets,
   } as const;
-  static readonly reads = [...reads("redis"), "nlpServiceUrl"] as const;
+  static readonly reads = ["redis", "nlpServiceUrl"] as const;
 
   static async create(setup: ModelProviderSetup): Promise<ModelProviderApp> {
     return ModelProviderApp.withPlatformChain(

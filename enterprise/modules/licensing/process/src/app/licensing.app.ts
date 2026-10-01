@@ -66,7 +66,6 @@ import type { FeatureSetup } from "@langwatch/kernel";
 import { optionalUsageReportKeys } from "@langwatch/ops-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  reads,
   type Encryption,
   type MembersRead,
   type RateLimiter,
@@ -233,7 +232,10 @@ export class LicensingApp implements LicensingApiContract {
   } as const;
   /** `isSaas` and `serviceVersion` are the process's own facts, drilled in. */
   static readonly reads = [
-    ...reads("prisma", "logger", "encryption", "rateLimiter"),
+    "prisma",
+    "logger",
+    "encryption",
+    "rateLimiter",
     "isSaas",
     "serviceVersion",
   ] as const;

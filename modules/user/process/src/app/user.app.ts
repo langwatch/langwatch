@@ -26,7 +26,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceInput,
 } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant } from "@langwatch/time";
@@ -169,7 +169,7 @@ type UserSetup = FeatureSetup<
 export class UserApp implements UserApi {
   static readonly contract = UserApi;
   /** `publicBaseUrl` is named raw: the process answers it, no store does. */
-  static readonly reads = [...reads("prisma", "redis"), "publicBaseUrl"] as const;
+  static readonly reads = ["prisma", "redis", "publicBaseUrl"] as const;
   static readonly dependencies: {
     auth: typeof AuthApi;
     authz: typeof AuthzApi;

@@ -455,6 +455,12 @@ decides it, and no layer, projection or screen re-derives another's answer.
 | Permission              | May this user do it?                                                       | authz; the service checks before acting                                                                                                 | The session's `hasPermission` / `hasOrganizationPermission`                                                                             |
 | Release flag            | Is it rolled out here yet?                                                 | Feature flags                                                                                                                           | The flags host service                                                                                                                  |
 
+**Fixed bounds read the registry; per-organization bounds ask entitlement** (Alex, 2026-10-01). A
+bound fixed before any organization is known (a route's body limit at declaration, a default page
+size, a per-IP rate limit before auth) reads `@langwatch/plans` directly. Every bound that varies
+by organization goes through `EntitlementApi.requestBound` / `assertWithinUsageLimit`. Known gap:
+fixed bounds do not honour the `LANGWATCH_REQUEST_BOUNDS` override.
+
 **Off is opaque by default.** The feature is hidden or disabled, and the screen says only "contact
 LangWatch support" (SaaS) or "contact your administrator" (self-hosted), never why. A reader holding
 the permission that could fix it may be told what is missing, through a read only that permission
@@ -957,14 +963,11 @@ This is the four-way rule's second way, and it is why a config fact two modules
 both want is not evidence that the fact should be process-wide — it is usually
 evidence that one of them owns it and the other should be asking.
 
-Note the two member vocabularies, which are not interchangeable: `reads(...)`
-from `@langwatch/process-stores/members` is a **closed** list of the fifteen
-store members, so `reads("publicBaseUrl")` is a compile error on purpose. A
-module reading anything else declares the raw literal
-`static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates
-the member shapes in its own `Readonly<{…}>` type — a module depends on
-contracts, never on the stores package's types. `modules/platform-health` and
-`modules/project` are the exemplars.
+**One member vocabulary** (Alex, 2026-10-01): every module declares the raw literal
+`static readonly reads = ["prisma", "publicBaseUrl"] as const` and restates the member shapes
+in its own `Readonly<{…}>` type — a module depends on contracts, never on the stores package's
+types. The `reads(...)` helper from `@langwatch/process-stores/members` is deleted (§15);
+`modules/platform-health` and `modules/project` are the exemplars.
 
 **A credential's owner builds what others need from it** (ruled 2026-09-24,
 ADR-132 applied). The stores own `CLICKHOUSE_URL` and `DATABASE_URL`, and a

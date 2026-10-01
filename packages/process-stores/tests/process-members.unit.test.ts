@@ -19,7 +19,7 @@ import {
   MemberNotConfiguredError,
   MemberSuppliedUndefinedError,
 } from "../src/create-members.ts";
-import { MEMBER_NAMES, reads, type ProcessConfig } from "../src/index.ts";
+import { MEMBER_NAMES, type ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all. */
 function config(overrides: Partial<ProcessConfig> = {}): ProcessConfig {
@@ -180,10 +180,6 @@ describe("given the closed member list", () => {
     it("names no audit member: the sink is the audit-log module's app", () => {
       expect([...MEMBER_NAMES]).not.toContain("audit");
       expect(MEMBER_NAMES).toHaveLength(15);
-    });
-
-    it("reads a module's declaration back as the tuple it wrote", () => {
-      expect(reads("clock", "logger")).toEqual(["clock", "logger"]);
     });
   });
 });

@@ -20,7 +20,7 @@ import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { Secret } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
@@ -617,7 +617,8 @@ export class WorkflowApp implements WorkflowApi {
    * the project secrets `projectEnvironment` reads.
    */
   static readonly reads = [
-    ...reads("prisma", "encryption"),
+    "prisma",
+    "encryption",
     "nlpServiceUrl",
     "nlpCodeBlockTimeoutSeconds",
     "publicBaseUrl",

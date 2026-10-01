@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { credentialsSecret, sessionSecret } from "@langwatch/secrets";
 import {
@@ -23,7 +23,7 @@ import type { SlackRepositories } from "../repositories/slack.repositories.ts";
 import { SlackConnectionClaimService } from "../services/slack-connection-claim.service.ts";
 import { SlackConnectionService } from "../services/slack-connection.service.ts";
 
-const slackReads = reads("encryption");
+const slackReads = ["encryption"] as const;
 
 type SlackSetup = FeatureSetup<
   typeof SlackApp.dependencies,

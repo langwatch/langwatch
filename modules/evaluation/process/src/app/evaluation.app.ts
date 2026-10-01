@@ -42,7 +42,7 @@ import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { openAiApiKey, Secret } from "@langwatch/secrets";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
@@ -272,7 +272,7 @@ export class EvaluationApp implements EvaluationApiContract {
     /** The experiment and run history SDK batches and dataset evaluations are written into. */
     experiments: ExperimentApi,
   };
-  static readonly reads = reads("objectStorage");
+  static readonly reads = ["objectStorage"] as const;
   static readonly secrets = {
     openAi: openAiApiKey,
     azureContentSafety: Secret.load("AZURE_CONTENT_SAFETY_KEY", { optional: true }),

@@ -101,7 +101,7 @@ import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OnboardingApi } from "@langwatch/onboarding-contract";
 import { PresenceApi } from "@langwatch/presence-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi } from "@langwatch/scenario-contract";
@@ -225,7 +225,7 @@ export interface LangyLocalControl {
   baseHost: string | undefined;
 }
 
-const langyStores = reads("prisma", "redis", "rateLimiter");
+const langyStores = ["prisma", "redis", "rateLimiter"] as const;
 
 /** `publicBaseUrl` is the process's own fact, absent where the deployment named no `BASE_HOST`. */
 type LangySetup = FeatureSetup<

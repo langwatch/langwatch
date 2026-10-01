@@ -17,7 +17,6 @@ import {
   type PresenceCursorEvent,
   type PresenceEvent,
 } from "@langwatch/presence-contract";
-import { reads } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 import type { Cluster, Redis } from "ioredis";
@@ -69,7 +68,7 @@ type PresenceSetup = FeatureSetup<
 export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
-  static readonly reads = reads("redis", "logger");
+  static readonly reads = ["redis", "logger"] as const;
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;

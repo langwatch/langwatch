@@ -46,7 +46,7 @@ import { NotificationService } from "@langwatch/notification-contract";
  */
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
+import { type MembersRead, type RateLimiter } from "@langwatch/process-stores/members";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { Temporal, nowInstant } from "@langwatch/time";
@@ -420,7 +420,10 @@ export class IdentityApp implements IdentityApi, IdentityLookupApi, TwoStepVerif
     notifications: NotificationService,
   };
   static readonly reads = [
-    ...reads("prisma", "eventing", "encryption", "rateLimiter"),
+    "prisma",
+    "eventing",
+    "encryption",
+    "rateLimiter",
     "isSaas",
     "adminEmails",
     "publicBaseUrl",

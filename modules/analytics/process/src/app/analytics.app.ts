@@ -423,7 +423,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi, An
       Promise.resolve(new ClickHouseMemberSession(clickhouse, tenantId));
     const analytics = AnalyticsAdapter.create({
       resolveClient,
-      // The member is a `reads("clickhouse")` claim: boot refuses this
+      // The member is a `reads = ["clickhouse"]` claim: boot refuses this
       // process before `create()` runs if no ClickHouse was configured, so by
       // the time this constructs, ClickHouse is always available.
       clickhouseEnabled: true,

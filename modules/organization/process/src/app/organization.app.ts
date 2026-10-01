@@ -118,7 +118,7 @@ import {
   type LimitType,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi, type PaginatedProjects, type Project } from "@langwatch/project-contract";
 import { RoleApi } from "@langwatch/role-contract";
 import { internalSlackSignupsWebhook } from "@langwatch/secrets";
@@ -326,7 +326,10 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   };
   /** Named raw: the process answers these two, no store carries them. */
   static readonly reads = [
-    ...reads("prisma", "encryption", "logger", "redis"),
+    "prisma",
+    "encryption",
+    "logger",
+    "redis",
     "publicBaseUrl",
     "processName",
   ] as const;

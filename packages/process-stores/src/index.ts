@@ -1,11 +1,10 @@
 /**
  * The members a process hands its modules, and the function that builds them
  * from parsed config. No pool noun on purpose: a module names the members it
- * reads with {@link reads} and is handed exactly those.
+ * reads in `static readonly reads` and is handed exactly those.
  */
 export {
   MEMBER_NAMES,
-  reads,
   type Cache,
   type Clock,
   type Encryption,

@@ -8,13 +8,13 @@ import {
 } from "@langwatch/enterprise-saas-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 
 import { productAnalyticsChannels } from "../channels/product-analytics-channels.registry.ts";
 import { LangWatchCloudService } from "../services/langwatch-cloud.service.ts";
 import { UsageReportReceiverService } from "../services/usage-report-receiver.service.ts";
 
-const SAAS_CLOSED_READS = reads("logger", "clock", "rateLimiter");
+const SAAS_CLOSED_READS = ["logger", "clock", "rateLimiter"] as const;
 
 /** The process members Cloud reads: three of the closed record, and the process's `isSaas` fact. */
 export type SaasProcessMembers = MembersRead<typeof SAAS_CLOSED_READS> &

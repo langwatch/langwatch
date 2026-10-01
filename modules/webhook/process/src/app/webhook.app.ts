@@ -10,7 +10,7 @@ import type { EventingParticipation, FeatureSetup } from "@langwatch/kernel";
  */
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant, type Instant } from "@langwatch/time";
 import {
   WebhookApi,
@@ -140,7 +140,7 @@ export interface WebhookAppDependencies {
   requests?: WebhookRequestService;
 }
 
-const storeReads = reads("rateLimiter");
+const storeReads = ["rateLimiter"] as const;
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookApp.dependencies,

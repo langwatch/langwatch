@@ -10,13 +10,13 @@ import {
 import type { StaticPipelineDefinition } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { nowInstant } from "@langwatch/time";
 
 import { buildDemoDataPipeline } from "../eventing/demo-data.pipeline.ts";
 import { DemoDataService } from "../services/demo-data.service.ts";
 
-const DEMO_DATA_READS = reads("logger");
+const DEMO_DATA_READS = ["logger"] as const;
 
 type DemoDataSetup = FeatureSetup<
   typeof DemoDataApp.dependencies,

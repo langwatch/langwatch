@@ -5,7 +5,7 @@ import {
   type PinTraceInput,
 } from "@langwatch/data-retention-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   ShareApi,
@@ -45,7 +45,7 @@ export class ShareApp implements ShareApiContract {
     authorization: AuthzApi,
     projects: ProjectApi,
   };
-  static readonly reads = reads("redis");
+  static readonly reads = ["redis"] as const;
 
   readonly #shares: ShareService;
   readonly #retention: DataRetentionApi;

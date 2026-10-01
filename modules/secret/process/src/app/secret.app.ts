@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 /** The secret feature application shared by all transports. */
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   RESERVED_PROJECT_SECRET_NAMES,
@@ -40,7 +40,7 @@ type SecretSetup = FeatureSetup<
 export class SecretApp implements SecretApiContract {
   static readonly contract = SecretApi;
   static readonly dependencies = { projects: ProjectApi, permissions: AuthzApi };
-  static readonly reads = reads("encryption");
+  static readonly reads = ["encryption"] as const;
 
   #secrets: SecretService;
   #reveals: OneTimeRevealService;

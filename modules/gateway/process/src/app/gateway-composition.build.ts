@@ -324,7 +324,7 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     spendEvents,
     projects,
     usage,
-    // `reads("clickhouse")` is a boot claim: a process that opened no
+    // `reads = ["clickhouse"]` is a boot claim: a process that opened no
     // ClickHouse never reaches this function, so the spend source is present
     // whenever the control plane is.
     spendSourceAvailable: true,

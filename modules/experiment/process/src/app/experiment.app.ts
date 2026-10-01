@@ -86,7 +86,7 @@ import {
 import type { FeatureSetup } from "@langwatch/kernel";
 import { ModelProviderApi, type ModelCostRate } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
-import { reads, type MembersRead } from "@langwatch/process-stores/members";
+import { type MembersRead } from "@langwatch/process-stores/members";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
@@ -303,7 +303,10 @@ export class ExperimentApp implements ExperimentApi {
   };
   static readonly config = experimentConfig;
   static readonly reads = [
-    ...reads("prisma", "clickhouse", "redis", "logger"),
+    "prisma",
+    "clickhouse",
+    "redis",
+    "logger",
     "publicBaseUrl",
     "processName",
     "isSaas",
