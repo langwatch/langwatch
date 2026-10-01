@@ -621,7 +621,7 @@ export interface TraceAppDependencies {
    * operations refuse by name rather than answering an empty run.
    */
   instantEvals?: InstantEvalApi;
-  /** The model seam the AI search composer calls; absent, the three AI operations refuse by name. */
+  /** The AI search composer's model seam; absent, the three AI operations refuse by name. */
   models?: Pick<ModelProviderApi, "generateText" | "generateStructured">;
   codingAgents: CodingAgentApi;
   presence?: PresenceApi;
