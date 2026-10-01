@@ -1,4 +1,5 @@
 import { generate } from "@langwatch/ksuid";
+import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
 import { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyTurnAdmissionRepository } from "../langy-turn-admission.repository.ts";
@@ -212,13 +213,14 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
           },
         );
       } catch (error) {
-        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS && isRetryableTransactionError(error)) {
-          continue;
-        }
-        throw error;
+        if (!isRetryableTransactionError(error)) throw error;
+        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS) continue;
+        throw new LangyAgentUnavailableError(
+          "Too many turns are starting at once. Please retry shortly.",
+        );
       }
     }
-    throw new Error("unreachable: Langy turn admission retries exhausted");
+    throw new LangyAgentUnavailableError();
   }
 
   async commit(input: {
