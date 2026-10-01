@@ -1,10 +1,10 @@
+import { operatorFeatureFlagCatalogueSchema } from "@langwatch/feature-flag-contract";
 /**
  * The deployment-wide levers an operator pulls: feature flags, the blob
  * store, and system migrations. Anything that can destroy a payload also
  * asks for a non-impersonated session and a typed `confirm`.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
-import { operatorFeatureFlagCatalogueSchema } from "@langwatch/feature-flag-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

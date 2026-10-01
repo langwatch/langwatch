@@ -123,7 +123,9 @@ describe("ImpersonationService", () => {
     );
   });
 
-  /** @scenario "An admin cannot impersonate another admin" */
+  /** @scenario An administrator cannot impersonate another administrator */
+  /** @scenario A deactivated account cannot be impersonated */
+  /** @scenario An account that does not exist is not impersonated */
   it("rejects missing, deactivated, and platform-admin targets", async () => {
     await expect(
       serviceFor(new InMemoryImpersonationRepository(null)).service.start(input),
@@ -194,7 +196,7 @@ describe("ImpersonationService", () => {
       ...overrides,
     });
 
-    /** @scenario "An operator cannot hop from one impersonation straight into another" */
+    /** @scenario An operator already impersonating cannot jump straight to another account */
     it("refuses the hop before looking the target up or auditing anything", async () => {
       const repository = new InMemoryImpersonationRepository(target());
       repository.window = openWindow();
@@ -208,7 +210,7 @@ describe("ImpersonationService", () => {
       expect(repository.window).toEqual(openWindow());
     });
 
-    /** @scenario "An operator cannot hop from one impersonation straight into another" */
+    /** @scenario An operator already impersonating cannot jump straight to another account */
     it("allows the start once the window has lapsed or names the operator themselves", async () => {
       const lapsed = new InMemoryImpersonationRepository(target());
       lapsed.window = openWindow({ expires: Temporal.Instant.from("2025-12-31T23:59:59.000Z") });

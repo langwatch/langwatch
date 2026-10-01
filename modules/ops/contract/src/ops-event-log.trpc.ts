@@ -3,7 +3,7 @@
  * event log, read one aggregate's events, recompute a projection, drive a
  * rebuild, and the anomalies raised alongside them.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { opsDismissAnomalyInputSchema } from "./ops-anomaly.ts";

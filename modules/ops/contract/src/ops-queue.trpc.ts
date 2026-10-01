@@ -3,7 +3,7 @@
  * list what is blocked, parked or retired; writes unblock, drain, retire
  * and replay it. See `ops-dashboard.trpc.ts` for why this is one of five.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { groupInfoSchema } from "./ops-dashboard.ts";
