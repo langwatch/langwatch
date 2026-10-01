@@ -9,18 +9,14 @@ import { scenarioRunKeyPermissions } from "../scenario-run-key.rules.ts";
 
 describe("scenarioRunKeyPermissions", () => {
   /** @scenario "A run nobody started calls LangWatch with a project key holding only what it needs" */
-  it("gives a prompt, code, http or voice target traces alone", () => {
-    for (const targetType of ["prompt", "code", "http", "voice"]) {
+  it("gives every non-workflow target what the child itself calls: run events and its traces", () => {
+    for (const targetType of ["prompt", "code", "http", "voice", "connected"]) {
       expect(scenarioRunKeyPermissions({ targetType, workflowNodes: undefined })).toEqual([
         "traces:create",
+        "traces:view",
+        "scenarios:create",
       ]);
     }
-  });
-
-  it("adds the agent relay for a connected agent", () => {
-    expect(
-      scenarioRunKeyPermissions({ targetType: "connected", workflowNodes: undefined }),
-    ).toEqual(["traces:create", "scenarios:create"]);
   });
 
   it("follows the workflow graph for a workflow target", () => {
@@ -28,10 +24,14 @@ describe("scenarioRunKeyPermissions", () => {
 
     expect(scenarioRunKeyPermissions({ targetType: "workflow", workflowNodes: nodes })).toEqual([
       "traces:create",
+      "traces:view",
+      "scenarios:create",
       "evaluations:manage",
     ]);
     expect(scenarioRunKeyPermissions({ targetType: "workflow", workflowNodes: [] })).toEqual([
       "traces:create",
+      "traces:view",
+      "scenarios:create",
     ]);
   });
 });

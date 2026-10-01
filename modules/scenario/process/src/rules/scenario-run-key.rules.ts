@@ -1,8 +1,9 @@
 import { runKeyPermissions } from "@langwatch/workflow-contract";
 
 /**
- * What a scenario run's child calls LangWatch for, and nothing more: traces always, the agent
- * relay for a connected agent, and whatever the graph needs when the target is a workflow.
+ * What a scenario run's child calls LangWatch for, and nothing more: its own run events and the
+ * agent relay (scenarios:create), traces written and read back for the judge, and whatever the
+ * graph needs when the target is a workflow.
  */
 export function scenarioRunKeyPermissions({
   targetType,
@@ -11,11 +12,12 @@ export function scenarioRunKeyPermissions({
   targetType: string;
   workflowNodes: unknown;
 }): readonly string[] {
-  if (targetType === "connected") return ["traces:create", "scenarios:create"];
-  if (targetType !== "workflow") return ["traces:create"];
+  const child = ["traces:create", "traces:view", "scenarios:create"];
+  if (targetType !== "workflow") return child;
 
-  return runKeyPermissions({
+  const graph = runKeyPermissions({
     eventType: "execute_flow",
     nodes: Array.isArray(workflowNodes) ? workflowNodes : [],
   });
+  return [...new Set([...child, ...graph])];
 }
