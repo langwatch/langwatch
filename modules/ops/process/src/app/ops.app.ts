@@ -112,7 +112,6 @@ import {
   type OpsServerConfig,
   type ProductAnalyticsTarget,
   type SubmitBugReport,
-  type AdminOperationInput,
   type AdminOperationResult,
   type CanaryRedriveQueueDlqInput,
   type CanaryRedriveQueueDlqResult,
@@ -1169,9 +1168,6 @@ export class OpsModule implements OpsApi {
   stopImpersonation(input: StopImpersonationInput): Promise<void> {
     return this.#dependencies.ops.stopImpersonation(input);
   }
-  adminOperation(input: AdminOperationInput): Promise<AdminOperationResult> {
-    return this.#dependencies.ops.adminOperation(input);
-  }
 
   async startAdminImpersonation(
     input: StartAdminImpersonationInput,
@@ -1216,6 +1212,14 @@ export class OpsModule implements OpsApi {
       });
     }
     if (resource.data === "subscription") this.#refuseWithoutCloudOps();
+    // A deactivation change is account lifecycle: refused when impersonating, as user's door does.
+    if (
+      input.actor?.impersonator &&
+      resource.data === "user" &&
+      "deactivatedAt" in (input.params.data ?? {})
+    ) {
+      throw new OpsImpersonatedOperatorRefusedError();
+    }
 
     return this.#dependencies.ops.adminOperation({
       resource: resource.data,

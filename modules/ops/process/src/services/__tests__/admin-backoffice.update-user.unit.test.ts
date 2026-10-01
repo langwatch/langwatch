@@ -82,14 +82,38 @@ describe("AdminBackofficeService user update", () => {
       "deactivates through user, as the operator, keeping no picked date",
       { deactivatedAt: "2026-01-02T03:04:05.000Z" },
     ],
-    ["deactivates without an unreadable picked date", { deactivatedAt: "not a date" }],
-    ["passes an unrecognised deactivation value through", { deactivatedAt: 5 }],
+    [
+      "deactivates on an unreadable picked date as on a readable one",
+      { deactivatedAt: "not a date" },
+    ],
     ["changes the email and revokes sessions", { email: " New@Example.com " }],
     ["keeps sessions when the email is unchanged", { email: "SAME@example.com" }],
     ["saves plain fields only", { name: "Only" }],
     ["combines every side effect", { deactivatedAt: null, email: "a@b.c", name: "N" }],
   ])("%s", async (_label, data) => {
     expect(await updateUser(data)).toMatchSnapshot();
+  });
+
+  it("refuses an unrecognised deactivation value with validation_error and writes nothing", async () => {
+    const log: unknown[] = [];
+    const service = AdminBackofficeService.create({
+      repository: new RecordingRepository(log),
+      users: new TestUserApi({}),
+      auth: createApiFixture<AuthApi>({}),
+      audit: new RecordingAudit(log),
+    });
+    const params = { id: "user-1", data: { deactivatedAt: 5, name: "X" } };
+
+    await expect(
+      service.execute({
+        resource: "user",
+        method: "update",
+        params,
+        actorId: "olive",
+        req: { headers: {} },
+      }),
+    ).rejects.toMatchObject({ code: "validation_error" });
+    expect(log).toEqual([]);
   });
 });
 
@@ -113,4 +137,32 @@ describe("AdminBackofficeService user writes past the user module", () => {
     ).rejects.toMatchObject({ code: "validation_error" });
     expect(log).toEqual([]);
   });
+});
+
+describe("AdminBackofficeService user create", () => {
+  /** @scenario "The Back office creates an account only as active" */
+  it.each([null, "2026-01-02T03:04:05.000Z", 5])(
+    "refuses a deactivation value of %s with validation_error and writes nothing",
+    async (deactivatedAt) => {
+      const log: unknown[] = [];
+      const service = AdminBackofficeService.create({
+        repository: new RecordingRepository(log),
+        users: new TestUserApi({}),
+        auth: createApiFixture<AuthApi>({}),
+        audit: new RecordingAudit(log),
+      });
+      const params = { data: { email: "new@example.com", deactivatedAt } };
+
+      await expect(
+        service.execute({
+          resource: "user",
+          method: "create",
+          params,
+          actorId: "olive",
+          req: { headers: {} },
+        }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      expect(log).toEqual([]);
+    },
+  );
 });

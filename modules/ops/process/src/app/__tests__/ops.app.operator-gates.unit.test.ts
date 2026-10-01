@@ -4,7 +4,7 @@
  * ops:manage for writes, the impersonator's own grant when impersonating.
  * Spec: modules/ops/specs/admin.feature
  */
-import type { OpsOperator } from "@langwatch/ops-contract";
+import type { AdminOperationInput, OpsOperator } from "@langwatch/ops-contract";
 import { describe, expect, it } from "vitest";
 
 import { createOpsTestApp, platformOperatorAuthz } from "./ops.fixture.ts";
@@ -79,5 +79,56 @@ describe("given the platform-operator grant answers through authz", () => {
 
     await expect(run(OUTSIDER, "getList")).rejects.toMatchObject({ code: "not_found" });
     await expect(run(VIEWER, "update")).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
+describe("given an impersonating operator in the Back office", () => {
+  const backOfficeCalls: AdminOperationInput[] = [];
+  const { app: backOffice } = createOpsTestApp({
+    authz: platformOperatorAuthz({ holders: { [MANAGER.id]: ["ops:view", "ops:manage"] } }),
+    capability: {
+      adminOperation: async (input) => {
+        backOfficeCalls.push(input);
+        return { data: { id: input.params.id } };
+      },
+    },
+  });
+  const run = (method: "create" | "update", data: Record<string, unknown>) =>
+    backOffice.runAdminOperation({
+      actor: IMPERSONATING_MANAGER,
+      req: { headers: {} },
+      resource: "user",
+      method,
+      params: { id: "user_target", data },
+    });
+
+  /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
+  it.each<["create" | "update", unknown]>([
+    ["update", null],
+    ["update", "2026-01-02T03:04:05.000Z"],
+    ["update", ""],
+    ["update", 5],
+    ["create", null],
+    ["create", "2026-01-02T03:04:05.000Z"],
+  ])(
+    "refuses %s with a deactivation of %s and never reaches the back office or user",
+    async (method, deactivatedAt) => {
+      backOfficeCalls.length = 0;
+      await expect(run(method, { deactivatedAt })).rejects.toMatchObject({
+        code: "ops_impersonated_operator_refused",
+      });
+      expect(backOfficeCalls).toEqual([]);
+    },
+  );
+
+  /** @scenario "An impersonating operator cannot deactivate or reactivate an account from the back office" */
+  it("still lets the impersonating operator update a user's other fields", async () => {
+    backOfficeCalls.length = 0;
+    await expect(run("update", { name: "Renamed" })).resolves.toEqual({
+      data: { id: "user_target" },
+    });
+    expect(backOfficeCalls.map((call) => [call.method, call.params.data, call.actorId])).toEqual([
+      ["update", { name: "Renamed" }, MANAGER.id],
+    ]);
   });
 });

@@ -87,6 +87,15 @@ export class AdminBackofficeService {
     }
     if (
       parsed.resource === "user" &&
+      parsed.method === "create" &&
+      "deactivatedAt" in (parsed.params.data ?? {})
+    ) {
+      throw new ValidationError("A new account starts active", {
+        meta: { fieldErrors: { deactivatedAt: ["Create the account, then deactivate it."] } },
+      });
+    }
+    if (
+      parsed.resource === "user" &&
       parsed.method === "update" &&
       parsed.params.id &&
       parsed.params.data
@@ -107,13 +116,14 @@ export class AdminBackofficeService {
     const sideEffectAudits: UserSideEffectAudit[] = [];
 
     if ("deactivatedAt" in data) {
-      const audits = await this.applyDeactivation({
-        userId,
-        actorId: input.actorId,
-        value: data.deactivatedAt,
-      });
-      if (audits.length > 0) delete data.deactivatedAt;
-      sideEffectAudits.push(...audits);
+      sideEffectAudits.push(
+        await this.applyDeactivation({
+          userId,
+          actorId: input.actorId,
+          value: data.deactivatedAt,
+        }),
+      );
+      delete data.deactivatedAt;
     }
 
     if ("email" in data && typeof data.email === "string") {
@@ -145,7 +155,7 @@ export class AdminBackofficeService {
   }
 
   /**
-   * Reactivates on a blank value, deactivates on a date; any other value is left to the save.
+   * Reactivates on a blank value, deactivates on a date; any other value is refused.
    * Both go through user's lifecycle, which stamps the database's clock, so a picked date is
    * not kept: the fact names the operator as its actor.
    */
@@ -157,16 +167,22 @@ export class AdminBackofficeService {
     userId: string;
     actorId: string;
     value: unknown;
-  }): Promise<UserSideEffectAudit[]> {
+  }): Promise<UserSideEffectAudit> {
     const actor: LedgerActor = { type: "user", id: actorId };
     if (value === null || value === "") {
       await this.users.reactivate({ id: userId, actor });
-      return [{ action: "update/user", payload: { id: userId, reactivate: true } }];
+      return { action: "update/user", payload: { id: userId, reactivate: true } };
     }
-    if (typeof value !== "string" && !(value instanceof Date)) return [];
+    if (typeof value !== "string" && !(value instanceof Date)) {
+      throw new ValidationError("Unreadable deactivation", {
+        meta: {
+          fieldErrors: { deactivatedAt: ["Send a date to deactivate, or null to reactivate."] },
+        },
+      });
+    }
 
     await this.users.deactivate({ id: userId, actor });
-    return [{ action: "update/user", payload: { id: userId, deactivate: true } }];
+    return { action: "update/user", payload: { id: userId, deactivate: true } };
   }
 
   /** Saves the normalised email; a real change signs the user out of every browser. */

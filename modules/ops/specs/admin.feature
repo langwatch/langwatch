@@ -127,3 +127,17 @@ Feature: Platform administration package boundary
     When they bulk-update, delete or bulk-delete users through the Back office
     Then the write is refused with validation_error
     And no user row is written and nothing is audited
+
+  @unit
+  Scenario: An impersonating operator cannot deactivate or reactivate an account from the back office
+    Given an operator holding the manage grant who is impersonating an account
+    When they write a user's deactivation through the Back office
+    Then the write is refused with ops_impersonated_operator_refused
+    And user is never asked to deactivate or reactivate the account
+
+  @unit
+  Scenario: The Back office creates an account only as active
+    Given an operator holding the manage grant, impersonating or not
+    When they create a user through the Back office with a deactivation value
+    Then the write is refused with validation_error
+    And no user row is written and nothing is audited

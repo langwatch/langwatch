@@ -105,7 +105,7 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
+exports[`AdminBackofficeService user update > deactivates on an unreadable picked date as on a readable one 1`] = `
 {
   "log": [
     [
@@ -137,7 +137,7 @@ exports[`AdminBackofficeService user update > deactivates through user, as the o
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates without an unreadable picked date 1`] = `
+exports[`AdminBackofficeService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
 {
   "log": [
     [
@@ -192,37 +192,6 @@ exports[`AdminBackofficeService user update > keeps sessions when the email is u
     [
       "repository.findUserById",
       "user-1",
-    ],
-  ],
-  "result": {
-    "data": {
-      "id": "user-1",
-    },
-  },
-}
-`;
-
-exports[`AdminBackofficeService user update > passes an unrecognised deactivation value through 1`] = `
-{
-  "log": [
-    [
-      "repository.execute",
-      {
-        "data": {
-          "deactivatedAt": 5,
-        },
-        "id": "user-1",
-      },
-    ],
-    [
-      "audit.record",
-      "admin/update/user",
-      {
-        "data": {
-          "deactivatedAt": 5,
-        },
-        "id": "user-1",
-      },
     ],
   ],
   "result": {

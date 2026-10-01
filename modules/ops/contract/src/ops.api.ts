@@ -8,7 +8,6 @@ import type { SearchProjectsResult } from "@langwatch/project-contract";
 import type {
   AdminImpersonationStarted,
   AdminImpersonationStopped,
-  AdminOperationInput,
   AdminOperationResult,
   RunAdminOperationInput,
   StartAdminImpersonationInput,
@@ -410,7 +409,6 @@ export interface OpsApi {
   runAdminOperation(input: RunAdminOperationInput): Promise<AdminOperationResult>;
   startImpersonation(input: StartImpersonationInput): Promise<void>;
   stopImpersonation(input: StopImpersonationInput): Promise<void>;
-  adminOperation(input: AdminOperationInput): Promise<AdminOperationResult>;
   listBlobQueues(): Promise<string[]>;
   getBlobStoreStats(): Promise<OpsBlobStoreStats>;
   listBlobs(input: ListBlobsInput): Promise<OpsBlobPage>;
