@@ -27,8 +27,8 @@ vi.mock("@langwatch/analytics-browser-kit", () => ({
   useFilterParams: () => ({ filterParams: { filters: {} }, queryOpts: {} }),
 }));
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
+vi.mock("../../../../behavior/analytics-api.ts", () => ({
+  analyticsApi: {
     traces: {
       getTopicCounts: {
         useQuery: () => ({

@@ -17,6 +17,7 @@ import type {
   TRPCQueryProcedure,
   TRPCSubscriptionProcedure,
 } from "@trpc/server";
+import type { Serialize } from "@trpc/server/unstable-core-do-not-import";
 
 /**
  * One procedure as a feature web package describes it. Feature writes a plain nested map; this
@@ -79,13 +80,56 @@ export type ContractApiMap<TContract> = TContract extends {
   ? NamespaceKeyed<Namespace, { [Name in keyof Members]: ContractMemberShape<Members[Name]> }>
   : never;
 
+/**
+ * JSON that may also hold `undefined` members. tRPC's own JSON check refuses those, then walks a
+ * recursive one without end (TS2589); a value of this shape is already its own wire shape.
+ */
+type LooseJson =
+  | string
+  | number
+  | boolean
+  | null
+  | readonly LooseJson[]
+  | { readonly [key: string]: LooseJson | undefined };
+
+/** What tRPC's `Serialize<>` treats as `Function`: dropped from objects. */
+type Callable = ((...args: never[]) => unknown) | (abstract new (...args: never[]) => unknown);
+
+/** `Serialize<{ toJSON(): X }>` is X verbatim: a held member arrives as {@link Wire} says. */
+type Held<V> = 0 extends 1 & V
+  ? V
+  : unknown extends V
+    ? V
+    : V extends boolean | number | string | null | undefined | void | symbol | Callable
+      ? V
+      : { toJSON(): Wire<V> };
+
+/**
+ * tRPC's `Serialize<>`, except loose JSON is answered as is instead of walked. One known
+ * difference: a required `X | undefined` member of pure JSON stays required (tRPC: optional).
+ */
+type Wire<T> = 0 extends 1 & T ? T : T extends LooseJson ? T : WireMembers<T>;
+
+/** A value that is not loose JSON: tRPC serialises it, after each plain-object member is held. */
+type WireMembers<T> = T extends
+  | { toJSON(): unknown }
+  | Map<unknown, unknown>
+  | ReadonlySet<unknown>
+  | PromiseLike<unknown>
+  | AsyncIterable<unknown>
+  | Callable
+  ? Serialize<T>
+  : T extends object
+    ? Serialize<{ [K in keyof T]: Held<T[K]> }>
+    : Serialize<T>;
+
 type ProceduresFrom<TMap> = {
   [K in keyof TMap]: TMap[K] extends { query: { input: infer TIn; output: infer TOut } }
-    ? TRPCQueryProcedure<{ input: TIn; output: TOut; meta: unknown }>
+    ? TRPCQueryProcedure<{ input: TIn; output: Held<TOut>; meta: unknown }>
     : TMap[K] extends { mutation: { input: infer TIn; output: infer TOut } }
-      ? TRPCMutationProcedure<{ input: TIn; output: TOut; meta: unknown }>
+      ? TRPCMutationProcedure<{ input: TIn; output: Held<TOut>; meta: unknown }>
       : TMap[K] extends { subscription: { input: infer TIn; output: infer TOut } }
-        ? TRPCSubscriptionProcedure<{ input: TIn; output: TOut; meta: unknown }>
+        ? TRPCSubscriptionProcedure<{ input: TIn; output: Held<TOut>; meta: unknown }>
         : ProceduresFrom<TMap[K]>;
 };
 

@@ -4,9 +4,12 @@
  * Drawer -> Dialog on this branch; the wire name did not change.
  */
 
+import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
+import { savedViewTrpc } from "@langwatch/dashboard-contract";
 import { defineWebModule } from "@langwatch/ui-kernel";
 import { createElement } from "react";
 
+import { analyticsApi } from "./behavior/analytics-api.ts";
 import type { CustomGraphScreenMode } from "./ui/sections/analytics/custom-graph.screen.tsx";
 
 /** The chart builder serves both its addresses; the mode is the route's own key. */
@@ -20,6 +23,7 @@ function customGraph(mode: CustomGraphScreenMode) {
 }
 
 export const analyticsWeb = defineWebModule("analytics")
+  .withApi(analyticsApi, { contracts: [analyticsTrpc, analyticsLwqlTrpc, savedViewTrpc] })
   .withHosts({
     requires: ["AnalyticsHostApi"],
     mounts: { AnalyticsHostApi: { load: () => import("./behavior/analytics-host-mount.tsx") } },

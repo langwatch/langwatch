@@ -10,10 +10,9 @@ import {
   type FilterParam,
   useFilterParams,
 } from "@langwatch/analytics-browser-kit";
+import type { OutputsFromMap } from "@langwatch/api/web";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { api } from "@langwatch/browser-trpc/workflow-api";
-import type { SavedView as StoredSavedView } from "@langwatch/dashboard-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import type React from "react";
 import {
@@ -25,7 +24,9 @@ import {
   useRef,
   useState,
 } from "react";
+import { z } from "zod";
 
+import { analyticsApi, type AnalyticsApiMap } from "../../behavior/analytics-api.ts";
 import {
   type DefaultView,
   findMatchingView,
@@ -39,6 +40,9 @@ import {
   withoutView,
   withViewRenamed,
 } from "./saved-views-logic.ts";
+
+/** One stored view as the browser receives it, derived from the contract output. */
+type StoredSavedView = OutputsFromMap<AnalyticsApiMap>["savedViews"]["getAll"][number];
 
 // Re-export types and constants for consumers
 export {
@@ -155,22 +159,40 @@ function buildViewQuery({
 // DB → client conversion
 // ---------------------------------------------------------------------------
 
-function toClientView(dbView: {
-  id: string;
-  name: string;
-  userId?: string | null;
-  filters: unknown;
-  query: string | null;
-  period: unknown;
-}): SavedView {
-  return {
-    id: dbView.id,
-    name: dbView.name,
-    userId: dbView.userId,
-    filters: (dbView.filters ?? {}) as Partial<Record<FilterField, FilterParam>>,
-    query: dbView.query ?? undefined,
-    period: dbView.period as SavedView["period"],
-  };
+const filterParamSchema = z.union([
+  z.array(z.string()),
+  z.record(z.string(), z.array(z.string())),
+  z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+]);
+
+const storedViewRowSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  userId: z.string().nullish(),
+  filters: z.record(z.string(), filterParamSchema).catch({}),
+  query: z.string().nullish(),
+  period: z
+    .object({
+      relativeDays: z.number().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    })
+    .nullish()
+    .catch(undefined),
+});
+
+/** Parses the wire rows once: stored filters and period are free JSON until checked. */
+function toClientViews(rows: StoredSavedView[] | undefined): SavedView[] | undefined {
+  const parsed = z.array(storedViewRowSchema).safeParse(rows);
+  if (!parsed.success) return undefined;
+  return parsed.data.map((row) => ({
+    id: row.id,
+    name: row.name,
+    userId: row.userId,
+    filters: row.filters,
+    query: row.query ?? undefined,
+    period: row.period ?? undefined,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +201,7 @@ function toClientView(dbView: {
 
 type ViewFilters = Partial<Record<FilterField, FilterParam>>;
 type SavedViewsRouter = ReturnType<typeof useRouter>;
-type SavedViewsUtils = ReturnType<typeof api.useUtils>;
+type SavedViewsUtils = ReturnType<typeof analyticsApi.useUtils>;
 type Flag = { current: boolean };
 
 /**
@@ -207,19 +229,19 @@ function useCustomViews(projectId: string) {
     return readCachedViews(projectId) ?? undefined;
   }, [projectId]);
 
-  const savedViewsQuery = api.savedViews.getAll.useQuery({ projectId }, { enabled: !!projectId });
-  const rawViews: StoredSavedView[] | undefined = savedViewsQuery.data;
+  const savedViewsQuery = analyticsApi.savedViews.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+  const serverViews = useMemo(() => toClientViews(savedViewsQuery.data), [savedViewsQuery.data]);
   const isInitialized = savedViewsQuery.isFetched || cachedViews !== undefined;
 
-  const customViews = useMemo(() => {
-    if (rawViews) return rawViews.map(toClientView);
-    return cachedViews ?? [];
-  }, [rawViews, cachedViews]);
+  const customViews = useMemo(() => serverViews ?? cachedViews ?? [], [serverViews, cachedViews]);
 
   useEffect(() => {
-    if (!projectId || !rawViews) return;
-    writeCachedViews(projectId, rawViews.map(toClientView));
-  }, [projectId, rawViews]);
+    if (!projectId || !serverViews) return;
+    writeCachedViews(projectId, serverViews);
+  }, [projectId, serverViews]);
 
   return { customViews, isInitialized };
 }
@@ -228,10 +250,10 @@ function useCustomViews(projectId: string) {
 function useSavedViewMutations(projectId: string, utils: SavedViewsUtils) {
   const refresh = { onSuccess: () => void utils.savedViews.getAll.invalidate({ projectId }) };
   return {
-    createMutation: api.savedViews.create.useMutation(refresh),
-    deleteMutation: api.savedViews.delete.useMutation(refresh),
-    renameMutation: api.savedViews.rename.useMutation(refresh),
-    reorderMutation: api.savedViews.reorder.useMutation(refresh),
+    createMutation: analyticsApi.savedViews.create.useMutation(refresh),
+    deleteMutation: analyticsApi.savedViews.delete.useMutation(refresh),
+    renameMutation: analyticsApi.savedViews.rename.useMutation(refresh),
+    reorderMutation: analyticsApi.savedViews.reorder.useMutation(refresh),
   };
 }
 
@@ -362,8 +384,8 @@ function optimisticStoredView(input: {
     period: view.period ?? null,
     order,
     kind: "v1-traces-filter",
-    createdAt: toDate(nowInstant()),
-    updatedAt: toDate(nowInstant()),
+    createdAt: toDate(nowInstant()).toISOString(),
+    updatedAt: toDate(nowInstant()).toISOString(),
   };
 }
 
@@ -535,7 +557,7 @@ function useSavedViewsInternal() {
   const projectId = project?.id ?? "";
   const router = useRouter();
   const { filters } = useFilterParams();
-  const utils = api.useUtils();
+  const utils = analyticsApi.useUtils();
 
   const selection = useStoredSelection(projectId);
   const { selectedViewId, setSelectedViewIdState, skipNextMatchRef, pendingRestoreRef } = selection;

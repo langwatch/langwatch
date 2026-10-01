@@ -16,6 +16,7 @@ import type {
   dashboardWidgetTrpcRowSchema,
   graphDetailSchema,
   graphListItemSchema,
+  savedViewTrpc,
 } from "@langwatch/dashboard-contract";
 import type { z } from "zod";
 
@@ -334,6 +335,7 @@ type BorrowedProcedures = {
 
 export type AnalyticsApiMap = ContractApiMap<typeof analyticsTrpc> &
   ContractApiMap<typeof analyticsLwqlTrpc> &
+  ContractApiMap<typeof savedViewTrpc> &
   BorrowedProcedures;
 
 /**

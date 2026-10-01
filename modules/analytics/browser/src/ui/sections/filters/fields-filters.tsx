@@ -20,10 +20,9 @@ import {
   type FilterParam,
   useFilterParams,
 } from "@langwatch/analytics-browser-kit";
+import type { OutputsFromMap, RouterFromMap } from "@langwatch/api/web";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/browser-trpc/workflow-api";
-import { api } from "@langwatch/browser-trpc/workflow-api";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { useColorRawValue } from "@langwatch/design-system/color-mode";
 import { InputGroup } from "@langwatch/design-system/input-group";
@@ -43,7 +42,11 @@ import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
 
-import type { AnalyticsFilterOption } from "../../../behavior/analytics-api.ts";
+import {
+  analyticsApi,
+  type AnalyticsApiMap,
+  type AnalyticsFilterOption,
+} from "../../../behavior/analytics-api.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */
@@ -729,7 +732,7 @@ function ListSelection({
   const filter = availableFilters[filterId];
 
   const { filterParams, queryOpts } = useFilterParams();
-  const filterData = api.analytics.dataForFilter.useQuery(
+  const filterData = analyticsApi.analytics.dataForFilter.useQuery(
     {
       ...filterParams,
       field: filterId,
@@ -747,15 +750,16 @@ function ListSelection({
   const options = useMemo(() => {
     const sortingFn = (a: { count: number }, b: { count: number }) => (a.count > b.count ? -1 : 1);
 
+    const all: AnalyticsFilterOption[] = filterData.data?.options ?? [];
     if (query) {
-      return filterData.data?.options
-        .filter((option: AnalyticsFilterOption) => {
-          return option.label.toLowerCase().includes(query.toLowerCase());
-        })
+      return all
+        .filter((option: AnalyticsFilterOption) =>
+          option.label.toLowerCase().includes(query.toLowerCase()),
+        )
         .toSorted(sortingFn);
     }
 
-    return filterData.data?.options.toSorted(sortingFn);
+    return all.toSorted(sortingFn);
   }, [filterData.data?.options, query]);
 
   // Use immediateQuery for custom value display (no debounce delay)
@@ -910,8 +914,8 @@ function RangeFilter({
   onChange,
 }: {
   filterData: UseTRPCQueryResult<
-    RouterOutputs["analytics"]["dataForFilter"],
-    TRPCClientErrorLike<WorkflowApiRouter>
+    OutputsFromMap<AnalyticsApiMap>["analytics"]["dataForFilter"],
+    TRPCClientErrorLike<RouterFromMap<AnalyticsApiMap>>
   >;
   currentValues: string[];
   onChange: (value: string[]) => void;
