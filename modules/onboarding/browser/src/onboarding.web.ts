@@ -5,12 +5,14 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 
+import { onboardingGuidedPath } from "./features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingGuidedTour } from "./features/guided-onboarding/behavior/guided-tour.capability.ts";
 
 export const onboardingWeb = defineBrowserModule("onboarding")
   // The tour's state for Langy's tour card, and the Home offer a screen draws in its own space.
   .withCapabilities({
     guidedTour: onboardingGuidedTour,
+    guidedPathActive: onboardingGuidedPath,
     guidedOnboardingOffer: {
       load: () => import("./features/guided-onboarding/ui/home/guided-onboarding-offer.tsx"),
     },

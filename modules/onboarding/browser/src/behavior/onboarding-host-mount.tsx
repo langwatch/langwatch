@@ -70,7 +70,7 @@ const INERT_SIDEBAR: OnboardingSidebarCapability = {
 };
 const INERT_GOVERNANCE: OnboardingGovernanceCapability = {
   setSampleChoice() {
-    /* no governance capability wired yet */
+    /* no governance module installed */
   },
 };
 
@@ -221,6 +221,11 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
     [declarations],
   );
 
+  const governance = useMemo(
+    () => declarations.declared("sampleChoice")[0]?.capability ?? INERT_GOVERNANCE,
+    [declarations],
+  );
+
   const scope: OnboardingScope = useMemo(
     () => ({
       organization: graph.organization,
@@ -254,7 +259,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
         failed: (failure) => feedback.failed(failure),
         langy,
         sidebar,
-        governance: INERT_GOVERNANCE,
+        governance,
         joinOffers,
       }),
     [
@@ -271,6 +276,7 @@ export default function OnboardingHostMount({ children }: { children?: ReactNode
       joinOffers,
       langy,
       sidebar,
+      governance,
     ],
   );
 

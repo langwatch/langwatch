@@ -6,7 +6,11 @@
 
 import { defineBrowserModule } from "@langwatch/browser";
 
+import { writeSampleChoice } from "./ui/elements/governance-sample-mode.ts";
+
 export const governanceWeb = defineBrowserModule("governance")
+  /** The sample-data choice onboarding's guided tour shows and hides. */
+  .withCapabilities({ sampleChoice: { setSampleChoice: writeSampleChoice } })
   .withHosts({
     requires: ["GovernanceHostApi"],
     mounts: {

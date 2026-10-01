@@ -3,6 +3,7 @@
 import { createUi } from "@langwatch/browser";
 import { describe, expect, it } from "vitest";
 
+import { onboardingGuidedPath } from "../features/guided-onboarding/behavior/guided-path-active.capability.ts";
 import { onboardingWeb } from "../onboarding.web.ts";
 
 function browserDocument() {
@@ -66,6 +67,12 @@ describe("given a browser that installs onboarding", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
+    });
+  });
+
+  describe("when a peer reads whether a guided path is active", () => {
+    it("lends the guided path as guidedPathActive", () => {
+      expect(onboardingWeb.installation.capabilities.guidedPathActive).toBe(onboardingGuidedPath);
     });
   });
 });

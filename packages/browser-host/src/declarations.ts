@@ -643,6 +643,12 @@ export type UiNavigationSidebar = {
   restoreAll(): void;
 };
 
+/** Governance's sample-data choice, written by onboarding's guided tour. */
+export type UiGovernanceSampleChoice = { setSampleChoice(choice: boolean): void };
+
+/** Onboarding's guided path; `useIsActive` is a hook, call it during render. */
+export type UiGuidedPathActive = { useIsActive(): boolean };
+
 export type UiDeclaredCapabilities = {
   addOrEditDatasetDrawer: UiDeclaredComponent<UiAddOrEditDatasetDrawerProps>;
   agentActionsMenu: UiDeclaredComponent<UiAgentActionsMenuProps>;
@@ -663,6 +669,7 @@ export type UiDeclaredCapabilities = {
   editModelProviderForm: UiDeclaredComponent<UiEditModelProviderFormProps>;
   guidedOnboarding: UiLangyGuidedOnboarding;
   guidedOnboardingOffer: UiDeclaredComponent<UiGuidedOnboardingOfferProps>;
+  guidedPathActive: UiGuidedPathActive;
   guidedTour: UiGuidedTour;
   heroAskField: UiDeclaredComponent<UiHeroAskFieldProps>;
   hoverableBigText: UiDeclaredComponent<UiHoverableBigTextProps>;
@@ -691,6 +698,7 @@ export type UiDeclaredCapabilities = {
   renderInputOutput: UiDeclaredComponent<UiRenderInputOutputProps>;
   resourceLimitRow: UiDeclaredComponent<UiResourceLimitRowProps>;
   runExperimentViaApiDialog: UiDeclaredComponent<UiRunExperimentViaApiDialogProps>;
+  sampleChoice: UiGovernanceSampleChoice;
   setupWithAgentButton: UiDeclaredComponent<UiSetupWithAgentButtonProps>;
   sidebar: UiNavigationSidebar;
   signInMethodLinking: UiDeclaredOperations<UiSignInMethodLinking>;
