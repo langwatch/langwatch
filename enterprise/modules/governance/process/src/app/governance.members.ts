@@ -448,6 +448,9 @@ export interface GovernanceOcsfEventWriter {
   insertEvent(row: GovernanceOcsfEvent): Promise<void>;
 }
 
+/** The organization's hidden governance project, resolved by the caller from its owner. */
+export type ActivityMonitorTenant = { govProjectId: string | null };
+
 export interface ActivityMonitorRepository {
   sourceDataCoverage(input: {
     organizationId: string;
@@ -459,27 +462,38 @@ export interface ActivityMonitorRepository {
     lastSuccessfulPullIso: string | null;
     days: { dayStartIso: string; covered: boolean }[];
   }>;
-  summary(input: ActivityMonitorWindowQuery): Promise<ActivityMonitorSummary>;
-  spendByUser(input: ActivityMonitorPagedWindowQuery): Promise<SpendByUserRow[]>;
-  spendByTeam(input: ActivityMonitorPagedWindowQuery): Promise<SpendByTeamRow[]>;
+  summary(
+    input: ActivityMonitorWindowQuery & ActivityMonitorTenant,
+  ): Promise<ActivityMonitorSummary>;
+  spendByUser(
+    input: ActivityMonitorPagedWindowQuery & ActivityMonitorTenant,
+  ): Promise<SpendByUserRow[]>;
+  spendByTeam(
+    input: ActivityMonitorPagedWindowQuery & ActivityMonitorTenant,
+  ): Promise<SpendByTeamRow[]>;
   spendByDepartment(input: ActivityMonitorWindowQuery): Promise<SpendByDepartmentRow[]>;
-  spendOverTime(input: {
-    organizationId: string;
-    windowDays: number;
-    groupBy: SpendOverTimeGroupBy;
-  }): Promise<SpendOverTimeResult>;
+  spendOverTime(
+    input: {
+      organizationId: string;
+      windowDays: number;
+      groupBy: SpendOverTimeGroupBy;
+    } & ActivityMonitorTenant,
+  ): Promise<SpendOverTimeResult>;
   recentAnomalies(input: { organizationId: string; limit?: number }): Promise<RecentAnomalyRow[]>;
-  ingestionSourcesHealth(input: { organizationId: string }): Promise<IngestionSourceHealthRow[]>;
-  eventsForSource(input: {
-    organizationId: string;
-    sourceId: string;
-    limit?: number;
-    beforeIso?: string;
-  }): Promise<ActivityEventDetailRow[]>;
-  sourceHealthMetrics(input: {
-    organizationId: string;
-    sourceId: string;
-  }): Promise<SourceHealthMetrics>;
+  ingestionSourcesHealth(
+    input: { organizationId: string } & ActivityMonitorTenant,
+  ): Promise<IngestionSourceHealthRow[]>;
+  eventsForSource(
+    input: {
+      organizationId: string;
+      sourceId: string;
+      limit?: number;
+      beforeIso?: string;
+    } & ActivityMonitorTenant,
+  ): Promise<ActivityEventDetailRow[]>;
+  sourceHealthMetrics(
+    input: { organizationId: string; sourceId: string } & ActivityMonitorTenant,
+  ): Promise<SourceHealthMetrics>;
 }
 
 export type GovernanceClickHouseResult = {

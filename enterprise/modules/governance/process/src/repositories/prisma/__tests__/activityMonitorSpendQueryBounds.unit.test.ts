@@ -8,12 +8,13 @@
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
 } from "../../../app/governance.members.ts";
-import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
+import type { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
 
 type ClickHouseCall = Parameters<GovernanceClickHouseClient["query"]>[0];
 
@@ -38,7 +39,7 @@ const NOW = Date.UTC(2026, 1, 1);
 
 function repository() {
   const clickhouse = new RecordedClickHouseClient();
-  const repo = PrismaActivityMonitorRepository.create({
+  const repo = createActivityMonitorTestService({
     prisma: prismaDouble({
       project: {
         findFirst: async () => ({ id: "governance-project" }),
@@ -57,7 +58,7 @@ function repository() {
 /** Each spend read, driven to completion; a read added later without a bound fails here. */
 const READS: {
   name: string;
-  run: (repo: PrismaActivityMonitorRepository) => Promise<unknown>;
+  run: (repo: ActivityMonitorService) => Promise<unknown>;
 }[] = [
   { name: "summary", run: (repo) => repo.summary({ organizationId: "org-a", windowDays: 7 }) },
   {

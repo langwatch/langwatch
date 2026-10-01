@@ -410,6 +410,7 @@ export interface GovernanceAppDependencies {
       | "getTeamWithMembers"
       | "getSessionPolicy"
       | "saveSessionPolicy"
+      | "getSettings"
     >;
   /** The SSO directory's external ids, which the identity match reads as proof. */
   scim: Pick<ScimApi, "findDirectoryExternalIds">;
@@ -554,7 +555,10 @@ export class GovernanceApp implements GovernanceRestApi {
     this.repositories = repositories;
     this.encryption = encryption;
     this.anomalyRules = AnomalyRuleService.create({ repository: repositories.anomalyRules });
-    this.activityMonitor = ActivityMonitorService.create(repositories.activityMonitor);
+    this.activityMonitor = ActivityMonitorService.create({
+      repository: repositories.activityMonitor,
+      projects: dependencies.projects,
+    });
     this.planGate = GovernancePlanGateService.create({ entitlements: dependencies.entitlements });
     this.costAttributionPolicy = PostgresGovernancePolicyService.create(
       repositories.costAttributionPolicies,
@@ -680,7 +684,7 @@ export class GovernanceApp implements GovernanceRestApi {
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
     });
     this.ocsfExport = DefaultGovernanceOcsfExportService.create({
-      repository: repositories.ocsfExports,
+      projects: dependencies.projects,
       events: repositories.ocsfEvents,
     });
     this.quarantineFill = QuarantineFillEvaluatorService.create({
@@ -699,6 +703,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     this.spendSpikes = SpendSpikeAnomalyEvaluatorService.create({
       repository: repositories.spendSpikeAnomalies,
+      projects: dependencies.projects,
       spend: repositories.anomalySpend,
       dispatcher: AnomalyAlertDispatcherService.create({
         http: HttpAnomalyAlertChannel.create(),
@@ -782,6 +787,7 @@ export class GovernanceApp implements GovernanceRestApi {
     });
     const supportContacts = OrganizationSupportContactService.create({
       repository: repositories.supportContacts,
+      organizations: dependencies.organizations,
     });
     this.cliBootstraps = DefaultGovernanceCliBootstrapService.create({
       catalog: this.aiTools,

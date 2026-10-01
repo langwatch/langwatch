@@ -46,8 +46,6 @@ export type MemoryGovernanceAlert = AnomalyAlertDispatchRecord & {
  */
 export class MemoryGovernanceStore {
   readonly people = new Map<string, MemoryGovernancePerson>();
-  readonly supportContacts = new Map<string, string>();
-  readonly governanceTenantIds = new Map<string, string>();
   readonly members: MemoryGovernanceMember[] = [];
   readonly departments: Department[] = [];
   readonly departmentMemberships: MemoryDepartmentMembershipLink[] = [];

@@ -55,7 +55,7 @@ async function buildApp(planType: string) {
     repositories: { ...MemoryGovernanceRepositories.create(), activityMonitor: activity },
     dependencies: {
       agents: createApiFixture<AgentApi>(),
-      projects: createApiFixture<ProjectApi>(),
+      projects: createApiFixture<ProjectApi>({ findInternal: async () => null }),
       auth: createApiFixture<AuthApi>(),
       entitlements: createApiFixture<EntitlementApi>({
         getActivePlan: async (input) => {

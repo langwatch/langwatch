@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const query = vi.fn();
 
+import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 import type { GovernanceClickHouseResolver } from "../../../app/governance.members.ts";
-import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
 
 class FakeClickHouseResolver implements GovernanceClickHouseResolver {
   async getClient() {
@@ -12,7 +12,7 @@ class FakeClickHouseResolver implements GovernanceClickHouseResolver {
 }
 
 function activityMonitor(prisma: unknown) {
-  return PrismaActivityMonitorRepository.create({
+  return createActivityMonitorTestService({
     prisma: prisma as never,
     clickhouse: new FakeClickHouseResolver(),
   });

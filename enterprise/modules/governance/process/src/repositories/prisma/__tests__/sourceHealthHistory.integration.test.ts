@@ -13,7 +13,7 @@ import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PrismaActivityMonitorRepository } from "../prisma.ingestion-source-activity.repository.ts";
+import { createActivityMonitorTestService } from "../../../__tests__/testing.ts";
 
 const DAY_MS = 86_400_000;
 
@@ -123,7 +123,7 @@ describe("source health during a historical provider import", () => {
         ],
         clickhouse_settings: { async_insert: 0 },
       });
-      const repository = PrismaActivityMonitorRepository.create({
+      const repository = createActivityMonitorTestService({
         prisma: prismaDouble({ project: { findFirst: async () => ({ id: tenantId }) } }),
         clickhouse: { getClient: async () => clickhouse },
       });
