@@ -3,7 +3,7 @@
 import type { UiStudioPromptEditorProps } from "@langwatch/browser-host/declarations";
 import { useMemo } from "react";
 
-import { nodeDataToLocalPromptConfig } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
+import { nodeDataToLocalPromptConfig } from "../../../model/prompt-node-conversion.ts";
 import { PromptEditorDrawer } from "./prompt-editor-drawer.tsx";
 
 export function LentStudioPromptEditor({ nodeData, ...props }: UiStudioPromptEditorProps) {

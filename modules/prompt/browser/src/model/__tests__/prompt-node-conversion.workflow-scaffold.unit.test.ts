@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { nodeDataToLocalPromptConfig } from "../llm-prompt-config-utils.ts";
+import { nodeDataToLocalPromptConfig } from "../prompt-node-conversion.ts";
 
 describe("nodeDataToLocalPromptConfig — workflow scaffold round-trip (Issue #3196)", () => {
   describe("given a scaffolded signature node carrying the registry's default system message", () => {

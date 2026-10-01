@@ -6,7 +6,7 @@ import { formSchema } from "@langwatch/prompt-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
+import { formValuesToTriggerSaveVersionParams } from "../../prompt-node-conversion.ts";
 import { buildDefaultFormValues } from "../default-form-values.ts";
 
 describe("formValuesToTriggerSaveVersionParams", () => {

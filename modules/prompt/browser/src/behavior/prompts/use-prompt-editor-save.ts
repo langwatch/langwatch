@@ -5,6 +5,7 @@ import { promptClient } from "@langwatch/prompt-client";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useRef, useState } from "react";
 
+import { formValuesToTriggerSaveVersionParams } from "../../model/prompt-node-conversion.ts";
 import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
 import {
   type ChangeHandleFormValues,
@@ -13,7 +14,6 @@ import {
 } from "../../prompt-form.ts";
 import { promptApi } from "../prompt-api.ts";
 import type { usePromptConfigForm } from "../use-prompt-config-form.ts";
-import { formValuesToTriggerSaveVersionParams } from "./llm-prompt-config-utils.ts";
 
 type SavedPrompt = {
   id: string;
