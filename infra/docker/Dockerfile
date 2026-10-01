@@ -176,6 +176,12 @@ COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
+
+# Every tiktoken encoding file, so token counting reads it from disk instead of
+# downloading it from openaipublic.blob.core.windows.net at runtime (about 8 MB).
+ENV TIKTOKENS_PATH=/app/tiktoken
+RUN cd platform/app && node scripts/download-tiktoken-encodings.mjs "$TIKTOKENS_PATH"
+
 EXPOSE 5560
 
 # Set bash as the default shell

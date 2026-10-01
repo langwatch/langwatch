@@ -111,6 +111,14 @@ spec:
             - name: CPU_COUNT
               value: {{ include "langwatch.langevals.cpuCount" . | quote }}
             {{- end }}
+            {{- /* RAGAS_DO_NOT_TRACK: RAGAS usage analytics to
+                   t.explodinggradients.com. LITELLM_LOCAL_MODEL_COST_MAP: the
+                   price list LiteLLM otherwise downloads from
+                   raw.githubusercontent.com at import; the copy bundled with
+                   the pinned LiteLLM is used instead. */}}
+            {{- include "langwatch.privacyDefaultEnvs" (dict "extraEnvs" .Values.langevals.extraEnvs "defaults" (list
+                  (dict "name" "RAGAS_DO_NOT_TRACK" "value" "true")
+                  (dict "name" "LITELLM_LOCAL_MODEL_COST_MAP" "value" "True"))) | nindent 12 }}
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}

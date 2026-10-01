@@ -1822,3 +1822,23 @@ azure.workload.identity/use: "true"
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/* Self-hosted privacy defaults: environment variables that switch off a
+     third-party call a library would otherwise make at runtime, so a default
+     install calls home only for the license, the usage report and the hosted
+     services its license names. Each default is emitted unless the
+     component's extraEnvs names the same variable, which is how an operator
+     turns the call back on (one entry per name, no duplicate env keys).
+     Takes (dict "extraEnvs" <list> "defaults" (list (dict "name" .. "value" ..))). */}}
+{{- define "langwatch.privacyDefaultEnvs" -}}
+{{- $named := list }}
+{{- range .extraEnvs }}
+{{- $named = append $named (toString .name) }}
+{{- end }}
+{{- range .defaults }}
+{{- if not (has .name $named) }}
+- name: {{ .name }}
+  value: {{ .value | quote }}
+{{- end }}
+{{- end }}
+{{- end }}

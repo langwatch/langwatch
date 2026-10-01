@@ -167,6 +167,16 @@ spec:
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
             {{- end }}
 
+            {{- /* CHECKPOINT_DISABLE: Prisma's version check during the
+                   `prisma migrate deploy` every start does. VOICE_TUNNEL: the
+                   cloudflared quick tunnel voice runs fall back to; the app
+                   already defaults it off outside SaaS, and the chart says so
+                   explicitly. Set VOICE_PUBLIC_BASE_URL, or VOICE_TUNNEL=true,
+                   in workers.extraEnvs to run phone calls. */}}
+            {{- include "langwatch.privacyDefaultEnvs" (dict "extraEnvs" .Values.workers.extraEnvs "defaults" (list
+                  (dict "name" "CHECKPOINT_DISABLE" "value" "1")
+                  (dict "name" "VOICE_TUNNEL" "value" "false"))) | nindent 12 }}
+
             {{- with .Values.workers.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
             {{- toYaml . | nindent 12 }}

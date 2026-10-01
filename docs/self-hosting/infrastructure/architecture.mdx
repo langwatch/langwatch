@@ -57,7 +57,7 @@ architecture-beta
 <Card title="API Layer" icon="globe">
 **LangWatch App** (:5560)
 
-Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The only externally-exposed component.
+Web UI, REST API, OTel ingestion, authentication, SSE real-time updates. The main externally exposed component; the AI Gateway can have its own ingress.
 </Card>
 <Card title="Processing" icon="microchip">
 **LangWatch Workers**
@@ -100,7 +100,7 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 ### LangWatch App (port 5560)
 
-Next.js server, the single external entry point for all traffic:
+Next.js server, the external entry point for everything except AI Gateway traffic:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -123,7 +123,7 @@ A Go binary (`nlpgo`, image `langwatch/langwatch_nlp`) for:
 - Optimization Studio workflow execution, synchronous and streamed
 - The prompt playground's model calls, proxied to the configured provider
 
-Topic clustering runs on the Workers, not in this service.
+Topic clustering is not in this service: the Workers schedule it and send the clustering batches to LangEvals.
 
 ### LangEvals (port 5562)
 
@@ -288,11 +288,11 @@ sequenceDiagram
     LW->>Browser: Real-time update
 ```
 
-Periodic work (topic clustering, alert triggers, webhook delivery log pruning) runs as scheduled work on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
+Periodic work (topic clustering, alert triggers, webhook delivery log pruning) is scheduled on the Workers. The chart ships no Kubernetes CronJobs; `cronjobs.jobs` stays empty unless you add your own.
 
 ## Network Topology
 
-Only the App is exposed externally. Everything else is cluster-internal:
+The App is exposed externally, and the AI Gateway can be when clients outside the cluster call it. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|
