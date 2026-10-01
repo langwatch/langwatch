@@ -12,7 +12,7 @@ import {
   type UiCapabilities,
 } from "@langwatch/browser-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -44,6 +44,12 @@ import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts
 import PersonalWorkspaceHostMount from "../personal-workspace-host-mount.tsx";
 
 class SignedInSession extends UiSession {
+  refreshes = 0;
+
+  override async refresh(): Promise<void> {
+    this.refreshes += 1;
+  }
+
   currentUser(): UiActor {
     return { id: "user-1", name: null, email: null, image: null };
   }
@@ -71,11 +77,11 @@ class TestScope extends UiScope {
   }
 }
 
-function harness(scope: UiActiveScope) {
+function harness(scope: UiActiveScope, session = new SignedInSession()) {
   const capabilities: UiCapabilities = {
     ...createUiCapabilitiesFromHost(
       { route: () => ({ params: {}, query: {} }), navigate: () => void 0 },
-      new SignedInSession(),
+      session,
     ),
     scope: new TestScope(scope),
     deployment: {
@@ -85,6 +91,7 @@ function harness(scope: UiActiveScope) {
       hasNlpService: true,
       hasLangevals: true,
       hasEmailProvider: false,
+      emailPasswordEnabled: true,
       hasCloudOps: false,
     },
   };
@@ -108,6 +115,8 @@ function GuardReader() {
       <span data-testid="sso">{organization?.ssoProvider ?? "(none)"}</span>
       <span data-testid="team-of-project">{host.project()?.teamId ?? "(none)"}</span>
       <span data-testid="base-url">{host.deployment().appBaseUrl}</span>
+      <span data-testid="passwords">{String(host.deployment().emailPasswordEnabled)}</span>
+      <button onClick={() => void host.refreshSession()}>refresh</button>
     </div>
   );
 }
@@ -133,6 +142,28 @@ describe("given a personal workspace host above the screens that read it", () =>
       render(<GuardReader />, { wrapper: Harness });
 
       expect(screen.getByTestId("base-url")).toHaveTextContent("https://app.langwatch.test");
+    });
+  });
+
+  describe("when the deployment mounts email/password sign-in", () => {
+    it("says so, so the password section shows beside single sign-on", () => {
+      const Harness = harness({ organizationId: ORGANIZATION_ID, projectId: PROJECT_ID });
+
+      render(<GuardReader />, { wrapper: Harness });
+
+      expect(screen.getByTestId("passwords")).toHaveTextContent("true");
+    });
+  });
+
+  describe("when a screen changed the reader's name or photo", () => {
+    it("asks the shell's session to read the reader again", () => {
+      const session = new SignedInSession();
+      const Harness = harness({ organizationId: ORGANIZATION_ID, projectId: PROJECT_ID }, session);
+
+      render(<GuardReader />, { wrapper: Harness });
+      fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+
+      expect(session.refreshes).toBe(1);
     });
   });
 });

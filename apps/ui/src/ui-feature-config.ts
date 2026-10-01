@@ -2,6 +2,7 @@ import { authWebConfigSchema } from "@langwatch/auth-contract";
 import { authzWebConfigSchema } from "@langwatch/authz-contract";
 import type { UiDeployment } from "@langwatch/browser-host/capabilities";
 import { deriveUiDeployment } from "@langwatch/browser-host/deployment";
+import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
 import {
   parsePublicConfigSlice,
   processWebConfigSchema,
@@ -13,7 +14,6 @@ import { gatewayWebConfigSchema } from "@langwatch/gateway-contract";
 import { notificationWebConfigSchema } from "@langwatch/notification-contract";
 import { opsWebConfigSchema } from "@langwatch/ops-contract";
 import { rumWebConfigSchema } from "@langwatch/rum-contract";
-import type { UiPublicTelemetry } from "@langwatch/browser/inner-providers";
 import type { output, ZodType } from "zod";
 
 /** Each owner's slice of the page's config, checked by its contract's schema before any render. */
@@ -62,6 +62,7 @@ export function uiDeploymentOf({
     hasEmailProvider: config.notification.email,
     ...(config.auth.authProvider ? { authProvider: config.auth.authProvider } : {}),
     passkeysEnabled: config.auth.passkeys,
+    emailPasswordEnabled: config.auth.emailPasswordEnabled,
     hasCloudOps: config.ops.cloudOps,
     gatewayBaseUrl: config.gateway.gatewayBaseUrl,
   });

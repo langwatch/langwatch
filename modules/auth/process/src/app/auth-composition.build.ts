@@ -2,7 +2,11 @@
  * Auth module's ONE Better Auth instance. Ported from deleted composition;
  * absences are deliberate—each collaborator refuses by name if absent.
  */
-import { AuthUnavailableError, type AuthApi } from "@langwatch/auth-contract";
+import {
+  AuthUnavailableError,
+  isEmailPasswordEnabled,
+  type AuthApi,
+} from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
@@ -40,7 +44,6 @@ import {
 } from "../channels/better-auth.channel.ts";
 import {
   createBetterAuthTransport,
-  isEmailPasswordEnabled,
   type BetterAuthTransport,
   type SignInAttemptCounter,
 } from "../channels/http/http.better-auth.channel.ts";

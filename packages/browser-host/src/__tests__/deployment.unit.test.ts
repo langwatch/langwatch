@@ -15,6 +15,7 @@ function slicesWith(overrides: Partial<UiDeploymentSlices>): UiDeploymentSlices 
     hasLangevals: true,
     hasEmailProvider: true,
     passkeysEnabled: false,
+    emailPasswordEnabled: false,
     hasCloudOps: false,
     ...overrides,
   };
@@ -115,11 +116,12 @@ describe("deriveUiDeployment", () => {
   describe("given a deployment behind a federated sign-in provider", () => {
     it("names the provider, so the security screen offers to link it", () => {
       const deployment = deriveUiDeployment(
-        slicesWith({ authProvider: "auth0", passkeysEnabled: true }),
+        slicesWith({ authProvider: "auth0", passkeysEnabled: true, emailPasswordEnabled: true }),
       );
 
       expect(deployment.authProvider).toBe("auth0");
       expect(deployment.passkeysEnabled).toBe(true);
+      expect(deployment.emailPasswordEnabled).toBe(true);
     });
   });
 

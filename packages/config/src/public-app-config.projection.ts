@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { Config, parseProcessConfig, type ConfigOf, type ConfigSlice } from "./config.ts";
 import { gatewayAddressOf } from "./deployment-facts.ts";
+import { environmentOneOrTrueSchema } from "./env-schemas.ts";
 import {
   processWebConfigSchema,
   publicAppConfigSchema,
@@ -16,11 +17,6 @@ import {
 
 export { LOCAL_GATEWAY_URL, SAAS_GATEWAY_URL } from "./deployment-facts.ts";
 const DEFAULT_RUM_SAMPLE_RATIO = 1;
-
-const exactTrue = z
-  .union([z.boolean(), z.string()])
-  .optional()
-  .transform((value) => value === true || value === "true");
 
 const unlessFalse = z
   .union([z.boolean(), z.string()])
@@ -48,7 +44,7 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   appBaseUrl: c.env("BASE_HOST", z.string().min(1)),
   nodeEnvironment: c.env("NODE_ENV", z.enum(["development", "test", "production"])),
   demoProjectSlug: c.env("DEMO_PROJECT_SLUG", z.string().min(1).optional()),
-  isSaas: c.env("IS_SAAS", exactTrue),
+  isSaas: c.env("IS_SAAS", environmentOneOrTrueSchema),
   authProvider: c.env("NEXTAUTH_PROVIDER", z.string().min(1).optional()),
   authProviderName: c.env("AUTH_PROVIDER", z.string().min(1).optional()),
   gateway: {
@@ -72,6 +68,8 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
   identity: {
     /** Offered unless "off", as auth's own switch reads it: the dev server drew no passkeys. */
     passkeys: c.env("PASSKEYS_ENABLED", z.enum(["off", "on"]).optional()),
+    /** Passwords beside a federated provider, as auth's own switch reads it. */
+    localPasswords: c.env("LOCAL_PASSWORDS_ENABLED", z.enum(["off", "on"]).optional()),
     /** The address readers sign in on, as auth projects it for copy-paste snippets. */
     publicUrl: c.env(
       "NEXTAUTH_URL",
@@ -246,6 +244,11 @@ function projectPublicAppConfig(
       passkeys: config.identity.passkeys !== "off",
       identityFrontDoor: true,
       authProvider: config.authProviderName ?? config.authProvider,
+      // auth's `isEmailPasswordEnabled`, copied: this package cannot import the contract.
+      emailPasswordEnabled:
+        (config.authProviderName ?? config.authProvider ?? "email") === "email" ||
+        !config.isSaas ||
+        config.identity.localPasswords === "on",
       ...(config.identity.publicUrl ? { publicUrl: config.identity.publicUrl } : {}),
     },
     authz: { demoProjectSlug: config.demoProjectSlug },

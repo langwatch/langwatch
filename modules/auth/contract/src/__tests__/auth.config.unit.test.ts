@@ -65,6 +65,20 @@ describe("auth server configuration", () => {
     });
   });
 
+  describe("given the browser asks whether passwords are on here", () => {
+    it("projects the same rule the credential routes mount by", async () => {
+      const passwords = async (environment: Record<string, string>) =>
+        (await authBrowserConfig.project(read(environment), void 0)).emailPasswordEnabled;
+
+      await expect(passwords({})).resolves.toBe(true);
+      await expect(passwords({ IS_SAAS: "true" })).resolves.toBe(true);
+      await expect(passwords({ IS_SAAS: "true", AUTH_PROVIDER: "auth0" })).resolves.toBe(false);
+      await expect(
+        passwords({ IS_SAAS: "true", AUTH_PROVIDER: "auth0", LOCAL_PASSWORDS_ENABLED: "on" }),
+      ).resolves.toBe(true);
+    });
+  });
+
   describe("given only one half of the browser session identity is named", () => {
     /** @scenario "A cross-field rule refuses a half-configured feature at boot" */
     it("refuses the configuration and names both variables", () => {
@@ -79,6 +93,7 @@ describe("auth server configuration", () => {
             idpSimulatorUrl: undefined,
             localPasswords: false,
             auth0ManagementClientId: undefined,
+            isSaas: false,
             signInProviders: {
               authProvider: undefined,
               legacyProvider: undefined,

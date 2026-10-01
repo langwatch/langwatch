@@ -31,6 +31,7 @@ import {
   type UiEffectivePermissionsRead,
   type UiFeatureApiTransport,
 } from "./ui-session-queries";
+import { useRefreshUiSession } from "./ui-session-refresh";
 
 /** The screen a visitor with no session is sent to. */
 export const UI_SIGN_IN_PATH = "/auth/signin";
@@ -91,6 +92,8 @@ export class UiFeatureFlagRequests {
 export type BrowserUiSessionState = {
   readonly flags: ReadonlyMap<string, boolean>;
   readonly askFlag: (flag: string) => void;
+  /** Absent where nothing can re-read the session, as in a recorded test. */
+  readonly refresh?: () => Promise<void>;
 } & (
   | { readonly snapshot: UiSessionSnapshot }
   | {
@@ -138,6 +141,11 @@ export class BrowserUiSession extends UiSession {
   override snapshot(): UiSessionSnapshot {
     if (!("snapshot" in this.state)) return super.snapshot();
     return this.state.snapshot;
+  }
+
+  override refresh(): Promise<void> {
+    if (!this.state.refresh) return super.refresh();
+    return this.state.refresh();
   }
 
   featureFlag(flag: string): boolean | undefined {
@@ -257,6 +265,7 @@ export function useBrowserUiSession({
   });
 
   const askFlag = useCallback((flag: string) => flagRequests.ask(flag), [flagRequests]);
+  const refresh = useRefreshUiSession();
 
   const snapshot: UiSessionSnapshot = {
     session,
@@ -264,7 +273,7 @@ export function useBrowserUiSession({
     permissions: readPermissions(scope.status, permissions, organizationPermissions),
   };
 
-  return BrowserUiSession.create({ snapshot, flags, askFlag });
+  return BrowserUiSession.create({ snapshot, flags, askFlag, refresh });
 }
 
 function readSession(query: UseQueryResult<UiSessionResponse>): UiSessionReading {

@@ -63,6 +63,7 @@ async function bootAuth({
         idpSimulatorUrl: undefined,
         localPasswords: false,
         auth0ManagementClientId: undefined,
+        isSaas: false,
         signInProviders: NO_SIGN_IN_PROVIDERS,
       },
     })

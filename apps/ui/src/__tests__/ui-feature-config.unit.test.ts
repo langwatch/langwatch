@@ -10,7 +10,12 @@ const served: PublicAppConfig = {
     deployment: "saas",
     nlp: false,
   },
-  auth: { passkeys: true, identityFrontDoor: false, authProvider: "auth0" },
+  auth: {
+    passkeys: true,
+    identityFrontDoor: false,
+    authProvider: "auth0",
+    emailPasswordEnabled: true,
+  },
   authz: {},
   billing: {},
   evaluation: { langevals: true },
@@ -41,6 +46,7 @@ describe("browser feature configuration", () => {
         hasEmailProvider: true,
         authProvider: "auth0",
         passkeysEnabled: true,
+        emailPasswordEnabled: true,
         gatewayBaseUrl: "https://gateway.langwatch.test",
       });
     });
