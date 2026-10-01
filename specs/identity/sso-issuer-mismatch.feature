@@ -38,3 +38,9 @@ Feature: An SSO connection's issuer matches the issuer its ID tokens carry
   Scenario: Registration refuses a discovery document that names another issuer
     When an administrator registers an issuer whose discovery document names a different one
     Then the registration is refused with "sso_issuer_mismatch" naming both issuers
+
+  @integration
+  Scenario: The registration form says where Microsoft Entra ID shows its issuer
+    When an administrator picks Microsoft Entra ID in the registration form
+    Then the form says to copy the OpenID Connect metadata document address from the app's Endpoints
+    And to remove "/.well-known/openid-configuration" from the end, with no trailing slash
