@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.19.4](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.3...langwatch@v3.19.4) (2026-10-01)
+
+
+### Bug Fixes
+
+* **pii:** keep known span kinds out of strict name detection ([#8384](https://github.com/langwatch/langwatch/issues/8384)) ([08c9bfa](https://github.com/langwatch/langwatch/commit/08c9bfacc23f145fac2bddc3dc4749389b59de88)), closes [#8383](https://github.com/langwatch/langwatch/issues/8383)
+* **sso:** link Entra ID and SAML sign-ins on self-hosted, match the Entra issuer ([#8405](https://github.com/langwatch/langwatch/issues/8405)) ([18b8555](https://github.com/langwatch/langwatch/commit/18b85556bb0ab4fe56df0324ab767aaf28bbb945))
+* **traces:** has:feedback, has:annotation and flat keyed filters; docs ([#8336](https://github.com/langwatch/langwatch/issues/8336)) ([2cd705c](https://github.com/langwatch/langwatch/commit/2cd705cfa984901f566146aa21236125acc5a311))
+
+
+### Documentation
+
+* **self-hosting:** clearer secrets and external database guidance for Helm and ArgoCD ([#8398](https://github.com/langwatch/langwatch/issues/8398)) ([e907f80](https://github.com/langwatch/langwatch/commit/e907f80860adce753d84dbb2d62aa4864dd8cb81))
+
 ## [3.19.3](https://github.com/langwatch/langwatch/compare/langwatch@v3.19.2...langwatch@v3.19.3) (2026-09-30)
 
 
