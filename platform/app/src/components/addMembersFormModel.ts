@@ -1,4 +1,4 @@
-import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { OrganizationUserRole } from "~/generated/prisma/client";
 import {
   getAutoCorrectedTeamRoleForOrganizationRole,
   type TeamRoleValue,
@@ -110,24 +110,22 @@ export function teamRoleCorrectionsForSeat({
   });
 }
 
+/**
+ * A staged row as the seat allows it. A changed role drops any custom role,
+ * and a Lite Member seat never carries one.
+ */
 function teamForSeat(
   team: TeamAssignment,
   seat: OrganizationUserRole,
 ): TeamAssignment {
-  if (seat === OrganizationUserRole.EXTERNAL) {
-    return {
-      teamId: team.teamId,
-      role: TeamUserRole.VIEWER,
-      customRoleId: undefined,
-    };
+  const role = getAutoCorrectedTeamRoleForOrganizationRole({
+    organizationRole: seat,
+    currentTeamRole: team.role,
+  });
+  if (role === team.role && seat !== OrganizationUserRole.EXTERNAL) {
+    return team;
   }
-  if (
-    seat === OrganizationUserRole.MEMBER &&
-    team.role === TeamUserRole.VIEWER
-  ) {
-    return { ...team, role: TeamUserRole.MEMBER, customRoleId: undefined };
-  }
-  return team;
+  return { ...team, role, customRoleId: undefined };
 }
 
 /**
