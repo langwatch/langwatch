@@ -13,22 +13,13 @@ import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import {
-  passwordResetSessionBridge,
-  sessionCallbackEvidence,
-  sessionRevocation,
-  ssoRegisteredIssuers,
-} from "~/server/app-layer/identity/runtime";
+import { sessionRevocation } from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
-import {
-  nameIssuerMismatch,
-  runWithIdTokenIssuerScope,
-} from "~/server/better-auth/id-token-issuer-mismatch";
-import { aliasLegacyMicrosoftCallback } from "~/server/better-auth/legacy-callback-alias";
+import { handleAuthRequest } from "~/server/better-auth/auth-request";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import {
   redirectFailedSignInCallback,
@@ -200,25 +191,12 @@ const betterAuthCatchAll = async (c: Context) => {
   // Better Auth decides its own rate-limit buckets from the request it is
   // handed, so it is handed the caller this application already resolved from
   // the connection. See `auth/caller-header.ts`.
-  const handle = () =>
-    auth.handler(
-      requestStatingCaller({
-        request: aliasLegacyMicrosoftCallback(c.req.raw),
-        caller: getAuthRateLimitClientIpFromHonoContext(c),
-      }),
-    );
-  // The reset scope is opened around EVERY request rather than only the
-  // reset path: it is a per-request slot that costs nothing empty, and the
-  // path check belongs to the hook that reads it, not to the route.
-  const response = await runWithIdTokenIssuerScope(async () =>
-    nameIssuerMismatch({
-      response: await sessionCallbackEvidence().runWithScope(() =>
-        passwordResetSessionBridge().runWithScope(handle),
-      ),
-      expectedIssuer: async () =>
-        (await ssoRegisteredIssuers().issuersForRequest(c.req.raw))[0] ?? null,
-    }),
-  );
+  const caller = getAuthRateLimitClientIpFromHonoContext(c);
+  const response = await handleAuthRequest({
+    request: c.req.raw,
+    handler: (request) =>
+      auth.handler(requestStatingCaller({ request, caller })),
+  });
   // better-auth's refusals speak its own vocabulary, which is neither a
   // registered code nor copy anybody wrote for a customer. This is where the
   // families we have translated join the handled-error contract; everything

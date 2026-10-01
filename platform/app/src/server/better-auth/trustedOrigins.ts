@@ -83,6 +83,7 @@ export function resolveTrustedOrigins({
   trustedIdpOrigins,
   idpSimulatorUrl,
   registeredIssuers = [],
+  issuerEndpointOrigins = [],
   isProduction,
 }: {
   nextAuthUrl: string;
@@ -97,6 +98,9 @@ export function resolveTrustedOrigins({
    *  Each one was registered by an administrator of the organization it
    *  belongs to, which is what makes it trusted. */
   registeredIssuers?: string[];
+  /** Origins the discovery documents of `registeredIssuers` name for their
+   *  endpoints, already checked public (`SsoIssuerEndpointOrigins`). */
+  issuerEndpointOrigins?: string[];
   isProduction: boolean;
 }): string[] {
   const origins = [
@@ -106,6 +110,7 @@ export function resolveTrustedOrigins({
       const origin = originOf(issuer);
       return origin === null ? [] : [origin, ...entraEndpointOrigins(issuer)];
     }),
+    ...issuerEndpointOrigins,
     ...originsIn(trustedIdpOrigins),
     ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
   ];

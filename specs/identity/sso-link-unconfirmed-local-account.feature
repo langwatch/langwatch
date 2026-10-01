@@ -121,6 +121,15 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain,
     And no second account is created for that address
 
   @integration @regression
+  Scenario: A confirmed account on a domain the connection has not verified is refused with the missing proof named
+    Given a password account whose address is confirmed
+    And the connection has not verified the account's domain
+    When a provider that sends no email_verified claim signs that address in
+    Then the sign-in is refused with "sso_domain_not_verified"
+    And the page says to verify the domain, not that the email is registered with another method
+    And the account is left as it was
+
+  @integration @regression
   Scenario: A deactivated or contested unconfirmed account is not linked
     Given the connection is live and has verified the account's domain
     And the account is deactivated, or another account holds a live identifier for the address or the subject

@@ -17,6 +17,8 @@ import { readFileSync } from "node:fs";
 import { inflateRawSync } from "node:zlib";
 
 import { PrismaScimSsoUsers } from "@ee/scim/scim-sso-user.prisma.repository";
+import type { SsoIssuerDiscoveryPort } from "@ee/sso/sso-idp-registration";
+import { SsoIssuerEndpointOrigins } from "@ee/sso/sso-issuer-endpoint-origins";
 import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
 import * as samlify from "samlify";
@@ -37,14 +39,11 @@ import {
   ssoProvisionedUsers,
   ssoRegisteredIssuers,
 } from "~/server/app-layer/identity/runtime";
+import { handleAuthRequest } from "~/server/better-auth/auth-request";
 import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
-import {
-  nameIssuerMismatch,
-  noteIdTokenIssuerRefusal,
-  runWithIdTokenIssuerScope,
-} from "~/server/better-auth/id-token-issuer-mismatch";
+import { noteIdTokenIssuerRefusal } from "~/server/better-auth/id-token-issuer-mismatch";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { resolveTrustedOrigins } from "~/server/better-auth/trustedOrigins";
 import { prisma } from "~/server/db";
@@ -57,6 +56,24 @@ const IDP = `https://idp-${SUITE}.unconfirmed-link-test.example`;
  *  tenant per connection, since an issuer routes to a single connection. */
 const ENTRA_HOST = "https://login.microsoftonline.com";
 const entra = (label: string) => `${ENTRA_HOST}/${SUITE}-${label}/v2.0`;
+/** Google's issuer. Its discovery document serves token, userinfo and keys
+ *  from `*.googleapis.com`, other origins than the issuer's. */
+const GOOGLE = "https://accounts.google.com";
+const googleDiscovery = () => ({
+  issuer: GOOGLE,
+  authorization_endpoint: `${GOOGLE}/o/oauth2/v2/auth`,
+  token_endpoint: "https://oauth2.googleapis.com/token",
+  userinfo_endpoint: "https://openidconnect.googleapis.com/v1/userinfo",
+  jwks_uri: "https://www.googleapis.com/oauth2/v3/certs",
+  response_types_supported: ["code"],
+  subject_types_supported: ["public"],
+  id_token_signing_alg_values_supported: ["RS256"],
+  scopes_supported: ["openid", "email", "profile"],
+});
+/** Issuers stored with only a discovery endpoint, the way production stores
+ *  every connection, so the engine reads the endpoints at sign-in. */
+const discoveredOnly = (issuer: string) =>
+  issuer.startsWith(`${ENTRA_HOST}/`) || issuer === GOOGLE;
 const CLIENT_ID = "langwatch-test-client";
 const SAML_IDP = `https://saml-${SUITE}.unconfirmed-link-test.example`;
 const SP_ENTITY_ID = `${BASE_URL}/api/auth/sso/saml2/sp`;
@@ -148,6 +165,28 @@ async function identityProviderAsserts({
   });
 }
 
+/** The production endpoint-origin lookup, reading discovery through the
+ *  stubbed fetch, with every host resolving public. */
+const discoveryThroughFetch: SsoIssuerDiscoveryPort = {
+  async discover({ issuer }) {
+    const document = await globalThis
+      .fetch(`${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`)
+      .then((response) => response.json() as Promise<Record<string, unknown>>)
+      .catch(() => null);
+    if (document === null) return { reachable: false, reason: "unreachable" };
+    return {
+      reachable: true,
+      endpoints: Object.entries(document)
+        .filter(([key]) => key.endsWith("_endpoint") || key === "jwks_uri")
+        .map(([, value]) => String(value)),
+    };
+  },
+};
+const issuerEndpointOrigins = new SsoIssuerEndpointOrigins({
+  discovery: discoveryThroughFetch,
+  resolveHost: async () => ["93.184.216.34"],
+});
+
 /** The resolver as LangWatch Cloud composes it. */
 const cloudUsers = PrismaScimSsoUsers.create(identityStorageTransactions, {
   isHosted: () => true,
@@ -173,16 +212,20 @@ const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
     },
     // The production resolution: the origins of the issuer the request names,
     // and for Entra ID the Microsoft Graph origin its userinfo endpoint is on.
-    trustedOrigins: async (request) =>
-      resolveTrustedOrigins({
+    trustedOrigins: async (request) => {
+      const registeredIssuers =
+        await ssoRegisteredIssuers().issuersForRequest(request);
+      return resolveTrustedOrigins({
         nextAuthUrl: BASE_URL,
         baseHost: undefined,
         trustedIdpOrigins: undefined,
         idpSimulatorUrl: undefined,
-        registeredIssuers:
-          await ssoRegisteredIssuers().issuersForRequest(request),
+        registeredIssuers,
+        issuerEndpointOrigins:
+          await issuerEndpointOrigins.originsFor(registeredIssuers),
         isProduction: false,
-      }),
+      });
+    },
     plugins: plugins({
       backupCodeCount: 10,
       passkeySignUp: () => ({}) as PasskeySignUpRegistration,
@@ -337,7 +380,7 @@ async function connection({
         clientId: CLIENT_ID,
         clientSecret: "langwatch-test-secret",
         discoveryEndpoint: `${issuer.replace(/\/+$/, "")}/.well-known/openid-configuration`,
-        ...(issuer.startsWith(`${ENTRA_HOST}/`)
+        ...(discoveredOnly(issuer)
           ? {}
           : {
               authorizationEndpoint: `${issuer}/authorize`,
@@ -507,15 +550,11 @@ async function signInThrough(
       headers: { cookie: started.headers.get("set-cookie") ?? "" },
     },
   );
-  // Wrapped the way `server/routes/auth.ts` wraps every auth request.
-  const callback = await runWithIdTokenIssuerScope(async () =>
-    nameIssuerMismatch({
-      response: await betterAuthInstance.handler(callbackRequest),
-      expectedIssuer: async () =>
-        (await ssoRegisteredIssuers().issuersForRequest(callbackRequest))[0] ??
-        null,
-    }),
-  );
+  // Through the same request handling the auth route uses.
+  const callback = await handleAuthRequest({
+    request: callbackRequest,
+    handler: (request) => betterAuthInstance.handler(request),
+  });
   const location = callback.headers.get("location") ?? "";
   const cookie = callback.headers
     .getSetCookie()
@@ -608,6 +647,18 @@ beforeAll(async () => {
       }
       if (url.includes("/oauth2/v2.0/token")) return respond(tokenResponse());
       if (url.includes("/discovery/v2.0/keys")) return respond(jwks);
+    }
+    if (url === `${GOOGLE}/.well-known/openid-configuration`) {
+      return respond(googleDiscovery());
+    }
+    if (url.startsWith("https://oauth2.googleapis.com/token")) {
+      return respond(tokenResponse());
+    }
+    if (url.startsWith("https://www.googleapis.com/oauth2/v3/certs")) {
+      return respond(jwks);
+    }
+    if (url.startsWith("https://openidconnect.googleapis.com/v1/userinfo")) {
+      return respond(graphUserInfo);
     }
     const issuer = url.startsWith(IDP) ? IDP : undefined;
     if (!issuer) return realFetch(input, init);
@@ -1039,6 +1090,31 @@ describe("given a password account whose address is confirmed", () => {
       expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
     });
   });
+
+  describe("when a provider that sends no email_verified signs it in before the domain is verified", () => {
+    /** @scenario "A confirmed account on a domain the connection has not verified is refused with the missing proof named" */
+    it("refuses with sso_domain_not_verified and leaves the account as it was", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-confirmed-unproved",
+        state: "DRAFT",
+        domainVerified: false,
+        issuer: entra("entra-confirmed-unproved"),
+        confirmed: true,
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-confirmed-unproved-${SUITE}`,
+        issuer: entra("entra-confirmed-unproved"),
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBe("sso_domain_not_verified");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+    });
+  });
 });
 
 describe("given a password account whose address was never confirmed, on LangWatch Cloud", () => {
@@ -1149,6 +1225,31 @@ describe("given a Microsoft Entra ID connection registered for one tenant", () =
       expect(params.get("error_description")).toBeNull();
       expect(result.session).toBeNull();
       expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+    });
+  });
+});
+
+describe("given a Google Workspace connection", () => {
+  describe("when its discovery document serves endpoints from googleapis.com", () => {
+    /** @scenario "Google's endpoints on googleapis.com are trusted for a Google connection" */
+    it("signs in through the endpoints the document names", async () => {
+      const { user, providerId } = await setUp({
+        label: "google",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: GOOGLE,
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `google-${SUITE}`,
+        issuer: GOOGLE,
+        emailVerified: true,
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBeNull();
+      expect(result.session?.user.id).toBe(user.id);
     });
   });
 });

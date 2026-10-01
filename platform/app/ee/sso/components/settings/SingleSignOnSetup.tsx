@@ -25,14 +25,18 @@ import type {
   SelfServeGoLiveView,
   SelfServeSetupView,
 } from "@ee/sso/sso-self-serve.types";
-import type { SsoConnectionLifecycleState } from "@langwatch/identity";
-import { Copy, TriangleAlert } from "lucide-react";
+import {
+  type SsoConnectionLifecycleState,
+  ssoConnectionIdpIsEditable,
+} from "@langwatch/identity";
+import { Copy, Pencil, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { IdentityChip } from "~/components/access/IdentityRow";
 import { SettingList, SettingRow } from "~/components/settings/kit/SettingRow";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { SettingsRowsSkeleton } from "~/components/settings/kit/SettingsSkeleton";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { ProtocolMark } from "./authentication/SingleSignOnCard";
@@ -40,6 +44,7 @@ import { ArrivalsSection } from "./singleSignOn/ArrivalsSection";
 import { BreakGlassSection } from "./singleSignOn/BreakGlassSection";
 import { ConnectionNameRow } from "./singleSignOn/ConnectionNameRow";
 import { DomainsSection } from "./singleSignOn/DomainsSection";
+import { EditIdentityProvider } from "./singleSignOn/EditIdentityProvider";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { HistorySection } from "./singleSignOn/HistorySection";
 import { LegacyRouteNotice } from "./singleSignOn/LegacyRouteNotice";
@@ -498,6 +503,67 @@ function copyIssuerToClipboard(issuer: string | null | undefined): void {
   });
 }
 
+/** The issuer, a copy button, and the way into editing the identity
+ *  provider settings when `onEdit` is offered. */
+function IssuerRow({
+  issuer,
+  onEdit,
+}: {
+  issuer: string;
+  onEdit: (() => void) | null;
+}) {
+  return (
+    <SettingRow
+      label="Issuer"
+      hint="The address your provider identifies itself by."
+    >
+      <HStack gap={1} minWidth={0} maxWidth="full">
+        {/* The scheme is chrome, not information: every issuer here is
+            https, so the display drops it. The whole address is on the
+            hover, and the button puts it on the clipboard. */}
+        <Text
+          fontFamily="mono"
+          fontSize="xs"
+          color="fg.muted"
+          truncate
+          maxWidth="full"
+          title={issuer}
+          data-testid="connection-issuer"
+        >
+          {issuer.replace(/^https?:\/\//, "")}
+        </Text>
+        <IconButton
+          aria-label="Copy issuer address"
+          size="xs"
+          variant="ghost"
+          flexShrink={0}
+          color="fg.subtle"
+          _hover={{ color: "fg.muted" }}
+          onClick={() => copyIssuerToClipboard(issuer)}
+        >
+          <Copy size={12} />
+        </IconButton>
+        {onEdit && (
+          <Tooltip content="Edit identity provider settings">
+            <IconButton
+              aria-label="Edit identity provider settings"
+              size="xs"
+              variant="ghost"
+              flexShrink={0}
+              color="fg.subtle"
+              _hover={{ color: "fg.muted" }}
+              onClick={onEdit}
+              data-testid="identity-provider-edit"
+            >
+              <Pencil size={12} />
+            </IconButton>
+          </Tooltip>
+        )}
+      </HStack>
+    </SettingRow>
+  );
+}
+
 function ConnectionSummary({
   organizationId,
   connection,
@@ -518,7 +584,13 @@ function ConnectionSummary({
     state: connection.state,
     goLiveBlockedBecause,
   });
-  const copyIssuer = () => copyIssuerToClipboard(connection.issuer);
+  const [editingIdp, setEditingIdp] = useState(false);
+  // A grandfathered connection dials the deployment's own provider and has
+  // no settings of its own to change.
+  const canEditIdp =
+    canManage &&
+    connection.source === "self-serve" &&
+    ssoConnectionIdpIsEditable(connection.state);
 
   return (
     <SettingsCard
@@ -559,39 +631,21 @@ function ConnectionSummary({
           />
         </SettingRow>
         {connection.issuer && (
-          <SettingRow
-            label="Issuer"
-            hint="The address your provider identifies itself by."
-          >
-            <HStack gap={1} minWidth={0} maxWidth="full">
-              {/* The scheme is chrome, not information — every issuer here
-                  is https, so the display drops it. The whole address is on
-                  the hover, and the button puts it on the clipboard. */}
-              <Text
-                fontFamily="mono"
-                fontSize="xs"
-                color="fg.muted"
-                truncate
-                maxWidth="full"
-                title={connection.issuer}
-              >
-                {connection.issuer.replace(/^https?:\/\//, "")}
-              </Text>
-              <IconButton
-                aria-label="Copy issuer address"
-                size="xs"
-                variant="ghost"
-                flexShrink={0}
-                color="fg.subtle"
-                _hover={{ color: "fg.muted" }}
-                onClick={copyIssuer}
-              >
-                <Copy size={12} />
-              </IconButton>
-            </HStack>
-          </SettingRow>
+          <IssuerRow
+            issuer={connection.issuer}
+            onEdit={
+              canEditIdp && !editingIdp ? () => setEditingIdp(true) : null
+            }
+          />
         )}
       </SettingList>
+      {editingIdp && (
+        <EditIdentityProvider
+          organizationId={organizationId}
+          connectionId={connection.connectionId}
+          onDone={() => setEditingIdp(false)}
+        />
+      )}
       {/* WHAT TURNING IT ON DID, and the way back — the REAL one. This used
           to promise "turn the connection off to move them back, it takes
           effect immediately", and there is no such control on this page or

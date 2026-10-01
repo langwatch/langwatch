@@ -1,0 +1,25 @@
+---
+title: First run
+description: "From a fresh install to single sign-on: the first account, the license and the identity provider connection."
+sidebarTitle: First run
+keywords: first run, setup, first account, license, activation code, sso, single sign-on, identity provider, self-hosted
+---
+
+## Steps
+
+These steps take a fresh install to single sign-on through your own identity provider. They apply to [Helm](/self-hosting/deployment/kubernetes-helm), [ArgoCD](/self-hosting/deployment/argocd) and [Docker Compose](/self-hosting/deployment/docker-compose) installs alike.
+
+1. **Install LangWatch.** No email provider is needed for these steps.
+2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey for this account, since step 5 links single sign-on to the password account. The first account becomes an administrator of the organization, the same role any other administrator has. It gets no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it from the organization.
+3. **Add the license.** Open **Settings > License**. Enter the activation code LangWatch sent you, which needs outbound HTTPS to `connect.langwatch.ai` (see [Connect](/self-hosting/connect)). On an install without that access, paste or upload the license key instead (see [Editions and licensing](/self-hosting/licensing)). Restart the app once the license is active: single sign-on turns on at startup.
+4. **Connect your identity provider.** Open **Settings > Authentication > Identity provider** and follow the setup:
+   1. Register the connection with the issuer, client id and client secret from your identity provider, or with its SAML metadata.
+   2. Copy the redirect URI the page shows into your identity provider. It has the form `https://<your LangWatch host>/api/auth/sso/callback/<connection id>`. In Microsoft Entra ID, add it under the **Web** platform.
+   3. Add your domain.
+   4. Run the test sign-in.
+   5. Name an administrator who can still get in if the identity provider is unavailable.
+   6. Choose who the connection lets in.
+   7. Select **Go live**.
+5. **Sign in through single sign-on.** The administrator's password account links to the identity provider on its first single sign-on sign-in, which is the test sign-in in step 4. You keep the same account, organization and projects.
+
+See [SSO configuration](/self-hosting/configuration/sso) for the redirect URIs, the issuer each provider uses and how existing accounts link.

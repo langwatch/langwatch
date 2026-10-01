@@ -31,7 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { models } from "../config/models";
-import { aliasLegacyMicrosoftCallback } from "../legacy-callback-alias";
+import { handleAuthRequest } from "../auth-request";
 
 const BASE_URL = "http://localhost:3000";
 const CLIENT_ID = "azure-client";
@@ -206,11 +206,11 @@ async function signInWithMicrosoft(auth: ReturnType<typeof buildAuth>) {
     .getSetCookie()
     .map((value) => value.split(";", 1)[0])
     .join("; ");
-  return auth.handler(
-    aliasLegacyMicrosoftCallback(
-      new Request(callback, { headers: { cookie }, redirect: "manual" }),
-    ),
-  );
+  // Through the same request handling the auth route uses.
+  return handleAuthRequest({
+    request: new Request(callback, { headers: { cookie }, redirect: "manual" }),
+    handler: (request) => auth.handler(request),
+  });
 }
 
 beforeEach(async () => {

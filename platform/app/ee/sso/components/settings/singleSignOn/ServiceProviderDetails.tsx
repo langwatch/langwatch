@@ -76,8 +76,8 @@ export function ServiceProviderDetails({
       <CopyValueRows rows={rows} />
       {deploymentSignIn && (
         <Text color="fg.muted" fontSize="sm">
-          This installation also has {deploymentSignIn.name} sign-in set up by
-          its deployment, which the sign-in page offers. That sign-in returns to{" "}
+          The sign-in page also offers {deploymentSignIn.name}, set up by this
+          installation's deployment. That sign-in returns to{" "}
           <code>{deploymentSignIn.redirectUrl}</code>. If it uses the same
           application in your identity provider, register both addresses there.
         </Text>

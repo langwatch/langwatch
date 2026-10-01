@@ -335,7 +335,7 @@ function recoveryFor({
     case "OAuthAccountNotLinked":
       return {
         prose: [
-          "This email is already registered with a different sign-in method. To get back in, sign out completely and sign in again using the method you used originally.",
+          "An account with this email address already exists, and this sign-in method can't be added to it because the provider didn't confirm the address. Sign in with the method you used before, then connect this one in Settings > Security.",
           "If your organization uses single sign-on, enter your work email and choose your company login.",
         ],
         action: signOutAndRetry,

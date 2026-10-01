@@ -983,6 +983,7 @@
             "group": "Overview",
             "pages": [
               "self-hosting/overview",
+              "self-hosting/first-run",
               "self-hosting/licensing",
               "self-hosting/connect",
               "self-hosting/data-and-telemetry",

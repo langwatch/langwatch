@@ -1,3 +1,6 @@
+import { federatedProviderLabel } from "~/features/auth/logic/methodLabels";
+import { legacyCallbackUrl } from "./providers";
+
 /**
  * The sign-in a deployment configures for itself (`NEXTAUTH_PROVIDER`), next
  * to the connection an organization sets up here.
@@ -9,18 +12,6 @@
  * the deployment names one, so an administrator who registered only one of
  * the two addresses sees the other one refused by their identity provider.
  */
-
-const PROVIDER_NAMES: Readonly<Record<string, string>> = {
-  "azure-ad": "Microsoft",
-  auth0: "Auth0",
-  cognito: "AWS Cognito",
-  github: "GitHub",
-  gitlab: "GitLab",
-  google: "Google",
-  okta: "Okta",
-  onelogin: "OneLogin",
-  oidc: "OpenID Connect",
-};
 
 export interface DeploymentSignIn {
   name: string;
@@ -42,7 +33,7 @@ export function deploymentSignInFor({
 }): DeploymentSignIn | null {
   if (!provider || provider === "email") return null;
   return {
-    name: PROVIDER_NAMES[provider] ?? provider,
-    redirectUrl: `${baseUrl.replace(/\/+$/, "")}/api/auth/callback/${provider}`,
+    name: federatedProviderLabel(provider),
+    redirectUrl: legacyCallbackUrl({ baseUrl, providerId: provider }),
   };
 }

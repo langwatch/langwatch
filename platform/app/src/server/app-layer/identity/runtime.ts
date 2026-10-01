@@ -71,6 +71,7 @@ import { SsoDomainReproofService } from "@ee/sso/sso-domain-reproof.service";
 import { engineProviderFor } from "@ee/sso/sso-engine-provider";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { HttpSsoIssuerDiscovery } from "@ee/sso/sso-issuer-discovery";
+import { SsoIssuerEndpointOrigins } from "@ee/sso/sso-issuer-endpoint-origins";
 import { SsoLicenseRepository } from "@ee/sso/sso-license.repository";
 import { PrismaSsoMembershipRepository } from "@ee/sso/sso-membership.prisma.repository";
 import { ssoMethodDialWith } from "@ee/sso/sso-method-configured";
@@ -906,19 +907,7 @@ export function ssoSelfServe(): SsoSelfServeService {
     // form. The two addresses somebody named in advance — an operator's own
     // provider, and the simulator — are the two it must not refuse, and they
     // are the same two the engine already dials at sign-in.
-    discovery: new HttpSsoIssuerDiscovery(
-      // The PAIRED fetch, not the global one. The dispatcher the guard pins
-      // each hop with comes from the workspace's undici and Node's built-in
-      // fetch rejects it outright, so handing the global in here reported
-      // every issuer unreachable however well it answered.
-      pinnedFetch,
-      systemHostResolver,
-      resolveDialableInternalOrigins({
-        trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
-        idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
-        isProduction: env.NODE_ENV === "production",
-      }),
-    ),
+    discovery: ssoIssuerDiscovery(),
     baseUrl: env.NEXTAUTH_URL ?? "",
     deploymentProvider: resolveAuthProvider,
     // The evidence a test sign-in happened is the account the engine wrote,
@@ -1456,6 +1445,38 @@ export function sessionMinter(): BetterAuthSessionMinter {
 }
 
 /** Request-scoped SSO origin resolution reads the selected connection fresh. */
+function dialableInternalOrigins(): string[] {
+  return resolveDialableInternalOrigins({
+    trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+    idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+    isProduction: env.NODE_ENV === "production",
+  });
+}
+
+function ssoIssuerDiscovery(): HttpSsoIssuerDiscovery {
+  return new HttpSsoIssuerDiscovery(
+    // The PAIRED fetch, not the global one. The dispatcher the guard pins
+    // each hop with comes from the workspace's undici and Node's built-in
+    // fetch rejects it outright, so handing the global in here reported
+    // every issuer unreachable however well it answered.
+    pinnedFetch,
+    systemHostResolver,
+    dialableInternalOrigins(),
+  );
+}
+
+let issuerEndpointOriginsInstance: SsoIssuerEndpointOrigins | null = null;
+
+/** The endpoint origins a registered issuer's discovery document names,
+ *  trusted for sign-in requests naming that issuer. */
+export function ssoIssuerEndpointOrigins(): SsoIssuerEndpointOrigins {
+  issuerEndpointOriginsInstance ??= new SsoIssuerEndpointOrigins({
+    discovery: ssoIssuerDiscovery(),
+    dialableInternalOrigins: dialableInternalOrigins(),
+  });
+  return issuerEndpointOriginsInstance;
+}
+
 let registeredIssuersInstance: RegisteredIssuers | null = null;
 
 export function ssoRegisteredIssuers(): RegisteredIssuers {

@@ -43,57 +43,9 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
-### SSO Provider Variables
-
-Each SSO provider requires specific variables. See [SSO Configuration](/self-hosting/configuration/sso) for detailed setup guides.
-
-**Auth0:**
-
-| Variable | Description |
-|----------|-------------|
-| `AUTH0_CLIENT_ID` | Auth0 application client ID |
-| `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
-| `AUTH0_ISSUER` | Auth0 issuer URL (e.g. `https://your-tenant.auth0.com`) |
-
-**Azure AD:**
-
-| Variable | Description |
-|----------|-------------|
-| `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
-| `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
-| `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**GitHub:**
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
-
-**GitLab:**
-
-| Variable | Description |
-|----------|-------------|
-| `GITLAB_CLIENT_ID` | GitLab OAuth app client ID |
-| `GITLAB_CLIENT_SECRET` | GitLab OAuth app client secret |
-
-**Google:**
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-
-**Okta:**
-
-| Variable | Description |
-|----------|-------------|
-| `OKTA_CLIENT_ID` | Okta application client ID |
-| `OKTA_CLIENT_SECRET` | Okta application client secret |
-| `OKTA_ISSUER` | Okta issuer URL |
+Single sign-on is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso).
 
 ## Services
 
@@ -352,7 +304,6 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
-| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |

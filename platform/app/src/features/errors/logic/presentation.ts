@@ -3014,7 +3014,7 @@ const presentations = {
   sso_domain_not_verified: {
     title: "That address isn't on a verified domain",
     describe: () =>
-      "Your organization hasn't verified the domain of the address your identity provider sent. Ask whoever manages single sign-on to verify it.",
+      "Your organization hasn't verified the domain of the address your identity provider sent. If you are setting up single sign-on, verify the domain in Settings > Authentication > Identity provider and try again. Otherwise, ask whoever manages single sign-on to verify it.",
   },
   sso_domain_proof_lapsed: {
     // Says why a colleague can sign in and this reader cannot, because that

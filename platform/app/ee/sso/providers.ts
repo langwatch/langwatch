@@ -95,11 +95,8 @@ type SocialProviderEnv = Pick<
   | "AZURE_AD_CLIENT_ID"
   | "AZURE_AD_CLIENT_SECRET"
   | "AZURE_AD_TENANT_ID"
-> & {
-  /** Where the Microsoft callback is pinned. Every deployment sets it; the
-   *  unit tests that only inspect which providers mount leave it out. */
-  NEXTAUTH_URL?: string;
-};
+  | "NEXTAUTH_URL"
+>;
 
 /**
  * What the social providers call out to while a sign-in is in flight.
@@ -308,17 +305,6 @@ export const parseIssuerUrl = (issuer: string, envName: string): URL => {
   }
 };
 
-/**
- * The callback URL an operator registers with their identity provider. One
- * shape for every provider we document, which is the whole reason the legacy
- * path is pinned rather than left at the plugin default.
- *
- * Identity providers compare redirect URIs by exact string, so a trailing
- * slash on the base URL is not cosmetic: it would send
- * `https://host//api/auth/callback/x` against a registration of
- * `https://host/api/auth/callback/x` and the provider would refuse the
- * request.
- */
 /** The callback path segment Azure app registrations carry for the
  *  Microsoft provider, from the NextAuth releases where it was `azure-ad`. */
 export const MICROSOFT_LEGACY_CALLBACK_ID = "azure-ad";
@@ -342,6 +328,17 @@ function microsoftRedirect(baseUrl: string | undefined): {
   };
 }
 
+/**
+ * The callback URL an operator registers with their identity provider. One
+ * shape for every provider we document, which is the whole reason the legacy
+ * path is pinned rather than left at the plugin default.
+ *
+ * Identity providers compare redirect URIs by exact string, so a trailing
+ * slash on the base URL is not cosmetic: it would send
+ * `https://host//api/auth/callback/x` against a registration of
+ * `https://host/api/auth/callback/x` and the provider would refuse the
+ * request.
+ */
 export const legacyCallbackUrl = ({
   baseUrl,
   providerId,

@@ -54,6 +54,24 @@ export const ssoIdpRegistrationSchema = z.discriminatedUnion("protocol", [
   ssoSamlRegistrationSchema,
 ]);
 
+/**
+ * What an administrator hands over to change an existing connection's
+ * identity provider settings. The same fields as a registration, except that
+ * an OpenID Connect client secret left blank keeps the one already stored:
+ * a secret is never shown back, so asking for it again on every issuer fix
+ * would send the administrator to their provider's console for nothing.
+ */
+export const ssoOidcUpdateSchema = ssoOidcRegistrationSchema.extend({
+  clientSecret: z.string().max(4096).nullable().default(null),
+});
+
+export const ssoIdpUpdateSchema = z.discriminatedUnion("protocol", [
+  ssoOidcUpdateSchema,
+  ssoSamlRegistrationSchema,
+]);
+
+export type SsoIdpUpdate = z.infer<typeof ssoIdpUpdateSchema>;
+
 export type SsoOidcRegistration = z.infer<typeof ssoOidcRegistrationSchema>;
 export type SsoSamlRegistration = z.infer<typeof ssoSamlRegistrationSchema>;
 export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;
@@ -65,8 +83,10 @@ export type SsoIdpRegistration = z.infer<typeof ssoIdpRegistrationSchema>;
  */
 export interface SsoIssuerDiscoveryPort {
   discover(args: { issuer: string }): Promise<
-    /** `issuer` is the one the discovery document names, when it names one. */
-    { reachable: true; issuer?: string } | { reachable: false; reason: string }
+    /** `issuer` is the one the discovery document names, when it names one;
+     *  `endpoints` are the endpoint addresses it lists. */
+    | { reachable: true; issuer?: string; endpoints?: string[] }
+    | { reachable: false; reason: string }
   >;
 }
 
@@ -203,10 +223,9 @@ export async function validateOidcRegistration({
     throw new SsoIssuerMismatchError({
       expected: registration.issuer,
       received: named,
-      at: "registration",
     });
   }
-  return { issuer: named };
+  return { issuer: canonicalEntraIssuer(named) };
 }
 
 /**

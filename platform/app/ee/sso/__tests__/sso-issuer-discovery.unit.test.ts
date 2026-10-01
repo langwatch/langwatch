@@ -54,7 +54,13 @@ describe("given an issuer that answers a discovery document", () => {
 
       expect(
         await discovery.discover({ issuer: "https://login.acme.okta.com" }),
-      ).toEqual({ reachable: true });
+      ).toEqual({
+        reachable: true,
+        endpoints: [
+          "https://login.acme.okta.com/authorize",
+          "https://login.acme.okta.com/token",
+        ],
+      });
       expect(asked).toEqual([DISCOVERY_URL]);
     });
   });
@@ -75,7 +81,10 @@ describe("given an issuer that answers a discovery document", () => {
 
       expect(
         await discovery.discover({ issuer: "https://login.acme.okta.com/" }),
-      ).toEqual({ reachable: true, issuer: "https://login.acme.okta.com" });
+      ).toMatchObject({
+        reachable: true,
+        issuer: "https://login.acme.okta.com",
+      });
     });
   });
 
