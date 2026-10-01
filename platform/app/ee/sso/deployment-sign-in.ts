@@ -1,5 +1,6 @@
 import { federatedProviderLabel } from "~/features/auth/logic/methodLabels";
 import { legacyCallbackUrl } from "./providers";
+import type { DeploymentSignIn } from "./sso-self-serve.types";
 
 /**
  * The sign-in a deployment configures for itself (`NEXTAUTH_PROVIDER`), next
@@ -12,11 +13,6 @@ import { legacyCallbackUrl } from "./providers";
  * the deployment names one, so an administrator who registered only one of
  * the two addresses sees the other one refused by their identity provider.
  */
-
-export interface DeploymentSignIn {
-  name: string;
-  redirectUrl: string;
-}
 
 /**
  * The deployment's own provider and the address it returns to, or null when

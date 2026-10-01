@@ -12,7 +12,13 @@ import type {
   SsoSelfServeAvailability,
   SsoVerificationMethod,
 } from "@langwatch/identity";
-import type { DeploymentSignIn } from "./deployment-sign-in";
+
+/** The sign-in a deployment configures for itself (`NEXTAUTH_PROVIDER`) and
+ *  the address it returns to (`deployment-sign-in.ts`). */
+export interface DeploymentSignIn {
+  name: string;
+  redirectUrl: string;
+}
 
 export interface SsoServiceProviderDetails {
   redirectUrl: string;
