@@ -151,10 +151,30 @@ Feature: Usage meters, decisions and who learns them
     Then Stripe is sent a quantity of 1,000 for the month
 
   @unit @billing @unimplemented
-  Scenario: A stale roll-up never reports a negative quantity
+  Scenario: A lower corrected total is applied as an explicit adjustment
     Given billing's checkpoint for the month stands at 5,000
     When billing's subscriber handles a month_counted event with 4,500 billable events
-    Then nothing is sent to Stripe and the checkpoint stays at 5,000
+    Then billing applies an adjustment of minus 500 for the month and the checkpoint becomes 4,500
+    And the lower total is not dropped as a stale reading
+
+  @unit @billing @unimplemented
+  Scenario: A redelivered month_counted event applies no second adjustment
+    Given billing has applied an adjustment for a month_counted event
+    When billing's subscriber handles the same event again
+    Then no further adjustment is applied
+
+  @unit @trace @unimplemented
+  Scenario: Every limit is soft, so ingest is accepted while the limit event is still in flight
+    Given usage has recorded limit_reached but trace has not yet handled it
+    When a trace arrives at OTLP ingest for one of the organization's projects
+    Then the ingest is accepted, because enforcement is eventual and fails open
+    And the overshoot is the documented enforcement lag, not a defect
+
+  @unit @trace @unimplemented
+  Scenario: An upgrade reinstates ingest promptly through limit_cleared
+    Given trace refuses ingest for an organization after limit_reached
+    When the organization upgrades its plan and usage records limit_cleared
+    Then trace accepts ingest again as soon as it handles limit_cleared
 
   # --- The wire -----------------------------------------------------------------
 

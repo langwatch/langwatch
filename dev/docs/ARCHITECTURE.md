@@ -29,7 +29,8 @@ packages below.
 
 **One exception to "no product code" in shape, not in kind (R4, Alex, 2026-10-01).** An app may also
 hold a generated module list: the process apps (`api`, `worker`, `tasks`) each carry the list of
-installed process halves, and `apps/ui` the list of installed browser halves, written by
+installed process halves in `src/process-modules.generated.ts`, and `apps/ui` the list of installed
+browser halves in `src/browser-modules.generated.ts`, written by
 `pnpm generate:modules` from `modules/catalogue.json` and never edited by hand. Each app depends only
 on the half it runs, so no declared edge reaches a browser package from a process app. The
 `installed-*` packages are deleted.
@@ -39,6 +40,11 @@ module spawns per run, which owns its own logic (adapters, turn execution) and
 reads the parent-child protocol from `@langwatch/scenario-contract` (Alex,
 2026-09-28). The scenario module locates the program by its own path under the workspace root; no member and no app import carries it (Alex, 2026-09-29).
 
+**Agent runtimes** (Alex, 2026-10-01): scenario owns execution orchestration and a versioned
+child protocol. Each runtime declares its input schema, executable artefact, resource class and
+cancel/drain behaviour. A host chooses which resource classes it consumes, independently of which
+APIs it installs, and admission uses weighted slots. The child stays a narrow runner.
+
 `apps/*-web` are the internal consoles (haven hub and stack home, IdP
 simulator, mail sink): React bundles built by Vite and served by their Go
 owner, on `@langwatch/design-system-internal`, `@langwatch/sim-console` (the simulators' shared shell) and `@langwatch/time` only,
@@ -46,7 +52,10 @@ importing nothing from `modules/` ([ADR-160](adr/160-internal-consoles-are-go-se
 2026-09-28).
 
 **The same code runs everywhere.** One `main.ts` per app, byte-identical
-across laptop, CI and production. Only the parsed environment differs. There
+across laptop, CI and production. Application logic is shared and the parsed
+environment differs; hosting differs too: locally one process and one shared module
+runner and event loop can host ui, api and worker (§19), so a combined boot proves no
+multi-process lifecycle or singleton isolation (Alex, 2026-10-01). There
 is no dev-only branch anywhere in an app, because an app has nowhere to put
 one.
 
@@ -120,8 +129,12 @@ in a server graph; no `process*` package in a web graph.
 Trace's query language and content dispatchers are to be a trace-owned package, portable and
 framework-free, which trace's process, the server and any browser import, in neither the contract nor
 a shared browser package (Alex, 2026-09-29). It is not extracted yet: no `modules/trace/query-language`
-exists, and the field metadata sits in trace's contract (`trace-query-metadata.ts`). Trace and analytics read the same trace data: that
-relationship is an open design item, and neither side takes an exemption meanwhile (Alex, 2026-09-29).
+exists, and the field metadata sits in trace's contract (`trace-query-metadata.ts`). Trace and analytics read the same trace data, and
+operational state has one owning writer. Analytics may own declared analytical read models fed from
+owners' facts; each cross-subject query names its read-model owner, grain, join keys, late-update
+semantics and freshness. Today's trace and evaluation analytical joins are a named compatibility
+surface until migrated, not licence to query a peer's tables (Alex, 2026-10-01; replaces the
+open item of 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
 terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
@@ -148,8 +161,10 @@ Enterprise-licensed subjects moving to their owner land in that owner's enterpri
 Enterprise modules mirror the shape exactly under `enterprise/modules/`.
 Usage is a module of its own and owns all counting: the counters, their enforcement, the warning
 thresholds, the billable-events meter projection and its table, and the trace count it takes itself.
-Entitlement keeps plans and features only; every other module checks a limit or reads a roll-up through
-`UsageApi`, and no trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
+Entitlement keeps plans and features only. Usage is events (Alex, 2026-10-01): limits travel as
+`limit_reached` and `limit_cleared`, the month's total as `month_counted`, and no module asks `UsageApi`
+for either, so no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Every limit is soft:
+eventual and fail-open, with a documented enforcement lag and overshoot (Alex, 2026-10-01).
 Not built yet (Alex, 2026-09-30): `entitlement -> trace` and `trace -> entitlement` stay listed in the
 peer-cycle baseline until usage lands.
 Slack is a module of its own (Alex, 2026-09-30; supersedes ADR-093 §5a on ownership). `modules/slack`
@@ -337,7 +352,7 @@ Enterprise-licensed code stays in enterprise modules: auth (open) obtains the SS
 `SsoApi`, building better-auth lazily so no peer is called during construction (Alex, 2026-09-25).
 Model provider asks the enterprise `ManagedProviderApi` whether LangWatch supplies a provider's credentials and
 for a managed call's parameters, naming the project's organization itself so managed-provider holds no project
-peer and closes no cycle (Alex, 2026-09-29).
+peer and closes no construction or package-import cycle (Alex, 2026-09-29).
 
 ### 3.4 The browser half; no kits
 
@@ -352,7 +367,7 @@ A screen reads host services directly, typed by tokens: `useLent`, `openDrawer`,
 `useReleaseFlag` (Alex, 2026-10-01). A `*HostApi` keeps only a module's own
 host needs, which the shell implements from `browser-host` capabilities. The half is declared with
 `defineBrowserModule` — screens (each may name the release `flags:` it sits behind, §10.1), drawers, publications, host mounts — and
-exported at `./declaration`; the generated `browserModules` list installs it.
+exported at `./declaration`; the generated `browserModules` list (`apps/ui/src/browser-modules.generated.ts`) installs it.
 
 **One layout, nested** (ruled 2026-09-18). Those layers are the whole
 vocabulary. A package that outgrows one `ui/sections/` folder does not invent
@@ -530,12 +545,14 @@ installed server modules' own declared schemas, composed by the generated
 parse (§6). An app's `config.ts` holds none of it: api's and worker's is only
 `processEnvironment`, the one place `process.env` reaches the preamble; tasks' names its
 own runner controls and connections, and scenario-child's reads what its parent stated.
-A hand-maintained per-app config of what modules own is a defect.
+A hand-maintained per-app config of what modules own is a defect. One rule, here and in §6:
+an app's `config.ts` holds only that environment seam, never a module's config or a connection
+string (Alex, 2026-10-01).
 
 ```ts
 // apps/api/src/main.ts
 import "@langwatch/time/polyfill";
-import { processModules } from "./process-modules.generated";
+import { processModules } from "./process-modules.generated.ts";
 import { processTelemetry } from "@langwatch/observability/node";
 import { processConfig, Server } from "@langwatch/process";
 
@@ -742,7 +759,7 @@ transport internals.
 nothing conditionally (Alex, 2026-10-01): a module whose behaviour depends on the deployment decides
 it from its own config and secrets (§3.3 rule 4). The audit log follows the same rule (Alex,
 2026-09-24): every module is always installed and entitlement refuses per
-organization (§11), so the generated list installs audit-log in every
+organization (§11), so the generated list (`process-modules.generated.ts` in each process app) installs audit-log in every
 deployment, as main recorded in every deployment. No app names it.
 Audit-log first becomes a leaf: it records and reads, and recording is never gated. Organization's
 trail read moves into it, the recent items move to project (which owns home), and
@@ -827,6 +844,11 @@ command on the other module's pipeline, or a pull by a scheduled process manager
 itself be a cycle). When the list is empty the container refuses a peer cycle at boot by name, and the
 list is deleted.
 
+Online policy execution (guardrails) is a synchronous capability with an end-to-end deadline and
+cancellation, distinct from monitors and run history. The evaluation runtime it calls is a dependency
+leaf, depending on none of gateway, monitor or run orchestration. Reporting follows the decision, and
+removing a cycle may not make a synchronous precondition eventual (Alex, 2026-10-01).
+
 `gateway -> evaluation` (guardrail checks) and `instant-eval -> licensing` (Connect judge) are listed
 temporarily (Alex, 2026-09-30): hosted judging moves to instant-eval, and the guardrail check's owner is
 revisited later.
@@ -866,7 +888,7 @@ the primitives; report the gap, never widen the root.
 ## 6. Config
 
 **Every value is declared at its owner; the parse is generated; apps hold no
-config file** (settled 2026-09-18 — this section replaces every earlier
+module config** (settled 2026-09-18 — this section replaces every earlier
 iteration).
 
 ```ts
@@ -920,8 +942,8 @@ inference flows from the module array itself, so a field added on a schema
 appears everywhere with no other edit. Framework-owned values follow the
 same rule at their owning package (the server's port and shutdown deadline
 on the process package, store connections on the stores config,
-observability on its own). There is no per-app config file — a `config.ts`
-in an app is a defect. **The pre-existing config machinery is deleted, not
+observability on its own). There is no per-app config schema: an app's `config.ts`
+holds only the environment seam (§4), and anything else in it is a defect. **The pre-existing config machinery is deleted, not
 migrated** (ruled 2026-09-18): RuntimeConfig definitions, the contract
 `*ConfigDefinition` files, the generated config map and both app config
 files all go; the compiler enumerates the fallout and this section is what
@@ -1182,18 +1204,7 @@ LANGWATCH_STORES=memory
 export const storesConfig = (modules) =>
   Config.group({
     tier: Config.value(z.enum(["live", "memory"]).default("live"), { env: "LANGWATCH_STORES" }),
-    postgres: Config.value(z.string().url(), {
-      env: "DATABASE_URL",
-      developmentDefault: "postgresql://…localhost…",
-    }),
-    clickhouse: Config.value(z.string().url(), {
-      env: "CLICKHOUSE_URL",
-      developmentDefault: "http://…localhost…",
-    }),
-    redis: Config.value(z.string(), {
-      env: "REDIS_URL",
-      developmentDefault: "redis://localhost:6379",
-    }),
+    /* DATABASE_URL, CLICKHOUSE_URL and REDIS_URL are secrets: see storesSecrets below */
     objectStorage: Config.group({
       backend: Config.value(z.enum(["s3", "azure", "file"]).optional(), {
         env: "STORED_OBJECTS_BACKEND",
@@ -1204,6 +1215,13 @@ export const storesConfig = (modules) =>
     /* rule 1: live + a required store unset → refuse naming modules and key
              rule 2: memory + NODE_ENV=production → refuse by name */
   );
+
+// connection strings are Secret declarations, never Config.value fields (Alex, 2026-10-01)
+export const storesSecrets = {
+  postgres: Secret.load("DATABASE_URL"),
+  clickhouse: Secret.load("CLICKHOUSE_URL"),
+  redis: Secret.load("REDIS_URL"),
+} as const;
 ```
 
 | You did                                 | What happens                                                                                           |
@@ -1266,7 +1284,7 @@ media keep main's shapes; each moves to createUpload, PUT and confirmUpload only
 ruling. main's signal-focused home (`release_ui_home_signal_focused_enabled`) is not ported;
 automation email previews render in the browser, as on main.
 
-**Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). Redis stays one
+**Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). One Redis is the default: one
 instance running `noeviction`, because queues, the outbox and locks must never be evicted. So every key a
 cache repository (`redis.<subject>-cache.repository.ts`) writes carries a short TTL in the same atomic
 command (`SET … EX|PX`, `SETEX`, a `MULTI` or Lua script that expires the key it writes; never a write then
@@ -1275,6 +1293,8 @@ expiry. The classes: at most 60 s for anything that authorises or identifies a r
 GitHub token, gateway agent); 5 minutes for folds, analytics, billing and data retention; never longer than
 the source's own expiry (a GitHub token caches for min(its expiry − 60 s, 60 s)); an existing shorter TTL
 stays. `packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts` refuses a write without one.
+A deployment may split cache from durable queues when measured pressure warrants it: expiry bounds a
+key's age, not the key count or memory, so headroom alerts are required either way (Alex, 2026-10-01).
 
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
@@ -1480,6 +1500,9 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   holds the answer for 5 s (an unknown token for 2 s), matched by the token's hash and holding no secret (a key's
   answer sits under its public lookup id, so a revoke can find it); Postgres is the truth. A failed check is never held. A revoke sets `revokedAt` and leaves a 5 s refusal in the held answer that a fill (written only when no entry exists) cannot replace, so the key is dead
   on every pod at once (if Redis cannot take the refusal, within 5 s; this holds only under `noeviction`); no process memory tier and no broadcast. A change deletes the held answer; the answer carries the project's identity. `modules/api-key/specs/auth-check-cache.feature`
+- Credential kinds (Alex, 2026-10-01): the old `eyJ...` keys, the format of the project's `apiKey` column
+  before December 2024 and matched as opaque strings, are the **legacy API key** kind. `lw_at_` is the
+  project-bound (CLI) access token. **Personal access token** means the `sk-lw-` personal key only.
 - A socket is declared like a route: a module declares its `WebSocketProtocol`, and the process opens one upgrade router
   and mounts every installed module's protocols, as it mounts REST (coordinator, 2026-09-25; main's connect gateway, pending Alex's review).
 - `publicRoute`/raw results only for genuinely non-JSON protocols
@@ -1572,7 +1595,9 @@ A module reacting to a peer's event does it through a subscriber that lives in t
 the owner's pipeline events, and sends its own command, so the reaction lands as a durable event on the
 reacting module's own pipeline (Alex, 2026-09-25; placement Alex, 2026-09-29).
 The subscriber's edge runs from the reacting module to the owner, the same way as any read of it, so
-it never closes a cycle and needs no pull. Seat changes are the case: billing subscribes to licensing's
+it closes no construction or package-import cycle and needs no pull. Those two graphs must stay
+acyclic; event causation may loop (a request and its completion) and idempotency handles it
+(Alex, 2026-10-01). Seat changes are the case: billing subscribes to licensing's
 seat-raised event and sends its own invoicing command; `LicensingApi.findSeatChanges` and the minute
 poll go (Alex, 2026-09-29).
 A module reading its own event-sourced state writes optimistically or tolerates eventual consistency
@@ -1584,7 +1609,7 @@ each owner's events, which carry ids and the non-personal, point-in-time facts; 
 personal data: where a signal needs some it carries the id (and a revision), and nurturing reads the value from
 `UserApi` at delivery and never stores it. Only the email and name leave, to Customer.io, once at sign-up; each
 identify sends only the traits that signal changes, once per source event.
-With no owner-to-nurturing edges, its `nurturing -> user` read closes no cycle, and the ratchet baseline
+With no owner-to-nurturing edges, its `nurturing -> user` read closes no construction or package-import cycle, and the ratchet baseline
 carries no exception for it (Alex, 2026-09-29).
 
 The framework's public types carry typed parameters or `unknown`, never `any`: an event, command or
@@ -1852,22 +1877,27 @@ states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md
 
 **No request batching** (Alex, 2026-10-01): the browser sends one tRPC call per request and the server refuses batched calls, with no grace window.
 
-**A write makes reads stale through the key** (Alex, 2026-10-01): a cursor-backed read's cache key carries its projection cursor, so a write changes the key and no call site invalidates by hand; a read with no cursor falls back to SSE hints and the 5-minute refetch.
+**A write makes reads stale through the key** (Alex, 2026-10-01): a cursor-backed read's cache key carries its projection cursor, so a write changes the key and no call site invalidates by hand; a read with no cursor falls back to SSE hints and lifecycle-triggered reconciliation.
 
-**No timer polling** (Alex, 2026-10-01): screens that polled on a timer, ops' 37 included, follow events instead. The 5-minute "safety refetch" below is not polling: it is the query client's `staleTime`, so a read older than five minutes refetches when a tab is shown, on mount or on reconnect, and nothing runs on an interval (`packages/browser-host/src/query-sync.ts`). A screen with no server event yet waits for one rather than polling; the backend builds the missing events (Alex, 2026-10-01). The one user-chosen timer, dashboard auto-refresh, is off by default (Alex, 2026-10-01).
+**No timer polling** (Alex, 2026-10-01): screens that polled on a timer, ops' 37 included, follow events instead. The "safety refetch" below is lifecycle-triggered reconciliation, not polling and not a staleness bound: the query client's `staleTime` only lets a read older than five minutes refetch when a tab is shown, on mount or on reconnect, and nothing runs on an interval (`packages/browser-host/src/query-sync.ts`). A screen with no server event yet waits for one rather than polling; the backend builds the missing events (Alex, 2026-10-01). The one user-chosen timer, dashboard auto-refresh, is off by default (Alex, 2026-10-01).
 
 **One tRPC call per request over `httpLink`** (Alex, 2026-10-01): each answer carries its own status, session version and schema hash; a slow call never holds another back.
 
-**Projection cursor reads** (Alex, 2026-10-01): a read declared `fromProjection` always answers in full; its cursor decides freshness and keys the cache, never a short answer. The cursor is the event id alone: event ids are KSUIDs, k-sortable with the timestamp first, so a plain string compare orders them and max-wins keeps the larger. It is stored durably in the Postgres process store per (projection, tenant) and per (projection, key). A hint carries its event id; every read answer carries the newest event id its projection has applied. An answer is fresh when its id is at or past the hint's; otherwise the tab asks again. KSUIDs order only to the second (then by writer instance), so an answer whose id shares the hint's second is fresh only when it equals the hint's id (Alex, 2026-10-01). Authz, scope and entitlement run first; the caller's session version is folded into the cache key. The settle window (5 s, configurable) only bounds how long the tab keeps asking. Stale hints stay a subscriber on the committed event; the cursor closes the race with a slow projection (Alex, 2026-10-01). A projection that applies events out of id order can leave a cursor past an event it has not applied yet; that gap is accepted as too unlikely to engineer for, and the 5-minute refetch covers it (Alex, 2026-10-01). A cursor read touches only its projections, guarded in tests and dev. Hints are sent from the cursor advance; erasure and retention go through events the projection applies; only projections a read names advance a cursor; time-relative reads stay off this path. packages/eventing/specs/projection-cursor-reads.feature.
+**Projection cursor reads** (Alex, 2026-10-01): a read declared `fromProjection` always answers in full; its cursor decides freshness and keys the cache, never a short answer. The cursor is the event id alone: event ids are KSUIDs, k-sortable with the timestamp first, but the comparison decodes the seconds and is never a plain string compare, and a newer id does not prove
+older events applied (`isFresh`). It is stored durably in the Postgres process store per (projection, tenant) and per (projection, key). A hint carries its event id; every read answer carries the newest event id its projection has applied. An answer is fresh when its id is at or past the hint's; otherwise the tab asks again. KSUIDs order only to the second (then by writer instance), so an answer whose id shares the hint's second is fresh only when it equals the hint's id (Alex, 2026-10-01). An event id is identity, not a "caught up"
+watermark: an aggregate-scoped read checks that aggregate's applied sequence, and a tenant-wide list is
+approximately fresh (Alex, 2026-10-01). Authz, scope and entitlement run first; the caller's session version is folded into the cache key. The settle window (5 s, configurable) only bounds how long the tab keeps asking. Stale hints stay a subscriber on the committed event; the cursor closes the race with a slow projection (Alex, 2026-10-01). A projection that applies events out of id order can leave a cursor past an event it has not applied yet; that gap is accepted as too unlikely to engineer for, and lifecycle-triggered reconciliation covers it (Alex, 2026-10-01). A cursor read touches only its projections, guarded in tests and dev. Hints are sent from the cursor advance; erasure and retention go through events the projection applies; only projections a read names advance a cursor; time-relative reads stay off this path. packages/eventing/specs/projection-cursor-reads.feature.
 
-**The server never answers `unchanged`; it always sends the full answer** (Alex, 2026-10-01): no content-hash ETag, 304 or `{ unchanged }` envelope. The browser caches: memory, plus a sealed IndexedDB mirror (every read by default, §10.2); staleness comes from SSE read hints and a 5-minute safety refetch. No shared server-side read cache is built until a measurement asks for one (Alex, 2026-10-01). Reads backed by event-sourced projections answer in full too; their cursor only decides freshness and keys the cache. A contract drives hints with `.query(name, { invalidatedBy: [EVENT_TYPE] })`; `PresenceApi.readHints` streams them on `presence.onOrganizationReadHints` (`organization:view`) and `presence.onProjectReadHints` (`project:view`), which take the organisation (and project) as input and the user from the session, never from the request (Alex, 2026-10-01). The read-hints pipeline publishes on the framework's own channel `eventing:read_invalidated`, never on `broadcast:*`; presence subscribes and fans the hints out to browsers (Alex, 2026-10-01). packages/api/specs/read-hints.feature.
+**Collaborative writes carry an expected entity revision** (Alex, 2026-10-01): a write names the revision it read and gets a conflict outcome when the entity has moved on. No CRDT system is built.
+
+**The server never answers `unchanged`; it always sends the full answer** (Alex, 2026-10-01): no content-hash ETag, 304 or `{ unchanged }` envelope. The browser caches: memory, plus a sealed IndexedDB mirror (every read by default, §10.2); staleness comes from SSE read hints and lifecycle-triggered reconciliation. No shared server-side read cache is built until a measurement asks for one (Alex, 2026-10-01). Reads backed by event-sourced projections answer in full too; their cursor only decides freshness and keys the cache. A contract drives hints with `.query(name, { invalidatedBy: [EVENT_TYPE] })`; `PresenceApi.readHints` streams them on `presence.onOrganizationReadHints` (`organization:view`) and `presence.onProjectReadHints` (`project:view`), which take the organisation (and project) as input and the user from the session, never from the request (Alex, 2026-10-01). The read-hints pipeline publishes on the framework's own channel `eventing:read_invalidated`, never on `broadcast:*`; presence subscribes and fans the hints out to browsers (Alex, 2026-10-01). packages/api/specs/read-hints.feature.
 
 **The mirror is sealed per session and the seal expires** (Alex, 2026-10-01): every row the browser mirrors to IndexedDB is sealed whole with AES-GCM: a fresh 96-bit IV per write and the row's IndexedDB key as associated data. The key comes from the session read (`GET /api/auth/session`): HKDF-SHA256 of the session secret over `lw-query-cache|sessionId|impersonator|epoch`, where the session id is the one the server resolved from the cookie, never one the browser sent. It is derived on every read and never stored. The epoch is seven days on the server's clock (`QUERY_CACHE_EPOCH_MS`); the browser never computes one. The read carries this epoch's key and the last one, both kept in memory only, and the session read itself is never mirrored. A row opens under this epoch's key; failing that, under last epoch's key, and is then re-sealed in the background, which bounds a long sliding session. Otherwise it is a miss: dropped and refetched, as is a row tampered with or moved. A refresh or a new tab in the same session restores. A new session, such as a re-login after expiry, gets a new key, so the old mirror is a miss that is refetched and overwritten; that is accepted. A revoked or ended session derives no key again, so its disk copy is dead. An explicit sign-out also wipes `lw-query:*`. A device-bound key would add nothing: whoever holds the disk also holds the session cookie while it is valid. `useReadFreshness` tells a screen when a read was fetched and whether the network has confirmed a restored copy since.
 
 **Visible tabs talk to the server** (Alex, 2026-10-01): a visible tab is live (hint stream, refetches) whether or not its window holds focus; a hidden tab makes no calls and catches up when shown. A BroadcastChannel carries `{ key, version }` only, never data, after a fetch lands; a receiver whose version differs marks the key stale without fetching. A read without a server version is compared by a hash of its data. There is no leader. specs/ui/browser-query-caching.feature.
 
 **Server events say when a read is stale** (Alex, 2026-10-01): a browser read is cached and refetched when
-an SSE event its contract names arrives, with a 5-minute staleness bound (a refetch on focus, mount or reconnect once a read is older, never a timer); modules pick no per-read tier.
+an SSE event its contract names arrives, with lifecycle-triggered reconciliation (a refetch on focus, mount or reconnect once a read is older than five minutes, never a timer; no staleness bound is promised); modules pick no per-read tier.
 There is no `unchanged` answer on any read. Event-sourced progress (experiment runs,
 scenarios) follows its events, never a timer. A heavy read is split by fetching the entity and loading its
 people when needed, not by a summary procedure. A user-chosen dashboard auto-refresh is the one caller-set
@@ -2299,7 +2329,7 @@ gets its own small read. `no-direct-chakra` turns on once Chakra waves 2-3 are g
 ## 11. Enterprise
 
 `enterprise/modules/<name>` mirrors the module shape exactly and **exports
-modules like any other** — the generated lists carry core and enterprise
+modules like any other** — the generated lists (`apps/*/src/{process,browser}-modules.generated.ts`) carry core and enterprise
 tiers, and the same catalogue installs both into the same processes. There is
 no enterprise composition package, no separate wiring, no conditional
 mounting: **enterprise routes are always mounted and refuse per-organization
@@ -2330,8 +2360,10 @@ in billing on organization's events (Alex, 2026-09-28; placement Alex, 2026-09-2
 It counts the month once per project in the organization's meter, decides the crossed threshold and
 records it as a usage event with the per-project counts; billing learns the warning from that event,
 resolves the admins and project names, sends once per threshold a month and records it. Billing
-counts nothing, reads roll-ups through `UsageApi` and holds no `TraceApi` peer for usage; no
-trace-usage or billing-usage cycle forms (Alex, 2026-09-29).
+counts nothing, learns the month's total from usage's `month_counted` event and holds no `TraceApi` peer
+for usage; no trace-usage or billing-usage cycle forms (Alex, 2026-09-29). Billing applies explicit
+adjustments, so a lower corrected total is never dropped as a stale reading, and `limit_cleared` reaches
+the doors promptly after an upgrade (Alex, 2026-10-01).
 
 **Enterprise scim owns the directory-sync state** (`ScimSyncState`, its `scim-sync` pipeline,
 guards and ledger); identity keeps none of it, and `ScimApp` builds the sync lifecycle over its
@@ -2555,6 +2587,11 @@ eventing's client for both roles; `browserModules` is
 empty (no module exports `./declaration` yet — the browser serves chrome
 only); the ClickHouse resolver ruling (§7); background loops main runs that this
 branch never starts, each to become a scheduled process manager.
+
+**Parked** (Alex, 2026-10-01; do not re-raise): the ingestion stage plan (Alex will redesign it later);
+erasure tombstones and owner-complete acknowledgement; deployment audience and subscription rollout
+(transport protocol versus audience, cutover and backfill for new durable subscriptions); tenant
+placement and regions (one execution region per deployment today).
 
 ---
 
