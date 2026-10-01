@@ -7,8 +7,8 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithEvaluatorHost } from "../../../testing.tsx";
 import EvaluatorsScreen from "../evaluators.screen.tsx";
+import { renderWithEvaluatorHost } from "./testing.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {
@@ -179,13 +179,19 @@ describe("given a project with evaluators", () => {
 
   describe("when one evaluator's history is opened", () => {
     /** @scenario "The history I am reading is in the address" */
-    it("puts the evaluator in the address rather than in component state", async () => {
+    it("opens the evaluatorHistory drawer naming the evaluator", async () => {
       const { host } = renderWithEvaluatorHost(<EvaluatorsScreen />);
 
       await userEvent.click(screen.getByRole("button", { name: /Actions for Answer relevancy/i }));
       await userEvent.click(await screen.findByText("View history"));
 
-      expect(host.queries).toEqual([{ history: "eval_1" }]);
+      expect(host.overlays).toEqual([
+        {
+          drawer: "evaluatorHistory",
+          params: { evaluatorId: "eval_1", evaluatorName: "Answer relevancy" },
+        },
+      ]);
+      expect(host.queries).toEqual([]);
     });
   });
 

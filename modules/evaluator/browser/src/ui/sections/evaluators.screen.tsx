@@ -1,7 +1,7 @@
 /**
  * `/:project/evaluators`: list, delete (naming the cascade), replicate,
- * push, sync, history, snippets. Creating/editing are drawers this
- * family doesn't own — written via `host.openOverlay`.
+ * push, sync, history, snippets. Creating, editing and history are
+ * drawers, opened through `host.openOverlay`.
  */
 
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -15,12 +15,8 @@ import { evaluatorApi } from "../../behavior/evaluator-api.ts";
 import { useEvaluatorHost } from "../../model/evaluator-host.ts";
 import { EvaluatorDeleteDialog } from "../blocks/evaluator-delete-dialog.tsx";
 import { EvaluatorGridCard } from "../blocks/evaluator-grid-card.tsx";
-import { EvaluatorHistoryPanel } from "./evaluator-history-panel.tsx";
 import { EvaluatorPushToCopiesDialog } from "./evaluator-push-to-copies-dialog.tsx";
 import { EvaluatorReplicateDialog } from "./evaluator-replicate-dialog.tsx";
-
-/** The query key the history panel is addressed by. */
-const HISTORY_PARAM = "history";
 
 type EvaluatorRef = { id: string; name: string };
 
@@ -38,9 +34,6 @@ export default function EvaluatorsScreen() {
     { projectId: projectId ?? "" },
     { enabled: !!projectId },
   );
-
-  const historyId = host.route().query[HISTORY_PARAM];
-  const historyEvaluator = evaluatorsQuery.data?.find((evaluator) => evaluator.id === historyId);
 
   const syncFromSource = evaluatorClient.evaluators.syncFromSource.useMutation({
     onSuccess: (_result, variables) => {
@@ -117,10 +110,11 @@ export default function EvaluatorsScreen() {
 
   const openCreate = () => host.openOverlay({ drawer: "evaluatorCategorySelector" });
 
-  const openHistory = (evaluatorId: string) =>
-    host.setQuery({ ...host.route().query, [HISTORY_PARAM]: evaluatorId });
-
-  const closeHistory = () => host.setQuery({ ...host.route().query, [HISTORY_PARAM]: void 0 });
+  const openHistory = (evaluator: EvaluatorRef) =>
+    host.openOverlay({
+      drawer: "evaluatorHistory",
+      params: { evaluatorId: evaluator.id, evaluatorName: evaluator.name },
+    });
 
   const confirmDelete = () => {
     if (!evaluatorToDelete || !projectId) return;
@@ -198,7 +192,7 @@ export default function EvaluatorsScreen() {
                     setEvaluatorForPush({ id: evaluator.id, name: evaluator.name })
                   }
                   onSyncFromSource={() => handleSyncFromSource(evaluator.id)}
-                  onViewHistory={() => openHistory(evaluator.id)}
+                  onViewHistory={() => openHistory({ id: evaluator.id, name: evaluator.name })}
                 />
               ))}
             </Grid>
@@ -233,14 +227,6 @@ export default function EvaluatorsScreen() {
         evaluatorId={evaluatorForPush?.id ?? ""}
         evaluatorName={evaluatorForPush?.name ?? ""}
       />
-
-      {historyId && (
-        <EvaluatorHistoryPanel
-          evaluatorId={historyId}
-          evaluatorName={historyEvaluator?.name ?? "Evaluator"}
-          onClose={closeHistory}
-        />
-      )}
     </>
   );
 }

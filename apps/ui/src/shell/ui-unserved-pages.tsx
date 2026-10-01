@@ -17,12 +17,8 @@ export function UiUnservedPage() {
   );
 }
 
-const unservedPage = async () => ({ default: UiUnservedPage });
-
 /**
  * The list only ever shrinks: a module declaring one of these keys makes its
  * entry here dead, which `every-route-page-is-declared` fails on.
  */
-export const uiUnservedPageLoaders: UiPageLoaderRegistry = {
-  "pages/[project]/evaluations/[id]/edit/choose": unservedPage,
-};
+export const uiUnservedPageLoaders: UiPageLoaderRegistry = {};

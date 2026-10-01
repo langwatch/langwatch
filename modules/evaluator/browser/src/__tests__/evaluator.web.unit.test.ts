@@ -16,6 +16,7 @@ describe("the evaluator browser declaration", () => {
       "codeEvaluatorEditor",
       "evaluatorCategorySelector",
       "evaluatorEditor",
+      "evaluatorHistory",
       "evaluatorList",
       "guardrails",
       "onlineEvaluation",

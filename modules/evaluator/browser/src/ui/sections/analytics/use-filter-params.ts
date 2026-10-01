@@ -1,11 +1,11 @@
 import { availableFilters, type FilterField } from "@langwatch/analytics-filters";
+import { usePeriodSelector } from "@langwatch/browser-host/period-selector";
 import { readUiStorage } from "@langwatch/browser-host/storage";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
 import qs from "qs";
 
 import { URL_QS_PARSE_OPTIONS } from "../../../model/analytics/qs-parse-options.ts";
-import { usePeriodSelector } from "../../elements/analytics/period-selector-barrel.ts";
 import { filterOutEmptyFilters } from "./utils.ts";
 
 export type FilterParam =

@@ -1,3 +1,4 @@
+import { PeriodSelector, usePeriodSelector } from "@langwatch/browser-host/period-selector";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
@@ -44,7 +45,6 @@ import {
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
-import { PeriodSelector, usePeriodSelector } from "../../elements/analytics/period-selector.tsx";
 import { FilterToggle } from "../analytics/filters/filter-toggle.tsx";
 import { useFilterParams } from "../analytics/use-filter-params.ts";
 import type { CheckConfigFormData } from "./check-config-form.tsx";

@@ -16,7 +16,7 @@ import {
   type EvaluatorRouteReading,
   type EvaluatorScope,
   type EvaluatorSuccessNotice,
-} from "./model/evaluator-host.ts";
+} from "../../../model/evaluator-host.ts";
 
 const DEFAULT_TARGETS: EvaluatorCopyTarget[] = [
   { id: "proj-1", name: "Acme / Engineering / Web App", canCreate: true },
