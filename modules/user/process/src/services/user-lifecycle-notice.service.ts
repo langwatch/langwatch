@@ -1,7 +1,10 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
+import type { UserLedgerActor } from "@langwatch/user-contract";
 
 import type { RecordUserLifecycleCommandData } from "../eventing/user-lifecycle.events.ts";
+
+type Change = { userId: string; actor: UserLedgerActor; at: Instant };
 
 export type UserLifecycleSenders = Readonly<{
   recordUserDeactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;
@@ -26,12 +29,12 @@ export class UserLifecycleNoticeService {
     this.#senders = senders;
   }
 
-  async deactivated({ userId, at }: { userId: string; at: Instant }): Promise<void> {
-    await this.#connected().recordUserDeactivated.send(this.#data({ userId, at }));
+  async deactivated({ userId, actor, at }: Change): Promise<void> {
+    await this.#connected().recordUserDeactivated.send(this.#data({ userId, actor, at }));
   }
 
-  async reactivated({ userId, at }: { userId: string; at: Instant }): Promise<void> {
-    await this.#connected().recordUserReactivated.send(this.#data({ userId, at }));
+  async reactivated({ userId, actor, at }: Change): Promise<void> {
+    await this.#connected().recordUserReactivated.send(this.#data({ userId, actor, at }));
   }
 
   #connected(): UserLifecycleSenders {
@@ -39,7 +42,7 @@ export class UserLifecycleNoticeService {
     return this.#senders;
   }
 
-  #data({ userId, at }: { userId: string; at: Instant }): RecordUserLifecycleCommandData {
-    return { tenantId: userId, userId, occurredAt: at.epochMilliseconds };
+  #data({ userId, actor, at }: Change): RecordUserLifecycleCommandData {
+    return { tenantId: userId, userId, occurredAt: at.epochMilliseconds, actor };
   }
 }

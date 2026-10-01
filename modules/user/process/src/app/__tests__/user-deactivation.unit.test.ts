@@ -7,6 +7,7 @@
 import {
   UserAccountAccessDeniedError,
   UserLastPlatformOperatorError,
+  userLifecycleEventDataSchema,
 } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -125,7 +126,7 @@ describe("user.deactivate", () => {
         passwordHash: "hashed:first",
       });
       operators.add(op.id);
-      await app.deactivate({ id: gone.id });
+      await app.deactivate({ id: gone.id, actor: { type: "system", id: null } });
       const caller = { id: customer.id, operatorId: op.id, impersonated: true };
 
       await expect(app.deactivateAccount({ userId: other.id, caller })).rejects.toBeInstanceOf(
@@ -153,9 +154,9 @@ describe("user.deactivate", () => {
       const operator = await account(app);
       operators.add(operator.id);
 
-      await expect(app.deactivate({ id: operator.id })).rejects.toBeInstanceOf(
-        UserLastPlatformOperatorError,
-      );
+      await expect(
+        app.deactivate({ id: operator.id, actor: { type: "system", id: null } }),
+      ).rejects.toBeInstanceOf(UserLastPlatformOperatorError);
       await expect(app.findById({ id: operator.id })).resolves.toMatchObject({
         deactivatedAt: null,
       });
@@ -176,7 +177,7 @@ describe("user.deactivate", () => {
       });
       operators.add(operator.id).add(other.id);
 
-      await app.deactivate({ id: operator.id });
+      await app.deactivate({ id: operator.id, actor: { type: "system", id: null } });
 
       await expect(app.findById({ id: operator.id })).resolves.toMatchObject({
         deactivatedAt: expect.any(Date),
@@ -199,9 +200,11 @@ describe("user.deactivate", () => {
       });
       operators.add(first.id).add(second.id);
 
-      await app.deactivate({ id: first.id });
+      await app.deactivate({ id: first.id, actor: { type: "system", id: null } });
 
-      await expect(app.deactivate({ id: second.id })).rejects.toMatchObject({
+      await expect(
+        app.deactivate({ id: second.id, actor: { type: "system", id: null } }),
+      ).rejects.toMatchObject({
         code: "user_last_platform_operator",
       });
       await expect(app.findById({ id: second.id })).resolves.toMatchObject({
@@ -221,7 +224,7 @@ describe("user.deactivate", () => {
       });
       const created = await account(app);
 
-      await app.deactivate({ id: created.id });
+      await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
 
       expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
       expect(revokeForUser).toHaveBeenCalledWith({ userId: created.id });
@@ -246,7 +249,9 @@ describe("user.deactivate", () => {
       });
       const created = await account(app);
 
-      await expect(app.deactivate({ id: created.id })).rejects.toThrow("event store unavailable");
+      await expect(
+        app.deactivate({ id: created.id, actor: { type: "system", id: null } }),
+      ).rejects.toThrow("event store unavailable");
 
       expect(auth.revokeAllBrowserSessions).toHaveBeenCalledWith({ userId: created.id });
       expect(revokeForUser).toHaveBeenCalledWith({ userId: created.id });
@@ -260,11 +265,47 @@ describe("user.deactivate", () => {
       const app = createUserTestApp({ lifecycle: senders });
       const created = await account(app);
 
-      await app.deactivate({ id: created.id });
-      await app.reactivate({ id: created.id });
+      await app.deactivate({ id: created.id, actor: { type: "system", id: null } });
+      await app.reactivate({ id: created.id, actor: { type: "system", id: null } });
 
       expect(recorded.map(({ type }) => type)).toEqual(["deactivated", "reactivated"]);
       expect(recorded[0]?.data).toMatchObject({ tenantId: created.id, userId: created.id });
+    });
+  });
+
+  describe("given an operator changes accounts, directly or while impersonating", () => {
+    /** @scenario "A user's lifecycle fact records who made the change" */
+    it("records the operator as the actor, and an older fact without one still reads", async () => {
+      const operators = new Set<string>();
+      const { senders, recorded } = createUserTestLifecycle();
+      const app = createUserTestApp({
+        lifecycle: senders,
+        dependencies: { authz: createUserTestAuthorization(operators) },
+      });
+      const customer = await account(app);
+      const op = await app.createCredentialUser({
+        name: "Op",
+        email: "op@example.test",
+        passwordHash: "hashed:first",
+      });
+      operators.add(op.id);
+      const direct = { id: op.id, operatorId: op.id, impersonated: false };
+
+      await app.deactivateAccount({ userId: customer.id, caller: direct });
+      await app.reactivateAccount({ userId: customer.id, caller: direct });
+      await app.deactivateAccount({
+        userId: customer.id,
+        caller: { id: customer.id, operatorId: op.id, impersonated: true },
+      });
+
+      expect(recorded.map(({ data }) => data.actor)).toEqual([
+        { type: "user", id: op.id },
+        { type: "user", id: op.id },
+        { type: "user", id: op.id },
+      ]);
+      expect(
+        userLifecycleEventDataSchema.parse({ tenantId: "u", userId: "u", occurredAt: 1 }),
+      ).not.toHaveProperty("actor");
     });
   });
 });

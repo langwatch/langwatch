@@ -43,6 +43,10 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
     [
       "users.reactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "users.findById",
@@ -101,17 +105,16 @@ exports[`AdminBackofficeService user update > combines every side effect 1`] = `
 }
 `;
 
-exports[`AdminBackofficeService user update > deactivates at a picked date 1`] = `
+exports[`AdminBackofficeService user update > deactivates through user, as the operator, keeping no picked date 1`] = `
 {
   "log": [
     [
       "users.deactivate",
       "user-1",
-    ],
-    [
-      "repository.setUserDeactivatedAt",
-      "user-1",
-      "2026-01-02T03:04:05Z",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",
@@ -119,7 +122,6 @@ exports[`AdminBackofficeService user update > deactivates at a picked date 1`] =
       {
         "deactivate": true,
         "id": "user-1",
-        "pickedDate": "2026-01-02T03:04:05.000Z",
       },
     ],
     [
@@ -141,6 +143,10 @@ exports[`AdminBackofficeService user update > deactivates without an unreadable 
     [
       "users.deactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",
@@ -233,6 +239,10 @@ exports[`AdminBackofficeService user update > reactivates on a blank deactivatio
     [
       "users.reactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",
@@ -276,6 +286,10 @@ exports[`AdminBackofficeService user update > reactivates on a null deactivation
     [
       "users.reactivate",
       "user-1",
+      {
+        "id": "olive",
+        "type": "user",
+      },
     ],
     [
       "audit.record",

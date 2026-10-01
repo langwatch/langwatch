@@ -16,6 +16,7 @@ import {
   updateUserProfileInputSchema,
   userEmailInputSchema,
   userIdInputSchema,
+  userLifecycleChangeInputSchema,
   userProfilesInputSchema,
   type CreateUserInput,
   type CreateCredentialUserInput,
@@ -33,6 +34,7 @@ import {
   type UserFullProfile,
   type UserPasskeyNudgeStatus,
   type UserIdInput,
+  type UserLifecycleChangeInput,
   type UserProfile,
   type UserProfilesInput,
   type UserSsoStatus,
@@ -327,23 +329,23 @@ export class UserService {
    * Never the last active platform operator. Credentials end before user's fact is sent, so access
    * stops at once on every door, whatever authz's lag or a failed send.
    */
-  async deactivate(input: UserIdInput): Promise<UserProfile> {
-    const parsed = userIdInputSchema.parse(input);
+  async deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
     const at = await this.repository.readClock();
     const user = await this.writeDeactivation({ id: parsed.id, at });
     await this.auth.revokeAllBrowserSessions({ userId: parsed.id });
     await this.cliCredentials.revokeForUser({ userId: parsed.id });
-    await this.lifecycle.deactivated({ userId: parsed.id, at });
+    await this.lifecycle.deactivated({ userId: parsed.id, actor: parsed.actor, at });
 
     return user;
   }
 
   /** Stamped from the database's clock, like deactivation, so the two order across servers. */
-  async reactivate(input: UserIdInput): Promise<UserProfile> {
-    const parsed = userIdInputSchema.parse(input);
+  async reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
+    const parsed = userLifecycleChangeInputSchema.parse(input);
     const at = await this.repository.readClock();
     const user = await this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
-    await this.lifecycle.reactivated({ userId: parsed.id, at });
+    await this.lifecycle.reactivated({ userId: parsed.id, actor: parsed.actor, at });
 
     return user;
   }

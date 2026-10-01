@@ -1,7 +1,6 @@
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
 import { AdminBackofficeRepository } from "../../repositories/admin-backoffice.repository.ts";
@@ -24,10 +23,6 @@ class RecordingRepository extends AdminBackofficeRepository {
     this.log.push(["repository.findUserById", id]);
     return { data: { id } };
   }
-
-  async setUserDeactivatedAt(id: string, value: Instant): Promise<void> {
-    this.log.push(["repository.setUserDeactivatedAt", id, value.toString()]);
-  }
 }
 
 class RecordingAudit extends AdminAuditSink {
@@ -45,12 +40,12 @@ async function updateUser(data: Record<string, unknown>) {
   const service = AdminBackofficeService.create({
     repository: new RecordingRepository(log),
     users: new TestUserApi({
-      reactivate: async ({ id }) => {
-        log.push(["users.reactivate", id]);
+      reactivate: async ({ id, actor }) => {
+        log.push(["users.reactivate", id, actor]);
         return { ...backofficeOperator, id };
       },
-      deactivate: async ({ id }) => {
-        log.push(["users.deactivate", id]);
+      deactivate: async ({ id, actor }) => {
+        log.push(["users.deactivate", id, actor]);
         return { ...backofficeOperator, id };
       },
       findById: async ({ id }) => {
@@ -83,7 +78,10 @@ describe("AdminBackofficeService user update", () => {
   it.each([
     ["reactivates on a null deactivation", { deactivatedAt: null }],
     ["reactivates on a blank deactivation and saves the rest", { deactivatedAt: "", name: "X" }],
-    ["deactivates at a picked date", { deactivatedAt: "2026-01-02T03:04:05.000Z" }],
+    [
+      "deactivates through user, as the operator, keeping no picked date",
+      { deactivatedAt: "2026-01-02T03:04:05.000Z" },
+    ],
     ["deactivates without an unreadable picked date", { deactivatedAt: "not a date" }],
     ["passes an unrecognised deactivation value through", { deactivatedAt: 5 }],
     ["changes the email and revokes sessions", { email: " New@Example.com " }],

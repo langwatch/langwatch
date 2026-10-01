@@ -60,6 +60,7 @@ import type {
   UserFullProfile,
   UserHomePagePickerState,
   UserIdInput,
+  UserLifecycleChangeInput,
   UserLinkedAccount,
   UserPasskeyNudgeStatus,
   UserSecureAccountOffer,
@@ -711,12 +712,12 @@ export class UserApp implements UserApi {
   }
 
   /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
-  deactivate(input: UserIdInput): Promise<UserProfile> {
+  deactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.deactivate(input);
   }
 
   /** Restores a retired account. */
-  reactivate(input: UserIdInput): Promise<UserProfile> {
+  reactivate(input: UserLifecycleChangeInput): Promise<UserProfile> {
     return this.#users.reactivate(input);
   }
 
@@ -737,7 +738,7 @@ export class UserApp implements UserApi {
       throw new UserAccountAccessDeniedError();
     }
 
-    await this.#users.deactivate({ id: userId });
+    await this.#users.deactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
   /** An operator's call alone, never while impersonating: it can restore an operator's grant. */
@@ -752,7 +753,7 @@ export class UserApp implements UserApi {
       throw new UserAccountAccessDeniedError();
     }
 
-    await this.#users.reactivate({ id: userId });
+    await this.#users.reactivate({ id: userId, actor: { type: "user", id: caller.operatorId } });
   }
 
   // -- the avatar ------------------------------------------------------------

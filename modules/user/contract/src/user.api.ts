@@ -57,6 +57,7 @@ import type {
   UserAvatarResult,
   UserAvatarUrl,
   UserIdInput,
+  UserLifecycleChangeInput,
   UserFullProfile,
   UserProfilesInput,
   UserPasskeyNudgeStatus,
@@ -144,8 +145,8 @@ export interface UserApi {
   revokeOtherBrowserSessions(input: { userId: string; keepSessionId: string }): Promise<void>;
   revokeAllBrowserSessions(input: { userId: string }): Promise<void>;
   /** Retires an account and ends its sessions and CLI tokens; never the last active operator. */
-  deactivate(input: UserIdInput): Promise<UserProfile>;
-  reactivate(input: UserIdInput): Promise<UserProfile>;
+  deactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
+  reactivate(input: UserLifecycleChangeInput): Promise<UserProfile>;
   /** Retires an account and ends every credential family that outlives it. */
   deactivateAccount(input: { userId: string; caller: UserCaller }): Promise<void>;
   /** Restores a retired account. Operators only. */

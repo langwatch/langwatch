@@ -8,8 +8,7 @@ import {
   type AdminOperationResult,
   type AdminOperationParams,
 } from "@langwatch/ops-contract";
-import { Temporal, toEpochMs } from "@langwatch/time";
-import type { UserApi } from "@langwatch/user-contract";
+import type { UserApi, UserLedgerActor } from "@langwatch/user-contract";
 
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
@@ -107,7 +106,11 @@ export class AdminBackofficeService {
     const sideEffectAudits: UserSideEffectAudit[] = [];
 
     if ("deactivatedAt" in data) {
-      const audits = await this.applyDeactivation({ userId, value: data.deactivatedAt });
+      const audits = await this.applyDeactivation({
+        userId,
+        actorId: input.actorId,
+        value: data.deactivatedAt,
+      });
       if (audits.length > 0) delete data.deactivatedAt;
       sideEffectAudits.push(...audits);
     }
@@ -140,37 +143,29 @@ export class AdminBackofficeService {
     return result;
   }
 
-  /** Reactivates on a blank value, deactivates on a date; any other value is left to the save. */
+  /**
+   * Reactivates on a blank value, deactivates on a date; any other value is left to the save.
+   * Both go through user's lifecycle, which stamps the database's clock, so a picked date is
+   * not kept: the fact names the operator as its actor.
+   */
   private async applyDeactivation({
     userId,
+    actorId,
     value,
   }: {
     userId: string;
+    actorId: string;
     value: unknown;
   }): Promise<UserSideEffectAudit[]> {
+    const actor: UserLedgerActor = { type: "user", id: actorId };
     if (value === null || value === "") {
-      await this.users.reactivate({ id: userId });
+      await this.users.reactivate({ id: userId, actor });
       return [{ action: "update/user", payload: { id: userId, reactivate: true } }];
     }
     if (typeof value !== "string" && !(value instanceof Date)) return [];
 
-    await this.users.deactivate({ id: userId });
-    const pickedMs = toEpochMs(value);
-    if (Number.isNaN(pickedMs)) {
-      return [{ action: "update/user", payload: { id: userId, deactivate: true } }];
-    }
-    const picked = Temporal.Instant.fromEpochMilliseconds(pickedMs);
-    await this.repository.setUserDeactivatedAt(userId, picked);
-    return [
-      {
-        action: "update/user",
-        payload: {
-          id: userId,
-          deactivate: true,
-          pickedDate: picked.toString({ fractionalSecondDigits: 3 }),
-        },
-      },
-    ];
+    await this.users.deactivate({ id: userId, actor });
+    return [{ action: "update/user", payload: { id: userId, deactivate: true } }];
   }
 
   /** Saves the normalised email; a real change signs the user out of every browser. */

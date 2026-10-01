@@ -37,7 +37,6 @@ function authFake() {
 class RepositoryFake extends AdminBackofficeRepository {
   execute = vi.fn();
   findUserById = vi.fn(async () => ({ data: user }));
-  setUserDeactivatedAt = vi.fn(async () => undefined);
 }
 
 class AuditFake extends AdminAuditSink {

@@ -248,7 +248,7 @@ describe("UserService", () => {
       revokeAllBrowserSessions,
     });
     const { service, repository } = createService({ auth });
-    await service.deactivate({ id: "user-1" });
+    await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
       deactivatedAt: NOW,
@@ -259,7 +259,7 @@ describe("UserService", () => {
   /** @scenario "user.reactivate clears deactivatedAt on the user" */
   it("clears the deactivation stamp when a user is reactivated", async () => {
     const { service, repository } = createService();
-    await service.reactivate({ id: "user-1" });
+    await service.reactivate({ id: "user-1", actor: { type: "system", id: null } });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
       deactivatedAt: null,
@@ -634,8 +634,8 @@ describe("the lifecycle facts' clock", () => {
       lifecycle,
     });
 
-    await service.deactivate({ id: "user-1" });
-    await service.reactivate({ id: "user-1" });
+    await service.deactivate({ id: "user-1", actor: { type: "system", id: null } });
+    await service.reactivate({ id: "user-1", actor: { type: "system", id: null } });
 
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",

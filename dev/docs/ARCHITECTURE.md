@@ -1387,6 +1387,8 @@ user exists. Users with no organization yet also wait; only a decision latches (
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
+Each lifecycle fact also names its actor in the grants ledger's shape (older facts have none). The back
+office deactivates only through user, so it keeps no picked date (Alex, 2026-10-01).
 
 ---
 

@@ -62,6 +62,13 @@ Feature: Canonical user lifecycle
     Then each change is recorded on user's pipeline as "lw.user.deactivated" and "lw.user.reactivated"
     And each fact is keyed by the user and its instant, so a redelivery records nothing new
 
+  @unit
+  Scenario: A user's lifecycle fact records who made the change
+    Given a platform operator
+    When they deactivate or reactivate an account, directly or while impersonating its owner
+    Then each fact carries the operator as its actor, in the grants ledger's shape
+    And a fact recorded before actors existed still reads, with no actor
+
   Scenario: Changing an email refreshes authenticated identity
     When an authorized transport changes a user's normalized email through the User service
     Then the profile is updated

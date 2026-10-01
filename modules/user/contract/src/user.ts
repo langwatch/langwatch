@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { userLedgerActorSchema } from "./user.events.ts";
+
 export const USER_FEATURE_ID = "user" as const;
 export const USER_KSUID_RESOURCE = "user" as const;
 export const USER_ACCOUNT_KSUID_RESOURCE = "account" as const;
@@ -47,6 +49,12 @@ export type UserFullProfile = z.infer<typeof userFullProfileSchema>;
 
 export const userIdInputSchema = z.object({ id: z.string().min(1) }).strict();
 export type UserIdInput = z.infer<typeof userIdInputSchema>;
+
+/** A deactivation or reactivation, and who made it. */
+export const userLifecycleChangeInputSchema = z
+  .object({ id: z.string().min(1), actor: userLedgerActorSchema })
+  .strict();
+export type UserLifecycleChangeInput = z.infer<typeof userLifecycleChangeInputSchema>;
 
 export const userProfilesInputSchema = z.object({ userIds: z.array(z.string().min(1)) }).strict();
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
