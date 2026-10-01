@@ -138,7 +138,6 @@ export {
 // principal a second permission question is asked with, the scope a handler
 // reads back, and who is behind a personal-workspace key.
 export {
-  apiKeyIdOfCredential,
   browserCallerOfRequest,
   credentialPrincipalOf,
   credentialPrincipalOfToken,
@@ -147,6 +146,7 @@ export {
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   organizationOf,
+  principalOfCredential,
   projectCredentialOfRequest,
   recordBrowserCaller,
   recordKeyCredential,

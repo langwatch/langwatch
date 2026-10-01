@@ -4,12 +4,13 @@
  * @see specs/model-providers/model-default-config-cascade.feature
  */
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzPermission, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   ModelDefaultApiKeyScopeCheck,
   ModelProviderApi,
+  ModelDefaultConfig,
 } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
@@ -45,7 +46,7 @@ class ApiKeyPermissionDeniedTestError extends HandledError {
   }
 }
 
-type Credential = { apiKeyId: string; userId: string | null; organizationId: string } | null;
+type Credential = { principal: PrincipalRef; userId: string | null; organizationId: string } | null;
 
 function mount(
   options: {
@@ -56,9 +57,13 @@ function mount(
   } = {},
 ) {
   const asked: AuthzPermission[] = [];
-  const credential =
+  const credential: Credential =
     options.credential === undefined
-      ? { apiKeyId: "api-key-1", userId: "owner-user", organizationId: ORGANIZATION }
+      ? {
+          principal: { type: "apiKey", id: "api-key-1" },
+          userId: "owner-user",
+          organizationId: ORGANIZATION,
+        }
       : options.credential;
 
   const { app } = mountableModelProviderApp({ modelProviders: options.modelProviders ?? {} });
@@ -98,6 +103,22 @@ const writeBody = (scope: { scopeType: string; scopeId: string }) => ({
   config: { DEFAULT: "openai/gpt-5-mini" },
   scopes: [scope],
 });
+
+/** A project-bound access token, checked as the person it was issued to. */
+const CLI_TOKEN: Credential = {
+  principal: { type: "user", id: "owner-user" },
+  userId: "owner-user",
+  organizationId: ORGANIZATION,
+};
+
+const ORG_CONFIG: ModelDefaultConfig = {
+  id: "config-1",
+  config: { DEFAULT: "openai/gpt-5-mini" },
+  scopes: [{ scopeType: "ORGANIZATION", scopeId: ORGANIZATION }],
+  authorId: "owner-user",
+  createdAt: new Date(0),
+  updatedAt: new Date(0),
+};
 
 const ORGANIZATION_WRITE = writeBody({ scopeType: "ORGANIZATION", scopeId: ORGANIZATION });
 
@@ -224,4 +245,63 @@ describe("given a project-restricted API key minted by an organization administr
       expect(saveDefaultConfig).toHaveBeenCalledOnce();
     });
   });
+});
+
+describe("given a project-bound access token", () => {
+  describe("when it names a scope outside its project", () => {
+    /** @scenario A project-bound access token cannot write model defaults outside its project */
+    it("refuses with model_default_scope_forbidden and never reaches the application", async () => {
+      const saveDefaultConfig = vi.fn<ModelProviderApi["saveDefaultConfig"]>(
+        async () => ORG_CONFIG,
+      );
+      const { send } = mount({ credential: CLI_TOKEN, modelProviders: { saveDefaultConfig } });
+
+      const response = await send("POST", "/api/model-defaults", ORGANIZATION_WRITE);
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        error: "model_default_scope_forbidden",
+      });
+      expect(saveDefaultConfig).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a project-bound access token and an organization-scoped config", () => {
+  const byId = [
+    ["updates", "PUT", { config: { DEFAULT: "openai/gpt-5" } }],
+    ["empties the scopes of", "PUT", { scopes: [] }],
+    ["deletes", "DELETE", undefined],
+  ] as const;
+
+  for (const [verb, method, body] of byId) {
+    describe(`when it ${verb} that config by id`, () => {
+      /** @scenario A project-bound access token cannot update or delete a model default outside its project */
+      it("refuses with model_default_scope_forbidden and never reaches the application", async () => {
+        const saveDefaultConfig = vi.fn<ModelProviderApi["saveDefaultConfig"]>(
+          async () => ORG_CONFIG,
+        );
+        const deleteDefaultConfig = vi.fn<ModelProviderApi["deleteDefaultConfig"]>(
+          async () => undefined,
+        );
+        const { send } = mount({
+          credential: CLI_TOKEN,
+          modelProviders: {
+            findDefaultConfig: async () => ORG_CONFIG,
+            saveDefaultConfig,
+            deleteDefaultConfig,
+          },
+        });
+
+        const response = await send(method, "/api/model-defaults/config-1", body);
+
+        expect(response.status).toBe(403);
+        await expect(response.json()).resolves.toMatchObject({
+          error: "model_default_scope_forbidden",
+        });
+        expect(saveDefaultConfig).not.toHaveBeenCalled();
+        expect(deleteDefaultConfig).not.toHaveBeenCalled();
+      });
+    });
+  }
 });

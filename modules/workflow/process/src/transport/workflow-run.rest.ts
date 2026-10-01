@@ -3,7 +3,6 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
 import { resolveRequestBound } from "@langwatch/plans";
 import {
@@ -22,16 +21,14 @@ const bodyLimit = {
   onExceeded: () => new PayloadTooLargeError(),
 } as const;
 
-/** The API key a run was started with, so the run's own key holds no more; null for a project key. */
+/**
+ * The API key a run was started with, so the run's own key holds no more; null for a legacy
+ * API key or a project-bound access token, which have no key row.
+ */
 export const workflowRunCallerKey = defineRestMiddleware(
   "workflowRunCallerKey",
   z.string().min(1).nullable(),
 );
-
-/** The key that bounds the run: none for a project key, or a person's access token (no key row). */
-export function workflowRunCallerKeyOf(credential: RestResolvedProjectCredential): string | null {
-  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
-}
 
 /** The member a run acts as, and the key they called with. */
 function runPrincipal(userId: string, callerKey: string | null): WorkflowRunPrincipal {

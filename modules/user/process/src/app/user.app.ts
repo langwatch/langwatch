@@ -1012,7 +1012,7 @@ export class UserModule implements UserApi {
     const project = await this.#requireProject({ projectId });
     const ownerUserId = this.#account.personalUsageCallerFor({ project, credential });
     const organizationId =
-      (credential.kind === "apiKey" ? credential.organizationId : null) ??
+      (credential.kind === "legacyProjectKey" ? null : credential.organizationId) ??
       (await this.#account.findOrganizationIdByTeamId({ teamId: project.teamId }));
     const tenant = organizationId
       ? await this.#members.governanceProjects.findGovernanceProject({ organizationId })

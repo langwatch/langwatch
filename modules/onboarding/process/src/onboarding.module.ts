@@ -15,10 +15,10 @@ export const onboardingProcessModule = defineProcessModule("onboarding")
     bindRestMiddleware(onboardingRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
       const organizationId =
-        credential.type === "apiKey"
-          ? credential.organizationId
-          : credential.project.organizationId;
-      const userId = credential.type === "apiKey" ? credential.userId : null;
+        credential.type === "legacyProjectKey"
+          ? credential.project.organizationId
+          : credential.organizationId;
+      const userId = credential.type === "legacyProjectKey" ? null : credential.userId;
 
       return { organizationId, userId };
     }),

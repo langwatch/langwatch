@@ -81,7 +81,14 @@ export const gatewayProcessModule = defineProcessModule("gateway")
       // transport carries.
       bindRestMiddleware(gatewayRestCredential, (context): GatewayRequestCredential => {
         const credential = projectCredentialOfRequest(context.req.raw);
-        if (credential.type !== "apiKey") return { kind: "legacyProjectKey" };
+        if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+        if (credential.type === "cliAccessToken") {
+          return {
+            kind: "user",
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+          };
+        }
 
         return {
           kind: "apiKey",

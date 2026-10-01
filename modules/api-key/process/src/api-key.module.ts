@@ -2,6 +2,7 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   bindRestMiddleware,
   organizationCredentialOfRequest,
+  principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
@@ -81,17 +82,13 @@ export const apiKeyProcessModule = defineProcessModule("api-key")
     bindRestMiddleware(apiKeyIngestionCaller, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
 
-      return credential.type === "apiKey"
-        ? {
-            isPersonSession: credential.isPersonSession === true,
-            userId: credential.userId,
-            organizationId: credential.organizationId,
-          }
-        : {
-            isPersonSession: false,
-            userId: null,
-            organizationId: credential.project.organizationId,
-          };
+      return {
+        principal: principalOfCredential(credential),
+        organizationId:
+          credential.type === "legacyProjectKey"
+            ? credential.project.organizationId
+            : credential.organizationId,
+      };
     }),
   ])
   .withEventing(apiKeyEventing);

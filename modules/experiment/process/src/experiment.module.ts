@@ -54,6 +54,9 @@ export const experimentProcessModule = defineProcessModule("experiment")
     bindRestMiddleware(experimentWorkbenchCredential, (context): WorkbenchCredential => {
       const credential = projectCredentialOfRequest(context.req.raw);
       if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "cliAccessToken") {
+        return { kind: "cliAccessToken", userId: credential.userId };
+      }
 
       return {
         kind: "apiKey",

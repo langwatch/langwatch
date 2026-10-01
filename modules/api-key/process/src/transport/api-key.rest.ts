@@ -27,6 +27,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { principalRefSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 /** Every operation in this family is filed under one tag. */
@@ -47,14 +48,13 @@ export const apiKeyRestCredential = defineRestMiddleware(
 );
 
 /**
- * The project credential the ingestion mint reads: the person it acts as, whether the door
- * marked it a person's access token rather than a key, and the project's organization.
+ * The project credential the ingestion mint reads: the principal it is checked as (a person
+ * only for a project-bound access token) and the project's organization.
  */
 export const apiKeyIngestionCaller = defineRestMiddleware(
   "apiKeyIngestionCaller",
   z.object({
-    isPersonSession: z.boolean(),
-    userId: z.string().nullable(),
+    principal: principalRefSchema.nullable(),
     organizationId: z.string(),
   }),
 );
@@ -515,10 +515,11 @@ export const apiKeyRest: Readonly<{
   })
   .withMiddleware(apiKeyIngestionCaller)
   .handle(async ({ app, input, scope }, caller) => {
-    const { userId } = caller;
-    if (userId === null || !caller.isPersonSession) {
+    const { principal } = caller;
+    if (principal?.type !== "user") {
       throw new ApiKeyScopeViolationError("Only a person's sign-in session mints an ingestion key");
     }
+    const userId = principal.id;
     if (!isIngestionShape({ input, projectId: scope.id, callerUserId: userId })) {
       throw new ApiKeyScopeViolationError(
         "An ingestion key is personal, bound to this one project, and holds only ingestion",

@@ -352,6 +352,16 @@ describe("ApiKeyTokenResolutionService", () => {
         });
       });
 
+      it("resolves a pre-2025 `eyJ` value as an opaque legacy key, never as a JWT", async () => {
+        const { service } = serviceWith({ legacyProjectId: "project-1" });
+        const token = "eyJhbGciOiJIUzI1NiJ9.eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEifQ.c2lnbmF0dXJl";
+
+        await expect(service.findResolvedToken({ token })).resolves.toMatchObject({
+          type: "legacyProjectKey",
+          project: { id: "project-1" },
+        });
+      });
+
       it("refuses one whose project no longer exists", async () => {
         const { service } = serviceWith({ legacyProjectId: "project-1", identity: null });
 

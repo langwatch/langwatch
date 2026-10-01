@@ -5,7 +5,7 @@
  */
 
 import {
-  apiKeyIdOfCredential,
+  principalOfCredential,
   credentialPrincipalOf,
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
@@ -13,6 +13,7 @@ import {
   type RestCredentialPrincipal,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import { Context } from "hono";
 import { describe, expect, it } from "vitest";
 
@@ -252,16 +253,15 @@ describe("the key row a project credential names", () => {
     project,
   } satisfies RestResolvedProjectCredential;
 
-  it.each<[string, RestResolvedProjectCredential, string | null]>([
-    ["a scoped API key", key, "key_1"],
-    ["a scoped API key marked not a session", { ...key, isPersonSession: false }, "key_1"],
+  it.each<[string, RestResolvedProjectCredential, PrincipalRef | null]>([
+    ["a project key", key, { type: "apiKey", id: "key_1" }],
     [
-      "a person's access token",
-      { ...key, apiKeyId: "cli-access-abc", isPersonSession: true },
-      null,
+      "a project-bound access token",
+      { type: "cliAccessToken", userId: "user_1", organizationId: "organization-1", project },
+      { type: "user", id: "user_1" },
     ],
     ["a legacy project key", { type: "legacyProjectKey", project }, null],
   ])("given %s", (_label, credential, expected) => {
-    expect(apiKeyIdOfCredential(credential)).toBe(expected);
+    expect(principalOfCredential(credential)).toEqual(expected);
   });
 });

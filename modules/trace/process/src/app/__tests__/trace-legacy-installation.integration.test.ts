@@ -137,7 +137,7 @@ function bootTraceApp(options: {
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => app,
     onError: canonicalErrorResponse,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
   });
 
   return { family, findById };

@@ -1,4 +1,5 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
@@ -89,7 +90,7 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
   shares(): TraceLegacyShare;
   /** The same redactions, for the key the project door resolved. */
   resolveApiKeyProtections(
-    input: Readonly<{ projectId: string; apiKeyId: string | null; userId: string | null }>,
+    input: Readonly<{ projectId: string; principal: PrincipalRef | null }>,
   ): Promise<unknown>;
   /**
    * Search body schema: strict parsing (method, not field).
@@ -168,14 +169,13 @@ function legacySearchTraces(
 /** The project the door resolved, and the key it resolved it from. */
 type LegacyDoor = Readonly<{
   projectId: string;
-  caller: Readonly<{ apiKeyId: string | null; userId: string | null }>;
+  caller: Readonly<{ principal: PrincipalRef | null }>;
 }>;
 
 function protectionsFor({ app, door }: { app: LegacyApp; door: LegacyDoor }): Promise<unknown> {
   return app.resolveApiKeyProtections({
     projectId: door.projectId,
-    apiKeyId: door.caller.apiKeyId,
-    userId: door.caller.userId,
+    principal: door.caller.principal,
   });
 }
 

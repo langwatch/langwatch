@@ -46,7 +46,9 @@ function mount(readTraceTranscript: TraceApi["readTraceTranscript"]) {
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: "key-1", userId: "user-1" })),
+      bindRestMiddleware(tracesRestCredential, () => ({
+        principal: { type: "apiKey" as const, id: "key-1" },
+      })),
     ],
   });
 
@@ -66,8 +68,7 @@ describe("GET /api/v1/traces/:traceId/transcript", () => {
       expect(read).toHaveBeenCalledWith({
         projectId: "project-1",
         traceId: "trace-abc",
-        apiKeyId: "key-1",
-        userId: "user-1",
+        principal: { type: "apiKey" as const, id: "key-1" },
       });
     });
   });

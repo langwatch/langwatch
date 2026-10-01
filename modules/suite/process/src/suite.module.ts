@@ -1,6 +1,7 @@
 import {
   bindRestHeader,
   bindRestMiddleware,
+  principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
@@ -8,7 +9,7 @@ import { defineProcessModule } from "@langwatch/process";
 import { SuiteModule } from "#app/suite.app";
 import { suiteRunProcessingEventing } from "#eventing/suite-run-processing.pipeline";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
-import { suiteCallerKeyFact, suiteCallerKeyOf, suiteSurfaceFact } from "#rules/suite-wire-v1.rules";
+import { suiteCallerKeyFact, suiteSurfaceFact } from "#rules/suite-wire-v1.rules";
 import { createRunPlansRest } from "#transport/run-plans.rest";
 import { suiteTrpcTransport } from "#transport/suite.trpc";
 import { createSuitesAliasRest } from "#transport/suites-alias.rest";
@@ -30,8 +31,9 @@ export const suiteProcessModule = defineProcessModule("suite")
   // collaborator need answer.
   .withTransportFacts(() => [
     bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
-    bindRestMiddleware(suiteCallerKeyFact, (context) =>
-      suiteCallerKeyOf(projectCredentialOfRequest(context.req.raw)),
-    ),
+    bindRestMiddleware(suiteCallerKeyFact, (context) => {
+      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
+      return principal?.type === "apiKey" ? principal.id : null;
+    }),
   ])
   .withEventing(suiteRunProcessingEventing);

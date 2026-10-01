@@ -75,6 +75,7 @@ import type { SavedWorkbenchRead } from "./workbench/actions/saved-workbench-rea
  */
 export type WorkbenchCredential =
   | Readonly<{ kind: "apiKey"; userId: string | null; isLangySessionKey?: boolean }>
+  | Readonly<{ kind: "cliAccessToken"; userId: string }>
   | Readonly<{ kind: "legacyProjectKey" }>;
 
 /**

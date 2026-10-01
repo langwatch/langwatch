@@ -23,7 +23,14 @@ export const userProcessModule = defineProcessModule("user")
   .withTransportFacts(() => [
     bindRestMiddleware(mePersonalCredential, (context): MePersonalCredential => {
       const credential = projectCredentialOfRequest(context.req.raw);
-      if (credential.type !== "apiKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+      if (credential.type === "cliAccessToken") {
+        return {
+          kind: "cliAccessToken",
+          userId: credential.userId,
+          organizationId: credential.organizationId,
+        };
+      }
 
       return {
         kind: "apiKey",

@@ -351,7 +351,7 @@ describe("given a configuration over one scenario and one agent", () => {
     /** @scenario "A scenario run started with a CLI access token is bounded by the person alone" */
     it("names no key for a person's access token, so the person alone bounds the run's key", async () => {
       const withToken = mountSuiteFamilies({
-        caller: { userId: "user-runner", apiKeyId: "cli-access-1", isPersonSession: true },
+        caller: { userId: "user-runner" },
       });
       const scenario = withToken.world.addScenario({ name: "Refund Flow" }).id;
       const agent = withToken.world.addAgent().id;

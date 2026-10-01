@@ -246,7 +246,7 @@ class ApiSurface {
 
         return {
           projectSlug: credential.project.slug,
-          viewerUserId: credential.type === "apiKey" ? (credential.userId ?? null) : null,
+          viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId,
           actorId: actorIdOf(credential),
         };
       }),
@@ -343,7 +343,8 @@ function unboundDirectoryDoor(): RestIdentity {
 }
 
 function actorIdOf(resolved: RestResolvedProjectCredential): string {
-  if (resolved.type !== "apiKey") return resolved.project.id;
+  if (resolved.type === "legacyProjectKey") return resolved.project.id;
+  if (resolved.type === "cliAccessToken") return resolved.userId;
 
   return resolved.userId ?? resolved.apiKeyId;
 }

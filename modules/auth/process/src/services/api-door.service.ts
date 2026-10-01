@@ -217,7 +217,7 @@ function projectCaller(request: Request, credential: ApiProjectCredential): Rest
   }
 
   return ownedCaller({
-    userId: credential.resolved.type === "apiKey" ? credential.resolved.userId : null,
+    userId: credential.resolved.type === "legacyProjectKey" ? null : credential.resolved.userId,
     scope: { tier: "project", id: credential.project.id },
     markUsed: credential.markUsed,
   });

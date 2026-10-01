@@ -121,7 +121,7 @@ export const governanceProcessModule = defineProcessModule("governance")
       bindRestMiddleware(governanceRestCaller, (context) => {
         const credential = projectCredentialOfRequest(context.req.raw);
 
-        return { viewerUserId: credential.type === "apiKey" ? credential.userId : null };
+        return { viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId };
       }),
       bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
       bindRestCredential("cliToken", () => app.cliTokenDoor),

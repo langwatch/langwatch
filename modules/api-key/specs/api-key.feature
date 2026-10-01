@@ -225,3 +225,10 @@ Feature: API key lifecycle
     When the platform mints a system-managed key with no owner bound to that workspace
     Then the binding is accepted and the key acts as no person
     And a key a person asked for, with no owner or another owner, is still refused there
+
+  @unit
+  Scenario: A pre-2025 legacy API key still authenticates on every header
+    Given a project whose legacy API key is an opaque value from before December 2024, starting "eyJ"
+    When it is sent as a bearer, as basic auth, or as X-Auth-Token
+    Then it authenticates as that project's legacy API key
+    And it is matched as an opaque string, never verified as a JWT

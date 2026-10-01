@@ -32,9 +32,9 @@ export type Scope = {
 };
 
 /**
- * Identity a key write is authorized as — one vocabulary for both doors, so REST and tRPC cannot
- * diverge: a session with its role-binding cascade, a scoped API key checked as the intersection
- * of key and user at each touched scope, or a legacy project key confined to its own project.
+ * Identity a key write is authorized as, for both doors: a session (role cascade), a scoped API
+ * key (key and user at each scope), a legacy project key or a project-bound access token (the
+ * person), both confined to their own project (ARCHITECTURE.md §1830).
  */
 export type VirtualKeyActor =
   | { kind: "session"; session: VirtualKeySessionActor }
@@ -44,7 +44,8 @@ export type VirtualKeyActor =
       userId: string | null;
       organizationId: string;
     }
-  | { kind: "legacyProjectKey"; projectId: string };
+  | { kind: "legacyProjectKey"; projectId: string }
+  | { kind: "cliAccessToken"; userId: string; projectId: string };
 
 export type ActorContext = {
   actor: VirtualKeyActor;
@@ -207,6 +208,13 @@ export class VirtualKeyAuthorizationService {
         // project keys), nothing at any other scope. Broader provisioning
         // requires a scoped API key with the bindings to prove it.
         return scope.scopeType === "PROJECT" && scope.scopeId === actor.projectId;
+      case "cliAccessToken": {
+        if (scope.scopeType !== "PROJECT" || scope.scopeId !== actor.projectId) return false;
+        const scopeRef = await this.scopeRefFor(scope);
+        if (!scopeRef) return false;
+
+        return ctx.permissions.sessionHolds({ userId: actor.userId, permission, scope: scopeRef });
+      }
     }
   }
 
@@ -285,22 +293,22 @@ export class VirtualKeyAuthorizationService {
   }
 
   /**
-   * Update / rotate / delete gate: require the op permission on at least one
-   * of the key's existing scopes. Throws permission_denied when the caller holds it
-   * on none of them.
+   * Change gate (update, re-scope, rotate, disable, enable, revoke): the op permission at EVERY
+   * scope the key covers (Alex, 2026-10-01), so a caller confined to one project changes only
+   * keys scoped to that project alone. Throws permission_denied at the first scope it lacks.
    */
   async assertActorCanOperateOnAnyScope(
     ctx: ActorContext,
     scopes: Scope[],
     permission: AuthzPermission,
   ): Promise<void> {
+    if (scopes.length === 0) throw permissionDenied(permission, undefined);
+
     for (const scope of scopes) {
-      if (await this.actorHasPermissionAtScope(ctx, scope, permission)) {
-        return;
+      if (!(await this.actorHasPermissionAtScope(ctx, scope, permission))) {
+        throw permissionDenied(permission, scope);
       }
     }
-
-    throw permissionDenied(permission, scopes[0]);
   }
 
   /**

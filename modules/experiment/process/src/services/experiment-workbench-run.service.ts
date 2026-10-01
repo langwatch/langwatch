@@ -112,7 +112,7 @@ export class ExperimentWorkbenchRunService {
         }),
         // The person behind a key; a personal agent refuses a key that names nobody, as main did.
         actor: deriveRunActor({
-          userId: input.credential.kind === "apiKey" ? input.credential.userId : null,
+          userId: input.credential.kind === "legacyProjectKey" ? null : input.credential.userId,
           surfaceHeader: null,
         }),
         data: saved.data,

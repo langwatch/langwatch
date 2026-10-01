@@ -1,3 +1,4 @@
+import { PermissionDeniedError } from "@langwatch/authorization";
 import type { AuthzPermission } from "@langwatch/authorization";
 import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -150,5 +151,46 @@ describe("assertActorCanCreateScopes", () => {
         meta: { permission: "virtualKeys:manage", scopeType: "project" },
       });
     });
+  });
+});
+
+describe("given a project-bound access token held by an organization admin", () => {
+  const ctx = {
+    permissions: { sessionHolds: async () => true, apiKeyHolds: async () => false },
+    actor: { kind: "cliAccessToken" as const, userId: "user_1", projectId: "proj_demo" },
+  };
+
+  /** @scenario A project-bound access token cannot write gateway keys outside its project */
+  it("refuses a team scope, another project and an organization-owned row", async () => {
+    await expect(
+      service.assertActorCanCreateScopes(ctx, { scopes: [TEAM], callerProjectId: "proj_demo" }),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanCreateScopes(ctx, {
+        scopes: [OTHER_PROJECT],
+        callerProjectId: "proj_demo",
+      }),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanOperateAtOrganization(ctx, {
+        organizationId: "org_1",
+        permission: "virtualKeys:manage",
+      }),
+    ).rejects.toThrow(PermissionDeniedError);
+  });
+
+  it("changes only a key scoped to its own project alone", async () => {
+    await expect(
+      service.assertActorCanOperateOnAnyScope(ctx, [PROJECT, TEAM], "virtualKeys:update"),
+    ).rejects.toThrow(PermissionDeniedError);
+    await expect(
+      service.assertActorCanOperateOnAnyScope(ctx, [PROJECT], "virtualKeys:update"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("acts as the person at its own project", async () => {
+    await expect(
+      service.assertActorCanCreateScopes(ctx, { scopes: [PROJECT], callerProjectId: "proj_demo" }),
+    ).resolves.toBeUndefined();
   });
 });

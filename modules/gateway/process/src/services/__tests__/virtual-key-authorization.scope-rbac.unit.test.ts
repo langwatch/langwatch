@@ -237,7 +237,7 @@ describe("creating a key", () => {
 });
 
 describe("operating on an existing key", () => {
-  /** @scenario Deleting a VK requires virtualKeys:delete at one of the VK's scopes */
+  /** @scenario Deleting a VK requires virtualKeys:delete at every one of the VK's scopes */
   it("refuses a delete to a holder of view only", async () => {
     const ctx = sessionWith([{ permission: "virtualKeys:view", at: "team", id: "platform" }]);
 
@@ -250,11 +250,39 @@ describe("operating on an existing key", () => {
     });
   });
 
-  it("passes a delete for the grant at any one of the key's scopes", async () => {
+  it("refuses a delete to a holder of the grant at only one of the key's scopes", async () => {
     const ctx = sessionWith([{ permission: "virtualKeys:delete", at: "team", id: "data-sci" }]);
 
     await expect(
       service().assertActorCanOperateOnAnyScope(ctx, [PLATFORM, DATA_SCI], "virtualKeys:delete"),
+    ).rejects.toMatchObject({
+      code: "permission_denied",
+      meta: { permission: "virtualKeys:delete" },
+    });
+  });
+
+  /** @scenario Changing a virtual key needs the permission at every scope it covers */
+  it("refuses a holder at the project alone and allows a holder at the project and the team", async () => {
+    const projectOnly = sessionWith([
+      { permission: "virtualKeys:update", at: "project", id: "demo" },
+    ]);
+    const both = sessionWith([
+      { permission: "virtualKeys:update", at: "project", id: "demo" },
+      { permission: "virtualKeys:update", at: "team", id: "platform" },
+    ]);
+
+    await expect(
+      service().assertActorCanOperateOnAnyScope(
+        projectOnly,
+        [DEMO, PLATFORM],
+        "virtualKeys:update",
+      ),
+    ).rejects.toMatchObject({
+      code: "permission_denied",
+      meta: { permission: "virtualKeys:update" },
+    });
+    await expect(
+      service().assertActorCanOperateOnAnyScope(both, [DEMO, PLATFORM], "virtualKeys:update"),
     ).resolves.toBeUndefined();
   });
 });

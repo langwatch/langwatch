@@ -86,7 +86,7 @@ function mount(
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: "user-1" })),
+      bindRestMiddleware(tracesRestCredential, () => ({ principal: null })),
     ],
   });
 

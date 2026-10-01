@@ -5,6 +5,7 @@
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
+import { principalRefSchema } from "@langwatch/authorization";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
@@ -260,8 +261,7 @@ export const traceAmbiguousPrefixBodySchema = z.object({
 
 /** The credential a v1 trace route reads: an API key's id and the member it acts as, if any. */
 export const tracesRestCredentialSchema = z.object({
-  apiKeyId: z.string().nullable(),
-  userId: z.string().nullable(),
+  principal: principalRefSchema.nullable(),
 });
 
 /** Values per page when a facets caller names a field and no limit. */

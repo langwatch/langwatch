@@ -4,6 +4,8 @@ import type {
   ModelDefaultApiKeyPrincipal,
 } from "@langwatch/model-provider-contract";
 
+import { modelDefaultWritePermission } from "../rules/model-default-write-permission.rules.ts";
+
 /** Every permission a model-provider scope check can name, read or write. */
 type ModelProviderPermission =
   | ReturnType<typeof ModelProviderAuthorizationService.writePermission>
@@ -75,15 +77,7 @@ export class ModelProviderAuthorizationService {
   static writePermission(
     scopeType: ModelDefaultScope["scopeType"],
   ): "organization:manage" | "team:manage" | "project:update" {
-    if (scopeType === "ORGANIZATION") {
-      return "organization:manage";
-    }
-
-    if (scopeType === "TEAM") {
-      return "team:manage";
-    }
-
-    return "project:update";
+    return modelDefaultWritePermission(scopeType);
   }
 
   private static readPermission(

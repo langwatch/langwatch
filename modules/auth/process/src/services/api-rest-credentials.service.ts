@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import {
   OrganizationAuthenticationUnavailableError,
   OrganizationCredentialClassMismatchError,
@@ -58,7 +56,10 @@ export type ApiKeyDoorCredential = Readonly<{
 
 export type ApiRestCredentialPeers = Readonly<{
   apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "resolveOrganizationToken" | "markUsed">;
-  authz: Pick<AuthzApi, "hasApiKeyPermission" | "getApiKeyProjectDecision" | "hasProjectPermission">;
+  authz: Pick<
+    AuthzApi,
+    "hasApiKeyPermission" | "getApiKeyProjectDecision" | "hasProjectPermission"
+  >;
   /** Reads the person and project behind a CLI access bearer; refuses one bound to none. */
   cliProjects: Readonly<{
     getCliAccessProject: (input: { authorization: string }) => Promise<CliAccessProject>;
@@ -153,20 +154,7 @@ export class ApiRestCredentialsService {
   async identifyKey(input: { request: Request }): Promise<ApiKeyDoorCredential> {
     const person = await this.#cliAccessCredential(input.request);
     if (person) {
-      const { resolved } = person;
-      if (resolved.type !== "apiKey") throw new ProjectInvalidCredentialsError();
-
-      return {
-        principal: {
-          kind: "apiKey",
-          apiKeyId: resolved.apiKeyId,
-          userId: resolved.userId,
-          organizationId: resolved.organizationId,
-          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
-        },
-        organizationId: resolved.organizationId,
-        markUsed: person.markUsed,
-      };
+      throw new ProjectInvalidCredentialsError();
     }
 
     const credentials = extractApiKeyRequestCredentials(input.request);
@@ -205,11 +193,7 @@ export class ApiRestCredentialsService {
     };
   }
 
-  /**
-   * A project-bound access token (`lw_at_`, as `X-Auth-Token` or a bearer) as its person. Shaped
-   * as a key credential with a derived id no key row carries, so any second question asked of
-   * that id finds no grants and is refused: only the project-permission check above admits it.
-   */
+  /** A project-bound access token (`lw_at_`, header or bearer) as its person. */
   async #cliAccessCredential(
     request: Request,
   ): Promise<(ApiProjectCredential & Readonly<{ actsAsPerson: { userId: string } }>) | null> {
@@ -225,13 +209,9 @@ export class ApiRestCredentialsService {
     return {
       project: held.project,
       resolved: {
-        type: "apiKey",
-        apiKeyId: `cli-access-${createHash("sha256").update(token).digest("hex").slice(0, 16)}`,
+        type: "cliAccessToken",
         userId: held.userId,
         organizationId: held.organizationId,
-        ingestSourceType: null,
-        ingestionTemplateId: null,
-        isPersonSession: true,
         project: held.project,
       },
       markUsed: () => {},

@@ -398,3 +398,18 @@ Feature: Model default config cascade
     And the pool wait is budgeted separately
     # Prisma's 5s timeout turned a write that only had to wait its turn into
     # an unknown 500 (main budgeted timeout 20s, maxWait 10s).
+
+  @unit
+  Scenario: A project-bound access token cannot write model defaults outside its project
+    Given an organization admin's access token bound to one project, which has no key row
+    When it saves a default-model config naming the organization scope
+    Then the write is refused with model_default_scope_forbidden
+    And the application is never reached
+
+  @unit
+  Scenario: A project-bound access token cannot update or delete a model default outside its project
+    Given an organization admin's access token bound to one project
+    And a default-model config scoped to the organization
+    When it updates that config by id, empties its scopes, or deletes it by id
+    Then the write is refused with model_default_scope_forbidden
+    And the application is never reached

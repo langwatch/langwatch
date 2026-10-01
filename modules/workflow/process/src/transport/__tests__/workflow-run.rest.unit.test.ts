@@ -3,23 +3,26 @@ import {
   bindRestMiddleware,
   createRestRuntime,
   type RestErrorHandler,
+  principalOfCredential,
   type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  workflowRunCallerKey,
-  workflowRunCallerKeyOf,
-  workflowRunRest,
-} from "../workflow-run.rest.ts";
+import { workflowRunCallerKey, workflowRunRest } from "../workflow-run.rest.ts";
 
 const renderUnexpected: RestErrorHandler = (error, context) =>
   context.json({ error: String(error) }, 500);
 
-/** A key the project door resolved for user_1; `isPersonSession` marks a person's access token. */
-function keyCredential(apiKeyId: string, isPersonSession = false): RestResolvedProjectCredential {
+/** The key row the door binds: only an API key principal has one. */
+function keyRowOf(credential: RestResolvedProjectCredential): string | null {
+  const principal = principalOfCredential(credential);
+  return principal?.type === "apiKey" ? principal.id : null;
+}
+
+/** A key the project door resolved for user_1. */
+function keyCredential(apiKeyId: string): RestResolvedProjectCredential {
   return {
     type: "apiKey",
     apiKeyId,
@@ -27,7 +30,6 @@ function keyCredential(apiKeyId: string, isPersonSession = false): RestResolvedP
     organizationId: "org_1",
     ingestSourceType: null,
     ingestionTemplateId: null,
-    ...(isPersonSession ? { isPersonSession: true } : {}),
     project: {
       id: "project_1",
       name: "Acme",
@@ -58,9 +60,7 @@ function mount(
     credential: "project",
     onError: renderUnexpected,
     facts: [
-      bindRestMiddleware(workflowRunCallerKey, () =>
-        caller ? workflowRunCallerKeyOf(caller.credential) : null,
-      ),
+      bindRestMiddleware(workflowRunCallerKey, () => (caller ? keyRowOf(caller.credential) : null)),
     ],
   });
 }
@@ -124,7 +124,12 @@ describe("the synchronous workflow run routes", () => {
   /** @scenario "A run started with a CLI access token is bounded by the person alone" */
   it("runs as the person and names no key for their access token, which has no key row", async () => {
     const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
-    const credential = keyCredential("cli-access-1", true);
+    const credential: RestResolvedProjectCredential = {
+      type: "cliAccessToken",
+      userId: "user_1",
+      organizationId: "org_1",
+      project: keyCredential("key_1").project,
+    };
 
     const response = await mount(runSynchronous, { userId: "user_1", credential }).request(
       "/api/workflows/workflow_1/run",

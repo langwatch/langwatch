@@ -25,7 +25,6 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type RestResolvedProjectCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { z } from "zod";
@@ -39,11 +38,6 @@ export const agentTraceparent = defineRestMiddleware("traceparent", z.string().n
 
 /** The API key a test run was started with, so the run's key holds no more; null if none. */
 export const agentCallerKey = defineRestMiddleware("agentCallerKey", z.string().min(1).nullable());
-
-/** The key that bounds the run: none for a project key, or a person's access token (no key row). */
-export function agentCallerKeyOf(credential: RestResolvedProjectCredential): string | null {
-  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
-}
 
 function response(
   agent: AgentOverview,

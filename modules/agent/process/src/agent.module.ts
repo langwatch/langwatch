@@ -1,6 +1,7 @@
 import {
   bindRestHeader,
   bindRestMiddleware,
+  principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
@@ -10,12 +11,7 @@ import { agentRepositories } from "#repositories/agent-repositories.registry";
 import { agentConnectHeaders, createAgentConnectRest } from "#transport/agent-connect.rest";
 import { createAgentWebSocketProtocol } from "#transport/agent-connect.ws";
 import { agentLegacyRest } from "#transport/agent-legacy.rest";
-import {
-  agentCallerKey,
-  agentCallerKeyOf,
-  agentTraceparent,
-  createAgentRest,
-} from "#transport/agent.rest";
+import { agentCallerKey, agentTraceparent, createAgentRest } from "#transport/agent.rest";
 import { agentTrpcTransport } from "#transport/agent.trpc";
 import { httpProxyTrpcTransport } from "#transport/http-proxy.trpc";
 
@@ -35,9 +31,10 @@ export const agentProcessModule = defineProcessModule("agent")
   // them itself and answers a refusal as a frame, which the agent protocol's client parses.
   .withTransportFacts(() => [
     bindRestHeader(agentTraceparent, "traceparent"),
-    bindRestMiddleware(agentCallerKey, (context) =>
-      agentCallerKeyOf(projectCredentialOfRequest(context.req.raw)),
-    ),
+    bindRestMiddleware(agentCallerKey, (context) => {
+      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
+      return principal?.type === "apiKey" ? principal.id : null;
+    }),
     bindRestMiddleware(agentConnectHeaders, (context) => ({
       authorization: context.req.header("authorization"),
       projectId: context.req.header("x-project-id"),

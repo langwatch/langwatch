@@ -3,6 +3,7 @@
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
+import type { PrincipalRef } from "@langwatch/authorization";
 import type { CodingAgentApi, CodingAgentTranscript } from "@langwatch/coding-agent-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
@@ -1280,8 +1281,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   async readTraceFacetsForApiKey(input: {
     projectId: string;
     query: TraceFacetsQuery;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<TraceFacetsAnswer> {
     const { field, prefix, limit, offset, startDate, endDate } = input.query;
     // One clock read for both ends, so the default window is exactly one day.
@@ -1297,8 +1297,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     }
     const protections = await this.resolveApiKeyProtections({
       projectId: input.projectId,
-      apiKeyId: input.apiKeyId,
-      userId: input.userId,
+      principal: input.principal,
     });
     const facetKey = this.#dependencies.traces.list.resolveFacetKey({ field, protections });
     const result = await this.readFacetValues({
@@ -1490,8 +1489,7 @@ export class TraceModule implements TraceApi, CollectorApp {
 
   resolveApiKeyProtections(input: {
     projectId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Protections> {
     if (!this.#dependencies.protections)
       throw new Error("Trace protections service is unavailable");
@@ -2535,8 +2533,7 @@ export class TraceModule implements TraceApi, CollectorApp {
     traceId: string;
     format: "digest" | "json";
     projectSlug: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<Record<string, unknown>> {
     const protections = await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({
@@ -2571,8 +2568,7 @@ export class TraceModule implements TraceApi, CollectorApp {
   async readTraceTranscript(input: {
     projectId: string;
     traceId: string;
-    apiKeyId: string | null;
-    userId: string | null;
+    principal: PrincipalRef | null;
   }): Promise<CodingAgentTranscript> {
     const protections = await this.resolveApiKeyProtections(input);
     const trace = await this.#getTraceByIdOrPrefix({ ...input, protections });

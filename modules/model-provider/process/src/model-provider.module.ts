@@ -1,4 +1,8 @@
-import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestMiddleware,
+  principalOfCredential,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { defineProcessModule } from "@langwatch/process";
@@ -72,13 +76,10 @@ export const modelProviderProcessModule = defineProcessModule("model-provider")
   .withTransportFacts(() => [
     bindRestMiddleware(modelDefaultsRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
-      if (credential.type !== "apiKey") return null;
+      const principal = principalOfCredential(credential);
+      if (principal === null || credential.type === "legacyProjectKey") return null;
 
-      return {
-        apiKeyId: credential.apiKeyId,
-        userId: credential.userId,
-        organizationId: credential.organizationId,
-      };
+      return { principal, userId: credential.userId, organizationId: credential.organizationId };
     }),
   ])
   .withTasks(async ({ secrets }) => [

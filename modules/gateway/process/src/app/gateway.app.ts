@@ -590,7 +590,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     scopes: readonly GatewayVirtualKeyScope[];
     callerProjectId: string;
   }): Promise<void>;
-  /** One named permission on AT LEAST ONE of the key's existing scopes. */
+  /** One named permission at EVERY one of the key's existing scopes (Alex, 2026-10-01). */
   assertCanOperateOnAnyScope(input: {
     actor: GatewayActor;
     scopes: readonly GatewayVirtualKeyScope[];

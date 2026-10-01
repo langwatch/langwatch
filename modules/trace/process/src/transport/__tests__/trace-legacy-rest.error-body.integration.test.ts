@@ -46,7 +46,7 @@ function buildApi(findTrace: () => Promise<never>) {
 
   const family = runtime.mount(traceLegacyRest.router(), {
     app: () => members,
-    facts: [bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: null, userId: null }))],
+    facts: [bindRestMiddleware(tracesRestCredential, () => ({ principal: null }))],
     // The boundary the process installs, restated: a handled refusal answers
     // with its code, and anything else degrades to the generic unknown.
     onError: (error, context) => {

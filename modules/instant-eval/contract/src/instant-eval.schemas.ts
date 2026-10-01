@@ -448,6 +448,13 @@ export const instantEvalRestCredentialSchema: z.ZodType<RestProjectCredentialPri
       teamId: z.string(),
       isLangySessionKey: z.boolean().optional(),
     }),
+    z.object({
+      kind: z.literal("cliAccessToken"),
+      userId: z.string(),
+      organizationId: z.string(),
+      projectId: z.string(),
+      teamId: z.string(),
+    }),
     z.object({ kind: z.literal("legacyProjectKey") }),
   ]);
 

@@ -80,6 +80,7 @@ export const experimentWorkbenchCredential = defineRestMiddleware(
         isLangySessionKey: z.boolean().optional(),
       })
       .strict(),
+    z.object({ kind: z.literal("cliAccessToken"), userId: z.string() }).strict(),
     z.object({ kind: z.literal("legacyProjectKey") }).strict(),
   ]),
 );

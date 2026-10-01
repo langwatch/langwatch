@@ -365,8 +365,14 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
     // A scoped API key acts as its owning user; a legacy project key carries
     // none, so it acts as a stable machine principal for its project, which
     // keeps an audit row traceable back to the credential that wrote it.
-    actorForCredential: ({ projectId, credential }) =>
-      credential.kind === "apiKey"
+    actorForCredential: ({ projectId, credential }) => {
+      if (credential.kind === "user") {
+        return {
+          actor: { kind: "cliAccessToken", userId: credential.userId, projectId },
+          actorUserId: credential.userId,
+        } satisfies { actor: VirtualKeyActor; actorUserId: string };
+      }
+      return credential.kind === "apiKey"
         ? {
             actor: {
               kind: "apiKey",
@@ -379,7 +385,8 @@ export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): G
         : {
             actor: { kind: "legacyProjectKey", projectId } satisfies VirtualKeyActor,
             actorUserId: `svc_${projectId}`,
-          },
+          };
+    },
 
     listVisibleVirtualKeys: async ({ organizationId, userId }) => {
       const membership = await virtualKeyAuthorization.loadMembershipSet({
@@ -525,6 +532,13 @@ function gatewayVirtualKeyActor(actor: unknown): VirtualKeyActor {
       userId: actor.userId,
       organizationId: actor.organizationId,
     };
+  }
+  if (actor.kind === "cliAccessToken") {
+    const userId = "userId" in actor ? actor.userId : null;
+    const projectId = "projectId" in actor ? actor.projectId : null;
+    if (typeof userId === "string" && typeof projectId === "string") {
+      return { kind: "cliAccessToken", userId, projectId };
+    }
   }
   if (
     actor.kind === "legacyProjectKey" &&

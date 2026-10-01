@@ -13,6 +13,7 @@ import {
   type RestAuditRow,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
+import type { PrincipalRef } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
@@ -107,11 +108,14 @@ export function mountApiKeyRest(
         apiKeyId: API_KEY_ID,
         userId: callerOf(c.req.raw) ?? null,
       })),
-      bindRestMiddleware(apiKeyIngestionCaller, (c) => ({
-        isPersonSession: presentedOf(c.req.raw) === AS_SESSION,
-        userId: callerOf(c.req.raw) ?? null,
-        organizationId: ORGANIZATION_ID,
-      })),
+      bindRestMiddleware(apiKeyIngestionCaller, (c) => {
+        const userId = callerOf(c.req.raw);
+        const principal: PrincipalRef =
+          presentedOf(c.req.raw) === AS_SESSION && userId
+            ? { type: "user", id: userId }
+            : { type: "apiKey", id: API_KEY_ID };
+        return { principal, organizationId: ORGANIZATION_ID };
+      }),
     ],
   });
 

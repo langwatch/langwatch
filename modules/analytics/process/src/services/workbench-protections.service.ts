@@ -137,9 +137,12 @@ export class WorkbenchProtectionsService {
   }): Promise<LangWatchQLProtections> {
     const { credential } = input;
     const catalogue =
-      credential.kind === "apiKey"
+      credential.kind === "apiKey" || credential.kind === "cliAccessToken"
         ? await this.catalogueFor({
-            principal: { type: "apiKey", id: credential.apiKeyId },
+            principal:
+              credential.kind === "apiKey"
+                ? { type: "apiKey", id: credential.apiKeyId }
+                : { type: "user", id: credential.userId },
             scope: {
               type: "project",
               id: credential.projectId,
@@ -172,6 +175,18 @@ export class WorkbenchProtectionsService {
     permission: "cost:view" | "analytics:view";
   }): Promise<boolean> {
     const { credential, permission } = input;
+    if (credential.kind === "cliAccessToken") {
+      return this.dependencies.authz.can({
+        principal: { type: "user", id: credential.userId },
+        permission,
+        scope: {
+          type: "project",
+          id: credential.projectId,
+          teamId: credential.teamId,
+          organizationId: credential.organizationId,
+        },
+      });
+    }
     if (credential.kind !== "apiKey") return Promise.resolve(true);
 
     return this.dependencies.authz.hasApiKeyPermission({

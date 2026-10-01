@@ -31,7 +31,9 @@ function mount(updateTraceMetadata: TraceApi["updateTraceMetadata"]) {
         viewerUserId: null,
         actorId: "user-1",
       })),
-      bindRestMiddleware(tracesRestCredential, () => ({ apiKeyId: "key-1", userId: "user-1" })),
+      bindRestMiddleware(tracesRestCredential, () => ({
+        principal: { type: "apiKey" as const, id: "key-1" },
+      })),
     ],
   });
 

@@ -1,4 +1,8 @@
-import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestMiddleware,
+  principalOfCredential,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
 
 import {
@@ -94,10 +98,7 @@ export const traceProcessModule = defineProcessModule("trace")
     // than whoever holds it. A legacy project key names neither.
     bindRestMiddleware(tracesRestCredential, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
-      return {
-        apiKeyId: credential.type === "apiKey" ? credential.apiKeyId : null,
-        userId: credential.type === "apiKey" ? credential.userId : null,
-      };
+      return { principal: principalOfCredential(credential) };
     }),
   ])
   .withEventing(traceProcessingEventing)

@@ -1,7 +1,7 @@
 import {
-  apiKeyIdOfCredential,
   bindRestMiddleware,
   browserCallerOfRequest,
+  principalOfCredential,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import { defineProcessModule } from "@langwatch/process";
@@ -14,11 +14,7 @@ import { WorkflowHttpSecretsService } from "#services/workflow-http-secrets.serv
 import { WorkflowPermissionService } from "#services/workflow-permission.service";
 import { WorkflowHttpCredentialsBackfillTask } from "#tasks/workflow-http-credentials-backfill.task";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
-import {
-  workflowRunCallerKey,
-  workflowRunCallerKeyOf,
-  workflowRunRest,
-} from "#transport/workflow-run.rest";
+import { workflowRunCallerKey, workflowRunRest } from "#transport/workflow-run.rest";
 import { workflowStudioRest, workflowStudioSession } from "#transport/workflow-studio.rest";
 import { createWorkflowRest, workflowEvaluationRunCeiling } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
@@ -45,38 +41,25 @@ export const workflowProcessModule = defineProcessModule("workflow")
     }),
   ])
   .withTransportFacts(({ dependencies }) => [
-    bindRestMiddleware(workflowRunCallerKey, (context) =>
-      workflowRunCallerKeyOf(projectCredentialOfRequest(context.req.raw)),
-    ),
+    bindRestMiddleware(workflowRunCallerKey, (context) => {
+      const principal = principalOfCredential(projectCredentialOfRequest(context.req.raw));
+      return principal?.type === "apiKey" ? principal.id : null;
+    }),
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);
 
       return caller?.userId ? { user: { id: caller.userId } } : null;
     }),
-    // A legacy project key predates RBAC and carries full project access by its
-    // class alone. An api key answers for its own bindings, owner or not; a
-    // person's access token has no key row, so the person is the only bound.
+    // A legacy API key predates RBAC and carries full project access by its class alone. Any
+    // other credential is asked as its principal: a key its own row, a person's token the person.
     bindRestMiddleware(workflowEvaluationRunCeiling, async (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
-      if (credential.type === "legacyProjectKey") return true;
+      const principal = principalOfCredential(credential);
+      if (principal === null) return true;
 
-      const permissions = WorkflowPermissionService.create({ authz: dependencies.authz });
-      const apiKeyId = apiKeyIdOfCredential(credential);
-      if (apiKeyId === null) {
-        if (credential.userId === null) return false;
-        return permissions.has({
-          userId: credential.userId,
-          projectId: credential.project.id,
-          permission: "evaluations:view",
-        });
-      }
-
-      return permissions.hasApiKeyPermission({
-        apiKeyId,
-        userId: credential.userId,
-        organizationId: credential.organizationId,
-        projectId: credential.project.id,
-        teamId: credential.project.teamId,
+      return WorkflowPermissionService.create({ authz: dependencies.authz }).holds({
+        principal,
+        project: credential.project,
         permission: "evaluations:view",
       });
     }),

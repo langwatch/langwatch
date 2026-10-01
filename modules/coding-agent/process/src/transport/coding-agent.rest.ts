@@ -36,6 +36,13 @@ export const codingAgentRestCaller = defineRestMiddleware(
       ownerUserId: z.string().nullable(),
     }),
     credential: z.discriminatedUnion("kind", [
+      z.object({
+        kind: z.literal("cliAccessToken"),
+        userId: z.string(),
+        organizationId: z.string(),
+        projectId: z.string(),
+        teamId: z.string(),
+      }),
       z.object({ kind: z.literal("legacyProjectKey") }),
       z.object({
         kind: z.literal("apiKey"),
@@ -115,7 +122,7 @@ export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
       credential: caller.credential,
     });
     const by: CodingAgentCallerScope =
-      caller.credential.kind === "legacyProjectKey"
+      caller.credential.kind === "legacyProjectKey" || caller.credential.kind === "cliAccessToken"
         ? { kind: "user", userId: ownerUserId }
         : {
             kind: "apiKey",

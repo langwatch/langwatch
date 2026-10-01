@@ -222,7 +222,10 @@ describe("a project-bound CLI access token", () => {
 
       expect(credential.project.id).toBe("project-1");
       expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
-      expect(credential.resolved).toMatchObject({ type: "apiKey", isPersonSession: true });
+      expect(credential.resolved).toMatchObject({
+        type: "cliAccessToken",
+        userId: expect.any(String),
+      });
       expect(asked).toContainEqual({
         userId: "user-9",
         projectId: "project-1",
@@ -247,8 +250,36 @@ describe("a project-bound CLI access token", () => {
   describe("when the person lacks the permission at the bound project", () => {
     it("is refused as a permission denial", async () => {
       expect(
-        await refusalCode(tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" })),
+        await refusalCode(
+          tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" }),
+        ),
       ).toBe("api_key_permission_denied");
     });
   });
+});
+
+describe("given a pre-2025 legacy API key, an opaque `eyJ` value never verified as a JWT", () => {
+  const PRE_2025_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJwcm9qZWN0SWQiOiJwcm9qZWN0LTEifQ.c2lnbmF0dXJl";
+  const legacyStore = new KeyStore(
+    new Map<string, ResolvedApiKeyCredential>([
+      [PRE_2025_KEY, { type: "legacyProjectKey", project: PROJECT }],
+    ]),
+    new Map(),
+  );
+  const headers = [
+    ["a bearer", { authorization: `Bearer ${PRE_2025_KEY}` }],
+    ["basic auth", { authorization: `Basic ${btoa(`project-1:${PRE_2025_KEY}`)}` }],
+    ["X-Auth-Token", { "x-auth-token": PRE_2025_KEY }],
+  ] as const;
+
+  for (const [label, sent] of headers) {
+    describe(`when it arrives as ${label}`, () => {
+      /** @scenario A pre-2025 legacy API key still authenticates on every header */
+      it("authenticates as the legacy API key of its project", async () => {
+        const credential = await doorOver(legacyStore).identify({ request: request(sent) });
+
+        expect(credential.resolved).toEqual({ type: "legacyProjectKey", project: PROJECT });
+      });
+    });
+  }
 });

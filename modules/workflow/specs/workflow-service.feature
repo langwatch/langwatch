@@ -245,6 +245,13 @@ Feature: Workflow service boundary
     Then the authz peer is asked about the key at that project with no user
 
   @unit
+  Scenario: An evaluation run started with a project-bound access token is judged as its person
+    Given a person's access token bound to the project, which has no key row
+    When it asks to evaluate a workflow
+    Then the authz peer is asked about that person's user principal at that project
+    And no key id is asked about
+
+  @unit
   Scenario: The Studio event door hands the app the signed-in browser session
     Given an editor with a browser session
     When it posts a Studio event

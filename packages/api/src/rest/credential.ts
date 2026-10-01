@@ -3,6 +3,7 @@
  * a second permission question is asked with, the scope a handler reads back, and the person
  * a personal-workspace key stands for.
  */
+import type { PrincipalRef } from "@langwatch/authorization";
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context, ErrorHandler } from "hono";
 
@@ -50,8 +51,13 @@ export type RestResolvedProjectCredential =
       isLangySessionKey?: boolean;
       /** Set on an ownerless run key minted for a run nobody started: it acts as the system. */
       isUnattendedRunKey?: boolean;
-      /** Set when a person's access token (CLI, hosted MCP) stands behind it: no key row exists. */
-      isPersonSession?: boolean;
+      project: RestProjectIdentity;
+    }
+  | {
+      /** A person's access token (CLI, hosted MCP): no key row, it acts as the person. */
+      type: "cliAccessToken";
+      userId: string;
+      organizationId: string;
       project: RestProjectIdentity;
     };
 
@@ -131,6 +137,13 @@ export type RestProjectCredentialPrincipal =
       teamId: string;
       isLangySessionKey?: boolean;
     }>
+  | Readonly<{
+      kind: "cliAccessToken";
+      userId: string;
+      organizationId: string;
+      projectId: string;
+      teamId: string;
+    }>
   | Readonly<{ kind: "legacyProjectKey" }>;
 
 /**
@@ -153,7 +166,16 @@ export type RestCredentialPrincipal =
 export function credentialPrincipalOfToken(
   resolved: RestResolvedProjectCredential,
 ): RestProjectCredentialPrincipal {
-  if (resolved.type !== "apiKey") return { kind: "legacyProjectKey" };
+  if (resolved.type === "legacyProjectKey") return { kind: "legacyProjectKey" };
+  if (resolved.type === "cliAccessToken") {
+    return {
+      kind: "cliAccessToken",
+      userId: resolved.userId,
+      organizationId: resolved.organizationId,
+      projectId: resolved.project.id,
+      teamId: resolved.project.teamId,
+    };
+  }
 
   return {
     kind: "apiKey",
@@ -168,9 +190,18 @@ export function credentialPrincipalOfToken(
   };
 }
 
-/** The key row a credential names: none for a legacy project key or a person's access token. */
-export function apiKeyIdOfCredential(credential: RestResolvedProjectCredential): string | null {
-  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
+/**
+ * Who authz checks a project credential as: a project-bound access token is its user, a project
+ * key or legacy access token its own key row. None for a legacy API key, which predates RBAC
+ * and carries full project access by its class alone.
+ */
+export function principalOfCredential(
+  credential: RestResolvedProjectCredential,
+): PrincipalRef | null {
+  if (credential.type === "legacyProjectKey") return null;
+  if (credential.type === "cliAccessToken") return { type: "user", id: credential.userId };
+
+  return { type: "apiKey", id: credential.apiKeyId };
 }
 
 /** The principal a resolved organization token stands for. */

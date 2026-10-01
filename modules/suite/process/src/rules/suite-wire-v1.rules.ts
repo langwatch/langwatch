@@ -3,7 +3,7 @@
  * Speaks the domain's own scope vocabulary (all/test_suites/labels/scenarios) — unlike the
  * deprecated `/api/suites` alias, which remaps to folders/cases.
  */
-import { defineRestMiddleware, type RestResolvedProjectCredential } from "@langwatch/api/rest";
+import { defineRestMiddleware } from "@langwatch/api/rest";
 import { modelOverrideSchema } from "@langwatch/model-provider-contract";
 import {
   type EvaluatorAttachment,
@@ -32,16 +32,14 @@ import { z } from "zod";
  */
 export const suiteSurfaceFact = defineRestMiddleware("suiteSurface", z.string().nullable());
 
-/** The API key a run was started with, so the run's own key holds no more; null for a project key. */
+/**
+ * The API key a run was started with, so the run's own key holds no more; null for a legacy
+ * API key or a project-bound access token, which have no key row.
+ */
 export const suiteCallerKeyFact = defineRestMiddleware(
   "suiteCallerKey",
   z.string().min(1).nullable(),
 );
-
-/** The key that bounds the run: none for a project key, or a person's access token (no key row). */
-export function suiteCallerKeyOf(credential: RestResolvedProjectCredential): string | null {
-  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
-}
 
 export const suiteFieldWireSchema = suiteFieldDefinitionSchema.describe(
   "One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value for it.",
