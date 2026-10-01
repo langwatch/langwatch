@@ -87,8 +87,3 @@ export type {
   TeamRoleUpdateOrigin,
 } from "./services/compute-effective-team-role-updates.service.ts";
 export type { InviteServiceDependencies } from "./rules/invite-contracts.rules.ts";
-export {
-  type OrganizationInviteMail,
-  type OrganizationInviteRateLimit,
-  type OrganizationInviteSeatCensus,
-} from "./app/organization.members.ts";

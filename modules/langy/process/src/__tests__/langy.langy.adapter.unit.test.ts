@@ -19,10 +19,8 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type {
   LangyConversationCommands,
-  LangyEventingMembers,
   LangyTurnTechnicalMembers,
 } from "@langwatch/langy-process";
-import { LangyBlockMetricsOtelService, LangyPostgresService } from "@langwatch/langy-process";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import {
@@ -46,6 +44,9 @@ import { LangyModule } from "../app/langy.app.ts";
 import { createLangyDatabaseRepositories } from "../repositories/langy-repositories.registry.ts";
 import { MemoryLangyRepositories } from "../repositories/memory/memory.langy.repositories.ts";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
+import { LangyBlockMetricsOtelService } from "../services/langy-block-metrics-otel.service.ts";
+import type { LangyEventingMembers } from "../services/langy-postgres.service.ts";
+import { LangyPostgresService } from "../services/langy-postgres.service.ts";
 import { LangyService } from "../services/langy.service.ts";
 
 function commands(): LangyConversationCommands {

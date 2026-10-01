@@ -5,16 +5,16 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { CancellationMessage } from "../app/scenario.app.ts";
 import type {
-  CancellationMessage,
   CancellationPublisherClient,
   CancellationSubscriberClient,
-} from "../index.ts";
+} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 import {
   CANCELLATION_CHANNEL,
   RedisScenarioCancellationPublisherChannel,
   RedisScenarioCancellationSubscriberChannel,
-} from "../index.ts";
+} from "../channels/redis/redis.scenario-cancellation.channel.ts";
 
 function createMockPublisher(): CancellationPublisherClient {
   return {

@@ -30,7 +30,6 @@ export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
 // port. Its cursor codec is private to the feature: nothing outside it
 // names that any more.
 export type { WebhookClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
-export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
 export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export type { WebhookEndpointConfigurationInput } from "./rules/webhook-endpoint-policy.rules.ts";
 export type {
@@ -38,14 +37,7 @@ export type {
   WebhookUrlProblemCode,
 } from "./rules/webhook-destination.rules.ts";
 export type { ParsedSqsQueueUrl } from "./rules/sqs-queue-url.rules.ts";
-export {
-  WebhookDeliveryService,
-  type WebhookDeliveryProcessDeps,
-} from "./services/webhook-delivery.service.ts";
-export {
-  WEBHOOK_DELIVERY_PROCESS_NAME,
-  WEBHOOK_SEND_MAX_ATTEMPTS,
-} from "./rules/webhook-delivery-contract.rules.ts";
+export type { WebhookDeliveryProcessDeps } from "./services/webhook-delivery.service.ts";
 export type {
   AdmitSpendCommandData,
   ConfirmSpendCommandData,
@@ -62,7 +54,6 @@ export type {
   WebhookDeliveryState,
 } from "./rules/webhook-delivery-contract.rules.ts";
 export type { PendingEnvelope } from "./services/webhook-batch-planner.service.ts";
-export { WebhookEnvelopeService } from "./services/webhook-envelope.service.ts";
 export type {
   WebhookEventsService,
   LegacyWebhookEventsServiceOptions,
@@ -79,11 +70,7 @@ export type {
  * from the endpoint store, the health report, the emitted-events log, the entitlement check,
  * the delivery hop a test fire uses, and the `Idempotency-Key` ledger.
  */
-export {
-  WebhookModule,
-  type WebhookAppDependencies,
-  type WebhookTestDispatch,
-} from "./app/webhook.app.ts";
+export type { WebhookAppDependencies, WebhookTestDispatch } from "./app/webhook.app.ts";
 
 /**
  * How another package composes this feature: the envelope a spend row is
@@ -117,11 +104,7 @@ export type {
   WebhookDispatchResult,
   WebhookDispatchVerdict,
 } from "./app/webhook.app.ts";
-export {
-  WebhookDestinationDispatchService,
-  type WebhookDestinationDeps,
-} from "./services/webhook-destination-dispatch.service.ts";
-export { HttpWebhookDestinationService } from "./services/http-webhook-destination.service.ts";
+export type { WebhookDestinationDeps } from "./services/webhook-destination-dispatch.service.ts";
 export type {
   AwsClientConfigResolver,
   SqsDestinationConfig,

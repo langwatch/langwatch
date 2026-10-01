@@ -8,11 +8,11 @@ import { ChildProcess } from "child_process";
 import { TARGET_STOP_SIGNAL } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
 import {
   type ExecutionJobData,
   ScenarioExecutionPoolService,
-  type ScenarioExecutionRunner,
-} from "../index.ts";
+} from "../services/scenario-execution-pool.service.ts";
 
 function makeJob(id: string): ExecutionJobData {
   return {

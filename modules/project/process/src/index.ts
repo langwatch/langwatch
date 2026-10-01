@@ -1,11 +1,4 @@
 export type { PrismaCodingAgentActivityDatabase } from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
-export { type PrismaProjectDatabase } from "./repositories/prisma/prisma.project.repository.ts";
-export { ProjectMetadataService } from "./services/project-metadata.service.ts";
-export { ProjectService } from "./services/project.service.ts";
-export {
-  ProjectCredentials,
-  ProjectCredentialsService,
-} from "./services/project-credentials.service.ts";
 export type { ProjectInfrastructure } from "./app/project.app.ts";
 export {
   projectProcessModule,
@@ -13,7 +6,6 @@ export {
   createProjectCodingAgentActivityRepository,
   createProjectMetadataService,
 } from "./project.module.ts";
-export { ProjectDiagnostics, ProjectStoredObjects } from "./services/project.service.ts";
 export {
   type ProjectManagementApi,
   projectRest,
@@ -25,8 +17,3 @@ export {
   type ProjectFieldProtections,
   type ProjectPermissionScope,
 } from "./transport/project.trpc.ts";
-export {
-  GovernanceInternalProject,
-  GovernanceInternalProjectService,
-  ProjectOldestTeam,
-} from "./services/governance-internal-project.service.ts";

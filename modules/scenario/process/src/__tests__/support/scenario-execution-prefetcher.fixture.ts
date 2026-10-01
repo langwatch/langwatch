@@ -26,11 +26,11 @@ import {
 } from "@langwatch/workflow-contract";
 import { vi } from "vitest";
 
+import { type ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
-  type ScenarioSecretCipher,
-} from "../../index.ts";
+} from "../../services/scenario-execution-prefetcher.service.ts";
 import type { VoiceTargetReader } from "../../services/scenario-target-prefetch.service.ts";
 import type { ScenarioService } from "../../services/scenario.service.ts";
 

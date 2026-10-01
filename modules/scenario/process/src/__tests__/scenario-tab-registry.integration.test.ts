@@ -9,14 +9,14 @@ import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-c
 import { nowInstant, type Instant } from "@langwatch/time";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { type ScenarioClock } from "../app/scenario.app.ts";
+import { RedisScenarioTabStoreRepository } from "../repositories/redis/redis.scenario-tab-store.repository.ts";
 import {
-  RedisScenarioTabStoreRepository,
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
   SCENARIO_TAB_PENDING_TTL_SECONDS,
   SCENARIO_TAB_TTL_SECONDS,
-  type ScenarioClock,
   ScenarioTabRegistryService,
-} from "../index.ts";
+} from "../services/scenario-tab-registry.service.ts";
 
 const projectId = `proj-${randomUUID()}`;
 const otherProjectId = `proj-${randomUUID()}`;

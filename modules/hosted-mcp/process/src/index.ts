@@ -1,6 +1,4 @@
-export { HOSTED_MCP_FAMILY, hostedMcpRoutePolicies } from "./rules/mcp-routes.rules.ts";
 export type { McpHandler } from "./services/mcp-endpoint.service.ts";
-export { HeaderMcpClientAddressService } from "./services/header-mcp-client-address.service.ts";
 export type { HostedMcpDependencies } from "./app/hosted-mcp.app.ts";
 export type {
   McpApprovalOutcome,

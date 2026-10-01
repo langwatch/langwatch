@@ -4,11 +4,11 @@ import {
   type AuthzEffectivePermissionsInput,
   type AuthzEffectivePermissionsOutput,
 } from "@langwatch/authz-contract";
-import { type LangySessionKeyMetrics } from "@langwatch/langy-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
+import { type LangySessionKeyMetrics } from "../../app/langy.members.ts";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyService,

@@ -1,8 +1,5 @@
 export type { AuthzServiceOptions } from "./services/authz.service.ts";
-export {
-  AuthzCollectorService,
-  type AuthzCollectorOptions,
-} from "./services/authz-collector.service.ts";
+export type { AuthzCollectorOptions } from "./services/authz-collector.service.ts";
 export type { AuthzGrantsServiceOptions } from "./services/authz-grants.service.ts";
 export {
   PostgresAuthzAdapter,
@@ -10,15 +7,8 @@ export {
   type PostgresAuthzAdapterOptions,
   type PostgresAuthzBuild,
 } from "./app/authz-composition.build.ts";
+export type { AuthzGrantPipelineDatabase, PostgresAuthzPipelineOptions } from "./app/authz-composition.build.ts";
 export {
-  PostgresAuthzPipelineAdapter,
-  type AuthzGrantPipelineDatabase,
-  type PostgresAuthzPipelineOptions,
-} from "./app/authz-composition.build.ts";
-export {
-  AuthzGrantsCommandDispatcher,
-  AuthzLedgerUnavailableError,
-  LEDGER_APP_HANDLE_WAIT_MS,
   AuthzCommandDispatcherService,
   type AuthzGrantsCommandSenders,
 } from "./services/authz-grants-command-dispatcher.service.ts";

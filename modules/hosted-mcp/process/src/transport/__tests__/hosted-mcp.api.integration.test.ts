@@ -20,8 +20,9 @@ import {
 } from "vitest";
 
 import { HostedMcpModule } from "../../app/hosted-mcp.app.ts";
-import { HeaderMcpClientAddressService, type McpHandler } from "../../index.ts";
 import type { AuthzMcpSessionGrantService } from "../../services/authz-mcp-session-grant.service.ts";
+import { HeaderMcpClientAddressService } from "../../services/header-mcp-client-address.service.ts";
+import type { McpHandler } from "../../services/mcp-endpoint.service.ts";
 import type { McpApiKeyCipher } from "../../services/mcp-oauth-token.service.ts";
 import type {
   McpLiveProjectLookup,

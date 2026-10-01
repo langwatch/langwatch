@@ -26,14 +26,6 @@ export type {
 } from "./app/analytics.app.ts";
 
 /**
- * Filter matching without a query engine: the legacy `filters` grammar
- * decided in memory, published because a settled automation match is
- * re-checked in a background process with no ClickHouse round trip to spend.
- */
-export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
-export { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
-
-/**
  * The LangWatchQL workbench: the refusals a caller can act on, and the shapes
  * its dependencies are named by. The services themselves stay private to this
  * package and are reached through the composition seam above.

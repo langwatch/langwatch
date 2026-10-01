@@ -9498,9 +9498,6 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
-      '@langwatch/agent-process':
-        specifier: workspace:*
-        version: link:../../agent/process
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api

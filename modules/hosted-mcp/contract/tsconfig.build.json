@@ -15,5 +15,5 @@
       "path": "../../../packages/module/tsconfig.build.json"
     }
   ],
-  "exclude": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"]
+  "exclude": ["**/__tests__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"]
 }

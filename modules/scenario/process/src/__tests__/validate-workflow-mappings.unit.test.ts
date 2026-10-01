@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { ScenarioWorkflowMappingService } from "../index.ts";
+import { ScenarioWorkflowMappingService } from "../services/scenario-workflow-mapping.service.ts";
 
 const mappings = ScenarioWorkflowMappingService.create();
 

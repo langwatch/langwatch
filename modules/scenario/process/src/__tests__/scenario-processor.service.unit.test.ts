@@ -7,19 +7,23 @@ import {
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import {
-  type NodeScenarioChildService,
-  ScenarioExecutionPoolService,
-  ScenarioProcessorService,
-  buildOtelResourceAttributes,
-  parseChildProcessResult,
+  type CancellationSubscriber,
   type CancellationMessage,
-  type ExecutionJobData,
   type ScenarioChildExecutionSession,
   type ScenarioExecutionRunner,
   type ScenarioProcessorServiceMetrics,
-} from "../index.ts";
+} from "../app/scenario.app.ts";
+import {
+  type NodeScenarioChildService,
+  buildOtelResourceAttributes,
+  parseChildProcessResult,
+} from "../services/node-scenario-child.service.ts";
+import {
+  ScenarioExecutionPoolService,
+  type ExecutionJobData,
+} from "../services/scenario-execution-pool.service.ts";
+import { ScenarioProcessorService } from "../services/scenario-processor.service.ts";
 
 const job = (id: string): ExecutionJobData => ({
   projectId: "project-1",

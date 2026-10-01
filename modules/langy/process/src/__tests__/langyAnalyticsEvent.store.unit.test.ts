@@ -1,11 +1,9 @@
 import { createTenantId } from "@langwatch/eventing";
-import {
-  LangyAnalyticsEventStorageService,
-  type LangyAnalyticsEventProjectionRecord,
-} from "@langwatch/langy-process";
+import { type LangyAnalyticsEventProjectionRecord } from "@langwatch/langy-process";
 import { describe, expect, it, vi } from "vitest";
 
 import { LangyAnalyticsEventRepository } from "../repositories/langy-analytics-event.repository.ts";
+import { LangyAnalyticsEventStorageService } from "../services/langy-analytics-event-storage.service.ts";
 
 const record: LangyAnalyticsEventProjectionRecord = {
   eventId: "event_1",

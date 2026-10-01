@@ -1,7 +1,9 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { LangyUiActionSurfaceService, LANGY_UI_ACTIONS_FLAG } from "@langwatch/langy-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
+import { LANGY_UI_ACTIONS_FLAG } from "../../app/langy.members.ts";
+import { LangyUiActionSurfaceService } from "../langy-ui-action-surface.service.ts";
 
 const INPUT = { userId: "user-1", projectId: "project-1", organizationId: "org-1" };
 

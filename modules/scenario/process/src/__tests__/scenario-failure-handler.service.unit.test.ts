@@ -12,9 +12,10 @@ import {
   decodeScenarioError,
   ScenarioInfraErrorCode,
 } from "@langwatch/scenario-contract";
-import { ScenarioFailureHandlerService } from "@langwatch/scenario-process";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { ScenarioFailureHandlerService } from "../services/scenario-failure-handler.service.ts";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
 
