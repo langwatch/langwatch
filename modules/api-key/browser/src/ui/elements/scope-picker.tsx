@@ -3,10 +3,10 @@
  * ui-screen-closure findings on each import of authz-web.
  */
 
+export { ProviderScopeChips } from "../sections/authz/scope-picker/provider-scope-chips.tsx";
 export {
-  ProviderScopeChips,
   ScopeChipPicker,
-  ScopeFilter,
   type ScopeChipPickerEntry,
   type ScopeTriadEntry,
-} from "@langwatch/authz-browser-kit";
+} from "../sections/authz/scope-picker/scope-chip-picker.tsx";
+export { ScopeFilter } from "../sections/authz/scope-picker/scope-filter.tsx";

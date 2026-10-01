@@ -13,11 +13,13 @@ import { renderWithApiKeyHost } from "../../../testing.tsx";
 import { EditApiKeyDrawer } from "../edit-api-key-drawer.tsx";
 
 // The picker has its own suite in authz; this file pins what the drawer sends.
-vi.mock("@langwatch/authz-browser-kit", () => ({
-  ScopeChipPicker: () => null,
+vi.mock("../authz/scope-picker/scope-chip-picker.tsx", () => ({ ScopeChipPicker: () => null }));
+
+vi.mock("../authz/scope-picker/provider-scope-chips.tsx", () => ({
   ProviderScopeChips: () => null,
-  ScopeFilter: () => null,
 }));
+
+vi.mock("../authz/scope-picker/scope-filter.tsx", () => ({ ScopeFilter: () => null }));
 
 vi.mock("../../blocks/permission-category-list.tsx", () => ({
   PermissionCounter: ({ count }: { count: number }) => <span data-testid="counter">{count}</span>,
@@ -84,6 +86,7 @@ function renderDrawer(apiKey: Props["apiKey"]) {
           },
         ],
         isLoading: false,
+        isError: false,
       }}
       orgProjects={[{ id: "proj-1", name: "Web App", teamId: "team-1" }]}
       orgTeams={[{ id: "team-1", name: "Platform" }]}

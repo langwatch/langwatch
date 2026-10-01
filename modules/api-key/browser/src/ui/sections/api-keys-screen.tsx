@@ -22,17 +22,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
-import { Clipboard, Key, MoreVertical, Plus, RotateCw } from "lucide-react";
+import { Key, MoreVertical, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
+import { useLegacyKeyPresent } from "../../behavior/use-legacy-key-status.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import {
-  API_KEY_SCOPE_QUERY_KEY,
-  PROJECT_KEY_ROTATE_PERMISSION,
-  useApiKeyHost,
-  type ApiKeyHostApi,
-} from "../../model/api-key-host.ts";
+import { API_KEY_SCOPE_QUERY_KEY, useApiKeyHost } from "../../model/api-key-host.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -42,57 +38,15 @@ import {
 } from "../../model/api-key-scope-filter.ts";
 import { readableDate } from "../../model/display-formatters.ts";
 import { IngestionKeysSection } from "../blocks/ingestion-keys-section.tsx";
+import { LegacyProjectKeyBanner } from "../blocks/legacy-project-key-banner.tsx";
 import { RevokeConfirmDialog } from "../blocks/revoke-confirm-dialog.tsx";
 import { ProviderScopeChips, ScopeFilter } from "../elements/scope-picker.tsx";
 import { CreateApiKeyDrawer, type CreateApiKeyInput } from "./create-api-key-drawer.tsx";
 import { EditApiKeyDrawer } from "./edit-api-key-drawer.tsx";
-import { RegenerateApiKeyDialog } from "./regenerate-api-key-dialog.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;
-
-/**
- * Actions for the legacy "Project API Key" row. The row intentionally has no edit/revoke
- * affordance - the only mutating action is rotation, and only when the viewer can manage the
- * project (`project:manage`).
- */
-function ProjectKeyActions({
-  apiKey,
-  canManage,
-  host,
-  onRotate,
-}: {
-  apiKey: string;
-  canManage: boolean;
-  host: ApiKeyHostApi;
-  onRotate: () => void;
-}) {
-  return (
-    <HStack gap={1}>
-      <Button
-        size="xs"
-        variant="ghost"
-        aria-label="Copy secret key"
-        onClick={() => {
-          void host.copyToClipboard({
-            text: apiKey,
-            succeeded: { title: "API key copied to clipboard" },
-          });
-        }}
-      >
-        <Clipboard size={14} />
-      </Button>
-      {canManage && (
-        <Tooltip content="Rotate this key">
-          <Button size="xs" variant="ghost" aria-label="Rotate Project API Key" onClick={onRotate}>
-            <RotateCw size={14} aria-hidden="true" />
-          </Button>
-        </Tooltip>
-      )}
-    </HStack>
-  );
-}
 
 /** Why a create request cannot be sent, or null when it can. */
 function createInputProblem(
@@ -154,81 +108,6 @@ function NoKeysRow({ filtered }: { filtered: boolean }) {
             ? "No keys match the current scope. Change the filter above to see other keys."
             : "No API keys. Create one to get started."}
         </Text>
-      </Table.Cell>
-    </Table.Row>
-  );
-}
-
-/** The legacy project key: fixed to its project, with every permission. */
-function ProjectKeyRow({
-  apiKey,
-  projectId,
-  projectName,
-  canManage,
-  host,
-  onRotate,
-}: {
-  apiKey: string;
-  projectId: string;
-  projectName: string | undefined;
-  canManage: boolean;
-  host: ApiKeyHostApi;
-  onRotate: () => void;
-}) {
-  return (
-    <Table.Row>
-      <Table.Cell>
-        <HStack align="center">
-          <Key size={14} />
-          <Text>Project API Key</Text>
-        </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Badge size="sm" colorPalette="green">
-          Active
-        </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-          sk-…{apiKey.slice(-4)}
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm" color="fg.muted">
-          -
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="sm" color="fg.muted">
-          -
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Badge size="sm" colorPalette="purple">
-          Service
-        </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        {/* Name the project this legacy key is fixed to, using
-          the same named scope chip as the user-scoped rows. */}
-        <ProviderScopeChips
-          size="xs"
-          scopes={[
-            {
-              scopeType: "PROJECT",
-              scopeId: projectId,
-              name: projectName,
-            },
-          ]}
-        />
-      </Table.Cell>
-      <Table.Cell>
-        <Badge size="sm" colorPalette="green">
-          All
-        </Badge>
-      </Table.Cell>
-      <Table.Cell>
-        <ProjectKeyActions apiKey={apiKey} canManage={canManage} host={host} onRotate={onRotate} />
       </Table.Cell>
     </Table.Row>
   );
@@ -362,10 +241,6 @@ export default function ApiKeysScreen() {
   const endpoint = host.apiEndpoint();
   const reading = host.route();
 
-  // Rotating the legacy project base key is a project-level admin action,
-  // gated on `project:manage` (same gate as the regenerateApiKey mutation).
-  const canManageProject = host.hasPermission(PROJECT_KEY_ROTATE_PERMISSION);
-
   const apiKeys = apiKeyApi.apiKey.list.useQuery({ organizationId });
   const myBindings = apiKeyApi.apiKey.myBindings.useQuery({ organizationId });
   const orgProjects = apiKeyApi.apiKey.orgProjects.useQuery({ organizationId });
@@ -374,10 +249,13 @@ export default function ApiKeysScreen() {
   // An empty member list is how the page knows the reader is not an
   // organization admin: the procedure answers `[]` for everybody else.
   const isAdmin = (orgMembers.data?.length ?? 0) > 0;
+  const hasLegacyKey = useLegacyKeyPresent({
+    projectId: scope.projectId,
+    canManageProject: host.hasPermission("project:manage"),
+  });
   const createMutation = apiKeyApi.apiKey.create.useMutation();
   const updateMutation = apiKeyApi.apiKey.update.useMutation();
   const revokeMutation = apiKeyApi.apiKey.revoke.useMutation();
-  const regenerateMutation = apiKeyApi.project.regenerateApiKey.useMutation();
   const queryClient = apiKeyApi.useUtils();
 
   const { open: isCreateOpen, onOpen: onCreateOpen, onClose: onCreateClose } = useDisclosure();
@@ -386,7 +264,6 @@ export default function ApiKeysScreen() {
   const [newKeyInput, setNewKeyInput] = useState<CreateApiKeyInput | null>(null);
   const [apiKeyToRevoke, setApiKeyToRevoke] = useState<string | null>(null);
   const [apiKeyToEdit, setApiKeyToEdit] = useState<ApiKeyRow | null>(null);
-  const [isRotateConfirmOpen, setIsRotateConfirmOpen] = useState(false);
 
   // The scopes the reader can see: the filter's options, and the names the
   // per-row chips resolve their ids to.
@@ -538,53 +415,6 @@ export default function ApiKeysScreen() {
     );
   };
 
-  // Rotate the legacy project base key. The mutation does a single atomic
-  // update + audit log server-side, so on success the previous key is already
-  // dead; we surface the fresh key once via the existing TokenCreatedDialog
-  // (driven by `newToken`) and refresh the row that sources `project.apiKey`.
-  const handleRotateProjectKey = () => {
-    if (!scope.projectId) return;
-    regenerateMutation.mutate(
-      { projectId: scope.projectId },
-      {
-        onSuccess: (res) => {
-          setIsRotateConfirmOpen(false);
-          setNewToken(res.apiKey);
-          void queryClient.organization.getAll.invalidate();
-          host.succeeded({
-            title: "Project API key rotated",
-            description: "The previous key no longer works. Update your integrations.",
-          });
-        },
-        onError: (error) => {
-          setIsRotateConfirmOpen(false);
-          host.failed({ error, fallbackTitle: "Couldn't rotate the project API key" });
-        },
-      },
-    );
-  };
-
-  const projectApiKey = scope.projectApiKey;
-
-  // Decide whether the legacy project service key survives the active scope
-  // filter by running it through the same inclusive cascade as user-scoped keys.
-  // A fake row with a single PROJECT-scoped binding is synthesised so the same
-  // predicate can decide. Intent: keep the cascade rules in ONE place - not a
-  // hack to bypass typing.
-  const showProjectKey: boolean = useMemo(() => {
-    if (!projectApiKey || !scope.projectId) return false;
-    const fakeRow = {
-      scopes: [{ scopeType: "PROJECT" as const, scopeId: scope.projectId }],
-    };
-    return (
-      filterRowsByScope([fakeRow], scopeFilter, {
-        hierarchy,
-        currentTeamId: scope.teamId,
-        currentProjectId: scope.projectId,
-      }).length > 0
-    );
-  }, [projectApiKey, scope.projectId, scope.teamId, scopeFilter, hierarchy]);
-
   const getScopeBadge = (apiKeyRow: ApiKeyRow) => {
     return (
       <ProviderScopeChips
@@ -620,6 +450,8 @@ export default function ApiKeysScreen() {
           Manage credentials used to authenticate with the LangWatch API.
         </Text>
 
+        {hasLegacyKey && <LegacyProjectKeyBanner />}
+
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null). The page
             heading titles this table, so the section carries no heading of
@@ -648,18 +480,6 @@ export default function ApiKeysScreen() {
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
-                    {/* Project service key row - shown only if it survives the scope filter */}
-                    {showProjectKey && projectApiKey && (
-                      <ProjectKeyRow
-                        apiKey={projectApiKey}
-                        projectId={scope.projectId ?? ""}
-                        projectName={scope.projectName}
-                        canManage={canManageProject}
-                        host={host}
-                        onRotate={() => setIsRotateConfirmOpen(true)}
-                      />
-                    )}
-
                     {/* User-scoped API key rows */}
                     {filteredKeys.map((apiKey) => (
                       <ApiKeyTableRow
@@ -672,7 +492,7 @@ export default function ApiKeysScreen() {
                       />
                     ))}
 
-                    {filteredKeys.length === 0 && !showProjectKey && (
+                    {filteredKeys.length === 0 && (
                       <NoKeysRow filtered={scopeFilter.kind !== "all"} />
                     )}
                   </Table.Body>
@@ -736,13 +556,6 @@ export default function ApiKeysScreen() {
           isRevoking={revokeMutation.isPending}
           onCancel={() => setApiKeyToRevoke(null)}
           onConfirm={handleRevoke}
-        />
-
-        <RegenerateApiKeyDialog
-          open={isRotateConfirmOpen}
-          isLoading={regenerateMutation.isPending}
-          onClose={() => setIsRotateConfirmOpen(false)}
-          onConfirm={handleRotateProjectKey}
         />
       </VStack>
     </>

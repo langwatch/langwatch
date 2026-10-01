@@ -7,7 +7,6 @@ export {
   ApiKeyHostApi,
   ApiKeyHostProvider,
   CLI_LEAD_SOURCE,
-  PROJECT_KEY_ROTATE_PERMISSION,
   type ApiKeyActor,
   type ApiKeyAvailableScopes,
   type ApiKeyFailureNotice,

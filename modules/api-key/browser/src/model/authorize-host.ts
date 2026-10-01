@@ -72,10 +72,10 @@ export abstract class AuthorizeHostApi {
   abstract handOffTo(url: string): void;
 
   /**
-   * The project's legacy base key, or `undefined` when the reader may not hold
-   * it. See the module docblock: this is a question, not a scope field.
+   * Mints a personal access token for the active project and answers it once, or
+   * `undefined` when there is no active project. Called on a click, never on mount.
    */
-  abstract revealProjectApiKey(): string | undefined;
+  abstract mintProjectToken(): Promise<string | undefined>;
 
   /**
    * The control that chooses what is being authorized. `null` only if a

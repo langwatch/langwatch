@@ -5,7 +5,6 @@
  * authorize-project-picker, post-login-first-trace-redirect.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -19,6 +18,7 @@ const { state } = vi.hoisted(() => ({
   state: {
     bindings: [] as { scopeType: string; scopeId: string; role: string }[],
     bindingsLoading: false,
+    bindingsFailed: false,
     firstMessage: void 0 as boolean | undefined,
   },
 }));
@@ -28,7 +28,11 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     useUtils: () => ({ apiKey: { list: { invalidate: vi.fn() } } }),
     apiKey: {
       myBindings: {
-        useQuery: () => ({ data: state.bindings, isLoading: state.bindingsLoading }),
+        useQuery: () => ({
+          data: state.bindings,
+          isLoading: state.bindingsLoading,
+          isError: state.bindingsFailed,
+        }),
       },
     },
     project: {
@@ -43,7 +47,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // The picker is `@langwatch/authz-browser`'s and has its own suite; what this file
 // is about is which scopes the SCREEN preselects and sends, so the picker
 // renders its value and offers one way to change it.
-vi.mock("@langwatch/authz-browser-kit", () => ({
+vi.mock("../authz/scope-picker/scope-chip-picker.tsx", () => ({
   ScopeChipPicker: ({
     value,
     onChange,
@@ -116,6 +120,7 @@ async function confirmCode(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   state.bindings = [];
   state.bindingsLoading = false;
+  state.bindingsFailed = false;
   state.firstMessage = void 0;
 });
 
@@ -228,6 +233,18 @@ describe("given an organization admin", () => {
       renderWithApiKeyHost(<CliAuthScreen />, hostFor());
       await confirmCode(user);
       expect(await screen.findByText("Loading your access…")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
+    });
+  });
+
+  describe("when the bindings fail to load", () => {
+    /** @scenario approval is blocked when the user's own access cannot be read */
+    it("keeps approve unavailable and says the access could not be read", async () => {
+      const user = userEvent.setup();
+      state.bindingsFailed = true;
+      renderWithApiKeyHost(<CliAuthScreen />, hostFor());
+      await confirmCode(user);
+      expect(await screen.findByText("Couldn't read your access")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Approve" })).toBeDisabled();
     });
   });
@@ -445,11 +462,9 @@ describe("given a second login is opened in the same tab", () => {
       },
     });
     rerender(
-      <ChakraProvider value={defaultSystem}>
-        <ApiKeyHostProvider value={second}>
-          <CliAuthScreen />
-        </ApiKeyHostProvider>
-      </ChakraProvider>,
+      <ApiKeyHostProvider value={second}>
+        <CliAuthScreen />
+      </ApiKeyHostProvider>,
     );
 
     expect(await screen.findByText("PQRS-TUVW")).toBeInTheDocument();

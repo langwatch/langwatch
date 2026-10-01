@@ -16,13 +16,25 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/api-key-contract": "workspace:*"
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/time": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
   }
 }

@@ -127,6 +127,25 @@ async function approveDeviceLogin({
   };
 }
 
+/**
+ * Denied either way: a network failure on the way to the deny endpoint leaves the code to
+ * expire on its own, and telling the reader it worked is the honest answer to what they asked.
+ */
+async function denyDeviceLogin({
+  host,
+  userCode,
+  setAction,
+}: {
+  host: ApiKeyHostApi;
+  userCode: string | null;
+  setAction: (action: ActionState) => void;
+}): Promise<void> {
+  if (!userCode) return;
+  setAction({ kind: "submitting" });
+  await host.denyDeviceCode(userCode);
+  setAction({ kind: "denied" });
+}
+
 /** Redirects to sign-in, or through onboarding for a reader with no organization yet. */
 function useCliAuthRedirects({
   host,
@@ -174,6 +193,7 @@ function isApprovalIncomplete({
   requiresProject,
   selectedProjectId,
   isLoadingBindings,
+  isBindingsFailed,
   scopeCount,
   permissionCount,
   isManagementBlocked,
@@ -182,13 +202,20 @@ function isApprovalIncomplete({
   requiresProject: boolean;
   selectedProjectId: string | null;
   isLoadingBindings: boolean;
+  isBindingsFailed: boolean;
   scopeCount: number;
   permissionCount: number;
   isManagementBlocked: boolean;
 }): boolean {
   if (!selectedOrgId) return true;
   if (requiresProject) return !selectedProjectId;
-  return isLoadingBindings || scopeCount === 0 || permissionCount === 0 || isManagementBlocked;
+  return (
+    isLoadingBindings ||
+    isBindingsFailed ||
+    scopeCount === 0 ||
+    permissionCount === 0 ||
+    isManagementBlocked
+  );
 }
 
 type ManagementRequest = {
@@ -325,6 +352,7 @@ export default function CliAuthScreen() {
     requiresProject,
     selectedProjectId,
     isLoadingBindings: myBindings.isLoading,
+    isBindingsFailed: myBindings.isError,
     scopeCount: keyScopes.selectedScopes.length,
     permissionCount: keyPermissions.permissions.length,
     isManagementBlocked: management.cannotGrant || management.needsOrganization,
@@ -364,15 +392,7 @@ export default function CliAuthScreen() {
     );
   };
 
-  const handleDeny = async () => {
-    if (!userCode) return;
-    setAction({ kind: "submitting" });
-    await host.denyDeviceCode(userCode);
-    // Denied either way: a network failure on the way to the deny endpoint
-    // leaves the code to expire on its own, and telling the reader it worked
-    // is the honest answer to what they asked for.
-    setAction({ kind: "denied" });
-  };
+  const handleDeny = () => denyDeviceLogin({ host, userCode, setAction });
 
   if (sessionStatus === "loading" || (sessionStatus === "unauthenticated" && userCode)) {
     return <CliAuthContainer title="Authorize the LangWatch CLI" loading />;
@@ -446,6 +466,13 @@ export default function CliAuthScreen() {
                 />
                 <CliManagementRequest management={management} />
               </>
+            )}
+
+            {myBindings.isError && (
+              <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
+                The key can only carry the access you hold, so it can't be approved until that
+                loads. Reload and try again.
+              </StatusCard>
             )}
 
             {action.kind === "error" && (

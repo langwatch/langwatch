@@ -10,7 +10,7 @@ import {
   type ResolvedScopeFilter,
   type ScopeFilterValue,
   type ScopeHierarchy,
-} from "@langwatch/authz-browser-kit";
+} from "./authz/scope-picker/scope-filter-address.ts";
 
 /**
  * The `?scope=` address contract, passed through for the one screen that

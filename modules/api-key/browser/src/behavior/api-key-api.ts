@@ -1,6 +1,6 @@
 /**
  * The procedures this package calls, `apiKey` derived from the contract
- * (the borrowed three await their own). Segment names are load-bearing
+ * (the borrowed ones await their own). Segment names are load-bearing
  * (cache key); no read below carries key material — see ADR-001.
  */
 
@@ -13,13 +13,9 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
  */
 type BorrowedProcedures = {
   project: {
-    /**
-     * Rotates the LEGACY project base key and hands back the new one, once.
-     * The rotation is a single atomic update plus an audit row server-side, so
-     * by the time this answers the previous key is already dead.
-     */
-    regenerateApiKey: {
-      mutation: { input: { projectId: string }; output: { apiKey: string } };
+    /** Whether the project still has its legacy key; project admins only, others are refused. */
+    getLegacyKeyStatus: {
+      query: { input: { projectId: string }; output: { present: boolean } };
     };
 
     /**
@@ -42,7 +38,7 @@ type BorrowedProcedures = {
   };
 };
 
-/** Everything this family calls: the declared namespace plus the borrowed three. */
+/** Everything this family calls: the declared namespace plus the borrowed ones. */
 export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> & BorrowedProcedures;
 
 /**

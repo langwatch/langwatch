@@ -131,10 +131,13 @@ describe("given the shared scope-picker surface", () => {
       const local = collectSources(PACKAGE_SRC).filter((file) =>
         path.basename(file).toLowerCase().includes("scope-filter"),
       );
-      // The one file allowed to carry the name is the pure fan over rows, which
-      // delegates to the surface's predicate. A COMPONENT with that name would
-      // be the second opinion the spec forbids.
-      expect(local.map((file) => path.basename(file))).toEqual(["api-key-scope-filter.ts"]);
+      // The pure fan over rows delegates to the surface's predicate. The shared surface itself
+      // (address codec and component) lives under authz/scope-picker, once, for every page.
+      expect(local.map((file) => path.basename(file))).toEqual([
+        "api-key-scope-filter.ts",
+        "scope-filter-address.ts",
+        "scope-filter.tsx",
+      ]);
     });
   });
 });

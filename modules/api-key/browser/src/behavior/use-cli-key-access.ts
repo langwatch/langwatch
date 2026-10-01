@@ -6,7 +6,6 @@ import {
   selectionsFromPermissions,
   type AccessLevel,
 } from "@langwatch/api-key-contract";
-import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -14,6 +13,7 @@ import {
   getUserPermissionsAcrossScopes,
 } from "../model/api-key-permissions.ts";
 import { defaultCliKeyScopes } from "../model/cli-key-scope-defaults.ts";
+import type { ScopeTriadEntry } from "../ui/sections/authz/scope-picker/scope-chip-picker.tsx";
 
 type Binding = { scopeType: string; scopeId: string; role: string };
 type OfferedProject = { id: string; teamId: string };

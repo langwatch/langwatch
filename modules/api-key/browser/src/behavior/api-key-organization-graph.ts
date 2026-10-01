@@ -17,7 +17,6 @@ type GraphProject = {
   id: string;
   name: string;
   slug: string;
-  apiKey?: string | null;
   isPersonal?: boolean | null;
   ownerUserId?: string | null;
   kind?: string | null;

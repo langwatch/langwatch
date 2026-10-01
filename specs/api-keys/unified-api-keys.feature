@@ -65,27 +65,17 @@ Feature: Unified API Keys
     Then the row for "CI Pipeline" carries that anchor id
     And it is scrolled into view once the keys have loaded
 
-  Scenario: Legacy project key row names its project
+  Scenario: The legacy project key can no longer be found on the keys page
     Given the project has a legacy per-project service key
     When I navigate to Settings > API Keys
-    Then the legacy "Project API Key" row's scope names the project
+    Then no "Project API Key" row is listed
+    And no control copies or rotates the project key
 
   Scenario: Ingestion key names the device session that minted it
     Given the organization has an ingestion key minted from "Rogerio's MacBook Pro"
     When I navigate to Settings > API Keys
     Then the ingestion key row shows the device label "Rogerio's MacBook Pro"
     And an ingestion key with no captured device falls back to "Unknown device"
-
-  @unimplemented
-  Scenario: Legacy project key row displays in table
-    When I navigate to Settings > API Keys
-    Then the table contains a legacy project key row with:
-      | NAME        | Project API Key |
-      | STATUS      | Active          |
-      | SECRET KEY  | sk-...XXXX      |
-      | CREATED BY  | Service         |
-      | PERMISSIONS | All             |
-    And the legacy project key row has no edit or revoke button
 
   @unimplemented
   Scenario: Expired API key shows expired status

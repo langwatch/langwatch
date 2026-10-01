@@ -3,8 +3,8 @@
  * @see specs/api-keys/token-created-snippets.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiKeyHostProvider } from "../../../model/api-key-host.ts";
@@ -32,18 +32,16 @@ function renderDialog(
   overrides: { projectId?: string; orgProjects?: { id: string; name: string }[] } = {},
 ) {
   const host = new FakeApiKeyHost();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ApiKeyHostProvider value={host}>
-        <TokenCreatedDialog
-          newToken={TOKEN}
-          projectId={"projectId" in overrides ? overrides.projectId : "project-abc"}
-          endpoint="https://app.langwatch.ai"
-          orgProjects={overrides.orgProjects ?? [{ id: "project-abc", name: "ACME" }]}
-          onClose={() => void 0}
-        />
-      </ApiKeyHostProvider>
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <ApiKeyHostProvider value={host}>
+      <TokenCreatedDialog
+        newToken={TOKEN}
+        projectId={"projectId" in overrides ? overrides.projectId : "project-abc"}
+        endpoint="https://app.langwatch.ai"
+        orgProjects={overrides.orgProjects ?? [{ id: "project-abc", name: "ACME" }]}
+        onClose={() => void 0}
+      />
+    </ApiKeyHostProvider>,
   );
   return host;
 }
