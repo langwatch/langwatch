@@ -14,7 +14,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
   - an enterprise organization is offered a word with us instead, and is never switched on by a
     click;
   - a self-hosted install is offered a word with us too, because its judging is a matter of its
-    own key or its Connect license and not of this switch;
+    Connect license and not of this switch;
   - the operator's release flag stays as it was, and either the flag or the switch makes a
     project judgeable.
 

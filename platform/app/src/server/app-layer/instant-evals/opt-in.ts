@@ -35,7 +35,7 @@ import { InstantEvalOptInNotOfferedError } from "./errors";
  *   throw, so the popover offers no button that the server would refuse.
  * - `contact_us`: an enterprise organization, whose agreement is negotiated
  *   rather than clicked; and any self-hosted install, whose judging is a matter
- *   of its own key or its Connect license and not of this switch.
+ *   of its Connect license and not of this switch.
  */
 export type InstantEvalOptInOffer = "enable" | "ask_admin" | "contact_us";
 
