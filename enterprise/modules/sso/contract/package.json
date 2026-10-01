@@ -25,7 +25,6 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/secrets": "workspace:*",

@@ -4,7 +4,7 @@
  * schemas as its types. Spec: specs/identity/sso-onboarding-tiers.feature.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {

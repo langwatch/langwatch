@@ -4,7 +4,7 @@
  * is the back office. The names are the page's cache keys, so they are the
  * wire names it has always called.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import {
