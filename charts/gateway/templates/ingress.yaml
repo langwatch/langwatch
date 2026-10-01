@@ -1,21 +1,45 @@
-{{- if .Values.ingress.enabled -}}
+{{- /*
+  Off by default, like the umbrella chart's app ingress. A host without
+  `enabled` is refused rather than ignored: before the default flipped, setting
+  only `ingress.host` was enough to publish the gateway, so an upgrade that
+  silently dropped the Ingress would take the public route down with no error.
+*/ -}}
+{{- if not .Values.ingress.enabled }}
+{{- if .Values.ingress.host }}
+{{- fail (printf "ingress.host is %q but ingress.enabled is not true. The gateway Ingress is off by default, so this values file would render no Ingress for that host. Set ingress.enabled=true (plus ingress.className, ingress.tls and ingress.annotations for your controller) to publish it, or clear ingress.host if you route to the gateway Service another way." (toString .Values.ingress.host)) }}
+{{- end }}
+{{- else }}
+{{- if not .Values.ingress.host }}
+{{- fail "ingress.enabled is true but ingress.host is empty. Set ingress.host to the hostname LLM clients use for the gateway, for example gateway.acme.com." }}
+{{- end }}
+{{- /* Controller-specific defaults apply only to the controller they were
+       written for. Keys in ingress.annotations win over them. */ -}}
+{{- $annotations := dict }}
+{{- with .Values.ingress.className }}
+{{- $annotations = deepCopy (get ($.Values.ingress.controllerAnnotations | default dict) .) | default dict }}
+{{- end }}
+{{- $annotations = mergeOverwrite $annotations (deepCopy (.Values.ingress.annotations | default dict)) }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ include "gateway.fullname" . }}
   labels: {{- include "gateway.labels" . | nindent 4 }}
+  {{- with $annotations }}
   annotations:
-    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
   {{- if .Values.ingress.tls.enabled }}
   tls:
     - hosts:
-        - {{ .Values.ingress.host }}
+        - {{ .Values.ingress.host | quote }}
       secretName: {{ .Values.ingress.tls.secretName }}
   {{- end }}
   rules:
-    - host: {{ .Values.ingress.host }}
+    - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
           - path: {{ .Values.ingress.path }}

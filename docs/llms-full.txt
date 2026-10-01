@@ -9751,7 +9751,7 @@ description: Point a public hostname at the LangWatch AI Gateway and terminate T
 sidebarTitle: DNS & TLS
 ---
 
-Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the nginx ingress the chart renders, a cloud load balancer in front of the Service, and the checks that prove the endpoint works.
+Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the chart Ingress on ingress-nginx, a cloud load balancer in front of the Service, and the checks that prove the endpoint works. For Envoy Gateway and other Gateway API implementations, see [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Prerequisites
 
@@ -9762,7 +9762,7 @@ Give the gateway its own hostname, separate from the app. LLM clients and coding
 <Steps>
 <Step title="Set the ingress values">
 
-The chart renders one Ingress from these values:
+The gateway Ingress is off by default. These values turn it on:
 
 ```yaml
 gateway:
@@ -9780,15 +9780,11 @@ gateway:
       secretName: gateway-tls
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
-Replace `host`. The chart placeholder `gateway.langwatch.ai` is skipped when the control plane derives the public URL, so an install that keeps it hands CLI users no gateway URL.
+Replace `host`. The control plane derives the public URL CLI users get from it.
 
-The four `nginx.ingress.kubernetes.io/proxy-*` annotations keep streamed responses unbuffered and let a stream run for an hour. Keep them.
+With `className: nginx` the chart adds the ingress-nginx annotations from `ingress.controllerAnnotations.nginx`. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys you set in `annotations` override them.
 
 </Step>
 <Step title="Issue the certificate">
@@ -9904,7 +9900,7 @@ A Service of type `LoadBalancer` publishes every route, including `/metrics`, th
 
 ## Other ingress controllers
 
-Set `ingress.className` and replace the nginx annotations with the controller's equivalents. Two settings matter for every controller: response buffering off, and an idle or read timeout above the longest stream you allow. The gateway lets a provider call run up to 14 minutes.
+Set `ingress.className` and put the controller's equivalents of the nginx settings in `ingress.annotations`. The ingress-nginx annotations are added only when `className` is `nginx`. Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
 
 AWS ALB example:
 
@@ -9937,9 +9933,9 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `curl` reports an unknown certificate | cert-manager has not issued `gateway-tls` yet | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
-| Streamed responses arrive all at once | Buffering is on at the proxy | Add the `proxy-buffering: "off"` annotation, or its equivalent on your controller |
+| Streamed responses arrive all at once | Buffering is on at the proxy | Set `className: nginx` so the chart adds `proxy-buffering: "off"`, or set the equivalent on your controller |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
-| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `gateway.ingress.host` to your hostname, or `gateway.publicUrl` |
+| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Enable the gateway Ingress with `gateway.ingress.host`, or set `gateway.publicUrl` |
 | A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
@@ -9967,7 +9963,7 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/metrics` | Prometheus | Always. See [Observability](/ai-gateway/observability#metrics-prometheus) |
 | `/debug/control-plane` | Operators, in-cluster | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL` |
 
-None of these endpoints requires a key. With the chart's default ClusterIP Service and ingress, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and its Ingress enabled, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
 
 ## Probe responses
 
@@ -10099,12 +10095,12 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment and Service next to `langwatch-app`. The gateway Ingress is off until you enable it. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
 ## Prerequisites
 
 - A Kubernetes cluster and `helm` 3.
-- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- An ingress controller or a Gateway API implementation. [Routing and ingress controllers](/self-hosting/deployment/routing) lists what to expose on each.
 - A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 - The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
@@ -10169,10 +10165,8 @@ gateway:
       secretName: gateway-tls
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    # className nginx adds the ingress-nginx streaming, timeout and
+    # body-size annotations from ingress.controllerAnnotations.nginx.
 
   security:
     maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth
@@ -10382,7 +10376,7 @@ Expected:
 
 This probe reaches the gateway because `networkPolicy.enabled` is `false` by default. With the network policy on, the gateway admits only the selectors in `networkPolicy.ingressFrom`, and this pod is not one of them. Add a selector for the probe pod to `ingressFrom` to run it.
 
-The default ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
+The chart Ingress is no way around this: it publishes `/v1` and `/health` only, so `/healthz` does not answer through it. To check the process from outside the cluster, use `/health` and read step 3, which covers what its `control_plane` field means. A deployment that sets `ingress.path: /` publishes every route, the probes included, and can reach `/healthz` that way.
 
 ## 3. The gateway reaches the control plane
 
@@ -10463,14 +10457,14 @@ Expected: `gateway_spend_spool_appended_total` is at least 1 and `gateway_spend_
 
 ## 8. The control plane knows the public URL
 
-The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host`.
+The control plane hands the gateway URL to CLI users at sign-in. It reads `LW_GATEWAY_PUBLIC_URL`, which the chart sets from `gateway.publicUrl` or derives from `gateway.ingress.host` when the gateway Ingress is enabled.
 
 ```bash
 kubectl -n langwatch get deploy langwatch-app \
   -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="LW_GATEWAY_PUBLIC_URL")].value}'
 ```
 
-Expected: `https://gateway.acme.com`. An empty result means the ingress host is still the chart placeholder; set `gateway.ingress.host` or `gateway.publicUrl` and upgrade.
+Expected: `https://gateway.acme.com`. An empty result means the install has neither a gateway Ingress nor `gateway.publicUrl`. Enable the Ingress with `gateway.ingress.host`, or set `gateway.publicUrl`, and upgrade.
 
 Members can then sign in from the CLI and get a [personal key](/ai-gateway/governance/personal-keys) bound to this gateway.
 
@@ -62503,7 +62497,8 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS.
+# Ingress with TLS, on ingress-nginx. For Envoy Gateway, Gateway API or
+# another controller, see /self-hosting/deployment/routing.
 #
 # `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
 # so the private control plane is never internet-reachable. Blocked requests
@@ -62737,14 +62732,14 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `gateway.ingress.enabled: true`, `gateway.ingress.host` and `gateway.ingress.className`, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
    The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -62800,7 +62795,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
+If both installs enable an Ingress, give each its own `ingress.hosts` and `gateway.ingress.host`. Overlapping host and path rules conflict in the ingress controller.
 
 ### Custom StorageClass
 
@@ -62984,6 +62979,156 @@ First-time image builds take several minutes. Subsequent `make example-up` runs 
 
 - [Production Kubernetes deployment](/self-hosting/deployment/kubernetes-helm): Deploy to a real cluster
 - [Sizing & Scaling](/self-hosting/configuration/sizing-and-scaling): Resource recommendations
+
+---
+
+# FILE: ./self-hosting/deployment/routing.mdx
+
+---
+title: Routing and ingress controllers
+description: "The hosts, paths, Services, timeouts and body sizes to expose for LangWatch on any ingress controller or Gateway API implementation"
+sidebarTitle: Routing
+---
+
+A Helm install creates no Ingress by default, for the app or the AI Gateway. Turn on the chart Ingress for each one, or write your own routes with Envoy Gateway, another Gateway API implementation, Traefik or a cloud load balancer. This page lists what those routes must expose.
+
+## What to expose
+
+LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and coding agents reach the LangWatch AI Gateway.
+
+| Host | Path | Match | Backend Service | Port |
+|---|---|---|---|---|
+| App, for example `langwatch.acme.com` | `/` | Prefix | `<release>-app` | `5560` |
+| App | `/api/internal` | Prefix | Do not route. Block it. | |
+| Gateway, for example `gateway.acme.com` | `/v1` | Prefix | `<release>-gateway` | `80` |
+| Gateway | `/health` | Exact | `<release>-gateway` | `80` |
+
+`<release>` is the Helm release name. The gateway Service forwards port 80 to container port 5563.
+
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/metrics`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Gemini-native clients also need `/v1beta`. Add it as a third Prefix rule if you use them.
+
+`/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
+
+## Proxy settings
+
+| Setting | App | Gateway |
+|---|---|---|
+| Response buffering | Off, for Server-Sent Events under `/api/sse` and streamed runs | Off, for streamed completions |
+| Request buffering | Default | Off |
+| Idle or read timeout | Above 30 seconds. Streams send a keep-alive every 25 seconds and long polls wait up to 25 seconds. `120` is a good value. | At least 60 seconds. Non-streaming calls send a heartbeat every 45 seconds. The chart nginx default is `3600`. |
+| Total request timeout | Disabled, or longer than your longest stream | Disabled, or above 15 minutes. A provider call can run up to 14 minutes. |
+| Request body size | At least 50 MB | At least 32 MB, the gateway `security.maxRequestBodyBytes` |
+| WebSocket upgrades | Pass through on `/api/trpc-ws` and `/api/v1/agents/connect` | Not used |
+
+Envoy and Traefik stream responses without buffering and pass WebSocket upgrades by default. ingress-nginx buffers by default and caps request bodies at 1 MB, so it needs annotations. See [Architecture](/self-hosting/infrastructure/architecture) for the connected-agents WebSocket.
+
+## ingress-nginx
+
+Set `className: nginx` on the gateway Ingress and the gateway chart adds its ingress-nginx annotations. These turn off buffering, set one-hour read and send timeouts, and set a 32 MB body size. Keys in `gateway.ingress.annotations` override them.
+
+```yaml
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+  hosts:
+    - host: langwatch.acme.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+  tls:
+    - secretName: langwatch-tls
+      hosts:
+        - langwatch.acme.com
+
+gateway:
+  ingress:
+    enabled: true
+    className: nginx
+    host: gateway.acme.com
+    tls:
+      enabled: true
+      secretName: gateway-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+```
+
+## Other Ingress controllers
+
+Set `className` to your IngressClass and put the controller's own annotations in `annotations`. Leave `className` empty to use the cluster's default IngressClass. You can also add an entry for your class under `gateway.ingress.controllerAnnotations`. The gateway chart applies it only when `gateway.ingress.className` matches.
+
+Traefik works with `className: traefik` and no extra annotations for buffering. It can also serve the HTTPRoutes below through its Gateway API provider.
+
+## Gateway API (Envoy Gateway)
+
+Leave both chart Ingresses off and attach HTTPRoutes to your Gateway. Set `gateway.publicUrl`, because the control plane cannot derive the gateway URL without a gateway Ingress.
+
+```yaml
+# values.yaml
+ingress:
+  enabled: false
+gateway:
+  publicUrl: https://gateway.acme.com
+```
+
+These routes are for release `langwatch` in namespace `langwatch`, on a Gateway named `public` in namespace `envoy-gateway-system`:
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-app
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - langwatch.acme.com
+  rules:
+    # No backendRefs: requests to the private control plane get a 5xx.
+    - matches:
+        - path: { type: PathPrefix, value: /api/internal }
+    - matches:
+        - path: { type: PathPrefix, value: / }
+      backendRefs:
+        - name: langwatch-app
+          port: 5560
+      timeouts:
+        request: 0s
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: langwatch-gateway
+  namespace: langwatch
+spec:
+  parentRefs:
+    - name: public
+      namespace: envoy-gateway-system
+  hostnames:
+    - gateway.acme.com
+  rules:
+    - matches:
+        - path: { type: PathPrefix, value: /v1 }
+        - path: { type: Exact, value: /health }
+      backendRefs:
+        - name: langwatch-gateway
+          port: 80
+      timeouts:
+        request: 0s
+```
+
+`request: 0s` turns off the total request timeout, so streams are not cut. You do not need to order the two app rules: Gateway API matches the longest prefix first, so `/api/internal` takes precedence over `/`. Check that your implementation answers that rule with a 5xx before you rely on it.
+
+If your Gateway is in a different namespace from the routes, set `allowedRoutes.namespaces` on its listener to admit the `langwatch` namespace. If you set idle timeouts in an Envoy Gateway `ClientTrafficPolicy` or `BackendTrafficPolicy`, keep them above the values in the table.
+
+## Network policies
+
+`gateway.networkPolicy.enabled` is off by default. When you turn it on, the default `gateway.networkPolicy.ingressFrom` admits only the `ingress-nginx` namespace and Prometheus. Change it to the namespace where your proxy pods run, for example `envoy-gateway-system`, or the gateway refuses that traffic.
 
 ---
 
@@ -66631,6 +66776,29 @@ docker compose up -d
 ```
 
 ## Breaking Changes
+
+### LangWatch AI Gateway Ingress is off by default (Helm)
+
+The gateway sub-chart used to create an Ingress on every install, with class `nginx`, host `gateway.langwatch.ai`, TLS secret `gateway-tls`, a `letsencrypt-prod` cert-manager issuer and ingress-nginx streaming annotations. It now creates none until `gateway.ingress.enabled` is `true`, the same as the app Ingress.
+
+If you published the gateway through that Ingress, set these values before you upgrade:
+
+```yaml
+gateway:
+  ingress:
+    enabled: true
+    className: nginx
+    host: gateway.acme.com
+    tls:
+      enabled: true
+      secretName: gateway-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod   # only if you used it
+```
+
+With `className: nginx` the chart still adds the streaming and timeout annotations, and now sets a 32 MB body limit. A values file that sets `gateway.ingress.host` without `enabled: true` fails to render, so the Ingress cannot disappear on upgrade without an error. If you route to the gateway another way, remove `gateway.ingress.host` and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
+
+The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only when the gateway runs more than one pod. The app, workers, NLP and LangEvals budgets also render only above one replica. The chart refuses a budget that leaves no pod evictable, such as `minAvailable` equal to `replicaCount` or `maxUnavailable: 0`.
 
 ### 3.16 or 3.17 to 3.18: Sign-in and SSO
 

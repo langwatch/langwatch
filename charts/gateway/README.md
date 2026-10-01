@@ -71,7 +71,9 @@ self-hosting. The values you most often override:
 | `image.tag`                   | Image tag override (defaults to `Chart.AppVersion`)                  |
 | `controlPlane.baseUrl`        | URL of your LangWatch app. Empty resolves to `<release>-app:5560`     |
 | `secrets.existingSecretName`  | Name of the Secret created above (default `gateway-runtime-secrets`) |
-| `ingress.host`                | Customer-facing hostname for the gateway                             |
+| `ingress.enabled`             | Render an Ingress (default `false`)                                  |
+| `ingress.className`           | IngressClass; empty uses the cluster default                         |
+| `ingress.host`                | Customer-facing hostname for the gateway, required when enabled      |
 | `ingress.tls.secretName`      | TLS Secret managed by cert-manager (or BYO)                          |
 | `replicaCount`                | Static replicas if `autoscaling.enabled: false`                      |
 | `autoscaling.minReplicas` / `maxReplicas` | HPA bounds                                              |
@@ -115,7 +117,7 @@ Response shape and tuning are documented in
 
 `GET /health` (also `HEAD`) is the public status-page surface, exposed
 through the ingress as an Exact path when `ingress.healthPath.enabled`
-(default `true`); point an uptime monitor at `https://<ingress.host>/health`.
+(default `true`) and the Ingress is enabled; point an uptime monitor at `https://<ingress.host>/health`.
 It reports the gateway process plus the control-plane connectivity
 verdict that a background probe refreshes every 15 s over the signed
 internal channel: HTTP 200 healthy, 503 once the control plane has been
@@ -125,24 +127,26 @@ out anywhere. Distinct from the k8s probes above, which stay in-cluster.
 
 ## Streaming / SSE
 
-The default ingress annotations (`charts/gateway/values.yaml: ingress.annotations`)
-disable nginx proxy buffering and bump read/send timeouts to one hour
-so SSE chunks reach clients promptly:
+The Ingress is off by default (`ingress.enabled: false`). When you enable
+it with `ingress.className: nginx`, the chart adds the annotations under
+`ingress.controllerAnnotations.nginx`: proxy buffering off, one-hour
+read/send timeouts so SSE chunks reach clients promptly, and a 32m body
+size to match `security.maxRequestBodyBytes`. Keys in `ingress.annotations`
+win over them. Any other class gets only `ingress.annotations`:
 
 ```yaml
 ingress:
-  annotations:
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+  enabled: true
+  className: nginx
+  host: gateway.acme.com
 ```
 
-If you swap `ingress.className` to `alb` or another controller, port
-the equivalent SSE/streaming knobs over (ALB needs
-`load-balancer-attributes: idle_timeout.timeout_seconds=3600`). See
-[DNS and TLS](https://docs.langwatch.ai/ai-gateway/self-hosting/dns-and-tls)
-for the per-controller cookbook.
+For `alb` or another controller, set the equivalent streaming knobs in
+`ingress.annotations` (ALB needs
+`load-balancer-attributes: idle_timeout.timeout_seconds=3600`). For
+Envoy Gateway and other Gateway API implementations, leave the Ingress off
+and follow
+[Routing and ingress controllers](https://docs.langwatch.ai/self-hosting/deployment/routing).
 
 ## Scaling
 

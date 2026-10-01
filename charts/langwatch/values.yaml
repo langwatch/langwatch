@@ -2213,10 +2213,20 @@ gateway:
   internalUrl: ""
 
   # The gateway needs its OWN externally-reachable endpoint, separate from
-  # the main app — point a second ingress / load balancer at gateway.ingress
-  # below (the LLM clients hit the gateway, the browser hits the app). The
-  # gateway subchart ships ingress.enabled=true with a SaaS placeholder host;
-  # override gateway.ingress.host with your domain.
+  # the main app: LLM clients hit the gateway, the browser hits the app.
+  # Like the app ingress, the gateway Ingress is off by default. Enable it
+  # below, or route to the `<release>-gateway` Service (port 80) with your
+  # own Gateway API HTTPRoute or load balancer and set gateway.publicUrl.
+  # Routes, timeouts and body size: docs/self-hosting/deployment/routing.
+  ## @param gateway.ingress.enabled [default: false] Render an Ingress for the AI Gateway (paths /v1 and /health).
+  ## @param gateway.ingress.className [string, default: ""] IngressClass for the gateway Ingress. Empty uses the cluster default IngressClass. When it is nginx, the subchart adds the ingress-nginx streaming, timeout and body-size annotations.
+  ## @param gateway.ingress.host [string, default: ""] Gateway hostname, e.g. gateway.your-corp.com. Required when gateway.ingress.enabled is true, and refused when it is not.
+  ## @param gateway.ingress.annotations [object] Annotations applied to the gateway Ingress as written. Keys here win over the subchart's per-controller defaults.
+  ingress:
+    enabled: false
+    className: ""
+    host: ""
+    annotations: {}
 
   # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
   # PDB, SecurityContext) live in charts/gateway/values.yaml. Common

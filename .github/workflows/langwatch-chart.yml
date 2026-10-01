@@ -218,6 +218,13 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-internal-url.sh
 
+      # A plain install renders no Ingress for the app or the gateway, an
+      # enabled gateway Ingress uses the class the operator picked, and no
+      # PodDisruptionBudget can block a node drain.
+      - name: "assert ingress is opt-in and disruption budgets allow drains"
+        if: "!cancelled()"
+        run: ./tests/gateway-ingress-and-pdbs.sh
+
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
       # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the

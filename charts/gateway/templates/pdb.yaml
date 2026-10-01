@@ -1,11 +1,42 @@
-{{- if .Values.podDisruptionBudget.enabled -}}
+{{- /*
+  The fewest pods the gateway runs: the HPA floor when autoscaling is on,
+  replicaCount otherwise. A budget over one pod can never let a drain evict
+  it, so node upgrades and autoscaler scale-downs hang; none is rendered
+  there. A budget that leaves no pod evictable at that floor is refused for
+  the same reason (admission policies reject it too).
+*/ -}}
+{{- $pdb := .Values.podDisruptionBudget | default dict }}
+{{- $replicas := int .Values.replicaCount }}
+{{- if .Values.autoscaling.enabled }}
+{{- $replicas = int .Values.autoscaling.minReplicas }}
+{{- end }}
+{{- if and $pdb.enabled (gt $replicas 1) }}
+{{- $minAvailable := $pdb.minAvailable }}
+{{- $maxUnavailable := 1 }}
+{{- if not (or (kindIs "invalid" $pdb.maxUnavailable) (eq (toString $pdb.maxUnavailable) "")) }}
+{{- $maxUnavailable = $pdb.maxUnavailable }}
+{{- end }}
+{{- $useMin := not (or (kindIs "invalid" $minAvailable) (eq (toString $minAvailable) "")) }}
+{{- if $useMin }}
+{{- if and (not (kindIs "string" $minAvailable)) (ge (int $minAvailable) $replicas) }}
+{{- fail (printf "podDisruptionBudget.minAvailable is %v with %d gateway pods, so no pod may ever be evicted and every node drain hangs. Use a value below %d, or podDisruptionBudget.maxUnavailable." $minAvailable $replicas $replicas) }}
+{{- end }}
+{{- else }}
+{{- if and (not (kindIs "string" $maxUnavailable)) (lt (int $maxUnavailable) 1) }}
+{{- fail "podDisruptionBudget.maxUnavailable must be at least 1; 0 blocks every node drain." }}
+{{- end }}
+{{- end }}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "gateway.fullname" . }}
   labels: {{- include "gateway.labels" . | nindent 4 }}
 spec:
-  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- if $useMin }}
+  minAvailable: {{ $minAvailable }}
+  {{- else }}
+  maxUnavailable: {{ $maxUnavailable }}
+  {{- end }}
   selector:
     matchLabels: {{- include "gateway.selectorLabels" . | nindent 6 }}
 {{- end }}

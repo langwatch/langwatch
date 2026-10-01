@@ -1822,3 +1822,40 @@ azure.workload.identity/use: "true"
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+PodDisruptionBudget pass-through: whether to render it, and a refusal for a
+budget that blocks node drains.
+
+Prints "true" when the component runs more than one pod. A budget over a
+single pod can never let a drain evict it, so node upgrades and autoscaler
+scale-downs hang; the PDB is skipped there. With more pods, a budget that
+leaves none evictable (minAvailable at or above replicaCount or 100%, or
+maxUnavailable 0) is refused, since it hangs drains the same way and
+admission policies reject it.
+
+Usage: {{- if include "langwatch.pdbRenders" (dict "name" "app" "spec" .Values.app.podDisruptionBudget "replicas" .Values.app.replicaCount) }}
+*/}}
+{{- define "langwatch.pdbRenders" -}}
+{{- $spec := .spec | default dict -}}
+{{- $replicas := int (.replicas | default 1) -}}
+{{- if and $spec (gt $replicas 1) -}}
+  {{- $min := get $spec "minAvailable" -}}
+  {{- $max := get $spec "maxUnavailable" -}}
+  {{- if not (kindIs "invalid" $min) -}}
+    {{- if kindIs "string" $min -}}
+      {{- if eq (trimSuffix "%" $min) "100" -}}
+        {{- fail (printf "%s.podDisruptionBudget.minAvailable is %q, so no pod may ever be evicted and every node drain hangs. Use a lower value, or maxUnavailable: 1." .name $min) -}}
+      {{- end -}}
+    {{- else if ge (int $min) $replicas -}}
+      {{- fail (printf "%s.podDisruptionBudget.minAvailable is %v with replicaCount %d, so no pod may ever be evicted and every node drain hangs. Use a value below %d, or maxUnavailable: 1." .name $min $replicas $replicas) -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if not (kindIs "invalid" $max) -}}
+    {{- if or (and (kindIs "string" $max) (eq (trimSuffix "%" $max) "0")) (and (not (kindIs "string" $max)) (lt (int $max) 1)) -}}
+      {{- fail (printf "%s.podDisruptionBudget.maxUnavailable is %v, so no pod may ever be evicted and every node drain hangs. Use 1 or more." .name $max) -}}
+    {{- end -}}
+  {{- end -}}
+true
+{{- end -}}
+{{- end -}}

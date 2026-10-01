@@ -195,7 +195,8 @@ clickhouse:
     # its password key.
     existingSecret: langwatch-clickhouse-creds
 
-# Ingress with TLS.
+# Ingress with TLS, on ingress-nginx. For Envoy Gateway, Gateway API or
+# another controller, see /self-hosting/deployment/routing.
 #
 # `/api/internal` is hard-blocked at the edge by default (ingress.blockedPaths)
 # so the private control plane is never internet-reachable. Blocked requests
@@ -429,14 +430,14 @@ gateway:
   chartManaged: false
 ```
 
-The defaults are 2 replicas, a ClusterIP service and an ingress for the placeholder host `gateway.langwatch.ai`. Set `gateway.ingress.host` to your own hostname, or `gateway.ingress.enabled: false` to reach the gateway only from inside the cluster. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+The defaults are 2 replicas, a ClusterIP service and no Ingress. To publish the gateway, set `gateway.ingress.enabled: true`, `gateway.ingress.host` and `gateway.ingress.className`, or route to the `<release>-gateway` Service yourself and set `gateway.publicUrl`. [Routing and ingress controllers](/self-hosting/deployment/routing) lists the paths, timeouts and body sizes for ingress-nginx, Envoy Gateway and other controllers. For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
 
 Three things to know when running it:
 
 1. **One Secret holds everything** (or use `autogen.enabled=true` and let the chart materialise it). Both `langwatch-app` and the AI Gateway pod mount `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` from the same `secrets.existingSecret` Secret (default `langwatch-app-secrets`), which also holds the app keys `credentialsEncryptionKey`, `cronApiKey`, `nextAuthSecret` and `virtualKeyPepper`.
 
    The [Production Deployment](#production-deployment) section above shows the single `kubectl create secret generic` command. With `autogen.enabled=false` and any required key missing, the preflight Job aborts the install with a list of what is missing; under `autogen.enabled=true` the chart materialises the Secret on first install via lookup-or-rand.
-2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+2. **A public route needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`), separate cert, separate route. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
 3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that trace-processing folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
 
 ## Upgrade
@@ -492,7 +493,7 @@ prometheus:
     clusterRoleNameOverride: langwatch-staging-prometheus-server
 ```
 
-Both installs render ingress rules for the same default hosts and paths, and overlapping host and path rules conflict in the ingress controller. Give each install its own `ingress.hosts` and `gateway.ingress.host`, or disable an ingress that install does not need.
+If both installs enable an Ingress, give each its own `ingress.hosts` and `gateway.ingress.host`. Overlapping host and path rules conflict in the ingress controller.
 
 ### Custom StorageClass
 

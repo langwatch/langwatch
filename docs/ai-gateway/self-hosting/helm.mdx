@@ -4,12 +4,12 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment, Service and Ingress next to `langwatch-app`. This guide takes you from an empty namespace to a gateway that answers a chat completion.
+The gateway is a sub-chart of the `langwatch` Helm chart. The umbrella chart enables it by default with `gateway.chartManaged: true` and runs it as its own Deployment and Service next to `langwatch-app`. The gateway Ingress is off until you enable it. This guide takes you from an empty namespace to a gateway that answers a chat completion.
 
 ## Prerequisites
 
 - A Kubernetes cluster and `helm` 3.
-- An ingress controller. The chart defaults to `ingress.className: nginx`.
+- An ingress controller or a Gateway API implementation. [Routing and ingress controllers](/self-hosting/deployment/routing) lists what to expose on each.
 - A hostname for the gateway, separate from the app hostname. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls).
 - The LangWatch umbrella chart. Follow [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for the app side first if you have not installed it yet.
 
@@ -74,10 +74,8 @@ gateway:
       secretName: gateway-tls
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+    # className nginx adds the ingress-nginx streaming, timeout and
+    # body-size annotations from ingress.controllerAnnotations.nginx.
 
   security:
     maxRequestBodyBytes: 33554432 # 32 MiB, applied before auth

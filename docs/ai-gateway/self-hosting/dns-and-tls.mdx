@@ -4,7 +4,7 @@ description: Point a public hostname at the LangWatch AI Gateway and terminate T
 sidebarTitle: DNS & TLS
 ---
 
-Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the nginx ingress the chart renders, a cloud load balancer in front of the Service, and the checks that prove the endpoint works.
+Give the gateway its own hostname, separate from the app. LLM clients and coding agents send requests to the gateway hostname; browsers use the app hostname. This guide covers the chart Ingress on ingress-nginx, a cloud load balancer in front of the Service, and the checks that prove the endpoint works. For Envoy Gateway and other Gateway API implementations, see [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Give the gateway its own hostname, separate from the app. LLM clients and coding
 <Steps>
 <Step title="Set the ingress values">
 
-The chart renders one Ingress from these values:
+The gateway Ingress is off by default. These values turn it on:
 
 ```yaml
 gateway:
@@ -33,15 +33,11 @@ gateway:
       secretName: gateway-tls
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-prod
-      nginx.ingress.kubernetes.io/proxy-buffering: "off"
-      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
-Replace `host`. The chart placeholder `gateway.langwatch.ai` is skipped when the control plane derives the public URL, so an install that keeps it hands CLI users no gateway URL.
+Replace `host`. The control plane derives the public URL CLI users get from it.
 
-The four `nginx.ingress.kubernetes.io/proxy-*` annotations keep streamed responses unbuffered and let a stream run for an hour. Keep them.
+With `className: nginx` the chart adds the ingress-nginx annotations from `ingress.controllerAnnotations.nginx`. They keep streamed responses unbuffered, let a stream run for an hour, and raise the body limit to 32 MB. Keys you set in `annotations` override them.
 
 </Step>
 <Step title="Issue the certificate">
@@ -157,7 +153,7 @@ A Service of type `LoadBalancer` publishes every route, including `/metrics`, th
 
 ## Other ingress controllers
 
-Set `ingress.className` and replace the nginx annotations with the controller's equivalents. Two settings matter for every controller: response buffering off, and an idle or read timeout above the longest stream you allow. The gateway lets a provider call run up to 14 minutes.
+Set `ingress.className` and put the controller's equivalents of the nginx settings in `ingress.annotations`. The ingress-nginx annotations are added only when `className` is `nginx`. Three settings matter for every controller: response buffering off, an idle or read timeout above the longest stream you allow, and a body limit of at least 32 MB. The gateway lets a provider call run up to 14 minutes. [Routing and ingress controllers](/self-hosting/deployment/routing) has the full list and an Envoy Gateway HTTPRoute.
 
 AWS ALB example:
 
@@ -190,9 +186,9 @@ Both switches default to `false`, so a self-hosted install can route to a model 
 | Symptom | Cause | Fix |
 |---|---|---|
 | `curl` reports an unknown certificate | cert-manager has not issued `gateway-tls` yet | `kubectl -n langwatch describe certificate gateway-tls` shows the pending challenge |
-| Streamed responses arrive all at once | Buffering is on at the proxy | Add the `proxy-buffering: "off"` annotation, or its equivalent on your controller |
+| Streamed responses arrive all at once | Buffering is on at the proxy | Set `className: nginx` so the chart adds `proxy-buffering: "off"`, or set the equivalent on your controller |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
-| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `gateway.ingress.host` to your hostname, or `gateway.publicUrl` |
+| CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Enable the gateway Ingress with `gateway.ingress.host`, or set `gateway.publicUrl` |
 | A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the hostname to `ALLOWED_PROXY_HOSTS` |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).

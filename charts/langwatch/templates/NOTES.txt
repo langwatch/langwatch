@@ -1,4 +1,6 @@
 LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Namespace }}.
+{{- $appHost := "" }}
+{{- if .Values.ingress.enabled }}{{ with .Values.ingress.hosts }}{{ $appHost = (first .).host | default "" }}{{ end }}{{ end }}
 
 ──────────────────────────────────────────────────────────────────────
 1. Reach the UI
@@ -6,7 +8,7 @@ LangWatch {{ .Chart.AppVersion }} has been deployed to namespace {{ .Release.Nam
 {{- if .Values.ingress.enabled }}
 Once DNS is pointing at your ingress, your team reaches LangWatch at:
 
-  https://{{ .Values.ingress.host | default "<your-ingress-host>" }}
+  https://{{ $appHost | default "<your-ingress-host>" }}
 
 {{- else }}
 Ingress is disabled. Port-forward to reach the UI from your laptop:
@@ -55,7 +57,7 @@ in that state.
 ──────────────────────────────────────────────────────────────────────
 Once steps 1-3 are done, share the install command with your team:
 
-  npx langwatch@latest login --device --url https://{{ .Values.ingress.host | default "<your-host>" }}
+  npx langwatch@latest login --device --url https://{{ $appHost | default "<your-host>" }}
 
 Then in any terminal:
 
@@ -75,6 +77,22 @@ dev's Personal Workspace at https://<your-host>/me .
       kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/name={{ .Release.Name }}-gateway
   • Healthcheck (in-cluster):
       curl http://{{ .Release.Name }}-gateway/healthz
+{{- $gwIngress := .Values.gateway.ingress | default dict }}
+{{- if $gwIngress.enabled }}
+  • AI Gateway public route: Ingress for {{ $gwIngress.host }}{{ with $gwIngress.className }} (class {{ . }}){{ end }}, paths /v1 and /health.
+{{- else if .Values.gateway.publicUrl }}
+  • AI Gateway public URL: {{ .Values.gateway.publicUrl }} (no Ingress
+    rendered; your own route must send /v1 and /health to Service
+    {{ .Release.Name }}-gateway port 80).
+{{- else }}
+  • The AI Gateway has no public route: gateway.ingress is off by default.
+    LLM clients and the CLI need one. Either set gateway.ingress.enabled=true
+    with gateway.ingress.host and gateway.ingress.className, or route
+    /v1 and /health on your gateway hostname to Service
+    {{ .Release.Name }}-gateway port 80 (Gateway API HTTPRoute, a load
+    balancer) and set gateway.publicUrl. Routes, timeouts and body size:
+      https://docs.langwatch.ai/self-hosting/deployment/routing
+{{- end }}
 {{- end }}
 {{- if (index .Values "langyagent").chartManaged }}
   • Langy, the in-product assistant:

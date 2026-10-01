@@ -35,9 +35,15 @@ autoscaling:
   # Optional autoscaling/v2 scale-up/down stabilization and rate policies.
   behavior: {}
 
+# Rendered only when the gateway runs more than one pod (autoscaling
+# minReplicas, or replicaCount with autoscaling off). A PDB over a single pod
+# blocks every node drain, so none is rendered there. maxUnavailable: 1 lets a
+# drain evict one pod at a time at any replica count. Set minAvailable instead
+# to use that form; the chart refuses a budget that leaves no pod evictable.
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1
+  maxUnavailable: 1
+  minAvailable: ""
 
 service:
   type: ClusterIP
@@ -51,10 +57,20 @@ service:
     enabled: false
     port: 80
 
+# Off by default, like the umbrella chart's app ingress: a plain install
+# creates no Ingress. Enable it to publish the gateway through an Ingress
+# controller, or leave it off and route to the gateway Service yourself
+# (Gateway API HTTPRoute, a LoadBalancer Service, a mesh). The routes,
+# timeouts and body size any controller needs are in
+# docs/self-hosting/deployment/routing.
 ingress:
-  enabled: true
-  className: nginx
-  host: gateway.langwatch.ai
+  enabled: false
+  # IngressClass to use. Empty leaves spec.ingressClassName unset, so the
+  # cluster's default IngressClass picks it up.
+  className: ""
+  # Hostname LLM clients use for the gateway, separate from the app host.
+  # Required when enabled.
+  host: ""
   path: /v1
   pathType: Prefix
   # Public status-page surface. An Exact match publishes this one path and
@@ -70,14 +86,24 @@ ingress:
     enabled: true
     path: /health
   tls:
-    enabled: true
+    enabled: false
     secretName: gateway-tls
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"        # SSE needs unbuffered
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"     # long-lived streams
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+  # Applied as written, whatever the controller. Put cert-manager issuers,
+  # controller timeouts and the like here. Keys here win over
+  # controllerAnnotations.
+  annotations: {}
+  # Added only when ingress.className equals the key, so a cluster on another
+  # controller never receives them. The nginx set keeps streamed (SSE)
+  # responses unbuffered, lets a stream run for an hour, and raises
+  # ingress-nginx's 1m body default to security.maxRequestBodyBytes (32 MiB).
+  # Add an entry for your own IngressClass name to get the same behaviour.
+  controllerAnnotations:
+    nginx:
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+      nginx.ingress.kubernetes.io/proxy-body-size: "32m"
 
 # Control-plane connection (LangWatch app). Left empty, this resolves to the
 # app Service of the install the gateway is part of, `<release>-app:5560` —
