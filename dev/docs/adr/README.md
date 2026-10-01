@@ -71,6 +71,7 @@ Document **important technical and architectural decisions** — context, trade-
 | [131](./131-better-auth-is-a-boundary-over-identity-services.md) | better-auth is a boundary tier of classes over identity services, not a place that queries Prisma | Accepted |
 | [136](./136-lwql-postgres-catalog-derived-opt-out.md) | The PostgreSQL half of the LangWatchQL catalog is derived from the Prisma manifest, opt-out | Accepted |
 | [142](./142-the-app-owns-the-lwql-access-model.md) | The app owns the LangWatchQL access model — one definition, two emitters, delivered to every pod | Accepted |
+| [143](./143-auth0-password-export-moves-passwords-home.md) | A one-time Auth0 password export moves database-connection passwords home, decoupled from the SSO exit gate | Proposed |
 
 ## When to Write an ADR
 

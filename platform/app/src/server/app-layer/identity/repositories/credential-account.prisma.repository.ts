@@ -145,6 +145,22 @@ export class PrismaCredentialAccountRepository
   }
 
   /**
+   * Read from `Account` for a latched user too: the identity fold projects
+   * every live identifier's bridge row there, so the row answers either way.
+   */
+  async findUserIdByFederatedPasswordAccountId({
+    federatedUserId,
+  }: {
+    federatedUserId: string;
+  }): Promise<string | null> {
+    const account = await this.prisma.account.findFirst({
+      where: { provider: "auth0", providerAccountId: federatedUserId },
+      select: { userId: true },
+    });
+    return account?.userId ?? null;
+  }
+
+  /**
    * The count, the read and the delete in one SERIALIZABLE transaction.
    *
    * They were three unisolated statements, so two concurrent unlinks — a

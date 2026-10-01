@@ -103,6 +103,7 @@ const credentialServiceOver = ({
       });
     },
     findFederatedPasswordAccountId: async () => null,
+    findUserIdByFederatedPasswordAccountId: async () => null,
     deleteLinkedAccount: async ({ userId, accountId }) => {
       legacyCalls.push("deleteLinkedAccount");
       const owned = legacyAccounts.filter((row) => row.userId === userId);

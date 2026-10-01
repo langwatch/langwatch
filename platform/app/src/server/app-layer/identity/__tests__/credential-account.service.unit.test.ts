@@ -120,6 +120,7 @@ const credentialAccountsOver = ({
     findFederatedPasswordAccountId: async ({ userId }) =>
       rows.find((row) => row.userId === userId && row.provider === "auth0")
         ?.providerAccountId ?? null,
+    findUserIdByFederatedPasswordAccountId: async () => null,
     deleteLinkedAccount: async ({ userId, accountId }) => {
       const owned = rows.filter((row) => row.userId === userId);
       if (owned.length <= 1) return "would_strand_user";
