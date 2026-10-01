@@ -21,7 +21,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { QueueRunCommand } from "../../../eventing/simulation-processing.commands.ts";
+import { QueueRunCommand } from "../../../eventing/queue-run.commands.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,

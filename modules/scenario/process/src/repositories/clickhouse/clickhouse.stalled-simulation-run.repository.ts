@@ -88,5 +88,3 @@ export class ClickHouseStalledSimulationRunRepository implements StalledSimulati
     return rows;
   }
 }
-
-export { ClickHouseStalledSimulationRunRepository as ClickHouseStalledRunFinder };

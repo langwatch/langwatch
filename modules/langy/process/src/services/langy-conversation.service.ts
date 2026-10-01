@@ -47,13 +47,6 @@ const defaultRuntime: LangyConversationRuntime = {
   createTurnId: () => generate(LANGY_ID_RESOURCES.turn).toString(),
 };
 
-/**
- * Shape gate for ADOPTED conversation ids (`ensureConversation` with
- * `adoptUnknownId`): caller-chosen ids become aggregate keys, so they must fit
- * our KSUID-prefixed alphabet — a scenario `threadId` fits.
- */
-export const ADOPTABLE_CONVERSATION_ID = /^[A-Za-z0-9_-]{6,120}$/;
-
 /** Everything one conversation's local control left on the record. */
 
 /**

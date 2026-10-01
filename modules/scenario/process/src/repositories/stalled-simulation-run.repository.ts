@@ -16,5 +16,3 @@ export abstract class StalledSimulationRunRepository {
     thresholdMs: number;
   }): Promise<StalledHistoricalRun[]>;
 }
-
-export type StalledRunFinder = StalledSimulationRunRepository;

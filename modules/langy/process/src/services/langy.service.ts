@@ -17,15 +17,15 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { LangyConversationCommands } from "../app/langy.members.ts";
-import type {
-  ConversationDetail,
-  ConversationListItem,
-  ConversationListPage,
+import {
+  ADOPTABLE_CONVERSATION_ID,
+  type ConversationDetail,
+  type ConversationListItem,
+  type ConversationListPage,
 } from "../rules/langy-conversation-shape.rules.ts";
 import type { LatestControlRequest } from "../rules/langy-local-control-request-state.rules.ts";
 import {
   type LangyConversationService,
-  ADOPTABLE_CONVERSATION_ID,
   type LangyConversationEventsReader,
   type LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
