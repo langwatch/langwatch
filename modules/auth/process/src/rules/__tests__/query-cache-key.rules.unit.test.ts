@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * The key a browser seals its mirrored reads under, derived per user and per epoch.
+ * The key a browser seals its mirrored reads under, derived per session and per epoch.
  * @see specs/ui/browser-query-caching.feature
  */
 import { Temporal } from "@langwatch/time";
@@ -13,11 +13,11 @@ import {
 } from "../query-cache-key.rules.ts";
 
 const derive = queryCacheKeyDeriver({ secret: "a-deployment-session-secret" });
-const alice = { userId: "user-1", impersonatorId: undefined, epoch: 2900 };
+const alice = { sessionId: "session-1", impersonatorId: undefined, epoch: 2900 };
 
 describe("queryCacheKeyDeriver", () => {
-  describe("given one user, generation and epoch", () => {
-    /** @scenario "The same user always gets the same cache key" */
+  describe("given one session and epoch", () => {
+    /** @scenario "The same session and epoch always get the same cache key" */
     it("derives the same 256-bit key every time", () => {
       const first = derive(alice);
 
@@ -26,25 +26,25 @@ describe("queryCacheKeyDeriver", () => {
     });
   });
 
-  describe("given two users, or a user and someone browsing as them", () => {
-    /** @scenario "Two users get different cache keys" */
+  describe("given two sessions, or a session and someone browsing as its user", () => {
+    /** @scenario "Two sessions get different cache keys" */
     it("derives different keys", () => {
       const own = derive(alice);
 
-      expect(derive({ ...alice, userId: "user-2" })).not.toBe(own);
+      expect(derive({ ...alice, sessionId: "session-2" })).not.toBe(own);
       expect(derive({ ...alice, impersonatorId: "admin-1" })).not.toBe(own);
     });
   });
 
   describe("given the epoch moved on", () => {
     /** @scenario "A key expires with its epoch" */
-    it("derives a different key for the same user", () => {
+    it("derives a different key for the same session", () => {
       expect(derive({ ...alice, epoch: alice.epoch - 1 })).not.toBe(derive(alice));
     });
   });
 
   describe("given another deployment's secret", () => {
-    it("derives a different key for the same user", () => {
+    it("derives a different key for the same session", () => {
       const elsewhere = queryCacheKeyDeriver({ secret: "another-secret" });
 
       expect(elsewhere(alice)).not.toBe(derive(alice));

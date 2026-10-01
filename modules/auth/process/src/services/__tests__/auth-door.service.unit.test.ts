@@ -59,8 +59,8 @@ function door(overrides: Partial<AuthDoorDeps> = {}) {
     verifyBrowserSession,
     resolveBrowserSession: async () => SIGNED_IN,
     revokeBrowserSession,
-    deriveQueryCacheKey: ({ userId, impersonatorId, epoch }) =>
-      `key-for-${userId}-${impersonatorId}-${epoch}`,
+    deriveQueryCacheKey: ({ sessionId, impersonatorId, epoch }) =>
+      `key-for-${sessionId}-${impersonatorId}-${epoch}`,
     // Two epochs and a day in: the server's clock alone names the epoch.
     now: () => Temporal.Instant.fromEpochMilliseconds(15 * 24 * 60 * 60 * 1000),
     ...overrides,
@@ -217,13 +217,22 @@ describe("AuthDoorService", () => {
         document: {
           session: { expiresAt: "2026-01-01T00:00:00.000Z" },
           user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
-          cacheKey: "key-for-user-1-undefined-2",
-          previousCacheKey: "key-for-user-1-undefined-1",
+          cacheKey: "key-for-session-1-undefined-2",
+          previousCacheKey: "key-for-session-1-undefined-1",
         },
       });
       expect(world.verifyBrowserSession.mock.calls[0]![0].headers.get("cookie")).toBe(
         SESSION_COOKIE,
       );
+    });
+
+    /** @scenario "A revoked session's key is gone" */
+    it("publishes no document, so no key, for a session whose row was revoked", async () => {
+      const world = door({ resolveBrowserSession: async () => ({ kind: "anonymous" }) });
+
+      await expect(world.service.getSessionByCookie({ cookie: SESSION_COOKIE })).resolves.toEqual({
+        document: null,
+      });
     });
 
     it("publishes null for a caller Better Auth does not know", async () => {
