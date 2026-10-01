@@ -93,7 +93,7 @@ func splitList(raw string) []string {
 type Server struct {
 	cfg Config
 	now func() time.Time
-	// stripes serialise writes against reads of the same object, so load on
+	// stripes serialize writes against reads of the same object, so load on
 	// one key never blocks another; bucketMu guards the bucket set alone.
 	stripes  [objectStripes]sync.Mutex
 	bucketMu sync.RWMutex
