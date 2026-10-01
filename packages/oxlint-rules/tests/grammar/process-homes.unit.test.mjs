@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   RULES_PATTERN,
   PROCESS_HOMES,
+  PROCESS_MANAGER_SERVICE_PATTERN,
   PROCESS_PATTERNS,
+  SERVICE_MODULE_PATTERN,
+  stripFeaturePrefix,
 } from "../../grammar/feature-layout-policy.mjs";
 
 // The message a refused file prints is the allowlist read aloud. If the two
@@ -36,6 +39,31 @@ const REFUSED = [
   "stores/annotation.store.ts",
   "fixtures/annotation.fixture.ts",
   "transport/api-rest/annotation.api.ts",
+];
+
+const NESTED = [
+  "features/billing/services/invoice.service.ts",
+  "features/billing/rules/invoice.rules.ts",
+  "features/billing/repositories/invoice.repository.ts",
+  "features/billing/repositories/invoice-repositories.registry.ts",
+  "features/billing/repositories/prisma/prisma.invoice.repository.ts",
+  "features/billing/eventing/invoice.pipeline.ts",
+  "features/billing/eventing/invoice.projection.ts",
+  "features/billing/eventing/invoice/invoice.events.ts",
+];
+
+const NESTED_REFUSED = [
+  "features/billing/features/tax/services/tax.service.ts",
+  "features/billing/tax/services/tax.service.ts",
+  "services/features/billing/invoice.service.ts",
+  "features/billing/services/sub/invoice.service.ts",
+  "features/billing/transport/invoice.rest.ts",
+  "features/billing/app/invoice.app.ts",
+  "features/billing/tasks/backfill.task.ts",
+  "features/billing/migrations/x-import.y.migration.ts",
+  "features/billing/channels/invoice.channel.ts",
+  "features/billing/index.ts",
+  "features/Billing/services/invoice.service.ts",
 ];
 
 function hasHome(path) {
@@ -76,6 +104,37 @@ describe("given the closed process allowlist", () => {
       expect(hasHome("annotation.members.ts")).toBe(false);
       expect(hasHome("app/annotation-members.ts")).toBe(false);
       expect(hasHome("members/annotation.members.ts")).toBe(false);
+    });
+  });
+
+  describe("when a concern nests its own services, rules, repositories and eventing", () => {
+    /** @scenario "A concern may nest services, rules, repositories and eventing one level deep" */
+    it("admits features/<concern>/ in front of those four homes and names it in the message", () => {
+      expect(NESTED.filter((path) => !hasHome(path))).toEqual([]);
+      expect(PROCESS_HOMES).toContain("features/<concern>/");
+    });
+
+    /** @scenario "Nesting stops at one level and leaves the other homes at the top" */
+    it("refuses a second level, features/ inside a home, and a nested transport, app, task, migration, channel or index", () => {
+      expect(NESTED_REFUSED.filter(hasHome)).toEqual([]);
+    });
+
+    /** @scenario "A nested rules, service or process-manager file gets the same checks as a top-level one" */
+    it("keeps the service and rules patterns in step with the homes", () => {
+      expect(RULES_PATTERN.test("features/billing/rules/invoice.rules.ts")).toBe(true);
+      expect(RULES_PATTERN.test("features/billing/features/tax/rules/tax.rules.ts")).toBe(false);
+      expect(SERVICE_MODULE_PATTERN.test("features/billing/services/invoice.service.ts")).toBe(
+        true,
+      );
+      expect(
+        PROCESS_MANAGER_SERVICE_PATTERN.test(
+          "features/billing/services/invoice-process.service.ts",
+        ),
+      ).toBe(true);
+      expect(stripFeaturePrefix("features/billing/services/invoice.service.ts")).toBe(
+        "services/invoice.service.ts",
+      );
+      expect(stripFeaturePrefix("services/invoice.service.ts")).toBe("services/invoice.service.ts");
     });
   });
 

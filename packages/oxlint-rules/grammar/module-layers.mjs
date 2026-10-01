@@ -1,3 +1,5 @@
+import { stripFeaturePrefix } from "./feature-layout-policy.mjs";
+
 // The closed layer grammar of a module's process package, as tables.
 // A repository takes the store it reads, a channel the client it speaks to, a
 // transport declares and calls the module. A service works over repository
@@ -49,11 +51,11 @@ function normalise(path) {
 
 /** The path below `src/` a specifier lands on, or undefined for a package. */
 export function targetPath({ sourcePath, specifier }) {
-  if (specifier.startsWith("#")) return specifier.slice(1);
+  if (specifier.startsWith("#")) return stripFeaturePrefix(specifier.slice(1));
   if (!specifier.startsWith(".")) return undefined;
 
   const directory = sourcePath.slice(0, sourcePath.lastIndexOf("/"));
-  return normalise(`${directory}/${specifier}`);
+  return stripFeaturePrefix(normalise(`${directory}/${specifier}`));
 }
 
 /** The folder below `src/` a specifier lands in, or undefined for a package. */

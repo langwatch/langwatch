@@ -250,6 +250,48 @@ describe("feature shape", () => {
     });
   });
 
+  describe("given repositories nested under features/<concern>/", () => {
+    const NESTED = "modules/widget/process/src/features/billing/repositories";
+
+    function nestedRepositories(): void {
+      write(`${NESTED}/billing.repository.ts`);
+      write(`${NESTED}/prisma/prisma.billing.repository.ts`);
+      write(`${NESTED}/memory/memory.billing.repository.ts`);
+      write(`${NESTED}/__tests__/billing.repository.contract.test.ts`);
+    }
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("accepts a concern that rides the module's one top-level registry", () => {
+      referenceFeature();
+      nestedRepositories();
+
+      expect(findings()).toEqual([]);
+    });
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("asks for a registry when no repositories folder holds one", () => {
+      referenceFeature();
+      nestedRepositories();
+      rmSync(join(root, "modules/widget/process/src/repositories/widget-repositories.registry.ts"));
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["unregistered-repositories"]);
+    });
+
+    /** @scenario "A concern's repositories are held to the module's one registry, memory twin and contract test" */
+    it("asks for the memory twin and its contract test inside the concern", () => {
+      referenceFeature();
+      nestedRepositories();
+      rmSync(join(root, NESTED, "memory"), { recursive: true });
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["postgres-without-memory"]);
+
+      write(`${NESTED}/memory/memory.billing.repository.ts`);
+      rmSync(join(root, NESTED, "__tests__"), { recursive: true });
+
+      expect(findings().map((finding) => finding.kind)).toEqual(["memory-twin-untested"]);
+    });
+  });
+
   describe("given a feature that lacks a piece of the reference", () => {
     it("asks for the installer when no <feature>.server.ts exists", () => {
       referenceFeature();

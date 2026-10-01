@@ -108,7 +108,23 @@ export const PROCESS_HOMES =
   "channels/ (the interface, the bundle, the registry, and a tier folder beside them), " +
   "eventing/<feature>.pipeline.ts and what it names, rules/<name>.rules.ts, " +
   "tasks/<name>.task.ts, migrations/, " +
+  "features/<concern>/ holding that concern's own services/, rules/, repositories/ and eventing/ " +
+  "(one level, nothing else nests), " +
   "app/<feature>-composition.build.ts (the ported process composition a converted module still carries; it only shrinks)";
+
+/**
+ * One level of concern nesting (ARCHITECTURE.md, "Process and contract nest
+ * the same way"): services, rules, repositories and eventing may sit under
+ * `features/<concern>/`. Everything else stays at the top.
+ */
+export const FEATURE_PREFIX = `(?:features/${NAME}/)?`;
+const FEATURE_PREFIX_RE = new RegExp(`^features/${NAME}/`);
+
+/** The path with a leading `features/<concern>/` removed, so a layer reads the same
+ * nested or not. */
+export function stripFeaturePrefix(path) {
+  return path.replace(FEATURE_PREFIX_RE, "");
+}
 
 export const PROCESS_PATTERNS = [
   /^index\.ts$/,
@@ -122,13 +138,13 @@ export const PROCESS_PATTERNS = [
   // helps nobody; the expectation is that it shrinks to nothing as repositories
   // and members conversion completes (ADR-144).
   new RegExp(`^app/${NAME}-composition\\.build\\.ts$`),
-  new RegExp(`^services/${NAME}\\.service\\.ts$`),
-  new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}services/${NAME}\\.service\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repository\\.ts$`),
   // A feature can select a repository bundle by persistence backend.
-  new RegExp(`^repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
-  new RegExp(`^repositories/${NAME}(?:\\.${NAME})?\\.repositories\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:-repositories)?\\.registry\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}repositories/${NAME}(?:\\.${NAME})?\\.repositories\\.ts$`),
   new RegExp(
-    `^repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
+    `^${FEATURE_PREFIX}repositories/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:database|mapper|repository|repositories|store)\\.ts$`,
   ),
   // A channel carries messages to or from something the module does not own.
   new RegExp(`^channels/${NAME}(?:\\.${NAME})?\\.channel\\.ts$`),
@@ -139,12 +155,12 @@ export const PROCESS_PATTERNS = [
   // its events, its projections, its subscribers, its process managers and its
   // commands through `definePipeline` from `@langwatch/eventing`; the files
   // beside it hold what that declaration names.
-  new RegExp(`^eventing/${NAME}\\.pipeline\\.ts$`),
+  new RegExp(`^${FEATURE_PREFIX}eventing/${NAME}\\.pipeline\\.ts$`),
   new RegExp(
-    `^eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    `^${FEATURE_PREFIX}eventing/${NAME}\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
   ),
   new RegExp(
-    `^eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
+    `^${FEATURE_PREFIX}eventing/(${NAME})/(?:${NAME}|\\1\\.${NAME})\\.(?:events|commands|schemas|projection|subscriber|process|intent|store)\\.ts$`,
   ),
   // One-shot programs run from the task launcher, composed by apps/tasks.
   new RegExp(`^tasks/${NAME}\\.task\\.ts$`),
@@ -153,13 +169,15 @@ export const PROCESS_PATTERNS = [
   new RegExp(`^migrations/${NAME}-import\\.${NAME}\\.migration\\.ts$`),
 ];
 
-export const SERVICE_MODULE_PATTERN = /^services\/.+\.service\.ts$/;
-export const PROCESS_MANAGER_SERVICE_PATTERN = /^services\/.+-process\.service\.ts$/;
+export const SERVICE_MODULE_PATTERN = new RegExp(`^${FEATURE_PREFIX}services/.+\\.service\\.ts$`);
+export const PROCESS_MANAGER_SERVICE_PATTERN = new RegExp(
+  `^${FEATURE_PREFIX}services/.+-process\\.service\\.ts$`,
+);
 
 // A pure function/constant module: a package of functions in the Go sense,
 // not a single-method class. Checked separately because it carries its own
 // purity and import rules.
-export const RULES_PATTERN = new RegExp(`^rules/${NAME}\\.rules\\.ts$`);
+export const RULES_PATTERN = new RegExp(`^${FEATURE_PREFIX}rules/${NAME}\\.rules\\.ts$`);
 
 /**
  * Built-ins a rules module may construct: a value, not a collaborator and not

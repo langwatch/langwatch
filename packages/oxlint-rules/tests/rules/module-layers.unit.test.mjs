@@ -108,6 +108,20 @@ describe("given a transport", () => {
   });
 });
 
+describe("given a service nested under features/<concern>/", () => {
+  /** @scenario "A nested service is held to the same layers as a top-level one" */
+  it("reads its layer from the folder below features/<concern>/ and reports a backend", () => {
+    const code = [
+      'import type { AgentRepository } from "../repositories/agent.repository.ts";',
+      'import { PrismaAgentRepository } from "../repositories/prisma/prisma.agent.repository.ts";',
+    ].join("\n");
+
+    expect(report(`${PROCESS}/features/billing/services/billing.service.ts`, code)).toEqual([
+      { crossed: "a repository backend", line: 2, messageId: "serviceNamesABackend" },
+    ]);
+  });
+});
+
 describe("given a service", () => {
   /** @scenario "A service works over repository interfaces, never a backend" */
   it("reports serviceNamesABackend for a backend, value or type, and passes the interface", () => {

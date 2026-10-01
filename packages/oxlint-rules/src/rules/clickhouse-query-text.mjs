@@ -2,6 +2,7 @@
 // template literals that spell it. A template's `${identifier}` is inlined when
 // it names a string constant in reach; anything else stays an opaque `${...}`.
 
+import { stripFeaturePrefix } from "../../grammar/feature-layout-policy.mjs";
 import { walk } from "../ast.mjs";
 
 const MAX_INLINE_DEPTH = 4;
@@ -27,7 +28,9 @@ export function isClickHouseRepository(file) {
   return (
     file.role === "process" &&
     !file.isTest &&
-    Boolean(file.sourcePath?.startsWith("repositories/clickhouse/"))
+    Boolean(
+      file.sourcePath && stripFeaturePrefix(file.sourcePath).startsWith("repositories/clickhouse/"),
+    )
   );
 }
 

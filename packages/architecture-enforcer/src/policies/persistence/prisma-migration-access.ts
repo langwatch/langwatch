@@ -1,5 +1,6 @@
 import { join } from "node:path";
 
+import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
 
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
@@ -11,6 +12,10 @@ import {
   workspaceModuleResolver,
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
+
+const PRISMA_MIGRATION_REPOSITORY_FILE = new RegExp(
+  `/process/src/${FEATURE_PREFIX}repositories/prisma/prisma\\.[^/]+-migration\\.repository\\.ts$`,
+);
 
 const OWNERSHIP = "@langwatch/prisma-client/ownership";
 const TEST = /(?:__tests__|__fixtures__|\.(?:test|spec)\.)/;
@@ -371,10 +376,7 @@ function lintScopedRepository({
     return violations;
   }
 
-  const validLocation =
-    /\/process\/src\/repositories\/prisma\/prisma\.[^/]+-migration\.repository\.ts$/.test(
-      source.fileName,
-    );
+  const validLocation = PRISMA_MIGRATION_REPOSITORY_FILE.test(source.fileName);
 
   const consumers = callerFiles
     .filter((file) =>

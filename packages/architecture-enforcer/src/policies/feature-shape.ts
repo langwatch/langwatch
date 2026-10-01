@@ -5,6 +5,7 @@ import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } 
 import { getAnchor } from "../workspace/anchors.ts";
 import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
+import { repositoryHomes } from "../workspace/repository-homes.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 
 /** Colocated tests are not the shape they test. */
@@ -220,7 +221,7 @@ function serverFindings({
 
   if (legacyRuntime) add("legacy-transport-runtime", legacyRuntime);
 
-  addRepositoryFindings({ repositories: join(src, "repositories"), add });
+  addRepositoryFindings({ repositories: repositoryHomes({ src }), add });
   addChannelFindings({ channels: join(src, "channels"), add });
 
   return findings;
@@ -230,14 +231,27 @@ function addRepositoryFindings({
   repositories,
   add,
 }: {
+  repositories: string[];
+  add: (kind: FeatureShapeLegacyKind, path: string) => void;
+}): void {
+  const [first] = repositories;
+  if (first === undefined) return;
+
+  const registered = repositories.some((directory) =>
+    files(directory).some((name) => name.endsWith(".registry.ts")),
+  );
+  if (!registered) add("unregistered-repositories", first);
+
+  for (const directory of repositories) addTwinFindings({ repositories: directory, add });
+}
+
+function addTwinFindings({
+  repositories,
+  add,
+}: {
   repositories: string;
   add: (kind: FeatureShapeLegacyKind, path: string) => void;
 }): void {
-  if (!isDirectory(repositories)) return;
-
-  const registered = files(repositories).some((name) => name.endsWith(".registry.ts"));
-  if (!registered) add("unregistered-repositories", repositories);
-
   const prisma = join(repositories, "prisma");
   const memory = join(repositories, "memory");
   const memoryTwinMissing = isDirectory(prisma) && !isDirectory(memory);

@@ -100,6 +100,30 @@ describe("memory twin drift", () => {
     });
   });
 
+  describe("given a twin pair under features/<concern>/repositories", () => {
+    /** @scenario "A twin pair under features/<concern>/repositories is checked like a top-level pair" */
+    it("reports drift against the process package", () => {
+      const nested = `${PACKAGE}/src/features/billing/repositories`;
+      write(
+        `${nested}/prisma/prisma.widget.repository.ts`,
+        "export class PrismaWidgetRepository {\n  findAll(): void {}\n}\n",
+      );
+      write(
+        `${nested}/memory/memory.widget.repository.ts`,
+        "export class MemoryWidgetRepository {}\n",
+      );
+
+      const found = collectMemoryTwinDriftFindings(root);
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({
+        packagePath: PACKAGE,
+        method: "findAll",
+        path: `${nested}/memory/memory.widget.repository.ts`,
+      });
+    });
+  });
+
   describe("given twins that carry the same methods", () => {
     /** @scenario "Twins that carry the same methods report nothing" */
     it("reports nothing, and counts neither a private nor a static member", () => {

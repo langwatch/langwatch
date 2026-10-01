@@ -7,6 +7,7 @@ import {
   PROCESS_MANAGER_SERVICE_PATTERN,
   RULES_PATTERN,
   SERVICE_MODULE_PATTERN,
+  stripFeaturePrefix,
   TEST_DIRECTORY,
 } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
@@ -192,7 +193,7 @@ function relativeRulesImportViolations({
 }): ArchitectureViolation[] {
   const target = resolveRelativeModule({ file, specifier });
   const relativeTarget = target ? workspacePath(`${pkg.root}/src`, target) : void 0;
-  if (relativeTarget?.startsWith("rules/")) return [];
+  if (relativeTarget && stripFeaturePrefix(relativeTarget).startsWith("rules/")) return [];
 
   const kind = relativeTarget ? rulesImplementationKind(relativeTarget) : void 0;
 

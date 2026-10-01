@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { FEATURE_PREFIX } from "@langwatch/oxlint-rules/grammar/feature-layout-policy.mjs";
 import ts from "typescript";
 
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
@@ -9,6 +10,9 @@ import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
+const PRISMA_REPOSITORY_FILE = new RegExp(
+  `/process/src/${FEATURE_PREFIX}repositories/prisma/prisma\\.[^/]+\\.repository\\.ts$`,
+);
 const OWNERSHIP_MODULE = "@langwatch/prisma-client/ownership";
 const REPOSITORY_MODULE = "@langwatch/prisma-client";
 const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
@@ -74,7 +78,7 @@ function isClaimProperty(call: ts.CallExpression, file: string): boolean {
   return (
     modifiers.some((item) => item.kind === ts.SyntaxKind.StaticKeyword) &&
     modifiers.some((item) => item.kind === ts.SyntaxKind.ReadonlyKeyword) &&
-    /\/process\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file)
+    PRISMA_REPOSITORY_FILE.test(file)
   );
 }
 
@@ -181,7 +185,7 @@ function isNativeClaimHeritage(call: ts.CallExpression, file: string): boolean {
 
   if (!ts.isClassDeclaration(heritage.parent.parent)) return false;
 
-  return /\/process\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file);
+  return PRISMA_REPOSITORY_FILE.test(file);
 }
 
 function isFactoryReference(node: ts.Node, bindings: Bindings): boolean {
