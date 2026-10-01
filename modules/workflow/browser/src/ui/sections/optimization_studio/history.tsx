@@ -243,6 +243,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                     <Button
                       variant="ghost"
                       onClick={() => void onRestoreSuccess(version.id)}
+                      data-testid="workflow-version-restore"
                       loading={restoreVersion.isPending}
                     >
                       <HistoryIcon size={24} />

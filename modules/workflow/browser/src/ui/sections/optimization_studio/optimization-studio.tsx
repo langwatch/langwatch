@@ -238,7 +238,8 @@ export default function OptimizationStudio() {
 
   return (
     <WorkflowNodeHostProvider value={studioNodeHost}>
-      <div style={{ width: "100vw", height: "100vh" }}>
+      {/* Fixed over the app chrome: main drew the studio full-screen, not inside it. */}
+      <Box position="fixed" inset={0} zIndex="overlay" background="bg">
         <Head>
           <title>LangWatch - Optimization Studio - {name}</title>
         </Head>
@@ -410,7 +411,7 @@ export default function OptimizationStudio() {
         studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
         Pending app-level overlay slot in apps/ui.
       */}
-      </div>
+      </Box>
     </WorkflowNodeHostProvider>
   );
 }
