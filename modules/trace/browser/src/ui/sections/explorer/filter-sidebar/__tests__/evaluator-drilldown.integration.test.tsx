@@ -2,14 +2,14 @@
 // active state, and score range committing.
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { FacetItem } from "@langwatch/trace-browser-kit";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { EvaluatorDrilldown } from "../evaluator-drilldown.tsx";
 
 const buildItem = (aggregates?: Partial<NonNullable<FacetItem["aggregates"]>>): FacetItem => ({
@@ -39,16 +39,14 @@ const renderDrilldown = ({
   setScoreRange = vi.fn(),
   removeScoreRange = vi.fn(),
 } = {}) => {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <EvaluatorDrilldown
-        item={item}
-        ast={ast}
-        toggleSubFilter={toggleSubFilter}
-        setScoreRange={setScoreRange}
-        removeScoreRange={removeScoreRange}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <EvaluatorDrilldown
+      item={item}
+      ast={ast}
+      toggleSubFilter={toggleSubFilter}
+      setScoreRange={setScoreRange}
+      removeScoreRange={removeScoreRange}
+    />,
   );
   return { toggleSubFilter, setScoreRange, removeScoreRange };
 };

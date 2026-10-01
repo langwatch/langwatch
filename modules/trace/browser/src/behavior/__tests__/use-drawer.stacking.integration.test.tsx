@@ -1,5 +1,5 @@
 /**
- * The drawer back stack, driven through the real hook and the real `qs` serialization.
+ * The drawer stack in the address and `history.state`, driven through the real hook.
  * @vitest-environment jsdom
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
@@ -41,8 +41,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => harness.router,
 }));
 
-const { clearDrawerStack, getDrawerStack, useDrawer } =
-  await import("@langwatch/browser-host/use-drawer");
+const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/use-drawer");
 
 /** What the address bar holds for the drawer, as the browser would show it. */
 function drawerInUrl(): Record<string, string> {
@@ -63,7 +62,6 @@ function openTraceDrawerOn(traceId: string) {
 
 beforeEach(() => {
   window.history.replaceState({}, "", harness.PATH);
-  clearDrawerStack();
 });
 
 afterEach(cleanup);

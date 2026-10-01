@@ -3,7 +3,6 @@ import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LIVE_REFETCH_MS } from "../../../../../model/trace-freshness.ts";
 import type * as spanTreePagedQueryModule from "../span-tree-paged-query.ts";
 import { useSpanTree } from "../use-span-tree.ts";
 
@@ -18,7 +17,7 @@ type DeltaQueryCall = {
   input: { sinceUpdatedAtMs: number };
   options: {
     enabled: boolean;
-    refetchInterval: unknown;
+    refetchInterval?: unknown;
   };
 };
 
@@ -185,7 +184,7 @@ describe("useSpanTree", () => {
       renderHook(() => useSpanTree());
 
       expect(lastDeltaCall().options.enabled).toBe(true);
-      expect(lastDeltaCall().options.refetchInterval).toBe(false);
+      expect(lastDeltaCall().options.refetchInterval).toBeUndefined();
     });
 
     it("never re-walks the tree on an SSE update — that is ceil(N/500) requests per batch", () => {
@@ -203,13 +202,13 @@ describe("useSpanTree", () => {
       sseConnectionState = "disconnected";
     });
 
-    it("polls spanTreeDelta from the loaded tree's high-water mark instead of re-walking every page", () => {
+    it("reads spanTreeDelta from the loaded tree's high-water mark instead of re-walking every page", () => {
       treeData = [node("a", 100), node("b", 300)];
 
       renderHook(() => useSpanTree());
 
       expect(lastDeltaCall().options.enabled).toBe(true);
-      expect(lastDeltaCall().options.refetchInterval).toBe(LIVE_REFETCH_MS);
+      expect(lastDeltaCall().options.refetchInterval).toBeUndefined();
       expect(lastDeltaCall().input).toMatchObject({
         projectId: "p1",
         traceId: "t1",

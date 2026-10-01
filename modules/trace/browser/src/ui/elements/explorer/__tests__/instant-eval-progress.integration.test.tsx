@@ -3,7 +3,7 @@
  * The determinate bar over the table while an Instant Eval run judges.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -15,7 +15,7 @@ import {
 } from "../instant-eval-progress.tsx";
 
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 describe("given a run with total 10,000, progress 3,200 and 412 matched", () => {

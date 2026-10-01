@@ -1,13 +1,13 @@
 // Conversation-context strip: redacted content shows "Redacted", not
 // "(no user message)" / "(no assistant response)" placeholders.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (s: { viewMode: string }) => unknown) =>
     selector({ viewMode: "summary" }),
 }));
 
@@ -100,15 +100,13 @@ vi.mock("../../hooks/use-conversation-context.ts", () => ({
 import { ConversationContext } from "../conversation-context.tsx";
 
 function renderStrip() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationContext
-        conversationId="conv_1"
-        traceId="trace_1"
-        collapsed={false}
-        onToggleCollapsed={() => undefined}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConversationContext
+      conversationId="conv_1"
+      traceId="trace_1"
+      collapsed={false}
+      onToggleCollapsed={() => undefined}
+    />,
   );
 }
 

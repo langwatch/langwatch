@@ -1,6 +1,5 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Flex, Text } from "@langwatch/design-system/primitives";
-import { useExplorerStore, type LensConfig } from "@langwatch/trace-browser-kit";
 import {
   getCoreRowModel,
   getSortedRowModel,
@@ -10,7 +9,8 @@ import {
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
+import { type LensConfig } from "../../../../behavior/view.slice.ts";
 import {
   EXPANDED_BG,
   EXPANDED_BG_CSS,
@@ -166,7 +166,6 @@ function useOpenLatestTrace(): (group: ConversationGroup) => void {
       const traceId = group.lastTraceId;
       if (!traceId) return;
       const occurredAtMs = group.latestTimestamp;
-      useDrawerStore.getState().openTrace(traceId, occurredAtMs);
       openDrawer("traceV2Details", {
         traceId,
         // `t` (timestamp) is the partition-pruning hint the drawer's reads

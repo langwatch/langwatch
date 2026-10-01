@@ -7,10 +7,10 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { CircleHelp } from "lucide-react";
 import type React from "react";
 
+import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
 import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
 import {
   modelProviderIcons,

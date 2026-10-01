@@ -1,10 +1,11 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
 import { Button, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
-import { type SearchNotice, useFilterStore } from "@langwatch/trace-browser-kit";
 import { Sparkles, X } from "lucide-react";
 import type React from "react";
 import { useCallback, useState } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 
 const MODEL_PROVIDERS_HREF = "/settings/model-providers";

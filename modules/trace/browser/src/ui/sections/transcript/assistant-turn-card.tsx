@@ -1,5 +1,5 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import type { DisplayRoleVisuals } from "@langwatch/trace-browser-kit";
+import type { DisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { ChatMessage, ContentBlock } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuBot } from "react-icons/lu";

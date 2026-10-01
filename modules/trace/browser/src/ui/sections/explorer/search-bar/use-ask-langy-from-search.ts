@@ -1,8 +1,9 @@
-import { useFilterStore, useTraceViewContext } from "@langwatch/trace-browser-kit";
 import { useCallback } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useCanAskLangy } from "../../../../behavior/langy/use-can-ask-langy.ts";
 import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
+import { useTraceViewContext } from "../../../../behavior/view-context-chip.ts";
 import { useShowLangy } from "../../langy/hooks/use-show-langy.ts";
 import { handOffSearchToLangy } from "./search-langy-handoff.ts";
 

@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { Server } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -22,8 +22,8 @@ vi.mock("../../../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("../../../explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule>();
   return {
     ...actual,
     useFilterStore: (selector: (s: unknown) => unknown) =>
@@ -31,10 +31,9 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
   };
 });
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
+import type * as actualModule from "../../../explorer.store.ts";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 // Five preloaded service values — the top-N the discover payload shipped.
 // "finance-team-42" is deliberately NOT among them: it lives only server-side.
@@ -49,19 +48,17 @@ const PRELOADED: FacetItem[] = [
 const neutral = (): FacetValueState => "neutral";
 
 function renderSection(props?: { serverValueSearch?: boolean; items?: FacetItem[] }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetSection
-        title="SERVICE"
-        icon={Server}
-        field="service"
-        items={props?.items ?? PRELOADED}
-        getValueState={neutral}
-        onToggle={vi.fn()}
-        onExclude={vi.fn()}
-        serverValueSearch={props?.serverValueSearch}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <FacetSection
+      title="SERVICE"
+      icon={Server}
+      field="service"
+      items={props?.items ?? PRELOADED}
+      getValueState={neutral}
+      onToggle={vi.fn()}
+      onExclude={vi.fn()}
+      serverValueSearch={props?.serverValueSearch}
+    />,
   );
 }
 

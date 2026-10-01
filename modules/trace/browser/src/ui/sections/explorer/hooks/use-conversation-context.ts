@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { api } from "../../../../behavior/trace-api.ts";
 import type { ConversationTurn } from "../../../../model/explorer/conversation-turn.ts";
 import { isPreviewTraceId } from "../../../../model/preview-trace-id.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 import { useDrawerProjectId } from "./use-drawer-project-id.ts";
 
 export interface ConversationContextResult {
@@ -37,12 +37,12 @@ export function useConversationContext(
   traceId: string | null | undefined,
 ): ConversationContextResult {
   const projectId = useDrawerProjectId();
-  const shared = useSharedTrace();
+  const isReadOnly = useIsReadOnlyTrace();
 
   // Conversation context for preview-mode traces is seeded directly into the cache by
   // `useOpenTraceDrawer`.
   const isPreview = !!traceId && isPreviewTraceId(traceId);
-  const fetchEnabled = !!projectId && !!conversationId && !isPreview && !shared;
+  const fetchEnabled = !!projectId && !!conversationId && !isPreview && !isReadOnly;
 
   const query = api.traces.conversationContext.useQuery(
     {
@@ -51,10 +51,8 @@ export function useConversationContext(
     },
     {
       enabled: fetchEnabled,
-      staleTime: 30_000,
       gcTime: 1_800_000,
       placeholderData: keepPreviousData,
-      refetchOnWindowFocus: false,
     },
   );
 
@@ -65,10 +63,9 @@ export function useConversationContext(
         data: query.data,
         isLoading: query.isLoading,
         projectId,
-        shared: !!shared,
         traceId: traceId ?? null,
       }),
-    [projectId, query.data, query.isLoading, conversationId, traceId, shared],
+    [projectId, query.data, query.isLoading, conversationId, traceId],
   );
 }
 
@@ -80,17 +77,14 @@ function conversationContextResult({
   data,
   isLoading,
   projectId,
-  shared,
   traceId,
 }: {
   conversationId: string | null;
   data: ConversationContextData | undefined;
   isLoading: boolean;
   projectId: string;
-  shared: boolean;
   traceId: string | null;
 }): ConversationContextResult {
-  if (shared) return { ...NULL_RESULT, conversationId };
   if (!projectId || !conversationId) return NULL_RESULT;
   if (!data) return { ...NULL_RESULT, conversationId, isLoading };
 

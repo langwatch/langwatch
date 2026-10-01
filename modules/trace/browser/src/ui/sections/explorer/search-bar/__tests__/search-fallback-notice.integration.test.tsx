@@ -3,7 +3,7 @@
  *
  * Spec: specs/traces-v2/search.feature ("A search that ran without a model says so").
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,12 +12,11 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { SearchFallbackNotice } from "../search-fallback-notice.tsx";
 
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 beforeEach(() => {

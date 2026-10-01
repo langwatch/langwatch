@@ -1,7 +1,10 @@
-import { SessionView } from "@langwatch/coding-agent-browser-kit";
 import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
-import { api } from "../../../../../behavior/trace-api.ts";
+import {
+  useCodingAgentSession,
+  useCodingAgentTranscript,
+} from "../../../../../behavior/reads/use-coding-agent-reads.ts";
+import { SessionView } from "../../../../elements/coding-agent/trace/session-view.tsx";
 
 interface SessionTabProps {
   projectId: string;
@@ -14,19 +17,18 @@ interface SessionTabProps {
  * The Session tab's data boundary.
  */
 export function SessionTab({ projectId, traceId, occurredAtMs }: SessionTabProps) {
-  const query = api.codingAgents.session.useQuery(
-    { projectId, traceId },
-    { refetchOnWindowFocus: false, staleTime: 60_000 },
-  );
+  const query = useCodingAgentSession({ projectId, traceId });
   // The token timeline reflects the trace currently open, not (yet) every
   // trace the merged session above spans — stitching a transcript across
   // sibling traces is a reasonable follow-up, not done here. Shares its
   // cache key with the Terminal tab's own read, so switching tabs on a
   // session already opened once costs nothing extra.
-  const transcriptQuery = api.codingAgents.transcript.useQuery(
-    { projectId, traceId, occurredAtMs },
-    { refetchOnWindowFocus: false, staleTime: 60_000, enabled: !!query.data },
-  );
+  const transcriptQuery = useCodingAgentTranscript({
+    projectId,
+    traceId,
+    occurredAtMs,
+    enabled: !!query.data,
+  });
 
   if (query.isLoading) return <SessionSkeleton />;
 

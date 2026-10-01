@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useState } from "react";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 
 export type DrawerLayout = "vertical" | "horizontal";
 
@@ -9,7 +9,7 @@ export type DrawerLayout = "vertical" | "horizontal";
  * the same rule Chrome DevTools uses for its Network tab auto orientation.
  */
 export function usePaneLayout(containerRef: RefObject<HTMLElement | null>): DrawerLayout {
-  const widthPx = useDrawerStore((s) => s.widthPx);
+  const widthPx = useTraceDrawer((s) => s.widthPx);
 
   const widthDrivenLayout = widthDrivenLayoutFor(widthPx);
 

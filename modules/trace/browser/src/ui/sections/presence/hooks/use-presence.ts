@@ -1,5 +1,5 @@
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import type { PresenceEvent, PresenceLocation } from "@langwatch/presence-contract";
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
 import { type RefObject, useEffect, useMemo, useRef } from "react";
 
 import { usePresencePreferencesStore } from "../../../../behavior/presence/presence-preferences-store.ts";

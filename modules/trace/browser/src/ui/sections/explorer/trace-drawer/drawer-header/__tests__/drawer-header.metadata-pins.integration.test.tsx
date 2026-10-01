@@ -2,8 +2,8 @@
  * What the metadata auto-pin sweep promotes onto the pinned-context strip.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -168,11 +168,7 @@ function makeTrace(overrides: Partial<TraceHeader> = {}): TraceHeader {
 }
 
 function renderHeader(trace: TraceHeader = makeTrace()) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <DrawerHeader trace={trace} onClose={vi.fn()} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<DrawerHeader trace={trace} onClose={vi.fn()} />);
 }
 
 beforeEach(() => {

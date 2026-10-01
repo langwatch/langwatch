@@ -4,8 +4,8 @@
  * clear button, parse error indicator) end-to-end.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
@@ -45,7 +45,7 @@ vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => false,
 }));
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   const state = () => ({
     isOpen: false,
@@ -58,16 +58,11 @@ vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
   return { ...actual, useLangyStore };
 });
 
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { SearchBar } from "../search-bar.tsx";
 
 function renderSearchBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <SearchBar />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<SearchBar />);
 }
 
 function getEditor(): HTMLElement {

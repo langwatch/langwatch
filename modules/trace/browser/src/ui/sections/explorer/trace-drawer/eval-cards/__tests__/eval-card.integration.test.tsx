@@ -2,8 +2,8 @@
  * Integration coverage for the lazy-loaded evaluator inputs in EvalCard.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -30,11 +30,7 @@ import { EvalCard } from "../eval-card.tsx";
 import type { EvalEntry } from "../utils.ts";
 
 function renderCard(eval_: EvalEntry) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EvalCard eval_={eval_} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<EvalCard eval_={eval_} />);
 }
 
 const baseEval: EvalEntry = {

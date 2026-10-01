@@ -1,6 +1,6 @@
+import { formatTokens } from "@langwatch/design-system/display-formatters";
 import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatTokens } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 
 import { TokenBreakdownTooltipContent } from "../../../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";

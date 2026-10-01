@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -128,10 +128,8 @@ import { AddToAnnotationQueueDialog } from "../add-to-annotation-queue-dialog.ts
 const onClose = vi.fn();
 
 const renderDialog = (traceIds = ["t1", "t2", "t3"]) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AddToAnnotationQueueDialog open={true} onClose={onClose} traceIds={traceIds} />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <AddToAnnotationQueueDialog open={true} onClose={onClose} traceIds={traceIds} />,
   );
 
 const pickAndSend = () => {

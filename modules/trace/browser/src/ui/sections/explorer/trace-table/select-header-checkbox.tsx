@@ -3,9 +3,9 @@ import { Box, chakra } from "@langwatch/design-system/primitives";
 const ChakraButton = chakra("button");
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useSelectionStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 
+import { useSelectionStore } from "../../../../behavior/explorer.store.ts";
 import { ariaCheckedFor, checkboxStateFor } from "../../../../model/tri-state-checkbox.ts";
 
 interface SelectHeaderCheckboxProps {

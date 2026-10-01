@@ -27,13 +27,13 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../api-key/client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/browser-host/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../coding-agent/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../coding-agent/contract/tsconfig.build.json"
@@ -42,7 +42,7 @@
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {
-      "path": "../../dataset/browser-kit/tsconfig.build.json"
+      "path": "../../dataset/client/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
@@ -57,7 +57,7 @@
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../evaluator/browser-kit/tsconfig.build.json"
+      "path": "../../evaluator/client/tsconfig.build.json"
     },
     {
       "path": "../../evaluator/contract/tsconfig.build.json"
@@ -72,10 +72,7 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
-      "path": "../../langy/browser-kit/tsconfig.build.json"
-    },
-    {
-      "path": "../../model-provider/browser-kit/tsconfig.build.json"
+      "path": "../../langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
@@ -87,10 +84,10 @@
       "path": "../../onboarding/browser/tsconfig.build.json"
     },
     {
-      "path": "../../onboarding/browser-kit/tsconfig.build.json"
+      "path": "../../presence/contract/tsconfig.build.json"
     },
     {
-      "path": "../../presence/contract/tsconfig.build.json"
+      "path": "../../prompt/client/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
@@ -99,25 +96,22 @@
       "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
+      "path": "../../scenario/client/tsconfig.build.json"
+    },
+    {
       "path": "../../scenario/contract/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"
     },
     {
-      "path": "../../stored-object/browser-kit/tsconfig.build.json"
+      "path": "../../stored-object/contract/tsconfig.build.json"
     },
     {
       "path": "../../suite/browser/tsconfig.build.json"
     },
     {
-      "path": "../../suite/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../browser-kit/tsconfig.build.json"
     },
     {
       "path": "../contract/tsconfig.build.json"
@@ -126,7 +120,7 @@
       "path": "../../../packages/ui-kernel/tsconfig.build.json"
     },
     {
-      "path": "../../user/browser-kit/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"

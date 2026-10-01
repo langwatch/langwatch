@@ -1,5 +1,6 @@
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
+
+import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 
 /**
  * The identity of what the table is showing: change any part of it and a row

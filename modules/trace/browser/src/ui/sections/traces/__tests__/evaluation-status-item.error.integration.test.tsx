@@ -2,9 +2,9 @@
  * Integration tests for EvaluationStatusItem — error rendering.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/browser-host/use-router", () => ({
@@ -32,12 +32,16 @@ vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
 
 vi.mock("../../../../behavior/trace-api.ts", () => ({
   api: {
-    evaluators: {
+    monitors: {
       getById: {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
     },
-    monitors: {
+  },
+}));
+vi.mock("@langwatch/evaluator-client", () => ({
+  evaluatorClient: {
+    evaluators: {
       getById: {
         useQuery: () => ({ data: undefined, isLoading: false }),
       },
@@ -46,10 +50,6 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 }));
 
 import { EvaluationStatusItem } from "../evaluation-status-item.tsx";
-
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 function buildEvaluation(
   overrides: Partial<ElasticSearchEvaluation> = {},
@@ -84,7 +84,7 @@ describe("<EvaluationStatusItem /> error rendering", () => {
         },
       });
 
-      render(<EvaluationStatusItem check={check} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<EvaluationStatusItem check={check} />);
 
       expect(
         screen.getByText(/Could not connect to https:\/\/bad\.example\.com/),
@@ -102,7 +102,7 @@ describe("<EvaluationStatusItem /> error rendering", () => {
         details: "Legacy path: Azure returned 401 Unauthorized — invalid subscription key",
       });
 
-      render(<EvaluationStatusItem check={check} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<EvaluationStatusItem check={check} />);
 
       expect(screen.getByText(/Azure returned 401 Unauthorized/)).toBeInTheDocument();
     });
@@ -116,7 +116,7 @@ describe("<EvaluationStatusItem /> error rendering", () => {
         details: "All checks passed",
       });
 
-      render(<EvaluationStatusItem check={check} />, { wrapper: Wrapper });
+      renderWithDesignSystem(<EvaluationStatusItem check={check} />);
 
       expect(screen.queryByText("Error")).not.toBeInTheDocument();
     });

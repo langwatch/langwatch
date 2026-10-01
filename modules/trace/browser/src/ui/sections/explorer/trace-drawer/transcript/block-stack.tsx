@@ -1,5 +1,4 @@
-import { TerminalOutput } from "@langwatch/coding-agent-browser-kit";
-
+import { TerminalOutput } from "../../../../elements/coding-agent/trace/terminal-output.tsx";
 import { TranscriptRenderProvider } from "../../../../elements/transcript-render-ports.tsx";
 import { TraceMediaPart } from "../../../traces/trace-media-part.tsx";
 import {

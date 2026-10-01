@@ -3,12 +3,12 @@
  * keyboard-shortcuts dialog, and the dead "Find a facet" shortcut is gone.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../../behavior/ui.store.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useUIStore: (selector: (state: unknown) => unknown) =>
     selector({
@@ -36,11 +36,7 @@ afterEach(() => {
 });
 
 function renderDialog() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <PageKeyboardShortcuts />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<PageKeyboardShortcuts />);
 }
 
 describe("PageKeyboardShortcuts", () => {

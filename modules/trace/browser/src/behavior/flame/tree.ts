@@ -1,4 +1,4 @@
-import { formatDuration } from "@langwatch/trace-browser-kit";
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 
 import { ZOOM_FIT_PADDING } from "../../model/flame/constants.ts";
 import type {

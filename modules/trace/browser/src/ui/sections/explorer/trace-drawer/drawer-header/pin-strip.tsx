@@ -1,5 +1,5 @@
+import { Chip } from "@langwatch/design-system/chip";
 import { Box, VStack } from "@langwatch/design-system/primitives";
-import { Chip } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 import { LuPin } from "react-icons/lu";
 

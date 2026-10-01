@@ -20,8 +20,12 @@ import {
   LuScanSearch,
 } from "react-icons/lu";
 
-import { api } from "../../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
+import {
+  usePinTrace,
+  useTracePinRead,
+  useUnpinTrace,
+} from "../../../../../behavior/writes/use-trace-writes.ts";
 import { isPreviewTraceId } from "../../../../../model/preview-trace-id.ts";
 import { showErrorToast } from "../../../errors/index.ts";
 import { useConversationTurns } from "../../hooks/use-conversation-turns.ts";
@@ -53,28 +57,21 @@ interface TraceOverflowMenuProps {
  * while the share is live, and the menu says so rather than failing.
  */
 function useTracePin({ projectId, traceId }: { projectId: string | undefined; traceId: string }) {
-  const utils = api.useUtils();
-  const pinQuery = api.pinnedTrace.getPin.useQuery(
-    { projectId: projectId ?? "", traceId },
-    { enabled: !!projectId },
-  );
+  const pinQuery = useTracePinRead({ projectId, traceId });
   const isPinned = !!pinQuery.data;
   const isSharePin = pinQuery.data?.source === "share";
-  const onChanged = (title: string) => () => {
-    if (projectId) void utils.pinnedTrace.getPin.invalidate({ projectId, traceId });
-    toaster.create({ title, type: "success" });
-  };
-  const pinMutation = api.pinnedTrace.pin.useMutation({
-    onSuccess: onChanged("Trace pinned"),
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't pin trace" }),
-  });
-  const unpinMutation = api.pinnedTrace.unpin.useMutation({
-    onSuccess: onChanged("Trace unpinned"),
-    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't unpin trace" }),
-  });
+  const pinMutation = usePinTrace();
+  const unpinMutation = useUnpinTrace();
   const toggle = () => {
     if (!projectId) return;
-    (isPinned ? unpinMutation : pinMutation).mutate({ projectId, traceId });
+    const verb = isPinned ? "unpin" : "pin";
+    (isPinned ? unpinMutation : pinMutation).mutate(
+      { projectId, traceId },
+      {
+        onSuccess: () => toaster.create({ title: `Trace ${verb}ned`, type: "success" }),
+        onError: (error) => showErrorToast({ error, fallbackTitle: `Couldn't ${verb} trace` }),
+      },
+    );
   };
   const ownLabel = isPinned ? "Unpin trace" : "Pin trace";
   return {

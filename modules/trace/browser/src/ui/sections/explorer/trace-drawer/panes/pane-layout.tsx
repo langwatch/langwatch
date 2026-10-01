@@ -8,7 +8,7 @@ import {
   PanelResizeHandle,
 } from "react-resizable-panels";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer, getTraceDrawer, type TraceDrawerState } from "../../../../../behavior/trace-drawer.ts";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 import { ConversationContext } from "../conversation-context.tsx";
@@ -67,14 +67,14 @@ export function PaneLayout({
   isSpansLoading,
   layout,
 }: PaneLayoutProps) {
-  const vizTab = useDrawerStore((s) => s.vizTab);
-  const setVizTab = useDrawerStore((s) => s.setVizTab);
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const clearSpan = useDrawerStore((s) => s.clearSpan);
+  const vizTab = useTraceDrawer((s) => s.vizTab);
+  const setVizTab = useTraceDrawer((s) => s.setVizTab);
+  const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
+  const selectSpan = useTraceDrawer((s) => s.selectSpan);
+  const clearSpan = useTraceDrawer((s) => s.clearSpan);
 
-  const paneState = useDrawerStore((s) => s.paneState);
-  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
+  const paneState = useTraceDrawer((s) => s.paneState);
+  const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
 
   // Conversation context pane slot only exists for genuinely multi-turn conversations.
   const ctx = useConversationContext(trace.conversationId, trace.traceId);
@@ -246,11 +246,11 @@ export function PaneLayout({
             // Library-driven collapse/expand fires when the operator drags the divider
             // across the `collapsedSize` threshold.
             onCollapse={() => {
-              const { collapsed } = useDrawerStore.getState().paneState.conversationContext;
+              const { collapsed } = getTraceDrawer().paneState.conversationContext;
               if (!collapsed) togglePaneCollapsed("conversationContext");
             }}
             onExpand={() => {
-              const { collapsed } = useDrawerStore.getState().paneState.conversationContext;
+              const { collapsed } = getTraceDrawer().paneState.conversationContext;
               if (collapsed) togglePaneCollapsed("conversationContext");
             }}
           >
@@ -608,14 +608,14 @@ function VizDetailGroup({
   layout: DrawerLayout;
   onClearSpan: () => void;
   onSelectSpan: (spanId: string) => void;
-  onTogglePaneCollapsed: ReturnType<typeof useDrawerStore.getState>["togglePaneCollapsed"];
-  onVizTabChange: ReturnType<typeof useDrawerStore.getState>["setVizTab"];
+  onTogglePaneCollapsed: TraceDrawerState["togglePaneCollapsed"];
+  onVizTabChange: TraceDrawerState["setVizTab"];
   selectedSpan: SpanTreeNode | null;
   selectedSpanId: string | null;
   spans: SpanTreeNode[];
   trace: TraceHeader;
   vizDetailGroupRef: ElementRef;
-  vizTab: ReturnType<typeof useDrawerStore.getState>["vizTab"];
+  vizTab: TraceDrawerState["vizTab"];
 }) {
   // The Visualization panel renders its own tab strip as chrome — no
   // outer Pane wrapper. A 1px border on the side facing the Details
@@ -720,11 +720,11 @@ function VizDetailGroup({
             // is the SAME state as clicking the "Hide details" button: the pane
             // disappears AND the "Show details" affordance on the viz tab row appears.
             onCollapse={() => {
-              const { collapsed } = useDrawerStore.getState().paneState.spanDetail;
+              const { collapsed } = getTraceDrawer().paneState.spanDetail;
               if (!collapsed) onTogglePaneCollapsed("spanDetail");
             }}
             onExpand={() => {
-              const { collapsed } = useDrawerStore.getState().paneState.spanDetail;
+              const { collapsed } = getTraceDrawer().paneState.spanDetail;
               if (collapsed) onTogglePaneCollapsed("spanDetail");
             }}
           >

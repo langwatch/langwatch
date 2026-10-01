@@ -1,47 +1,22 @@
+import type { PersonalTokenMint } from "@langwatch/api-key-client";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
-import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import { CLOUD_ENDPOINT, CodePreview, InlineCopyButton } from "@langwatch/onboarding-browser-kit";
-import { Key, Sparkles } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import {
+  API_KEY_PLACEHOLDER,
+  PersonalAccessTokenBanner,
+} from "@langwatch/design-system/personal-access-token-banner";
+import { VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useRef, useState } from "react";
 
-import { api } from "../../../../behavior/trace-api.ts";
 import { selfHostedEndpoint } from "../../../../model/explorer/onboarding/self-hosted-endpoint.ts";
-import { TeamUserRole } from "../../../../model/prisma-types.ts";
+import { CLOUD_ENDPOINT } from "../../../../model/onboarding/shared/build-mcp-config.ts";
 import { showErrorToast } from "../../errors/index.ts";
+import { CodePreview } from "../../onboarding/observability/code-preview.tsx";
 
 interface ApiKeyIntegrationInfoCardProps {
-  organizationId: string;
   projectId: string;
-  /**
-   * The token, when one has been minted. Lifting this to the parent lets
-   * the empty-state shell drive every setup tab off the same API key instead
-   * of forcing each path to mint its own.
-   */
-  token: string | null;
-  onTokenGenerated: (token: string) => void;
+  /** Held by the parent, so every setup tab uses the same token instead of minting its own. */
+  minting: PersonalTokenMint;
 }
-
-/**
- * Hardcoded scope for the empty-state API key: project-level MEMBER role — read+write
- * within the active project, nothing else.
- */
-function buildEmptyStateBindings(projectId: string) {
-  return [
-    {
-      role: TeamUserRole.MEMBER,
-      customRoleId: null as string | null,
-      scopeType: "PROJECT" as const,
-      scopeId: projectId,
-    },
-  ];
-}
-
-// TODO(traces-v2): Rename this card's generated key to something more
-// descriptive ("LangWatch Tracing — <projectName>") and let the user supply
-// their own name. "Initial API key" is a placeholder so the empty-state
-// flow has zero text inputs.
-const API_KEY_NAME = "Initial API key";
 
 interface EnvLine {
   key: string;
@@ -79,16 +54,12 @@ function renderEnv(lines: EnvLine[]): string {
 }
 
 /**
- * Generate-token card for the traces-v2 empty state. Mints an API key scoped to the
- * caller's role bindings, then renders the `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID`
+ * Generate-token card for the traces-v2 empty state. Mints a personal access token on the
+ * project, then renders the `LANGWATCH_API_KEY` / `LANGWATCH_PROJECT_ID`
  * / `LANGWATCH_ENDPOINT` env block exactly once.
  */
-export function ApiKeyIntegrationInfoCard({
-  organizationId,
-  projectId,
-  token,
-  onTokenGenerated,
-}: ApiKeyIntegrationInfoCardProps) {
+export function ApiKeyIntegrationInfoCard({ projectId, minting }: ApiKeyIntegrationInfoCardProps) {
+  const token = minting.token ?? null;
   // Mirror the onboarding ApiIntegrationInfoCard / codegen logic: only
   // surface LANGWATCH_ENDPOINT on a self-hosted deployment.
   const selfHosted = selfHostedEndpoint(useUiDeployment().appBaseUrl);
@@ -101,29 +72,19 @@ export function ApiKeyIntegrationInfoCard({
   // them hide it again.
   const [revealed, setRevealed] = useState(true);
 
-  const createMutation = api.apiKey.create.useMutation();
-
   const handleGenerate = () => {
-    createMutation.mutate(
-      {
-        organizationId,
-        name: API_KEY_NAME,
-        bindings: buildEmptyStateBindings(projectId),
-      },
-      {
-        onSuccess: (result) => {
-          onTokenGenerated(result.token);
-        },
-        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create API key" }),
-      },
-    );
+    minting
+      .mint()
+      .catch((error: unknown) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't create the personal access token" }),
+      );
   };
 
   // `G` triggers Generate when the button is on screen.
   const handleGenerateRef = useRef(handleGenerate);
   handleGenerateRef.current = handleGenerate;
   useEffect(() => {
-    if (token || createMutation.isPending) return;
+    if (token || minting.isMinting) return;
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
@@ -137,14 +98,10 @@ export function ApiKeyIntegrationInfoCard({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [token, createMutation.isPending]);
+  }, [token, minting.isMinting]);
 
-  // Pre-generation preview shows the .env shape with a non-secret placeholder for the
-  // API key. The placeholder is hidden behind a "Generate access token" overlay so the
-  // user can't mistakenly copy `sk-lw-xxxxx...` and wonder why their SDK rejects it.
-  const PLACEHOLDER_TOKEN = "sk-lw-xxxxxxxxxxxxxxxxxxxxxxxx";
   const realLines = buildEnvLines({
-    token: token ?? PLACEHOLDER_TOKEN,
+    token: token ?? API_KEY_PLACEHOLDER,
     projectId,
     endpoint,
     showEndpoint,
@@ -154,91 +111,12 @@ export function ApiKeyIntegrationInfoCard({
 
   return (
     <VStack align="stretch" gap={3}>
-      {/* Slim, full-width, subtly orange banner sitting directly above
-          the .env code block — this is the single canonical mint CTA
-          for the whole integration surface. It transforms in place
-          after the user mints, becoming the "copy this token now"
-          advisory + Mint-another link. Both .env and mcp.json fill in
-          from the same shared state, so one click is enough. */}
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={token ? "post-gen" : "pre-gen"}
-          initial={{ opacity: 0, y: 2 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -2 }}
-          transition={{ duration: 0.16, ease: "easeOut" }}
-        >
-          {token ? (
-            <Box
-              borderWidth="1px"
-              borderColor="orange.muted"
-              borderRadius="lg"
-              bg="orange.subtle"
-              paddingX={4}
-              paddingY={3}
-            >
-              <HStack justify="space-between" align="center" gap={3}>
-                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
-                  <Icon as={Sparkles} boxSize={4} color="orange.fg" flexShrink={0} />
-                  <Text fontSize="sm" lineHeight="snug">
-                    <Text as="span" color="orange.fg" fontWeight="semibold">
-                      Copy this token before you move on.
-                    </Text>{" "}
-                    <Text as="span" color="fg.muted">
-                      It won&apos;t be shown again.
-                    </Text>
-                  </Text>
-                  <InlineCopyButton text={token} label="Token" />
-                </HStack>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  colorPalette="orange"
-                  onClick={handleGenerate}
-                  loading={createMutation.isPending}
-                  flexShrink={0}
-                >
-                  <Key size={12} />
-                  Mint another
-                </Button>
-              </HStack>
-            </Box>
-          ) : (
-            <Box
-              borderWidth="1px"
-              borderColor="orange.muted"
-              borderRadius="lg"
-              bg="orange.subtle"
-              paddingX={4}
-              paddingY={3}
-            >
-              <HStack justify="space-between" align="center" gap={3}>
-                <HStack gap={2} align="center" color="fg" flex={1} minWidth={0}>
-                  <Icon as={Key} boxSize={4} color="orange.fg" flexShrink={0} />
-                  <Text fontSize="sm" lineHeight="snug">
-                    <Text as="span" fontWeight="semibold" color="fg">
-                      Generate an access token
-                    </Text>{" "}
-                    <Text as="span" color="fg.muted">
-                      to fill the snippets below.
-                    </Text>
-                  </Text>
-                </HStack>
-                <Button
-                  size="sm"
-                  colorPalette="orange"
-                  variant="solid"
-                  onClick={handleGenerate}
-                  loading={createMutation.isPending}
-                  flexShrink={0}
-                >
-                  Generate access token
-                </Button>
-              </HStack>
-            </Box>
-          )}
-        </motion.div>
-      </AnimatePresence>
+      <PersonalAccessTokenBanner
+        token={token}
+        isCreating={minting.isMinting}
+        onCreate={handleGenerate}
+        scopeNote={minting.scopeNote}
+      />
       <CodePreview
         code={code}
         filename=".env"

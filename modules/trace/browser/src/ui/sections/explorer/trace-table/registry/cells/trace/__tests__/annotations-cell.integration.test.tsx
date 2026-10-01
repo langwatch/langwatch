@@ -2,8 +2,8 @@
  * The Annotations column.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../../../../use-score-names-by-id.ts", () => ({
@@ -65,11 +65,7 @@ function row(over: Partial<TraceListItem>): TraceListItem {
  * than the component, so a change to what the column registers is caught here.
  */
 function renderCell(item: TraceListItem) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {AnnotationsCell.render({ row: item } as never)}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(AnnotationsCell.render({ row: item } as never));
 }
 
 const countOn = (testId: string) => screen.getByTestId(testId).textContent?.trim();

@@ -1,5 +1,6 @@
+import { BUBBLE_TONES, type BubbleTone } from "@langwatch/design-system/bubble-tones";
+import { useConversationExpand } from "@langwatch/design-system/conversation-expand-context";
 import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@langwatch/design-system/primitives";
-import { BUBBLE_TONES, type BubbleTone, useConversationExpand } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
 import { useState } from "react";

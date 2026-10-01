@@ -1,7 +1,7 @@
 // Redacted field shows redaction marker, not editor (nothing to correct).
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -30,17 +30,15 @@ const { useTraceEditStore } = await import("../../../../../../index.ts");
 const { SpanEditableIO } = await import("../span-editable-io.tsx");
 
 function renderInput({ redacted }: { redacted: boolean }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <RedactedField field="input" redacted={redacted} visibleTo="no one">
-        <SpanEditableIO
-          spanId="span-1"
-          field="input"
-          label="Input"
-          capturedText="what is the weather"
-        />
-      </RedactedField>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <RedactedField field="input" redacted={redacted} visibleTo="no one">
+      <SpanEditableIO
+        spanId="span-1"
+        field="input"
+        label="Input"
+        capturedText="what is the weather"
+      />
+    </RedactedField>,
   );
 }
 

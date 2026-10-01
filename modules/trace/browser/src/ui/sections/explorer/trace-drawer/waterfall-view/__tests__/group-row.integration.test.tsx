@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { GroupRow } from "../group-row.tsx";
@@ -37,11 +37,7 @@ const baseProps = {
 };
 
 function renderGroupRow(over: Partial<SiblingGroup> = {}) {
-  const { container } = render(
-    <ChakraProvider value={defaultSystem}>
-      <GroupRow group={group(over)} {...baseProps} />
-    </ChakraProvider>,
-  );
+  const { container } = renderWithDesignSystem(<GroupRow group={group(over)} {...baseProps} />);
   // The dashed left border carries the accent color — its class name changes
   // whenever the resolved color token changes (Chakra emits one atomic class
   // per distinct style value), so a class diff proves the row actually

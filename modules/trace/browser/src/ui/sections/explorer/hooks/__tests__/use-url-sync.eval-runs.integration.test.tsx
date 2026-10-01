@@ -32,11 +32,17 @@ const LENSES = [
 /** The runs the page holds when the fragment is applied. */
 let heldRuns: Record<string, string> = {};
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("../../../../../behavior/view.slice.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     getPersistedActiveLensId: () => null,
+  };
+});
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
     useViewStore: (sel: (s: unknown) => unknown) =>
       sel({
         activeLensId: "all-traces",
@@ -57,8 +63,8 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
   };
 });
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-
+import type * as actualModule1 from "../../../../../behavior/explorer.store.ts";
+import type * as actualModule0 from "../../../../../behavior/view.slice.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 function HookMount() {

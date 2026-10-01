@@ -4,9 +4,9 @@
  * Both trace UIs (RenderInputOutput and the traces-v2 BlockStack) render an inline
  * <audio> player for audio content instead of a raw JSON dump.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { parseContentBlocks } from "@langwatch/trace-contract/transcript";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -52,10 +52,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 // An OpenAI Realtime "input_audio" recording, already externalized to a
 // stored-object URL — the production shape after content extraction.
 const inputAudioPart = {
@@ -74,9 +70,8 @@ afterEach(cleanup);
 describe("Audio player in trace views", () => {
   /** @scenario "Legacy trace view plays an input_audio recording" */
   it("legacy input/output view shows an inline player for an input_audio recording", () => {
-    render(
+    renderWithDesignSystem(
       <RenderInputOutput value={JSON.stringify([{ role: "user", content: [inputAudioPart] }])} />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
@@ -88,21 +83,20 @@ describe("Audio player in trace views", () => {
     const blocks = parseContentBlocks([inputAudioPart]);
     expect(blocks).toEqual([expect.objectContaining({ kind: "media" })]);
 
-    render(<BlockStack blocks={blocks} toolCalls={[]} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
 
     expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
   });
 
   /** @scenario "Both input_audio and AG-UI audio shapes are supported" */
   it("renders a distinct player for each of an input_audio and an AG-UI audio recording", () => {
-    render(
+    renderWithDesignSystem(
       <RenderInputOutput
         value={JSON.stringify([
           { role: "user", content: [inputAudioPart] },
           { role: "assistant", content: [aguiAudioPart] },
         ])}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getAllByTestId("media-part-audio")).toHaveLength(2);

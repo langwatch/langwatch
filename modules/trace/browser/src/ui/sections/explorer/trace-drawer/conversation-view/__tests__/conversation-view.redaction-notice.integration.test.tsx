@@ -1,8 +1,8 @@
 // Single redaction notice for whole conversation (project policy); link to
 // setting included.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -70,10 +70,8 @@ function turn(over: Partial<TraceListItem> = {}): TraceListItem {
 
 function renderConversation(items: TraceListItem[]) {
   turns.splice(0, turns.length, ...items);
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ConversationView conversationId="thread-1" currentTraceId="trace-1" />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ConversationView conversationId="thread-1" currentTraceId="trace-1" />,
   );
 }
 

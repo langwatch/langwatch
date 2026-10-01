@@ -1,44 +1,15 @@
 /**
- * Closing the trace drawer, against the real drawer stack.
+ * Closing the trace drawer, against the real drawer stack in the address.
  * @vitest-environment jsdom
  */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const harness = vi.hoisted(() => {
-  const PATH = "/my-project/traces";
-  const navigate = (url: string) => {
-    window.history.replaceState({}, "", url);
-    return Promise.resolve(true);
-  };
-  return {
-    PATH,
-    router: {
-      get query() {
-        const query: Record<string, string> = {};
-        new URLSearchParams(window.location.search).forEach((value, key) => {
-          query[key] = value;
-        });
-        return query;
-      },
-      pathname: "/[project]/traces",
-      get asPath() {
-        return window.location.pathname + window.location.search;
-      },
-      push: navigate,
-      replace: navigate,
-    },
-  };
-});
+import { setWindowAddress } from "../../../../../__tests__/window-location-router.ts";
 
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
-}));
-
-vi.mock("@langwatch/browser-host/use-router", () => ({
-  default: harness.router,
-  useRouter: () => harness.router,
 }));
 
 vi.mock("../../../../../behavior/trace-api.ts", () => ({
@@ -52,8 +23,12 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-vi.mock("../../hooks/use-drawer-url-sync.ts", () => ({
-  useDrawerUrlSync: () => undefined,
+vi.mock("@langwatch/scenario-client", () => ({
+  scenarioClient: {
+    scenarios: {
+      getRunState: { useQuery: () => ({ data: undefined, isLoading: false }) },
+    },
+  },
 }));
 
 vi.mock("../../hooks/use-span-tree.ts", () => ({
@@ -96,11 +71,11 @@ vi.mock("../../hooks/use-trace-refresh.ts", () => ({
   useTraceRefresh: () => ({ refresh: vi.fn() }),
 }));
 
-const { clearDrawerStack, getDrawerStack, useDrawer } =
-  await import("@langwatch/browser-host/use-drawer");
-const { useDrawerStore } = await import("../../../../../index.ts");
+const { getDrawerStack, useDrawer } = await import("@langwatch/browser-host/use-drawer");
+const { getTraceDrawer } = await import("../../../../../behavior/trace-drawer.ts");
 const { useTraceDrawerScaffold } = await import("../use-trace-drawer-scaffold.ts");
 
+const PATH = "/my-project/traces";
 const TRACE = "trace-1";
 
 function drawerInUrl(): Record<string, string> {
@@ -111,20 +86,8 @@ function drawerInUrl(): Record<string, string> {
   return drawer;
 }
 
-/** Puts the reader on a trace the way a fresh open leaves things. */
-function readerIsOnTrace(traceId: string) {
-  useDrawerStore.getState().openTrace(traceId, null);
-  window.history.replaceState(
-    {},
-    "",
-    `${harness.PATH}?drawer.open=traceV2Details&drawer.traceId=${traceId}`,
-  );
-}
-
 beforeEach(() => {
-  window.history.replaceState({}, "", harness.PATH);
-  clearDrawerStack();
-  useDrawerStore.getState().closeDrawer();
+  setWindowAddress({ url: PATH });
 });
 
 afterEach(cleanup);
@@ -142,7 +105,6 @@ describe("given a trace opened from a simulation run's drawer", () => {
       act(() => {
         drawer.current.openDrawer("traceV2Details", { traceId: TRACE });
       });
-      useDrawerStore.getState().openTrace(TRACE, null);
 
       const { result } = renderHook(() => useTraceDrawerScaffold());
       act(() => result.current.handleClose());
@@ -151,12 +113,12 @@ describe("given a trace opened from a simulation run's drawer", () => {
         open: "scenarioRunDetail",
         scenarioRunId: "run-1",
       });
-      expect(useDrawerStore.getState().traceId).toBeNull();
+      expect(getTraceDrawer().traceId).toBeNull();
     });
   });
 });
 
-describe("given the drawer stack still holds a drawer I already left", () => {
+describe("given the reader walked back to a trace through other drawers", () => {
   describe("when I close the trace I am reading", () => {
     /** @scenario "Closing the trace drawer never reopens a drawer I already dismissed" */
     it("closes, and brings nothing else back", () => {
@@ -167,16 +129,18 @@ describe("given the drawer stack still holds a drawer I already left", () => {
       act(() => {
         drawer.current.openDrawer("addDatasetRecord", { traceId: "trace-0" });
       });
-      // The stack is now describing the dataset drawer, and the reader has
-      // moved on to reading a trace again.
       expect(getDrawerStack().at(-1)?.drawer).toBe("addDatasetRecord");
-      readerIsOnTrace(TRACE);
+      // Opening a trace again returns to the trace entry already in the stack,
+      // so the dataset drawer is not left beneath it.
+      act(() => {
+        drawer.current.openDrawer("traceV2Details", { traceId: TRACE });
+      });
 
       const { result } = renderHook(() => useTraceDrawerScaffold());
       act(() => result.current.handleClose());
 
       expect(drawerInUrl()).toEqual({});
-      expect(useDrawerStore.getState().traceId).toBeNull();
+      expect(getTraceDrawer().traceId).toBeNull();
     });
   });
 });

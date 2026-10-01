@@ -1,5 +1,5 @@
-import { Dialog as ChakraDialog } from "@chakra-ui/react";
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { RawDialog as ChakraDialog } from "@langwatch/design-system/dialog";
 import { Portal } from "@langwatch/design-system/primitives";
 import * as React from "react";
 

@@ -1,12 +1,12 @@
+import { select, setFilter, setLens } from "@langwatch/trace-contract";
+import { beforeEach, describe, expect, it } from "vitest";
+
 /**
  * A transformed state reaches the store through the store's own actions, so
  * what the store derives follows.
  * Spec: specs/traces-v2/explorer-actions.feature.
  */
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { select, setFilter, setLens } from "@langwatch/trace-contract";
-import { beforeEach, describe, expect, it } from "vitest";
-
+import { useExplorerStore } from "../../explorer.store.ts";
 import { commitExplorerState, readExplorerState } from "../commit-explorer-state.ts";
 
 beforeEach(() => {

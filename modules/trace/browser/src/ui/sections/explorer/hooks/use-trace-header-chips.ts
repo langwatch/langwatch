@@ -1,8 +1,8 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { TraceHeader } from "@langwatch/trace-contract";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
 import { useFocusSectionStore } from "../../../../behavior/focus-section.store.ts";
 import type { SdkInfo } from "../../../../model/sdk-info.ts";
 import { parseSdkInfo } from "../../../../model/sdk-info.ts";
@@ -177,7 +177,7 @@ export function useTraceHeaderChips(
   // to expand the drawer past the metadata strip to see any eval
   // signal, even on heavily-evaluated traces.
   const { rich: evals } = useTraceEvaluations();
-  const setViewMode = useDrawerStore((s) => s.setViewMode);
+  const setViewMode = useTraceDrawer((s) => s.setViewMode);
   const requestFocus = useFocusSectionStore((s) => s.request);
   for (const ev of evals) {
     chips.push({

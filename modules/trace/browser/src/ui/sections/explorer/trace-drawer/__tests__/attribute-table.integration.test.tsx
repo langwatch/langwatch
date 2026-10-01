@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -14,10 +14,8 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 import { AttributeTable } from "../attribute-table.tsx";
 
 function renderTable() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AttributeTable spanId="span-abc123" attributes={{ "gen_ai.operation.name": "chat" }} />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AttributeTable spanId="span-abc123" attributes={{ "gen_ai.operation.name": "chat" }} />,
   );
 }
 
@@ -65,13 +63,11 @@ describe("AttributeTable", () => {
 
   describe("given a custom attribute under a restrict rule", () => {
     function renderWithRestriction(canSee: boolean) {
-      return render(
-        <ChakraProvider value={defaultSystem}>
-          <AttributeTable
-            attributes={{ "app.billing.plan": "pro", "service.name": "api" }}
-            restrictedAttributes={[{ pattern: "app.billing.*", visibleTo: "Admins", canSee }]}
-          />
-        </ChakraProvider>,
+      return renderWithDesignSystem(
+        <AttributeTable
+          attributes={{ "app.billing.plan": "pro", "service.name": "api" }}
+          restrictedAttributes={[{ pattern: "app.billing.*", visibleTo: "Admins", canSee }]}
+        />,
       );
     }
 

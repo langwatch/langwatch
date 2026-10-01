@@ -1,8 +1,8 @@
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import type { TraceEventRollup } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { TraceListItem } from "../types/trace.ts";
@@ -44,11 +44,7 @@ export function useTraceListEvents({
     },
     {
       enabled,
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      placeholderData: keepPreviousData,
-      trpc: { context: { skipBatch: true } },
-    },
+      placeholderData: keepPreviousData,    },
   );
 
   const rollups = query.data;

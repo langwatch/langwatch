@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent } from "@testing-library/react";
 import { createRef } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -44,11 +44,7 @@ describe("FlameCanvas", () => {
       onResetZoom: vi.fn(),
     };
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <FlameCanvas {...props} />
-      </ChakraProvider>,
-    );
+    renderWithDesignSystem(<FlameCanvas {...props} />);
 
     expect(document.querySelector(".flame-time-axis")).toBeInTheDocument();
     const flameLayer = document.querySelector('[data-flame-layer="true"]');

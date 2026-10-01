@@ -2,8 +2,8 @@
  * Facet rows must not reorder under the cursor.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { Compass } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -16,10 +16,9 @@ vi.mock("../../../../ui/sections/explorer/hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
 import { useFacetLensStore } from "../../../facet-lens.store.ts";
+import type { FacetItem, FacetValueState } from "../types.ts";
 
 beforeEach(() => {
   // Facets collapse by default now; force ORIGIN open via the lens override
@@ -42,17 +41,15 @@ const tree = (activeValues: ReadonlySet<string>) => {
   const getValueState = (value: string): FacetValueState =>
     activeValues.has(value) ? "include" : "neutral";
   return (
-    <ChakraProvider value={defaultSystem}>
-      <FacetSection
-        title="ORIGIN"
-        icon={Compass}
-        field="origin"
-        items={ITEMS}
-        getValueState={getValueState}
-        onToggle={vi.fn()}
-        onExclude={vi.fn()}
-      />
-    </ChakraProvider>
+    <FacetSection
+      title="ORIGIN"
+      icon={Compass}
+      field="origin"
+      items={ITEMS}
+      getValueState={getValueState}
+      onToggle={vi.fn()}
+      onExclude={vi.fn()}
+    />
   );
 };
 
@@ -76,7 +73,7 @@ describe("<FacetSection /> row ordering", () => {
   describe("given the pointer is inside the section", () => {
     /** @scenario "A facet value keeps its row position while the pointer is in the section" */
     it("keeps a toggled value in its row instead of yanking it to the pinned area", () => {
-      const { container, rerender } = render(tree(new Set()));
+      const { container, rerender } = renderWithDesignSystem(tree(new Set()));
       const section = container.firstElementChild as HTMLElement;
       expect(valueOrder(container)).toEqual(["a", "b", "c"]);
 
@@ -96,7 +93,7 @@ describe("<FacetSection /> row ordering", () => {
   describe("when the pointer leaves the section", () => {
     /** @scenario "Active facet values reflow to the pinned area once the pointer leaves" */
     it("reflows the active value up to the pinned area", () => {
-      const { container, rerender } = render(tree(new Set()));
+      const { container, rerender } = renderWithDesignSystem(tree(new Set()));
       const section = container.firstElementChild as HTMLElement;
 
       enterSection(section);
@@ -117,7 +114,7 @@ describe("<FacetSection /> row ordering", () => {
   describe("when search is active while the pointer is inside the section", () => {
     /** @scenario "Value search narrows the list live even while the layout would otherwise be frozen" */
     it("bypasses freeze and narrows rows as the user types", () => {
-      const { container, getByLabelText } = render(tree(new Set()));
+      const { container, getByLabelText } = renderWithDesignSystem(tree(new Set()));
       const section = container.firstElementChild as HTMLElement;
       expect(valueOrder(container)).toEqual(["a", "b", "c"]);
 
@@ -135,7 +132,7 @@ describe("<FacetSection /> row ordering", () => {
 
     /** @scenario "Empty-state hint and rendered rows agree when no values match" */
     it("renders empty-state alone when no rows match — not list+empty together", () => {
-      const { container, getByLabelText, queryByText } = render(tree(new Set()));
+      const { container, getByLabelText, queryByText } = renderWithDesignSystem(tree(new Set()));
       const section = container.firstElementChild as HTMLElement;
 
       enterSection(section);

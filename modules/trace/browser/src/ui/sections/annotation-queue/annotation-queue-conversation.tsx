@@ -10,7 +10,7 @@ import { CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import { useCallback, useMemo } from "react";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useTraceById } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useConversationTurns } from "../explorer/hooks/use-conversation-turns.ts";
 import { useDrawerProjectId } from "../explorer/hooks/use-drawer-project-id.ts";
 import { ConversationView } from "../explorer/trace-drawer/conversation-view/conversation-view.tsx";
@@ -30,10 +30,7 @@ export function AnnotationQueueConversation({
   const { colorMode } = useColorMode();
   const shikiAdapter = useShikiAdapter(colorMode);
 
-  const traceDetails = api.traces.getById.useQuery(
-    { projectId: projectId ?? "", traceId },
-    { enabled: !!projectId && !!traceId, refetchOnWindowFocus: false },
-  );
+  const traceDetails = useTraceById({ projectId, traceId });
 
   // The conversation reads back 90 days, so an older thread answers with no
   // turns; once that read has settled, the trace is handed over as the only turn.

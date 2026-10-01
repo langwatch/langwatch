@@ -2,10 +2,7 @@ import type { LangwatchSignalBucket } from "@langwatch/trace-contract";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useMemo } from "react";
 
-import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
-import { LIVE_REFETCH_MS } from "../../../../model/trace-freshness.ts";
-import { asSharedQueryResult, useSharedTrace } from "../context/shared-trace-context.tsx";
 import { useTraceQueryArgs } from "./use-trace-query-args.ts";
 
 /**
@@ -14,23 +11,15 @@ import { useTraceQueryArgs } from "./use-trace-query-args.ts";
  * "Only LangWatch spans" filter light up once this resolves.
  */
 export function useSpanLangwatchSignals() {
-  const shared = useSharedTrace();
-  const { isLive, isReady, hintReady, queryArgs } = useTraceQueryArgs();
-  // SSE-aware polling (see `useSpanTree` for the rationale): poll only
-  // when `useTraceFreshness`'s SSE subscription isn't keeping the cache
-  // fresh via invalidations.
-  const sseConnected = useSseStatusStore((s) => s.sseConnectionState === "connected");
+  const { isReady, hintReady, queryArgs } = useTraceQueryArgs();
 
   const query = api.traces.spanLangwatchSignals.useQuery(queryArgs, {
-    enabled: isReady && hintReady && !shared,
-    staleTime: 300_000,
+    enabled: isReady && hintReady,
     gcTime: 1_800_000,
     placeholderData: keepPreviousData,
-    refetchOnWindowFocus: true,
-    refetchInterval: isLive && !sseConnected ? LIVE_REFETCH_MS : false,
   });
 
-  const rows = shared?.spanSignals ?? query.data;
+  const rows = query.data;
   const signalsBySpanId = useMemo(() => {
     const map = new Map<string, LangwatchSignalBucket[]>();
     for (const row of rows ?? []) {
@@ -39,6 +28,5 @@ export function useSpanLangwatchSignals() {
     return map;
   }, [rows]);
 
-  const base = shared ? asSharedQueryResult(shared.spanSignals) : query;
-  return { ...base, signalsBySpanId };
+  return { ...query, signalsBySpanId };
 }

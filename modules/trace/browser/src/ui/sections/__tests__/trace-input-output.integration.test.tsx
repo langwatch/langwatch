@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TraceInputOutput, type TraceInputOutputProps } from "../../blocks/trace-input-output.tsx";
@@ -35,11 +35,7 @@ const renderInputOutput = (overrides: Partial<TraceInputOutputProps> = {}) => {
     ...overrides,
   };
 
-  const result = render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceInputOutput {...props} />
-    </ChakraProvider>,
-  );
+  const result = renderWithDesignSystem(<TraceInputOutput {...props} />);
 
   return { ...result, copyToClipboard, onCopyFailure };
 };
@@ -131,13 +127,11 @@ describe("TraceMediaStrip", () => {
       filename: `file-${index}`,
     }));
 
-    render(
-      <ChakraProvider value={defaultSystem}>
-        <TraceMediaStrip
-          parts={parts}
-          renderPart={(part) => <span>{part.type === "binary" ? part.filename : part.type}</span>}
-        />
-      </ChakraProvider>,
+    renderWithDesignSystem(
+      <TraceMediaStrip
+        parts={parts}
+        renderPart={(part) => <span>{part.type === "binary" ? part.filename : part.type}</span>}
+      />,
     );
 
     expect(screen.getByText("file-0")).toBeInTheDocument();

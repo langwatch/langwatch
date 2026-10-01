@@ -1,7 +1,6 @@
-import { UserAvatar } from "@langwatch/user-browser-kit";
-
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { AnnotationCard as PackageAnnotationCard } from "../../../../blocks/explorer/trace-drawer/annotation-card.tsx";
+import { PersonAvatar } from "../../../person-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 import { useJumpToAnnotationAnchor } from "../../hooks/use-jump-to-annotation-anchor.ts";
 
@@ -30,7 +29,7 @@ export function AnnotationCard({
   onEdit,
 }: AnnotationCardProps) {
   const jumpToAnchor = useJumpToAnnotationAnchor();
-  const openTraceId = useDrawerStore((state) => state.traceId);
+  const openTraceId = useTraceDrawer((state) => state.traceId);
 
   return (
     <PackageAnnotationCard
@@ -42,7 +41,7 @@ export function AnnotationCard({
       openTraceId={openTraceId}
       onJumpToAnchor={jumpToAnchor}
       renderAvatar={(user) => (
-        <UserAvatar
+        <PersonAvatar
           size="xs"
           background="gray.solid"
           color="white"

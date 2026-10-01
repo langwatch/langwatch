@@ -1,7 +1,6 @@
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useDrawerStore } from "../drawer.store.ts";
 import {
   buildTraceEditPatch,
   selectIsSpanDeleted,
@@ -86,7 +85,7 @@ describe("traceEditStore", () => {
           baselineName: CAPTURED_NAME,
         });
 
-        useDrawerStore.getState().openTrace("trace-2", 1000);
+        state().dropSessionForOtherTrace("trace-2");
 
         expect(state().editingTraceId).toBeNull();
         expect(state().spanDrafts).toEqual({});
@@ -104,7 +103,7 @@ describe("traceEditStore", () => {
           baselineName: CAPTURED_NAME,
         });
 
-        useDrawerStore.getState().openTrace("trace-1", 1000);
+        state().dropSessionForOtherTrace("trace-1");
 
         expect(state().editingTraceId).toBe("trace-1");
         expect(state().spanDrafts).toEqual({

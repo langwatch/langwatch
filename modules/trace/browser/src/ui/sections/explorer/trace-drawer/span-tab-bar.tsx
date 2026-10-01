@@ -1,3 +1,4 @@
+import { formatDuration } from "@langwatch/design-system/display-formatters";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -9,7 +10,6 @@ import {
   Text,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatDuration } from "@langwatch/trace-browser-kit";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
 import { memo, useMemo, useRef } from "react";
 import {
@@ -24,7 +24,7 @@ import {
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import {
   selectPeersMatching,
@@ -256,19 +256,19 @@ export const SpanTabBar = memo(function SpanTabBar({
   rightSlot,
   collapsePosition = "leading",
 }: SpanTabBarProps) {
-  const traceId = useDrawerStore((s) => s.traceId);
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
-  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
-  const selectSpan = useDrawerStore((s) => s.selectSpan);
-  const clearSpan = useDrawerStore((s) => s.clearSpan);
-  const pinSpan = useDrawerStore((s) => s.pinSpan);
-  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const traceId = useTraceDrawer((s) => s.traceId);
+  const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
+  const pinnedSpanIds = useTraceDrawer((s) => s.pinnedSpanIds);
+  const selectSpan = useTraceDrawer((s) => s.selectSpan);
+  const clearSpan = useTraceDrawer((s) => s.clearSpan);
+  const pinSpan = useTraceDrawer((s) => s.pinSpan);
+  const unpinSpan = useTraceDrawer((s) => s.unpinSpan);
   const prefetchSpan = usePrefetchSpanDetail();
   // The Details pane no longer has its own header — the collapse
   // affordance sits at the leftmost edge of this tab row (mirrors
   // Chrome DevTools' "Headers / Cookies / Request / Response" row).
-  const detailCollapsed = useDrawerStore((s) => s.paneState.spanDetail.collapsed);
-  const togglePaneCollapsed = useDrawerStore((s) => s.togglePaneCollapsed);
+  const detailCollapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
+  const togglePaneCollapsed = useTraceDrawer((s) => s.togglePaneCollapsed);
   const collapseToggle = (
     <DetailCollapseToggle
       collapsed={detailCollapsed}

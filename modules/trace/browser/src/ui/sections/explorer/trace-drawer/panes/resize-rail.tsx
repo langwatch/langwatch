@@ -1,12 +1,8 @@
 import { Box } from "@langwatch/design-system/primitives";
 import { useCallback, useEffect, useRef } from "react";
 
-import {
-  DRAWER_DEFAULT_WIDTH_PX,
-  DRAWER_MAXIMIZE_EDGE_PX,
-  DRAWER_MIN_WIDTH_PX,
-  useDrawerStore,
-} from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
+import { DRAWER_DEFAULT_WIDTH_PX, DRAWER_MAXIMIZE_EDGE_PX, DRAWER_MIN_WIDTH_PX } from "../../../../../behavior/drawer-chrome.store.ts";
 
 const MAGNET_PX = 32;
 
@@ -67,9 +63,9 @@ function useClampOnViewportResize({
  * Left-edge resize rail for the trace drawer.
  */
 export function ResizeRail() {
-  const widthPx = useDrawerStore((s) => s.widthPx);
-  const setWidthPx = useDrawerStore((s) => s.setWidthPx);
-  const toggleSnapMaximize = useDrawerStore((s) => s.toggleSnapMaximize);
+  const widthPx = useTraceDrawer((s) => s.widthPx);
+  const setWidthPx = useTraceDrawer((s) => s.setWidthPx);
+  const toggleSnapMaximize = useTraceDrawer((s) => s.toggleSnapMaximize);
 
   const dragState = useRef<{ startX: number; startWidth: number; didMove: boolean } | null>(null);
 

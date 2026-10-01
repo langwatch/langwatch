@@ -1,5 +1,5 @@
 /**
- * Polls every run behind the query's `eval` chips until it settles, keeps the
+ * Reads every run behind the query's `eval` chips until it settles, keeps the
  * run store current, and reads the list and the facets again as progress moves
  * so matches appear as pages finish. Mounted once, on the Explorer page.
  * @see specs/traces-v2/instant-eval-search.feature
@@ -18,9 +18,6 @@ import { useOrganizationTeamProject } from "../../../../behavior/use-organizatio
 import { dueInstantEvalRefetches } from "../../../../model/instant-eval-refetch-pacing.ts";
 import { useInstantEvalRuns } from "./use-instant-eval-runs.ts";
 
-/** How often a judging run is read while it judges, the CLI's own cadence. */
-export const INSTANT_EVAL_POLL_MS = 1_000;
-
 export function useInstantEvalRunWatch(): void {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
@@ -30,24 +27,19 @@ export function useInstantEvalRunWatch(): void {
     [chips],
   );
   const runs = useInstantEvalRunStore((s) => s.runs);
-  const settled = useInstantEvalRunStore((s) => s.settled);
   const setRun = useInstantEvalRunStore((s) => s.setRun);
   const keepOnly = useInstantEvalRunStore((s) => s.keepOnly);
   useEffect(() => {
     keepOnly(runIds);
   }, [runIds, keepOnly]);
 
-  // A run is read until it has settled, not until its status turns terminal:
-  // the page it held when it stopped lands its verdicts after that.
   const results = api.useQueries((t) =>
     runIds.map((runId) => {
-      const isWatched = !settled[runId];
       return t.traces.instantEval.get(
         { projectId, runId },
         {
           enabled: !!projectId,
-          refetchInterval: isWatched ? INSTANT_EVAL_POLL_MS : false,
-          staleTime: isWatched ? 0 : 60_000,
+          // needs a read hint: instant eval run progressed (a page judged)
         },
       );
     }),

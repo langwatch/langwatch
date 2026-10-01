@@ -3,9 +3,9 @@
  * composer offers on it, and the rows that offer no comment at all.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { RestrictedAttribute } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -126,15 +126,13 @@ function renderTable({
     pathPrefix: "params",
     commentsFor: (anchorPath) => stored.filter((a) => a.anchorPath === anchorPath),
   };
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AttributeTable
-        attributes={CAPTURED}
-        restrictedAttributes={restrictedAttributes}
-        editing={editing}
-        comments={comments}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AttributeTable
+      attributes={CAPTURED}
+      restrictedAttributes={restrictedAttributes}
+      editing={editing}
+      comments={comments}
+    />,
   );
 }
 

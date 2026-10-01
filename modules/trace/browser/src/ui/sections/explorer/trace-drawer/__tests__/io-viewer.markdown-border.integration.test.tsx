@@ -3,7 +3,7 @@
  * "bg.subtle + border" container that Pretty uses for plain text and JSON.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -40,7 +40,7 @@ import { IOViewer } from "../io-viewer.tsx";
 afterEach(cleanup);
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+  <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
 // Markdown content with structural signals but NO fenced code block, so the

@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * Unseen queue: refresh all lists and badges when saved.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -52,7 +52,16 @@ vi.mock("../../../behavior/trace-api.ts", () => ({
     }),
     annotation: {
       createOrUpdateQueue: {
-        useMutation: () => ({ mutate: mocks.mutate, isPending: false }),
+        useMutation: (options?: { onSuccess?: (result: unknown) => void }) => ({
+          mutate: (variables: unknown, callbacks?: { onSuccess?: (result: unknown) => void }) =>
+            mocks.mutate(variables, {
+              onSuccess: (result: unknown) => {
+                options?.onSuccess?.(result);
+                callbacks?.onSuccess?.(result);
+              },
+            }),
+          isPending: false,
+        }),
       },
       getQueueBySlugOrId: {
         useQuery: () => ({ data: mocks.queue }),
@@ -91,11 +100,7 @@ vi.mock("../errors/index.ts", () => ({
 import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
 
 const renderDrawer = () =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <AddAnnotationQueueDrawer open={true} queueId="q1" onClose={vi.fn()} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<AddAnnotationQueueDrawer open={true} queueId="q1" onClose={vi.fn()} />);
 
 beforeEach(() => {
   mocks.mutate.mockReset();

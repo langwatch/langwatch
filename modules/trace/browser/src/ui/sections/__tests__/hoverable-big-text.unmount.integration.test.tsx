@@ -2,16 +2,14 @@
  * @vitest-environment jsdom
  * HoverableBigText: measures box on timer after browser layout.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 
 const renderText = () =>
-  render(<HoverableBigText>a very long value</HoverableBigText>, {
-    wrapper: ({ children }) => <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>,
-  });
+  renderWithDesignSystem(<HoverableBigText>a very long value</HoverableBigText>);
 
 describe("HoverableBigText overflow probe lifetime", () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
+import { formatCost } from "@langwatch/design-system/display-formatters";
 import { Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { formatCost } from "@langwatch/trace-browser-kit";
 import type { ReactElement } from "react";
 
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";

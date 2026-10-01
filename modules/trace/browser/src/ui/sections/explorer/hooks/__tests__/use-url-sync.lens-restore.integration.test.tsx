@@ -25,8 +25,8 @@ const SHARED_LENS = { id: "custom-abc", name: "Shared", filterText: "" };
 let allLenses = BUILT_INS;
 let activeLensId = "all-traces";
 
-vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
-  const actual = await importOriginal<typeof traceBrowserKitModule>();
+vi.mock("../../../../../behavior/explorer.store.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule0>();
   return {
     ...actual,
     useViewStore: (sel: (s: unknown) => unknown) =>
@@ -36,7 +36,6 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
         draftState: new Map(),
         selectLens: selectLensMock,
       }),
-    getPersistedActiveLensId: () => persistedLens,
     useFilterStore: (sel: (s: unknown) => unknown) =>
       sel({
         queryText: "",
@@ -54,9 +53,16 @@ vi.mock("@langwatch/trace-browser-kit", async (importOriginal) => {
       }),
   };
 });
+vi.mock("../../../../../behavior/view.slice.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof actualModule1>();
+  return {
+    ...actual,
+    getPersistedActiveLensId: () => persistedLens,
+  };
+});
 
-import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
-
+import type * as actualModule0 from "../../../../../behavior/explorer.store.ts";
+import type * as actualModule1 from "../../../../../behavior/view.slice.ts";
 import { useURLSync } from "../use-url-sync.ts";
 
 function Harness() {

@@ -4,7 +4,7 @@
  * filter. The trailing chevron stays, but it's no longer the only way in.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Activity } from "lucide-react";
@@ -19,8 +19,10 @@ vi.mock("../../hooks/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
-import type { FacetItem, FacetValueState } from "@langwatch/trace-browser-kit";
-
+import type {
+  FacetItem,
+  FacetValueState,
+} from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { FacetSection } from "../facet-section.tsx";
 
 const ITEMS: FacetItem[] = [
@@ -85,7 +87,7 @@ const Harness = ({
     [onToggleSpy],
   );
   return (
-    <ChakraProvider value={defaultSystem}>
+    <DesignSystemProvider forcedTheme="light">
       {/* Stands in for the query bar: drops every filter without the sidebar
           row being involved. */}
       <button type="button" onClick={() => setStates(new Map())}>
@@ -102,7 +104,7 @@ const Harness = ({
         renderActiveRowExtras={withDrilldown ? renderActiveRowExtras : undefined}
         renderInactiveRowExtras={withDrilldown ? renderInactiveRowExtras : undefined}
       />
-    </ChakraProvider>
+    </DesignSystemProvider>
   );
 };
 

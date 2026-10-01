@@ -1,93 +1,64 @@
-import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useEffect, useRef } from "react";
 
-import {
-  isOccurredAtParam,
-  isViewMode,
-  parseEditParam,
-  useDrawerStore,
-} from "../../../../behavior/drawer.store.ts";
+import { drawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
+import { getTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
 } from "../../../../behavior/trace-edit.store.ts";
+import { TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import { enterTraceEditMode, exitTraceEditMode } from "../utils/trace-edit-mode.ts";
 
+/** The trace the drawer was last open on, so a close can be told from "never opened". */
+interface OpenTrace {
+  traceId: string;
+  occurredAtMs: number | null;
+  projectId: string | null;
+}
+
 /**
- * One-way URL → drawer store sync. Lives at the page level so the
- * `<TraceV2DrawerShell>` mount decision can read the store directly (synchronous on
- * click) instead of waiting for the URL push to round-trip through React Router.
+ * Settles what follows from the address naming a trace: the correction state
+ * a new trace starts from, the edit session its link asks for, and what a
+ * close takes with it. The address is the one truth; nothing is copied from it.
+ * Lives at the page level so one mount serves every page the drawer opens over.
  */
 export function useTraceDrawerUrlHydrator(): void {
-  const { currentDrawer, openDrawer, closeDrawer } = useDrawer();
-  const params = useDrawerParams();
+  const { openDrawer, closeDrawer } = useDrawer();
+  const isOpen = useTraceDrawer((s) => s.isOpen);
+  const traceId = useTraceDrawer((s) => s.traceId);
+  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
+  const projectId = useTraceDrawer((s) => s.projectId);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
+  const lastOpen = useRef<OpenTrace | null>(null);
   // Held in a ref rather than as dependencies: both change identity with every
-  // query change on the page, and this effect answers to the drawer parameters
-  // alone.
+  // query change on the page, and this effect answers to the drawer address alone.
   const drawerRef = useRef({ openDrawer, closeDrawer });
   drawerRef.current = { openDrawer, closeDrawer };
 
   useEffect(() => {
-    hydrateDrawerFromUrl({
-      drawer: drawerRef.current,
-      editParam: params.edit,
-      modeParam: params.mode,
-      occurredAtMs: timestampParam(params.t),
-      projectIdParam: params.projectId,
-      traceId: params.traceId ?? null,
-      wantsOpen: currentDrawer === "traceV2Details",
-    });
-  }, [currentDrawer, params.traceId, params.t, params.edit, params.mode, params.projectId]);
-}
+    if (!isOpen || !traceId) return;
+    // Reading the captured trace is a decision about the trace in front of the
+    // reader, not a preference: the next one opens corrected. An unsaved correction
+    // belongs to the trace it was written against, and a session on the trace
+    // being opened survives, so a link straight into edit mode re-enters it.
+    useTraceEditStore.getState().setOverlayView("edited");
+    useTraceEditStore.getState().dropSessionForOtherTrace(traceId);
+  }, [isOpen, traceId]);
 
-/** The `t` link parameter as a timestamp, or null when it names no usable one. */
-function timestampParam(raw: string | undefined): number | null {
-  return isOccurredAtParam(raw) ? Number(raw) : null;
-}
-
-/** Brings the drawer store in line with what the link asks for. */
-function hydrateDrawerFromUrl({
-  drawer,
-  editParam,
-  modeParam,
-  occurredAtMs,
-  projectIdParam,
-  traceId,
-  wantsOpen,
-}: {
-  drawer: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">;
-  editParam: string | undefined;
-  modeParam: string | undefined;
-  occurredAtMs: number | null;
-  projectIdParam: string | undefined;
-  traceId: string | null;
-  wantsOpen: boolean;
-}): void {
-  const store = useDrawerStore.getState();
-
-  if (wantsOpen && traceId) {
-    const alreadyOnTrace = store.traceId === traceId && store.occurredAtMs === occurredAtMs;
-    // `drawer.projectId` travels on the same navigation as the trace it names —
-    // read it here too (not only at module load), or a trace opened from
-    // another project than the chrome's resolves against the wrong one on
-    // every soft navigation.
-    if (!alreadyOnTrace) store.openTrace(traceId, occurredAtMs, { projectId: projectIdParam });
-    // `drawer.mode` is applied here too (not only at load/popstate), or a
-    // soft navigation into a named mode silently falls back to whatever was
-    // last used. Compared to the store first so it's a no-op once the two
-    // already agree.
-    if (modeParam && isViewMode(modeParam) && modeParam !== store.viewMode) {
-      store.setViewModeTransient(modeParam);
+  useEffect(() => {
+    if (isOpen && traceId) {
+      lastOpen.current = { traceId, occurredAtMs, projectId };
+      syncEditMode({ traceId, wantsEdit: isEditing });
+      return;
     }
-    syncEditMode({ traceId, editParam, openDrawer: drawer.openDrawer });
-    return;
-  }
-
-  if (!wantsOpen && store.traceId) {
-    if (keepDrawerForUnsavedEdit(drawer)) return;
-    store.closeDrawer();
+    const closed = lastOpen.current;
+    if (!closed) return;
+    lastOpen.current = null;
+    if (keepDrawerForUnsavedEdit({ closed, drawer: drawerRef.current })) return;
+    drawerChrome.getState().reset();
     exitTraceEditMode();
-  }
+  }, [isOpen, traceId, occurredAtMs, projectId, isEditing]);
 }
 
 /**
@@ -96,56 +67,41 @@ function hydrateDrawerFromUrl({
  * one with no way to get it back.
  */
 function keepDrawerForUnsavedEdit({
-  openDrawer,
-  closeDrawer,
-}: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">): boolean {
+  closed,
+  drawer,
+}: {
+  closed: OpenTrace;
+  drawer: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">;
+}): boolean {
   const editStore = useTraceEditStore.getState();
-  const drawer = useDrawerStore.getState();
   const editingTraceId = editStore.editingTraceId;
-  if (editingTraceId === null || editingTraceId !== drawer.traceId) {
-    return false;
-  }
+  if (editingTraceId === null || editingTraceId !== closed.traceId) return false;
   if (!selectIsTraceEditDirty(editStore)) return false;
 
-  drawer.setIsEditing(true);
-  openDrawer("traceV2Details", {
+  drawer.openDrawer(TRACE_DRAWER_NAME, {
     traceId: editingTraceId,
-    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
+    ...(closed.occurredAtMs !== null ? { t: String(closed.occurredAtMs) } : {}),
+    ...(closed.projectId !== null ? { projectId: closed.projectId } : {}),
     urlParams: { edit: "1" },
   });
   editStore.requestExit(() => {
-    useDrawerStore.getState().closeDrawer();
+    drawerChrome.getState().reset();
     exitTraceEditMode();
     // The link was put back to keep the drawer on screen for the question, so
     // taking the answer means taking it out again.
-    closeDrawer();
+    drawer.closeDrawer();
   });
   return true;
 }
 
-/**
- * Brings the edit session in line with what the link asks for.
- */
-function syncEditMode({
-  traceId,
-  editParam,
-  openDrawer,
-}: {
-  traceId: string;
-  editParam: string | undefined;
-  openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
-}): void {
-  const wantsEdit = parseEditParam({ raw: editParam, traceId });
+/** Brings the edit session in line with what the link asks for. */
+function syncEditMode({ traceId, wantsEdit }: { traceId: string; wantsEdit: boolean }): void {
   const editStore = useTraceEditStore.getState();
   const editingTraceId = editStore.editingTraceId;
 
   if (wantsEdit) {
     // Starting over would drop the drafts, so only a different trace does that.
-    // The drawer's own flag is asserted either way: opening a trace clears it,
-    // and leaving it cleared would strip `drawer.edit` from a link that asks
-    // for edit mode and take the drafts with it.
     if (editingTraceId !== traceId) enterTraceEditMode(traceId);
-    else useDrawerStore.getState().setIsEditing(true);
     return;
   }
 
@@ -154,15 +110,8 @@ function syncEditMode({
     exitTraceEditMode();
     return;
   }
-  // The correction stays, so the link has to say so. Leaving the URL without
+  // The correction stays, so the link has to say so. Leaving the address without
   // `drawer.edit` would keep the edit bar on screen over a link that reads as
   // "not editing", and the next reload would take the work with it unasked.
-  if (editingTraceId !== traceId) return;
-  const drawer = useDrawerStore.getState();
-  drawer.setIsEditing(true);
-  openDrawer("traceV2Details", {
-    traceId,
-    ...(drawer.occurredAtMs !== null ? { t: String(drawer.occurredAtMs) } : {}),
-    urlParams: { edit: "1" },
-  });
+  if (editingTraceId === traceId) getTraceDrawer().setIsEditing(true);
 }

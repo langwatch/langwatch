@@ -1,10 +1,10 @@
 import type { InstrumentationScope, SpanResourceInfoDto } from "@langwatch/trace-contract";
 import { useMemo } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useSharedTrace } from "../context/shared-trace-context.tsx";
+import { useIsReadOnlyTrace } from "../../../elements/explorer/context/trace-viewer-context.tsx";
 
 export interface TraceResourcesResult {
   rootSpanId: string | null;
@@ -32,9 +32,9 @@ const NULL_RESULT: TraceResourcesResult = {
  */
 export function useTraceResources(traceId: string | null | undefined): TraceResourcesResult {
   const { project } = useOrganizationTeamProject();
-  const shared = useSharedTrace();
-  const occurredAtMs = useDrawerStore((s) => s.occurredAtMs);
-  const enabled = !!project?.id && !!traceId && !shared;
+  const isReadOnly = useIsReadOnlyTrace();
+  const occurredAtMs = useTraceDrawer((s) => s.occurredAtMs);
+  const enabled = !!project?.id && !!traceId && !isReadOnly;
 
   const query = api.traces.resourceInfo.useQuery(
     {
@@ -44,13 +44,11 @@ export function useTraceResources(traceId: string | null | undefined): TraceReso
     },
     {
       enabled,
-      staleTime: 60_000,
       gcTime: 1_800_000,
-      refetchOnWindowFocus: false,
     },
   );
 
-  const data = shared?.resources ?? query.data;
+  const data = query.data;
 
   return useMemo<TraceResourcesResult>(() => {
     if (!data) {

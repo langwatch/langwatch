@@ -1,12 +1,12 @@
 // VisibleOrderStrip maps visible indices to columnOrder indices,
 // accounting for hidden columns.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { LensColumnOption } from "@langwatch/trace-browser-kit";
-import { cleanup, fireEvent, render } from "@testing-library/react";
-import "@testing-library/jest-dom/vitest";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
+import type { LensColumnOption } from "../../../../../../model/lens-capabilities.ts";
 import { VisibleOrderStrip } from "../visible-order-strip.tsx";
 
 afterEach(() => cleanup());
@@ -24,15 +24,13 @@ const COLUMN_ORDER = ["time", "hidden-x", "trace", "hidden-y", "duration"];
 const setup = () => {
   const reorderColumns = vi.fn();
   const onRemove = vi.fn();
-  const utils = render(
-    <ChakraProvider value={defaultSystem}>
-      <VisibleOrderStrip
-        columns={VISIBLE}
-        columnOrder={COLUMN_ORDER}
-        reorderColumns={reorderColumns}
-        onRemove={onRemove}
-      />
-    </ChakraProvider>,
+  const utils = renderWithDesignSystem(
+    <VisibleOrderStrip
+      columns={VISIBLE}
+      columnOrder={COLUMN_ORDER}
+      reorderColumns={reorderColumns}
+      onRemove={onRemove}
+    />,
   );
   return { ...utils, reorderColumns, onRemove };
 };

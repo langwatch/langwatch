@@ -1,4 +1,4 @@
-import { Pagination as ChakraPagination } from "@chakra-ui/react";
+import { RawPagination as ChakraPagination } from "@langwatch/design-system/pagination";
 import {
   Button,
   Grid,

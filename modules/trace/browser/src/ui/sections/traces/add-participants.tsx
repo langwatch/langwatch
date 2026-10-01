@@ -1,4 +1,4 @@
-import { CloseButton } from "@chakra-ui/react";
+import { CloseButton } from "@langwatch/design-system/close-button";
 import {
   Badge,
   Box,
@@ -12,9 +12,10 @@ import {
 import { Select } from "@langwatch/design-system/select";
 import { Plus, Users } from "react-feather";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useAnnotationQueues } from "../../../behavior/reads/use-annotation-reads.ts";
+import { useOrganizationMembersWithTeams } from "../../../behavior/reads/use-organization-members.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
-import { RandomColorAvatar } from "../../blocks/random-color-avatar.tsx";
+import { MemberAvatar } from "../member-avatar.tsx";
 
 export const AddParticipants = ({
   annotators,
@@ -39,25 +40,11 @@ export const AddParticipants = ({
 }) => {
   const { organization, project } = useOrganizationTeamProject();
 
-  const annotationQueues = api.annotation.getQueues.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project,
-    },
-  );
+  const annotationQueues = useAnnotationQueues({ projectId: project?.id });
 
   const selectedValues = annotators.map((a) => a.id);
 
-  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization,
-    },
-  );
+  const users = useOrganizationMembersWithTeams({ organizationId: organization?.id });
 
   const userOptions = users.data?.members.map((member) => ({
     label: member.user.name ?? "",
@@ -120,7 +107,7 @@ export const AddParticipants = ({
                         background="bg.muted"
                       >
                         {item.value.startsWith("user-") ? (
-                          <RandomColorAvatar size="2xs" name={item.label} image={item.image} />
+                          <MemberAvatar size="2xs" name={item.label} image={item.image} />
                         ) : (
                           <Box padding={1}>
                             <Users size={18} />
@@ -166,7 +153,7 @@ export const AddParticipants = ({
                   <VStack align="start">
                     <HStack>
                       {item.value.startsWith("user-") ? (
-                        <RandomColorAvatar size="2xs" name={item.label} image={item.image} />
+                        <MemberAvatar size="2xs" name={item.label} image={item.image} />
                       ) : (
                         <Box padding={1}>
                           <Users size={18} />

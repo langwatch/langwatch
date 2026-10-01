@@ -18,6 +18,5 @@ export function useAttributeValues({
     prefix: "",
     enabled: enabled && attrKey.length > 0,
     limit: 30,
-    staleTimeMs: 5 * 60_000,
   });
 }

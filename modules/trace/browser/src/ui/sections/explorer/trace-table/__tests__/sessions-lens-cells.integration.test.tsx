@@ -2,14 +2,16 @@
 // page-local traces array.
 // @vitest-environment jsdom
 // @see specs/traces-v2/sessions-lens.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { getCapability, truncateId } from "@langwatch/trace-browser-kit";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import type React from "react";
-import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { truncateId } from "../../../../../model/display-formatters.ts";
+import "@testing-library/jest-dom/vitest";
+
 import type { SessionGroupPayloadItem } from "../../../../../model/explorer/session-group-payload.ts";
+import { getCapability } from "../../../../../model/lens-capabilities.ts";
 import { mapSessionGroupToConversationGroup } from "../../utils/map-session-groups-payload.ts";
 import type { ConversationGroup } from "../conversation-groups.ts";
 import { ConversationSummaryDetail } from "../registry/addons/conversation/conversation-summary.tsx";
@@ -84,11 +86,7 @@ function serverSession(overrides: Partial<SessionGroupPayloadItem> = {}): Conver
 function renderCell({ cellId, row }: { cellId: string; row: ConversationGroup }) {
   const cell = conversationCells[cellId];
   if (!cell) throw new Error(`No conversation cell registered for ${cellId}`);
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      {cell.render(cellContext(row)) as React.ReactElement}
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(cell.render(cellContext(row)) as React.ReactElement);
 }
 
 afterEach(() => {
@@ -168,11 +166,7 @@ describe("sessions lens cells", () => {
       expect(screen.queryByText("900")).not.toBeInTheDocument();
 
       cleanup();
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <ConversationSummaryDetail group={row} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<ConversationSummaryDetail group={row} />);
       expect(screen.getByText("900 spans")).toBeInTheDocument();
     });
   });

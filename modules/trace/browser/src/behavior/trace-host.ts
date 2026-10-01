@@ -18,8 +18,6 @@ export type TraceHostProject = {
   name: string;
   /** Whether anything has ever been ingested — the empty state leads on it. */
   firstMessage?: boolean;
-  /** The ingestion key the Integrate pane prints. */
-  apiKey?: string;
   /**
    * Whether live cursors and presence dots are on for this project.
    */

@@ -7,13 +7,18 @@ import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useAnnotationQueueSessionStore } from "../../../behavior/annotation-queue-session.store.ts";
+import { useDatasets } from "../../../behavior/reads/use-project-reads.ts";
+import { useTracesWithSpans } from "../../../behavior/reads/use-trace-mapping-reads.ts";
 import { useLocalStorageSelectedDataSetId } from "../../../behavior/use-local-storage-selected-dataset-id.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import {
+  useCreateDatasetRecord,
+  useInvalidateDatasets,
+} from "../../../behavior/writes/use-trace-writes.ts";
 import { Drawer } from "../drawer.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { DatasetMappingPreview } from "./dataset-mapping-preview.tsx";
@@ -112,9 +117,9 @@ function toastAddedToDataset({
 }
 
 export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
-  const trpc = api.useUtils();
+  const invalidateDatasets = useInvalidateDatasets();
   const { project } = useOrganizationTeamProject();
-  const createDatasetRecord = api.datasetRecord.create.useMutation();
+  const createDatasetRecord = useCreateDatasetRecord();
   // Leaving this drawer hands the reader back to whatever opened it, the
   // trace they were reading say, rather than clearing the page. Opened with
   // nothing underneath (a bulk selection, the end-of-queue hand-off), going
@@ -141,10 +146,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
   });
 
   const datasetId = watch("datasetId");
-  const datasets = api.dataset.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project, refetchOnWindowFocus: false },
-  );
+  const datasets = useDatasets({ projectId: project?.id });
 
   const selectedDataset = datasets.data?.find((dataset) => dataset.id === datasetId);
 
@@ -155,17 +157,11 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
 
   // Fetch traces with spans data. Reviewer corrections apply here so a dataset
   // record carries exactly what the reviewer corrected.
-  const tracesWithSpans = api.traces.getTracesWithSpans.useQuery(
-    {
-      projectId: project?.id ?? "",
-      traceIds: traceIds,
-      withEditOverlay: true,
-    },
-    {
-      enabled: !!project,
-      refetchOnWindowFocus: false,
-    },
-  );
+  const tracesWithSpans = useTracesWithSpans({
+    projectId: project?.id,
+    traceIds,
+    withEditOverlay: true,
+  });
 
   // Dataset's editor is its own routed drawer: go there, and come back to the dataset it saved.
   const openDatasetEditor = () =>
@@ -181,7 +177,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
         : {}),
       onSuccess: (saved) => {
         rememberCreatedDataset(saved.datasetId);
-        void trpc.dataset.getAll.invalidate();
+        invalidateDatasets();
       },
       onClose: goBack,
     });
@@ -209,8 +205,6 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
       },
       {
         onSuccess: () => {
-          void trpc.dataset.getAll.invalidate();
-          void trpc.datasetRecord.getAll.invalidate();
           // Whoever opened the drawer gets told the records landed, so a flow
           // that led here can finish itself off.
           props.onSuccess?.();

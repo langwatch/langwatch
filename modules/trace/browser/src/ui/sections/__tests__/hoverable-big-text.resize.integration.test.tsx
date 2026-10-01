@@ -2,8 +2,8 @@
  * @vitest-environment jsdom
  * HoverableBigText: tooltip and dialog only when measured as clipped.
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -58,10 +58,7 @@ const clipContent = ({ element }: { element: HTMLElement }) => {
   });
 };
 
-const renderText = () =>
-  render(<HoverableBigText>{TEXT}</HoverableBigText>, {
-    wrapper: ({ children }) => <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>,
-  });
+const renderText = () => renderWithDesignSystem(<HoverableBigText>{TEXT}</HoverableBigText>);
 
 /** Let the post-render measurement land, so the box starts out un-clipped. */
 const settleFirstMeasurement = async () => {

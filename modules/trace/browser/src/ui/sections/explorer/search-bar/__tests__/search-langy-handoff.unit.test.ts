@@ -1,6 +1,6 @@
-import type { TraceViewContextChip } from "@langwatch/trace-browser-kit";
 import { describe, expect, it } from "vitest";
 
+import type { TraceViewContextChip } from "../../../../../behavior/view-context-chip.ts";
 import { handOffSearchToLangy, SEARCH_HANDOFF_DRAFT } from "../search-langy-handoff.ts";
 
 const view: TraceViewContextChip = {

@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TreeRow } from "../tree-row.tsx";
@@ -31,25 +31,23 @@ const node: WaterfallTreeNode = {
 };
 
 function renderRow(over: Partial<Parameters<typeof TreeRow>[0]> = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TreeRow
-        node={node}
-        rootStart={0}
-        rootDuration={10}
-        isSelected={false}
-        isPrompt={false}
-        logCount={0}
-        isCollapsed={false}
-        hasChildren={false}
-        hiddenDescendantCount={0}
-        isDimmed={false}
-        signals={[]}
-        onToggleCollapse={vi.fn()}
-        onSelect={vi.fn()}
-        {...over}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TreeRow
+      node={node}
+      rootStart={0}
+      rootDuration={10}
+      isSelected={false}
+      isPrompt={false}
+      logCount={0}
+      isCollapsed={false}
+      hasChildren={false}
+      hiddenDescendantCount={0}
+      isDimmed={false}
+      signals={[]}
+      onToggleCollapse={vi.fn()}
+      onSelect={vi.fn()}
+      {...over}
+    />,
   );
 }
 

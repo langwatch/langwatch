@@ -1,5 +1,4 @@
 import { chakra, Flex, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import { useStoredObjectUrl } from "@langwatch/stored-object-browser-kit";
 import {
   collectMediaParts,
   type MediaPartData,
@@ -11,6 +10,7 @@ import { Fragment, memo, type ReactNode, useLayoutEffect, useMemo, useRef } from
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
 import { formatPreview } from "../../../../behavior/preview-formatter.ts";
+import { useStoredObjectUrl } from "../../../../behavior/stored-object/use-stored-object-url.ts";
 import { tryParseChat } from "../../../../model/explorer/trace-table/chat-content.ts";
 import { useDensityTokens } from "../hooks/use-density-tokens.ts";
 

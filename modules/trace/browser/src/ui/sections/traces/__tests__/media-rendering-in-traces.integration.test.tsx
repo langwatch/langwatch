@@ -2,9 +2,9 @@
  * Integration coverage for specs/traces-v2/media-rendering.feature.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { parseContentBlocks } from "@langwatch/trace-contract/transcript";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -44,10 +44,6 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-const Wrapper = ({ children }: { children: React.ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 // Externalized references — the production shapes after ingest-side
 // content extraction.
 const imagePart = {
@@ -70,11 +66,10 @@ afterEach(cleanup);
 describe("Media rendering in trace views", () => {
   /** @scenario "The legacy input/output view surfaces images and attachments" */
   it("legacy input/output view shows an inline image and an attachment chip", () => {
-    render(
+    renderWithDesignSystem(
       <RenderInputOutput
         value={JSON.stringify([{ role: "user", content: [imagePart, pdfPart] }])}
       />,
-      { wrapper: Wrapper },
     );
 
     expect(screen.getByTestId("media-part-image")).toHaveAttribute("src", "/api/files/p1/img1");
@@ -88,7 +83,7 @@ describe("Media rendering in trace views", () => {
     const blocks = parseContentBlocks([imagePart]);
     expect(blocks).toEqual([expect.objectContaining({ kind: "media" })]);
 
-    render(<BlockStack blocks={blocks} toolCalls={[]} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
 
     expect(screen.getByTestId("media-part-image")).toBeInTheDocument();
   });
@@ -97,7 +92,7 @@ describe("Media rendering in trace views", () => {
   it("traces-v2 conversation view renders a PDF as a named attachment chip", () => {
     const blocks = parseContentBlocks([pdfPart]);
 
-    render(<BlockStack blocks={blocks} toolCalls={[]} />, { wrapper: Wrapper });
+    renderWithDesignSystem(<BlockStack blocks={blocks} toolCalls={[]} />);
 
     const chip = screen.getByTestId("media-part-binary");
     expect(chip).toHaveTextContent("report.pdf");
@@ -110,9 +105,7 @@ describe("Media rendering in trace views", () => {
       value: JSON.stringify([{ role: "user", content: [audioPart, imagePart] }]),
     };
 
-    render(<RenderInputOutput value={JSON.stringify(typedRaw)} />, {
-      wrapper: Wrapper,
-    });
+    renderWithDesignSystem(<RenderInputOutput value={JSON.stringify(typedRaw)} />);
 
     expect(screen.getByTestId("media-part-audio")).toBeInTheDocument();
     expect(screen.getByTestId("media-part-image")).toBeInTheDocument();

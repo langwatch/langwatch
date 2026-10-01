@@ -1,69 +1,19 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { useCallback } from "react";
 
-import {
-  type DrawerViewMode,
-  type TraceHistoryEntry,
-  useDrawerStore,
-} from "../../../../behavior/drawer.store.ts";
+import { drawerChrome } from "../../../../behavior/drawer-chrome.store.ts";
+import { getTraceDrawer, useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { type DrawerViewMode, TRACE_DRAWER_NAME } from "../../../../model/trace-drawer-params.ts";
 import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
 
-type OpenDrawer = ReturnType<typeof useDrawer>["openDrawer"];
-
-function traceDrawerParams({
-  traceId,
-  occurredAtMs,
-}: {
-  traceId: string;
-  occurredAtMs: number | undefined;
-}) {
-  return {
-    traceId,
-    ...(occurredAtMs !== undefined ? { t: String(occurredAtMs) } : {}),
-  };
-}
-
-function reopenHistoryEntry({
-  entry,
-  setViewMode,
-  openDrawer,
-}: {
-  entry: TraceHistoryEntry;
-  setViewMode: (mode: DrawerViewMode) => void;
-  openDrawer: OpenDrawer;
-}): void {
-  setViewMode(entry.viewMode);
-  useDrawerStore.getState().openTrace(entry.traceId, entry.occurredAtMs ?? null);
-  openDrawer(
-    "traceV2Details",
-    traceDrawerParams({ traceId: entry.traceId, occurredAtMs: entry.occurredAtMs }),
-  );
-}
-
-function applyTargetViewMode({
-  toViewMode,
-  persistViewMode,
-  setViewMode,
-}: {
-  toViewMode: DrawerViewMode | undefined;
-  persistViewMode: boolean;
-  setViewMode: (mode: DrawerViewMode) => void;
-}): void {
-  if (!toViewMode) return;
-  if (persistViewMode) setViewMode(toViewMode);
-  else useDrawerStore.getState().setViewModeTransient(toViewMode);
-}
-
 /**
- * Trace-to-trace navigation inside the v2 drawer with a back stack.
+ * Trace-to-trace navigation inside the v2 drawer. Each trace the reader leaves
+ * stays beneath the open one in the drawer stack, so Back, the back button and
+ * a reload all agree on where they came from.
  */
 export function useTraceDrawerNavigation() {
-  const { openDrawer } = useDrawer();
-  const pushTraceHistory = useDrawerStore((s) => s.pushTraceHistory);
-  const popTraceHistory = useDrawerStore((s) => s.popTraceHistory);
-  const popTraceHistoryTo = useDrawerStore((s) => s.popTraceHistoryTo);
-  const setViewMode = useDrawerStore((s) => s.setViewMode);
-  const traceBackStack = useDrawerStore((s) => s.traceBackStack);
+  const { openDrawer, goBack: goBackInStack, goBackTo: goBackToInStack, backStack } = useDrawer();
+  const traceBackStack = useTraceDrawer((s) => s.traceBackStack);
 
   const navigateToTrace = useCallback(
     ({
@@ -78,15 +28,12 @@ export function useTraceDrawerNavigation() {
       fromTraceId: string;
       fromViewMode: DrawerViewMode;
       /**
-       * The trace we're navigating *away from* — its occurredAt is captured
-       * onto the back stack so a future `goBack` can forward the partition-
-       * pruning hint to drawer queries (header / spanTree / evals).
+       * The trace we're navigating *away from* — its occurredAt rides on the stack
+       * entry so going back can forward the partition-pruning hint to drawer queries.
        */
       fromTimestamp?: number;
       toTraceId: string;
-      /**
-       * Trace's actual occurredAt (ms).
-       */
+      /** Trace's actual occurredAt (ms). */
       toTimestamp?: number;
       toViewMode?: DrawerViewMode;
       /**
@@ -102,45 +49,52 @@ export function useTraceDrawerNavigation() {
       // Moving to another trace leaves the correction behind, so an unsaved
       // one asks first and the navigation waits on the answer.
       guardTraceEditExit(() => {
-        pushTraceHistory({
-          traceId: fromTraceId,
-          viewMode: fromViewMode,
-          occurredAtMs: fromTimestamp,
-        });
-        applyTargetViewMode({ toViewMode, persistViewMode, setViewMode });
-        // Push into the store immediately so drawer hooks render with the
-        // right traceId/occurredAtMs before the URL change settles.
-        useDrawerStore.getState().openTrace(toTraceId, toTimestamp ?? null);
+        const leaving = getTraceDrawer();
+        // The entry the trace becomes records the view it was left on.
+        leaving.setViewModeTransient(fromViewMode);
+        if (fromTimestamp !== undefined) leaving.backfillOccurredAtMs(fromTimestamp);
+        if (toViewMode && persistViewMode) drawerChrome.getState().rememberViewMode(toViewMode);
         openDrawer(
-          "traceV2Details",
-          traceDrawerParams({ traceId: toTraceId, occurredAtMs: toTimestamp }),
+          TRACE_DRAWER_NAME,
+          {
+            traceId: toTraceId,
+            ...(toTimestamp !== undefined ? { t: String(toTimestamp) } : {}),
+            ...(leaving.projectId !== null ? { projectId: leaving.projectId } : {}),
+            mode: toViewMode ?? fromViewMode,
+            viz: leaving.vizTab,
+          },
+          { replace: false },
         );
       });
     },
-    [openDrawer, pushTraceHistory, setViewMode],
+    [openDrawer],
   );
 
   // Going back is going to another trace, so it asks about an unsaved
-  // correction the same way going forward does. The history is popped inside
-  // the guarded action: parking the exit and popping anyway would lose the
+  // correction the same way going forward does. The stack is only walked inside
+  // the guarded action: parking the exit and walking anyway would lose the
   // entry when the reviewer chooses to keep editing.
   const goBack = useCallback(() => {
     guardTraceEditExit(() => {
-      const previous = popTraceHistory();
+      const previous = traceBackStack[traceBackStack.length - 1];
       if (!previous) return;
-      reopenHistoryEntry({ entry: previous, setViewMode, openDrawer });
+      drawerChrome.getState().rememberViewMode(previous.viewMode);
+      goBackInStack();
     });
-  }, [openDrawer, popTraceHistory, setViewMode]);
+  }, [goBackInStack, traceBackStack]);
 
+  // The trace run sits at the top of the stack, so an index into it is an index
+  // into the stack shifted by whatever drawers lie beneath the run.
   const goBackTo = useCallback(
     (index: number) => {
       guardTraceEditExit(() => {
-        const target = popTraceHistoryTo(index);
+        const target = traceBackStack[index];
         if (!target) return;
-        reopenHistoryEntry({ entry: target, setViewMode, openDrawer });
+        drawerChrome.getState().rememberViewMode(target.viewMode);
+        goBackToInStack(backStack.length - traceBackStack.length + index);
       });
     },
-    [openDrawer, popTraceHistoryTo, setViewMode],
+    [backStack.length, goBackToInStack, traceBackStack],
   );
 
   return {

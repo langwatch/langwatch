@@ -1,20 +1,28 @@
+import {
+  type PersonalTokenMint,
+  SETUP_AGENT_PERMISSIONS,
+  useMintPersonalToken,
+} from "@langwatch/api-key-client";
 import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, HStack, Tabs, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  type ActiveProjectContextValue,
-  ActiveProjectProvider,
-  PromptList,
-  SkillList,
-  TRACING_SKILL_ID,
-  ViaMcpClientScreen,
-} from "@langwatch/onboarding-browser-kit";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 
+import { useOptionalTraceHost } from "../../../../behavior/trace-host.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { SdkSetup } from "../../../elements/explorer/onboarding/sdk-setup.tsx";
 import { Drawer } from "../../drawer.tsx";
+import {
+  type ActiveProjectContextValue,
+  ActiveProjectProvider,
+} from "../../onboarding/active-project-context.tsx";
+import {
+  PromptList,
+  SkillList,
+  TRACING_SKILL_ID,
+} from "../../onboarding/via-claude-code-screen.tsx";
+import { ViaMcpClientScreen } from "../../onboarding/via-claude-desktop-screen.tsx";
 import { ApiKeyIntegrationInfoCard } from "./api-key-integration-info-card.tsx";
 
 export type Segment = "skill" | "mcp" | "prompt" | "sdk";
@@ -74,7 +82,14 @@ export function IntegrateDrawer({
   onOpenChange,
 }: IntegrateDrawerProps): React.ReactElement | null {
   const { project, organization } = useOrganizationTeamProject();
-  const [token, setToken] = useState<string | null>(null);
+  const minting = useMintPersonalToken({
+    organizationId: organization?.id,
+    projectId: project?.id,
+    userId: useOptionalTraceHost()?.currentUser()?.id,
+    name: "Personal access token",
+    // The MCP and skills tabs reuse this token, so it may also read the project.
+    permissions: SETUP_AGENT_PERMISSIONS,
+  });
   const [segment, setSegment] = useState<Segment>("skill");
 
   const activeSegment = SEGMENTS.find((s) => s.value === segment) ?? SEGMENTS[0];
@@ -82,10 +97,9 @@ export function IntegrateDrawer({
   if (!project || !organization) return null;
 
   const activeProjectContext: ActiveProjectContextValue = {
-    project: token ? { ...project, apiKey: token } : project,
+    project,
     organization,
-    freshToken: token ?? undefined,
-    onFreshToken: setToken,
+    freshToken: minting.token,
   };
 
   return (
@@ -103,10 +117,8 @@ export function IntegrateDrawer({
         <Drawer.Body>
           <ActiveProjectProvider value={activeProjectContext}>
             <IntegrationContent
-              organizationId={organization.id}
               projectId={project.id}
-              token={token}
-              onTokenGenerated={setToken}
+              minting={minting}
               segment={segment}
               onSegmentChange={setSegment}
               activeSegmentDescription={activeSegment?.description ?? ""}
@@ -125,10 +137,8 @@ export function IntegrateDrawer({
  * re-implementing the API-key-then-tab pattern.
  */
 interface IntegrationContentProps {
-  organizationId: string;
   projectId: string;
-  token: string | null;
-  onTokenGenerated: (token: string) => void;
+  minting: PersonalTokenMint;
   segment: Segment;
   onSegmentChange: (segment: Segment) => void;
   activeSegmentDescription: string;
@@ -140,10 +150,8 @@ interface IntegrationContentProps {
 }
 
 export function IntegrationContent({
-  organizationId,
   projectId,
-  token,
-  onTokenGenerated,
+  minting,
   segment,
   onSegmentChange,
   activeSegmentDescription,
@@ -177,12 +185,7 @@ export function IntegrationContent({
             step of integration. The lifted onboarding screens below
             read the token via ActiveProjectProvider, so they
             automatically pick up the freshly-scoped credential. */}
-        <ApiKeyIntegrationInfoCard
-          organizationId={organizationId}
-          projectId={projectId}
-          token={token}
-          onTokenGenerated={onTokenGenerated}
-        />
+        <ApiKeyIntegrationInfoCard projectId={projectId} minting={minting} />
 
         <Tabs.Root
           value={segment}

@@ -1,5 +1,9 @@
+import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
 import { Text } from "@langwatch/design-system/primitives";
-import { formatCost, formatDuration, formatTokens } from "@langwatch/trace-browser-kit";
 
 import { MonoCell } from "../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import type { CellDef } from "../types.ts";

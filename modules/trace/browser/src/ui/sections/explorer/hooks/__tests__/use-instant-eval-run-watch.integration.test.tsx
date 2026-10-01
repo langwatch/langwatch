@@ -1,3 +1,8 @@
+import { instantEvalRunKey } from "@langwatch/trace-contract";
+import { renderHook } from "@testing-library/react";
+import { act } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  *
@@ -5,11 +10,7 @@
  * read the judging run's counters, and a poll that moves refetches the table.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { instantEvalRunKey } from "@langwatch/trace-contract";
-import { renderHook } from "@testing-library/react";
-import { act } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 
 const harness = vi.hoisted(() => ({
   list: vi.fn(),

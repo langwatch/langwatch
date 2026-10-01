@@ -12,18 +12,21 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
 import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import { formatDistanceToNow } from "@langwatch/time";
-import { readableDate } from "@langwatch/trace-browser-kit";
 import type { ElasticSearchEvaluation } from "@langwatch/trace-contract";
 import { MoreVertical, Pencil } from "lucide-react";
 import numeral from "numeral";
 import { useMemo } from "react";
 
-import { api } from "../../../behavior/trace-api.ts";
+import { useEvaluatorRead, useMonitorRead } from "../../../behavior/reads/use-project-reads.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { readableDate } from "../../../model/display-formatters.ts";
+import {
+  evaluationPassed,
+  evaluationStatusColor,
+} from "../../../model/evaluator/evaluation-status.ts";
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 
 export function formatEvaluationSingleValue(evaluation: {
@@ -220,21 +223,17 @@ export function EvaluationStatusItem({ check }: { check: ElasticSearchEvaluation
 
   const isEvaluatorTable = check.evaluator_id?.startsWith("evaluator_");
 
-  const evaluatorQuery = api.evaluators.getById.useQuery(
-    { id: check.evaluator_id ?? "", projectId: project?.id ?? "" },
-    {
-      enabled: !!isEvaluatorTable && !!check.evaluator_id && !!project?.id,
-      staleTime: 5 * 60 * 1000,
-    },
-  );
+  const evaluatorQuery = useEvaluatorRead({
+    projectId: project?.id,
+    id: check.evaluator_id ?? undefined,
+    enabled: !!isEvaluatorTable,
+  });
 
-  const monitorQuery = api.monitors.getById.useQuery(
-    { id: check.evaluator_id ?? "", projectId: project?.id ?? "" },
-    {
-      enabled: !isEvaluatorTable && !!check.evaluator_id && !!project?.id,
-      staleTime: 5 * 60 * 1000,
-    },
-  );
+  const monitorQuery = useMonitorRead({
+    projectId: project?.id,
+    id: check.evaluator_id ?? undefined,
+    enabled: !isEvaluatorTable,
+  });
 
   const color = evaluationStatusColor(check);
   const passed = evaluationPassed(check);

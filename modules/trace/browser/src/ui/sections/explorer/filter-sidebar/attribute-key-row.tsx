@@ -7,14 +7,15 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { type FacetValueState, formatCount } from "@langwatch/trace-browser-kit";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
+import { type FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
 import { NoneAttributeRow } from "../../../blocks/explorer/filter-sidebar/none-attribute-row.tsx";
 import { RowButton } from "../../../elements/explorer/filter-sidebar/row-button.tsx";
 import { useAttributeValues } from "../hooks/use-attribute-values.ts";
 import { AttributeValueRow } from "./attribute-value-row.tsx";
+import { formatCount } from "./utils.ts";
 
 export const AttributeKeyRow = memo(function AttributeKeyRow({
   attrKey,

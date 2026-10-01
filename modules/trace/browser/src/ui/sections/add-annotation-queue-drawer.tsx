@@ -19,8 +19,13 @@ import { useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 
-import { api } from "../../behavior/trace-api.ts";
+import {
+  useAnnotationQueue,
+  useActiveAnnotationScores,
+} from "../../behavior/reads/use-annotation-reads.ts";
+import { useOrganizationMembersWithTeams } from "../../behavior/reads/use-organization-members.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { useCreateOrUpdateAnnotationQueue } from "../../behavior/writes/use-trace-writes.ts";
 import { slugify } from "../../model/slugify.ts";
 import { RandomColorAvatar } from "../blocks/random-color-avatar.tsx";
 import { FullWidthFormControl } from "../elements/full-width-form-control.tsx";
@@ -60,20 +65,6 @@ function toggled(list: Picked[], item: Picked): Picked[] {
   return list.some((p) => p.id === item.id)
     ? list.filter((p) => p.id !== item.id)
     : [...list, item];
-}
-
-/**
- * Everything that lists queues or counts their work: the listing, the queue
- * page, the pickers, the sidebar and its badges. Membership decides whose work
- * an item is, so a walk already open reads the wrong set once it changes.
- */
-function invalidateQueueReads(utils: ReturnType<typeof api.useUtils>) {
-  void utils.annotation.getOptimizedAnnotationQueues.invalidate();
-  void utils.annotation.getQueueBySlugOrId.invalidate();
-  void utils.annotation.getQueues.invalidate();
-  void utils.annotation.getQueueItemsCounts.invalidate();
-  void utils.annotation.getPendingItemsCount.invalidate();
-  void utils.annotation.getAssignedItemsCount.invalidate();
 }
 
 /** A button listing the picked items as tags, opening a list to toggle them. */
@@ -176,17 +167,9 @@ export const AddAnnotationQueueDrawer = ({
   queueId?: string;
 }) => {
   const { project, organization } = useOrganizationTeamProject();
-  const createOrUpdateQueue = api.annotation.createOrUpdateQueue.useMutation();
+  const createOrUpdateQueue = useCreateOrUpdateAnnotationQueue();
 
-  const queue = api.annotation.getQueueBySlugOrId.useQuery(
-    {
-      queueId: queueId ?? "",
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && !!queueId && !!open,
-    },
-  );
+  const queue = useAnnotationQueue({ projectId: project?.id, queueId, enabled: !!open });
 
   const handleClose = () => {
     if (onOverlayClick) {
@@ -197,16 +180,7 @@ export const AddAnnotationQueueDrawer = ({
     }
   };
 
-  const queryClient = api.useUtils();
-
-  const annotationScores = api.annotationScore.getAllActive.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project && !!open,
-    },
-  );
+  const annotationScores = useActiveAnnotationScores({ projectId: project?.id, enabled: !!open });
 
   const { closeDrawer, openDrawer } = useDrawer();
 
@@ -215,14 +189,10 @@ export const AddAnnotationQueueDrawer = ({
     onClose?.();
   };
 
-  const users = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-    {
-      organizationId: organization?.id ?? "",
-    },
-    {
-      enabled: !!organization && !!open,
-    },
-  );
+  const users = useOrganizationMembersWithTeams({
+    organizationId: organization?.id,
+    enabled: !!open,
+  });
 
   const form = useForm<{
     name: string;
@@ -274,7 +244,6 @@ export const AddAnnotationQueueDrawer = ({
       },
       {
         onSuccess: (data) => {
-          invalidateQueueReads(queryClient);
           toastQueueSaved({ isUpdate: !!queueId, name: data.name });
           handleClose();
           reset();

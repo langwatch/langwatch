@@ -1,16 +1,16 @@
-/**
- * A suggested output is stored as a correction to the trace, so writing one has to make
- * the drawer's copy of that correction stale.
- * @vitest-environment jsdom
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   uiDeclarations,
   type UiAnnotationFormFooterProps,
   type UiDeclarations,
   type UiSuggestBodyProps,
 } from "@langwatch/browser-host/declarations";
-import { cleanup, fireEvent, render, renderHook, screen } from "@testing-library/react";
+/**
+ * A suggested output is stored as a correction to the trace, so writing one has to make
+ * the drawer's copy of that correction stale.
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -106,18 +106,16 @@ const annotationLends = uiDeclarations([
 ]);
 
 function renderSuggest({ annotationId }: { annotationId?: string } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationPopover
-        traceId={TRACE}
-        output="the original answer"
-        mode="suggest"
-        annotationId={annotationId}
-        open
-        onOpenChange={vi.fn()}
-        trigger={<button type="button">Suggest</button>}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotationPopover
+      traceId={TRACE}
+      output="the original answer"
+      mode="suggest"
+      annotationId={annotationId}
+      open
+      onOpenChange={vi.fn()}
+      trigger={<button type="button">Suggest</button>}
+    />,
   );
 }
 

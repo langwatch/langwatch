@@ -1,11 +1,12 @@
-/**
- * @vitest-environment jsdom
- */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   createUiScopeHost,
   UiScopeHostProvider,
 } from "@langwatch/browser-host/use-organization-team-project";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+/**
+ * @vitest-environment jsdom
+ */
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -52,15 +53,12 @@ const scopeHost = createUiScopeHost({
 });
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>
+  <DesignSystemProvider forcedTheme="light">
     <UiScopeHostProvider value={scopeHost}>{children}</UiScopeHostProvider>
-  </ChakraProvider>
+  </DesignSystemProvider>
 );
 
 /** A screen that mounts no scope host at all, as the simulations timeline did. */
-const BareWrapper = ({ children }: { children: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
 
 const lastHeaderInput = (): HeaderInput => {
   const input = capturedHeaderInputs[capturedHeaderInputs.length - 1];
@@ -139,11 +137,10 @@ describe("TraceIdPeek", () => {
 describe("TracePreviewHoverCard", () => {
   describe("when it is rendered by a family that mounts no scope host", () => {
     it("renders its trigger instead of taking the page down (D20)", () => {
-      render(
+      renderWithDesignSystem(
         <TracePreviewHoverCard traceId="trace-1">
           <span>turn separator</span>
         </TracePreviewHoverCard>,
-        { wrapper: BareWrapper },
       );
 
       expect(screen.getByText("turn separator")).toBeInTheDocument();

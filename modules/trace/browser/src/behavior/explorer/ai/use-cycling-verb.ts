@@ -1,6 +1,5 @@
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { useEffect, useState } from "react";
-
-import { useReducedMotion } from "../../use-reduced-motion.ts";
 
 export const DEFAULT_THINKING_VERBS = [
   "Thinking about",

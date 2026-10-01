@@ -1,8 +1,8 @@
 import { Box } from "@langwatch/design-system/primitives";
+import { useReducedMotion } from "@langwatch/design-system/use-reduced-motion";
 import { MeshGradient } from "@paper-design/shaders-react";
 import type React from "react";
 
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import { aiBrandPalette } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 
 interface AiShaderBackdropProps {

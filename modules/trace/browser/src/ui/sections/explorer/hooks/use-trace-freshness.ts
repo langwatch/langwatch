@@ -1,7 +1,7 @@
-import { useSSESubscription } from "@langwatch/trace-browser-kit";
+import { useSSESubscription } from "@langwatch/browser-host/sse-subscription";
 import { useCallback, useEffect, useRef } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import { useRowPulseStore } from "../../../../behavior/row-pulse.store.ts";
 import { useSseStatusStore } from "../../../../behavior/sse-status.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
@@ -70,7 +70,7 @@ function useSpanStoredInvalidation(projectId: string | undefined) {
   const trpcUtils = api.useUtils();
   return useCallback(
     (traceIds: string[]) => {
-      const { traceId: openTraceId } = useDrawerStore.getState();
+      const { traceId: openTraceId } = getTraceDrawer();
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
       const key = { projectId, traceId: openTraceId };
       void trpcUtils.traces.spanTreeDelta.invalidate(key);
@@ -110,7 +110,6 @@ function useSseStatusSync({
 export function useTraceFreshness() {
   const { project } = useOrganizationTeamProject();
   const trpcUtils = api.useUtils();
-  const requestFastPoll = useSseStatusStore((s) => s.requestFastPoll);
   const pulse = useRowPulseStore((s) => s.pulse);
   const visibleTraceIds = useVisibleTraceIds();
 
@@ -148,9 +147,8 @@ export function useTraceFreshness() {
       }
       // Facets are heavy: coalesced to 30s, and skipped outside live mode.
       if (isLive) refreshDiscover();
-      requestFastPoll();
       // The open trace's reads, scoped to the project the queries are keyed under.
-      const { traceId: openTraceId } = useDrawerStore.getState();
+      const { traceId: openTraceId } = getTraceDrawer();
       const projectId = project?.id;
       if (!openTraceId || !projectId || !traceIds.includes(openTraceId)) return;
       const key = { projectId, traceId: openTraceId };
@@ -160,7 +158,6 @@ export function useTraceFreshness() {
     },
     [
       trpcUtils,
-      requestFastPoll,
       project?.id,
       visibleTraceIds,
       pulse,

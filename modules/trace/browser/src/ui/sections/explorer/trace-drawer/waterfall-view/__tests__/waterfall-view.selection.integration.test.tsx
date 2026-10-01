@@ -1,9 +1,9 @@
 // Scroll selected span into view (makes comment naming useful); handle
 // deleted spans.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanTreeNode } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -174,15 +174,13 @@ function renderWaterfall({
   spans: SpanTreeNode[];
   selectedSpanId: string | null;
 }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <WaterfallView
-        spans={spans}
-        selectedSpanId={selectedSpanId}
-        onSelectSpan={vi.fn()}
-        onClearSpan={vi.fn()}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <WaterfallView
+      spans={spans}
+      selectedSpanId={selectedSpanId}
+      onSelectSpan={vi.fn()}
+      onClearSpan={vi.fn()}
+    />,
   );
 }
 

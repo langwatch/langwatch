@@ -1,28 +1,35 @@
 // All exit paths (drawer close, navigate, history back, browser back) use
 // the same unsaved-changes dialog.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 const mocks = vi.hoisted(() => ({
-  currentDrawer: "traceV2Details" as string | undefined,
-  drawerParams: {} as Record<string, string | undefined>,
   openDrawer: vi.fn(),
   closeDrawer: vi.fn(),
+  goBack: vi.fn(),
+  goBackTo: vi.fn(),
+  backStack: [] as { drawer: string; params: Record<string, unknown> }[],
   fetchOverlay: vi.fn(),
   invalidateOverlay: vi.fn(),
   upsert: vi.fn(),
 }));
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({
-    currentDrawer: mocks.currentDrawer,
     openDrawer: mocks.openDrawer,
     closeDrawer: mocks.closeDrawer,
+    goBack: mocks.goBack,
+    goBackTo: mocks.goBackTo,
+    backStack: mocks.backStack,
   }),
-  useDrawerParams: () => mocks.drawerParams,
 }));
 
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
@@ -51,14 +58,18 @@ vi.mock("@langwatch/design-system/toaster", () => ({ toaster: { create: vi.fn() 
 vi.mock("../../../errors/index.ts", () => ({ showErrorToast: vi.fn() }));
 
 const { EditModeBar } = await import("../../trace-drawer/edit-mode/edit-mode-bar.tsx");
-const { useDrawerStore } = await import("../../../../../index.ts");
-const { useTraceEditStore } = await import("../../../../../index.ts");
+const { drawerChrome, getTraceDrawer, useTraceEditStore } =
+  await import("../../../../../index.ts");
+const { setWindowAddress } = await import("../../../../../__tests__/window-location-router.ts");
 const { guardTraceEditExit } = await import("../../utils/trace-edit-mode.ts");
 const { useTraceDrawerNavigation } = await import("../use-trace-drawer-navigation.ts");
 const { useTraceDrawerUrlHydrator } = await import("../use-trace-drawer-url-hydrator.ts");
 
 const TRACE = "trace-1";
 const EARLIER_TRACE = "trace-0";
+const PAGE = "/my-project/traces";
+const drawerAddress = (traceId: string, extra = "") =>
+  `${PAGE}?drawer.open=traceV2Details&drawer.traceId=${traceId}${extra}`;
 
 let navigation: ReturnType<typeof useTraceDrawerNavigation>;
 
@@ -74,41 +85,27 @@ function HydratedHarness() {
   return <Harness />;
 }
 
-function harnessTree({ hydrate }: { hydrate: boolean }) {
-  return (
-    <ChakraProvider value={defaultSystem}>
+function renderHarness({ hydrate = false }: { hydrate?: boolean } = {}) {
+  return render(
+    <DesignSystemProvider forcedTheme="light">
       {hydrate ? <HydratedHarness /> : <Harness />}
-    </ChakraProvider>
+    </DesignSystemProvider>,
   );
 }
 
-function renderHarness({ hydrate = false }: { hydrate?: boolean } = {}) {
-  const utils = render(harnessTree({ hydrate }));
-  return {
-    ...utils,
-    /** Re-renders under the URL the browser has just navigated to. */
-    followUrl: () => utils.rerender(harnessTree({ hydrate })),
-  };
-}
-
 /** The browser leaving the drawer behind: no drawer in the URL any more. */
-function browserLeavesTheDrawer(followUrl: () => void) {
-  act(() => {
-    mocks.currentDrawer = undefined;
-    mocks.drawerParams = {};
-    followUrl();
-  });
+function browserLeavesTheDrawer() {
+  act(() => setWindowAddress({ url: PAGE }));
 }
 
 const discardDialog = () => screen.queryByText("Discard trace corrections?");
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.currentDrawer = "traceV2Details";
-  mocks.drawerParams = { traceId: TRACE, edit: "1" };
+  mocks.backStack = [];
+  drawerChrome.setState(drawerChrome.getInitialState(), true);
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().openTrace(TRACE, null);
-  useDrawerStore.getState().setIsEditing(true);
+  setWindowAddress({ url: drawerAddress(TRACE, "&drawer.edit=1") });
   useTraceEditStore.getState().startEditing({ traceId: TRACE });
   useTraceEditStore.getState().setSpanName({
     spanId: "span-1",
@@ -161,13 +158,17 @@ describe("given a correction with unsaved changes", () => {
 
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
       expect(mocks.openDrawer).not.toHaveBeenCalled();
-      expect(useDrawerStore.getState().traceId).toBe(TRACE);
+      expect(getTraceDrawer().traceId).toBe(TRACE);
     });
   });
 
   describe("when the reviewer walks back through the drawer's history", () => {
     beforeEach(() => {
-      useDrawerStore.getState().pushTraceHistory({ traceId: EARLIER_TRACE, viewMode: "trace" });
+      mocks.backStack = [{ drawer: "traceV2Details", params: { traceId: EARLIER_TRACE, mode: "trace" } }];
+      setWindowAddress({
+        url: drawerAddress(TRACE, "&drawer.edit=1"),
+        state: { drawerStack: mocks.backStack },
+      });
     });
 
     /** @scenario "Going back to an earlier trace with unsaved changes asks first" */
@@ -177,10 +178,10 @@ describe("given a correction with unsaved changes", () => {
       act(() => navigation.goBack());
 
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
-      expect(mocks.openDrawer).not.toHaveBeenCalled();
-      expect(useDrawerStore.getState().traceId).toBe(TRACE);
+      expect(mocks.goBack).not.toHaveBeenCalled();
+      expect(getTraceDrawer().traceId).toBe(TRACE);
       // The history entry is still there for the reviewer to come back to.
-      expect(useDrawerStore.getState().traceBackStack).toHaveLength(1);
+      expect(getTraceDrawer().traceBackStack).toHaveLength(1);
     });
 
     /** @scenario "Going back to an earlier trace with unsaved changes asks first" */
@@ -190,10 +191,7 @@ describe("given a correction with unsaved changes", () => {
 
       fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
-      expect(mocks.openDrawer).toHaveBeenCalledWith(
-        "traceV2Details",
-        expect.objectContaining({ traceId: EARLIER_TRACE }),
-      );
+      expect(mocks.goBack).toHaveBeenCalledTimes(1);
     });
 
     /** @scenario "Going back to an earlier trace with unsaved changes asks first" */
@@ -203,29 +201,29 @@ describe("given a correction with unsaved changes", () => {
       act(() => navigation.goBackTo(0));
 
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
-      expect(mocks.openDrawer).not.toHaveBeenCalled();
-      expect(useDrawerStore.getState().traceBackStack).toHaveLength(1);
+      expect(mocks.goBackTo).not.toHaveBeenCalled();
+      expect(getTraceDrawer().traceBackStack).toHaveLength(1);
     });
   });
 
   describe("when browser history moves off the drawer", () => {
     /** @scenario "Browser back with unsaved changes keeps the correction" */
     it("keeps the correction and asks what to do with it", async () => {
-      const { followUrl } = renderHarness({ hydrate: true });
+      renderHarness({ hydrate: true });
 
-      browserLeavesTheDrawer(followUrl);
+      browserLeavesTheDrawer();
 
       expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE);
       expect(useTraceEditStore.getState().spanDrafts["span-1"]?.name).toBe("search the web");
-      expect(useDrawerStore.getState().traceId).toBe(TRACE);
+      expect(getTraceDrawer().traceId).toBe(TRACE);
       expect(await screen.findByText("Discard trace corrections?")).toBeVisible();
     });
 
     /** @scenario "Browser back with unsaved changes keeps the correction" */
     it("puts the drawer's link back so the question has somewhere to live", () => {
-      const { followUrl } = renderHarness({ hydrate: true });
+      renderHarness({ hydrate: true });
 
-      browserLeavesTheDrawer(followUrl);
+      browserLeavesTheDrawer();
 
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: TRACE,
@@ -235,12 +233,11 @@ describe("given a correction with unsaved changes", () => {
 
     /** @scenario "Browser back with unsaved changes keeps the correction" */
     it("closes the drawer once the reviewer discards", async () => {
-      const { followUrl } = renderHarness({ hydrate: true });
-      browserLeavesTheDrawer(followUrl);
+      renderHarness({ hydrate: true });
+      browserLeavesTheDrawer();
 
       fireEvent.click(await screen.findByRole("button", { name: "Discard corrections" }));
 
-      expect(useDrawerStore.getState().traceId).toBeNull();
       expect(useTraceEditStore.getState().editingTraceId).toBeNull();
       // The link the hydrator put back comes out again with the correction.
       expect(mocks.closeDrawer).toHaveBeenCalled();
@@ -260,111 +257,74 @@ describe("given a correction with nothing changed yet", () => {
   describe("when browser history moves off the drawer", () => {
     /** @scenario "Cancelling without changes leaves edit mode straight away" */
     it("closes the drawer without asking", () => {
-      const { followUrl } = renderHarness({ hydrate: true });
+      renderHarness({ hydrate: true });
 
-      browserLeavesTheDrawer(followUrl);
+      browserLeavesTheDrawer();
 
       expect(discardDialog()).not.toBeInTheDocument();
-      expect(useDrawerStore.getState().traceId).toBeNull();
       expect(useTraceEditStore.getState().editingTraceId).toBeNull();
     });
   });
 });
 
-// Reuses this file's own `mocks`/`useTraceDrawerUrlHydrator` wiring rather
-// than a separate file: this package runs with `isolate: false`, and a
-// second file mocking `use-drawer.ts` (or the router beneath it) for the
-// same hydrator module races this one for which mock the shared module
-// cache keeps, which is exactly the drawer.mode/projectId path under test.
-describe("drawer.mode and drawer.projectId on a soft navigation into the drawer", () => {
+describe("the trace the address names", () => {
   function HydratorOnlyHarness() {
     useTraceDrawerUrlHydrator();
     return null;
-  }
-
-  function renderHydratorOnly() {
-    const utils = render(<HydratorOnlyHarness />);
-    return { ...utils, followUrl: () => utils.rerender(<HydratorOnlyHarness />) };
   }
 
   beforeEach(() => {
     // The outer `beforeEach` opens TRACE in edit mode; none of that applies
     // here, so it's undone before each case sets up its own scenario.
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().closeDrawer();
-    useDrawerStore.getState().hydrateUrlState({
-      viewMode: "summary",
-      vizTab: "waterfall",
-      selectedSpanId: null,
-      pinnedSpanIds: [],
-      isEditing: false,
-    });
-    mocks.currentDrawer = undefined;
-    mocks.drawerParams = {};
+    setWindowAddress({ url: PAGE });
   });
 
-  /** @scenario "A soft navigation into a named view mode lands there, not on the default" */
-  it("applies drawer.mode and drawer.projectId on the same navigation that opens the trace", () => {
-    const { followUrl } = renderHydratorOnly();
+  /** @scenario "A link into edit mode starts the correction on that trace" */
+  it("starts a correction on the trace a link into edit mode names", () => {
+    render(<HydratorOnlyHarness />);
 
-    act(() => {
-      mocks.currentDrawer = "traceV2Details";
-      mocks.drawerParams = {
-        traceId: "trace-99",
-        t: "1700000000000",
-        mode: "terminal",
-        projectId: "proj-other",
-      };
-      followUrl();
-    });
+    act(() => setWindowAddress({ url: drawerAddress("trace-99", "&drawer.edit=1") }));
 
-    const store = useDrawerStore.getState();
-    expect(store.traceId).toBe("trace-99");
-    expect(store.occurredAtMs).toBe(1_700_000_000_000);
-    expect(store.viewMode).toBe("terminal");
-    expect(store.projectId).toBe("proj-other");
+    expect(useTraceEditStore.getState().editingTraceId).toBe("trace-99");
+    expect(getTraceDrawer().isEditing).toBe(true);
   });
 
-  it("applies a repeat navigation's newly requested mode rather than keeping the last one shown", () => {
-    const { followUrl } = renderHydratorOnly();
-
-    act(() => {
-      mocks.currentDrawer = "traceV2Details";
-      mocks.drawerParams = { traceId: "trace-99", t: "1700000000000", mode: "terminal" };
-      followUrl();
+  /** @scenario "Opening a different trace drops the draft from the last one" */
+  it("drops a correction written against another trace when this one opens", () => {
+    render(<HydratorOnlyHarness />);
+    act(() => setWindowAddress({ url: drawerAddress(TRACE, "&drawer.edit=1") }));
+    useTraceEditStore.getState().setSpanName({
+      spanId: "span-1",
+      name: "left behind",
+      baselineName: "handler",
     });
-    expect(useDrawerStore.getState().viewMode).toBe("terminal");
 
-    // The reader switched to the Trace tab inside the drawer — the same
-    // change `useDrawerUrlSync` would have already mirrored into the URL by
-    // the time of the next click.
-    act(() => {
-      useDrawerStore.getState().setViewModeTransient("trace");
-      mocks.drawerParams = { ...mocks.drawerParams, mode: "trace" };
-      followUrl();
-    });
-    expect(useDrawerStore.getState().viewMode).toBe("trace");
+    act(() => setWindowAddress({ url: drawerAddress("trace-99") }));
 
-    // Then asked for the same turn's replay again — same traceId and
-    // timestamp, mode forced back to terminal.
-    act(() => {
-      mocks.drawerParams = { ...mocks.drawerParams, mode: "terminal" };
-      followUrl();
-    });
-    expect(useDrawerStore.getState().viewMode).toBe("terminal");
+    expect(useTraceEditStore.getState().editingTraceId).toBeNull();
+    expect(useTraceEditStore.getState().spanDrafts).toEqual({});
   });
 
-  it("leaves the persisted mode alone when the navigation names no view mode", () => {
-    useDrawerStore.getState().setViewModeTransient("conversation");
-    const { followUrl } = renderHydratorOnly();
+  /** @scenario "The captured trace is a choice about the trace in front of me" */
+  it("opens the next trace corrected, whatever view the last one was on", () => {
+    render(<HydratorOnlyHarness />);
+    useTraceEditStore.getState().setOverlayView("original");
 
-    act(() => {
-      mocks.currentDrawer = "traceV2Details";
-      mocks.drawerParams = { traceId: "trace-only", t: "1700000000000" };
-      followUrl();
+    act(() => setWindowAddress({ url: drawerAddress("trace-99") }));
+
+    expect(useTraceEditStore.getState().overlayView).toBe("edited");
+  });
+
+  describe("when the drawer closes", () => {
+    it("puts away what only made sense while it was open", () => {
+      render(<HydratorOnlyHarness />);
+      act(() => setWindowAddress({ url: drawerAddress("trace-99") }));
+      drawerChrome.getState().setMaximized(true);
+
+      act(() => setWindowAddress({ url: PAGE }));
+
+      expect(drawerChrome.getState().isMaximized).toBe(false);
     });
-
-    expect(useDrawerStore.getState().traceId).toBe("trace-only");
-    expect(useDrawerStore.getState().viewMode).toBe("conversation");
   });
 });

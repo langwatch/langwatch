@@ -1,9 +1,9 @@
 import type { PresenceLocation } from "@langwatch/presence-contract";
 import { useMemo } from "react";
 
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
 import {
-  selectMostVisibleSection,
+  pickMostVisibleSection,
   useSectionTrackerStore,
 } from "../../../../behavior/presence/section-tracker-store.ts";
 import { usePresenceFeatureEnabled } from "../../../../behavior/presence/use-presence-feature-enabled.ts";
@@ -18,12 +18,12 @@ export function useTracesPresence(): void {
   const projectId = project?.id ?? null;
   const { enabled: featureEnabled } = usePresenceFeatureEnabled();
 
-  const isOpen = useDrawerStore((s) => s.isOpen);
-  const traceId = useDrawerStore((s) => s.traceId);
-  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
-  const viewMode = useDrawerStore((s) => s.viewMode);
-  const vizTab = useDrawerStore((s) => s.vizTab);
-  const section = useSectionTrackerStore(selectMostVisibleSection);
+  const isOpen = useTraceDrawer((s) => s.isOpen);
+  const traceId = useTraceDrawer((s) => s.traceId);
+  const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
+  const viewMode = useTraceDrawer((s) => s.viewMode);
+  const vizTab = useTraceDrawer((s) => s.vizTab);
+  const section = useSectionTrackerStore(pickMostVisibleSection);
 
   const location = useMemo<PresenceLocation>(() => {
     const route: PresenceLocation["route"] = {

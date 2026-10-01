@@ -12,7 +12,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { evaluationPassed, evaluationStatusColor } from "@langwatch/evaluator-browser-kit";
 import {
   findPromptReferenceInAncestors,
   flattenParamsToPromptAttributes,
@@ -31,6 +30,10 @@ import { ChevronDown, Clock, Play, Settings } from "react-feather";
 
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "../../../behavior/prompts/use-load-span-into-prompt-playground.ts";
 import { durationColor } from "../../../model/duration-color.ts";
+import {
+  evaluationPassed,
+  evaluationStatusColor,
+} from "../../../model/evaluator/evaluation-status.ts";
 import type { Project } from "../../../model/prisma-types.ts";
 import { OverflownTextWithTooltip } from "../../elements/overflown-text.tsx";
 import { RedactedField } from "../redacted-field.tsx";

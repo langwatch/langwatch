@@ -1,11 +1,9 @@
-import {
-  useLangyContextTarget,
-  type LangyContextTargetDescriptor,
-} from "@langwatch/langy-browser-kit";
 import type { Row } from "@tanstack/react-table";
 import React, { useMemo } from "react";
 
 import { useDensityStore } from "../../../../../behavior/density.store.ts";
+import { type LangyContextTargetDescriptor } from "../../../../../behavior/langy/langy-context-target.store.ts";
+import { useLangyContextTarget } from "../../../../../behavior/langy/use-langy-context-target.ts";
 import { useRowPulseStore } from "../../../../../behavior/row-pulse.store.ts";
 import { Tbody, Td, Tr } from "../../../../elements/explorer/trace-table/table-primitives.tsx";
 import { useDensityTokens } from "../../hooks/use-density-tokens.ts";

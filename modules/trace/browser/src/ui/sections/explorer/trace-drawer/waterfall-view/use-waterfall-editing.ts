@@ -2,7 +2,7 @@ import type { SpanTreeNode, TraceEditOverlayPatch } from "@langwatch/trace-contr
 import { expandDeletedSpanIds } from "@langwatch/trace-contract";
 import { useCallback, useMemo } from "react";
 
-import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useTraceDrawer, getTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import type { SpanEditDraft } from "../../../../../behavior/trace-edit.store.ts";
 import {
   selectIsSpanDeleted,
@@ -42,9 +42,9 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
   draftNames: ReadonlyMap<string, string>;
   toggleSpanDeleted: (spanId: string) => void;
 } {
-  const isEditing = useDrawerStore((s) => s.isEditing);
-  const clearSpan = useDrawerStore((s) => s.clearSpan);
-  const unpinSpan = useDrawerStore((s) => s.unpinSpan);
+  const isEditing = useTraceDrawer((s) => s.isEditing);
+  const clearSpan = useTraceDrawer((s) => s.clearSpan);
+  const unpinSpan = useTraceDrawer((s) => s.unpinSpan);
   const basePatch = useTraceEditStore((s) => s.basePatch);
   const sessionDeleted = useTraceEditStore((s) => s.deletedSpanIds);
   const restoredSpanIds = useTraceEditStore((s) => s.restoredSpanIds);
@@ -82,7 +82,7 @@ export function useWaterfallEditing(spans: SpanTreeNode[]): {
       store.deleteSpan(spanId);
       // A span the correction removes can no longer be inspected, so it stops
       // being the open detail and stops holding a tab.
-      const drawer = useDrawerStore.getState();
+      const drawer = getTraceDrawer();
       if (drawer.selectedSpanId === spanId) clearSpan();
       if (drawer.pinnedSpanIds.includes(spanId)) unpinSpan(spanId);
     },

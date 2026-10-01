@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -28,7 +28,7 @@ vi.mock("../../../langy/hooks/use-show-langy.ts", () => ({
 vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => langyMock.enabled,
 }));
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => {
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => {
   const actual = (await importOriginal()) as object;
   // Only whether the panel is up: the ask itself leaves through the host.
   const state = () => ({ isOpen: langyMock.panelOpen });
@@ -100,8 +100,7 @@ vi.mock("@paper-design/shaders-react", () => ({
   MeshGradient: () => null,
 }));
 
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import {
   TraceHostApi,
   TraceHostProvider,
@@ -166,12 +165,10 @@ beforeEach(() => {
 });
 
 function renderSearchBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceHostProvider value={host}>
-        <SearchBar />
-      </TraceHostProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TraceHostProvider value={host}>
+      <SearchBar />
+    </TraceHostProvider>,
   );
 }
 

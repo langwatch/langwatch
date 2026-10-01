@@ -1,7 +1,7 @@
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { readableDate } from "@langwatch/trace-browser-kit";
-import { UserAvatar } from "@langwatch/user-browser-kit";
 
+import { readableDate } from "../../../../../model/display-formatters.ts";
+import { PersonAvatar } from "../../../person-avatar.tsx";
 import type { AnnotationByTrace } from "../../../use-annotations-by-trace-ids.ts";
 
 /**
@@ -24,7 +24,7 @@ export function AnchorCommentThread({ comments }: { comments: AnnotationByTrace[
     >
       {comments.map((comment) => (
         <HStack key={comment.id} gap={2.5} align="start">
-          <UserAvatar
+          <PersonAvatar
             size="xs"
             background="gray.solid"
             color="white"

@@ -1,14 +1,14 @@
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
-import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   formatCost,
   formatDuration,
-  formatRelativeTime,
   formatTokens,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/design-system/display-formatters";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 
 import { formatPreview } from "../../../../../../../behavior/preview-formatter.ts";
+import { formatRelativeTime } from "../../../../../../../model/display-formatters.ts";
 import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
 import { Td, Tr } from "../../../../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { DensityTokens } from "../../../../hooks/use-density-tokens.ts";

@@ -4,8 +4,8 @@
  * Unit tests for IntegrationCTACard rendering and dismiss logic.
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -59,11 +59,7 @@ beforeEach(() => {
 });
 
 function renderCard() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IntegrationCTACard />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<IntegrationCTACard />);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

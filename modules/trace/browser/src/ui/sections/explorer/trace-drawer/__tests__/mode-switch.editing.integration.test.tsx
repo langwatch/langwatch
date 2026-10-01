@@ -2,8 +2,8 @@
  * Which views a reviewer annotating a trace can still open.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -23,16 +23,14 @@ const EDITING_REASON = "Finish annotating to switch views";
 
 function renderTabs({ isEditing }: { isEditing: boolean }) {
   const onViewModeChange = vi.fn();
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <ModeSwitch
-        viewMode="trace"
-        onViewModeChange={onViewModeChange}
-        hasConversation
-        showTerminal
-        isEditing={isEditing}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <ModeSwitch
+      viewMode="trace"
+      onViewModeChange={onViewModeChange}
+      hasConversation
+      showTerminal
+      isEditing={isEditing}
+    />,
   );
   return { onViewModeChange };
 }

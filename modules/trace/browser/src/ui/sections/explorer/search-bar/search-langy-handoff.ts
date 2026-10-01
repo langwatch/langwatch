@@ -1,6 +1,5 @@
-import type { TraceViewContextChip } from "@langwatch/trace-browser-kit";
-
 import type { TraceLangyAskRequest, TraceLangyContext } from "../../../../behavior/trace-host.ts";
+import type { TraceViewContextChip } from "../../../../behavior/view-context-chip.ts";
 import { filterContextChip } from "../../langy/hooks/use-langy-filter-context.ts";
 
 /**

@@ -1,8 +1,8 @@
 // Turn separator actions: open trace to correct, and queue-walk tick
 // counter.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -12,8 +12,10 @@ const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
 }));
 
-vi.mock("../../scenario-roles.tsx", async () => {
-  const actual = await vi.importActual<typeof scenarioRolesModule>("../../scenario-roles");
+vi.mock("../../../../../../behavior/scenario-role.store.tsx", async () => {
+  const actual = await vi.importActual<typeof scenarioRolesModule>(
+    "../../../../../../behavior/scenario-role.store.tsx",
+  );
   return { ...actual, useIsScenarioRole: () => false };
 });
 
@@ -27,6 +29,11 @@ vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
     hasPermission: (permission: string) =>
       permission === "annotations:update" ? mocks.canUpdateAnnotations : false,
   }),
+}));
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
@@ -46,13 +53,19 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-import { isSessionMarked, useAnnotationQueueSessionStore } from "@langwatch/trace-browser-kit";
-
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import {
+  isSessionMarked,
+  useAnnotationQueueSessionStore,
+} from "../../../../../../behavior/annotation-queue-session.store.ts";
+import {
+  openTraceDrawerAt,
+  setWindowAddress,
+} from "../../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
+import type * as scenarioRolesModule from "../../../../../../behavior/scenario-role.store.tsx";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { NO_TRACE_EVENTS, type TraceListItem } from "../../../types/trace.ts";
 import { enterTraceEditMode } from "../../../utils/trace-edit-mode.ts";
-import type * as scenarioRolesModule from "../../scenario-roles.tsx";
 import { ChatTurnRow } from "../chat-turn-row.tsx";
 
 const TRACE_ID = "trace-1";
@@ -82,22 +95,20 @@ function turn(): TraceListItem {
 }
 
 function renderTurn({ showSessionCheckbox = false } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <ChatTurnRow
-        layout="thread"
-        turn={turn()}
-        userText="a question"
-        assistantText="the original answer"
-        assistantReasoning=""
-        gapSecs={0}
-        shouldShowGap={false}
-        index={1}
-        isCurrent={false}
-        onSelect={() => undefined}
-        showSessionCheckbox={showSessionCheckbox}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <ChatTurnRow
+      layout="thread"
+      turn={turn()}
+      userText="a question"
+      assistantText="the original answer"
+      assistantReasoning=""
+      gapSecs={0}
+      shouldShowGap={false}
+      index={1}
+      isCurrent={false}
+      onSelect={() => undefined}
+      showSessionCheckbox={showSessionCheckbox}
+    />,
   );
 }
 
@@ -125,8 +136,7 @@ beforeEach(() => {
     marks: {},
     handoff: "idle",
   });
-  useDrawerStore.getState().closeDrawer();
-  useDrawerStore.getState().setViewModeTransient("summary");
+  setWindowAddress({ url: "/my-project/traces" });
   useTraceEditStore.getState().discard();
   useTraceEditStore.getState().clearPendingExit();
   cleanup();
@@ -149,7 +159,7 @@ describe("given a reviewer who may correct annotated traces", () => {
   describe("when they choose it while reading the conversation", () => {
     /** @scenario "The turn separator offers to edit the turn's trace" */
     it("opens that turn's trace for editing, off the conversation tab", () => {
-      useDrawerStore.getState().setViewModeTransient("conversation");
+      openTraceDrawerAt({ mode: "conversation" });
       renderTurn();
 
       fireEvent.click(editTrace());
@@ -157,9 +167,9 @@ describe("given a reviewer who may correct annotated traces", () => {
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: TRACE_ID,
         t: String(OCCURRED_AT_MS),
+        mode: "summary",
         urlParams: { edit: "1" },
       });
-      expect(useDrawerStore.getState().viewMode).toBe("summary");
     });
   });
 });
@@ -212,27 +222,22 @@ describe("given a reviewer who may not update annotations", () => {
 });
 
 describe("given the drawer is already open on another trace's conversation", () => {
-  // The drawer must already hold the asked-for state when the address changes:
-  // a URL that asks for state the store does not hold yet leaves the shell's
-  // URL sync and the page-level hydrator rewriting the URL against each other.
+  // The drawer reads the address, so the move is one open call carrying the
+  // trace, the edit flag and the summary view; nothing is set on the side first.
   /** @scenario "Edit trace works while the drawer is already open on the conversation" */
-  it("moves the drawer store first, so the address only confirms it", () => {
-    useDrawerStore.getState().openTrace("other-trace", 111);
-    useDrawerStore.getState().setViewModeTransient("conversation");
+  it("asks the address for the turn's trace in edit mode, on the summary", () => {
+    openTraceDrawerAt({ traceId: "other-trace", t: "111", mode: "conversation" });
     renderTurn();
 
     fireEvent.click(editTrace());
 
-    const drawer = useDrawerStore.getState();
-    expect(drawer.traceId).toBe(TRACE_ID);
-    expect(drawer.isEditing).toBe(true);
-    expect(drawer.viewMode).toBe("summary");
-    expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
     expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
       traceId: TRACE_ID,
       t: String(OCCURRED_AT_MS),
+      mode: "summary",
       urlParams: { edit: "1" },
     });
+    expect(getTraceDrawer().traceId).toBe("other-trace");
   });
 });
 
@@ -243,8 +248,8 @@ describe("given the drawer is closed", () => {
 
     fireEvent.click(editTrace());
 
-    expect(useDrawerStore.getState().traceId).toBeNull();
-    expect(useDrawerStore.getState().isEditing).toBe(false);
+    expect(getTraceDrawer().traceId).toBeNull();
+    expect(getTraceDrawer().isEditing).toBe(false);
     expect(useTraceEditStore.getState().editingTraceId).toBeNull();
     expect(mocks.openDrawer).toHaveBeenCalledOnce();
   });
@@ -252,7 +257,7 @@ describe("given the drawer is closed", () => {
 
 describe("given an unsaved correction on another turn's trace", () => {
   function startDirtyCorrectionOn(traceId: string) {
-    useDrawerStore.getState().openTrace(traceId, 111);
+    openTraceDrawerAt({ traceId, t: "111" });
     enterTraceEditMode(traceId);
     useTraceEditStore.getState().setTraceOutput({
       text: "corrected",
@@ -271,12 +276,12 @@ describe("given an unsaved correction on another turn's trace", () => {
   it("asks before discarding, and cancelling keeps everything", () => {
     expect(mocks.openDrawer).not.toHaveBeenCalled();
     expect(useTraceEditStore.getState().pendingExit).not.toBeNull();
-    expect(useDrawerStore.getState().traceId).toBe("other-trace");
+    expect(getTraceDrawer().traceId).toBe("other-trace");
     expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
 
     useTraceEditStore.getState().clearPendingExit();
 
-    expect(useDrawerStore.getState().traceId).toBe("other-trace");
+    expect(getTraceDrawer().traceId).toBe("other-trace");
     expect(useTraceEditStore.getState().editingTraceId).toBe("other-trace");
     expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
   });
@@ -287,12 +292,11 @@ describe("given an unsaved correction on another turn's trace", () => {
     // the parked move.
     const run = useTraceEditStore.getState().pendingExit;
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setIsEditing(false);
+    getTraceDrawer().setIsEditing(false);
     run?.();
 
-    expect(useDrawerStore.getState().traceId).toBe(TRACE_ID);
-    expect(useDrawerStore.getState().isEditing).toBe(true);
-    expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
+    expect(getTraceDrawer().isEditing).toBe(false);
+    expect(useTraceEditStore.getState().editingTraceId).toBeNull();
     expect(mocks.openDrawer).toHaveBeenCalledOnce();
   });
 });
@@ -300,13 +304,12 @@ describe("given an unsaved correction on another turn's trace", () => {
 describe("given the turn's own trace is already being corrected", () => {
   /** @scenario "Re-entering edit mode on the same trace keeps the draft" */
   it("re-opens the editor without asking and keeps the draft", () => {
-    useDrawerStore.getState().openTrace(TRACE_ID, OCCURRED_AT_MS);
+    openTraceDrawerAt({ traceId: TRACE_ID, t: String(OCCURRED_AT_MS), mode: "conversation" });
     enterTraceEditMode(TRACE_ID);
     useTraceEditStore.getState().setTraceOutput({
       text: "corrected",
       baselineText: "original",
     });
-    useDrawerStore.getState().setViewModeTransient("conversation");
     renderTurn();
 
     fireEvent.click(editTrace());
@@ -315,7 +318,7 @@ describe("given the turn's own trace is already being corrected", () => {
     expect(useTraceEditStore.getState().pendingExit).toBeNull();
     expect(useTraceEditStore.getState().editingTraceId).toBe(TRACE_ID);
     expect(useTraceEditStore.getState().traceOutputDraft).not.toBeNull();
-    expect(useDrawerStore.getState().isEditing).toBe(true);
+    expect(getTraceDrawer().isEditing).toBe(true);
   });
 });
 

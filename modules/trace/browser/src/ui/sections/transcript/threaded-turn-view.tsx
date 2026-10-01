@@ -1,9 +1,10 @@
 import { Box, chakra, Flex, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
+import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import { type ChatLayout, type ConversationTurn } from "@langwatch/trace-contract/transcript";
 import { useMemo, useState } from "react";
 import { LuChevronDown, LuUser } from "react-icons/lu";
 
+import { useIsScenarioRole } from "../../../behavior/scenario-role.store.tsx";
 import { summarizeTurn } from "../../../model/transcript/turns.ts";
 import { getRolePalette, ROLE_ICONS, ROLE_LABELS } from "../../blocks/transcript/role-chip.tsx";
 import { FlatTurnView } from "./flat-turn-view.tsx";

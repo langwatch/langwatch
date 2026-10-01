@@ -13,11 +13,12 @@ import {
 } from "@langwatch/design-system/popover";
 import { Box, Button, HStack, Input, Stack, Tabs, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type LensConfig, useViewStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { useState } from "react";
 import { LuCopy, LuFilePlus, LuPencil, LuTrash2, LuUndo2 } from "react-icons/lu";
 
+import { useViewStore } from "../../../../behavior/explorer.store.ts";
+import { type LensConfig } from "../../../../behavior/view.slice.ts";
 import { LensNameDialog } from "./lens-name-dialog.tsx";
 
 interface LensTabProps {

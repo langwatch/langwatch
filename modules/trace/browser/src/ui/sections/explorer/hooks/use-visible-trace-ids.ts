@@ -1,6 +1,6 @@
 import { toEpochMs } from "@langwatch/time";
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 

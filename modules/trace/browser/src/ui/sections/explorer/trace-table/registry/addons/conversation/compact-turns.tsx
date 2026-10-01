@@ -1,5 +1,10 @@
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/use-drawer";
 import {
+  formatCost,
+  formatDuration,
+  formatTokens,
+} from "@langwatch/design-system/display-formatters";
+import {
   Badge,
   Box,
   Button,
@@ -8,18 +13,13 @@ import {
   Icon,
   Text,
 } from "@langwatch/design-system/primitives";
-import {
-  formatCost,
-  formatDuration,
-  formatISOTimestamp,
-  formatTokens,
-} from "@langwatch/trace-browser-kit";
 import type { Cell } from "@tanstack/react-table";
 import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 
 import { useTimeFormatStore } from "../../../../../../../behavior/time-format.store.ts";
+import { formatISOTimestamp } from "../../../../../../../model/display-formatters.ts";
 import { truncateText } from "../../../../../../../model/explorer/trace-table/chat-content.ts";
 import {
   EXPANDED_BG,

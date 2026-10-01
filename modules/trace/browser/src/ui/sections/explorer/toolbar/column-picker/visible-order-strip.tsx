@@ -9,9 +9,10 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Box, HStack, Icon, IconButton, Stack, Text } from "@langwatch/design-system/primitives";
-import type { LensColumnOption } from "@langwatch/trace-browser-kit";
 import { ArrowDown, ArrowUp, GripVertical, X } from "lucide-react";
 import type React from "react";
+
+import type { LensColumnOption } from "../../../../../model/lens-capabilities.ts";
 
 /**
  * Compact drag-to-reorder strip of the visible columns. Each row is

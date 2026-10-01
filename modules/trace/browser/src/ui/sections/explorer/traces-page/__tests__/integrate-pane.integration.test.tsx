@@ -2,8 +2,8 @@
 // action (not tab).
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/integrate-pane.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -23,7 +23,7 @@ vi.mock("../../../../../behavior/langy/use-can-ask-langy.ts", () => ({
   useCanAskLangy: () => true,
 }));
 
-vi.mock("@langwatch/langy-browser-kit", async (importOriginal) => ({
+vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) => ({
   ...((await importOriginal()) as object),
   useLangyStore: (selector: (s: { askLangy: () => void }) => unknown) =>
     selector({ askLangy: vi.fn() }),
@@ -39,6 +39,16 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
       getPrompt: { useQuery: () => ({ data: undefined }) },
     },
   },
+}));
+
+vi.mock("@langwatch/api-key-client", () => ({
+  SETUP_AGENT_PERMISSIONS: [],
+  useMintPersonalToken: () => ({
+    token: undefined,
+    isMinting: false,
+    scopeNote: "",
+    mint: vi.fn(),
+  }),
 }));
 
 // The faded page chrome is the real SearchBar and Toolbar, which pull
@@ -63,11 +73,7 @@ vi.mock("../../onboarding/spotlights/spotlight-overlay.tsx", () => ({
 import { IntegratePane } from "../integrate-pane.tsx";
 
 function renderPane() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <IntegratePane />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<IntegratePane />);
 }
 
 afterEach(() => {

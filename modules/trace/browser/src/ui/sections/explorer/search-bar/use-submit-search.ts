@@ -1,5 +1,4 @@
 import { toaster } from "@langwatch/design-system/toaster";
-import { useFilterStore, type SearchNotice } from "@langwatch/trace-browser-kit";
 import {
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -10,6 +9,8 @@ import {
 } from "@langwatch/trace-contract";
 import { type RefObject, useCallback, useRef } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { type SearchNotice } from "../../../../behavior/query.slice.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import type { InstantEvalRoutePayload } from "../../../../model/instant-eval-route.ts";

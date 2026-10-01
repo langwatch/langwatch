@@ -1,7 +1,7 @@
 import { Box, HStack, type SystemStyleObject, Text } from "@langwatch/design-system/primitives";
-import type { LangyContextTargetProps } from "@langwatch/langy-browser-kit";
 import type React from "react";
 
+import type { LangyContextTargetProps } from "../../../../behavior/langy/use-langy-context-target.ts";
 import { Tbody } from "../../../elements/explorer/trace-table/table-primitives.tsx";
 import type { TraceStatus } from "../types/trace.ts";
 

@@ -1,25 +1,29 @@
+import { defineSlice } from "@langwatch/browser-host/global-store";
 /**
  * @vitest-environment jsdom
  * The presence toggle as the account dropdown draws it.
  * Spec: specs/traces-v2/presence-toggle-placement.feature
  */
-import { ChakraProvider, defaultSystem, Menu } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Menu } from "@langwatch/design-system/menu";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import {
+  PRESENCE_PREFERENCES_ABSENT,
+  PRESENCE_PREFERENCES_SLICE,
+  type PresencePreferencesState,
+} from "@langwatch/presence-contract";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { usePresencePreferencesStore } from "../../../../behavior/presence/presence-preferences-store.ts";
 import { PresenceMenuItem, type PresenceMenuItemProps } from "../presence-menu-item.tsx";
 
 function renderInOpenMenu(switches: PresenceMenuItemProps) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <Menu.Root defaultOpen>
-        <Menu.Trigger>open</Menu.Trigger>
-        <Menu.Content>
-          <PresenceMenuItem {...switches} />
-        </Menu.Content>
-      </Menu.Root>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <Menu.Root defaultOpen>
+      <Menu.Trigger>open</Menu.Trigger>
+      <Menu.Content>
+        <PresenceMenuItem {...switches} />
+      </Menu.Content>
+    </Menu.Root>,
   );
 }
 
@@ -29,6 +33,16 @@ function presenceRow(): HTMLElement | undefined {
     .getAllByRole("menuitem")
     .find((element) => /Presence|presence/.test(element.textContent ?? ""));
 }
+
+// Stands in for presence, the owner of the slice, which this package only reads.
+const usePresencePreferencesStore = defineSlice<PresencePreferencesState>({
+  name: PRESENCE_PREFERENCES_SLICE,
+  create: (set, get) => ({
+    ...PRESENCE_PREFERENCES_ABSENT,
+    setHidden: (hidden) => set({ hidden }),
+    toggleHidden: () => set({ hidden: !get().hidden }),
+  }),
+});
 
 beforeEach(() => {
   usePresencePreferencesStore.getState().setHidden(false);

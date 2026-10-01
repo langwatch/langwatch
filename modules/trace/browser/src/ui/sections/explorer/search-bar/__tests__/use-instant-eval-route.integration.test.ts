@@ -1,13 +1,13 @@
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment jsdom
  *
  * The refusals on the Explorer's `instant_eval` route: a popover, or the phrase search.
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
-import { useFilterStore } from "@langwatch/trace-browser-kit";
-import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import type { InstantEvalRoutePayload } from "../../../../../model/instant-eval-route.ts";
 import { useInstantEvalRoute } from "../use-instant-eval-route.ts";
 

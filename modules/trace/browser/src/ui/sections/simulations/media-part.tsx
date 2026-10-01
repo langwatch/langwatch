@@ -2,7 +2,7 @@ import type { MediaPartProps, MediaProbeResult } from "@langwatch/scenario-contr
 import { useEffect, useState } from "react";
 
 import { LentMediaPart } from "../../../behavior/lent-media-part.tsx";
-import { api } from "../../../behavior/trace-api.ts";
+import { useStoredObjectHead } from "../../../behavior/reads/use-project-reads.ts";
 
 /** Where the part's bytes live: a binary's own url, or a url-typed source. */
 function urlOfPart(part: MediaPartProps["part"]): string | undefined {
@@ -23,10 +23,11 @@ export function MediaPart(props: MediaPartProps) {
   useEffect(() => {
     setProbeEnabled(false);
   }, [storedObjectId]);
-  const probe = api.storedObjects.headById.useQuery(
-    { projectId: props.projectId, id: storedObjectId ?? "" },
-    { enabled: probeEnabled && !!storedObjectId && !!props.projectId },
-  );
+  const probe = useStoredObjectHead({
+    projectId: props.projectId,
+    id: storedObjectId,
+    enabled: probeEnabled,
+  });
   const probeResult: MediaProbeResult = probe.isError ? null : probe.data;
 
   return (

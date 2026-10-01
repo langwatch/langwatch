@@ -2,8 +2,8 @@
  * Who is offered the annotation pass.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -11,6 +11,11 @@ import "@testing-library/jest-dom/vitest";
 const mocks = vi.hoisted(() => ({
   canUpdateAnnotations: true,
   openDrawer: vi.fn(),
+}));
+
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
 }));
 
 vi.mock("@langwatch/browser-host/use-drawer", () => ({
@@ -50,8 +55,8 @@ vi.mock("../../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-const { useDrawerStore } = await import("../../../../../../index.ts");
-const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { getTraceDrawer, useTraceEditStore } = await import("../../../../../../index.ts");
+const { openTraceDrawerAt } = await import("../../../../../../__tests__/window-location-router.ts");
 const { TraceOverflowMenu } = await import("../trace-overflow-menu.tsx");
 
 const renderMenu = ({
@@ -63,22 +68,20 @@ const renderMenu = ({
   traceId?: string;
   onAddToAnnotationQueue?: () => void;
 } = {}) => {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceOverflowMenu
-        traceId={traceId}
-        conversationId={null}
-        onCopyTraceId={vi.fn()}
-        onFindSimilar={null}
-        dejaViewHref={null}
-        onOpenRawJson={vi.fn()}
-        onShowShortcuts={vi.fn()}
-        onAddToAnnotationQueue={onAddToAnnotationQueue}
-        pinned={false}
-        onTogglePinned={vi.fn()}
-        readOnly={readOnly}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <TraceOverflowMenu
+      traceId={traceId}
+      conversationId={null}
+      onCopyTraceId={vi.fn()}
+      onFindSimilar={null}
+      dejaViewHref={null}
+      onOpenRawJson={vi.fn()}
+      onShowShortcuts={vi.fn()}
+      onAddToAnnotationQueue={onAddToAnnotationQueue}
+      pinned={false}
+      onTogglePinned={vi.fn()}
+      readOnly={readOnly}
+    />,
   );
   return { onAddToAnnotationQueue };
 };
@@ -100,8 +103,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.canUpdateAnnotations = true;
   useTraceEditStore.getState().discard();
-  useDrawerStore.getState().setIsEditing(false);
-  useDrawerStore.getState().setViewModeTransient("trace");
+  openTraceDrawerAt({ mode: "trace" });
 });
 
 afterEach(() => {
@@ -128,13 +130,13 @@ describe("given a reviewer reading a trace in the drawer", () => {
       await user.click(screen.getByText("Edit trace"));
 
       expect(useTraceEditStore.getState().editingTraceId).toBe("trace-1");
-      expect(useDrawerStore.getState().isEditing).toBe(true);
+      expect(getTraceDrawer().isEditing).toBe(true);
     });
   });
 
   describe("when they are reading the conversation view", () => {
     beforeEach(() => {
-      useDrawerStore.getState().setViewModeTransient("conversation");
+      openTraceDrawerAt({ mode: "conversation" });
     });
 
     /** @scenario "Starting to annotate from the conversation leaves the reader there" */
@@ -145,8 +147,8 @@ describe("given a reviewer reading a trace in the drawer", () => {
 
       await user.click(screen.getByText("Edit trace"));
 
-      expect(useDrawerStore.getState().viewMode).toBe("conversation");
-      expect(useDrawerStore.getState().isEditing).toBe(true);
+      expect(getTraceDrawer().viewMode).toBe("conversation");
+      expect(getTraceDrawer().isEditing).toBe(true);
     });
   });
 

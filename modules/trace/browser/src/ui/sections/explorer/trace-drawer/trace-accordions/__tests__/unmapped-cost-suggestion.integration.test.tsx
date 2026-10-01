@@ -2,10 +2,9 @@
 // opens model costs page in new window.
 // @vitest-environment jsdom
 // Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SpanAccordions } from "../span-accordions.tsx";
@@ -106,14 +105,8 @@ function makeDetail(overrides: Partial<SpanDetail> = {}): SpanDetail {
   };
 }
 
-const Wrapper = ({ children }: { children?: ReactNode }) => (
-  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
-);
-
 function renderSpanDetail() {
-  return render(<SpanAccordions traceId="trace-1" span={span} />, {
-    wrapper: Wrapper,
-  });
+  return renderWithDesignSystem(<SpanAccordions traceId="trace-1" span={span} />);
 }
 
 describe("Feature: Unmapped model cost suggestion in span details", () => {

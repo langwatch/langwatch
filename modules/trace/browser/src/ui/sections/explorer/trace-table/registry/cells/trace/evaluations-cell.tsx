@@ -1,9 +1,9 @@
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Badge, Box, HStack, Text } from "@langwatch/design-system/primitives";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type React from "react";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
+import { useFilterStore } from "../../../../../../../behavior/explorer.store.ts";
 import type { TraceEvalResult, TraceListItem } from "../../../../types/trace.ts";
 import { ioPreviewWillRenderFor } from "../../addons/trace/io-preview-addon.tsx";
 import { EvalChip } from "../../shared-chips.tsx";

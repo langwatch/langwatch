@@ -1,4 +1,4 @@
-import type { SuggestionState } from "@langwatch/trace-browser-kit";
+import type { SuggestionState } from "@langwatch/trace-contract";
 import { TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
 

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { NumericMode } from "../../../../../behavior/numeric-mode.store.ts";
@@ -16,20 +16,18 @@ const LABELS: Record<string, string> = {
 
 function renderPopover({ visible = ["model"] }: { visible?: string[] } = {}) {
   const calls: string[] = [];
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <FacetManagerPopover
-        open
-        orderedKeysAll={Object.keys(LABELS)}
-        sectionByKey={new Map(Object.entries(LABELS).map(([k, label]) => [k, { label }]))}
-        isVisible={(key) => visible.includes(key)}
-        onShow={(key) => calls.push(`show:${key}`)}
-        onHide={(key) => calls.push(`hide:${key}`)}
-        onResetAll={() => calls.push("reset")}
-        numericModeByKey={new Map<string, NumericMode>([["metric.cost", "range"]])}
-        setNumericMode={({ field, mode }) => calls.push(`mode:${field}:${mode}`)}
-      />
-    </ChakraProvider>,
+  renderWithDesignSystem(
+    <FacetManagerPopover
+      open
+      orderedKeysAll={Object.keys(LABELS)}
+      sectionByKey={new Map(Object.entries(LABELS).map(([k, label]) => [k, { label }]))}
+      isVisible={(key) => visible.includes(key)}
+      onShow={(key) => calls.push(`show:${key}`)}
+      onHide={(key) => calls.push(`hide:${key}`)}
+      onResetAll={() => calls.push("reset")}
+      numericModeByKey={new Map<string, NumericMode>([["metric.cost", "range"]])}
+      setNumericMode={({ field, mode }) => calls.push(`mode:${field}:${mode}`)}
+    />,
   );
   return calls;
 }

@@ -2,9 +2,9 @@
  * Integration tests for the SpanTypeTag component.
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { Span } from "@langwatch/trace-contract";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { getEvaluationResult, SpanTypeTag } from "../span-details.tsx";
@@ -32,11 +32,7 @@ describe("<SpanTypeTag/>", () => {
         value: { status: "processed", passed: true, score: 0.95 },
       });
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <SpanTypeTag span={span} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<SpanTypeTag span={span} />);
 
       expect(screen.getByText("EVALUATION")).toBeDefined();
     });
@@ -87,11 +83,7 @@ describe("<SpanTypeTag/>", () => {
     it("renders EVALUATION badge without evaluation result", () => {
       const span = buildEvaluationSpan(null);
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <SpanTypeTag span={span} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<SpanTypeTag span={span} />);
 
       expect(screen.getByText("EVALUATION")).toBeDefined();
       expect(getEvaluationResult(span)).toBeUndefined();
@@ -106,11 +98,7 @@ describe("<SpanTypeTag/>", () => {
         name: "gpt-4",
       } as Span;
 
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <SpanTypeTag span={span} />
-        </ChakraProvider>,
-      );
+      renderWithDesignSystem(<SpanTypeTag span={span} />);
 
       expect(screen.getByText("LLM")).toBeDefined();
     });

@@ -6,6 +6,10 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
+// Declare the `trace:` slices at install, so langy and annotation read them from first paint.
+import "./behavior/annotation-queue-session.store.ts";
+import "./behavior/explorer-scope.slice.ts";
+
 export const traceWeb = defineWebModule("trace")
   .withHosts({
     requires: ["TraceHostApi"],

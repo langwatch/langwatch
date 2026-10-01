@@ -1,3 +1,4 @@
+import { ConversationExpandContext } from "@langwatch/design-system/conversation-expand-context";
 import {
   Box,
   Button,
@@ -9,7 +10,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { hasRedactionMarker } from "@langwatch/redaction";
-import { ConversationExpandContext } from "@langwatch/trace-browser-kit";
 import {
   buildConversationMarkdownChunks,
   buildParsedTurns,

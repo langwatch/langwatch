@@ -1,8 +1,9 @@
 import { Box, chakra, Flex, Icon, Text } from "@langwatch/design-system/primitives";
-import { getDisplayRoleVisuals, useIsScenarioRole } from "@langwatch/trace-browser-kit";
+import { getDisplayRoleVisuals } from "@langwatch/design-system/role-visuals";
 import type { ContentBlock, ConversationTurn } from "@langwatch/trace-contract/transcript";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
 
+import { useIsScenarioRole } from "../../../behavior/scenario-role.store.tsx";
 import {
   getRolePalette,
   ROLE_ICONS,

@@ -4,13 +4,15 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useFilterStore, type FacetItem } from "@langwatch/trace-browser-kit";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { EMPTY_AST, parse } from "@langwatch/trace-contract";
-import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
 
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
+import { type FacetItem } from "../../../../../behavior/explorer/filter-sidebar/types.ts";
 import { EventDrilldown } from "../event-drilldown.tsx";
 
 const buildItem = ({
@@ -33,11 +35,7 @@ const buildItem = ({
 });
 
 const renderDrilldown = ({ item = buildItem(), ast = EMPTY_AST, toggleFacet = vi.fn() } = {}) => {
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<EventDrilldown item={item} ast={ast} toggleFacet={toggleFacet} />);
   return { toggleFacet };
 };
 
@@ -179,19 +177,17 @@ describe("EventDrilldown", () => {
         // shape no endpoint currently emits — guarded anyway so a future
         // payload change cannot produce a chevron expanding into a blank strip.
         for (const eventMetrics of [undefined, []]) {
-          const { container, unmount } = render(
-            <ChakraProvider value={defaultSystem}>
-              <EventDrilldown
-                item={{
-                  value: "custom_marker",
-                  label: "custom_marker",
-                  count: 3,
-                  eventMetrics,
-                }}
-                ast={EMPTY_AST}
-                toggleFacet={vi.fn()}
-              />
-            </ChakraProvider>,
+          const { container, unmount } = renderWithDesignSystem(
+            <EventDrilldown
+              item={{
+                value: "custom_marker",
+                label: "custom_marker",
+                count: 3,
+                eventMetrics,
+              }}
+              ast={EMPTY_AST}
+              toggleFacet={vi.fn()}
+            />,
           );
 
           expect(container).toBeEmptyDOMElement();
@@ -241,13 +237,13 @@ describe("EventDrilldown", () => {
       const toggleFacet = ({ field, value }: { field: string; value: string }) =>
         useFilterStore.getState().toggleFacet(field, value);
       const tree = () => (
-        <ChakraProvider value={defaultSystem}>
+        <DesignSystemProvider forcedTheme="light">
           <EventDrilldown
             item={item}
             ast={useFilterStore.getState().ast}
             toggleFacet={toggleFacet}
           />
-        </ChakraProvider>
+        </DesignSystemProvider>
       );
       const view = render(tree());
       // `eventActive` is derived from the `ast` PROP, so the component has to

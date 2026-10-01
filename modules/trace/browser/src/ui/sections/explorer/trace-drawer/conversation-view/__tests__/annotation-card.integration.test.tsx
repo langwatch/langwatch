@@ -1,12 +1,18 @@
 // Annotation card: rating, scores, author (including API), suggested
 // correction.
 // @vitest-environment jsdom
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { setWindowAddress } from "../../../../../../__tests__/window-location-router.ts";
+import { getTraceDrawer } from "../../../../../../behavior/trace-drawer.ts";
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 import type { AnnotationByTrace } from "../../../../use-annotations-by-trace-ids.ts";
 import { AnnotationCard } from "../annotation-card.tsx";
 
@@ -42,15 +48,8 @@ function renderCard({
   isOwn?: boolean;
   onEdit?: () => void;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnnotationCard
-        annotation={item}
-        scoreNamesById={SCORE_NAMES}
-        isOwn={isOwn}
-        onEdit={onEdit}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <AnnotationCard annotation={item} scoreNamesById={SCORE_NAMES} isOwn={isOwn} onEdit={onEdit} />,
   );
 }
 
@@ -340,9 +339,9 @@ describe("given an annotation somebody else wrote, reached with the keyboard", (
  */
 describe("given a turn's trace carries a comment about one of its spans", () => {
   beforeEach(() => {
-    useDrawerStore.setState({ traceId: "trace-1" });
-    useDrawerStore.getState().clearSpan();
-    useDrawerStore.getState().setViewModeTransient("conversation");
+    setWindowAddress({
+      url: "/my-project/traces?drawer.open=traceV2Details&drawer.traceId=trace-1&drawer.mode=conversation",
+    });
   });
 
   /** @scenario "Jumping to a span comment from the conversation moves to the trace view" */
@@ -353,8 +352,8 @@ describe("given a turn's trace carries a comment about one of its spans", () => 
 
     fireEvent.click(screen.getByTestId("annotation-anchor"));
 
-    expect(useDrawerStore.getState().viewMode).toBe("trace");
-    expect(useDrawerStore.getState().selectedSpanId).toBe("span-7");
+    expect(getTraceDrawer().viewMode).toBe("trace");
+    expect(getTraceDrawer().selectedSpanId).toBe("span-7");
   });
 
   /** @scenario "Jumping to a span comment from the conversation moves to the trace view" */

@@ -1,8 +1,9 @@
+import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { Circle, HStack, Icon, Text } from "@langwatch/design-system/primitives";
-import { formatCost, formatTokens, formatWallClock } from "@langwatch/trace-browser-kit";
 import { AlertTriangle, GitBranch, Zap } from "lucide-react";
 import type React from "react";
 
+import { formatWallClock } from "../../../../../../../model/display-formatters.ts";
 import type { ConversationGroup } from "../../../conversation-groups.ts";
 
 interface SummaryProps {

@@ -1,4 +1,3 @@
-import { removeNodeAtLocation, swapOperatorAtLocation } from "@langwatch/trace-contract";
 import Document from "@tiptap/extension-document";
 import History from "@tiptap/extension-history";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -33,9 +32,11 @@ import {
   CLOSED_SUGGESTION,
   highlightedRow,
   navigateSuggestion,
+  removeNodeAtLocation,
+  swapOperatorAtLocation,
   type SuggestionState,
   type SuggestionUIState,
-} from "@langwatch/trace-browser-kit";
+} from "@langwatch/trace-contract";
 
 const TRIGGER_TERMINATOR_REGEX = /[ \t\n()]/;
 const TRIGGER_PRECEDERS = new Set([" ", "\t", "\n", "("]);

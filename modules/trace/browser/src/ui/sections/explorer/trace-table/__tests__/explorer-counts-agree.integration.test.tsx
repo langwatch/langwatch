@@ -5,8 +5,8 @@
  * mocked, so the assertion is on the wiring rather than a mocked selector.
  * @see specs/traces-v2/search.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -41,17 +41,16 @@ vi.mock("../../hooks/use-session-groups.ts", () => ({
   SESSIONS_MAX_PAGE_SIZE: 100,
 }));
 
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import { ExplorerTotal } from "../../filter-sidebar/explorer-total.tsx";
 import { Pagination } from "../pagination.tsx";
 
 function renderBoth(): void {
-  render(
-    <ChakraProvider value={defaultSystem}>
+  renderWithDesignSystem(
+    <>
       <ExplorerTotal />
       <Pagination nextCursor={null} visibleCount={1} />
-    </ChakraProvider>,
+    </>,
   );
 }
 

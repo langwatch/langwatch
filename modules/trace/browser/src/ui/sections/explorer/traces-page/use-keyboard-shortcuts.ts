@@ -1,9 +1,10 @@
-import { useSelectionStore, useUIStore } from "@langwatch/trace-browser-kit";
 import { useEffect } from "react";
 
 import { useDensityStore } from "../../../../behavior/density.store.ts";
-import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useSelectionStore } from "../../../../behavior/explorer.store.ts";
 import { useFindStore } from "../../../../behavior/find-store.ts";
+import { getTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { useUIStore } from "../../../../behavior/ui.store.ts";
 
 const isTextInput = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
@@ -40,7 +41,7 @@ export const useFindShortcut = (): void => {
       }
 
       // Our in-page find is a table-only affordance.
-      if (useDrawerStore.getState().isOpen) return;
+      if (getTraceDrawer().isOpen) return;
       if (isInteractiveTarget(e.target)) return;
 
       // Read latest state imperatively so we never operate on stale isOpen
@@ -83,7 +84,7 @@ export const useShortcutsHelpShortcut = (): void => {
       if (e.key !== "?" || isTextInput(e.target)) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       // Drawer owns `?` while open — its handler will fire first.
-      if (useDrawerStore.getState().isOpen) return;
+      if (getTraceDrawer().isOpen) return;
       e.preventDefault();
       toggle();
     };

@@ -22,7 +22,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 
 // The discover-freshness subscription opens a real SSE connection when
 // unmocked; these tests only exercise the trace_summary_updated paths.
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("@langwatch/browser-host/sse-subscription", () => ({
   useSSESubscription: () => ({
     connectionState: "disconnected" as const,
     retryCount: 0,
@@ -90,13 +90,11 @@ vi.mock("../../../../../behavior/trace-api.ts", () => ({
   },
 }));
 
-// The stores live in @langwatch/trace-browser. Mocking the module rather than the
-// barrel keeps the rest of the package real for the hook under test.
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: Object.assign(
-    (selector: (s: unknown) => unknown) => selector({ traceId: null, occurredAtMs: null }),
-    { getState: () => ({ traceId: null, occurredAtMs: null }) },
-  ),
+// Mocking the module rather than the barrel keeps the rest of the package real for the hook under test.
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  getTraceDrawer: () => ({ traceId: null, occurredAtMs: null }),
+  useTraceDrawer: (selector: (s: unknown) => unknown) =>
+    selector({ traceId: null, occurredAtMs: null }),
 }));
 
 // Mutable live-updates mode — mutated in beforeEach / test body.
@@ -109,15 +107,12 @@ vi.mock("../../../../../behavior/sse-status.store.ts", () => ({
         liveUpdatesMode,
         liveUpdatesEnabled: true,
         sseConnectionState: "connected",
-        fastPollRequestedAt: 0,
-        requestFastPoll: vi.fn(),
         setSseConnectionState: vi.fn(),
         setLastEventAt: vi.fn(),
       }),
     {
       getState: () => ({
         liveUpdatesMode,
-        requestFastPoll: vi.fn(),
       }),
     },
   ),

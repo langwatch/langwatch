@@ -1,7 +1,7 @@
-import { useFilterStore, useViewStore } from "@langwatch/trace-browser-kit";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
+import { useFilterStore, useViewStore } from "../../../../behavior/explorer.store.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useSamplePreview } from "../onboarding/index.ts";
@@ -142,7 +142,6 @@ export function useSessionGroups(): SessionGroupsResult {
         !!project?.id &&
         sampleGroups === null &&
         (page === 1 || sessionCursor !== undefined),
-      staleTime: 60_000,
       placeholderData: keepPreviousData,
     },
   );

@@ -3,8 +3,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
@@ -24,9 +24,9 @@ vi.mock("../../ai/use-ai-trace-action.ts", () => ({
   }),
 }));
 
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import type { AiActionError } from "@langwatch/trace-contract";
 
+import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { explainAnyError } from "../../../errors/index.ts";
 import { FloatingAiBar } from "../floating-ai-bar.tsx";
 
@@ -56,11 +56,7 @@ beforeEach(() => {
 const RECT = { top: 100, left: 100, width: 600 };
 
 function renderBar() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <FloatingAiBar rect={RECT} onClose={vi.fn()} />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<FloatingAiBar rect={RECT} onClose={vi.fn()} />);
 }
 
 describe("<FloatingAiBar /> error row", () => {

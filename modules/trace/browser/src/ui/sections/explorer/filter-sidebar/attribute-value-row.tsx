@@ -1,6 +1,9 @@
 import { CheckboxCard, Box, HStack, Text } from "@langwatch/design-system/primitives";
-import { type FacetValueState, hashColor, paletteFromColor } from "@langwatch/trace-browser-kit";
 import { memo } from "react";
+
+import { type FacetValueState } from "../../../../behavior/explorer/filter-sidebar/types.ts";
+import { hashColor } from "../../../../model/display-formatters.ts";
+import { paletteFromColor } from "./utils.ts";
 
 function attributeCheckedState(state: FacetValueState): boolean | "indeterminate" {
   if (state === "include") return true;

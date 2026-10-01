@@ -25,7 +25,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   }),
 }));
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) => selector(harness.view),
 }));
 

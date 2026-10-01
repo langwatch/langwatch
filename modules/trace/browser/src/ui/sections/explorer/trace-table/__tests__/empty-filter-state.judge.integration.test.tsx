@@ -5,10 +5,11 @@
  * starts the pending chip's run the way Enter does. @see ADR-144
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
 import "@testing-library/jest-dom/vitest";
 
 import { useSearchSubmitRequestStore } from "../../../../../behavior/search-submit-request.store.ts";
@@ -30,11 +31,7 @@ vi.mock("../query-breakdown-chips.tsx", () => ({
 }));
 
 function renderEmptyState() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EmptyFilterState />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<EmptyFilterState />);
 }
 
 describe("<EmptyFilterState /> under an eval chip no run has answered", () => {

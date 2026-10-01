@@ -16,12 +16,10 @@ export function useTraceHeader({
   occurredAtMs,
   full,
   enabled = true,
-  staleTimeMs = 300_000,
 }: TraceHeaderReadInput & {
   full: boolean;
   /** Hold the read off until the caller has what it needs to ask. */
   enabled?: boolean;
-  staleTimeMs?: number;
 }): UseTraceHeaderResult {
   const query = traceApi.traces.header.useQuery(
     {
@@ -30,7 +28,7 @@ export function useTraceHeader({
       ...(occurredAtMs !== void 0 ? { occurredAtMs } : {}),
       full,
     },
-    { enabled: enabled && projectId.length > 0 && traceId.length > 0, staleTime: staleTimeMs },
+    { enabled: enabled && projectId.length > 0 && traceId.length > 0 },
   );
 
   return { header: query.data, isLoading: query.isLoading };

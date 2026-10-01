@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -59,10 +59,8 @@ function renderWithProvider({
   traces: TraceListItem[];
   children: ReactNode;
 }) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceStatisticsProvider traces={traces}>{children}</TraceStatisticsProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <TraceStatisticsProvider traces={traces}>{children}</TraceStatisticsProvider>,
   );
 }
 

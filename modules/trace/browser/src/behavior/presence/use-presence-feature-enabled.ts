@@ -1,9 +1,9 @@
-import { useMemo } from "react";
-
 import {
   resolvePresenceAvailability,
   type PresenceAvailability,
-} from "../../model/presence/presence-availability.ts";
+} from "@langwatch/presence-contract";
+import { useMemo } from "react";
+
 import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 /**

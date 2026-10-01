@@ -1,10 +1,10 @@
-// @vitest-environment jsdom
-// The Explorer's side of the UI-action channel, run against the real store.
-// Spec: specs/langy/langy-trace-explorer-actions.feature
-import { useExplorerStore } from "@langwatch/trace-browser-kit";
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// @vitest-environment jsdom
+// The Explorer's side of the UI-action channel, run against the real store.
+// Spec: specs/langy/langy-trace-explorer-actions.feature
+import { useExplorerStore } from "../../explorer.store.ts";
 import {
   type ExplorerLangyActionHandlers,
   useExplorerLangyActions,

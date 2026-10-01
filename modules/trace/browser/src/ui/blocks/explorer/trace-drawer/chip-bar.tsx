@@ -1,5 +1,5 @@
+import { Chip, type ChipProps } from "@langwatch/design-system/chip";
 import { HStack, VStack } from "@langwatch/design-system/primitives";
-import { Chip, type ChipProps } from "@langwatch/trace-browser-kit";
 import type { ReactElement, ReactNode } from "react";
 
 export interface ChipDef extends ChipProps {

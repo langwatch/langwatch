@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
 import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const overlayData = vi.hoisted<{ current: TraceEditOverlayDto | null }>(() => ({ current: null }));
@@ -18,12 +18,17 @@ vi.mock("../../../hooks/use-trace-header.ts", () => ({
   useTraceHeaderCanonical: () => ({ data: undefined }),
 }));
 
+vi.mock("react-router", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ...(await import("../../../../../../__tests__/window-location-router.ts")).windowLocationRouter,
+}));
+
 vi.mock("../../../hooks/use-spans-full.ts", () => ({
   useSpansFullCanonical: () => ({ data: undefined }),
   applyOverlayToSpansFull: ({ spans }: { spans: unknown[] }) => spans,
 }));
 
-import { useDrawerStore } from "../../../../../../behavior/drawer.store.ts";
+import { openTraceDrawerAt } from "../../../../../../__tests__/window-location-router.ts";
 import { useTraceEditStore } from "../../../../../../behavior/trace-edit.store.ts";
 import { EditedOriginalToggle } from "../edited-original-toggle.tsx";
 
@@ -45,18 +50,14 @@ function withCorrection(authorName: string | null = "Robin") {
 }
 
 function renderToggle() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EditedOriginalToggle />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<EditedOriginalToggle />);
 }
 
 describe("EditedOriginalToggle", () => {
   beforeEach(() => {
     overlayData.current = null;
     useTraceEditStore.getState().discard();
-    useDrawerStore.getState().setIsEditing(false);
+    openTraceDrawerAt({});
   });
 
   afterEach(cleanup);
@@ -107,7 +108,7 @@ describe("EditedOriginalToggle", () => {
 
     describe("when the reviewer is editing", () => {
       it("steps out of the way", () => {
-        useDrawerStore.getState().setIsEditing(true);
+        openTraceDrawerAt({ edit: "1" });
 
         renderToggle();
 

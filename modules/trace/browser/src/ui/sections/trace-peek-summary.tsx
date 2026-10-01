@@ -4,8 +4,8 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { Box, Circle, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import { STATUS_COLORS } from "@langwatch/trace-browser-kit";
 
+import { STATUS_COLORS } from "../../model/display-formatters.ts";
 import { useTraceHeader } from "./use-trace-header.ts";
 
 export type TracePeekSummaryProps = {

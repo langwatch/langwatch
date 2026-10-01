@@ -25,8 +25,6 @@ export function useSpanLogs() {
 
   const query = api.traces.traceLogs.useQuery(queryArgs, {
     enabled: isReady && mayHaveLogs,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
   });
 
   const logsBySpanId = useMemo(() => groupLogsBySpanId(query.data ?? []), [query.data]);

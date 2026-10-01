@@ -24,7 +24,7 @@ follows these conventions.
 │  ZUSTAND  │         TANSTACK QUERY                    │
 │  (intent) │         (server state + cache)             │
 │           │                                           │
-│  filter   │  queryClient (httpBatchStreamLink)         │
+│  filter   │  queryClient (httpLink)         │
 │  view     │  ├─ trace.list (stale: 30s)               │
 │  drawer   │  ├─ trace.header (stale: 5min)            │
 │  ui       │  ├─ span.summary (stale: 5min)            │
@@ -263,8 +263,8 @@ const DensityContext = createContext<Density>("comfortable");
 
 // ✅ Zustand via hook (for other shared state)
 export const TraceTableRow: React.FC<TraceTableRowProps> = ({ trace }) => {
-  const { open } = useDrawerStore(); // reads from store, no prop drilling
-  return <Tr onClick={() => open(trace.traceId)}>...</Tr>;
+  const { openDrawer } = useDrawer(); // writes the address, no prop drilling
+  return <Tr onClick={() => openDrawer("traceV2Details", { traceId: trace.traceId })}>...</Tr>;
 };
 ```
 
@@ -303,7 +303,7 @@ These rules were discovered during the throwaway mock and prevent real bugs:
 ### Zustand — one Explorer store, four slices
 
 Each slice owns one domain of user intent, and all four compose into the one
-Explorer store in `@langwatch/trace-browser-kit` (ADR-152).
+Explorer store in `behavior/explorer.store.ts` (ADR-152).
 
 ```tsx
 // query.slice.ts
@@ -732,7 +732,7 @@ import { describe, it, expect, vi } from "vitest";
 import { useTraceList } from "../useTraceList";
 
 // Mock the store: one module, every slice the hook reads
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../behavior/explorer.store.ts", () => ({
   useExplorerStore: vi.fn((selector) =>
     selector({
       ast: emptyAst(),

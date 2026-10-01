@@ -4,7 +4,7 @@
  * @see specs/prompts/open-existing-prompt-from-trace.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { Span } from "@langwatch/trace-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import React from "react";
@@ -69,14 +69,14 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
 
 const project = { id: "proj_1", slug: "test-project" } as Project;
 
-// Wrapper providing Router context (Link components need it), ChakraProvider,
+// Wrapper providing Router context (Link components need it), the design-system provider,
 // and Suspense (needed for React.lazy components used by dynamic() compat)
 function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <MemoryRouter>
-      <ChakraProvider value={defaultSystem}>
+      <DesignSystemProvider forcedTheme="light">
         <React.Suspense fallback={<div>Loading...</div>}>{children}</React.Suspense>
-      </ChakraProvider>
+      </DesignSystemProvider>
     </MemoryRouter>
   );
 }

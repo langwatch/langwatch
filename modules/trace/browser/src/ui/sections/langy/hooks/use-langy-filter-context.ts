@@ -1,6 +1,7 @@
-import type { LangyContextChip } from "@langwatch/langy-browser-kit";
-import { useFilterStore } from "@langwatch/trace-browser-kit";
 import { useMemo } from "react";
+
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import type { LangyContextChip } from "../../../../behavior/langy/langy.store.ts";
 
 /**
  * Turns the Trace Explorer's active filter query into a Langy context chip — "filtered:

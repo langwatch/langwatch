@@ -1,3 +1,7 @@
+import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { api } from "../../../../../behavior/trace-api.ts";
 import {
   CONVERSATION_TURN_CAP,
   type EarlierTotals,
@@ -5,13 +9,11 @@ import {
   mergeSessionTurns,
   type ScrollbackStatus,
   type TurnDivider,
+} from "../../../../../model/coding-agent/trace/terminal-session-scrollback.ts";
+import {
   type TerminalToolSpan,
   indexToolSpansBySpanId,
-} from "@langwatch/coding-agent-browser-kit";
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-
-import { api } from "../../../../../behavior/trace-api.ts";
+} from "../../../../../model/coding-agent/trace/terminal-tool-spans.ts";
 import type { ConversationTurn } from "../../../../../model/explorer/conversation-turn.ts";
 import { useConversationContext } from "../../hooks/use-conversation-context.ts";
 
@@ -20,9 +22,6 @@ import { useConversationContext } from "../../hooks/use-conversation-context.ts"
  * this cannot be walked to its start, and the view says so rather than
  * pretending the oldest turn it can see is the beginning.
  */
-
-/** Shared by every read of an earlier turn, matching the opened turn's own. */
-const EARLIER_TURN_FETCH = { staleTime: 60_000 } as const;
 
 /** The turn a read is asked for: its trace, and the partition hint. */
 interface TurnTarget {
@@ -72,9 +71,9 @@ async function readTurn({
     occurredAtMs: target.timestamp,
   };
   const [transcript, spans, events] = await Promise.all([
-    utils.codingAgents.transcript.fetch(input, EARLIER_TURN_FETCH),
-    utils.traces.spansFull.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
-    utils.traces.traceEvents.fetch(input, EARLIER_TURN_FETCH).catch(() => []),
+    utils.codingAgents.transcript.fetch(input),
+    utils.traces.spansFull.fetch(input).catch(() => []),
+    utils.traces.traceEvents.fetch(input).catch(() => []),
   ]);
 
   return {

@@ -4,8 +4,8 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -88,7 +88,7 @@ vi.mock("../../hooks/use-explorer-counts.ts", () => ({
         },
 }));
 
-vi.mock("@langwatch/trace-browser-kit", () => ({
+vi.mock("../../../../../behavior/explorer.store.ts", () => ({
   useViewStore: (selector: (s: unknown) => unknown) =>
     selector({
       activeLensId: "all-traces",
@@ -106,9 +106,11 @@ vi.mock("@langwatch/trace-browser-kit", () => ({
     grouping: mockGrouping,
     columns: [],
   }),
+  useFilterStore: (selector: (s: unknown) => unknown) => selector(mockFilterState),
+}));
+vi.mock("../../../../../behavior/view.slice.ts", () => ({
   rowKindForGrouping: (grouping: string) =>
     grouping === "by-conversation" ? "conversation" : "trace",
-  useFilterStore: (selector: (s: unknown) => unknown) => selector(mockFilterState),
 }));
 
 // ─── Lens body stubs ──────────────────────────────────────────────────────────
@@ -197,11 +199,7 @@ beforeEach(() => {
 });
 
 function renderTable() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <TraceTable />
-    </ChakraProvider>,
-  );
+  return renderWithDesignSystem(<TraceTable />);
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, fireEvent, render } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { EditableIOField } from "../editable-io-field.tsx";
@@ -20,16 +20,14 @@ function renderField({
   onChange?: (text: string) => void;
   onReset?: () => void;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <EditableIOField
-        label="Output"
-        captured={captured}
-        draft={draft}
-        onChange={onChange}
-        onReset={onReset}
-      />
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <EditableIOField
+      label="Output"
+      captured={captured}
+      draft={draft}
+      onChange={onChange}
+      onReset={onReset}
+    />,
   );
 }
 
@@ -100,15 +98,13 @@ describe("EditableIOField", () => {
         expect(onReset).toHaveBeenCalled();
 
         rerender(
-          <ChakraProvider value={defaultSystem}>
-            <EditableIOField
-              label="Output"
-              captured={CAPTURED_JSON}
-              draft={undefined}
-              onChange={vi.fn()}
-              onReset={onReset}
-            />
-          </ChakraProvider>,
+          <EditableIOField
+            label="Output"
+            captured={CAPTURED_JSON}
+            draft={undefined}
+            onChange={vi.fn()}
+            onReset={onReset}
+          />,
         );
         expect((getByLabelText("Edit output") as HTMLTextAreaElement).value).toBe(
           JSON.stringify(JSON.parse(CAPTURED_JSON), null, 2),

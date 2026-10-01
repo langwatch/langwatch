@@ -1,10 +1,10 @@
 // Summary mode renders ConversationContext strip (flexShrink=0), wired to
-// drawerStore's collapsed state.
+// the drawer chrome's collapsed state.
 // @vitest-environment jsdom
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { Box } from "@langwatch/design-system/primitives";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
@@ -20,8 +20,8 @@ const storeState = {
   togglePaneCollapsed,
 };
 
-vi.mock("../../../../../behavior/drawer.store.ts", () => ({
-  useDrawerStore: (selector: (s: typeof storeState) => unknown) => selector(storeState),
+vi.mock("../../../../../behavior/trace-drawer.ts", () => ({
+  useTraceDrawer: (selector: (s: typeof storeState) => unknown) => selector(storeState),
 }));
 
 vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
@@ -86,7 +86,7 @@ interface SummaryTrace {
 }
 
 // Mirrors summary mode: ConversationContext mounts conditionally, collapse
-// state from drawer store.
+// state from the trace drawer.
 function SummaryBranch({ trace }: { trace: SummaryTrace }) {
   const collapsed = storeState.paneState.conversationContext.collapsed;
   return (
@@ -106,11 +106,7 @@ function SummaryBranch({ trace }: { trace: SummaryTrace }) {
 }
 
 const renderSummaryBranch = (trace: SummaryTrace) =>
-  render(
-    <ChakraProvider value={defaultSystem}>
-      <SummaryBranch trace={trace} />
-    </ChakraProvider>,
-  );
+  renderWithDesignSystem(<SummaryBranch trace={trace} />);
 
 describe("Summary view conversation context strip", () => {
   afterEach(() => {

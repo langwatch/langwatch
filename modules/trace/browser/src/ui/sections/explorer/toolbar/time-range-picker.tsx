@@ -13,19 +13,20 @@ import {
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { format, Temporal, toEpochMs } from "@langwatch/time";
-import { type TimeRange, readableDate } from "@langwatch/trace-browser-kit";
 import type { TimeRangePreset } from "@langwatch/trace-contract";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
 import { Fragment, useMemo, useState } from "react";
 
+import { useFilterStore } from "../../../../behavior/explorer.store.ts";
+import { type TimeRange } from "../../../../behavior/query.slice.ts";
 import {
   getPresetById,
   matchPreset,
   PRESET_GROUPS,
   useCopyToClipboard,
-  useFilterStore,
 } from "../../../../index.ts";
+import { readableDate } from "../../../../model/display-formatters.ts";
 
 export const TimeRangePicker: React.FC<{ compact?: boolean }> = ({ compact = false }) => {
   const timeRange = useFilterStore((s) => s.timeRange);
