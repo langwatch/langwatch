@@ -62404,7 +62404,9 @@ A missing required key leaves the pods that read it in `CreateContainerConfigErr
 </Note>
 
 <Note>
-**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely. To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again, then restart the ClickHouse StatefulSet.
+**LangWatchQL is optional.** The two `LWQL_*` values are passwords for dedicated read-only identities the app creates for user-written queries: a PostgreSQL role `lwql_ro` (read-only transactions, a statement timeout, `SELECT` on approved views only) and a matching ClickHouse identity. The app keeps writing through its own connection. Without these keys every pod still starts and LangWatchQL stays unavailable; set `lwql.enabled: false` to turn it off entirely.
+
+To add the keys later on chart-managed ClickHouse, delete the `<release>-lwql-access-render-<hash>` Job so the next sync or upgrade runs it again, then restart the ClickHouse StatefulSet.
 
 With external PostgreSQL, the `DATABASE_URL` user needs `CREATE ROLE`, or at least `ALTER ROLE` on a pre-created `lwql_ro`, because the app re-converges the role on every boot. Without it LangWatchQL stays unavailable and the rest of LangWatch runs normally. See the chart README for the exact role statements.
 </Note>
@@ -66806,6 +66808,7 @@ The gateway PodDisruptionBudget now uses `maxUnavailable: 1` and renders only wh
 ### Helm installs with autogen off and Argo CD
 
 With `autogen.enabled=false`, chart-managed Redis and PostgreSQL now need `redis.auth.existingSecret` and `postgresql.auth.existingSecret` (or a password value). The chart used to generate these passwords, and under Argo CD a generated password changed on every sync. A plain `helm upgrade` of a release that already has the chart's own `<release>-redis` and `<release>-postgresql` Secrets keeps them.
+
 Under Argo CD, first copy the password PostgreSQL currently accepts into a Secret of your own with another name: Argo CD prunes the chart's Secret once `existingSecret` is set.
 
 The LangWatchQL render Job is now named `<release>-lwql-access-render-<hash>` from its spec, and the install Job no longer expires. Argo CD no longer recreates it every few minutes or fails the sync on an immutable Job. Missing LangWatchQL passwords no longer block ClickHouse: the Job logs the missing keys and LangWatchQL stays off.
