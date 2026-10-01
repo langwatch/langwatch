@@ -6,7 +6,7 @@ import {
   parseAnsi,
   stripAnsi,
   xterm256ToHex,
-} from "../trace/terminal-ansi-parser.ts";
+} from "../terminal-ansi-parser.ts";
 
 /** Flatten a parsed result to plain text, joining lines with \n. */
 function textOf(lines: AnsiLine[]): string {

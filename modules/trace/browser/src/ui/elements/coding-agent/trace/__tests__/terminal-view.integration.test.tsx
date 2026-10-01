@@ -9,8 +9,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { type TurnDivider } from "../model/trace/terminal-session-scrollback.ts";
-import { statusLineCostLabel, TerminalView } from "../ui/elements/trace/terminal-view.tsx";
+import { type TurnDivider } from "../../../../../model/coding-agent/trace/terminal-session-scrollback.ts";
+import { statusLineCostLabel, TerminalView } from "../terminal-view.tsx";
 
 /** How tall a laid-out row is, so a test can say what moved in whole rows. */
 const ROW_HEIGHT = 150;

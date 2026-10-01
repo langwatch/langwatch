@@ -1,3 +1,4 @@
+import "@testing-library/jest-dom/vitest";
 /**
  * @vitest-environment jsdom
  * Pull-request detail drawer: what it shows a reader and what it must never

@@ -4,8 +4,8 @@ import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
  */
 import { describe, expect, it } from "vitest";
 
-import { type LoadedTurn, mergeSessionTurns } from "../trace/terminal-session-scrollback.ts";
-import { type TerminalToolSpan } from "../trace/terminal-tool-spans.ts";
+import { type LoadedTurn, mergeSessionTurns } from "../terminal-session-scrollback.ts";
+import { type TerminalToolSpan } from "../terminal-tool-spans.ts";
 
 function prompt(text: string, atMs: number): TranscriptEntry {
   return { kind: "user_prompt", atMs, text, chars: text.length };

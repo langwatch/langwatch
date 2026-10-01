@@ -1,7 +1,7 @@
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { deriveSessionBanner } from "../trace/terminal-session-banner.ts";
+import { deriveSessionBanner } from "../terminal-session-banner.ts";
 
 function span(over: Partial<SpanDetail>): SpanDetail {
   return {

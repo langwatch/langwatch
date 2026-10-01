@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { contextHealthBand, contextWindowCeiling } from "../trace/context-health.ts";
+import { contextHealthBand, contextWindowCeiling } from "../context-health.ts";
 
 describe("contextWindowCeiling", () => {
   describe("given a session that only used standard-window models", () => {

@@ -6,7 +6,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TerminalOutput } from "../ui/elements/trace/terminal-output.tsx";
+import { TerminalOutput } from "../terminal-output.tsx";
 
 afterEach(cleanup);
 

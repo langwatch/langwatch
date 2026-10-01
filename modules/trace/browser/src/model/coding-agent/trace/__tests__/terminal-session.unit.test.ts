@@ -6,7 +6,7 @@ import {
   extractDiffFromToolInput,
   isDiffTool,
   toolPrimaryArg,
-} from "../trace/terminal-session.ts";
+} from "../terminal-session.ts";
 
 function modelCall(atMs: number, tokens: number, costUsd: number): TranscriptEntry {
   return {

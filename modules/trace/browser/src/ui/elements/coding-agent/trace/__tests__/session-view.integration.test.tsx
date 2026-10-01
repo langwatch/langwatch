@@ -9,8 +9,8 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { type CodingAgentSessionDisplay } from "../model/trace/session-display.ts";
-import { SessionView } from "../ui/elements/trace/session-view.tsx";
+import { type CodingAgentSessionDisplay } from "../../../../../model/coding-agent/trace/session-display.ts";
+import { SessionView } from "../session-view.tsx";
 
 afterEach(cleanup);
 
