@@ -219,9 +219,6 @@ flows:
       - action: expect
         with:
           testId: exit-compare-button
-      - action: click
-        with:
-          testId: run-checkbox-vd-run-a-{uid}
       - action: expect
         with:
           testIdPrefix: run-checkbox-
@@ -585,6 +582,18 @@ flows:
           state:
             <<: *runnableState
             name: vd-exppop-{uid}
+            datasets:
+              - id: test-data
+                name: Test Data
+                type: inline
+                inline:
+                  columns: *runnableColumns
+                  records:
+                    input:
+                      - vd row alpha is a sentence long enough for the language detector
+                      - vd row beta is a sentence long enough for the language detector
+                      - vd row gamma is a sentence long enough for the language detector
+                columns: *runnableColumns
             evaluators:
               - id: evaluator-1
                 evaluatorType: lingua/language_detection
@@ -667,7 +676,7 @@ flows:
           timeout: "60000"
       - action: hover
         with:
-          selector: 'text=/^3\/3$/'
+          selector: '[data-testid="target-summary"]'
       - action: expect
         with:
           text: /^Rows$/

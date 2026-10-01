@@ -94,11 +94,11 @@ flows:
           testId: edit-suite-button
       - action: fill
         with:
-          label: Test suite name
+          selector: 'input[placeholder="e.g., Critical Path Run Plan"]'
           value: vd-suite-{uid}-edited
       - action: click
         with:
-          testId: suite-editor-save
+          text: /^Save$/
       - action: expect
         with:
           testId: suite-rail-item-vd-suite-{uid}-edited
@@ -369,7 +369,7 @@ flows:
           text: vd-agent-{uid}
       - action: click
         with:
-          text: vd-agent-{uid}
+          testId: agent-card-name-vd-agent-{uid}
       - action: fill
         with:
           testId: agent-name-input
@@ -712,7 +712,10 @@ flows:
           testId: suite-rail-item-vd-suite-{uid}
       - action: click
         with:
-          testId: case-row-vd-scenario-{uid}-checkbox
+          selector: 'button[aria-label="Actions for vd-scenario-{uid}"]'
+      - action: click
+        with:
+          text: Move to suite...
       - action: click
         with:
           testId: cases-selection-move-to-suite

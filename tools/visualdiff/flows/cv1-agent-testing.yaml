@@ -52,6 +52,7 @@ flows:
         with:
           path: /api/v1/test-suites/{suiteId}
           method: DELETE
+          auth: project
       - action: go
         with:
           path: /{slug}/agent-testing
