@@ -13,8 +13,8 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import { resolveGatewayBaseUrl } from "@langwatch/config/public-app-config/projection";
-import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets";
 import { Secret } from "@langwatch/secrets/secret";
+import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
 
 /** The governance module's configuration slice. */

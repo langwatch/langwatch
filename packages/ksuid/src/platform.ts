@@ -38,30 +38,7 @@ export function getCryptoProvider(): CryptoProvider {
     };
   }
 
-  if (platform.isNode) {
-    try {
-      const crypto = require("crypto") as {
-        randomBytes: (size: number) => Uint8Array;
-      };
-      return {
-        getRandomValues: (array: Uint8Array) => {
-          const randomBytes = crypto.randomBytes(array.length);
-          array.set(randomBytes);
-          return array;
-        },
-        randomBytes: (size: number) => crypto.randomBytes(size),
-      };
-    } catch {
-      // Fallback to browser crypto if available
-      if (typeof crypto !== "undefined" && crypto) {
-        return {
-          getRandomValues: (array: Uint8Array) => crypto!.getRandomValues(array),
-        };
-      }
-    }
-  }
-
-  // For Bun, Deno, and other platforms
+  // Node, Bun, Deno and every other runtime expose the Web Crypto global.
   if (typeof crypto !== "undefined" && crypto) {
     return {
       getRandomValues: (array: Uint8Array) => crypto!.getRandomValues(array),

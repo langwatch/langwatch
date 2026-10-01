@@ -1,11 +1,11 @@
+import type { SecretHandle } from "@langwatch/secrets/secret";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Which sign-in providers this deployment configured, decided over config and
  * credentials alone: auth mounts exactly these on Better Auth, sso reports
  * whether the named one mounted. main's ee/sso/providers.ts, D09 included.
  */
-import { signInProviderSecrets } from "@langwatch/secrets";
-import type { SecretHandle } from "@langwatch/secrets/secret";
+import { signInProviderSecrets } from "@langwatch/secrets/shared-secrets";
 
 import type { SsoConfig, SsoConfiguration } from "./sso.config.ts";
 
