@@ -10,7 +10,7 @@
 // in another organization, so it cannot enumerate. `orgProjects` / `orgTeams`
 // / `orgMembers` feed the pickers the drawers render.
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   apiKeyTrpcCreateInputSchema,
