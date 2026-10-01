@@ -4,6 +4,7 @@ import { keepPreviousData } from "@tanstack/react-query";
 
 import { api } from "../../../../behavior/langy-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLangyDeletedConversationsStore } from "../stores/langy-deleted-conversations.store.ts";
 
 /** Bounded page size for the recents combobox's incremental rendering. */
 export const LANGY_LIST_PAGE_SIZE = 30;
@@ -43,6 +44,7 @@ export function useLangyConversationListQuery(queryText = ""): LangyConversation
   // The panel stays mounted while closed — never fetch (and so never fail)
   // for a list nobody is looking at. Opening the panel arms the query.
   const isOpen = useLangyStore((s) => s.isOpen);
+  const deletedIds = useLangyDeletedConversationsStore((s) => s.ids);
 
   const query = api.langy.list.useInfiniteQuery(
     getLangyConversationListInput(project?.id ?? "", queryText),
@@ -56,7 +58,9 @@ export function useLangyConversationListQuery(queryText = ""): LangyConversation
   );
 
   return {
-    items: query.data?.pages.flatMap((page) => page.items) ?? [],
+    items: (query.data?.pages.flatMap((page) => page.items) ?? []).filter(
+      (item) => !deletedIds.has(item.id),
+    ),
     // isLoading, not isLoading: React Query v4 reports a DISABLED
     // query as status "loading" forever, and this query is deliberately
     // disabled while the panel is closed — a permanent spinner for a fetch

@@ -15,9 +15,23 @@ const FLOATING_MAX_HEIGHT = `calc(${FLOATING_MAX_VIEWPORT_DVH}dvh - ${FLOATING_E
 
 // Floating grows OUT OF the peek it replaces (scaled down, offset toward the
 // corner); the dock slides in from the edge its own peek sliver rests on.
-const FLOATING_CLOSED = { opacity: 0, scale: 0.92, x: 10, y: 18 } as const;
-const SIDEBAR_CLOSED = { opacity: 0, scale: 1, x: SIDEBAR_PANEL_WIDTH, y: 0 } as const;
-const AT_REST = { opacity: 1, scale: 1, x: 0, y: 0 } as const;
+const FLOATING_CLOSED = {
+  opacity: 0,
+  scale: 0.92,
+  x: 10,
+  y: 18,
+  visibility: "hidden",
+} as const;
+const SIDEBAR_CLOSED = {
+  opacity: 0,
+  scale: 1,
+  x: SIDEBAR_PANEL_WIDTH,
+  y: 0,
+  visibility: "hidden",
+} as const;
+// Motion sets visibility at the start when showing and at the end when hiding, so a closed
+// panel is hidden from sight, focus and the accessibility tree once it has left.
+const AT_REST = { opacity: 1, scale: 1, x: 0, y: 0, visibility: "visible" } as const;
 
 // Opening settles with a spring; closing is a short ease-in.
 const OPEN_TRANSITION = { type: "spring", stiffness: 300, damping: 30, mass: 0.9 } as const;
@@ -32,7 +46,11 @@ export function panelGutter(floating: boolean): string {
 
 /** Peeking is the panel itself, opaque and un-offset; standing aside for the home's ask field
  * must not read as the panel leaving. */
-const PEEK_VARIANTS = { open: AT_REST, peek: AT_REST, peekDismissed: { ...AT_REST, opacity: 0 } };
+const PEEK_VARIANTS = {
+  open: AT_REST,
+  peek: AT_REST,
+  peekDismissed: { ...AT_REST, opacity: 0, visibility: "hidden" },
+};
 const FLOATING_VARIANTS = { ...PEEK_VARIANTS, closed: FLOATING_CLOSED };
 const SIDEBAR_VARIANTS = { ...PEEK_VARIANTS, closed: SIDEBAR_CLOSED };
 
