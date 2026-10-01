@@ -35,9 +35,9 @@ export abstract class UiScopeHost {
   abstract hasPermission(permission: string): boolean;
 
   /**
-   * The same question asked of the ORGANIZATION rather than of the page's scope. A grant held
-   * on the organization but narrowed by a project binding is a different answer, and the plan
-   * and team controls read that one.
+   * The same question asked of the ORGANIZATION alone. Team and project bindings do not count,
+   * so a permission granted only below the organization reads false here; the plan and team
+   * controls read this one.
    */
   abstract hasOrganizationPermission(permission: string): boolean;
 
