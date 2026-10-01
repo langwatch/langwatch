@@ -22,6 +22,11 @@ const exactTrue = z
   .optional()
   .transform((value) => value === true || value === "true");
 
+const unlessFalse = z
+  .union([z.boolean(), z.string()])
+  .optional()
+  .transform((value) => value !== false && value !== "false");
+
 const onOff = z
   .enum(["0", "1", "false", "true"])
   .optional()
@@ -51,7 +56,7 @@ export const publicAppConfigProjectionDefinition = Config.define((c) => ({
     legacyUrl: c.env("LW_GATEWAY_BASE_URL", optionalUrl),
   },
   rum: {
-    enabled: c.env("RUM_ENABLED", exactTrue),
+    enabled: c.env("RUM_ENABLED", unlessFalse),
     sampleRatio: c.env("RUM_SAMPLE_RATIO", sampleRatio),
     collectorEndpoint: c.env("RUM_COLLECTOR_ENDPOINT", z.string().optional()),
     telemetryEndpoint: c.env("OTEL_EXPORTER_OTLP_ENDPOINT", z.string().optional()),
