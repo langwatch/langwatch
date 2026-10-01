@@ -2445,6 +2445,12 @@ Rule: Event rows drill down into their metric values
     When the sidebar loads the Event name section
     Then the section loads with every event name and the vote drilldown
 
+  @unit
+  Scenario: Event metric values follow the same trace filter as the event name counts
+    Given a search filter narrows the traces in view
+    When the sidebar loads the Event name section
+    Then both the event name counts and their vote drilldown come from the filtered traces only
+
   # The vote is stored as 1 / 0 / -1, which reads as nothing in a sidebar.
   # Only the label is humanised — the value the filter carries stays the
   # stored string, so the round-trip is unaffected. Every other metric,

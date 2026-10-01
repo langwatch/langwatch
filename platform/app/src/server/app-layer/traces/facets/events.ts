@@ -39,8 +39,10 @@ const METRIC_VALUES_TOP_N = 10;
  * every span in the window just to count names. Instead the metrics half is
  * gated on the map's `.keys` subcolumn, which reaches PREWHERE and never opens
  * the values column, so the values are read only for spans that can
- * contribute a bucket. The gate is written as an explicit PREWHERE rather than
- * left for the optimizer to move there, so the saving does not depend on
+ * contribute a bucket. Only the gate goes in PREWHERE; the tenant, time and
+ * trace-scope predicates stay in WHERE as in the other facet builders, and
+ * still drive index analysis from there. The gate is written as an explicit
+ * PREWHERE rather than left for the optimizer to move there, so the saving does not depend on
  * `optimize_move_to_prewhere` or on how the optimizer ranks the conditions. It
  * is per granule, not per span: a granule holding one metric-bearing span still
  * reads every payload beside it. A span without such a key contributes nothing
@@ -96,11 +98,11 @@ export function buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
           FROM (
             SELECT arrayJoin(arrayZip(\`Events.Name\`, \`Events.Attributes\`)) AS ev
             FROM stored_spans
-            PREWHERE ${where}
-              AND arrayExists(
-                keys -> arrayExists(k -> startsWith(k, '${EVENT_METRICS_PREFIX}'), keys),
-                \`Events.Attributes\`.keys
-              )
+            PREWHERE arrayExists(
+              keys -> arrayExists(k -> startsWith(k, '${EVENT_METRICS_PREFIX}'), keys),
+              \`Events.Attributes\`.keys
+            )
+            WHERE ${where}
           )
           WHERE ev.1 != ''
         )

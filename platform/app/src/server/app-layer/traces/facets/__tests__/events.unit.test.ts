@@ -1,3 +1,6 @@
+/**
+ * @see specs/traces-v2/search.feature
+ */
 import { describe, expect, it } from "vitest";
 import type { FacetQueryContext } from "../../facet-registry";
 import { buildEventsFacetQuery } from "../events";
@@ -76,8 +79,47 @@ describe("buildEventsFacetQuery", () => {
         // Explicit rather than left to optimize_move_to_prewhere, so the
         // saving holds whatever the optimizer settings are.
         expect(metrics).toMatch(
-          /PREWHERE[\s\S]*arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
+          /PREWHERE arrayExists\(\s*keys -> arrayExists\(k -> startsWith\(k, 'event\.metrics\.'\), keys\),\s*`Events\.Attributes`\.keys\s*\)/,
         );
+      });
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("scopes both halves to the filtered traces", () => {
+        const scope = "TraceId IN (SELECT TraceId FROM scoped_traces)";
+        const { sql, params } = buildEventsFacetQuery(
+          ctx({ traceScope: { sql: scope, params: { scopeParam: "x" } } }),
+        );
+        const names = sql.slice(sql.indexOf("FROM ("), sql.indexOf("AS names"));
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        // Each half reads stored_spans on its own, so a scope present in only
+        // one of them would pair filtered name counts with unfiltered buckets.
+        expect(names).toContain(scope);
+        expect(metrics).toContain(scope);
+        expect(params.scopeParam).toBe("x");
+      });
+
+      /** @scenario Event metric values follow the same trace filter as the event name counts */
+      it("keeps the caller's predicate out of PREWHERE", () => {
+        const scope = "TraceId IN (SELECT TraceId FROM scoped_traces)";
+        const { sql } = buildEventsFacetQuery(
+          ctx({ traceScope: { sql: scope, params: {} } }),
+        );
+        const metrics = sql.slice(
+          sql.indexOf("AS names"),
+          sql.indexOf("AS metrics"),
+        );
+        const prewhere = metrics.slice(
+          metrics.indexOf("PREWHERE"),
+          metrics.indexOf("WHERE TenantId"),
+        );
+        // Only the metric-key gate belongs there; the tenant, time and scope
+        // predicates stay in WHERE as in every other facet builder.
+        expect(prewhere).toMatch(/`Events\.Attributes`\.keys/);
+        expect(prewhere).not.toContain("TenantId");
+        expect(prewhere).not.toContain(scope);
       });
 
       it("keeps an event name with no metrics as an empty bucket list", () => {
