@@ -38,7 +38,8 @@ import type {
 } from "./api-key.ts";
 import type { ApiKeyVisibleProjects, ApiKeyVisibleProjectsInput } from "./api-key.visibility.ts";
 
-export type ApiKeyManagementCaller = Readonly<{ id: string }>;
+/** The member a management call acts as, and the operator acting as them, if any. */
+export type ApiKeyManagementCaller = Readonly<{ id: string; impersonatorId?: string | undefined }>;
 /**
  * The credential an organization door resolved: the key itself, and the member
  * it acts as — null for a service key, which acts as nobody.

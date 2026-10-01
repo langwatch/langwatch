@@ -4,6 +4,19 @@ Feature: API key lifecycle
     Then its plaintext token is returned
     And verification returns the key without exposing its secret
 
+  @unit
+  Scenario: No API key is minted while an operator acts as another member
+    Given an operator acting as a member of an organization
+    When the session asks to create a personal or a service API key
+    Then permission_denied is returned with status 403
+    And no key is minted and no token is returned
+
+  @unit
+  Scenario: A member acting as themselves still mints API keys
+    Given a member signed in as themselves
+    When they create a personal API key
+    Then the request is not refused as an impersonated mint and goes on to the membership check
+
   @integration
   Scenario: A view-only member lists only their own API keys
     Given a member with organization:view and no organization:manage permission

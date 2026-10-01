@@ -373,6 +373,34 @@ Feature: Workflow service boundary
     And the run's key is minted holding what the member and the run both hold
 
   @unit
+  Scenario: A run started with a service key acts as that key
+    Given a service key with no owner that may run workflows on the project
+    When the key starts a run
+    Then the run names the key as its principal and no member
+    And the run's key is minted bounded by that key, not as the system
+
+  @unit
+  Scenario: A run started with a service key holds no more than that key
+    Given a service key with no owner that does not hold evaluations:manage
+    When the key starts a run whose graph has an evaluator node
+    Then api_key_permission_denied names evaluations:manage before the run starts
+    And no key is minted
+
+  @unit
+  Scenario: A service key's run key is a child of the starting key
+    Given a service key with no owner that holds every permission the run uses
+    When its run's key is minted
+    Then the run's key has no owner, names the starting key as its parent and holds only what the run uses
+    And it is never lent to a run another key or a scheduler started
+
+  @unit
+  Scenario: Only a run key nobody started acts as the system
+    Given a run key with no owner and no parent key, and one whose parent is a service key
+    When each is resolved at the door
+    Then the first resolves as an unattended run
+    And the second resolves as an ordinary key with no owner
+
+  @unit
   Scenario: A caller cannot ask for a run key that outlives an hour
     Given a caller asking for a run key with more than an hour of life left
     When the key is minted

@@ -18,9 +18,9 @@ import {
 type HeldRunKey = { token: string; expiresAtMs: number };
 
 /**
- * The one place a run's key is minted (ARCHITECTURE.md §10): the starter's, capped by what they
- * hold, or ownerless (the system) for a run nobody started. Shared per (user, project,
- * permissions) while it covers the caller's floor; it lapses and the sweep retires it.
+ * The one place a run's key is minted (ARCHITECTURE.md §10): the starter's or the starting key's,
+ * capped by what they hold, or ownerless (the system) for a run nobody started. Shared per (user,
+ * key, project, permissions) while it covers the caller's floor; the sweep retires it.
  */
 export class RunKeyMintService {
   static create(options: {
@@ -96,6 +96,8 @@ export class RunKeyMintService {
         "uses and expires by itself.",
       userId: input.userId,
       createdByUserId: input.userId,
+      // A child of the key that started the run: it dies with it, and is never the system's.
+      parentApiKeyId: input.callerApiKeyId ?? null,
       organizationId: input.organizationId,
       permissionMode: "restricted",
       permissions: [...input.permissions],

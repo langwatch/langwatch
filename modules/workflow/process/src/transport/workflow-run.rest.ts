@@ -30,9 +30,18 @@ export const workflowRunCallerKey = defineRestMiddleware(
   z.string().min(1).nullable(),
 );
 
-/** The member a run acts as, and the key they called with. */
-function runPrincipal(userId: string, callerKey: string | null): WorkflowRunPrincipal {
-  return { userId, ...(callerKey ? { callerApiKeyId: callerKey } : {}) };
+/** The member a run acts as and the key they called with, else the calling key alone. */
+function runPrincipalFields({
+  userId,
+  callerKey,
+}: {
+  userId: string | null;
+  callerKey: string | null;
+}): { principal?: WorkflowRunPrincipal } {
+  if (userId !== null) {
+    return { principal: { userId, ...(callerKey ? { callerApiKeyId: callerKey } : {}) } };
+  }
+  return callerKey ? { principal: { userId: null, callerApiKeyId: callerKey } } : {};
 }
 
 export const workflowRunRest = defineRestRouter(WorkflowApi)
@@ -66,7 +75,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       versionId,
       projectId: scope.id,
       inputs,
-      ...(actor?.type === "user" ? { principal: runPrincipal(actor.id, callerKey) } : {}),
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
     });
   })
 
@@ -93,7 +102,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       workflowId,
       projectId: scope.id,
       inputs,
-      ...(actor?.type === "user" ? { principal: runPrincipal(actor.id, callerKey) } : {}),
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
     });
   })
 
@@ -121,7 +130,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
       versionId,
       projectId: scope.id,
       inputs,
-      ...(actor?.type === "user" ? { principal: runPrincipal(actor.id, callerKey) } : {}),
+      ...runPrincipalFields({ userId: actor?.type === "user" ? actor.id : null, callerKey }),
     });
   })
   .build();

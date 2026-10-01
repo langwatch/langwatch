@@ -39,15 +39,17 @@ export function missingRunPermissions({
   return needed.filter((permission) => !holds.has(permission));
 }
 
-/** One key per starter (or none), project and permission set: a narrower run never borrows. */
+/** One key per starter, starting key, project and permission set: a narrower run never borrows. */
 export function runKeyCacheKey({
   userId,
+  callerApiKeyId,
   projectId,
   permissions,
 }: {
   userId: string | null;
+  callerApiKeyId?: string | null | undefined;
   projectId: string;
   permissions: readonly string[];
 }): string {
-  return JSON.stringify([userId, projectId, [...permissions].toSorted()]);
+  return JSON.stringify([userId, callerApiKeyId ?? null, projectId, [...permissions].toSorted()]);
 }

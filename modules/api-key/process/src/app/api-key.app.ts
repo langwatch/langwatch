@@ -34,6 +34,7 @@ import {
   type CliKeyScopeSummary,
   type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
@@ -54,9 +55,10 @@ import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
 import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 
-/** Who an operation is performed by, and whose membership is proved. */
+/** Who performs an operation, whose membership is proved, and any operator acting as them. */
 export interface ApiKeyCaller {
   readonly id: string;
+  readonly impersonatorId?: string | undefined;
 }
 
 type ApiKeyDependencies = Readonly<{
@@ -528,6 +530,14 @@ export class ApiKeyModule implements ApiKeyApi {
     input: CreateApiKeyRequest,
     by: ApiKeyCaller,
   ): Promise<{ token: string; apiKey: ApiKey; assignedToUserId: string | null }> {
+    // An operator acting as a member holds no grant to issue credentials as them.
+    if (by.impersonatorId) {
+      throw new PermissionDeniedError({
+        permission: "apiKeys:create",
+        scope: { type: "organization", id: input.organizationId },
+        denialReason: "no-binding",
+      });
+    }
     await this.#ensureMember(input.organizationId, by);
     const isService = input.keyType === "service";
     const assignedToAnother = Boolean(input.assignedToUserId) && input.assignedToUserId !== by.id;

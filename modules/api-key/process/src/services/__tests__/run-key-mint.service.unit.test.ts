@@ -123,6 +123,7 @@ describe("RunKeyMintService", () => {
     expect(created).toHaveLength(0);
   });
 
+  /** @scenario "A run started with a service key holds no more than that key" */
   it("bounds an ownerless run a service key started by that key's permissions", async () => {
     const { service, created } = createService([], ["traces:create"]);
 
@@ -135,6 +136,36 @@ describe("RunKeyMintService", () => {
       }),
     ).rejects.toMatchObject({ meta: { permission: "evaluations:manage" } });
     expect(created).toHaveLength(0);
+  });
+
+  /** @scenario "A run started with a service key acts as that key" */
+  /** @scenario "A service key's run key is a child of the starting key" */
+  it("mints an ownerless child of the starting service key, never lent to another starter", async () => {
+    const { service, created } = createService([], ["traces:create"]);
+    const permissions = ["traces:create"];
+
+    const own = await service.mintRunKey({
+      userId: null,
+      callerApiKeyId: "service-key-1",
+      projectId,
+      permissions,
+    });
+    const other = await service.mintRunKey({
+      userId: null,
+      callerApiKeyId: "service-key-2",
+      projectId,
+      permissions,
+    });
+    const scheduled = await service.mintRunKey({ userId: null, projectId, permissions });
+
+    expect(created[0]).toMatchObject({
+      userId: null,
+      createdByUserId: null,
+      parentApiKeyId: "service-key-1",
+      permissions,
+    });
+    expect(created[2]).toMatchObject({ parentApiKeyId: null });
+    expect(new Set([own, other, scheduled]).size).toBe(3);
   });
 
   it("mints for a run whose starter and key both hold every needed permission", async () => {

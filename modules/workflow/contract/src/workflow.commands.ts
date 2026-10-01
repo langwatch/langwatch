@@ -55,12 +55,13 @@ export const copyWorkflowCommandSchema = z.object({
 });
 
 /**
- * The member a run acts as, and the key they started it with. The key minted for the run is
- * theirs, holding no more than they or that key do; a run that names nobody gets an ownerless key.
+ * Who a run acts as: a member and the key they started it with, or a service key alone. The run's
+ * key holds no more than either; only a run that names nobody (a scheduler) acts as the system.
  */
-export const workflowRunPrincipalSchema = z
-  .object({ userId: z.string().min(1), callerApiKeyId: z.string().min(1).optional() })
-  .strict();
+export const workflowRunPrincipalSchema = z.union([
+  z.object({ userId: z.string().min(1), callerApiKeyId: z.string().min(1).optional() }).strict(),
+  z.object({ userId: z.null(), callerApiKeyId: z.string().min(1) }).strict(),
+]);
 export type WorkflowRunPrincipal = z.infer<typeof workflowRunPrincipalSchema>;
 
 /**

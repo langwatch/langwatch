@@ -4,7 +4,7 @@
  * back as "no", and the hashed secret has to stay on the server side of the boundary.
  */
 
-import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { LANGY_SESSION_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -339,6 +339,24 @@ describe("ApiKeyTokenResolutionService", () => {
         await expect(service.findResolvedToken({ token: CURRENT_TOKEN })).resolves.toMatchObject({
           isLangySessionKey: false,
         });
+      });
+    });
+
+    describe("given ownerless run keys", () => {
+      /** @scenario "Only a run key nobody started acts as the system" */
+      it("marks only the one with no parent key as an unattended run", async () => {
+        const runKey = { name: WORKFLOW_RUN_API_KEY_NAME, isSystemManaged: true, userId: null };
+        const scheduled = serviceWith({ row: storedKey({ ...runKey, parentApiKeyId: null }) });
+        const keyStarted = serviceWith({
+          row: storedKey({ ...runKey, parentApiKeyId: "service-key-1" }),
+        });
+
+        await expect(
+          scheduled.service.findResolvedToken({ token: CURRENT_TOKEN }),
+        ).resolves.toMatchObject({ isUnattendedRunKey: true, userId: null });
+        await expect(
+          keyStarted.service.findResolvedToken({ token: CURRENT_TOKEN }),
+        ).resolves.toMatchObject({ isUnattendedRunKey: false, userId: null });
       });
     });
 

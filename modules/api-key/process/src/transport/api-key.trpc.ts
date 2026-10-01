@@ -51,7 +51,7 @@ export const apiKeyTrpcTransport: TrpcRouterDeclaration<ApiKeyApi, typeof apiKey
     // else. Only the key's identity rides beside it, which is also all the
     // declared output admits.
     .handle(async ({ app, input, actor }) => {
-      const { token, apiKey } = await app.createKey(input, { id: actor.id });
+      const { token, apiKey } = await app.createKey(input, actor);
 
       return {
         token,

@@ -12,9 +12,9 @@ export const AGENT_SANDBOX_PERMISSIONS: readonly string[] = ["agentCache:manage"
 /** One run's key (ARCHITECTURE.md §10): the starter's, or nobody's when nobody started it. */
 export const mintRunKeyInputSchema = z
   .object({
-    /** The member who started the run; null acts as the system and owns nothing. */
+    /** The member who started the run; null with no calling key acts as the system. */
     userId: z.string().min(1).nullable(),
-    /** The key the run was started with, whose own permissions also bound the run's key. */
+    /** The key the run was started with: it bounds the run's key and is its parent. */
     callerApiKeyId: z.string().min(1).nullable().optional(),
     projectId: z.string().min(1),
     permissions: z.array(z.string().min(1)).min(1),

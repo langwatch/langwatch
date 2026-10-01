@@ -363,6 +363,7 @@ export class ApiKeyTokenResolutionService {
       isUnattendedRunKey:
         apiKey.isSystemManaged === true &&
         apiKey.userId === null &&
+        !apiKey.parentApiKeyId &&
         apiKey.name === WORKFLOW_RUN_API_KEY_NAME,
       project,
     });
