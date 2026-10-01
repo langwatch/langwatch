@@ -71,7 +71,7 @@ export function buildLangyInfrastructure(input: {
   redis: RedisConnection | null;
   config: LangyServerConfig;
   publicBaseUrl: string | undefined;
-  worker: LangyWorker;
+  worker: LangyWorker | null;
   repositories: LangyRepositories;
   models: LangyModel;
   sessionKeys: LangySessionKeyService;

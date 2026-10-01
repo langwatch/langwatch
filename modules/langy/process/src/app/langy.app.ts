@@ -1,6 +1,7 @@
 import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { RestIdentity } from "@langwatch/api/hosting";
 import { BearerIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
 import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -163,7 +164,6 @@ import type { LangyService } from "../services/langy.service.ts";
 import { SetupSkillsService } from "../services/setup-skills.service.ts";
 import { buildLangyInfrastructure } from "./langy-composition.build.ts";
 import type { LangyConversationCommands, LocalControlRuntime } from "./langy.members.ts";
-import type { RestIdentity } from "@langwatch/api/hosting";
 
 /**
  * The Redis surface the live-turn edge needs: the turn-access record a
@@ -275,20 +275,24 @@ export class LangyModule implements LangyApiContract {
   static readonly reads = [...langyStores, "publicBaseUrl"] as const;
 
   static async create(setup: LangySetup): Promise<LangyModule> {
-    const { channel, door } = await setup.secrets.into(langySecrets.internal, (internalSecret) => {
-      assertLangyServerConfig(setup.config, internalSecret);
-      const metrics = LangyWorkerMetricsOtelService.create();
-      const channel =
-        setup.config.agentUrl && internalSecret
-          ? HttpLangyWorkerChannel.create({
-              agentUrl: setup.config.agentUrl,
-              internalSecret,
-              metrics,
-            })
-          : UnavailableLangyWorkerChannel.create(metrics);
-      const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
-      return { channel, door };
-    });
+    const { channel, door, configured } = await setup.secrets.into(
+      langySecrets.internal,
+      (internalSecret) => {
+        assertLangyServerConfig(setup.config, internalSecret);
+        const metrics = LangyWorkerMetricsOtelService.create();
+        const configured = Boolean(setup.config.agentUrl && internalSecret);
+        const channel =
+          setup.config.agentUrl && internalSecret
+            ? HttpLangyWorkerChannel.create({
+                agentUrl: setup.config.agentUrl,
+                internalSecret,
+                metrics,
+              })
+            : UnavailableLangyWorkerChannel.create(metrics);
+        const door = BearerIdentity.create({ name: "langy-internal", token: internalSecret });
+        return { channel, door, configured };
+      },
+    );
     const adapter = LangyPostgresService.create({
       repositories: createLangyDatabaseRepositories(setup.members.prisma),
     });
@@ -301,7 +305,8 @@ export class LangyModule implements LangyApiContract {
       redis: setup.members.redis,
       config: setup.config,
       publicBaseUrl: setup.members.publicBaseUrl,
-      worker: channel,
+      // Main's preset: no agent, no turn worker, so a send refuses "Agent not configured".
+      worker: configured ? channel : null,
       repositories: setup.repositories,
       models: LangyModelService.create({ modelProviders: setup.dependencies.modelProviders }),
       sessionKeys,
