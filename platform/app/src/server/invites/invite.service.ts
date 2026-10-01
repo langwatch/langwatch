@@ -531,8 +531,15 @@ export class InviteService {
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =
       classifyInvitesByMemberType(newInvites, customRoleMap);
 
+    // A pool is checked only when the batch adds to it. An organization
+    // already over one limit (a plan downgrade) can still invite into the
+    // other pools, and a batch of Developers, which no plan limit applies to
+    // (ADR-143), is never refused for the Full or Lite counts.
     if (!subscriptionLimits.overrideAddingLimitations) {
-      if (currentFullMembers + newFullMembers > subscriptionLimits.maxMembers) {
+      if (
+        newFullMembers > 0 &&
+        currentFullMembers + newFullMembers > subscriptionLimits.maxMembers
+      ) {
         throw new LimitExceededError(
           "members",
           currentFullMembers,
@@ -540,8 +547,8 @@ export class InviteService {
         );
       }
       if (
-        currentMembersLite + newLiteMembers >
-        subscriptionLimits.maxMembersLite
+        newLiteMembers > 0 &&
+        currentMembersLite + newLiteMembers > subscriptionLimits.maxMembersLite
       ) {
         throw new LimitExceededError(
           "membersLite",

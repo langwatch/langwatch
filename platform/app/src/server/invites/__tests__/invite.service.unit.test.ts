@@ -628,6 +628,48 @@ describe("InviteService", () => {
       });
     });
 
+    describe("when the organization is already over both seat limits", () => {
+      beforeEach(() => {
+        vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(12);
+        vi.mocked(mockLicenseRepo.getMembersLiteCount).mockResolvedValue(7);
+        vi.mocked(mockPlanProvider.getActivePlan).mockResolvedValue({
+          maxMembers: 10,
+          maxMembersLite: 5,
+          overrideAddingLimitations: false,
+        } as any);
+      });
+
+      /** @scenario Developers are counted and never capped */
+      it("still lets a batch of Developer invitations through", async () => {
+        await expect(
+          service.checkLicenseLimits({
+            organizationId: "org-1",
+            newInvites: [
+              { role: OrganizationUserRole.DEVELOPER },
+              { role: OrganizationUserRole.DEVELOPER },
+            ],
+            user: { id: "user-1" } as any,
+          }),
+        ).resolves.toBeUndefined();
+      });
+
+      it("refuses a batch that adds a Full seat", async () => {
+        const error = await service
+          .checkLicenseLimits({
+            organizationId: "org-1",
+            newInvites: [
+              { role: OrganizationUserRole.DEVELOPER },
+              { role: OrganizationUserRole.MEMBER },
+            ],
+            user: { id: "user-1" } as any,
+          })
+          .catch((e) => e);
+
+        expect(error).toBeInstanceOf(LimitExceededError);
+        expect(error.limitType).toBe("members");
+      });
+    });
+
     describe("when overrideAddingLimitations is true", () => {
       it("does not enforce limits", async () => {
         vi.mocked(mockLicenseRepo.getMemberCount).mockResolvedValue(1000);

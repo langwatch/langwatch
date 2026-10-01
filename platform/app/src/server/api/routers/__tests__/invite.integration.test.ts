@@ -870,6 +870,45 @@ describe("Invite router integration", () => {
   // ============================================================================
 
   describe("createInvites (admin batch)", () => {
+    describe("when the plan has no Full or Lite seats left", () => {
+      /** @scenario An administrator invites a Developer while the plan is at its seat cap */
+      it("refuses a Member invitation and creates a Developer one", async () => {
+        mockGetActivePlan.mockResolvedValue(
+          makeTestPlan({ maxMembers: 1, maxMembersLite: 0 }),
+        );
+
+        await expect(
+          adminCaller.invite.createInvites({
+            organizationId,
+            invites: [
+              {
+                email: `capped-member-${testNamespace}@acme.com`,
+                role: "MEMBER",
+                teamIds: teamId,
+              },
+            ],
+          }),
+        ).rejects.toThrow();
+
+        const developerEmail = `capped-developer-${testNamespace}@acme.com`;
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email: developerEmail, role: "DEVELOPER", teamIds: "" }],
+        });
+
+        expect(results).toHaveLength(1);
+        await expect(
+          prisma.organizationInvite.findFirst({
+            where: { organizationId, email: developerEmail },
+            select: { role: true, status: true },
+          }),
+        ).resolves.toEqual({
+          role: OrganizationUserRole.DEVELOPER,
+          status: "PENDING",
+        });
+      });
+    });
+
     describe("when admin invites multiple users in a single batch", () => {
       /** @scenario "Admin batch invite creates all records before sending any emails" */
       it("creates all invite records before sending any emails", async () => {
