@@ -122,7 +122,7 @@ export class McpOAuthEndpointService {
       client_id: clientId,
       client_name: clientName,
       redirect_uris: redirectUris,
-      grant_types: ["authorization_code"],
+      grant_types: ["authorization_code", "refresh_token"],
       response_types: ["code"],
       token_endpoint_auth_method: "none",
     });
@@ -144,6 +144,7 @@ export class McpOAuthEndpointService {
       code: params.code,
       codeVerifier: params.code_verifier,
       redirectUri: params.redirect_uri,
+      refreshToken: params.refresh_token,
       clientId,
     });
     http.sendJson(res, exchange.status, exchange.body);

@@ -61,6 +61,8 @@ const door: AuthApi = {
   verifyBrowserSession: () => unreached("verifyBrowserSession"),
   resolveBrowserSession: () => unreached("resolveBrowserSession"),
   getCliAccessSession: () => unreached("getCliAccessSession"),
+  issueProjectCliSession: () => unreached("issueProjectCliSession"),
+  refreshCliSession: () => unreached("refreshCliSession"),
   findCliTokenRecordsForUser: () => unreached("findCliTokenRecordsForUser"),
   revokeCliTokens: () => unreached("revokeCliTokens"),
   listBrowserSessions: () => unreached("listBrowserSessions"),
@@ -144,7 +146,11 @@ describe("the signed-out front door", () => {
 
   describe("when a signed-out visitor asks where an address signs in", () => {
     it("meters the attempt on the address the process resolved, not on the identifier", async () => {
-      route.mockResolvedValue({ kind: "email" } as never);
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
 
       await visitor.route({ identifier: "ana@acme.com", breakGlass: undefined });
 
@@ -157,7 +163,11 @@ describe("the signed-out front door", () => {
     });
 
     it("spends one shared budget for every caller whose address the process could not resolve", async () => {
-      route.mockResolvedValue({ kind: "email" } as never);
+      route.mockResolvedValue({
+        outcome: "route_to_signup",
+        methodSet: [],
+        reasonCode: "identifier_unknown",
+      });
 
       await router.createCaller({}).route({ identifier: null, breakGlass: undefined });
 

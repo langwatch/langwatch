@@ -16,6 +16,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class NoProjects implements Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey"> {
   resolveLiveProjectByApiKey(): Promise<McpLiveProjectLookup> {
@@ -43,6 +44,7 @@ function handler() {
     redis: null,
     projects: new NoProjects(),
     grants: new NoGrants(),
+    cliSessions: new FakeCliSessions(),
     cipher: new PlainCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",

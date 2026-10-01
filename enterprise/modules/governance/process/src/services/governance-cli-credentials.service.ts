@@ -36,7 +36,7 @@ const logger = createLogger("langwatch:governance-cli");
 /** The personal workspace the credential routes resolve a project through. */
 export type GovernanceCliPersonalWorkspace = Readonly<{
   team: Readonly<{ id: string }>;
-  project: Readonly<{ id: string; slug: string; name: string; apiKey: string }>;
+  project: Readonly<{ id: string; slug: string; name: string }>;
 }>;
 
 /** One project, as the two handout routes answer it. */
@@ -55,19 +55,13 @@ export type GovernanceCliBudgetStatus =
     }>;
 
 export type GovernanceCliPersonalProjectOutcome =
-  | Readonly<{ outcome: "resolved"; project: GovernanceCliProject & { apiKey?: string } }>
+  | Readonly<{ outcome: "resolved"; project: GovernanceCliProject }>
   | Readonly<{ outcome: "failed" }>;
 
 export type GovernanceCliVirtualKeyOutcome =
   | Readonly<{ outcome: "issued"; id: string; secret: string; prefix: string }>
   | Readonly<{ outcome: "no-eligible-providers" }>
   | Readonly<{ outcome: "failed" }>;
-
-export type GovernanceCliProjectKeyOutcome =
-  | Readonly<{ outcome: "granted"; apiKey: string; project: GovernanceCliProject }>
-  | Readonly<{ outcome: "project-not-found"; slug: string }>
-  | Readonly<{ outcome: "personal-project-not-allowed" }>
-  | Readonly<{ outcome: "forbidden" }>;
 
 export type GovernanceCliIngestionKeyOutcome =
   | Readonly<{
@@ -96,7 +90,7 @@ export type GovernanceCliCredentialMembers = Readonly<{
   ingestionKeys: Pick<PersonalIngestionKeyService, "issueForProject" | "mint">;
   aiTools: Pick<DefaultGovernanceAiToolCatalogService, "resolveToolPolicy">;
   users: Pick<UserApi, "findById">;
-  projects: Pick<ProjectApi, "findLiveBySlug" | "findLiveByRef">;
+  projects: Pick<ProjectApi, "findLiveByRef">;
   /** Who to point a blocked caller at, when a budget refuses the request. */
   supportContacts: () => Pick<OrganizationSupportContactService, "findSupportContact">;
   ensurePersonalWorkspace: (input: {
@@ -134,10 +128,6 @@ export interface GovernanceCliCredentialApi {
     caller: GovernanceCliCaller;
     deviceLabel: string | undefined;
   }): Promise<GovernanceCliVirtualKeyOutcome>;
-  handOutProjectKey(input: {
-    caller: GovernanceCliCaller;
-    slug: string;
-  }): Promise<GovernanceCliProjectKeyOutcome>;
   mintIngestionKey(input: {
     caller: GovernanceCliCaller;
     sourceType: string;
@@ -231,7 +221,7 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
     };
   }
 
-  /** Lazy personal-key exchange for sessions minted before the exchange shipped one. */
+  /** The caller's personal workspace, ensured; it names the project and never its key. */
   async resolvePersonalProject(
     caller: GovernanceCliCaller,
   ): Promise<GovernanceCliPersonalProjectOutcome> {
@@ -244,16 +234,9 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
         displayName: person?.name,
         displayEmail: person?.email,
       });
+      const { id, slug, name } = workspace.project;
 
-      // The key is withheld, not the session refused, when this person cannot manage it.
-      const canManage = await this.members.permittedOnProject({
-        userId: caller.user_id,
-        projectId: workspace.project.id,
-        permission: "project:manage",
-      });
-      const { id, slug, name, apiKey } = workspace.project;
-
-      return { outcome: "resolved", project: { id, slug, name, ...(canManage ? { apiKey } : {}) } };
+      return { outcome: "resolved", project: { id, slug, name } };
     } catch (err) {
       logger.error(
         { err, userId: caller.user_id },
@@ -321,44 +304,6 @@ export class GovernanceCliCredentialService implements GovernanceCliCredentialAp
 
       return { outcome: "failed" };
     }
-  }
-
-  /**
-   * Non-interactive project login. Nothing is minted — the project's existing
-   * key is returned — and because that key is the shared write credential
-   * usable outside the console's RBAC constraints, membership alone is not
-   * enough: the caller needs administrative project permission.
-   */
-  async handOutProjectKey(input: {
-    caller: GovernanceCliCaller;
-    slug: string;
-  }): Promise<GovernanceCliProjectKeyOutcome> {
-    const [project] = await this.members.projects.findLiveBySlug({
-      slug: input.slug,
-      organizationId: input.caller.organization_id,
-    });
-
-    if (!project) return { outcome: "project-not-found", slug: input.slug };
-
-    // Another person's personal workspace is theirs alone; no permission grant
-    // makes a second principal's key into it legitimate.
-    if (project.isPersonal && project.ownerUserId !== input.caller.user_id) {
-      return { outcome: "personal-project-not-allowed" };
-    }
-
-    const permitted = await this.members.permittedOnProject({
-      userId: input.caller.user_id,
-      projectId: project.id,
-      permission: "project:manage",
-    });
-
-    if (!permitted) return { outcome: "forbidden" };
-
-    return {
-      outcome: "granted",
-      apiKey: project.apiKey,
-      project: { id: project.id, slug: project.slug, name: project.name },
-    };
   }
 
   /**

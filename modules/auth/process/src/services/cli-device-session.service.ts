@@ -95,15 +95,13 @@ export interface CliDeviceCodeRecord {
     base_url: string;
   };
   /**
-   * For `credential_type: "project_api_key"` after approval — the picked
-   * project's existing API key plus identifying fields, shipped to the CLI on
-   * the next `/exchange` poll. Mutable across approvals (the user can re-pick).
+   * For `credential_type: "project_api_key"` after approval: the picked
+   * project the exchange binds the session to. Never a key.
    */
-  project_api_key?: {
+  project?: {
     project_id: string;
     project_slug: string;
     project_name: string;
-    api_key: string;
   };
   /**
    * For `credential_type: "device_session"` after approval — the scope + permission
@@ -116,6 +114,8 @@ export interface CliDeviceCodeRecord {
 export interface CliRefreshTokenRecord {
   user_id: string;
   organization_id: string;
+  /** The one project the session is capped at; carried across rotations. */
+  project_id?: string;
   issued_at: number;
   expires_at: number;
   client_info?: CliClientInfo;
@@ -125,17 +125,31 @@ export interface CliRefreshTokenRecord {
    * tokens. Absent for sessions that minted no key.
    */
   cli_api_key_id?: string;
+  /** Set when the person consented to one project only (hosted MCP): no rotation re-scopes it. */
+  project_locked?: boolean;
+  /** The family this session heads, carried across rotations; its forks are filed under it. */
+  family_id?: string;
+  /** On a forked child: the family it was forked from, whose end is its end. */
+  parent_family_id?: string;
 }
 
 export interface CliAccessTokenRecord {
   user_id: string;
   organization_id: string;
+  /** Mirror of the refresh record's field; see there. */
+  project_id?: string;
   issued_at: number;
   expires_at: number;
   /** Mirror of the refresh record's field; the devices inventory reads it. */
   client_info?: CliClientInfo;
   /** Mirror of the refresh record's field; see there. */
   cli_api_key_id?: string;
+  /** Mirror of the refresh record's field; see there. */
+  project_locked?: boolean;
+  /** Mirror of the refresh record's field; see there. */
+  family_id?: string;
+  /** Mirror of the refresh record's field; see there. */
+  parent_family_id?: string;
 }
 
 /** The pair a completed grant — or a rotation — hands the CLI. */
@@ -187,6 +201,11 @@ function pollRateKey(deviceCode: string): string {
  */
 function exchangeClaimKey(deviceCode: string): string {
   return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
+}
+
+/** The token keys of the children forked from one session family. */
+function familyIndexKey(familyId: string): string {
+  return `lwcli:family:${familyId}`;
 }
 
 /** Everything the device grant stores, over one process's substrate. */
@@ -326,6 +345,23 @@ export class CliDeviceSessionService {
   }
 
   /**
+   * Claims the one rotation a refresh token may buy, so two concurrent presentations of the same
+   * token cannot both mint a pair. The loser is refused as a spent token.
+   */
+  claimRotation(refreshToken: string): Promise<boolean> {
+    return this.store.setIfAbsent({
+      key: `lwcli:refresh-claim:${refreshToken}`,
+      value: "1",
+      ttlSeconds: EXCHANGE_CLAIM_SECONDS,
+    });
+  }
+
+  /** Releases a rotation claim that minted nothing, so the token can be presented again. */
+  releaseRotationClaim(refreshToken: string): Promise<void> {
+    return this.store.delete(`lwcli:refresh-claim:${refreshToken}`);
+  }
+
+  /**
    * Releases a claim that bought nothing, so the next poll can try. Only for
    * paths that consumed NOTHING: releasing a successful redemption's claim
    * early could let a late reader re-claim and mint a second credential.
@@ -350,13 +386,13 @@ export class CliDeviceSessionService {
 
   /**
    * Flips a pending device code to `approved` and stamps the identity — and, for a
-   * project-key grant, the picked project's key — the next `/exchange` poll returns.
+   * project grant, the picked project — the next `/exchange` poll binds the session to.
    */
   async approveDeviceCode(input: {
     deviceCode: string;
     userId: string;
     organizationId: string;
-    projectApiKey?: CliDeviceCodeRecord["project_api_key"];
+    project?: CliDeviceCodeRecord["project"];
     keySelection?: CliKeySelection | undefined;
   }): Promise<{ approved: boolean }> {
     const record = await this.#storedDeviceCode(input.deviceCode).catch((error: unknown) => {
@@ -380,7 +416,7 @@ export class CliDeviceSessionService {
       status: "approved",
       user_id: input.userId,
       organization_id: input.organizationId,
-      project_api_key: input.projectApiKey,
+      project: input.project,
       key_selection: input.keySelection,
     };
     await this.rewriteDeviceCode(updated);
@@ -432,8 +468,14 @@ export class CliDeviceSessionService {
   async mintSession(input: {
     userId: string;
     organizationId: string;
+    projectId?: string | undefined;
     clientInfo?: CliClientInfo | undefined;
     cliApiKeyId?: string | undefined;
+    projectLocked?: boolean | undefined;
+    /** The family a rotation carries; a new one is started when absent. */
+    familyId?: string | undefined;
+    /** Files the pair as a child of this family, so ending the family ends it. */
+    parentFamilyId?: string | undefined;
   }): Promise<CliMintedSession> {
     const accessToken = `lw_at_${randomBytes(32).toString("base64url")}`;
     const refreshToken = `lw_rt_${randomBytes(32).toString("base64url")}`;
@@ -441,9 +483,13 @@ export class CliDeviceSessionService {
     const shared = {
       user_id: input.userId,
       organization_id: input.organizationId,
+      project_id: input.projectId,
       issued_at: now,
       client_info: input.clientInfo,
       cli_api_key_id: input.cliApiKeyId,
+      ...(input.projectLocked ? { project_locked: true } : {}),
+      family_id: input.familyId ?? randomBytes(16).toString("base64url"),
+      ...(input.parentFamilyId ? { parent_family_id: input.parentFamilyId } : {}),
     };
     await this.store.set({
       key: cliAccessTokenKey(accessToken),
@@ -461,11 +507,12 @@ export class CliDeviceSessionService {
       } satisfies CliRefreshTokenRecord),
       ttlSeconds: this.refreshTokenTtlSeconds,
     });
-    await this.store.indexTokens({
-      indexKey: cliUserTokensIndexKey(input.userId),
-      memberKeys: [cliAccessTokenKey(accessToken), cliRefreshTokenKey(refreshToken)],
-      ttlMs: this.refreshTokenTtlSeconds * 1000,
-    });
+    const memberKeys = [cliAccessTokenKey(accessToken), cliRefreshTokenKey(refreshToken)];
+    const ttlMs = this.refreshTokenTtlSeconds * 1000;
+    await this.store.indexTokens({ indexKey: cliUserTokensIndexKey(input.userId), memberKeys, ttlMs });
+    if (input.parentFamilyId) {
+      await this.store.indexTokens({ indexKey: familyIndexKey(input.parentFamilyId), memberKeys, ttlMs });
+    }
 
     return {
       accessToken,
@@ -510,6 +557,38 @@ export class CliDeviceSessionService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * The family a session heads. A session minted before families existed is given one now,
+   * written back onto its refresh record, so the child about to be forked is filed under it.
+   */
+  async familyOf(input: { refreshToken: string; record: CliRefreshTokenRecord }): Promise<string> {
+    if (input.record.family_id) return input.record.family_id;
+
+    const familyId = randomBytes(16).toString("base64url");
+    const remainingMs = input.record.expires_at - nowInstant().epochMilliseconds;
+    await this.store.set({
+      key: cliRefreshTokenKey(input.refreshToken),
+      value: JSON.stringify({ ...input.record, family_id: familyId }),
+      ttlSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+    });
+
+    return familyId;
+  }
+
+  /** Ends every child forked from these sessions' families, answering how many records were held. */
+  private async endChildren(
+    records: readonly Pick<CliRefreshTokenRecord, "family_id">[],
+  ): Promise<number> {
+    let ended = 0;
+    for (const familyId of new Set(records.flatMap(({ family_id }) => family_id ?? []))) {
+      const indexKey = familyIndexKey(familyId);
+      const memberKeys = await this.store.findIndexedTokens(indexKey);
+      ended += await this.store.deleteIndexedTokens({ indexKey, memberKeys });
+    }
+
+    return ended;
   }
 
   /** Drops one refresh token, which is what makes a rejected rotation final. */
@@ -595,7 +674,21 @@ export class CliDeviceSessionService {
     const indexed = await this.store.findIndexedTokens(indexKey);
     const memberKeys =
       tokenKeys === undefined ? indexed : indexed.filter((key) => tokenKeys.includes(key));
-    return { revokedCount: await this.store.deleteIndexedTokens({ indexKey, memberKeys }) };
+    const parents: Pick<CliRefreshTokenRecord, "family_id">[] = [];
+    for (const memberKey of memberKeys) {
+      const raw = await this.store.get(memberKey).catch((error: unknown) => {
+        if (isRecordNotFound(error)) return undefined;
+        throw error;
+      });
+      const record =
+        raw === undefined ? null : CliDeviceSessionService.decodeSession<CliRefreshTokenRecord>(raw);
+      if (record) parents.push(record);
+    }
+    // A revoked session's forks go with it.
+    const children = await this.endChildren(parents);
+    return {
+      revokedCount: children + (await this.store.deleteIndexedTokens({ indexKey, memberKeys })),
+    };
   }
 
   private static toTokenRecordEntry({
@@ -659,6 +752,8 @@ export class CliDeviceSessionService {
 
       await this.store.delete(keyFor(token));
     }
+    // Ending a session ends the children forked from it.
+    await this.endChildren(records);
 
     return records;
   }

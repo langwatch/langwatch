@@ -23,10 +23,12 @@ import {
 } from "./cli-api";
 import { type GovernanceConfig, displayConfigPath, loadConfig, saveConfig } from "./config";
 import {
+  createIngestionKey,
   type CredentialType,
   DeviceFlowError,
   type ExchangeApiKeyResult,
   type ExchangeDeviceSessionResult,
+  logout,
   pollUntilDone,
   startDeviceCode,
 } from "./device-flow";
@@ -253,7 +255,29 @@ async function completeDeviceSession({
   return cfg;
 }
 
-function completeProjectKey({
+/**
+ * The key a project login writes: an older server's `api_key` verbatim, or this machine's
+ * ingestion key minted with the project session, which then ends (only the key is kept).
+ */
+async function projectKeyOf({
+  baseUrl,
+  result,
+}: {
+  baseUrl: string;
+  result: ProjectKeyResult;
+}): Promise<string> {
+  if (result.kind === "api_key") return result.api_key;
+  try {
+    return await createIngestionKey(
+      { baseUrl },
+      { accessToken: result.access_token, project: result.project },
+    );
+  } finally {
+    await logout({ baseUrl }, result.refresh_token, result.access_token).catch(() => undefined);
+  }
+}
+
+async function completeProjectKey({
   cfg,
   result,
   spinner,
@@ -261,14 +285,15 @@ function completeProjectKey({
   cfg: GovernanceConfig;
   result: ProjectKeyResult;
   spinner: Ora;
-}): GovernanceConfig {
-  // kind === 'api_key' — write to project-local .env (NO copy-paste)
+}): Promise<GovernanceConfig> {
+  // Written to the project-local .env (NO copy-paste).
+  const apiKey = await projectKeyOf({ baseUrl: cfg.control_plane_url, result });
   spinner.succeed(`Connected to project ${chalk.bold(result.project.name)}`);
   // Seed the identity notice's credential-to-project-name cache while the
   // server is telling us the name anyway, so the first api-key notice
   // needs no extra round trip.
-  rememberProjectName(result.api_key, result.project.name);
-  const envResult = writeApiKeyToEnv(result.api_key);
+  rememberProjectName(apiKey, result.project.name);
+  const envResult = writeApiKeyToEnv(apiKey);
   console.log();
   console.log(chalk.green("✓ API key saved to .env"));
   if (envResult.created) {
@@ -351,7 +376,7 @@ export async function runUnifiedLoginFlow(
     if (result.kind === "device_session") {
       return await completeDeviceSession({ cfg, result, spinner, isQuiet });
     }
-    return completeProjectKey({ cfg, result, spinner });
+    return await completeProjectKey({ cfg, result, spinner });
   } catch (err) {
     spinner.fail();
     if (err instanceof DeviceFlowError) {
@@ -441,12 +466,12 @@ function persistDeviceSession(cfg: GovernanceConfig, result: ExchangeDeviceSessi
   // kept, its fresh validated_at could authenticate the new session as the
   // prior user until the revalidation window lapsed.
   delete cfg.personal_project;
-  if (result.personal_project?.api_key) {
+  if (result.personal_project) {
     cfg.personal_project = {
       id: result.personal_project.id,
       slug: result.personal_project.slug,
       name: result.personal_project.name,
-      api_key: result.personal_project.api_key,
+      ...(result.personal_project.api_key ? { api_key: result.personal_project.api_key } : {}),
       // The exchange that just delivered this key proved the session is
       // live, so seed the revalidation clock now.
       validated_at: Math.floor(Date.now() / 1000),

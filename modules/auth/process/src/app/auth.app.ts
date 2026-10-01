@@ -20,6 +20,7 @@ import {
   type BrowserSessionResolution,
   type BrowserSessionVerification,
   type CliAccessSession,
+  type CliSessionTokens,
   type CliTokenRecordEntry,
   type InviteLanding,
   type LegacySsoAccessQuery,
@@ -82,6 +83,7 @@ import {
 } from "../eventing/auth-lifecycle.pipeline.ts";
 import type { AuthRepositories } from "../repositories/auth.repositories.ts";
 import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.auth-directory.repository.ts";
+import type { CliAccessProject } from "../services/api-rest-credentials.service.ts";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
@@ -235,7 +237,7 @@ export class AuthApp implements AuthApiContract {
     notifications: NotificationService,
     /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
     sso: SsoApi,
-    /** Whether a CLI approver may still hand out a shared project's key (`project:manage`). */
+    /** Whether a CLI person may bind a session to a project (`project:view`). */
     authz: AuthzApi,
   };
   static readonly config = authServerConfig;
@@ -448,11 +450,11 @@ export class AuthApp implements AuthApiContract {
         directory: () => PrismaAuthDirectoryRepository.create(members.prisma),
         apiKeys: () => dependencies.apiKeys,
         ensurePersonalWorkspace: (input) => dependencies.users.ensurePersonalWorkspace(input),
-        canManageProject: ({ userId, projectId }) =>
+        canViewProject: ({ userId, projectId }) =>
           dependencies.authz.hasProjectPermission({
             userId,
             projectId,
-            permission: "project:manage",
+            permission: "project:view",
           }),
         featureFlags: () => dependencies.featureFlags,
         publicBaseUrl: () => members.publicBaseUrl,
@@ -808,6 +810,8 @@ export class AuthApp implements AuthApiContract {
     return {
       userId: record.user_id,
       organizationId: record.organization_id,
+      ...(record.project_id ? { projectId: record.project_id } : {}),
+      ...(record.project_locked ? { projectLocked: true } : {}),
       tokenKey: cliAccessTokenKey(token),
       ...(record.cli_api_key_id ? { cliApiKeyId: record.cli_api_key_id } : {}),
       ...(record.client_info
@@ -819,6 +823,11 @@ export class AuthApp implements AuthApiContract {
           }
         : {}),
     };
+  }
+
+  /** The API door's reader for a project-bound bearer; auth's own, not an `AuthApi` operation. */
+  getCliAccessProject(input: { authorization: string }): Promise<CliAccessProject> {
+    return this.#cliDeviceFlow.getAccessProject(input);
   }
 
   startCliDeviceCode(input: { raw: string }): Promise<CliDeviceFlowAnswer> {
@@ -863,6 +872,19 @@ export class AuthApp implements AuthApiContract {
     const resolution = await this.resolveBrowserSession({ verified: verification.verified });
 
     return resolution.kind === "signed_in" ? resolution.session.user : null;
+  }
+
+  issueProjectCliSession(input: {
+    userId: string;
+    organizationId: string;
+    projectId: string;
+    clientLabel: string;
+  }): Promise<CliSessionTokens> {
+    return this.#cliDeviceFlow.issueProjectSession(input);
+  }
+
+  refreshCliSession(input: { refreshToken: string }): Promise<CliSessionTokens> {
+    return this.#cliDeviceFlow.rotateSession(input);
   }
 
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]> {

@@ -12,7 +12,7 @@ vi.mock("../config", () => ({
 
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
-import { fetchPersonalProject, fetchProjectKeyBySlug, SessionApiError } from "../session-api";
+import { fetchPersonalProject, mintProjectIngestionKey } from "../session-api";
 
 const liveSession = (): GovernanceConfig =>
   ({
@@ -114,19 +114,85 @@ describe("session-api request bounds", () => {
     });
   });
 
-  describe("given a 200 project-key response with no api_key", () => {
-    it("throws instead of returning a keyless document", async () => {
+  describe("given a personal-project answer that carries no key", () => {
+    it("returns the project, since the login key authenticates now", async () => {
       const fetchImpl: typeof fetch = async () =>
-        jsonResponse(200, {
-          project: { id: "p1", slug: "demo", name: "Demo" },
-        });
+        jsonResponse(200, { project: { id: "p1", slug: "demo", name: "Demo" } });
 
-      await expect(fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl })).rejects.toThrow(
-        SessionApiError,
-      );
-      await expect(
-        fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl }),
-      ).rejects.toMatchObject({ code: "malformed_response" });
+      await expect(fetchPersonalProject(liveSession(), { fetchImpl })).resolves.toEqual({
+        id: "p1",
+        slug: "demo",
+        name: "Demo",
+      });
+    });
+  });
+
+  describe("given a project login by slug", () => {
+    function controlPlane(refreshAnswer: Record<string, unknown>) {
+      const calls: { url: string; body: Record<string, unknown>; auth: string | null }[] = [];
+      const fetchImpl: typeof fetch = async (input, init) => {
+        const url = requestUrl(input);
+        const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as Record<
+          string,
+          unknown
+        >;
+        calls.push({ url, body, auth: new Headers(init?.headers).get("authorization") });
+        if (url.endsWith("/api/auth/cli/refresh")) return jsonResponse(200, refreshAnswer);
+        if (url.endsWith("/api/v1/api-keys/ingestion")) {
+          return jsonResponse(201, { token: "sk-lw-ingest", apiKey: { id: "k1", name: "n" } });
+        }
+        return jsonResponse(200, { ok: true });
+      };
+      return { calls, fetchImpl };
+    }
+
+    it("forks a child session, mints the ingestion key with it, ends the child and keeps the parent", async () => {
+      const { calls, fetchImpl } = controlPlane({
+        access_token: "lw_at_child",
+        refresh_token: "lw_rt_child",
+        expires_in: 3600,
+        project: { id: "p1", slug: "demo", name: "Demo" },
+      });
+      const cfg = liveSession();
+
+      const minted = await mintProjectIngestionKey(cfg, "demo", { fetchImpl });
+
+      expect(minted).toEqual({
+        api_key: "sk-lw-ingest",
+        project: { id: "p1", slug: "demo", name: "Demo" },
+      });
+      expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+        "/api/auth/cli/refresh",
+        "/api/v1/api-keys/ingestion",
+        "/api/auth/cli/logout",
+      ]);
+      expect(calls[0]?.body).toEqual({ refresh_token: "lw_rt_test", project_slug: "demo" });
+      expect(calls[1]?.auth).toBe("Bearer lw_at_child");
+      expect(calls[1]?.body).toMatchObject({
+        keyType: "personal",
+        permissionMode: "restricted",
+        permissions: ["traces:create"],
+        bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: "p1" }],
+      });
+      expect(calls[2]?.body).toEqual({ refresh_token: "lw_rt_child", access_token: "lw_at_child" });
+      expect(cfg.refresh_token).toBe("lw_rt_test");
+      expect(saveConfig).not.toHaveBeenCalled();
+    });
+
+    it("keeps the pair an older server rotated, and mints nothing", async () => {
+      const { calls, fetchImpl } = controlPlane({
+        access_token: "lw_at_rotated",
+        refresh_token: "lw_rt_rotated",
+        expires_in: 3600,
+      });
+      const cfg = liveSession();
+
+      await expect(mintProjectIngestionKey(cfg, "demo", { fetchImpl })).rejects.toMatchObject({
+        code: "endpoint_missing",
+      });
+      expect(calls).toHaveLength(1);
+      expect(cfg.refresh_token).toBe("lw_rt_rotated");
+      expect(saveConfig).toHaveBeenCalled();
     });
   });
 });

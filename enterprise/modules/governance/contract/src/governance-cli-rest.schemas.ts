@@ -23,10 +23,6 @@ export const governanceCliVirtualKeyRequestSchema = z.object({
   device_label: z.string().optional(),
 });
 
-export const governanceCliProjectKeyRequestSchema = z.object({
-  slug: z.string().min(1),
-});
-
 export const governanceCliIngestionKeyRequestSchema = z.object({
   source_type: z.string().min(1),
   /**
@@ -147,16 +143,17 @@ export const governanceCliBudgetOverviewAnswers = {
 } as const;
 export const governanceCliPersonalProjectAnswers = {
   200: z.object({
-    project: z.object({ ...cliProjectSchema.shape, api_key: z.string().optional() }),
+    project: cliProjectSchema,
   }),
   ...governanceCliRefusalAnswers,
 } as const;
+/** The deleted project-key door: a 2xx the framework requires, never returned, and the 410 old CLIs read. */
+export const governanceCliProjectKeyGoneAnswers = {
+  ...governanceCliPersonalProjectAnswers,
+  410: cliRefusalSchema,
+} as const;
 export const governanceCliVirtualKeyAnswers = {
   201: z.object({ id: z.string(), secret: z.string(), prefix: z.string() }),
-  ...governanceCliRefusalAnswers,
-} as const;
-export const governanceCliProjectKeyAnswers = {
-  200: z.object({ api_key: z.string(), project: cliProjectSchema }),
   ...governanceCliRefusalAnswers,
 } as const;
 export const governanceCliIngestionSourcesAnswers = {
@@ -237,9 +234,6 @@ export type GovernanceCliPersonalProjectAnswer = GovernanceCliAnswerOf<
 >;
 export type GovernanceCliVirtualKeyAnswer = GovernanceCliAnswerOf<
   typeof governanceCliVirtualKeyAnswers
->;
-export type GovernanceCliProjectKeyAnswer = GovernanceCliAnswerOf<
-  typeof governanceCliProjectKeyAnswers
 >;
 export type GovernanceCliIngestionSourcesAnswer = GovernanceCliAnswerOf<
   typeof governanceCliIngestionSourcesAnswers

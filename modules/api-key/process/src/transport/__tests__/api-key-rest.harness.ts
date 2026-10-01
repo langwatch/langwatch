@@ -16,13 +16,14 @@ import {
 import { HandledError } from "@langwatch/handled-error";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
+import { apiKeyIngestionCaller, apiKeyRest, apiKeyRestCredential } from "../api-key.rest.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 export const ORGANIZATION_ID = "organization-1";
 export const CALLER_USER_ID = "user-caller";
 export const OTHER_USER_ID = "user-other";
 export const API_KEY_ID = "api-key-credential";
+export const PROJECT_ID = "project-1";
 
 /**
  * Which credential the request arrives with. A service credential acts as
@@ -31,11 +32,17 @@ export const API_KEY_ID = "api-key-credential";
  */
 export const AS_MEMBER = "member-credential";
 export const AS_SERVICE = "service-credential";
+/** A person's project-bound sign-in session, which the project door admits as that person. */
+export const AS_SESSION = "session-credential";
+
+function presentedOf(request: Request): string | undefined {
+  return request.headers.get("Authorization")?.replace(/^Bearer /, "");
+}
 
 /** The member a presented credential acts as, or `undefined` for one nobody issued. */
 function callerOf(request: Request): string | null | undefined {
-  const presented = request.headers.get("Authorization")?.replace(/^Bearer /, "");
-  if (presented === AS_MEMBER) return CALLER_USER_ID;
+  const presented = presentedOf(request);
+  if (presented === AS_MEMBER || presented === AS_SESSION) return CALLER_USER_ID;
   if (presented === AS_SERVICE) return null;
 
   return undefined;
@@ -61,7 +68,9 @@ export function mountApiKeyRest(
   options: { apiKeys?: Partial<TestApiKeyService>; granted?: readonly string[] } = {},
 ) {
   const apiKeys: ApiKeyApi = Object.assign(new TestApiKeyService(), options.apiKeys);
-  const granted = new Set(options.granted ?? ["organization:view", "organization:manage"]);
+  const granted = new Set(
+    options.granted ?? ["organization:view", "organization:manage", "traces:create"],
+  );
   // The trail the two addressed management routes declare. The runtime refuses
   // to mount a declared action with nowhere to write it, so a family that
   // stopped auditing would fail here rather than go quiet in production.
@@ -81,7 +90,10 @@ export function mountApiKeyRest(
 
         return {
           actor: userId ? { type: "user", id: userId } : { type: "api_key", id: API_KEY_ID },
-          scope: { tier: "organization", id: ORGANIZATION_ID },
+          scope:
+            permission === "traces:create"
+              ? { tier: "project", id: PROJECT_ID }
+              : { tier: "organization", id: ORGANIZATION_ID },
         };
       },
     },
@@ -94,6 +106,11 @@ export function mountApiKeyRest(
       bindRestMiddleware(apiKeyRestCredential, (c) => ({
         apiKeyId: API_KEY_ID,
         userId: callerOf(c.req.raw) ?? null,
+      })),
+      bindRestMiddleware(apiKeyIngestionCaller, (c) => ({
+        isPersonSession: presentedOf(c.req.raw) === AS_SESSION,
+        userId: callerOf(c.req.raw) ?? null,
+        organizationId: ORGANIZATION_ID,
       })),
     ],
   });

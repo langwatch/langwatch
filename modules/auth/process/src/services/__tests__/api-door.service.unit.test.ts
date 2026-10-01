@@ -64,8 +64,15 @@ const peers: ApiDoorPeers = {
       ),
     markUsed: () => {},
   },
+  cliProjects: {
+    getCliAccessProject: ({ authorization }) =>
+      authorization === "Bearer lw_at_bound"
+        ? Promise.resolve({ userId: "user-3", organizationId: "org-1", project: PROJECT })
+        : Promise.reject(new Error("a bearer bound to no project")),
+  },
   authz: {
     hasApiKeyPermission: refuseEverything,
+    hasProjectPermission: refuseEverything,
     getApiKeyProjectDecision: refuseEverything,
     getDecision: refuseEverything,
     getProjectAnyDecision: refuseEverything,
@@ -148,6 +155,24 @@ describe("the key doors' actor", () => {
   describe("given a legacy project key", () => {
     it("is no one on the project door", async () => {
       expect(await actorThrough(identities.project, { "x-auth-token": "legacy-key" })).toBeNull();
+    });
+  });
+
+  describe("given a CLI access token bound to a project", () => {
+    const headers = { authorization: "Bearer lw_at_bound" };
+
+    it("is the person on the project door", async () => {
+      expect(await actorThrough(identities.project, headers)).toEqual({
+        type: "user",
+        id: "user-3",
+      });
+    });
+
+    it("is the person on the key door", async () => {
+      expect(await actorThrough(identities.apiKey, headers)).toEqual({
+        type: "user",
+        id: "user-3",
+      });
     });
   });
 

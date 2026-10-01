@@ -8,8 +8,8 @@ import {
   governanceCliBootstrapAnswers,
   governanceCliBudgetOverviewAnswers,
   governanceCliPersonalProjectAnswers,
+  governanceCliProjectKeyGoneAnswers,
   governanceCliVirtualKeyAnswers,
-  governanceCliProjectKeyAnswers,
   governanceCliIngestionSourcesAnswers,
   governanceCliIngestionSourceEventsAnswers,
   governanceCliIngestionSourceHealthAnswers,
@@ -51,19 +51,26 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .withAccess(CLI_DOOR)
   .responds(governanceCliPersonalProjectAnswers)
   .handle(({ app, actor, scope }) => app.cliPersonalProject({ actor, organizationId: scope.id }))
+  // The deleted project-key door answers 410 so old CLIs upgrade (Alex, 2026-10-01). Remove
+  // after a few releases. Old CLIs print only `error_description`, so the body keeps their shape.
+  .post("/api/auth/cli/project-key", "readCliProjectKey")
+  .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
+  .withAccess(CLI_DOOR)
+  .responds(governanceCliProjectKeyGoneAnswers)
+  .handle(() => ({
+    status: 410 as const,
+    body: {
+      error: "gone",
+      error_description:
+        "This version of the LangWatch CLI is too old to log in to a project. Run: npm i -g langwatch@latest",
+    },
+  }))
   .post("/api/auth/cli/virtual-key", "issueCliVirtualKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliVirtualKeyAnswers)
   .handle(({ app, actor, scope, raw }) =>
     app.cliVirtualKey({ actor, organizationId: scope.id, raw }),
-  )
-  .post("/api/auth/cli/project-key", "readCliProjectKey")
-  .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
-  .withAccess(CLI_DOOR)
-  .responds(governanceCliProjectKeyAnswers)
-  .handle(({ app, actor, scope, raw }) =>
-    app.cliProjectKey({ actor, organizationId: scope.id, raw }),
   )
   .get("/api/auth/cli/governance/ingest/sources", "listCliIngestionSources")
   .withQuery(governanceCliSourcesQuerySchema)

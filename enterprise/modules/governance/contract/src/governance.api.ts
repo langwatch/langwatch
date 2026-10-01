@@ -43,7 +43,6 @@ import type {
   GovernanceCliBudgetOverviewAnswer,
   GovernanceCliPersonalProjectAnswer,
   GovernanceCliVirtualKeyAnswer,
-  GovernanceCliProjectKeyAnswer,
   GovernanceCliIngestionSourcesAnswer,
   GovernanceCliIngestionSourceEventsAnswer,
   GovernanceCliIngestionSourceHealthAnswer,
@@ -161,7 +160,8 @@ export type GovernanceMcpToolServer = {
 /** One hosted MCP session the governance tools install on. */
 export type GovernanceMcpSessionTools = {
   server: GovernanceMcpToolServer;
-  apiKey: string;
+  /** The project the session's credential is capped at; its organization scopes the tools. */
+  projectId: string;
   /** Captured at /api/mcp/authorize; absent for project-apiKey-only sessions. */
   callerUserId: string | undefined;
 };
@@ -175,7 +175,6 @@ export interface GovernanceRestApi {
   cliBudgetOverview(input: GovernanceCliRequest): Promise<GovernanceCliBudgetOverviewAnswer>;
   cliPersonalProject(input: GovernanceCliRequest): Promise<GovernanceCliPersonalProjectAnswer>;
   cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer>;
-  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer>;
   cliIngestionSources(
     input: GovernanceCliSourcesRequest,
   ): Promise<GovernanceCliIngestionSourcesAnswer>;

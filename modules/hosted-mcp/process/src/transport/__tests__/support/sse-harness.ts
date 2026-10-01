@@ -17,6 +17,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./fake-cli-sessions.ts";
 
 export const SSE_SESSION_PREFIX = "mcp:sse:session:";
 export const SSE_SESSION_SET_PREFIX = "mcp:sse:sessions_by_key:";
@@ -185,6 +186,7 @@ export async function startReplicaPair({
         redis,
         projects: new HarnessProjectLookup(apiKeys),
         grants: new HarnessSessionGrant(),
+        cliSessions: new FakeCliSessions(),
         cipher: new HarnessCipher(),
         address: new HarnessClientAddress(),
         baseHost: "https://app.langwatch.ai",

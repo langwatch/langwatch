@@ -30,6 +30,8 @@ import { BrowserSessionVerificationService } from "./browser-session-verificatio
 export type ApiDoorPeers = Readonly<{
   sessions: Pick<AuthApi, "verifyBrowserSession" | "resolveBrowserSession">;
   apiKeys: ApiRestCredentialPeers["apiKeys"];
+  /** Where a project-bound CLI access token is read back to its person and project. */
+  cliProjects: ApiRestCredentialPeers["cliProjects"];
   /** The decisions both transports authorize through, and the key ceilings the key doors ask. */
   authz: ApiDoor["authz"] & ApiRestCredentialPeers["authz"];
   organizations: Pick<OrganizationApi, "getSettings" | "getOrganizationIdByTeamId">;
@@ -53,6 +55,7 @@ export class ApiDoorService {
     this.#credentials = ApiRestCredentialsService.create({
       apiKeys: peers.apiKeys,
       authz: peers.authz,
+      cliProjects: peers.cliProjects,
       organizations: peers.organizations,
     });
     this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });

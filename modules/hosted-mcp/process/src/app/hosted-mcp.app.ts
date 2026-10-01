@@ -1,3 +1,4 @@
+import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import { HostedMcpApi, type HostedMcpApiContract } from "@langwatch/hosted-mcp-contract";
@@ -14,7 +15,7 @@ import { AuthzMcpSessionGrantService } from "../services/authz-mcp-session-grant
 import { HeaderMcpClientAddressService } from "../services/header-mcp-client-address.service.ts";
 import { McpAuthorizationService } from "../services/mcp-authorization.service.ts";
 import { McpEndpointService, type McpHandler } from "../services/mcp-endpoint.service.ts";
-import type { McpApiKeyCipher } from "../services/mcp-oauth-token.service.ts";
+import type { McpApiKeyCipher, McpCliSessions } from "../services/mcp-oauth-token.service.ts";
 import { ProjectMcpProjectLookupService } from "../services/project-mcp-project-lookup.service.ts";
 import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 
@@ -26,7 +27,7 @@ import type { McpAuthorizeApi } from "../transport/mcp-authorize.rest.ts";
 export type HostedMcpInfrastructure = Readonly<{
   /** The process's shared Redis connection, for OAuth codes and sessions (ADR-093). */
   redis: Redis | Cluster | null;
-  /** The deployment's symmetric cipher, for the API key an OAuth session was minted from. */
+  /** The deployment's symmetric cipher, for the credential an MCP session record holds. */
   encryption: Readonly<{
     encrypt(plaintext: string): string;
     decrypt(ciphertext: string): string;
@@ -41,6 +42,8 @@ export type HostedMcpDependencies = Readonly<{
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   /** Required, not optional: an unwired re-check is a token that never expires. */
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
+  /** Mints, rotates and reads the person-bound, project-capped sessions an approval opens. */
+  cliSessions: McpCliSessions;
   cipher: McpApiKeyCipher;
   address: Pick<HeaderMcpClientAddressService, "clientIp">;
   /** Absent installs no extra tools. */
@@ -54,6 +57,8 @@ type HostedMcpDependenciesMap = Readonly<{
   projects: typeof ProjectApi;
   /** Re-checks the grant an OAuth bearer was minted from. */
   authorization: typeof AuthzApi;
+  /** Issues and reads the access and refresh tokens an MCP sign-in answers. */
+  sessions: typeof AuthApi;
   /** Installs governance's tools on each session (Alex, 2026-09-27). */
   governance: typeof GovernanceRestApi;
 }>;
@@ -66,6 +71,7 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
   static readonly dependencies: HostedMcpDependenciesMap = {
     projects: ProjectApi,
     authorization: AuthzApi,
+    sessions: AuthApi,
     governance: GovernanceRestApi,
   };
   static readonly reads = ["redis", "encryption", "publicBaseUrl"] as const;
@@ -96,13 +102,16 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
         findProject: async ({ projectId }) => {
           const project = await projects.findById(projectId);
           return (
-            project && { id: project.id, apiKey: project.apiKey, archivedAt: project.archivedAt }
+            project && {
+              id: project.id,
+              organizationId: await projects.getOrganizationId(projectId),
+              archivedAt: project.archivedAt,
+            }
           );
         },
         mayApprove: ({ approver, projectId, permission }) =>
           authorization.hasPermission({ userId: approver.user.id, projectId, permission }),
         isDemoProject: (input) => authorization.isDemoProject(input),
-        encrypt: (value) => members.encryption.encrypt(value),
         clients: RedisMcpOAuthClientRepository.create({ redis: members.redis }),
         codes: RedisMcpOAuthTokenRepository.create({ redis: members.redis }),
       },
@@ -113,6 +122,7 @@ export class HostedMcpApp implements HostedMcpApiContract, McpAuthorizeApi {
         redis: members.redis,
         projects: ProjectMcpProjectLookupService.create({ projects: dependencies.projects }),
         grants: AuthzMcpSessionGrantService.create({ authorization: dependencies.authorization }),
+        cliSessions: dependencies.sessions,
         cipher: members.encryption,
         address: HeaderMcpClientAddressService.create(),
         baseHost: members.publicBaseUrl,

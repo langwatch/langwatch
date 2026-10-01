@@ -1,5 +1,9 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
+import {
+  bindRestMiddleware,
+  organizationCredentialOfRequest,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 
@@ -12,7 +16,11 @@ import {
 } from "./repositories/prisma/prisma.api-key.repository.ts";
 import { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
 import { CliLoginKeyReapService } from "./services/cli-login-key-reap.service.ts";
-import { apiKeyRest, apiKeyRestCredential } from "./transport/api-key.rest.ts";
+import {
+  apiKeyIngestionCaller,
+  apiKeyRest,
+  apiKeyRestCredential,
+} from "./transport/api-key.rest.ts";
 import { apiKeyTrpcTransport } from "./transport/api-key.trpc.ts";
 
 /**
@@ -69,6 +77,21 @@ export const apiKeyServer = defineServerModule("api-key")
       const credential = organizationCredentialOfRequest(context.req.raw);
 
       return { apiKeyId: credential.apiKeyId, userId: credential.userId };
+    }),
+    bindRestMiddleware(apiKeyIngestionCaller, (context) => {
+      const credential = projectCredentialOfRequest(context.req.raw);
+
+      return credential.type === "apiKey"
+        ? {
+            isPersonSession: credential.isPersonSession === true,
+            userId: credential.userId,
+            organizationId: credential.organizationId,
+          }
+        : {
+            isPersonSession: false,
+            userId: null,
+            organizationId: credential.project.organizationId,
+          };
     }),
   ])
   .withEventing(apiKeyEventing);

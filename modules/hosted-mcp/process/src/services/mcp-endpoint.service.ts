@@ -22,7 +22,11 @@ import type { HeaderMcpClientAddressService } from "./header-mcp-client-address.
 import { McpCallerAuthService } from "./mcp-caller-auth.service.ts";
 import { McpHttpService } from "./mcp-http.service.ts";
 import { McpOAuthEndpointService } from "./mcp-oauth-endpoint.service.ts";
-import { type McpApiKeyCipher, McpOAuthTokenService } from "./mcp-oauth-token.service.ts";
+import {
+  type McpApiKeyCipher,
+  type McpCliSessions,
+  McpOAuthTokenService,
+} from "./mcp-oauth-token.service.ts";
 import { McpSessionService } from "./mcp-session.service.ts";
 import { McpSseTransportService } from "./mcp-sse-transport.service.ts";
 import { McpStreamableTransportService } from "./mcp-streamable-transport.service.ts";
@@ -51,6 +55,7 @@ export type McpEndpointCollaborators = Readonly<{
   oauthClients: McpOAuthClientRepository;
   projects: Pick<ProjectMcpProjectLookupService, "resolveLiveProjectByApiKey">;
   grants: Pick<AuthzMcpSessionGrantService, "stillGranted">;
+  cliSessions: McpCliSessions;
   cipher: McpApiKeyCipher;
   address: Pick<HeaderMcpClientAddressService, "clientIp">;
   sessionTools?: Pick<GovernanceRestApi, "registerMcpTools"> | undefined;
@@ -83,11 +88,10 @@ export class McpEndpointService implements McpHandler {
     this.#http = http;
     this.#oauthTokens = McpOAuthTokenService.create({
       repository: collaborators.oauthTokenRecords,
-      cipher: collaborators.cipher,
+      issuer: collaborators.cliSessions,
     });
     const auth = McpCallerAuthService.create({
       ...collaborators,
-      oauthTokens: this.#oauthTokens,
       http,
     });
     this.#auth = auth;
@@ -151,7 +155,6 @@ export class McpEndpointService implements McpHandler {
   };
 
   clearTokenCache = (): void => {
-    this.#oauthTokens.clearCache();
     this.#auth.clearGrantChecks();
   };
 
@@ -295,11 +298,10 @@ export class McpEndpointService implements McpHandler {
     }
   }
 
-  /** Bounds the memory of abandoned sessions, never-used OAuth tokens and stale probes. */
+  /** Bounds the memory of abandoned sessions and stale probes. */
   #reap(): void {
     const now = nowInstant().epochMilliseconds;
     this.#sessions.reapIdle(now);
-    this.#oauthTokens.reapExpired();
     this.#auth.sweep(now);
     this.#oauth.sweep();
   }

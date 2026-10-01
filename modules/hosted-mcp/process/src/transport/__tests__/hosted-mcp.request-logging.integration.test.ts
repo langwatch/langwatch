@@ -49,6 +49,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 class LoggingProjectLookup implements Pick<
   ProjectMcpProjectLookupService,
@@ -227,6 +228,7 @@ describe("Feature: MCP request logging", () => {
       oauthClients: MemoryMcpOAuthClientRepository.create(),
       projects,
       grants: new AlwaysGranted(),
+      cliSessions: new FakeCliSessions(),
       cipher: new PassThroughCipher(),
       address: new LoopbackAddress(),
       baseHost: "https://app.langwatch.ai",

@@ -6,6 +6,8 @@
 import {
   ApiKeyAdminRequiredError,
   ApiKeyApi,
+  ApiKeyScopeViolationError,
+  INGESTION_PERMISSIONS,
   apiKeyRestCreateSchema,
   apiKeyRestDetailSchema,
   apiKeyRestListSchema,
@@ -42,6 +44,19 @@ const INVALID_TOKEN: Readonly<{ status: 401; description: string }> = {
 export const apiKeyRestCredential = defineRestMiddleware(
   "apiKeyRestCredential",
   z.object({ apiKeyId: z.string(), userId: z.string().nullable() }),
+);
+
+/**
+ * The project credential the ingestion mint reads: the person it acts as, whether the door
+ * marked it a person's access token rather than a key, and the project's organization.
+ */
+export const apiKeyIngestionCaller = defineRestMiddleware(
+  "apiKeyIngestionCaller",
+  z.object({
+    isPersonSession: z.boolean(),
+    userId: z.string().nullable(),
+    organizationId: z.string(),
+  }),
 );
 
 /** The credential, as the two organization-wide questions ask about it. */
@@ -199,6 +214,38 @@ const refuseNonAdminPrivilegedMint = async ({
   if (await callerIsAdmin({ app, caller, organizationId })) return;
 
   throw new ApiKeyAdminRequiredError(privilege({ isService, assignedToAnother }));
+};
+
+type ApiKeyRestCreate = z.infer<typeof apiKeyRestCreateSchema>;
+
+/**
+ * The one shape a person's project session may mint: personal, their own, one CUSTOM binding to
+ * that project, holding exactly INGESTION_PERMISSIONS. Expiry is the caller's; none never expires.
+ */
+const isIngestionShape = ({
+  input,
+  projectId,
+  callerUserId,
+}: {
+  input: ApiKeyRestCreate;
+  projectId: string;
+  callerUserId: string;
+}): boolean => {
+  const [binding, ...extra] = input.bindings ?? [];
+  const permissions = [...(input.permissions ?? [])].toSorted();
+
+  return (
+    input.keyType === "personal" &&
+    (input.assignedToUserId === undefined || input.assignedToUserId === callerUserId) &&
+    (input.projectIds ?? []).length === 0 &&
+    binding !== undefined &&
+    extra.length === 0 &&
+    binding.role === "CUSTOM" &&
+    binding.scopeType === "PROJECT" &&
+    binding.scopeId === projectId &&
+    input.permissionMode === "restricted" &&
+    permissions.join(",") === [...INGESTION_PERMISSIONS].toSorted().join(",")
+  );
 };
 
 export const apiKeyRest: Readonly<{
@@ -441,6 +488,63 @@ export const apiKeyRest: Readonly<{
     });
 
     return { success: true };
+  })
+
+  // A person's project-bound sign-in mints their app's ingestion key here (record, OAuth
+  // sentences): no organization:manage, and no key may mint one, so a leaked key cannot breed.
+  .post("/ingestion", "createIngestionApiKey")
+  .withCredential("project")
+  .withInput(apiKeyRestCreateSchema)
+  .withPermission("traces:create")
+  .withOutput(apiKeyRestMintedSchema)
+  .withStatus(201)
+  .withDocs({
+    tags: API_KEY_TAGS,
+    summary: "Create an ingestion API key",
+    description:
+      'Mint the caller\'s own ingestion key for the project their sign-in session is bound to, as `langwatch login --project` does. Only one shape is accepted: keyType "personal", owned by the caller, one CUSTOM binding to that project, permissionMode "restricted" and exactly the ingestion permissions. Name it after the machine; omit expiresAt for a key that never expires. Requires a person\'s project session holding traces:create; an API key cannot mint one.',
+    errors: [
+      INVALID_TOKEN,
+      {
+        status: 403,
+        description:
+          "The caller is not a person's sign-in session, lacks traces:create, or asked for any other shape (api_key_scope_violation)",
+      },
+      { status: 422, description: "Validation error (validation_error)" },
+    ],
+  })
+  .withMiddleware(apiKeyIngestionCaller)
+  .handle(async ({ app, input, scope }, caller) => {
+    const { userId } = caller;
+    if (userId === null || !caller.isPersonSession) {
+      throw new ApiKeyScopeViolationError("Only a person's sign-in session mints an ingestion key");
+    }
+    if (!isIngestionShape({ input, projectId: scope.id, callerUserId: userId })) {
+      throw new ApiKeyScopeViolationError(
+        "An ingestion key is personal, bound to this one project, and holds only ingestion",
+      );
+    }
+
+    const result = await app.create({
+      name: input.name,
+      description: input.description,
+      userId,
+      createdByUserId: userId,
+      organizationId: caller.organizationId,
+      expiresAt: input.expiresAt,
+      permissionMode: "restricted",
+      permissions: [...INGESTION_PERMISSIONS],
+      bindings: [{ role: "CUSTOM", scopeType: "PROJECT", scopeId: scope.id }],
+    });
+
+    return {
+      token: result.token,
+      apiKey: {
+        id: result.apiKey.id,
+        name: result.apiKey.name,
+        createdAt: result.apiKey.createdAt,
+      },
+    };
   })
 
   .build();

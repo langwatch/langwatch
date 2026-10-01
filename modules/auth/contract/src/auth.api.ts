@@ -36,12 +36,24 @@ import type {
 export type CliAccessSession = Readonly<{
   userId: string;
   organizationId: string;
+  /** The one project the session is capped at; absent for a session bound to none. */
+  projectId?: string | undefined;
+  /** Set when the person consented to that one project only (hosted MCP); never org-wide. */
+  projectLocked?: boolean | undefined;
   /** The login key the session minted at sign-in, where it minted one. */
   cliApiKeyId?: string | undefined;
   clientInfo?: Readonly<{
     deviceLabel?: string | undefined;
     hostname?: string | undefined;
   }>;
+}>;
+
+/** An access and refresh pair, with the seconds each lives. */
+export type CliSessionTokens = Readonly<{
+  accessToken: string;
+  refreshToken: string;
+  accessTtlSeconds: number;
+  refreshTtlSeconds: number;
 }>;
 
 /**
@@ -118,6 +130,22 @@ export interface AuthApi {
   getCliAccessSession(input: {
     authorization: string;
   }): Promise<CliAccessSession & Readonly<{ tokenKey: string }>>;
+  /**
+   * Mints the person-bound session a sign-in approved: an access token capped and
+   * locked at one project, and a rotating refresh token. Refuses when the person
+   * is no longer an active member who can view that project.
+   */
+  issueProjectCliSession(input: {
+    userId: string;
+    organizationId: string;
+    projectId: string;
+    clientLabel: string;
+  }): Promise<CliSessionTokens>;
+  /**
+   * Rotates a refresh token into a new pair, keeping its person and project. The
+   * old token ends; an unknown, expired or revoked one refuses as `invalid_grant`.
+   */
+  refreshCliSession(input: { refreshToken: string }): Promise<CliSessionTokens>;
   /** Every CLI token this person still holds; lapsed and unreadable ones are skipped. */
   findCliTokenRecordsForUser(input: { userId: string }): Promise<CliTokenRecordEntry[]>;
   /**

@@ -27,19 +27,26 @@ export const authServer = defineServerModule("auth")
   .withTasks(({ members }) => [
     ClearStalePendingSsoSetupTask.create({ database: () => members.prisma }),
   ])
-  .withTransportFacts(({ app, dependencies }) => [
-    bindTrpcFact(
-      authRequestHeadersFact,
-      (context: TrpcRuntimeContext) => context.req?.headers ?? null,
-    ),
-    bindApiDoor(
-      ApiDoorService.create({
-        sessions: app,
-        apiKeys: dependencies.apiKeys,
-        authz: dependencies.authz,
-        organizations: dependencies.organizations,
-        entitlements: dependencies.entitlements,
-        auditLog: dependencies.auditLog,
-      }).door(),
-    ),
-  ]);
+  .withTransportFacts(({ app, dependencies }) => {
+    if (!(app instanceof AuthApp)) {
+      throw new TypeError("The auth API door requires its constructed application");
+    }
+
+    return [
+      bindTrpcFact(
+        authRequestHeadersFact,
+        (context: TrpcRuntimeContext) => context.req?.headers ?? null,
+      ),
+      bindApiDoor(
+        ApiDoorService.create({
+          sessions: app,
+          apiKeys: dependencies.apiKeys,
+          cliProjects: app,
+          authz: dependencies.authz,
+          organizations: dependencies.organizations,
+          entitlements: dependencies.entitlements,
+          auditLog: dependencies.auditLog,
+        }).door(),
+      ),
+    ];
+  });

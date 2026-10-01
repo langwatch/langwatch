@@ -2,6 +2,7 @@
 
 import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { OrganizationInvalidCredentialsError } from "@langwatch/api";
 import { CliTokenIdentity } from "@langwatch/api/rest";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi, type BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
@@ -62,7 +63,6 @@ import {
   type GovernanceCliBudgetOverviewAnswer,
   type GovernanceCliPersonalProjectAnswer,
   type GovernanceCliVirtualKeyAnswer,
-  type GovernanceCliProjectKeyAnswer,
   type GovernanceCliIngestionSourcesAnswer,
   type GovernanceCliIngestionSourceEventsAnswer,
   type GovernanceCliIngestionSourceHealthAnswer,
@@ -316,7 +316,6 @@ export interface GovernanceAppDependencies {
     | "findProjectsWithDepartments"
     | "assignProjectDepartment"
     | "findLiveNonGovernanceIdsByOrganization"
-    | "findLiveBySlug"
     | "findLiveByRef"
   >;
   /** Agent owns the Agent table: the organization's connected agents, read by project. */
@@ -798,7 +797,12 @@ export class GovernanceApp implements GovernanceRestApi {
       gatewayUrl: gatewayBaseUrl,
     });
     this.cliTokenDoor = CliTokenIdentity.create({
-      verify: (presented) => dependencies.auth.getCliAccessSession(presented),
+      verify: async (presented) => {
+        const session = await dependencies.auth.getCliAccessSession(presented);
+        // A session consented to one project (hosted MCP) never reaches the organization tier.
+        if (session.projectLocked) throw new OrganizationInvalidCredentialsError();
+        return session;
+      },
     });
     this.cliAccessService = GovernanceCliAccessService.create({
       sessions: dependencies.auth,
@@ -1152,10 +1156,6 @@ export class GovernanceApp implements GovernanceRestApi {
 
   cliVirtualKey(input: GovernanceCliRawRequest): Promise<GovernanceCliVirtualKeyAnswer> {
     return this.cliService.virtualKey(input);
-  }
-
-  cliProjectKey(input: GovernanceCliRawRequest): Promise<GovernanceCliProjectKeyAnswer> {
-    return this.cliService.projectKey(input);
   }
 
   cliIngestionSources(

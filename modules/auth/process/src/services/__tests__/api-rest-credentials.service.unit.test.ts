@@ -61,6 +61,10 @@ function doorOver(store: KeyStore): ApiRestCredentialsService {
     authz: {
       hasApiKeyPermission: () => Promise.reject(new Error("the key door asks no permission")),
       getApiKeyProjectDecision: () => Promise.reject(new Error("the key door asks no permission")),
+      hasProjectPermission: () => Promise.reject(new Error("the key door asks no permission")),
+    },
+    cliProjects: {
+      getCliAccessProject: () => Promise.reject(new Error("the key door reads no CLI session")),
     },
     organizations: {
       getSettings: () => Promise.reject(new Error("the key door reads no organization")),
@@ -181,6 +185,70 @@ describe("the key door", () => {
           door.identifyKey({ request: request({ authorization: "Bearer sk-lw-unknown" }) }),
         ),
       ).toBe("invalid_credentials");
+    });
+  });
+});
+
+describe("a project-bound CLI access token", () => {
+  const asked: { userId: string; projectId: string; permission: string }[] = [];
+
+  function tokenDoor(holds: boolean): ApiRestCredentialsService {
+    return ApiRestCredentialsService.create({
+      apiKeys: store,
+      authz: {
+        hasApiKeyPermission: () => Promise.reject(new Error("an access token asks no key grant")),
+        getApiKeyProjectDecision: () => Promise.reject(new Error("an access token asks no key")),
+        hasProjectPermission: (input) => {
+          asked.push(input);
+          return Promise.resolve(holds);
+        },
+      },
+      cliProjects: {
+        getCliAccessProject: () =>
+          Promise.resolve({ userId: "user-9", organizationId: "org-1", project: PROJECT }),
+      },
+      organizations: { getSettings: () => Promise.reject(new Error("no organization read")) },
+    });
+  }
+
+  const bearer = request({ authorization: "Bearer lw_at_session" });
+
+  describe("when the person holds the permission at the bound project", () => {
+    it("authenticates as that person on that project, asking their own access", async () => {
+      const credential = await tokenDoor(true).authenticate({
+        request: bearer,
+        permission: "traces:view",
+      });
+
+      expect(credential.project.id).toBe("project-1");
+      expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
+      expect(credential.resolved).toMatchObject({ type: "apiKey", isPersonSession: true });
+      expect(asked).toContainEqual({
+        userId: "user-9",
+        projectId: "project-1",
+        permission: "traces:view",
+      });
+    });
+  });
+
+  describe("when the token arrives as X-Auth-Token, as the MCP tools send it", () => {
+    /** @scenario The API door accepts a project-bound access token as the person */
+    it("authenticates as that person on the bound project", async () => {
+      const credential = await tokenDoor(true).authenticate({
+        request: request({ "x-auth-token": "lw_at_session" }),
+        permission: "traces:view",
+      });
+
+      expect(credential.actsAsPerson).toEqual({ userId: "user-9" });
+      expect(credential.project.id).toBe("project-1");
+    });
+  });
+
+  describe("when the person lacks the permission at the bound project", () => {
+    it("is refused as a permission denial", async () => {
+      expect(
+        await refusalCode(tokenDoor(false).authenticate({ request: bearer, permission: "traces:view" })),
+      ).toBe("api_key_permission_denied");
     });
   });
 });

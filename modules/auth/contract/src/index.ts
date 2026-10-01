@@ -3,6 +3,7 @@ export {
   type AuthUsageCount,
   type BrowserSessionApi,
   type CliAccessSession,
+  type CliSessionTokens,
   type CliTokenRecordEntry,
   type LegacySsoAccessQuery,
 } from "./auth.api.ts";

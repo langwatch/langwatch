@@ -13,7 +13,5 @@ export {
 
 export {
   mcpAuthorizationCodeRecordSchema,
-  mcpOAuthTokenRecordSchema,
   type McpAuthorizationCodeRecord,
-  type McpOAuthTokenRecord,
 } from "./mcp-oauth-token.schemas.ts";

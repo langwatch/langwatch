@@ -1,11 +1,12 @@
 /**
- * OAuth bearer issuance and resolution for the hosted MCP endpoint. This
- * service owns the durable token/code records and the protocol checks that
- * decide whether an authorization code can become an MCP bearer.
+ * The hosted MCP token endpoint's decisions: whether an authorization code or a refresh token can
+ * become a session. The session itself, a person-bound access token capped at the approved
+ * project plus a rotating refresh token, is minted by the auth module, as for the CLI.
  */
 import { createHash } from "node:crypto";
 
-import { generate } from "@langwatch/ksuid";
+import type { AuthApi } from "@langwatch/auth-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -13,23 +14,14 @@ import type { McpOAuthTokenRepository } from "../repositories/mcp-oauth-token.re
 
 const logger = createLogger("langwatch:mcp");
 
-/**
- * Reversible encryption for the API key an OAuth session was minted from. The key is stored,
- * not hashed, because the MCP session has to present it again on every tool call.
- */
+/** The label a hosted MCP sign-in carries in the person's session inventory. */
+const MCP_CLIENT_LABEL = "Hosted MCP";
+
+/** Reversible encryption for the credential a session record holds. */
 export interface McpApiKeyCipher {
   encrypt(plaintext: string): string;
   decrypt(ciphertext: string): string;
 }
-
-const TOKEN_TTL_SECONDS = 30 * 24 * 3600;
-const OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE = "mcptoken";
-
-type OAuthTokenEntry = Readonly<{
-  apiKey: string;
-  userId: string | undefined;
-  expiresAt: number;
-}>;
 
 type OAuthError = Readonly<{
   error: string;
@@ -39,19 +31,14 @@ type OAuthError = Readonly<{
 export type McpOAuthTokenExchange =
   | Readonly<{
       status: 200;
-      body: Readonly<{ access_token: string; token_type: "Bearer"; expires_in: number }>;
+      body: Readonly<{
+        access_token: string;
+        token_type: "Bearer";
+        expires_in: number;
+        refresh_token: string;
+      }>;
     }>
   | Readonly<{ status: 400 | 401 | 500; body: OAuthError }>;
-
-/** A bearer read: the session it opens, or an expired or unreadable token the caller refuses. */
-export type McpOAuthSessionLookup =
-  | { kind: "session"; context: McpOAuthSessionContext }
-  | { kind: "refused" };
-
-export type McpOAuthSessionContext = Readonly<{
-  apiKey: string;
-  userId: string | undefined;
-}>;
 
 /** The OAuth form values after the raw Node transport has decoded them. */
 export type McpOAuthTokenRequest = Readonly<{
@@ -59,38 +46,73 @@ export type McpOAuthTokenRequest = Readonly<{
   code: string | undefined;
   codeVerifier: string | undefined;
   redirectUri: string | undefined;
+  refreshToken: string | undefined;
   clientId: string | null;
 }>;
 
-/** Owns the cached bearer state and the authorization-code exchange. */
+/** What the hosted MCP asks auth for: issue, rotate and read the sessions it answers. */
+export type McpCliSessions = Pick<
+  AuthApi,
+  "issueProjectCliSession" | "refreshCliSession" | "getCliAccessSession"
+>;
+
+/** Owns the authorization-code and refresh-token exchanges. */
 export class McpOAuthTokenService {
   readonly #repository: McpOAuthTokenRepository;
-  readonly #cipher: McpApiKeyCipher;
-  readonly #tokens = new Map<string, OAuthTokenEntry>();
+  readonly #issuer: McpCliSessions;
 
   private constructor({
     repository,
-    cipher,
+    issuer,
   }: {
     repository: McpOAuthTokenRepository;
-    cipher: McpApiKeyCipher;
+    issuer: McpCliSessions;
   }) {
     this.#repository = repository;
-    this.#cipher = cipher;
+    this.#issuer = issuer;
   }
 
   static create({
     repository,
-    cipher,
+    issuer,
   }: {
     repository: McpOAuthTokenRepository;
-    cipher: McpApiKeyCipher;
+    issuer: McpCliSessions;
   }): McpOAuthTokenService {
-    return new McpOAuthTokenService({ repository, cipher });
+    return new McpOAuthTokenService({ repository, issuer });
   }
 
   async redeem(request: McpOAuthTokenRequest): Promise<McpOAuthTokenExchange> {
-    const invalidRequest = this.#invalidRequestFor(request);
+    if (request.grantType === "refresh_token") return this.#refresh(request);
+    if (request.grantType !== "authorization_code") {
+      return {
+        status: 400,
+        body: {
+          error: "unsupported_grant_type",
+          error_description: "Only authorization_code and refresh_token grant types are supported",
+        },
+      };
+    }
+    return this.#exchangeCode(request);
+  }
+
+  async #refresh(request: McpOAuthTokenRequest): Promise<McpOAuthTokenExchange> {
+    if (!request.refreshToken) return this.#invalidRequest("refresh_token is required");
+    try {
+      return this.#granted(
+        await this.#issuer.refreshCliSession({ refreshToken: request.refreshToken }),
+      );
+    } catch (error) {
+      if (!HandledError.isHandled(error)) {
+        logger.error({ error }, "MCP refresh failed");
+        return { status: 500, body: { error: "server_error" } };
+      }
+      return this.#invalidGrant("Refresh token is invalid, expired or revoked");
+    }
+  }
+
+  async #exchangeCode(request: McpOAuthTokenRequest): Promise<McpOAuthTokenExchange> {
+    const invalidRequest = this.#invalidCodeRequestFor(request);
     if (invalidRequest) return invalidRequest;
 
     if (!this.#repository.isAvailable()) return { status: 500, body: { error: "server_error" } };
@@ -125,73 +147,38 @@ export class McpOAuthTokenService {
       return this.#invalidGrant("PKCE code_verifier does not match code_challenge");
     }
 
-    const apiKey = this.#cipher.decrypt(stored.encryptedApiKey);
-    const accessToken = this.#generateAccessToken();
-    await this.#store({ accessToken, apiKey, userId: stored.userId });
+    try {
+      return this.#granted(
+        await this.#issuer.issueProjectCliSession({
+          userId: stored.userId,
+          organizationId: stored.organizationId,
+          projectId: stored.projectId,
+          clientLabel: MCP_CLIENT_LABEL,
+        }),
+      );
+    } catch (error) {
+      // Auth refuses when the approver has since lost the project or the organization.
+      if (HandledError.isHandled(error)) return this.#invalidGrant("Access to the project ended");
+      logger.error({ error }, "MCP session issue failed");
+      return { status: 500, body: { error: "server_error" } };
+    }
+  }
 
+  #granted(
+    session: Awaited<ReturnType<McpCliSessions["issueProjectCliSession"]>>,
+  ): McpOAuthTokenExchange {
     return {
       status: 200,
-      body: { access_token: accessToken, token_type: "Bearer", expires_in: TOKEN_TTL_SECONDS },
+      body: {
+        access_token: session.accessToken,
+        token_type: "Bearer",
+        expires_in: session.accessTtlSeconds,
+        refresh_token: session.refreshToken,
+      },
     };
   }
 
-  async resolve(token: string): Promise<McpOAuthSessionLookup> {
-    const cached = this.#tokens.get(token);
-    if (cached) {
-      if (nowInstant().epochMilliseconds < cached.expiresAt) {
-        return { kind: "session", context: { apiKey: cached.apiKey, userId: cached.userId } };
-      }
-      this.#tokens.delete(token);
-      return { kind: "refused" };
-    }
-
-    try {
-      const found = await this.#repository.findBearer({ token });
-      if (found.kind === "missing")
-        return { kind: "session", context: { apiKey: token, userId: void 0 } };
-      if (found.kind === "corrupted") {
-        await this.#repository.removeBearer({ token });
-        return { kind: "refused" };
-      }
-
-      const { record: stored } = found;
-      if (nowInstant().epochMilliseconds < stored.expiresAt) {
-        const apiKey = this.#cipher.decrypt(stored.encryptedApiKey);
-        this.#tokens.set(token, { apiKey, userId: stored.userId, expiresAt: stored.expiresAt });
-        return { kind: "session", context: { apiKey, userId: stored.userId } };
-      }
-      await this.#repository.removeBearer({ token });
-      return { kind: "refused" };
-    } catch (error) {
-      // Validation of the direct API key still follows this lookup, so a
-      // Redis failure cannot admit a credential on its own.
-      logger.error({ error }, "Redis token lookup failed");
-    }
-
-    return { kind: "session", context: { apiKey: token, userId: void 0 } };
-  }
-
-  clearCache(): void {
-    this.#tokens.clear();
-  }
-
-  reapExpired(): void {
-    const now = nowInstant().epochMilliseconds;
-    for (const [token, entry] of this.#tokens) {
-      if (now >= entry.expiresAt) this.#tokens.delete(token);
-    }
-  }
-
-  #invalidRequestFor(request: McpOAuthTokenRequest): McpOAuthTokenExchange | null {
-    if (request.grantType !== "authorization_code") {
-      return {
-        status: 400,
-        body: {
-          error: "unsupported_grant_type",
-          error_description: "Only authorization_code grant type is supported",
-        },
-      };
-    }
+  #invalidCodeRequestFor(request: McpOAuthTokenRequest): McpOAuthTokenExchange | null {
     if (!request.code) return this.#invalidRequest("code is required");
     if (!request.codeVerifier) return this.#invalidRequest("code_verifier is required");
     if (!request.redirectUri) return this.#invalidRequest("redirect_uri is required");
@@ -219,33 +206,5 @@ export class McpOAuthTokenService {
 
   #invalidGrant(description: string): McpOAuthTokenExchange {
     return { status: 400, body: { error: "invalid_grant", error_description: description } };
-  }
-
-  #generateAccessToken(): string {
-    return createHash("sha256")
-      .update(generate(OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE).toString())
-      .digest("hex");
-  }
-
-  async #store({
-    accessToken,
-    apiKey,
-    userId,
-  }: {
-    accessToken: string;
-    apiKey: string;
-    userId: string | undefined;
-  }): Promise<void> {
-    const expiresAt = nowInstant().epochMilliseconds + TOKEN_TTL_SECONDS * 1000;
-    this.#tokens.set(accessToken, { apiKey, userId, expiresAt });
-
-    try {
-      await this.#repository.storeBearer({
-        token: accessToken,
-        record: { encryptedApiKey: this.#cipher.encrypt(apiKey), userId, expiresAt },
-      });
-    } catch (error) {
-      logger.error({ error }, "Failed to store OAuth token in Redis");
-    }
   }
 }

@@ -33,6 +33,7 @@ describe("the api-keys REST declaration", () => {
         ["get", "/:id", "getApiKey", "organization:view"],
         ["patch", "/:id", "updateApiKey", "organization:manage"],
         ["delete", "/:id", "revokeApiKey", "organization:manage"],
+        ["post", "/ingestion", "createIngestionApiKey", "traces:create"],
       ]);
     });
 
@@ -48,18 +49,27 @@ describe("the api-keys REST declaration", () => {
         ["getApiKey", undefined],
         ["updateApiKey", undefined],
         ["revokeApiKey", undefined],
+        ["createIngestionApiKey", 201],
       ]);
     });
 
     // Two questions this family asks are about the KEY as well as the member
     // it acts as, so every route reads the credential the door resolved.
-    it("binds the credential fact on every route", () => {
-      for (const route of declaration.routes) {
-        expect([route.operation, route.middleware?.map((fact) => fact.name)]).toEqual([
+    it("binds the credential fact each route's door resolved", () => {
+      expect(
+        declaration.routes.map((route) => [
           route.operation,
-          ["apiKeyRestCredential"],
-        ]);
-      }
+          route.credential ?? declaration.credential,
+          route.middleware?.map((fact) => fact.name),
+        ]),
+      ).toEqual([
+        ["listApiKeys", "organization", ["apiKeyRestCredential"]],
+        ["createApiKey", "organization", ["apiKeyRestCredential"]],
+        ["getApiKey", "organization", ["apiKeyRestCredential"]],
+        ["updateApiKey", "organization", ["apiKeyRestCredential"]],
+        ["revokeApiKey", "organization", ["apiKeyRestCredential"]],
+        ["createIngestionApiKey", "project", ["apiKeyIngestionCaller"]],
+      ]);
     });
 
     it("publishes the summary each operation has always carried", () => {
@@ -69,6 +79,7 @@ describe("the api-keys REST declaration", () => {
         "Get an API key",
         "Update an API key",
         "Revoke an API key",
+        "Create an ingestion API key",
       ]);
     });
   });

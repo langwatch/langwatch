@@ -27,6 +27,7 @@ import type {
   McpLiveProjectLookup,
   ProjectMcpProjectLookupService,
 } from "../../services/project-mcp-project-lookup.service.ts";
+import { FakeCliSessions } from "./support/fake-cli-sessions.ts";
 
 function stringField(body: unknown, key: string): string {
   const value: unknown =
@@ -85,6 +86,7 @@ class FakeSessionGrant implements Pick<AuthzMcpSessionGrantService, "stillGrante
 }
 
 const sessionGrant = new FakeSessionGrant();
+const cliSessions = new FakeCliSessions();
 
 /** Identity "encryption", so a test can read the value it expected to be stored. */
 class ReversibleTestCipher implements McpApiKeyCipher {
@@ -103,6 +105,7 @@ class ReversibleTestCipher implements McpApiKeyCipher {
 const VALID_API_KEY = "lw_test_key_123";
 const PROJECT_ID = "test-project-id";
 const APPROVING_USER_ID = "approving-user-1";
+const ORGANIZATION_ID = "test-organization-id";
 
 function validProject() {
   return {
@@ -235,15 +238,13 @@ function redisGetWithRegisteredClient(
 function mockAuthCodeInRedis({
   code,
   codeChallenge,
-  apiKey = VALID_API_KEY,
   expiresAt,
   redirectUri = TEST_REDIRECT_URI,
   clientId = TEST_CLIENT_ID,
-  userId,
+  userId = APPROVING_USER_ID,
 }: {
   code: string;
   codeChallenge: string;
-  apiKey?: string;
   expiresAt?: number;
   redirectUri?: string;
   clientId?: string;
@@ -251,8 +252,8 @@ function mockAuthCodeInRedis({
 }) {
   const entry = JSON.stringify({
     projectId: PROJECT_ID,
-    encryptedApiKey: `encrypted:${apiKey}`,
-    ...(userId === undefined ? {} : { userId }),
+    organizationId: ORGANIZATION_ID,
+    userId,
     codeChallenge,
     codeChallengeMethod: "S256",
     redirectUri,
@@ -344,6 +345,7 @@ beforeAll(async () => {
     redis: redisDouble(mockRedis),
     projects: new FakeProjectLookup(),
     grants: sessionGrant,
+    cliSessions,
     cipher: new ReversibleTestCipher(),
     address: HeaderMcpClientAddressService.create(),
     baseHost: "https://app.langwatch.ai",
@@ -493,9 +495,10 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(200);
       const body = (await res.json()) as Record<string, unknown>;
-      expect(body.access_token).toBeDefined();
+      expect(stringField(body, "access_token")).toMatch(/^lw_at_/);
+      expect(stringField(body, "refresh_token")).toMatch(/^lw_rt_/);
       expect(body.token_type).toBe("Bearer");
-      expect(body.expires_in).toBe(30 * 24 * 3600); // 30 days
+      expect(body.expires_in).toBe(3600);
 
       // Atomic consume makes the authorization code one-time even under concurrent exchanges.
       expect(mockRedis.call).toHaveBeenCalledWith("GETDEL", `mcp:auth_code:${code}`);
@@ -990,7 +993,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   });
 
   describe("when an OAuth-issued access token is used", () => {
-    it("re-validates the API key against the database during MCP init", async () => {
+    it("opens the session as the token's person and project, reading no project key", async () => {
       mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
       const code = randomUUID();
@@ -1015,11 +1018,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
       const tokenBody = await tokenRes.json();
       const accessToken = stringField(tokenBody, "access_token");
 
-      // Clear the mock to prove MCP init does its own DB lookup
       mockPrisma.project.findUnique.mockClear();
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
 
-      // Use the access token to initialize MCP
       const res = await sendRequest({
         server,
         body: mcpInitializeBody(),
@@ -1028,10 +1028,8 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
       expect(res.status).toBe(200);
       expect(res.headers["mcp-session-id"]).toBeDefined();
-      // Verify a fresh DB lookup happened during MCP init
-      expect(mockPrisma.project.findUnique).toHaveBeenCalledWith({
-        where: { apiKey: VALID_API_KEY, archivedAt: null },
-      });
+      // The bound session names the project; no project key is looked up.
+      expect(mockPrisma.project.findUnique).not.toHaveBeenCalled();
     });
   });
 
@@ -1116,38 +1114,133 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
     });
   });
 
-  // --- Redis Token Storage ---
+  // --- Person-bound, project-capped sessions ---
 
-  describe("when OAuth token is looked up from Redis after in-memory cache miss", () => {
-    it("accepts the connection via Redis lookup", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
+  async function exchangeCode(): Promise<Record<string, unknown>> {
+    const code = randomUUID();
+    const { codeVerifier, codeChallenge } = createPkceChallenge();
+    mockAuthCodeInRedis({ code, codeChallenge });
+    const addr = server.address();
+    const port = typeof addr === "object" && addr ? addr.port : 0;
+    const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({
+        grant_type: "authorization_code",
+        code,
+        code_verifier: codeVerifier,
+        redirect_uri: TEST_REDIRECT_URI,
+        client_id: TEST_CLIENT_ID,
+      }),
+    });
+    return (await res.json()) as Record<string, unknown>;
+  }
 
-      const code = randomUUID();
-      const { codeVerifier, codeChallenge } = createPkceChallenge();
+  async function refreshWith(refreshToken: string) {
+    const addr = server.address();
+    const port = typeof addr === "object" && addr ? addr.port : 0;
+    const res = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: formBody({ grant_type: "refresh_token", refresh_token: refreshToken }),
+    });
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  }
 
-      mockAuthCodeInRedis({ code, codeChallenge });
+  describe("when an authorization code is exchanged", () => {
+    /** @scenario "MCP sign-in issues a person-bound, project-capped token with refresh, never a project key" */
+    it("answers an access token bound to the approver and project, with a refresh token", async () => {
+      const body = await exchangeCode();
 
-      // Issue a token
-      const addr = server.address();
-      const port = typeof addr === "object" && addr ? addr.port : 0;
-      const tokenRes = await fetch(`http://127.0.0.1:${port}/oauth/token`, {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: formBody({
-          grant_type: "authorization_code",
-          code,
-          code_verifier: codeVerifier,
-          redirect_uri: TEST_REDIRECT_URI,
-          client_id: TEST_CLIENT_ID,
-        }),
+      expect(stringField(body, "access_token")).toMatch(/^lw_at_/);
+      expect(stringField(body, "refresh_token")).toMatch(/^lw_rt_/);
+      expect(body.access_token).not.toBe(VALID_API_KEY);
+      expect(cliSessions.access.get(stringField(body, "access_token"))).toEqual({
+        userId: APPROVING_USER_ID,
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
       });
-      const tokenBody = await tokenRes.json();
-      const accessToken = stringField(tokenBody, "access_token");
+    });
+  });
 
-      // Clear in-memory cache
-      handler.clearTokenCache();
+  describe("when a refresh token is redeemed", () => {
+    /** @scenario "A refreshed MCP token keeps working; an expired one asks to re-authorise" */
+    it("rotates the pair, serves the new access token and refuses the spent refresh token", async () => {
+      const first = await exchangeCode();
+      const refreshed = await refreshWith(stringField(first, "refresh_token"));
 
-      // Mock Redis to return the token data (encrypted format)
+      expect(refreshed.status).toBe(200);
+      const res = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${stringField(refreshed.body, "access_token")}` },
+      });
+      expect(res.status).toBe(200);
+      expect((await refreshWith(stringField(first, "refresh_token"))).status).toBe(400);
+    });
+
+    /** @scenario "A refreshed MCP token keeps working; an expired one asks to re-authorise" */
+    it("asks an expired access token to re-authorise with a WWW-Authenticate challenge", async () => {
+      const first = await exchangeCode();
+      cliSessions.expire(stringField(first, "access_token"));
+
+      const res = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${stringField(first, "access_token")}` },
+      });
+
+      expect(res.status).toBe(401);
+      expect(res.headers["www-authenticate"]).toContain("resource_metadata");
+    });
+  });
+
+  describe("when a client refreshes while its MCP session is open", () => {
+    /** @scenario "An open MCP session adopts the refreshed token of the same person and project" */
+    it("serves the session under the refreshed token and refuses another person's", async () => {
+      const first = await exchangeCode();
+      const opened = await sendRequest({
+        server,
+        body: mcpInitializeBody(),
+        headers: { authorization: `Bearer ${stringField(first, "access_token")}` },
+      });
+      const sessionId = opened.headers["mcp-session-id"];
+      expect(sessionId).toBeDefined();
+      const refreshed = await refreshWith(stringField(first, "refresh_token"));
+      const toolsList = { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} };
+
+      const adopted = await sendRequest({
+        server,
+        body: toolsList,
+        headers: {
+          authorization: `Bearer ${stringField(refreshed.body, "access_token")}`,
+          "mcp-session-id": sessionId!,
+        },
+      });
+      const stranger = await cliSessions.issueProjectCliSession({
+        userId: "user-somebody-else",
+        organizationId: ORGANIZATION_ID,
+        projectId: PROJECT_ID,
+        clientLabel: "Hosted MCP",
+      });
+      const refused = await sendRequest({
+        server,
+        body: toolsList,
+        headers: {
+          authorization: `Bearer ${stranger.accessToken}`,
+          "mcp-session-id": sessionId!,
+        },
+      });
+
+      expect(adopted.status).toBe(200);
+      expect(refused.status).toBe(401);
+    });
+  });
+
+  describe("when a bearer issued before the person-bound tokens is presented", () => {
+    /** @scenario "An MCP bearer issued before this change is refused and re-authorises" */
+    it("refuses it with a WWW-Authenticate challenge instead of resolving it", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue(null);
       mockRedis.get.mockResolvedValue(
         JSON.stringify({
           encryptedApiKey: `encrypted:${VALID_API_KEY}`,
@@ -1155,53 +1248,14 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
         }),
       );
 
-      // Use the access token - should fall back to Redis
       const res = await sendRequest({
         server,
         body: mcpInitializeBody(),
-        headers: { authorization: `Bearer ${accessToken}` },
-      });
-
-      expect(res.status).toBe(200);
-      expect(mockRedis.get).toHaveBeenCalled();
-    });
-  });
-
-  describe("when an expired OAuth token is used", () => {
-    it("returns 401", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(null);
-
-      // Mock Redis returning an expired token (encrypted format)
-      mockRedis.get.mockResolvedValue(
-        JSON.stringify({
-          encryptedApiKey: `encrypted:${VALID_API_KEY}`,
-          expiresAt: Date.now() - 1000, // expired
-        }),
-      );
-
-      const res = await sendRequest({
-        server,
-        body: mcpInitializeBody(),
-        headers: { authorization: "Bearer expired_token_abc" },
+        headers: { authorization: `Bearer ${"a".repeat(64)}` },
       });
 
       expect(res.status).toBe(401);
-    });
-  });
-
-  describe("when a present OAuth token record is corrupted", () => {
-    it("removes it and refuses the token instead of treating it as a direct API key", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue(validProject());
-      mockRedis.get.mockResolvedValue("not-json");
-
-      const res = await sendRequest({
-        server,
-        body: mcpInitializeBody(),
-        headers: { authorization: `Bearer ${VALID_API_KEY}` },
-      });
-
-      expect(res.status).toBe(401);
-      expect(mockRedis.del).toHaveBeenCalledWith(`mcp:oauth:token:${VALID_API_KEY}`);
+      expect(res.headers["www-authenticate"]).toContain("resource_metadata");
     });
   });
 

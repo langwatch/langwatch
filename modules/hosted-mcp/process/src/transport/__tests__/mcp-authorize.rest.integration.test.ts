@@ -51,14 +51,13 @@ function harnessFor(options: { held: readonly string[]; approver?: McpApprover |
   const authorization = McpAuthorizationService.create({
     collaborators: {
       findProject: () =>
-        Promise.resolve({ id: PROJECT_ID, apiKey: "lw_project_key", archivedAt: null }),
+        Promise.resolve({ id: PROJECT_ID, organizationId: "org-1", archivedAt: null }),
       mayApprove: (input) => {
         probed.push(input.permission);
 
         return Promise.resolve(options.held.includes(input.permission));
       },
       isDemoProject: () => false,
-      encrypt: (value: string) => `encrypted:${value}`,
       clients: RedisMcpOAuthClientRepository.create({ redis }),
       codes: RedisMcpOAuthTokenRepository.create({ redis }),
     },

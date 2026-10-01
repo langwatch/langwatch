@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import {
   OrganizationAuthenticationUnavailableError,
   OrganizationCredentialClassMismatchError,
@@ -26,10 +28,21 @@ import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 
+import { CliDeviceSessionService } from "./cli-device-session.service.ts";
+
 export type ApiProjectCredential = Readonly<{
   project: RestProjectIdentity;
   resolved: RestResolvedProjectCredential;
   markUsed: () => void;
+  /** Set when a person's project-bound CLI access token stands behind it, not an API key. */
+  actsAsPerson?: Readonly<{ userId: string }>;
+}>;
+
+/** The person and live project a project-bound CLI access bearer names. */
+export type CliAccessProject = Readonly<{
+  userId: string;
+  organizationId: string;
+  project: RestProjectIdentity;
 }>;
 
 export type ApiOrganizationCredential = Readonly<{
@@ -45,7 +58,11 @@ export type ApiKeyDoorCredential = Readonly<{
 
 export type ApiRestCredentialPeers = Readonly<{
   apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "resolveOrganizationToken" | "markUsed">;
-  authz: Pick<AuthzApi, "hasApiKeyPermission" | "getApiKeyProjectDecision">;
+  authz: Pick<AuthzApi, "hasApiKeyPermission" | "getApiKeyProjectDecision" | "hasProjectPermission">;
+  /** Reads the person and project behind a CLI access bearer; refuses one bound to none. */
+  cliProjects: Readonly<{
+    getCliAccessProject: (input: { authorization: string }) => Promise<CliAccessProject>;
+  }>;
   organizations: Pick<OrganizationApi, "getSettings">;
   logger?: Pick<Logger, "error">;
 }>;
@@ -62,12 +79,14 @@ export class ApiRestCredentialsService {
   private readonly apiKeys: ApiRestCredentialPeers["apiKeys"];
   private readonly authz: ApiRestCredentialPeers["authz"];
   private readonly organizations: ApiRestCredentialPeers["organizations"];
+  private readonly cliProjects: ApiRestCredentialPeers["cliProjects"];
   private readonly logger: Pick<Logger, "error">;
 
   private constructor(peers: Required<ApiRestCredentialPeers>) {
     this.apiKeys = peers.apiKeys;
     this.authz = peers.authz;
     this.organizations = peers.organizations;
+    this.cliProjects = peers.cliProjects;
     this.logger = peers.logger;
   }
 
@@ -75,6 +94,18 @@ export class ApiRestCredentialsService {
     request: Request;
     permission: AuthzPermission;
   }): Promise<ApiProjectCredential> {
+    const person = await this.#cliAccessCredential(input.request);
+    if (person) {
+      const allowed = await this.authz.hasProjectPermission({
+        userId: person.actsAsPerson.userId,
+        projectId: person.project.id,
+        permission: input.permission,
+      });
+      if (!allowed) throw new ApiKeyPermissionDeniedError(input.permission);
+
+      return person;
+    }
+
     const credentials = extractApiKeyRequestCredentials(input.request);
     if (!credentials) throw new ProjectMissingCredentialsError();
 
@@ -96,6 +127,9 @@ export class ApiRestCredentialsService {
   }
 
   async identify(input: { request: Request }): Promise<ApiProjectCredential> {
+    const person = await this.#cliAccessCredential(input.request);
+    if (person) return person;
+
     const credentials = extractApiKeyRequestCredentials(input.request);
     if (!credentials) throw new ProjectMissingCredentialsError();
 
@@ -117,6 +151,24 @@ export class ApiRestCredentialsService {
    * through its organization. Only a token that is neither is refused.
    */
   async identifyKey(input: { request: Request }): Promise<ApiKeyDoorCredential> {
+    const person = await this.#cliAccessCredential(input.request);
+    if (person) {
+      const { resolved } = person;
+      if (resolved.type !== "apiKey") throw new ProjectInvalidCredentialsError();
+
+      return {
+        principal: {
+          kind: "apiKey",
+          apiKeyId: resolved.apiKeyId,
+          userId: resolved.userId,
+          organizationId: resolved.organizationId,
+          resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+        },
+        organizationId: resolved.organizationId,
+        markUsed: person.markUsed,
+      };
+    }
+
     const credentials = extractApiKeyRequestCredentials(input.request);
     if (!credentials) throw new ProjectMissingCredentialsError();
 
@@ -150,6 +202,40 @@ export class ApiRestCredentialsService {
       principal: { kind: "apiKey", apiKeyId, userId, organizationId },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
+    };
+  }
+
+  /**
+   * A project-bound access token (`lw_at_`, as `X-Auth-Token` or a bearer) as its person. Shaped
+   * as a key credential with a derived id no key row carries, so any second question asked of
+   * that id finds no grants and is refused: only the project-permission check above admits it.
+   */
+  async #cliAccessCredential(
+    request: Request,
+  ): Promise<(ApiProjectCredential & Readonly<{ actsAsPerson: { userId: string } }>) | null> {
+    const xAuthToken = request.headers.get("x-auth-token")?.trim();
+    const presented = xAuthToken?.startsWith("lw_at_")
+      ? `Bearer ${xAuthToken}`
+      : request.headers.get("authorization");
+    const token = CliDeviceSessionService.extractBearerCliAccessToken(presented);
+    if (!token) return null;
+
+    const held = await this.cliProjects.getCliAccessProject({ authorization: `Bearer ${token}` });
+
+    return {
+      project: held.project,
+      resolved: {
+        type: "apiKey",
+        apiKeyId: `cli-access-${createHash("sha256").update(token).digest("hex").slice(0, 16)}`,
+        userId: held.userId,
+        organizationId: held.organizationId,
+        ingestSourceType: null,
+        ingestionTemplateId: null,
+        isPersonSession: true,
+        project: held.project,
+      },
+      markUsed: () => {},
+      actsAsPerson: { userId: held.userId },
     };
   }
 

@@ -22,8 +22,10 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
