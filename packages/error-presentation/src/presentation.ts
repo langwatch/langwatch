@@ -1456,6 +1456,14 @@ const presentations = {
     describe: () =>
       "A personal project can't be moved out, and nothing can be moved or created inside a personal workspace. Use a team project instead.",
   },
+  personal_project_not_found: {
+    title: "Personal project not found",
+    describe: () => "It may have been removed. Open your personal workspace from the menu instead.",
+  },
+  personal_project_owner_mismatch: {
+    title: "Personal project not found",
+    describe: () => "This personal project belongs to someone else. Open your own from the menu.",
+  },
   personal_project_protected: {
     title: "Your personal project can't be archived",
     describe: () =>

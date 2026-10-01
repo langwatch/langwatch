@@ -538,6 +538,8 @@ export const APP_ERROR_CODES = [
   "password_not_set",
   "permission_denied",
   "personal_project_key_required",
+  "personal_project_not_found",
+  "personal_project_owner_mismatch",
   "personal_project_protected",
   "personal_usage_key_mismatch",
   "personal_usage_service_key_unsupported",
