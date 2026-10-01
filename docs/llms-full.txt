@@ -60562,14 +60562,14 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 
 ## Voice Agents
 
-`VOICE_CALL_MAX_SECONDS` and `VOICE_RUNS_MAX_CONCURRENT` shape [voice agent](/agent-testing/voice-agents) runs, which need `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`. The other three act on every worker boot, with the flag on or off: each worker listens on `VOICE_WS_PORT`, and opens a cloudflared quick tunnel only when `VOICE_TUNNEL=true` and `VOICE_PUBLIC_BASE_URL` is unset.
+`VOICE_CALL_MAX_SECONDS` and `VOICE_RUNS_MAX_CONCURRENT` shape [voice agent](/agent-testing/voice-agents) runs, which need `FEATURE_FLAG_FORCE_ENABLE=release_voice_agents_enabled`. The other three act on every worker boot, with the flag on or off: each worker listens on `VOICE_WS_PORT`. On a self-hosted production install it opens a cloudflared quick tunnel only when `VOICE_TUNNEL=true` and `VOICE_PUBLIC_BASE_URL` is unset.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `VOICE_CALL_MAX_SECONDS` | Longest a voice call can last, in seconds. A scenario call is cut at this limit and marked "Cut at the call limit". Browser calls (**Talk to it**, **Call it myself**) are cut at the same limit. | `300` |
 | `VOICE_RUNS_MAX_CONCURRENT` | Voice runs at a time, per project, per worker process. More voice runs wait in the queue. Text runs are not affected. | `2` |
 | `VOICE_PUBLIC_BASE_URL` | Public https origin of the voice worker, for Twilio phone calls to reach it. When set, it always wins over the tunnel. | - |
-| `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. With both unset, phone runs fail. | `false` on a self-hosted install |
+| `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. With both unset, phone runs fail. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
 ## Feature Flags
@@ -61795,7 +61795,7 @@ Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in th
 
 ### Third-party calls that are off by default
 
-Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code and the images set the defaults below, and the Helm chart sets them again explicitly. The images carry the tokenizer files and the model prices they need.
+Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code, the images and the `npx @langwatch/server` launcher set the defaults below, and the Helm chart sets them again in a ConfigMap. The images carry the tokenizer files and the model prices they need.
 
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
@@ -61807,7 +61807,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 
 Emails the install sends embed the LangWatch logo from `app.langwatch.ai`, so the recipient's mail client loads it when it shows images.
 
-To change a default with Helm, name the variable in the component's `extraEnvs`. Your entry replaces the chart's default, so the pod carries one value. The Workers do not read `app.extraEnvs`. For example, to run phone calls through the tunnel and stop every call to LangWatch:
+The chart keeps these defaults in one ConfigMap that each workload lists first in `envFrom`. A variable you set in a component's `extraEnvs`, or in a Secret or ConfigMap you add through `extraEnvFrom`, overrides it. The Workers do not read `app.extraEnvs`. For example, to run phone calls through the tunnel and stop every call to LangWatch:
 
 ```yaml
 app:
@@ -63388,7 +63388,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally, and the AI Gateway can be when clients outside the cluster call it. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway subchart renders its own Ingress by default (`gateway.ingress.enabled`), which serves clients outside the cluster once an Ingress controller routes `gateway.ingress.host` to it. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|

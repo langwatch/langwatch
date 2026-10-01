@@ -1823,22 +1823,25 @@ azure.workload.identity/use: "true"
 {{- end -}}
 {{- end }}
 
-{{/* Self-hosted privacy defaults: environment variables that switch off a
-     third-party call a library would otherwise make at runtime, so a default
-     install calls home only for the license, the usage report and the hosted
-     services its license names. Each default is emitted unless the
-     component's extraEnvs names the same variable, which is how an operator
-     turns the call back on (one entry per name, no duplicate env keys).
-     Takes (dict "extraEnvs" <list> "defaults" (list (dict "name" .. "value" ..))). */}}
-{{- define "langwatch.privacyDefaultEnvs" -}}
-{{- $named := list }}
-{{- range .extraEnvs }}
-{{- $named = append $named (toString .name) }}
+{{/* Offline defaults: environment variables that switch off a third-party
+     call a library would otherwise make at runtime (Prisma's checkpoint, the
+     voice cloudflared quick tunnel, RAGAS analytics), so a default install
+     calls LangWatch only for the license sync and the usage report. They live
+     in one ConfigMap that each workload lists FIRST in envFrom. Kubernetes
+     lets a later envFrom source beat an earlier one and any env entry beat
+     every envFrom source, so a value an operator sets in extraEnvs or
+     extraEnvFrom (a Secret or ConfigMap) always wins over the default. */}}
+{{- define "langwatch.offlineDefaultsName" -}}
+{{ include "langwatch.fullname" . }}-offline-defaults
 {{- end }}
-{{- range .defaults }}
-{{- if not (has .name $named) }}
-- name: {{ .name }}
-  value: {{ .value | quote }}
-{{- end }}
+
+{{/* The envFrom block for a workload: the offline defaults, then the
+     operator's own sources. Takes (dict "root" $ "extraEnvFrom" <list>). */}}
+{{- define "langwatch.envFromWithOfflineDefaults" -}}
+envFrom:
+  - configMapRef:
+      name: {{ include "langwatch.offlineDefaultsName" .root }}
+{{- with .extraEnvFrom }}
+{{ toYaml . | indent 2 }}
 {{- end }}
 {{- end }}

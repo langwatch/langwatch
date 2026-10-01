@@ -285,6 +285,7 @@ describe("TiktokenClient", () => {
       }
     });
 
+    /** @scenario "Token counting reads the tokenizer files the image ships" */
     it("reads the local file and makes no network call", async () => {
       const count = await new TiktokenClient().countTokens("gpt-4o", "hi");
 

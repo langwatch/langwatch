@@ -350,20 +350,13 @@ spec:
             {{- end }}
             {{- end }}
 
-            {{- /* Prisma's version check (checkpoint.prisma.io) runs during the
-                   `prisma migrate deploy` every start does. */}}
-            {{- include "langwatch.privacyDefaultEnvs" (dict "extraEnvs" .Values.app.extraEnvs "defaults" (list
-                  (dict "name" "CHECKPOINT_DISABLE" "value" "1"))) | nindent 12 }}
 
             {{- with .Values.app.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "app.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- with .Values.app.extraEnvFrom}}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.app.extraEnvFrom) | nindent 10 }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:

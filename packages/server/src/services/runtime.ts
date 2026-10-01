@@ -21,7 +21,8 @@ import { ensureLangyCli } from "./langy-cli.ts";
 import { monobinarySupportsLangyagent, startLangyagent } from "./langyagent.ts";
 import { runMigrations } from "./migrate.ts";
 import { startNlpgo } from "./nlpgo.ts";
-import { ensureLangwatchDeps } from "./node-deps.ts";
+import { ensureLangwatchDeps, locateLangwatchDir } from "./node-deps.ts";
+import { ensureTiktokenEncodings } from "./offline-defaults.ts";
 import { startPostgres } from "./postgres.ts";
 import { startRedis } from "./redis.ts";
 import type { SupervisedHandle } from "./spawn.ts";
@@ -60,7 +61,12 @@ const runtimeImpl: RuntimeApi = {
 		const features = resolveEffectiveFeatures(ctx.envFile);
 		await Promise.all([
 			syncVenvs(ctx, bus),
-			ensureLangwatchDeps(ctx, bus),
+			ensureLangwatchDeps(ctx, bus).then(async () => {
+				const langwatchDir = locateLangwatchDir();
+				if (langwatchDir) {
+					await ensureTiktokenEncodings({ paths: ctx.paths, bus, langwatchDir });
+				}
+			}),
 			// The assistant's CLI: only an install running it needs the download.
 			...(features.isLangyEnabled ? [ensureLangyCli(ctx, bus)] : []),
 		]);

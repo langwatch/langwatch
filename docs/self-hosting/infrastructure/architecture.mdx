@@ -292,7 +292,7 @@ Periodic work (topic clustering, alert triggers, webhook delivery log pruning) i
 
 ## Network Topology
 
-The App is exposed externally, and the AI Gateway can be when clients outside the cluster call it. Everything else is cluster-internal:
+The App is exposed externally. The AI Gateway subchart renders its own Ingress by default (`gateway.ingress.enabled`), which serves clients outside the cluster once an Ingress controller routes `gateway.ingress.host` to it. Everything else is cluster-internal:
 
 | Component | Service Type | External |
 |-----------|-------------|----------|

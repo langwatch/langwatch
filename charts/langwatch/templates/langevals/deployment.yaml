@@ -111,15 +111,10 @@ spec:
             - name: CPU_COUNT
               value: {{ include "langwatch.langevals.cpuCount" . | quote }}
             {{- end }}
-            {{- /* RAGAS_DO_NOT_TRACK: RAGAS usage analytics to
-                   t.explodinggradients.com, off unless the operator opts in.
-                   LiteLLM's remote price list needs no variable here: LangEvals
-                   always uses its local cost map plus LangWatch's own pricing. */}}
-            {{- include "langwatch.privacyDefaultEnvs" (dict "extraEnvs" .Values.langevals.extraEnvs "defaults" (list
-                  (dict "name" "RAGAS_DO_NOT_TRACK" "value" "true"))) | nindent 12 }}
             {{- with .Values.langevals.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" list) | nindent 10 }}
 
           {{- if .Values.langevals.extraLifecycle}}
           lifecycle:

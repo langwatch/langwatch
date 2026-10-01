@@ -66,7 +66,7 @@ Presidio runs inside LangEvals, in the cluster. Strict PII redaction stays in th
 
 ### Third-party calls that are off by default
 
-Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code and the images set the defaults below, and the Helm chart sets them again explicitly. The images carry the tokenizer files and the model prices they need.
+Libraries inside the images can call third parties on their own. A self-hosted install switches each of these off by default: the code, the images and the `npx @langwatch/server` launcher set the defaults below, and the Helm chart sets them again in a ConfigMap. The images carry the tokenizer files and the model prices they need.
 
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
@@ -78,7 +78,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 
 Emails the install sends embed the LangWatch logo from `app.langwatch.ai`, so the recipient's mail client loads it when it shows images.
 
-To change a default with Helm, name the variable in the component's `extraEnvs`. Your entry replaces the chart's default, so the pod carries one value. The Workers do not read `app.extraEnvs`. For example, to run phone calls through the tunnel and stop every call to LangWatch:
+The chart keeps these defaults in one ConfigMap that each workload lists first in `envFrom`. A variable you set in a component's `extraEnvs`, or in a Secret or ConfigMap you add through `extraEnvFrom`, overrides it. The Workers do not read `app.extraEnvs`. For example, to run phone calls through the tunnel and stop every call to LangWatch:
 
 ```yaml
 app:
