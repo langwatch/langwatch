@@ -6,8 +6,6 @@
 
 import type { NavigationOpsAccess } from "@langwatch/navigation-browser/navigation";
 
-import { isLangyDemoProject } from "./model/langy/langy-demo-project.ts";
-
 /**
  * `langy:create`, not `langy:view`: the palette hand-off queues an auto-send,
  * so offering it on the read grant would invite a 403.
@@ -34,7 +32,8 @@ export function offersLangyAsk({
 }): boolean {
   if (!hasPermission(LANGY_CREATE_PERMISSION)) return false;
   if (!isFeatureEnabled(LANGY_RELEASE_FLAG)) return false;
-  return !isLangyDemoProject({ projectSlug, demoProjectSlug });
+  // Both sides present: an unset demo slug never matches an unloaded project.
+  return !demoProjectSlug || demoProjectSlug !== projectSlug;
 }
 
 export function offersPresenceMenuItem(routePattern: string): boolean {

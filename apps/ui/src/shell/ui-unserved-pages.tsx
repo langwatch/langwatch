@@ -6,17 +6,6 @@
 
 import type { UiPageLoaderRegistry } from "@langwatch/browser/feature-install";
 
-export function UiUnservedPage() {
-  return (
-    <output style={{ display: "block", padding: "3rem", textAlign: "center" }}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>
-        This page is not available yet
-      </h1>
-      <p style={{ opacity: 0.7 }}>Nothing on this build serves this address.</p>
-    </output>
-  );
-}
-
 /**
  * The list only ever shrinks: a module declaring one of these keys makes its
  * entry here dead, which `every-route-page-is-declared` fails on.

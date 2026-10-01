@@ -5,8 +5,15 @@ import type { Page, Request } from "playwright";
  * the claim and completion calls its Langy panel makes. The stream the adapter reads
  * says what was dispatched; the page's calls say what became of it.
  */
-import type { UiActionExecution } from "../../src/shell/model/langy/ui-actions/execute-ui-action.ts";
 import type { UiActionEntry } from "./langy-agent";
+
+/** The outcomes `executeUiAction` can reach, minus `duplicate`, which the network never shows. */
+type UiActionExecution =
+  | "no-handler"
+  | "not-claimed"
+  | "executed"
+  | "handler-failed"
+  | "completion-failed";
 
 /** One `ui` entry the turn stream carried, and what the page made of it. */
 export interface ObservedAction {
