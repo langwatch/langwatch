@@ -307,7 +307,7 @@ export class EntitlementApp implements EntitlementApiContract {
       id: input.operator.id,
       email: caller?.email ?? null,
       name: caller?.name ?? null,
-      ...(impersonator ? { impersonator: { email: impersonator.email } } : {}),
+      ...(impersonator ? { impersonator: { id: impersonator.id, email: impersonator.email } } : {}),
     };
   }
 }
