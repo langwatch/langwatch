@@ -11,7 +11,7 @@
  * identifiers back has to be one rule consulted twice, because a rule that only
  * one engine knows about is a rule the other engine will undo.
  *
- * Two questions are asked, in this order.
+ * Three questions are asked, in this order.
  *
  *   1. Does the attribute NAME reserve it, AND does the value look like the
  *      address that name promises? A short list of trace and span identifier
@@ -19,7 +19,12 @@
  *      are not a protected namespace — the OTLP endpoint takes attributes as the
  *      caller wrote them — so the value still has to be hex or decimal before
  *      the name is allowed to turn the personal-data pass off.
- *   2. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
+ *   2. Is it the SPAN KIND attribute holding one of the known kinds? Each is a
+ *      fixed word (`agent`, `workflow`, `llm`, …) that cannot carry personal
+ *      data, but the name detector reads some of them as first names. The gate
+ *      is the exact list, not a shape, because anyone can write that key: a
+ *      name written under it is still analysed.
+ *   3. Is the VALUE exclusively one opaque identifier token? A uuid, a hex
  *      digest, a ULID, a `prefix_<random>` record id. Nothing in such a value
  *      is personal data, so there is nothing for either engine to find.
  *      Exclusively: a value that merely CONTAINS one is prose, and prose is
@@ -44,7 +49,7 @@
  * fills in themselves — user, customer, thread and conversation identifiers.
  * Customers routinely put an email address or a full name in them, and a name on
  * the reserved list would mean storing that in the clear. They are covered by
- * question 2 like every other attribute: an opaque value is held back, personal
+ * question 3 like every other attribute: an opaque value is held back, personal
  * data is still redacted.
  */
 

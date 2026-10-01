@@ -515,6 +515,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
   // mode top-level spans stored `[PERSON]` as their kind. A known kind is a
   // fixed word, so it is never submitted and is stored unchanged.
   describe("given the span kind attribute", () => {
+    /** @scenario "A known span kind is never sent for analysis" */
     it.each([
       "agent",
       "workflow",
@@ -535,6 +536,7 @@ describe("OtlpSpanPiiRedactionService identifier hold-out before analysis", () =
       expect(attr(span, "app.support_note")).toBe("[PERSON]");
     });
 
+    /** @scenario "A name written under the span kind attribute is still redacted" */
     it("still redacts a name written under the kind attribute", async () => {
       const { service, namesEverything } = makeService();
       namesEverything();
