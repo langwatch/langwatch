@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 
+import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { generate } from "@langwatch/ksuid";
 
 import type { PersonalWorkspaceIdentity } from "../app/organization.members.ts";
@@ -8,7 +9,6 @@ import type { PersonalWorkspaceResourceIds } from "../repositories/organization.
 /** KSUID resource prefixes: a persisted format, since each id is written into a customer's row. */
 const TEAM_KSUID_RESOURCE = "team";
 const PROJECT_KSUID_RESOURCE = "project";
-const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /** The personal slug's user-id prefix length, random suffix length, and ingestion key length. */
 const SLUG_USER_PREFIX_CHARS = 12;
@@ -42,7 +42,7 @@ export class PersonalWorkspaceIdentityService implements PersonalWorkspaceIdenti
       projectId: generate(PROJECT_KSUID_RESOURCE).toString(),
       projectSlug: personalSlug(slugPrefix),
       projectApiKey: `pkey_${randomUrlSafe(PERSONAL_PROJECT_API_KEY_CHARS)}`,
-      ownerBindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+      ownerBindingId: newAuthzGrantId(),
     };
   }
 }

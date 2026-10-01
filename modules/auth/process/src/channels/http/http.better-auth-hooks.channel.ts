@@ -1,6 +1,11 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
 import { SYSTEM_ACTORS } from "@langwatch/authorization";
-import { GrantScopeTier, TeamUserRole, type AuthzGrantsService } from "@langwatch/authz-contract";
+import {
+  GrantScopeTier,
+  newAuthzGrantId,
+  TeamUserRole,
+  type AuthzGrantsService,
+} from "@langwatch/authz-contract";
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -11,7 +16,6 @@ import {
   type SsoMigrationAccountLinkDecision,
   type SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { BetterAuthOptions } from "better-auth";
@@ -19,11 +23,6 @@ import { APIError } from "better-auth/api";
 
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { BetterAuthAnnouncements, BetterAuthFederation } from "../better-auth.channel.ts";
-
-/**
- * The KSUID resource prefix a role-binding row is minted under.
- */
-const GRANT_KSUID_RESOURCE = "rolebinding";
 
 /**
  * The collaborators every hook in this file reaches, handed in together.
@@ -80,7 +79,7 @@ const grantDefaultOrgMembership = ({
     organizationId,
     bindings: [
       {
-        bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+        bindingId: newAuthzGrantId(),
         principal: { userId },
         role: TeamUserRole.MEMBER,
         customRoleId: null,

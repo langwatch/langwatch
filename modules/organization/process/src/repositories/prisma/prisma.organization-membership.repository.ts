@@ -5,8 +5,8 @@ import type {
   AuthzGrantsService,
   AuthzLedgerBindingAttach,
 } from "@langwatch/authz-contract";
+import { newAuthzGrantId } from "@langwatch/authz-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
-import { generate } from "@langwatch/ksuid";
 import {
   CannotRemoveSelfAsLastAdminError,
   LiteMemberViewerOnlyError,
@@ -201,7 +201,7 @@ async function planUserScopeBinding({
   return {
     revokeIds,
     attach: {
-      bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+      bindingId: newAuthzGrantId(),
       principal: { userId },
       role,
       customRoleId,
@@ -754,8 +754,6 @@ function auditLogFilterConditions({
   return conditions;
 }
 
-const GRANT_KSUID_RESOURCE = "rolebinding";
-
 export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
   static create(options: {
     database: PrismaClient;
@@ -903,7 +901,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
       organizationId: created.organization.id,
       bindings: [
         {
-          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId: input.userId },
           role: TeamUserRole.ADMIN,
           customRoleId: null,
@@ -911,7 +909,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
           scopeId: created.organization.id,
         },
         {
-          bindingId: generate(GRANT_KSUID_RESOURCE).toString(),
+          bindingId: newAuthzGrantId(),
           principal: { userId: input.userId },
           role: TeamUserRole.ADMIN,
           customRoleId: null,
