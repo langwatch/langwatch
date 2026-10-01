@@ -10,13 +10,16 @@ import { useCallback, useEffect, useMemo } from "react";
 
 import { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
+import {
+  type SuiteDraft,
+  useSuiteEditorStore,
+} from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   type AttachableEvaluator,
   missingInputsOf,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { type SuiteDraft, useSuiteEditorStore } from "./suite-editor-store.ts";
 import {
   openEvaluatorPicker,
   type SuiteDraftUpdate,

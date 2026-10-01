@@ -91,7 +91,9 @@ function accessFor({
   const screen = declared[page];
   return resolveUiPageAccess({
     ...(screen?.requires === void 0 ? {} : { permission: screen.requires }),
-    ...(screen?.flags === void 0 ? {} : { flags: screen.flags }),
+    ...(screen?.flags === void 0
+      ? {}
+      : { flags: screen.flags.map((flag) => (typeof flag === "string" ? flag : flag.name)) }),
     featureFlag: () => flagsOn,
     hasPermission: (needed) => grants.includes(needed),
     isSettled: () => true,

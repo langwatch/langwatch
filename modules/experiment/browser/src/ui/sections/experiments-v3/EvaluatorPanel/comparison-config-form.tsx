@@ -61,9 +61,11 @@ export function ComparisonConfigForm({
   // prop don't stomp each other. Parent-pushed value changes still resync
   // `draft`.
   const [draft, setDraft] = useState<ComparisonEvaluatorConfig>(value);
-  useEffect(() => {
+  const [valueFrom, setValueFrom] = useState(value);
+  if (valueFrom !== value) {
+    setValueFrom(value);
     setDraft(value);
-  }, [value]);
+  }
 
   const draftRef = useRef(draft);
   useEffect(() => {

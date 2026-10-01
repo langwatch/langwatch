@@ -7,7 +7,7 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
 import { useCallback } from "react";
 
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 
 export function useRunPlanViewMode() {
   const router = useRouter();

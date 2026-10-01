@@ -67,7 +67,7 @@ vi.mock("../generate-prompt-api-snippet-dialog.tsx", () => {
   return { GeneratePromptApiSnippetDialog: Dialog };
 });
 
-vi.mock("../../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
+vi.mock("../../../../blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 

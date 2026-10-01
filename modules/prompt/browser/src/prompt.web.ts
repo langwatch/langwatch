@@ -1,7 +1,5 @@
 /**
  * What a browser installs when it installs prompt: the Prompt Studio screen.
- * `publishSurfaces` was superseded by the kit (ARCHITECTURE.md §14, ruled
- * 2026-09-18) and is deleted here, not repointed.
  */
 
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";

@@ -13,10 +13,10 @@ import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { RunPlan } from "../../../../../behavior/agent-testing/results/run-plans.ts";
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { RunsSidebarEntry } from "../../../../elements/agent-testing/results/runs-sidebar-entry.tsx";
 import { passRateColor } from "../../../../elements/agent-testing/shared/pass-rate-color.ts";
 import { TARGET_COLORS } from "../../../../elements/agent-testing/shared/target-colors.ts";
-import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 import { NOT_IN_RUN_LABEL } from "../comparison-results-row.tsx";
 import { RUN_AGAIN_LABEL } from "../run-plan-detail-header.tsx";
 import { RunPlanDetail } from "../run-plan-detail.tsx";

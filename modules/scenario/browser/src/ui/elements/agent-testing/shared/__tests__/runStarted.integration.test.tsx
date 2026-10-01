@@ -13,9 +13,9 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useRunStartedHandler } from "../../../../sections/agent-testing/cases/use-case-run-actions.ts";
 import type { RunStartedInfo } from "../../../../sections/agent-testing/run/run-dialog-types.ts";
-import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
 
 const mockRouterPush = vi.hoisted(() => vi.fn());
 const mockOpenDrawer = vi.hoisted(() => vi.fn());

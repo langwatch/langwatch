@@ -7,7 +7,7 @@ import { LimitContent } from "./limit-content.tsx";
 import { LiteMemberRestrictionContent } from "./lite-member-restriction-content.tsx";
 
 // Store-driven mount for the upgrade/limit dialog: plan limits, seat changes,
-// unavailable features. Seat content is a SLOT, not a component.
+// unavailable features, mounted by licensing's host mount.
 export function GlobalUpgradeModal({ isSaaS }: { isSaaS: boolean }) {
   const { isOpen, variant, close } = useUpgradeModalStore();
   if (!variant) return null;

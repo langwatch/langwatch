@@ -16,12 +16,8 @@ import type { UpgradeModalSeatsVariant } from "./upgrade-modal-store.ts";
 export type UiSlotProps = {
   /** The "need more?" card. It reads the plan itself and takes nothing. */
   contactSales: Record<never, never>;
-  /** One line of "how much of this you may have, and how much you use". */
-  resourceLimits: { label: string; current: number; max?: number };
   /** Said above a provider's credentials when the credentials are not the customer's. */
   managedModelProviderAlert: { provider: string; error?: string };
-  /** The store-driven upgrade/limit dialog, mounted once at the app root. */
-  globalUpgradeModal: Record<never, never>;
   /**
    * The body of the seat-update dialog: what the change costs, and the button
    * that confirms it. Priced by whoever bills, which is why the dialog asks for
@@ -46,78 +42,29 @@ export type UiSlotComponents = {
 };
 
 /**
- * What an admin is told when choosing between a full and a lite seat. Copy,
- * not a component: the words follow from what the person can DO, so a
- * composition with no plan behind it still has a true answer to give.
- */
-export type UiSeatTypeCopy = {
-  liteMemberShortDescription: string;
-  liteMemberExplanation: string;
-  liteMemberNeedsTeamWarning: string;
-  seatTypesDocPath: string;
-};
-
-/** The seat-type words a composition that filled nothing still reads. */
-export const CORE_SEAT_TYPE_COPY: UiSeatTypeCopy = {
-  liteMemberShortDescription: "Can view the work, but not change it",
-  liteMemberExplanation:
-    "A lite member can open the projects they are invited to and read what the " +
-    "team produces there: traces, analytics, evaluations, scenario runs, " +
-    "datasets, prompts and experiments. They can leave annotations, and that is " +
-    "the only thing they can change. They cannot see costs, and they cannot " +
-    "create, edit or delete anything else. The same limits apply wherever they " +
-    "reach the data, including the API and the MCP server. Give someone " +
-    "permission to change something and they hold a full seat instead.",
-  liteMemberNeedsTeamWarning:
-    "Add a team, or this person will not see anything. A lite member reaches " +
-    "only the projects their teams give them, so one with no team can sign in " +
-    "and do no more. You can add a team later from the members list.",
-  seatTypesDocPath: "/ai-governance/roles-and-permissions#seats",
-};
-
-/**
- * What the composition put in each slot. Both readings are defaulted, so a
- * host that installed no slots at all behaves exactly like one that filled
- * none of them: the screen renders its fallback and nothing throws.
+ * What the composition put in each slot. A host that installed no slots at all
+ * behaves exactly like one that filled none: the screen renders its fallback.
  */
 export abstract class UiSlots {
   /** The component filling this slot, or undefined where none is. */
   filled<Name extends UiSlotName>(_name: Name): UiSlotComponent<Name> | undefined {
     return void 0;
   }
-
-  /** The seat-type words this composition wants read. */
-  seatTypeCopy(): UiSeatTypeCopy {
-    return CORE_SEAT_TYPE_COPY;
-  }
 }
 
 class InstalledUiSlots extends UiSlots {
-  constructor(
-    private readonly components: UiSlotComponents,
-    private readonly copy: UiSeatTypeCopy,
-  ) {
+  constructor(private readonly components: UiSlotComponents) {
     super();
   }
 
   override filled<Name extends UiSlotName>(name: Name): UiSlotComponent<Name> | undefined {
     return this.components[name];
   }
-
-  override seatTypeCopy(): UiSeatTypeCopy {
-    return this.copy;
-  }
 }
 
 /** What a composition installs: the blocks it can supply, and nothing else. */
-export function uiSlots({
-  components = {},
-  seatTypeCopy = CORE_SEAT_TYPE_COPY,
-}: {
-  components?: UiSlotComponents;
-  seatTypeCopy?: UiSeatTypeCopy;
-} = {}): UiSlots {
-  return new InstalledUiSlots(components, seatTypeCopy);
+export function uiSlots({ components = {} }: { components?: UiSlotComponents } = {}): UiSlots {
+  return new InstalledUiSlots(components);
 }
 
 /** A composition that filled nothing. Every reading is the core default. */
@@ -131,11 +78,6 @@ export function useUiSlots(): UiSlots {
 /** The component filling one slot, for a screen that needs the element itself. */
 export function useUiSlot<Name extends UiSlotName>(name: Name): UiSlotComponent<Name> | undefined {
   return useUiSlots().filled(name);
-}
-
-/** The seat-type words, this composition's or core's own. */
-export function useUiSeatTypeCopy(): UiSeatTypeCopy {
-  return useUiSlots().seatTypeCopy();
 }
 
 /**

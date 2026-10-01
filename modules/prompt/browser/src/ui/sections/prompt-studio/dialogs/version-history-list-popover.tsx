@@ -28,8 +28,8 @@ import {
   type PromptVersionSnapshot,
 } from "../../../../model/prompt-version-diff.ts";
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
-import { HistoryIcon } from "../../../../ui/elements/history-icon.tsx";
-import { VersionChanges } from "../../../../ui/elements/prompts/version-changes.tsx";
+import { HistoryIcon } from "../../../elements/history-icon.tsx";
+import { VersionChanges } from "../../../elements/prompts/version-changes.tsx";
 
 type VersionLoadRequest = {
   versionId: string;

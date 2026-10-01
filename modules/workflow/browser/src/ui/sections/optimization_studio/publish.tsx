@@ -27,7 +27,6 @@ import {
   getEntryInputs,
   type NodeDataset,
   parseStudioWorkflow,
-  type Project,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
 import type { Edge } from "@xyflow/react";
@@ -36,7 +35,10 @@ import { ArrowUp, ArrowUpCircle, ChevronDown, Code, Share2, XCircle } from "reac
 import { FormProvider, useForm } from "react-hook-form";
 
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
-import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import {
+  type StudioProject,
+  useOrganizationTeamProject,
+} from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi, type RouterOutputs } from "../../../behavior/workflow-api.ts";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
@@ -217,7 +219,7 @@ function PublishMenu({
   onTogglePublish,
   onToggleApi,
 }: {
-  project: Project;
+  project: StudioProject;
   onTogglePublish: () => void;
   onToggleApi: () => void;
 }) {
@@ -653,6 +655,10 @@ export const ApiModalContent = () => {
   }));
 
   const { project } = useOrganizationTeamProject();
+  const projectApiKey = workflowApi.project.getProjectAPIKey.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
 
   const publishedWorkflow = workflowApi.optimization.getPublishedWorkflow.useQuery(
     {
@@ -698,7 +704,7 @@ export const ApiModalContent = () => {
         <Box padding={4} backgroundColor={"#272822"}>
           <RenderCode
             code={`# Set your API key
-LANGWATCH_API_KEY="${project?.apiKey ?? "your_langwatch_api_key"}"
+LANGWATCH_API_KEY="${projectApiKey.data?.apiKey ?? "your_langwatch_api_key"}"
 
 # Use curl to send the POST request, e.g.:
 curl -X POST "${langwatchEndpoint()}/api/workflows/${workflowId}/run" \\

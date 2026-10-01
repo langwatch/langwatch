@@ -6,7 +6,7 @@ import {
   type GraphAlertTimePeriod,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { describeCron, isValidCron } from "../../model/report-schedule.ts";
 import { FacetSection, type FacetAccordionProps } from "../elements/facet-section.tsx";
@@ -190,9 +190,11 @@ function GraphCadence({
     Number.isFinite(threshold) ? String(threshold) : "",
   );
 
-  useEffect(() => {
+  const [thresholdFrom, setThresholdFrom] = useState(threshold);
+  if (!Object.is(thresholdFrom, threshold)) {
+    setThresholdFrom(threshold);
     setThresholdText(Number.isFinite(threshold) ? String(threshold) : "");
-  }, [threshold]);
+  }
 
   const parsed = thresholdText.trim() === "" ? NaN : Number(thresholdText);
   const thresholdInvalid = !Number.isFinite(parsed);

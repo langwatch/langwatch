@@ -13,7 +13,7 @@ import {
   useRunPlanBatches,
   useSelectedBatch,
 } from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
 import { RunsSidebar } from "./runs-sidebar.tsx";
 

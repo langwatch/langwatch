@@ -8,10 +8,10 @@ import { useRouter } from "@langwatch/browser-host/use-router";
 import { useEffect } from "react";
 
 import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingStore } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { api } from "../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
-import { useAgentTestingStore } from "./use-agent-testing-store.ts";
 
 /** The id of the suite the address names, or nothing for any other selection. */
 export function useSelectedSuiteTestSuiteId(selection: AgentTestingSelection): string | null {

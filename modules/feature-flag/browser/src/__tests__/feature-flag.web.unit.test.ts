@@ -23,13 +23,4 @@ describe("given a browser that installs feature-flag", () => {
       expect(installed.modules).toContain(featureFlagWeb);
     });
   });
-
-  describe("when the surface the declaration publishes is asked for", () => {
-    it("resolves the experiment catalogue surface", async () => {
-      const publication = featureFlagWeb.installation.publications["surfaces/experiment-catalogue"];
-      const loaded = await publication?.load();
-
-      expect(loaded).toBeDefined();
-    });
-  });
 });

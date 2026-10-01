@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import {
   addTagErrorMessage,
@@ -120,18 +120,17 @@ export function useDeployTags({
   );
   const versionItems = useVersionItems({ versions });
 
-  const [tagSelections, setTagSelections] = useState<TagSelections>({});
+  const [tagPicks, setTagPicks] = useState<TagSelections>({});
   const setTagVersionId = useCallback((tag: string, versionId: string) => {
-    setTagSelections((prev) => ({ ...prev, [tag]: versionId }));
+    setTagPicks((prev) => ({ ...prev, [tag]: versionId }));
   }, []);
 
   // A refetch after add/delete keeps the unsaved picks.
-  useEffect(() => {
-    if (!isOpen) return;
-    setTagSelections((previous) =>
-      seedTagSelections({ previous, tags: allTags, assignments: tagsQuery.data ?? [] }),
-    );
-  }, [isOpen, tagsQuery.data, allTags]);
+  const tagSelections = useMemo(
+    () =>
+      seedTagSelections({ previous: tagPicks, tags: allTags, assignments: tagsQuery.data ?? [] }),
+    [tagPicks, allTags, tagsQuery.data],
+  );
 
   const [isSaving, setIsSaving] = useState(false);
   const handleSave = useCallback(async () => {

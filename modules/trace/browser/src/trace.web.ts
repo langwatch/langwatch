@@ -12,6 +12,10 @@ export const traceWeb = defineWebModule("trace")
     mounts: { TraceHostApi: { load: () => import("./behavior/trace-host-mount.tsx") } },
   })
   .withScreens({
+    // Path-less: the route table nests every chrome page under it.
+    "layouts/trace-drawer": {
+      load: () => import("./ui/sections/explorer/trace-drawer-layout.tsx"),
+    },
     "pages/[project]/traces": {
       requires: "traces:view",
       load: () => import("./ui/sections/traces/traces-screen.tsx"),

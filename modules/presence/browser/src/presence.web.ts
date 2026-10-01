@@ -5,7 +5,4 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-/** What another module may mount. trace reads peers and cursors through it. */
-export const presenceWeb = defineWebModule("presence").publishSurfaces({
-  presence: { load: () => import("./index.ts") },
-});
+export const presenceWeb = defineWebModule("presence");

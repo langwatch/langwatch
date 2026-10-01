@@ -112,10 +112,4 @@ export const organizationWeb = defineWebModule("organization")
           .ProjectDepartmentField,
       }),
     },
-  })
-  .publishSurfaces({
-    "surfaces/personal-workspace-features": {
-      load: () => import("./behavior/personal-workspace-features-api.ts"),
-    },
-    "surfaces/department-picker": { load: () => import("./department-picker.ts") },
   });

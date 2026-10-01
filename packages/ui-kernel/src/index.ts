@@ -22,6 +22,7 @@ export {
   type UnrequiredHostMount,
   type UnmountedHostOwner,
 } from "./ui-host-mounts.ts";
+export { BrowserLendRefusedError, checkLends, findLendRefusals } from "./ui-module-lends.ts";
 export { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 export type {
   MissingUiSupplyFields,
@@ -45,6 +46,4 @@ export {
   type WebScreen,
   type WebScreenRoute,
   type WebScreens,
-  type WebSurfacePublication,
-  type WebSurfacePublications,
 } from "./web-module.ts";

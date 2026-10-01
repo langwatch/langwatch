@@ -1,6 +1,6 @@
 import { Field, HStack, Input, Text } from "@chakra-ui/react";
 import { MAX_TRACE_DEBOUNCE_MS, MIN_TRACE_DEBOUNCE_MS } from "@langwatch/automation-contract";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const MIN_SECONDS = Math.floor(MIN_TRACE_DEBOUNCE_MS / 1000);
 const MAX_SECONDS = Math.floor(MAX_TRACE_DEBOUNCE_MS / 1000);
@@ -16,9 +16,11 @@ export function AutomationTraceDebounceField({
   const committedSeconds = Math.round(value / 1000);
   const [localValue, setLocalValue] = useState(String(committedSeconds));
 
-  useEffect(() => {
+  const [seededFrom, setSeededFrom] = useState(committedSeconds);
+  if (seededFrom !== committedSeconds) {
+    setSeededFrom(committedSeconds);
     setLocalValue(String(committedSeconds));
-  }, [committedSeconds]);
+  }
 
   const commit = (raw: string) => {
     const parsed = Number(raw);

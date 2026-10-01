@@ -32,7 +32,7 @@ vi.mock("../../../../../behavior/use-prompt-tabs-browser-store.ts", () => ({
   useDraggableTabsBrowserStore: () => vi.fn(),
 }));
 
-vi.mock("../../../../../ui/blocks/delete-confirmation-dialog.tsx", () => ({
+vi.mock("../../../../blocks/delete-confirmation-dialog.tsx", () => ({
   DeleteConfirmationDialog: () => null,
 }));
 

@@ -119,13 +119,10 @@ export type AuthzApiMap = {
     };
   };
 
-  limits: {
-    /**
-     * The organization's plan, narrowed to the one fact these pages ask of it:
-     * whether it is Enterprise. The gateway's map reads the same procedure alike.
-     */
-    getUsage: {
-      query: { input: OrganizationScope; output: { activePlan: { type: string } } };
+  plan: {
+    /** The organization's plan, narrowed to the one fact these pages need: Enterprise or not. */
+    getActivePlan: {
+      query: { input: OrganizationScope; output: { type: string } };
     };
   };
 };

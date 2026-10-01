@@ -26,7 +26,7 @@ vi.mock("../../../../behavior/use-feature-flag.ts", () => ({
 }));
 
 // The v1 page itself is not under test: whether it renders at all is.
-vi.mock("../../../../ui/sections/suites/simulations-page.tsx", () => ({
+vi.mock("../../suites/simulations-page.tsx", () => ({
   default: () => <div>v1 simulations page</div>,
 }));
 

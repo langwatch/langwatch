@@ -29,7 +29,6 @@ import {
   type UiQueryStore,
 } from "@langwatch/browser-host/query-persistence";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
-import { UiSlot } from "@langwatch/browser-host/slots";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import {
@@ -192,9 +191,6 @@ export function createUiFeatureShell({
               <CurrentDrawer drawers={drawers} isDevelopment={isDevelopment} />
             </ModuleHosts>
           </UiApiWaitingGate>
-          {/* Always mounted, one gate for every routed page — a surface
-              without this reach opened a limit dialog nobody ever saw. */}
-          <UiSlot name="globalUpgradeModal" props={{}} />
         </UiScopeHostProvider>
       </UiCapabilityContextProvider>
     );

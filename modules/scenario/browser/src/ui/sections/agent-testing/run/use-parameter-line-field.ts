@@ -135,9 +135,11 @@ export function useParameterLineField({
   useReportOpenList(isListOpen);
 
   // The list changes under the highlight as the text does; keep it in range.
-  useEffect(() => {
+  const [itemCountFrom, setItemCountFrom] = useState(items.length);
+  if (itemCountFrom !== items.length) {
+    setItemCountFrom(items.length);
     setSelectedIndex((current) => (current >= items.length ? 0 : current));
-  }, [items.length]);
+  }
 
   const syncCursor = () => {
     const element = inputRef.current;

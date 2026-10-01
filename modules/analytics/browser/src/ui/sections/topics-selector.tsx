@@ -27,17 +27,9 @@ type TopicCounts = {
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const host = useAnalyticsHost();
   const { query } = host.route();
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
+  const selectedTopics = readListParam(query.topics);
+  const selectedSubtopics = readListParam(query.subtopics);
   const { filterParams, queryOpts } = useFilterParams();
-
-  useEffect(() => {
-    setSelectedTopics(readListParam(query.topics));
-  }, [query.topics]);
-
-  useEffect(() => {
-    setSelectedSubtopics(readListParam(query.subtopics));
-  }, [query.subtopics]);
 
   const topicCountsQuery = analyticsApi.traces.getTopicCounts.useQuery(
     {
@@ -65,8 +57,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       checked,
       subtopicCounts: topicCountsQuery.data?.subtopicCounts,
     });
-    setSelectedTopics(next.topics);
-    setSelectedSubtopics(next.subtopics);
     host.setQuery({
       ...query,
       topics: toListParam(next.topics),
@@ -76,7 +66,6 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
 
   const handleSubtopicChange = (subtopicId: string, checked: boolean) => {
     const newSubtopics = toggleSubtopic({ subtopics: selectedSubtopics, subtopicId, checked });
-    setSelectedSubtopics(newSubtopics);
     host.setQuery({ ...query, subtopics: toListParam(newSubtopics) });
   };
 

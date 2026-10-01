@@ -809,9 +809,11 @@ function useComparisonDraft({
     comparisonContext?.initialComparison ?? EMPTY_COMPARISON_CONFIG,
   );
   const initialComparison = comparisonContext?.initialComparison;
-  useEffect(() => {
+  const [comparisonFrom, setComparisonFrom] = useState(initialComparison);
+  if (comparisonFrom !== initialComparison) {
+    setComparisonFrom(initialComparison);
     setComparison(initialComparison ?? EMPTY_COMPARISON_CONFIG);
-  }, [initialComparison]);
+  }
 
   const handleComparisonChange = useCallback(
     (next: ComparisonEvaluatorConfig) => {
@@ -832,9 +834,11 @@ function useRequiredToggle({
 }) {
   // The switch flips right away; the attachment follows through the callback.
   const [required, setRequired] = useState(gateRequired ?? false);
-  useEffect(() => {
+  const [requiredFrom, setRequiredFrom] = useState(gateRequired);
+  if (requiredFrom !== gateRequired) {
+    setRequiredFrom(gateRequired);
     setRequired(gateRequired ?? false);
-  }, [gateRequired]);
+  }
   const handleRequiredChange = useCallback(
     (next: boolean) => {
       setRequired(next);

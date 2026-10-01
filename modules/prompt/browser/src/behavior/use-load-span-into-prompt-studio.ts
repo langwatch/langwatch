@@ -15,8 +15,8 @@ import { useEffect, useRef } from "react";
 import { DEFAULT_MODEL } from "../model/prompt-constants.ts";
 import { computeInitialFormValuesForPrompt } from "../model/prompt-form/index.ts";
 import { usePromptHost } from "../model/prompt-host.ts";
-import { TabDataSchema, type TabData } from "../model/prompt-tabs-store.ts";
 import { promptApi } from "./prompt-api.ts";
+import { TabDataSchema, type TabData } from "./prompt-tabs-store.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 

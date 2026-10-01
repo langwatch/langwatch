@@ -10,11 +10,11 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import type { StreamingMessage } from "../../../../../behavior/use-simulation-streaming-state.ts";
 import { TestCasesTab } from "../../../../sections/agent-testing/cases/test-cases-tab.tsx";
 import { AgentTestingRunDrawer } from "../../../../sections/agent-testing/drawers/agent-testing-run-drawer.tsx";
 import { RunDialog } from "../../../../sections/agent-testing/run/run-dialog.tsx";
-import { useAgentTestingStore } from "../../../../sections/agent-testing/use-agent-testing-store.ts";
 
 const mockGetRunState = vi.hoisted(() => vi.fn());
 const mockGetScenario = vi.hoisted(() => vi.fn());

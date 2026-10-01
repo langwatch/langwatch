@@ -104,10 +104,8 @@ function scaleValue(color: string): string | undefined {
 }
 
 /**
- * The literal colour for a token in the current colour mode: a scale step
- * (`gray.400`) straight from the palette, any other token (`blue.fg`,
- * `fg.muted`, `chart.3`) read from the stylesheet Chakra emits. Throws when
- * the token does not exist; it never guesses a colour.
+ * The literal colour for a token in the current mode: a scale step from the palette, any other
+ * token (`blue.fg`, `chart.3`) from Chakra's stylesheet. Throws on an unknown token, never guesses.
  */
 export function getRawColorValue(color: string): string {
   if (color === "white") {
@@ -124,7 +122,10 @@ export function getRawColorValue(color: string): string {
   }
   // Semantic tokens are declared on descendants of <html>, so read from <body>.
   const style = getComputedStyle(document.body);
-  return expandCssVars({ value: `var(${name})`, read: (variable) => style.getPropertyValue(variable) });
+  return expandCssVars({
+    value: `var(${name})`,
+    read: (variable) => style.getPropertyValue(variable),
+  });
 }
 
 function subscribeToColorMode(onChange: () => void): () => void {

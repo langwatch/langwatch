@@ -5,6 +5,7 @@
  * Spec: specs/features/drawer-flow-callbacks.feature
  */
 
+import { uiTokens } from "@langwatch/kernel/contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -62,6 +63,21 @@ describe("given a mounted component holds the registration", () => {
       clearFlowCallbacks();
 
       expect(getAllFlowCallbacks()).toEqual({});
+    });
+  });
+});
+
+describe("given a drawer named by its owner's token", () => {
+  const Editor = uiTokens("evaluator").drawer<{ onSaved?: () => void }>("tokenEditor");
+
+  describe("when a flow registers callbacks under the token", () => {
+    /** @scenario "A drawer token and its wire name are one registration" */
+    it("reads them back by the token and by the wire name", () => {
+      const onSaved = vi.fn();
+      setFlowCallbacks(Editor, { onSaved });
+
+      expect(getFlowCallbacks(Editor)?.onSaved).toBe(onSaved);
+      expect(getFlowCallbacks("tokenEditor")?.onSaved).toBe(onSaved);
     });
   });
 });

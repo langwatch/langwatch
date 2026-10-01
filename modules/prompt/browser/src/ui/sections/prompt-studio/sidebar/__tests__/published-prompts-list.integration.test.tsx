@@ -7,8 +7,11 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  clearStoreInstances,
+  getStoreForTesting,
+} from "../../../../../behavior/prompt-tabs-store.ts";
 import type { PromptBrowserStorage } from "../../../../../model/browser-capabilities.ts";
-import { clearStoreInstances, getStoreForTesting } from "../../../../../model/prompt-tabs-store.ts";
 import { PublishedPromptsList } from "../published-prompts-list.tsx";
 
 const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));

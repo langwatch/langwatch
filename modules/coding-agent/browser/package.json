@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/coding-agent.web.ts",
       "types": "./dist/coding-agent.web.d.ts",
       "default": "./src/coding-agent.web.ts"
-    },
-    "./surfaces/session-table": {
-      "langwatch-declaration-source": "./src/session-table.ts",
-      "types": "./dist/session-table.d.ts",
-      "default": "./src/session-table.ts"
-    },
-    "./surfaces/pull-requests": {
-      "langwatch-declaration-source": "./src/pull-requests.ts",
-      "types": "./dist/pull-requests.d.ts",
-      "default": "./src/pull-requests.ts"
     }
   },
   "scripts": {

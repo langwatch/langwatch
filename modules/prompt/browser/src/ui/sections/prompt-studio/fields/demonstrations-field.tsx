@@ -5,7 +5,7 @@ import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-cont
 import { Info } from "lucide-react";
 import { useFormContext } from "react-hook-form";
 
-import { VerticalFormControl } from "../../../../ui/elements/vertical-form-control.tsx";
+import { VerticalFormControl } from "../../../elements/vertical-form-control.tsx";
 import { DatasetPreview } from "./dataset-preview.tsx";
 
 /**

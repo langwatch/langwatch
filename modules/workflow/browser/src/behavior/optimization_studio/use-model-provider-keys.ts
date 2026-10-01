@@ -1,6 +1,6 @@
 import type { Component, LLMConfig, Signature, StudioWorkflow } from "@langwatch/workflow-contract";
 
-import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
+import { useStudioModelProviders } from "../studio-host/use-studio-model-providers.ts";
 
 export const useModelProviderKeys = ({
   workflow,
@@ -9,7 +9,7 @@ export const useModelProviderKeys = ({
   workflow: StudioWorkflow;
   extra_llms?: LLMConfig[];
 }) => {
-  const { modelProviders } = useOrganizationTeamProject();
+  const modelProviders = useStudioModelProviders();
 
   const modelProvidersWithoutCustomKeys = Object.values(modelProviders ?? {}).filter(
     (modelProvider) => !modelProvider.enabled && !modelProvider.customKeys,

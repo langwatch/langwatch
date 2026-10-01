@@ -7,8 +7,8 @@ import { Box, Grid, GridItem, HStack, Tabs, Text } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 
 import type { AgentTestingTab } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import type { OpenPlanTitle } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../model/agent-testing/shared/design.ts";
-import type { OpenPlanTitle } from "./use-agent-testing-store.ts";
 
 export type AgentTestingHeaderProps = {
   tab: AgentTestingTab;

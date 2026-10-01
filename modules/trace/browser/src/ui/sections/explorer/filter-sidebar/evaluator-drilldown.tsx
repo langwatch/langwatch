@@ -8,7 +8,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { LiqeQuery } from "liqe";
 import type React from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   commitRange,
@@ -317,9 +317,12 @@ const ScoreRangeControl: React.FC<{
     currentTo ?? max,
   ]);
 
-  useEffect(() => {
+  const propsKey = `${currentFrom}|${currentTo}|${min}|${max}`;
+  const [valueFrom, setValueFrom] = useState(propsKey);
+  if (valueFrom !== propsKey) {
+    setValueFrom(propsKey);
     setLocalValue([currentFrom ?? min, currentTo ?? max]);
-  }, [currentFrom, currentTo, min, max]);
+  }
 
   const commit = (rawFrom: number, rawTo: number) => {
     const normalized = commitRange({

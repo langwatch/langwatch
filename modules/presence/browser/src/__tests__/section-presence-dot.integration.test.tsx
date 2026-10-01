@@ -6,7 +6,8 @@ import type { PresenceLocation, PresenceSession } from "@langwatch/presence-cont
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { SectionPresenceDot, usePresenceStore } from "../index.ts";
+import { usePresenceStore } from "../behavior/presence-store.ts";
+import { SectionPresenceDot } from "../index.ts";
 
 afterEach(cleanup);
 

@@ -2,7 +2,7 @@ import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@chakra-ui/react"
 import { BUBBLE_TONES, type BubbleTone, useConversationExpand } from "@langwatch/trace-browser-kit";
 import { Lightbulb, MessageSquare } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { MessageExpandToggle } from "../../../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
 import { Markdown } from "../../../../../markdown.tsx";
@@ -176,7 +176,11 @@ export const Bubble: React.FC<BubbleProps> = ({
   // specs/traces-v2/conversation-message-expand.feature
   const { isExpandable, shouldExpandAll } = useConversationExpand();
   const [expanded, setExpanded] = useState(shouldExpandAll);
-  useEffect(() => setExpanded(shouldExpandAll), [shouldExpandAll]);
+  const [expandAllFrom, setExpandAllFrom] = useState(shouldExpandAll);
+  if (expandAllFrom !== shouldExpandAll) {
+    setExpandAllFrom(shouldExpandAll);
+    setExpanded(shouldExpandAll);
+  }
   const isTruncated = maxChars > 0 && text.length > maxChars;
   const canExpand = isExpandable && isTruncated;
   const truncated = truncateMarkdown({ text, maxChars });

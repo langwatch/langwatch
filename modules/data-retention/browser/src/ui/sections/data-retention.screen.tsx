@@ -33,7 +33,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
 import {
@@ -204,21 +204,19 @@ function DataRetentionPage({ host, projectId }: { host: DataRetentionHostApi; pr
   // Poll system.mutations while a retroactive apply is in flight, then idle.
   const projectIsWritable =
     rulesQuery.data?.available.projects.some((project) => project.id === projectId) ?? false;
-  const [pollMs, setPollMs] = useState<number | false>(false);
   const progressQuery = dataRetentionApi.dataRetention.getMutationProgress.useQuery(
     { projectId },
-    { enabled: projectIsWritable, refetchInterval: pollMs },
+    {
+      enabled: projectIsWritable,
+      refetchInterval: (query) => ((query.state.data?.length ?? 0) > 0 ? 3000 : false),
+    },
   );
   const activeMutations = progressQuery.data ?? [];
-  useEffect(() => {
-    setPollMs(activeMutations.length > 0 ? 3000 : false);
-  }, [activeMutations.length]);
 
   // Per-call toasts intentionally omitted — the drawer flow fans this out one
   // call per category. Call sites emit a single aggregated notice.
   const triggerUpdate = dataRetentionApi.dataRetention.triggerRetroactiveUpdate.useMutation({
     onSuccess: () => {
-      setPollMs(3000);
       void progressQuery.refetch();
     },
   });

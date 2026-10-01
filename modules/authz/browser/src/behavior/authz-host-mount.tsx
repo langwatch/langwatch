@@ -84,15 +84,15 @@ export default function AuthzHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback, route } = useUiCapabilities();
   const { query } = route.reading();
   const { organizationId } = useUiScope().activeScope();
-  // The same question, gate and cache entry as the navigation's plan reading.
-  const usage = authzApi.limits.getUsage.useQuery(
+  // The plan tier only: the session-cached read, not the monthly usage count.
+  const activePlan = authzApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
-  const planType = usage.data?.activePlan.type;
+  const planType = activePlan.data?.type;
   const plan = useMemo(
-    () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: usage.isLoading }),
-    [planType, usage.isLoading],
+    () => ({ isEnterprise: planType === "ENTERPRISE", isLoading: activePlan.isLoading }),
+    [planType, activePlan.isLoading],
   );
   // The shell's own workspace read, under the same cache key: no second request.
   const organizations = authzApi.organization.getAll.useQuery({ isDemo: false });

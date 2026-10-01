@@ -86,7 +86,7 @@ export function EvaluationResults({
         workflowId,
       }),
       refetchOnWindowFocus: false,
-      refetchInterval: keepFetching ? 1 : undefined,
+      refetchInterval: keepFetching ? 1000 : undefined,
     },
   );
 

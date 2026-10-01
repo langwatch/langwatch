@@ -12,21 +12,6 @@
       "langwatch-declaration-source": "./src/evaluator.web.ts",
       "types": "./dist/evaluator.web.d.ts",
       "default": "./src/evaluator.web.ts"
-    },
-    "./dynamic-zod-form": {
-      "langwatch-declaration-source": "./src/dynamic-zod-form.ts",
-      "types": "./dist/dynamic-zod-form.d.ts",
-      "default": "./src/dynamic-zod-form.ts"
-    },
-    "./evaluator-editor-content": {
-      "langwatch-declaration-source": "./src/evaluator-editor-content.ts",
-      "types": "./dist/evaluator-editor-content.d.ts",
-      "default": "./src/evaluator-editor-content.ts"
-    },
-    "./surfaces/evaluator-editor-shared": {
-      "langwatch-declaration-source": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx",
-      "types": "./dist/ui/sections/evaluators/evaluator-editor-shared.d.ts",
-      "default": "./src/ui/sections/evaluators/evaluator-editor-shared.tsx"
     }
   },
   "scripts": {

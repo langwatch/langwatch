@@ -181,6 +181,10 @@
     "./feedback": {
       "types": "./dist/ui-feedback.d.ts",
       "default": "./src/ui-feedback.ts"
+    },
+    "./lent": {
+      "types": "./dist/lent.d.ts",
+      "default": "./src/lent.ts"
     }
   },
   "scripts": {

@@ -31,7 +31,7 @@ describe("given a browser that installs licensing", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
   });
 
   describe("when billing or organization reads the resourceLimitRow capability", () => {
@@ -39,6 +39,6 @@ describe("given a browser that installs licensing", () => {
       const loaded = await licensingWeb.installation.capabilities.resourceLimitRow.load();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
   });
 });

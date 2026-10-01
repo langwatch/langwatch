@@ -167,9 +167,12 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
   const isActive = currentFrom !== undefined || currentTo !== undefined;
   const span = max - min || 1;
 
-  useEffect(() => {
+  const propsKey = `${currentFrom}|${currentTo}|${min}|${max}`;
+  const [valueFrom, setValueFrom] = useState(propsKey);
+  if (valueFrom !== propsKey) {
+    setValueFrom(propsKey);
     setLocalValue([currentFrom ?? min, currentTo ?? max]);
-  }, [currentFrom, currentTo, min, max]);
+  }
 
   useEffect(
     () => () => {

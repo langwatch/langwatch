@@ -10,10 +10,10 @@ import { isOnPlatformSet, type ScenarioRunData } from "@langwatch/scenario-contr
 import { isSuiteSetId } from "@langwatch/suite-contract";
 import { useCallback } from "react";
 
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { useCancelScenarioRun } from "../../../../behavior/suites/use-cancel-scenario-run.ts";
 import { useCan } from "../../../../behavior/use-can.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 
 /** What the person is told once a cancellation lands, and the list reread. */
 function cancelCallbacks({

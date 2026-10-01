@@ -7,7 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { create } from "zustand";
+
+import { useChatLayoutPref } from "../../../../behavior/chat-layout-pref.store.ts";
 
 export type ViewFormat = "pretty" | "text" | "json" | "markdown";
 export type MarkdownSubmode = "rendered" | "source";
@@ -31,18 +32,6 @@ interface IOViewerState {
   setEngaged: Dispatch<SetStateAction<boolean>>;
   engagedRef: RefObject<HTMLDivElement | null>;
 }
-
-/**
- * Shared chat-layout preference across every IOViewer instance.
- */
-interface ChatLayoutPrefState {
-  chatLayout: ChatLayout;
-  setChatLayout: (next: ChatLayout) => void;
-}
-const useChatLayoutPref = create<ChatLayoutPrefState>((set) => ({
-  chatLayout: "thread",
-  setChatLayout: (next) => set({ chatLayout: next }),
-}));
 
 /**
  * State + outside-click bookkeeping for the IOViewer panel. Engaged mode

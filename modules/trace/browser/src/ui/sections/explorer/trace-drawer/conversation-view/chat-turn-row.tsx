@@ -10,7 +10,7 @@ import {
 } from "@langwatch/trace-browser-kit";
 import type { MediaPartData } from "@langwatch/trace-contract";
 import { AlertTriangle, Lightbulb, MessageSquare } from "lucide-react";
-import { Fragment, memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, memo, useCallback, useMemo, useState } from "react";
 
 import type { RouterOutputs } from "../../../../../behavior/trace-api.ts";
 import { TRANSLATE_TEXT_MAX_CHARS } from "../../../../../model/constants.ts";
@@ -502,7 +502,11 @@ function ThreadMessage({
   // specs/traces-v2/conversation-message-expand.feature
   const { shouldExpandAll } = useConversationExpand();
   const [expanded, setExpanded] = useState(shouldExpandAll);
-  useEffect(() => setExpanded(shouldExpandAll), [shouldExpandAll]);
+  const [expandAllFrom, setExpandAllFrom] = useState(shouldExpandAll);
+  if (expandAllFrom !== shouldExpandAll) {
+    setExpandAllFrom(shouldExpandAll);
+    setExpanded(shouldExpandAll);
+  }
   const canExpand = text.length > THREAD_MAX_CHARS;
   const display =
     !canExpand || expanded

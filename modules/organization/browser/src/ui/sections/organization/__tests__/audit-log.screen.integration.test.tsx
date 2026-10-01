@@ -57,10 +57,10 @@ vi.mock("../../../../behavior/organization-api.ts", () => ({
         useQuery: () => ({ data: { members: state.members }, isLoading: false }),
       },
     },
-    limits: {
-      getUsage: {
+    plan: {
+      getActivePlan: {
         useQuery: () => ({
-          data: state.planLoading ? void 0 : { activePlan: { type: state.planType } },
+          data: state.planLoading ? void 0 : { type: state.planType },
           isLoading: state.planLoading,
         }),
       },

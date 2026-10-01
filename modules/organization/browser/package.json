@@ -12,22 +12,6 @@
       "langwatch-declaration-source": "./src/organization.web.ts",
       "types": "./dist/organization.web.d.ts",
       "default": "./src/organization.web.ts"
-    },
-    "./surfaces/personal-workspace-features": {
-      "types": "./dist/behavior/personal-workspace-features-api.d.ts",
-      "default": "./src/behavior/personal-workspace-features-api.ts"
-    },
-    "./surfaces/department-picker": {
-      "types": "./dist/department-picker.d.ts",
-      "default": "./src/department-picker.ts"
-    },
-    "./surfaces/organization-facts": {
-      "types": "./dist/behavior/ui-organization-facts.d.ts",
-      "default": "./src/behavior/ui-organization-facts.ts"
-    },
-    "./surfaces/scope-capability": {
-      "types": "./dist/behavior/scope-capability.d.ts",
-      "default": "./src/behavior/scope-capability.ts"
     }
   },
   "scripts": {

@@ -59,10 +59,14 @@ describe("defineTrpcContract", () => {
       // `defineRestMiddleware` living in rest/request.ts actually did.
       expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
       expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("ui-tokens.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
 
       expect(valueImports(sourceOf("index.ts"))).toEqual([
         "./trpc-contract.ts",
         "./rest-middleware.ts",
+        "./ui-tokens.ts",
+        "./release-flags.ts",
       ]);
     });
   });

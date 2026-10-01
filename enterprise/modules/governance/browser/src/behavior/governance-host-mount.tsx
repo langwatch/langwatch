@@ -131,16 +131,16 @@ export default function GovernanceHostMount({ children }: { children?: ReactNode
     [orgs, organizationId],
   );
 
-  const usage = governanceApi.limits.getUsage.useQuery(
+  const activePlan = governanceApi.plan.getActivePlan.useQuery(
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId && session.hasPermission("organization:view"), retry: false },
   );
   const plan = useMemo(
     () => ({
-      isEnterprise: usage.data?.activePlan.type === "ENTERPRISE",
-      isLoading: usage.isLoading,
+      isEnterprise: activePlan.data?.type === "ENTERPRISE",
+      isLoading: activePlan.isLoading,
     }),
-    [usage.data, usage.isLoading],
+    [activePlan.data, activePlan.isLoading],
   );
 
   const deployment = useMemo(

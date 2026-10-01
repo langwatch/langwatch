@@ -84,9 +84,11 @@ export function EvaluatorMappingsSection({
   const hasScrolledRef = useRef(false);
 
   // Sync from props when they change (e.g., dataset switch causing drawer to get new props)
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(initialMappings);
+  if (mappingsFrom !== initialMappings) {
+    setMappingsFrom(initialMappings);
     setLocalMappings(initialMappings);
-  }, [initialMappings]);
+  }
 
   // Compute missingMappingIds REACTIVELY from local state using shared validation
   const missingMappingIds = useMemo(() => {

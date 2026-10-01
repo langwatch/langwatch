@@ -13,6 +13,7 @@ import type { TimeInput } from "@langwatch/time";
 import { useCallback, useEffect, useEffectEvent, useMemo, useState } from "react";
 import { z } from "zod";
 
+import { useCodexCodingDefaultsAskStore } from "../../behavior/codex-coding-defaults-ask.store.ts";
 import { useModelProviderToaster } from "../../behavior/model-provider-feedback.ts";
 import {
   findModelProviderById,
@@ -39,7 +40,6 @@ import {
 } from "../../model/model-provider-helpers.ts";
 import { parseZodFieldErrors, type ZodErrorStructure } from "../../model/zod-field-errors.ts";
 import { SmallLabel } from "../elements/small-label.tsx";
-import { useCodexCodingDefaultsAskStore } from "./codex-coding-defaults-ask.tsx";
 import { CodexSignIn } from "./codex-sign-in.tsx";
 // DefaultProviderSection has been moved out of this drawer to a page-level
 // section on the model-providers settings page (DefaultModelsSection). See
@@ -264,6 +264,19 @@ async function probeCredential({
   clearRefusal();
 
   return true;
+}
+
+/** Only probe the upstream provider when the user entered a new API key. */
+async function saveIsBlockedByProbe({
+  shouldProbe,
+  ...probe
+}: {
+  shouldProbe: boolean;
+  clearRefusal: () => void;
+  recordRefusal: () => void;
+  validateApiKey: () => Promise<boolean>;
+}): Promise<boolean> {
+  return shouldProbe && !(await probeCredential(probe));
 }
 
 function finishSave({
@@ -941,10 +954,9 @@ export const EditModelProviderForm = ({
       return;
     }
 
-    // Only probe the upstream provider when the user has actually entered a new API key.
-    const needsProbe =
+    const shouldProbe =
       isLlmProvider && !isOAuthDeviceProvider && userEnteredNewApiKey && probeRequired;
-    if (needsProbe && !(await probeCredential({ clearRefusal, recordRefusal, validateApiKey }))) {
+    if (await saveIsBlockedByProbe({ shouldProbe, clearRefusal, recordRefusal, validateApiKey })) {
       return;
     }
 

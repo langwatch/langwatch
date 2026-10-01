@@ -12,11 +12,6 @@
       "langwatch-declaration-source": "./src/feature-flag.web.ts",
       "types": "./dist/feature-flag.web.d.ts",
       "default": "./src/feature-flag.web.ts"
-    },
-    "./surfaces/experiment-catalogue": {
-      "langwatch-declaration-source": "./src/experiment-catalogue.ts",
-      "types": "./dist/experiment-catalogue.d.ts",
-      "default": "./src/experiment-catalogue.ts"
     }
   },
   "scripts": {

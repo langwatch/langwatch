@@ -17,7 +17,7 @@ import { type TimeRange, readableDate } from "@langwatch/trace-browser-kit";
 import type { TimeRangePreset } from "@langwatch/trace-contract";
 import { Check, Clock, Copy } from "lucide-react";
 import type React from "react";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import {
   getPresetById,
@@ -170,10 +170,12 @@ const AbsoluteRangeColumn: React.FC<{
   const [from, setFrom] = useState(() => toDatetimeLocal(range.from));
   const [to, setTo] = useState(() => toDatetimeLocal(range.to));
 
-  useEffect(() => {
+  const [rangeFrom, setRangeFrom] = useState({ from: range.from, to: range.to });
+  if (rangeFrom.from !== range.from || rangeFrom.to !== range.to) {
+    setRangeFrom({ from: range.from, to: range.to });
     setFrom(toDatetimeLocal(range.from));
     setTo(toDatetimeLocal(range.to));
-  }, [range.from, range.to]);
+  }
 
   const parsed = parseAbsoluteRange({ from, to });
 

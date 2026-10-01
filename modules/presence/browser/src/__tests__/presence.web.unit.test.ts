@@ -23,13 +23,4 @@ describe("given a browser that installs presence", () => {
       expect(installed.modules).toContain(presenceWeb);
     });
   });
-
-  describe("when the surface the declaration publishes is asked for", () => {
-    it("resolves the presence store and components", async () => {
-      const publication = presenceWeb.installation.publications.presence;
-      const loaded = await publication?.load();
-
-      expect(loaded).toBeDefined();
-    });
-  });
 });

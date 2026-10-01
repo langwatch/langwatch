@@ -60,11 +60,12 @@ class StubSession extends UiSession {
   }
 }
 
-/** The host's registry: one loader for every page key the route table names. */
+/** The host's registry: one loader per page key the route table names; layouts pass through. */
 function hostLoaders(page: ComponentType): UiPageLoaderRegistry {
   const registry: Record<string, () => Promise<{ default: ComponentType }>> = {};
   for (const key of uiRoutePageKeys(uiRouteTable)) {
-    registry[key] = async () => ({ default: page });
+    const component = key.startsWith("layouts/") ? Outlet : page;
+    registry[key] = async () => ({ default: component });
   }
   return registry;
 }

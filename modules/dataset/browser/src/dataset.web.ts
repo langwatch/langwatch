@@ -1,7 +1,6 @@
 /**
  * What a browser installs when it installs dataset: the datasets list and
- * the dataset editor. `publishSurfaces` was superseded by the kit
- * (ARCHITECTURE.md §14, ruled 2026-09-18) and is deleted here.
+ * the dataset editor.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";

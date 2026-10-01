@@ -54,9 +54,11 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
   const [inputValue, setInputValue] = useState(value.toString());
 
   // Sync input when value changes externally
-  React.useEffect(() => {
+  const [valueFrom, setValueFrom] = useState(value);
+  if (valueFrom !== value) {
+    setValueFrom(value);
     setInputValue(value.toString());
-  }, [value]);
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);

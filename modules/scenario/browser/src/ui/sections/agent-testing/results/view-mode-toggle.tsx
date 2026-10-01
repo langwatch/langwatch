@@ -8,8 +8,8 @@ import { HStack, IconButton } from "@chakra-ui/react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LayoutGrid, Table2 } from "lucide-react";
 
+import type { AgentTestingViewMode } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
 
 export type ViewModeToggleProps = {
   viewMode: AgentTestingViewMode;

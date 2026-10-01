@@ -71,7 +71,9 @@ export function WorkflowPushToCopiesDialog({
   const host = useWorkflowHost();
   const { projectId } = host.scope();
   const utils = workflowApi.useUtils();
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [edited, setEdited] = useState<{ copyIds: string; selected: ReadonlySet<string> } | null>(
+    null,
+  );
 
   const copies = workflowApi.workflow.getCopies.useQuery(
     { workflowId, projectId: projectId ?? "" },
@@ -80,9 +82,10 @@ export function WorkflowPushToCopiesDialog({
   const pushToCopies = workflowApi.workflow.pushToCopies.useMutation();
 
   const copyIds = (copies.data ?? []).map((copy) => copy.id).join(",");
-  useEffect(() => {
-    setSelected(new Set(copyIds === "" ? [] : copyIds.split(",")));
-  }, [copyIds]);
+  const selected: ReadonlySet<string> =
+    edited?.copyIds === copyIds
+      ? edited.selected
+      : new Set(copyIds === "" ? [] : copyIds.split(","));
 
   useEffect(() => {
     if (copies.error) {
@@ -95,7 +98,7 @@ export function WorkflowPushToCopiesDialog({
     const next = new Set(selected);
     if (next.has(copyId)) next.delete(copyId);
     else next.add(copyId);
-    setSelected(next);
+    setEdited({ copyIds, selected: next });
   };
 
   const push = async () => {
@@ -112,7 +115,7 @@ export function WorkflowPushToCopiesDialog({
         title: "Workflow pushed",
         description: `"${workflowName}" has been pushed to ${result.pushedTo} of ${result.selectedCopies} selected replicated workflow(s).`,
       });
-      setSelected(new Set());
+      setEdited({ copyIds, selected: new Set() });
       onClose();
     } catch (error) {
       host.failed({ error, fallbackTitle: "Couldn't push the workflow" });

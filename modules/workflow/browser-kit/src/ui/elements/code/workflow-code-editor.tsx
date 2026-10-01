@@ -78,9 +78,11 @@ export function WorkflowCodeEditorModal({
   const [editorInstance, setEditorInstance] = useState<MonacoEditorInstance | null>(null);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
 
-  useEffect(() => {
+  const [seededFrom, setSeededFrom] = useState({ code, open });
+  if (seededFrom.code !== code || seededFrom.open !== open) {
+    setSeededFrom({ code, open });
     setLocalCode(code);
-  }, [code, open]);
+  }
 
   // Save = persist the buffer back to the parent and keep the modal open so
   // the user can keep editing. Mirrors a file editor's "save" — never closes.

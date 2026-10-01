@@ -556,9 +556,11 @@ function useVariableMapping({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Sync local mapping when prop changes (e.g., from external updates)
-  useEffect(() => {
+  const [mappingFrom, setMappingFrom] = useState(mapping);
+  if (mappingFrom !== mapping) {
+    setMappingFrom(mapping);
     setLocalMapping(mapping);
-  }, [mapping]);
+  }
 
   const sourceInfo = useMemo(() => {
     if (localMapping?.type !== "source") return null;

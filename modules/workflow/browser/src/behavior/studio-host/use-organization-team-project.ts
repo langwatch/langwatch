@@ -7,12 +7,11 @@ import { useWorkflowHost } from "@langwatch/workflow-browser-kit";
 import type { Project } from "@langwatch/workflow-contract";
 import { useMemo } from "react";
 
-import { workflowApi, type RouterOutputs } from "../workflow-api.ts";
-
 /**
- * The project row, as the studio's closure reads it.
+ * The project row, as the studio's closure reads it. The API key is not part of it:
+ * only the publish screen's API modal fetches it.
  */
-export type StudioProject = Project;
+export type StudioProject = Omit<Project, "apiKey">;
 
 export type StudioOrganization = { id: string };
 export type StudioTeam = { id: string };
@@ -24,11 +23,9 @@ export type StudioScopeReading = {
   projectId: string | undefined;
   hasPermission: (permission: string) => boolean;
   hasAnyPermission: (permissions: string[]) => boolean;
-  modelProviders: RouterOutputs["modelProvider"]["getAllForProject"] | undefined;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
   isLoading: boolean;
-  isRefetching: boolean;
 };
 
 export function useOrganizationTeamProject(
@@ -44,28 +41,12 @@ export function useOrganizationTeamProject(
   const host = useWorkflowHost();
   const scope = host.scope();
 
-  const modelProviders = workflowApi.modelProvider.getAllForProject.useQuery(
-    { projectId: scope.projectId ?? "" },
-    { enabled: !!scope.projectId },
-  );
-
-  /**
-   * ONE EXTRA READ THE APPLICATION DID NOT MAKE, and it is worth naming. `platform/app` had
-   * `apiKey` on the project row the shell already held; the host port carries an identity
-   * and a slug, not a credential.
-   */
-  const projectApiKey = workflowApi.project.getProjectAPIKey.useQuery(
-    { projectId: scope.projectId ?? "" },
-    { enabled: !!scope.projectId },
-  );
-
   return useMemo(() => {
     const project: StudioProject | undefined = scope.projectId
       ? {
           id: scope.projectId,
           slug: scope.projectSlug ?? "",
           name: scope.projectName ?? scope.projectSlug ?? "",
-          apiKey: projectApiKey.data?.apiKey ?? "",
           teamId: scope.teamId ?? "",
           language: "",
           framework: "",
@@ -84,10 +65,8 @@ export function useOrganizationTeamProject(
       hasPermission: (permission: string) => host.hasPermission(permission),
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
-      modelProviders: modelProviders.data,
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),
-      isRefetching: modelProviders.isRefetching,
     };
-  }, [host, scope, modelProviders.data, modelProviders.isRefetching, projectApiKey.data]);
+  }, [host, scope]);
 }

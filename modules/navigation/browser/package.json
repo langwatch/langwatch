@@ -17,10 +17,6 @@
       "types": "./dist/ui/index.d.ts",
       "default": "./src/ui/index.ts"
     },
-    "./surfaces/command-bar": {
-      "types": "./dist/command-bar.d.ts",
-      "default": "./src/command-bar.ts"
-    },
     "./navigation": {
       "types": "./dist/navigation.d.ts",
       "default": "./src/navigation.ts"

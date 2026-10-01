@@ -122,11 +122,11 @@ type BorrowedProcedures = {
       };
     };
   };
-  limits: {
-    getUsage: {
+  plan: {
+    getActivePlan: {
       query: {
         input: { organizationId: string };
-        output: { activePlan: { type: string } };
+        output: { type: string };
       };
     };
   };

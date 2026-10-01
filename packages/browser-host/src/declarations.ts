@@ -11,6 +11,7 @@ import type { AnnotationFormState } from "@langwatch/annotation-contract";
 import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
+import type { UiTokenIdentity } from "@langwatch/kernel/contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
 import type {
   MediaAudioElement,
@@ -710,12 +711,38 @@ export type UiDeclaringModule = {
   readonly name: string;
   readonly installation: {
     readonly capabilities: Readonly<Record<string, unknown>> & Partial<UiDeclaredCapabilities>;
+    readonly lends?: readonly UiLend[];
   };
 };
+
+/**
+ * What a module lent under a token: a chunk to load, or an eager value.
+ * The owner's `.lends` wrote the same payload under the legacy name too.
+ */
+export type UiLend = Readonly<{ token: UiTokenIdentity }> &
+  (Readonly<{ load: () => Promise<unknown> }> | Readonly<{ value: unknown }>);
+
+/** One lend, with the module that made it. */
+export type UiLentBy = Readonly<{ module: string; lend: UiLend }>;
+
+export type {
+  ReleaseFlagToken,
+  UiComponentToken,
+  UiDrawerToken,
+  UiExtensionToken,
+  UiHooksToken,
+  UiOperationsToken,
+  UiTokenIdentity,
+} from "@langwatch/kernel/contract";
 
 /** The declarations above this screen. Nothing declared reads as an empty list. */
 export abstract class UiDeclarations {
   declared<Name extends UiDeclaredName>(_name: Name): readonly UiDeclared<Name>[] {
+    return [];
+  }
+
+  /** Every lend under this token's key, in install order. */
+  lent(_token: UiTokenIdentity): readonly UiLentBy[] {
     return [];
   }
 }
@@ -731,6 +758,14 @@ class InstalledUiDeclarations extends UiDeclarations {
       const capability = named[name];
       return capability === undefined ? [] : [{ module: module.name, capability }];
     });
+  }
+
+  override lent(token: UiTokenIdentity): readonly UiLentBy[] {
+    return this.modules.flatMap((module) =>
+      (module.installation.lends ?? [])
+        .filter((lend) => lend.token.key === token.key)
+        .map((lend) => ({ module: module.name, lend })),
+    );
   }
 }
 

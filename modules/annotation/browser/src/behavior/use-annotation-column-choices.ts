@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { z } from "zod";
 
 import type { AnnotationColumnChoices } from "../ui/elements/annotation-columns.ts";
@@ -30,11 +30,14 @@ function readChoices(projectId: string): AnnotationColumnChoices {
 
 /** The reviewer's column choices, kept per project in this browser only. */
 export function useAnnotationColumnChoices({ projectId }: { projectId: string | undefined }) {
-  const [choices, setChoices] = useState<AnnotationColumnChoices>({});
-
-  useEffect(() => {
+  const [choices, setChoices] = useState<AnnotationColumnChoices>(() =>
+    readChoices(projectId ?? ""),
+  );
+  const [choicesFor, setChoicesFor] = useState(projectId);
+  if (choicesFor !== projectId) {
+    setChoicesFor(projectId);
     setChoices(readChoices(projectId ?? ""));
-  }, [projectId]);
+  }
 
   const persist = useCallback(
     (next: AnnotationColumnChoices) => {

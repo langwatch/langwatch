@@ -14,7 +14,7 @@ import { type PromptHostApi, usePromptHost } from "../../../../model/prompt-host
 import type { WireVersionedPrompt } from "../../../../model/wire-versioned-prompt.ts";
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { getDisplayHandle } from "../../../../prompt-reference.ts";
-import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
+import { DeleteConfirmationDialog } from "../../../blocks/delete-confirmation-dialog.tsx";
 import { CopyPromptDialog } from "../dialogs/copy-prompt-dialog.tsx";
 import { PushToCopiesDialog } from "../dialogs/push-to-copies-dialog.tsx";
 

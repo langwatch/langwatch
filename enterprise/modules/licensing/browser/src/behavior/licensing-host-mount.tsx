@@ -19,6 +19,7 @@ import {
   type LicensingFailureNotice,
   type LicensingSuccessNotice,
 } from "../model/licensing-host.ts";
+import { GlobalUpgradeModal } from "../ui/sections/global-upgrade-modal/global-upgrade-modal.tsx";
 import { licensingApi } from "./licensing-api.ts";
 
 class CapabilityLicensingHost extends LicensingHostApi {
@@ -92,9 +93,8 @@ class CapabilityLicensingHost extends LicensingHostApi {
 }
 
 /**
- * The mount the declaration names: one provider above the routed tree, so a
- * peer's screen reading this port finds it too. Default-exported because that
- * is what `mounts.load` resolves.
+ * The declared mount: one provider above the routed tree, plus the store-driven upgrade
+ * dialog every routed page opens. Default-exported because `mounts.load` resolves it.
  */
 export default function LicensingHostMount({ children }: { children?: ReactNode }) {
   const { feedback, session } = useUiCapabilities();
@@ -116,5 +116,10 @@ export default function LicensingHostMount({ children }: { children?: ReactNode 
     [organizationId, deployment.isSaaS, utils, feedback, mayManageOrganization],
   );
 
-  return <LicensingHostProvider value={host}>{children}</LicensingHostProvider>;
+  return (
+    <LicensingHostProvider value={host}>
+      {children}
+      <GlobalUpgradeModal isSaaS={deployment.isSaaS} />
+    </LicensingHostProvider>
+  );
 }

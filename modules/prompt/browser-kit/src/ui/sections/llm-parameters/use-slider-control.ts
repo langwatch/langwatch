@@ -3,7 +3,7 @@
  * ParameterPopoverContent, letting each keep its own styling.
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import type { SliderParameterConfig } from "./parameter-config.ts";
 
@@ -101,9 +101,11 @@ export function useSliderControl({
   const [inputValue, setInputValue] = useState(String(boundedValue));
 
   // Sync input value when external value changes
-  useEffect(() => {
+  const [valueFrom, setValueFrom] = useState(boundedValue);
+  if (valueFrom !== boundedValue) {
+    setValueFrom(boundedValue);
     setInputValue(String(boundedValue));
-  }, [boundedValue]);
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);

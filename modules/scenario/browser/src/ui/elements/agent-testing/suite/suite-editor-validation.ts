@@ -14,8 +14,11 @@ import {
   suiteFieldDefinitionSchema,
 } from "@langwatch/scenario-contract";
 
+import type {
+  SuiteDraft,
+  SuiteFieldRow,
+} from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { SUITE_NAME_REQUIRED } from "../../../sections/agent-testing/cases/suite-name-dialog.tsx";
-import type { SuiteDraft, SuiteFieldRow } from "./suite-editor-store.ts";
 
 /** What the editor says about a row with no identifier. */
 export const FIELD_IDENTIFIER_REQUIRED = "A field needs an identifier.";

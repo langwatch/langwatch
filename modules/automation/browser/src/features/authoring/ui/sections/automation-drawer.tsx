@@ -212,7 +212,7 @@ export function AutomationDrawer({
   initialFilters,
   initialFilterQuery,
   onClose,
-}: UiAutomationDrawerProps) {
+}: UiAutomationDrawerProps & { onClose: () => void }) {
   const { project, organization, team } = useOrganizationTeamProject();
   const appBaseUrl = useAppBaseUrl();
   const projectId = project?.id ?? "";

@@ -14,22 +14,6 @@
       "langwatch-declaration-source": "./src/ops.web.ts",
       "types": "./dist/ops.web.d.ts",
       "default": "./src/ops.web.ts"
-    },
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./src/index.ts"
-    },
-    "./surfaces/impersonation": {
-      "types": "./dist/ui/sections/impersonation/index.d.ts",
-      "default": "./src/ui/sections/impersonation/index.ts"
-    },
-    "./drawers": {
-      "types": "./dist/drawers.d.ts",
-      "default": "./src/drawers.ts"
-    },
-    "./ops": {
-      "types": "./dist/ops.d.ts",
-      "default": "./src/ops.ts"
     }
   },
   "scripts": {

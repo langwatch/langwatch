@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/trace.web.ts",
       "types": "./dist/trace.web.d.ts",
       "default": "./src/trace.web.ts"
-    },
-    "./surfaces/presence-menu-item": {
-      "langwatch-declaration-source": "./src/ui/sections/presence/presence-menu-item.tsx",
-      "types": "./dist/ui/sections/presence/presence-menu-item.d.ts",
-      "default": "./src/ui/sections/presence/presence-menu-item.tsx"
-    },
-    "./surfaces/project-span-names": {
-      "langwatch-declaration-source": "./src/ui/sections/use-project-span-names.ts",
-      "types": "./dist/ui/sections/use-project-span-names.d.ts",
-      "default": "./src/ui/sections/use-project-span-names.ts"
     }
   },
   "scripts": {

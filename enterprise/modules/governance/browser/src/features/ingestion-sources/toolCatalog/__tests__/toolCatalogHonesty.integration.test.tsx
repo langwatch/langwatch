@@ -74,11 +74,11 @@ describe("given sample licence counts with no contract price", () => {
   ])("shows the licence costs on %s as dashes requiring a contract price", (id) => {
     const card = renderCard(sample(id));
 
-    expect(within(card).getByLabelText(/^Licence per month not measured\./)).toHaveAccessibleName(
+    expect(within(card).getByLabelText(/^License per month not measured\./)).toHaveAccessibleName(
       /Contract price required/,
     );
     expect(
-      within(card).getByLabelText(/^Unassigned licence cost not measured\./),
+      within(card).getByLabelText(/^Unassigned license cost not measured\./),
     ).toHaveAccessibleName(/contract price required/);
   });
 });

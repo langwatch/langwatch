@@ -23,13 +23,4 @@ describe("given a browser that installs share", () => {
       expect(installed.modules).toContain(shareWeb);
     });
   });
-
-  describe("when a surface the declaration publishes is asked for", () => {
-    it.each([["share-link-views"], ["share-links"]] as const)("resolves %s", async (surface) => {
-      const publication = shareWeb.installation.publications[surface];
-      const loaded = await publication?.load();
-
-      expect(loaded).toBeDefined();
-    });
-  });
 });

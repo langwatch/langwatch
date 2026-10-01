@@ -4,7 +4,7 @@ import { normalizeWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import { useCallback } from "react";
 
 import { LLMConfigField } from "../../../../../behavior/lent-prompt.tsx";
-import { useOrganizationTeamProject } from "../../../../../behavior/studio-host/use-organization-team-project.ts";
+import { useStudioModelProviders } from "../../../../../behavior/studio-host/use-studio-model-providers.ts";
 import { useWorkflowStore } from "../../../../../behavior/use-workflow-store.ts";
 
 type OptimizationStudioLLMConfigFieldProps = {
@@ -37,7 +37,7 @@ export function OptimizationStudioLLMConfigField({
     hasCodeNodes: state.nodes.some((node) => node.type === "code"),
   }));
 
-  const { modelProviders } = useOrganizationTeamProject();
+  const modelProviders = useStudioModelProviders();
   const providerIsConfigured = Object.values(modelProviders ?? {}).some(
     (modelProvider) =>
       model.split("/")[0] === modelProvider.provider &&

@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/workflow.web.ts",
       "types": "./dist/workflow.web.d.ts",
       "default": "./src/workflow.web.ts"
-    },
-    "./hoverable-big-text": {
-      "langwatch-declaration-source": "./src/hoverable-big-text.ts",
-      "types": "./dist/hoverable-big-text.d.ts",
-      "default": "./src/hoverable-big-text.ts"
-    },
-    "./feature-flag": {
-      "langwatch-declaration-source": "./src/feature-flag.ts",
-      "types": "./dist/feature-flag.d.ts",
-      "default": "./src/feature-flag.ts"
     }
   },
   "scripts": {

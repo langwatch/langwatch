@@ -1,7 +1,7 @@
 import { Alert, Box, Button, HStack, IconButton, Spacer, Text } from "@chakra-ui/react";
 import { nowInstant } from "@langwatch/time";
 import { Eye, LogOut, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
@@ -39,10 +39,12 @@ export function AdminViewingAsBanner({ workspaceLabel }: { workspaceLabel: strin
   // data" alert), mini after 24h-dismiss (a small persistent chip). Never
   // fully hidden — the governance team's bar is "always visible signal,
   // even if compressed".
-  const [collapsed, setCollapsed] = useState(false);
-  useEffect(() => {
+  const [collapsed, setCollapsed] = useState(() => loadDismissed(workspaceLabel));
+  const [labelFrom, setLabelFrom] = useState(workspaceLabel);
+  if (labelFrom !== workspaceLabel) {
+    setLabelFrom(workspaceLabel);
     setCollapsed(loadDismissed(workspaceLabel));
-  }, [workspaceLabel]);
+  }
 
   const handleDismiss = () => {
     persistDismissed(workspaceLabel);

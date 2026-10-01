@@ -27,7 +27,6 @@ export const navigationWeb = defineWebModule("navigation")
     },
   })
   .withCapabilities({
-    sidebar: { load: () => import("./behavior/sidebar-capability.ts") },
     /** The host port the shell answers, and its provider; loaded before the shell renders. */
     host: { load: () => import("./navigation.ts") },
     /** The frame drawn around every address behind a session. */

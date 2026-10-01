@@ -5,8 +5,8 @@
  */
 
 import { usePromptHost } from "../model/prompt-host.ts";
-import type { DraggableTabsBrowserState } from "../model/prompt-tabs-store.ts";
-import { usePromptTabsStore } from "../model/prompt-tabs-store.ts";
+import type { DraggableTabsBrowserState } from "./prompt-tabs-store.ts";
+import { usePromptTabsStore } from "./prompt-tabs-store.ts";
 import { usePromptProject } from "./use-prompt-project.ts";
 
 export function useDraggableTabsBrowserStore<T>(

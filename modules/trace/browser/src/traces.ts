@@ -10,15 +10,6 @@ export const traceScreens = {
 
 export type TraceScreenName = keyof typeof traceScreens;
 
-/**
- * The trace drawer's global mount, which the chrome renders once above the outlet -
- * beside its own `CurrentDrawer` and outside any page.
- */
-export const traceDrawerMount: TraceScreenLoader = () =>
-  import("./ui/sections/explorer/global-trace-v2-drawer-mount.tsx").then((module) => ({
-    default: module.GlobalTraceV2DrawerMount,
-  }));
-
 export { api as traceApi, api as traceApiHooks } from "./behavior/trace-api.ts";
 export type { RouterOutputs as TraceRouterOutputs, TraceApiMap } from "./behavior/trace-api.ts";
 export {

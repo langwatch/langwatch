@@ -16,6 +16,8 @@ export default defineConfig({
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",
+    // Suites mock their own behavior modules; a shared fork would hand them the real one.
+    isolate: true,
     test: {
       setupFiles: ["./src/__tests__/setup.ts"],
     },

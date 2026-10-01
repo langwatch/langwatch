@@ -166,14 +166,14 @@ function SsoConfiguredButNotInUseNotice() {
 export function EnterpriseCapabilitiesSection() {
   const host = usePersonalWorkspaceHost();
   const organizationId = host.scope().organizationId ?? "";
-  const usage = api.limits.getUsage.useQuery(
+  const activePlan = api.plan.getActivePlan.useQuery(
     { organizationId },
     {
       enabled: !!organizationId && host.hasPermission("organization:view"),
       retry: false,
     },
   );
-  const isEnterprise = usage.data?.activePlan.type === "ENTERPRISE";
+  const isEnterprise = activePlan.data?.type === "ENTERPRISE";
 
   if (host.deployment().isSaas) return null;
 

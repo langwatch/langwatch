@@ -53,9 +53,6 @@ export const authWeb = defineWebModule("auth")
     frontDoorTheme: { load: () => import("./model/front-door-theme.ts") },
     /** The front door's host port, which the shell's auth layout implements. */
     host: { load: () => import("./model/auth-host.ts") },
-    /** Auth's half of a peer's host: a sign-in that names a connection, and
-     *  one spelling for a sign-in code. */
-    signIn: { load: () => import("./behavior/sign-in-capability.ts") },
     /** The reader's own passkeys, for the personal workspace's security screen. */
     passkeys: { load: () => import("./behavior/passkey-capability.ts") },
     /** Setting two-step verification up, and fresh backup codes. */

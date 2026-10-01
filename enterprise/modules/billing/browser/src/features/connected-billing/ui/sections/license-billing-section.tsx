@@ -3,7 +3,7 @@ import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import type { UiLicenseBillingSectionProps } from "@langwatch/browser-host/declarations";
 import { describeError } from "@langwatch/browser-host/errors";
 import type { ConnectedBillingOverview } from "@langwatch/enterprise-billing-contract";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { connectedBillingApi } from "../../behavior/connected-billing-api.ts";
 import { useConnectedBillingCommands } from "../../behavior/use-connected-billing-commands.ts";
@@ -81,9 +81,11 @@ function BillingPanel({
     billingFormFrom({ account: overview.account, license }),
   );
 
-  useEffect(() => {
+  const [seededFrom, setSeededFrom] = useState({ account: overview.account, license });
+  if (seededFrom.account !== overview.account || seededFrom.license !== license) {
+    setSeededFrom({ account: overview.account, license });
     setForm(billingFormFrom({ account: overview.account, license }));
-  }, [overview.account, license]);
+  }
 
   return (
     <VStack align="start" gap={4} width="full">

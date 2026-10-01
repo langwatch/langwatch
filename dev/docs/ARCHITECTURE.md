@@ -59,7 +59,8 @@ each runtime owns the declaration vocabulary for its own half, so weight is
 imported the rest of the way down, never from the top.
 
 - **`@langwatch/module`** — the light core, and ONLY what a contract needs:
-  the `moduleApi` token factory, supply tokens, module ids. Zod-only,
+  the `moduleApi` token factory, supply tokens, module ids, UI tokens and
+  release-flag tokens (§10.1; Alex, 2026-10-01). Zod-only,
   framework-free, browser-safe, near-zero weight. Every contract depends on
   it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
   here — it lives in the runtime that consumes it, so nothing backend-shaped
@@ -327,8 +328,9 @@ declarations (`browser-trpc`), never hand-written, never from a router type.
 Its inputs and outputs are typed from those declarations, never `any` (Alex, 2026-09-24). An
 interactive element is the native one (`button`, `a`, `input`) styled through the design system to
 look as before; a `div` given a role is not (Alex, 2026-09-24).
-A screen reads no session or router directly: it declares a `*HostApi` the
-shell implements from `browser-host` capabilities. The half is declared with
+A screen reads host services directly, typed by tokens: `useLent`, `openDrawer`,
+`useReleaseFlag` (Alex, 2026-10-01). A `*HostApi` keeps only a module's own
+host needs, which the shell implements from `browser-host` capabilities. The half is declared with
 `defineBrowserModule` — screens, drawers, publications, mounts, flags — and
 exported at `./declaration`; the generated `browserModules` list installs it.
 
@@ -418,6 +420,7 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    own client), while the passkey, two-step and sign-in-method ceremonies call
    auth's endpoints and so live in auth (Alex, 2026-09-29). Kits that still hold a
    client (identity, user, stored-object) are findings of rule 2, moved as touched.
+   A kit may hold its owner's UI tokens (§10.1).
 4. **A kit is a package, not a subpath** — a subpath is invisible to the
    dependency graph, so it cannot break a cycle or be budgeted. A package
    makes every cross-module browser edge a visible, lintable manifest line.
@@ -445,8 +448,8 @@ only a door that shuts. `surfaces/` and `screens/` are deleted spellings
    decides whether one is warranted, and if it is not, rule 5 still applies.
 7. **Lend only what a kit cannot hold, never copy it** (Alex, 2026-09-23; narrowed
    2026-09-29 by rule 3). A component that fetches a peer's data or reads a
-   `*HostApi` is published through its owner's `withCapabilities`, as `joinOffer`
-   does, and the consumer renders what it is handed; one that fetches only its
+   `*HostApi` is lent by its owner's token (§10.1), as `joinOffer` is, and the
+   consumer renders what it is handed; one that fetches only its
    owner's data moves to the owner's kit. A flow opens as the owner's drawer by
    name: ops' SSO import opens sso's register-connection drawer (Alex, 2026-09-29).
    Rule 5's duplicate is for thin, non-fetching surfaces only.
@@ -2038,6 +2041,37 @@ invented:
   case that forced it: six mounts (workflow, dataset, evaluator, monitor,
   prompt, agent) answered `[]`, so every Replicate dialog offered nothing.
 
+- **A name another module depends on is a token from its owner** (Alex, 2026-10-01). A lent
+  component, lent operations, lent hooks, an extension point and a drawer are each declared once as
+  a typed token, `uiTokens("<owner>").component<Props>("<name>")` from the light core. Consumers
+  read `useLent(Token)`, `useLentAll(Token)` or `openDrawer(Token, props)`. browser-host knows no
+  feature, and the compiler checks lender and reader against the one type.
+
+  **The owner lends by token.** `.lends(Token, { load })` and `.drawer(Token, { load })` check the
+  loaded default against the token and refuse a token another module owns. An extension token is the
+  one any module may lend, read as a list. `createUi` refuses two lenders of any other token, naming
+  both. `withCapabilities` keeps only what the composition root installs.
+
+  **A token lives in its owner's contract, or its kit when the contract cannot hold it**: props
+  naming a framework type, or a contract whose graph reaches the owner's, put the token in the
+  owner's kit. An owner with neither makes the props data-only. A drawer only its owner opens keeps
+  its token in its own `model/`; an extension token lives with the page that hosts it.
+
+  **Release flags are a host service feature-flag provides.** browser-host holds `UiFlags` (on, off
+  or not yet answered, for the current scope) and `useReleaseFlag(flag)`. Feature-flag's browser
+  implements it from its own client, and the shell composes it beside session (auth) and scope
+  (organization). Flags are `ReleaseFlagToken`s from `FrontendFlags` in feature-flag's contract,
+  screens' `flags:` included. The session answers no flag.
+
+  **A host service is provided by its owner and resolved by the kernel.** browser-host declares
+  `hostService<Source>(name)`; the owner declares `.provides(Service, { load })`; `createUi` resolves
+  each to its one installed provider, refuses none or two, and runs the sources in the kernel's
+  order. apps/ui names no provider.
+
+  **browser-host and ui-kernel depend on no module contract.** A feature type in a framework package
+  is a central map every browser program compiles: before tokens, 39 packages compiled 14 contracts
+  through `declarations.ts`. An enforcer policy holds this, with a shrink-only baseline (§17).
+
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
   the browser twin of a channel.
@@ -2105,6 +2139,22 @@ invented:
   adjacent"; it is **would a second browser application want this file** — if
   yes it belongs in `@langwatch/browser-host` or `@langwatch/ui-kernel`, and if
   no it is composition and may stay until it dissolves.
+
+### 10.2 Browser state (ruled 2026-10-01)
+
+**Four tiers, one home each** (Alex, 2026-10-01). (1) Server state lives in React Query
+through the tRPC client and is never copied into `useState` or a store (`query-data-in-state`).
+(2) Address-bar state (filters, tabs, drawers) lives in the router. (3) Shared client state
+is one zustand store per feature, under `behavior/`, actions as named functions.
+(4) Local state is `useState`; derive during render, never sync in an effect (`effect-derives-state`).
+
+**The store is module-private** (`browser-store-containment`). `create(` from zustand appears
+only under `behavior/`; the package's `<name>.web.ts` exports no store and no other module
+imports one. A browser-kit may own the store for its one concept (§10.1 rule 3). What another
+module needs is a contract answer or a `*HostApi` action.
+
+**Redux and any global store are refused** (`no-redux`): `redux`, `react-redux` and
+`@reduxjs/toolkit` are not imported in browser code.
 
 ---
 
@@ -2288,6 +2338,12 @@ and a response that truly needs its own schema goes through
 core screen renders the enterprise kit, and a shell-wide surface is its owner's declared mount (§11;
 Alex, 2026-09-29) · a mail member (notification owns mail, §3.3) · `AesGcmSecretEncryptionService` (§6) ·
 `composeProcess` / `*ProcessComposition` (renamed `container` / `*ProcessContainer`, Alex 2026-09-29).
+· `UiDeclaredCapabilities` / `UiDeclaredName` / `UiDeclared` and `declared("<name>")` · `UiDrawerMap`,
+`UiDrawerPropsOf`, `DrawerPropsMapOf`, `DrawersDifferingFromMap` and browser-host's `*-drawers.ts` props
+files · `useDrawer<Map>()` and a drawer opened, or its flow callbacks set, by a bare name
+(`navigateToDrawer` is the address door) · `withCapabilities` for a peer lend · `useFeatureFlag` and
+per-module `use-feature-flag.ts` copies · `UiSession.featureFlag` / `isFeatureEnabled` (§10.1; Alex,
+2026-10-01). While the migration runs the string spellings coexist with their tokens.
 
 ---
 
@@ -2352,7 +2408,9 @@ the type test asserts (Alex, 2026-09-27).
 A policy reads no baseline and reports every finding. A ruled transition may hold a shrink-only list
 beside the enforcer's tests (`packages/architecture-enforcer/tests/baselines/`), keyed so that growth
 inside a key is refused (a count per key), with a test that also refuses a listed finding that is
-gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29).
+gone. Two exist: §5's peer cycles and §7's event-table access (Alex, 2026-09-29). A third is ruled:
+"framework packages depend on no module contract" (§10.1), baselined on today's edges and shrinking
+as UI tokens move the feature types out (Alex, 2026-10-01).
 The `service-ceilings` policy is ported to a custom langwatch oxlint rule with the same exact limits
 (Alex, 2026-09-29).
 

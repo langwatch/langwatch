@@ -18,13 +18,17 @@ import {
 } from "@langwatch/scenario-contract";
 import { useCallback, useEffect, useMemo } from "react";
 
+import {
+  type SuiteDraft,
+  type SuiteFieldRow,
+  useSuiteEditorStore,
+} from "../../../../behavior/agent-testing/suite/suite-editor-store.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useProjectSpanNames } from "../../../../behavior/use-project-span-names.ts";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { SUITE_EDITOR_DRAWER } from "../../../sections/agent-testing/cases/drawer-keys.ts";
 import type { CustomizeChip } from "../shared/customize-chips.tsx";
-import { type SuiteDraft, type SuiteFieldRow, useSuiteEditorStore } from "./suite-editor-store.ts";
 import { definitionsOf, placeServerRefusal, refusalsOf } from "./suite-editor-validation.ts";
 import { usePendingAttachmentEditor, useSuiteAttachments } from "./use-suite-attachments.ts";
 

@@ -50,9 +50,9 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     license: {
       getSsoGateStatus: { useQuery: () => ({ data: state.ssoGate, isLoading: false }) },
     },
-    limits: {
-      getUsage: {
-        useQuery: () => ({ data: { activePlan: { type: state.planType } }, isLoading: false }),
+    plan: {
+      getActivePlan: {
+        useQuery: () => ({ data: { type: state.planType }, isLoading: false }),
       },
     },
     user: {

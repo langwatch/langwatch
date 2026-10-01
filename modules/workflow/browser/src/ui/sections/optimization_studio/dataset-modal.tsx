@@ -20,7 +20,7 @@ import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-cont
 import type { Node, NodeProps } from "@xyflow/react";
 import { useUpdateNodeInternals } from "@xyflow/react";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
 import { DatasetEditorTable } from "../../../behavior/optimization_studio/lent-dataset-editor-table.tsx";
@@ -113,10 +113,11 @@ export function DatasetModal({
   const { openDrawer } = useDrawer();
   const updateNodeInternals = useUpdateNodeInternals();
 
-  useEffect(() => {
+  const [openFrom, setOpenFrom] = useState<boolean | null>(null);
+  if (openFrom !== open) {
+    setOpenFrom(open);
     setEditingDataset(open ? editingDataset_ : undefined);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
 
   const { attachEntryDataset } = useWorkflowStore(({ attachEntryDataset }) => ({
     attachEntryDataset,

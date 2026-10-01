@@ -11,9 +11,9 @@ import {
 import { usePromptHost } from "../model/prompt-host.ts";
 import { formValuesToTriggerSaveVersionParams } from "../model/prompt-node-conversion.ts";
 import { useTabId } from "../model/prompt-tab-context.tsx";
-import type { TabData } from "../model/prompt-tabs-store.ts";
 import type { WireVersionedPrompt } from "../model/wire-versioned-prompt.ts";
 import { promptApi } from "./prompt-api.ts";
+import type { TabData } from "./prompt-tabs-store.ts";
 import { useLatestPromptVersion } from "./use-latest-prompt-version.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 

@@ -10,7 +10,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
@@ -31,6 +30,7 @@ import { api } from "../../behavior/organization-api.ts";
 import type { InviteData, MembersForm, TeamAssignment } from "../../model/member-invite-form.ts";
 import { getDefaultTeamRoleForOrganizationRole } from "../../model/member-role-constraints.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
+import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 import {
   type RoleOption,
   TeamRoleSelectItemContent,
@@ -69,7 +69,6 @@ interface AddMembersFormProps {
  * admin only finds out when they say so.
  */
 function LiteMemberNeedsTeamWarning() {
-  const seatCopy = useUiSeatTypeCopy();
   return (
     <Box
       paddingX={4}
@@ -80,7 +79,7 @@ function LiteMemberNeedsTeamWarning() {
       data-testid="lite-member-needs-team-warning"
     >
       <Text fontSize="sm" color="fg">
-        {seatCopy.liteMemberNeedsTeamWarning}
+        {SEAT_TYPE_COPY.liteMemberNeedsTeamWarning}
       </Text>
     </Box>
   );
@@ -153,7 +152,6 @@ export function AddMembersForm({
   isInviterAdmin = true,
   initialEmails = "",
 }: AddMembersFormProps) {
-  const seatCopy = useUiSeatTypeCopy();
   const {
     register,
     control,
@@ -277,15 +275,15 @@ export function AddMembersForm({
                       </Text>
                       <InfoWithoutSelecting>
                         <FieldInfoTooltip
-                          description={seatCopy.liteMemberExplanation}
-                          docHref={seatCopy.seatTypesDocPath}
+                          description={SEAT_TYPE_COPY.liteMemberExplanation}
+                          docHref={SEAT_TYPE_COPY.seatTypesDocPath}
                           docLabel="How seats are counted"
                           testId="lite-member-info"
                         />
                       </InfoWithoutSelecting>
                     </HStack>
                     <Text fontSize="xs" color="fg.muted">
-                      {seatCopy.liteMemberShortDescription}
+                      {SEAT_TYPE_COPY.liteMemberShortDescription}
                     </Text>
                   </VStack>
                 </Checkbox>

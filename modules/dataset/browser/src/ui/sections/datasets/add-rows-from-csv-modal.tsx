@@ -49,7 +49,6 @@ export function AddRowsFromCSVModal({
   const [hasErrors, setErrors] = useState<string[]>([]);
   const [csvUploaded, setCSVUploaded] = useState<string[][]>([]);
   const [mapping, setMapping] = useState<Record<string, string>>({});
-  const [canUpload, setCanUpload] = useState(false);
   const uploadRecords = datasetApi.datasetRecord.create.useMutation();
 
   const preprocessCSV = (csv: string[][]) => {
@@ -86,9 +85,7 @@ export function AddRowsFromCSVModal({
     return columns.every((column) => Object.keys(mapping).includes(column));
   }, [columnTypes, mapping]);
 
-  useEffect(() => {
-    setCanUpload(isMappingsComplete());
-  }, [isMappingsComplete, mapping]);
+  const canUpload = isMappingsComplete();
 
   const onSelectChange = (map: string) => (value: string) => {
     const column = value;

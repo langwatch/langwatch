@@ -13,10 +13,6 @@
       "langwatch-declaration-source": "./src/billing.web.ts",
       "types": "./dist/billing.web.d.ts",
       "default": "./src/billing.web.ts"
-    },
-    "./surfaces/contact-sales": {
-      "types": "./dist/ui/sections/contact-sales/index.d.ts",
-      "default": "./src/ui/sections/contact-sales/index.ts"
     }
   },
   "scripts": {

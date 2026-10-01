@@ -10,6 +10,7 @@ import { type RunGroupSummary, RunMetricsSummary } from "@langwatch/suite-browse
 import { Download, MoreVertical, Pencil, Play, Square, Settings2 } from "lucide-react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import type { AgentTestingViewMode } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   EvaluatorPill,
@@ -17,7 +18,6 @@ import {
 } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";
-import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
 import type { EvaluatorSummary } from "./evaluation-summaries.ts";
 import { ViewModeToggle } from "./view-mode-toggle.tsx";
 

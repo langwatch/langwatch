@@ -4,7 +4,7 @@
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { clearStoreInstances } from "../../model/prompt-tabs-store.ts";
+import { clearStoreInstances } from "../prompt-tabs-store.ts";
 import { useCreateDraftPrompt } from "../use-create-draft-prompt.ts";
 
 const { fetchResolvedDefault, resolvedDefaultQuery } = vi.hoisted(() => ({

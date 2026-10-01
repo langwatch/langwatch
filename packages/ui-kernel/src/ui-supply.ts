@@ -1,6 +1,7 @@
 import type { PublicAppConfig } from "@langwatch/config/public-app-config";
 
 import { checkHostMounts } from "./ui-host-mounts.ts";
+import { checkLends } from "./ui-module-lends.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 import type {
   CheckedUiModules,
@@ -182,6 +183,7 @@ export class UiSupply<
       modules: this.#state.modules,
       mountedByShell: [...KERNEL_MOUNTED_HOSTS, ...this.#state.mountedByShell],
     });
+    checkLends({ modules: this.#state.modules });
     const mount = this.#resolveMount();
     const config = this.#readConfig();
     return {

@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/project.web.ts",
       "types": "./dist/project.web.d.ts",
       "default": "./src/project.web.ts"
-    },
-    "./home": {
-      "langwatch-declaration-source": "./src/home.ts",
-      "types": "./dist/home.d.ts",
-      "default": "./src/home.ts"
-    },
-    "./project-settings": {
-      "langwatch-declaration-source": "./src/project-settings.ts",
-      "types": "./dist/project-settings.d.ts",
-      "default": "./src/project-settings.ts"
     }
   },
   "scripts": {

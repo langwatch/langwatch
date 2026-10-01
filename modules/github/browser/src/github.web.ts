@@ -5,8 +5,4 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-export const githubWeb = defineWebModule("github")
-  /** What another module may mount. Today langy mounts the connect popup. */
-  .publishSurfaces({
-    "surfaces/github-connect-popup": { load: () => import("./behavior/github-connect-popup.ts") },
-  });
+export const githubWeb = defineWebModule("github");

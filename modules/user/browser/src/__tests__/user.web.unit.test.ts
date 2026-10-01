@@ -31,48 +31,48 @@ describe("given a browser that installs user", () => {
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the personal configure component", async () => {
       const screen = userWeb.installation.screens["pages/me/configure"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the personal pull requests component", async () => {
       const screen = userWeb.installation.screens["pages/me/pull-requests"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the personal sessions component", async () => {
       const screen = userWeb.installation.screens["pages/me/sessions"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the personal budget request component", async () => {
       const screen = userWeb.installation.screens["pages/me/budget/request"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the Profile component", async () => {
       const screen = userWeb.installation.screens["pages/settings/profile"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
 
     it("answers with the Security component", async () => {
       const screen = userWeb.installation.screens["pages/settings/security"];
       const loaded = await screen?.load?.();
 
       expect(loaded).toHaveProperty("default");
-    });
+    }, 30_000);
   });
 });

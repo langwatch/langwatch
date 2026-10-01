@@ -158,9 +158,11 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
   const initialized = useRef<string | undefined>(void 0);
   const identity = options.agentId ?? "new";
 
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(inputMappings);
+  if (mappingsFrom !== inputMappings) {
+    setMappingsFrom(inputMappings);
     setLocalMappings(inputMappings);
-  }, [inputMappings]);
+  }
   useEffect(() => {
     if (!options.open) {
       initialized.current = void 0;

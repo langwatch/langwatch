@@ -1,4 +1,4 @@
-import type { Tab } from "../model/prompt-tabs-store.ts";
+import type { Tab } from "./prompt-tabs-store.ts";
 import { useDraggableTabsBrowserStore } from "./use-prompt-tabs-browser-store.ts";
 
 /**

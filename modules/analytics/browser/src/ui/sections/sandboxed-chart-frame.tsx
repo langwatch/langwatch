@@ -73,9 +73,11 @@ export function SandboxedChartFrame({
   // the chart with it); a widget can still call LW.setHeight to size to its
   // own content instead, which is what onHeightChange below feeds.
   const [height, setHeight] = useState(maxHeight);
-  useEffect(() => {
+  const [heightFor, setHeightFor] = useState(maxHeight);
+  if (heightFor !== maxHeight) {
+    setHeightFor(maxHeight);
     setHeight(maxHeight);
-  }, [maxHeight]);
+  }
 
   // The document at CHART_FRAME_PATH is identical for every widget and every
   // code change — the widget's source travels on lw:init — so a change to

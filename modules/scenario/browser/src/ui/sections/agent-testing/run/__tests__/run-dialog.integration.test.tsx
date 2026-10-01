@@ -12,9 +12,9 @@ import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAgentTestingStore } from "../../../../../behavior/agent-testing/use-agent-testing-store.ts";
 import { targetColor } from "../../../../elements/agent-testing/shared/target-colors.ts";
 import { TestCasesTab } from "../../cases/test-cases-tab.tsx";
-import { useAgentTestingStore } from "../../use-agent-testing-store.ts";
 import { COMPARE_HINT } from "../compare-agents-section.tsx";
 import { DUPLICATE_TARGETS_MESSAGE } from "../compare-rows.ts";
 import { configurationKeyOf } from "../run-configuration.ts";

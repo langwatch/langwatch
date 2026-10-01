@@ -72,11 +72,6 @@ export const annotationWeb = defineWebModule("annotation")
       load: () => import("./ui/sections/annotation-scores-screen.tsx"),
     },
   })
-  /** What another module may mount. Today the trace explorer mounts both. */
-  .publishSurfaces({
-    "annotation-chips": { load: () => import("./annotation-chips.ts") },
-    "annotation-scores": { load: () => import("./annotation-scores.ts") },
-  })
   /** The score editor, opened by address from the annotation queue drawer. */
   .withDrawers({
     addOrEditAnnotationScore: {

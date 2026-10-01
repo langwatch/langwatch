@@ -10,8 +10,8 @@ import type { PersistStorage, StorageValue } from "zustand/middleware";
 import { persist } from "zustand/middleware";
 import { immer } from "zustand/middleware/immer";
 
-import type { PromptTabsCapabilities } from "./browser-capabilities.ts";
-import { createTabId, createWindowId } from "./tab-id-generators.ts";
+import type { PromptTabsCapabilities } from "../model/browser-capabilities.ts";
+import { createTabId, createWindowId } from "../model/tab-id-generators.ts";
 
 /**
  * Zod schema for the data associated with a tab in the prompt playground browser.

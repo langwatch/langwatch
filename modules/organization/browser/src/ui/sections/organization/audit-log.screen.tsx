@@ -92,14 +92,14 @@ export default function AuditLogScreen() {
   );
   const [isExporting, setIsExporting] = useState(false);
 
-  const usage = organizationApi.limits.getUsage.useQuery(
+  const plan = organizationApi.plan.getActivePlan.useQuery(
     { organizationId },
     {
       enabled: !!organizationId && host.hasPermission(ORGANIZATION_VIEW_PERMISSION),
       retry: false,
     },
   );
-  const isEnterprise = usage.data?.activePlan.type === "ENTERPRISE";
+  const isEnterprise = plan.data?.type === "ENTERPRISE";
 
   const members = organizationApi.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
     { organizationId },
@@ -125,7 +125,7 @@ export default function AuditLogScreen() {
 
   const utils = organizationApi.useUtils();
 
-  if (!organizationId || usage.isLoading) {
+  if (!organizationId || plan.isLoading) {
     return <Skeleton width="full" height="200px" />;
   }
 

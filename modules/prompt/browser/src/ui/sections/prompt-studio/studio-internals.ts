@@ -26,7 +26,7 @@ export {
   type Tab,
   type TabData,
   type Window,
-} from "../../../model/prompt-tabs-store.ts";
+} from "../../../behavior/prompt-tabs-store.ts";
 export { createTabId, createWindowId } from "../../../model/tab-id-generators.ts";
 export { Sidebar } from "./prompt-studio-sidebar.tsx";
 export { SidebarEmptyState } from "./prompt-studio-sidebar-empty-state.tsx";

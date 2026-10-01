@@ -12,16 +12,6 @@
       "langwatch-declaration-source": "./src/dataset.web.ts",
       "types": "./dist/dataset.web.d.ts",
       "default": "./src/dataset.web.ts"
-    },
-    "./dataset-drawer": {
-      "langwatch-declaration-source": "./src/dataset-drawer.ts",
-      "types": "./dist/dataset-drawer.d.ts",
-      "default": "./src/dataset-drawer.ts"
-    },
-    "./dataset-record-sync": {
-      "langwatch-declaration-source": "./src/dataset-record-sync.ts",
-      "types": "./dist/dataset-record-sync.d.ts",
-      "default": "./src/dataset-record-sync.ts"
     }
   },
   "scripts": {

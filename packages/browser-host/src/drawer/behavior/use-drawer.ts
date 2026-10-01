@@ -4,11 +4,18 @@
  * the platform import behind them has no package export.
  */
 
+import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/kernel/contract";
 import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 
-import type { UiDrawerMap, UiDrawerPropsOf, UiFlowCallbacksStore } from "../model/drawer-map.ts";
+import type {
+  DrawerCallbacksIn,
+  UiDrawerMap,
+  UiDrawerPropsOf,
+  UiFlowCallbacksStore,
+  UndeclaredDrawerCallbacks,
+} from "../model/drawer-map.ts";
 import { URL_QS_PARSE_OPTIONS } from "../model/qs-parse-options.ts";
 import { type DrawerRouter, drawerRouterRef, useDrawerRouter } from "./drawer-router.ts";
 
@@ -76,38 +83,61 @@ let flowCallbacks: UiFlowCallbacksStore = {};
  */
 const keptOnClose = new Set<string>();
 
-/**
- * Sets flow callbacks for a drawer type; they persist across navigation until
- * closeDrawer() is called.
- */
-export const setFlowCallbacks = <Name extends string>(
-  drawer: Name,
-  callbacks: NonNullable<UiFlowCallbacksStore[Name]>,
-  options?: {
-    /**
-     * True when a mounted component owns the registration, so that closing a
-     * drawer leaves it alone. The owner takes it back on unmount, by
-     * registering an empty set.
-     */
-    keepOnClose?: boolean;
-  },
-) => {
-  // Deliberately does NOT notify: callers register callbacks before opening a
-  // drawer, or right before a setComplexProps that does notify — so a notify
-  // here is redundant, and expensive (~65 call sites; would cascade a
-  // re-render through the open drawer's subtree on every registration).
-  flowCallbacks[drawer] = callbacks;
-  if (options?.keepOnClose) keptOnClose.add(drawer);
-  else keptOnClose.delete(drawer);
+type FlowCallbackOptions = {
+  /**
+   * True when a mounted component owns the registration, so that closing a
+   * drawer leaves it alone. The owner takes it back on unmount, by
+   * registering an empty set.
+   */
+  keepOnClose?: boolean;
 };
 
+/** A drawer's address name: a token's wire name, or the string itself. */
+const drawerKey = (drawer: string | UiTokenIdentity): string =>
+  typeof drawer === "string" ? drawer : drawer.key;
+
 /**
- * Get flow callbacks for a specific drawer type.
+ * Sets flow callbacks for a drawer, named by its owner's token or, while the
+ * string path stays, by name; they persist across navigation until
+ * closeDrawer() is called.
+ */
+export function setFlowCallbacks<Props>(
+  drawer: UiDrawerToken<Props>,
+  callbacks: DrawerCallbacksIn<Props>,
+  options?: FlowCallbackOptions,
+): void;
+export function setFlowCallbacks<Name extends string>(
+  drawer: Name,
+  callbacks: NonNullable<UiFlowCallbacksStore[Name]>,
+  options?: FlowCallbackOptions,
+): void;
+export function setFlowCallbacks(
+  drawer: string | UiTokenIdentity,
+  callbacks: UndeclaredDrawerCallbacks,
+  options?: FlowCallbackOptions,
+): void {
+  // Deliberately does NOT notify: callers register callbacks before opening a
+  // drawer, or right before a setComplexProps that does notify; a notify here
+  // would cascade a re-render through the open drawer on every registration.
+  const key = drawerKey(drawer);
+  flowCallbacks[key] = callbacks;
+  if (options?.keepOnClose) keptOnClose.add(key);
+  else keptOnClose.delete(key);
+}
+
+/**
+ * Get flow callbacks for a specific drawer, by token or by name.
  * Returns undefined if no callbacks are registered for this drawer.
  */
-export const getFlowCallbacks = <Name extends string>(drawer: Name): UiFlowCallbacksStore[Name] => {
-  return flowCallbacks[drawer];
-};
+export function getFlowCallbacks<Props>(
+  drawer: UiDrawerToken<Props>,
+): DrawerCallbacksIn<Props> | undefined;
+export function getFlowCallbacks<Name extends string>(drawer: Name): UiFlowCallbacksStore[Name];
+export function getFlowCallbacks(
+  drawer: string | UiTokenIdentity,
+): UndeclaredDrawerCallbacks | undefined {
+  return flowCallbacks[drawerKey(drawer)];
+}
 
 /**
  * Clears the flow callbacks of the drawer flows; called automatically by
@@ -371,11 +401,13 @@ function buildUrl(path: string, queryString: string, hash: string): string {
   return url;
 }
 
-/**
- * Whether a value survives round-tripping through the URL query string.
- * Note: qs collapses single-element arrays to plain strings on round-trip
- * (`["a"]` → `"a"`), so consumers must handle both `T` and `T[]`.
- */
+/** The one-level object a drawer's `urlParams` is; anything else adds nothing. */
+function toRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? Object.fromEntries(Object.entries(value))
+    : {};
+}
+
 function isUrlSerializable(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "function") return false;
@@ -540,64 +572,64 @@ export const useDrawer = <Map extends object = UiDrawerMap>() => {
     [router],
   );
 
+  type OpenOptions = { replace?: boolean; resetStack?: boolean; replaceCurrentInStack?: boolean };
+  type OpenProps = Record<string, unknown> & { urlParams?: Record<string, string> };
+
   /**
-   * Open a drawer with type-safe props.
-   * @example
-   * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
+   * Open a drawer with type-safe props: by its owner's token, or by name
+   * while the string path stays.
    */
-  const openDrawer = useCallback(
-    <Name extends string>(
-      drawer: Name,
-      props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
-      {
-        replace,
-        resetStack,
-        replaceCurrentInStack,
-      }: {
-        replace?: boolean;
-        resetStack?: boolean;
-        replaceCurrentInStack?: boolean;
-      } = {},
-    ) => {
-      // The host's own rewrite: every trace open lands on the Trace Explorer
-      // drawer, from every entry point, rather than each call site choosing.
-      const { drawer: effectiveDrawer, props: effectiveProps } = openRewrite(
-        drawer,
-        props as Record<string, unknown> | undefined,
-      );
+  function open<Props>(
+    drawer: UiDrawerToken<Props>,
+    props?: Partial<Props> & { urlParams?: Record<string, string> },
+    options?: OpenOptions,
+  ): void;
+  function open<Name extends string>(
+    drawer: Name,
+    props?: Partial<UiDrawerPropsOf<Map, Name>> & { urlParams?: Record<string, string> },
+    options?: OpenOptions,
+  ): void;
+  function open(
+    drawer: string | UiTokenIdentity,
+    props?: OpenProps,
+    { replace, resetStack, replaceCurrentInStack }: OpenOptions = {},
+  ): void {
+    // The host's own rewrite: every trace open lands on the Trace Explorer
+    // drawer, from every entry point, rather than each call site choosing.
+    const { drawer: effectiveDrawer, props: effectiveProps } = openRewrite(
+      drawerKey(drawer),
+      props,
+    );
 
-      // Extract urlParams and merge with props
-      const { urlParams, ...drawerProps } = effectiveProps ?? {};
-      const allParams = {
-        ...drawerProps,
-        ...(urlParams as Record<string, string> | undefined),
-      } as Record<string, unknown>;
+    // Extract urlParams and merge with props
+    const { urlParams, ...drawerProps } = effectiveProps ?? {};
+    const allParams: Record<string, unknown> = { ...drawerProps, ...toRecord(urlParams) };
 
-      // Read the open drawer from the router reading directly to get the
-      // latest value.
-      const currentDrawerNow = router.query["drawer.open"];
+    // Read the open drawer from the router reading directly to get the
+    // latest value.
+    const currentDrawerNow = router.query["drawer.open"];
 
-      // If the same drawer is already open, just update the URL params without
-      // modifying the stack
-      if (currentDrawerNow === effectiveDrawer) {
-        updateDrawerUrl(effectiveDrawer, allParams, { replace: true });
-        return;
-      }
+    // If the same drawer is already open, just update the URL params without
+    // modifying the stack
+    if (currentDrawerNow === effectiveDrawer) {
+      updateDrawerUrl(effectiveDrawer, allParams, { replace: true });
+      return;
+    }
 
-      pushDrawerStack({
-        drawer: effectiveDrawer,
-        params: allParams,
-        currentDrawerNow,
-        query: router.query,
-        resetStack,
-        replaceCurrentInStack,
-      });
-      warnNonSerializableProps({ drawer: effectiveDrawer, params: allParams });
+    pushDrawerStack({
+      drawer: effectiveDrawer,
+      params: allParams,
+      currentDrawerNow,
+      query: router.query,
+      resetStack,
+      replaceCurrentInStack,
+    });
+    warnNonSerializableProps({ drawer: effectiveDrawer, params: allParams });
 
-      updateDrawerUrl(effectiveDrawer, allParams, { replace });
-    },
-    [router, updateDrawerUrl],
-  );
+    updateDrawerUrl(effectiveDrawer, allParams, { replace });
+  }
+
+  const openDrawer = useCallback(open, [router, updateDrawerUrl]);
 
   /**
    * Close the current drawer.

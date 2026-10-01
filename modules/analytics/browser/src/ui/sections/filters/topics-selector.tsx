@@ -22,17 +22,9 @@ import {
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const router = useRouter();
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [selectedSubtopics, setSelectedSubtopics] = useState<string[]>([]);
+  const selectedTopics = readListParam(router.query.topics);
+  const selectedSubtopics = readListParam(router.query.subtopics);
   const { filterParams, queryOpts } = useFilterParams();
-
-  useEffect(() => {
-    setSelectedTopics(readListParam(router.query.topics));
-  }, [router.query.topics]);
-
-  useEffect(() => {
-    setSelectedSubtopics(readListParam(router.query.subtopics));
-  }, [router.query.subtopics]);
 
   const topicCountsQuery = analyticsApi.traces.getTopicCounts.useQuery(
     {
@@ -59,14 +51,11 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       checked,
       subtopicCounts: topicCountsQuery.data?.subtopicCounts,
     });
-    setSelectedTopics(next.topics);
-    setSelectedSubtopics(next.subtopics);
     pushQuery({ topics: toListParam(next.topics), subtopics: toListParam(next.subtopics) });
   };
 
   const handleSubtopicChange = (subtopicId: string, checked: boolean) => {
     const newSubtopics = toggleSubtopic({ subtopics: selectedSubtopics, subtopicId, checked });
-    setSelectedSubtopics(newSubtopics);
     pushQuery({ subtopics: toListParam(newSubtopics) });
   };
 

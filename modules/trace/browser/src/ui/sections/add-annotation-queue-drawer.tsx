@@ -15,7 +15,7 @@ import type { AnnotationQueueDetail } from "@langwatch/annotation-contract";
 import { useDrawer } from "@langwatch/browser-host/use-drawer";
 import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/design-system/toaster";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check, ChevronDown, Plus } from "react-feather";
 import { useForm } from "react-hook-form";
 
@@ -232,6 +232,9 @@ export const AddAnnotationQueueDrawer = ({
       name: queue.data?.name ?? "",
       description: queue.data?.description ?? "",
     },
+    values: queue.data
+      ? { name: queue.data.name, description: queue.data.description ?? "" }
+      : undefined,
   });
   const {
     register,
@@ -246,19 +249,11 @@ export const AddAnnotationQueueDrawer = ({
     description?: string | null;
   };
 
-  const [participants, setParticipants] = useState<Picked[]>(() => participantsOf(queue.data));
-  const [scoreTypes, setScoreTypes] = useState<Picked[]>(() => scoreTypesOf(queue.data));
-
-  // Sync local state when queue data loads (edit mode hydration)
-  useEffect(() => {
-    if (!queue.data) return;
-    setParticipants(participantsOf(queue.data));
-    setScoreTypes(scoreTypesOf(queue.data));
-    reset({
-      name: queue.data.name,
-      description: queue.data.description ?? "",
-    });
-  }, [queue.data, reset]);
+  // The queue's own picks until the user toggles one; a refetch never overwrites an edit.
+  const [editedParticipants, setParticipants] = useState<Picked[]>();
+  const [editedScoreTypes, setScoreTypes] = useState<Picked[]>();
+  const participants = editedParticipants ?? participantsOf(queue.data);
+  const scoreTypes = editedScoreTypes ?? scoreTypesOf(queue.data);
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
@@ -341,7 +336,7 @@ export const AddAnnotationQueueDrawer = ({
                     name: member.user.name,
                   }))}
                   withAvatar
-                  onToggle={(item) => setParticipants((prev) => toggled(prev, item))}
+                  onToggle={(item) => setParticipants(toggled(participants, item))}
                 />
               </FullWidthFormControl>
 
@@ -376,7 +371,7 @@ export const AddAnnotationQueueDrawer = ({
                     id: score.id,
                     name: score.name,
                   }))}
-                  onToggle={(item) => setScoreTypes((prev) => toggled(prev, item))}
+                  onToggle={(item) => setScoreTypes(toggled(scoreTypes, item))}
                   footer={
                     <Button
                       width="100%"

@@ -95,8 +95,13 @@ class CapabilityDatasetHost extends DatasetHostApi {
     this.navigation.navigate(to);
   }
 
-  succeeded(notice: DatasetSuccessNotice): void {
-    this.feedback.succeeded(notice);
+  succeeded({ title, description, id, undo }: DatasetSuccessNotice): void {
+    this.feedback.succeeded({
+      title,
+      ...(description ? { description } : {}),
+      ...(id ? { id } : {}),
+      ...(undo ? { action: { label: undo.label, run: undo.perform } } : {}),
+    });
   }
 
   failed(failure: DatasetFailureNotice): void {

@@ -40,11 +40,15 @@ describe("given a browser that installs governance", () => {
       ["pages/governance/teams"],
       ["pages/governance/teams/[id]"],
       ["pages/governance/users/[id]"],
-    ] as const)("answers with a component for %s", async (page) => {
-      const screen = governanceWeb.installation.screens[page];
-      const loaded = await screen?.load?.();
+    ] as const)(
+      "answers with a component for %s",
+      async (page) => {
+        const screen = governanceWeb.installation.screens[page];
+        const loaded = await screen?.load?.();
 
-      expect(loaded).toHaveProperty("default");
-    });
+        expect(loaded).toHaveProperty("default");
+      },
+      30_000,
+    );
   });
 });

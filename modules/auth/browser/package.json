@@ -21,10 +21,6 @@
       "langwatch-declaration-source": "./src/auth.ts",
       "types": "./dist/auth.d.ts",
       "default": "./src/auth.ts"
-    },
-    "./session-capability": {
-      "types": "./dist/behavior/ui-session.d.ts",
-      "default": "./src/behavior/ui-session.ts"
     }
   },
   "scripts": {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PromptTabsCapabilities } from "../browser-capabilities.ts";
+import type { PromptTabsCapabilities } from "../../model/browser-capabilities.ts";
 import { clearStoreInstances, getStoreForTesting, type TabData } from "../prompt-tabs-store.ts";
 
 // Mock localStorage

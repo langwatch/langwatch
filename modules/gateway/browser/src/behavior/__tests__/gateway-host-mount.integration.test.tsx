@@ -31,7 +31,7 @@ const ORGANIZATION_GRAPH = {
 };
 
 type UsageAnswer = {
-  data?: { activePlan: { type: string; webhookEndpointsEnabled?: boolean } };
+  data?: { type: string; webhookEndpointsEnabled?: boolean };
   isLoading: boolean;
 };
 
@@ -40,7 +40,7 @@ const usage = vi.fn((): UsageAnswer => ({ isLoading: false }));
 vi.mock("../gateway-api.ts", () => ({
   gatewayApi: {
     organization: { getAll: { useQuery: () => answer() } },
-    limits: { getUsage: { useQuery: () => usage() } },
+    plan: { getActivePlan: { useQuery: () => usage() } },
   },
   api: { organization: { getAll: { useQuery: () => answer() } } },
 }));
@@ -153,7 +153,7 @@ describe("given a gateway host above a surface gated on the plan", () => {
     /** @scenario "A mounted host answers the reading its screen renders from" */
     it("reports the plan rather than a hard-coded refusal", () => {
       usage.mockReturnValue({
-        data: { activePlan: { type: "ENTERPRISE", webhookEndpointsEnabled: true } },
+        data: { type: "ENTERPRISE", webhookEndpointsEnabled: true },
         isLoading: false,
       });
 
@@ -169,7 +169,7 @@ describe("given a gateway host above a surface gated on the plan", () => {
 
   describe("when a legacy plan row carries no webhook flag", () => {
     it("reads webhook endpoints as off", () => {
-      usage.mockReturnValue({ data: { activePlan: { type: "ENTERPRISE" } }, isLoading: false });
+      usage.mockReturnValue({ data: { type: "ENTERPRISE" }, isLoading: false });
 
       render(<PlanReader />, {
         wrapper: harness({ organizationId: ORGANIZATION_ID, projectId: null }),

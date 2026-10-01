@@ -8,7 +8,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import {
@@ -84,9 +84,12 @@ export const ConversationLensBody: React.FC<ConversationLensBodyProps> = ({
   // from the server already ordered by it, so without this the indicators
   // would drift out of sync with the rendered group order when the lens
   // changes.
-  useEffect(() => {
+  const sortKey = `${lens.sort.columnId}:${lens.sort.direction}`;
+  const [sortFrom, setSortFrom] = useState(sortKey);
+  if (sortFrom !== sortKey) {
+    setSortFrom(sortKey);
     setSorting([{ id: lens.sort.columnId, desc: lens.sort.direction === "desc" }]);
-  }, [lens.sort.columnId, lens.sort.direction]);
+  }
 
   const table = useReactTable({
     data: groups,

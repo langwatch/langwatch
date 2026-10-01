@@ -5,7 +5,4 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-/** What another module may mount. ops reads the flag catalogue through it. */
-export const featureFlagWeb = defineWebModule("feature-flag").publishSurfaces({
-  "surfaces/experiment-catalogue": { load: () => import("./experiment-catalogue.ts") },
-});
+export const featureFlagWeb = defineWebModule("feature-flag");

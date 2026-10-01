@@ -1,6 +1,6 @@
 import { Button, HStack, PopoverTrigger, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Popover } from "@langwatch/design-system/popover";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { X } from "react-feather";
 
 export function WorkflowConfigPopover({
@@ -18,9 +18,11 @@ export function WorkflowConfigPopover({
 }) {
   const [localIsOpen, setLocalIsOpen] = useState(open);
 
-  useEffect(() => {
+  const [openFrom, setOpenFrom] = useState(open);
+  if (openFrom !== open) {
+    setOpenFrom(open);
     setLocalIsOpen(open);
-  }, [open]);
+  }
 
   if (!localIsOpen) {
     return null;

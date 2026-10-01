@@ -1,11 +1,11 @@
 import { createListCollection, HStack, Text, VStack } from "@chakra-ui/react";
-import { CORE_SEAT_TYPE_COPY, useUiSeatTypeCopy } from "@langwatch/browser-host/slots";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { InfoWithoutSelecting } from "@langwatch/design-system/info-without-selecting";
 import { Select } from "@langwatch/design-system/select";
 import { useMemo } from "react";
 
 import { OrganizationUserRole } from "../../model/prisma-types.ts";
+import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 export type OrgRoleOption = {
   label: string;
@@ -27,7 +27,7 @@ export const orgRoleOptions: OrgRoleOption[] = [
   {
     label: "Lite Member",
     value: OrganizationUserRole.EXTERNAL,
-    description: CORE_SEAT_TYPE_COPY.liteMemberShortDescription,
+    description: SEAT_TYPE_COPY.liteMemberShortDescription,
   },
 ];
 
@@ -42,18 +42,7 @@ export function OrganizationUserRoleField({
   value: OrganizationUserRole;
   onChange: (role: OrganizationUserRole) => void;
 }) {
-  // The composition may know better words for a lite seat than core's own.
-  const seatCopy = useUiSeatTypeCopy();
-  const roleOptions = useMemo(
-    () =>
-      orgRoleOptions.map((option) =>
-        option.value === OrganizationUserRole.EXTERNAL
-          ? { ...option, description: seatCopy.liteMemberShortDescription }
-          : option,
-      ),
-    [seatCopy],
-  );
-  const roleCollection = useMemo(() => createListCollection({ items: roleOptions }), [roleOptions]);
+  const roleCollection = useMemo(() => createListCollection({ items: orgRoleOptions }), []);
 
   return (
     <VStack align="start">
@@ -72,7 +61,7 @@ export function OrganizationUserRoleField({
             <Select.ValueText placeholder="Select role" />
           </Select.Trigger>
           <Select.Content width="320px" paddingY={2}>
-            {roleOptions.map((option) => (
+            {orgRoleOptions.map((option) => (
               <Select.Item
                 key={option.value}
                 item={option}
@@ -84,8 +73,8 @@ export function OrganizationUserRoleField({
                     {option.value === OrganizationUserRole.EXTERNAL && (
                       <InfoWithoutSelecting>
                         <FieldInfoTooltip
-                          description={seatCopy.liteMemberExplanation}
-                          docHref={seatCopy.seatTypesDocPath}
+                          description={SEAT_TYPE_COPY.liteMemberExplanation}
+                          docHref={SEAT_TYPE_COPY.seatTypesDocPath}
                           docLabel="How seats are counted"
                           testId="lite-member-info"
                         />

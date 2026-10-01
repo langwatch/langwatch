@@ -25,8 +25,8 @@ import { useMemo } from "react";
 import { useDeployTags } from "../../../../behavior/use-deploy-tags.ts";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
 import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
-import { CopyButton } from "../../../../ui/elements/copy-button.tsx";
+import { DeleteConfirmationDialog } from "../../../blocks/delete-confirmation-dialog.tsx";
+import { CopyButton } from "../../../elements/copy-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {

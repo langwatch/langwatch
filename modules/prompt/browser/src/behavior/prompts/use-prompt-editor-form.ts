@@ -40,9 +40,11 @@ export function useEditorInputMappings({
 }) {
   const [inputMappings, setInputMappings] = useState(fromProps);
 
-  useEffect(() => {
+  const [mappingsFrom, setMappingsFrom] = useState(fromProps);
+  if (mappingsFrom !== fromProps) {
+    setMappingsFrom(fromProps);
     setInputMappings(fromProps);
-  }, [fromProps]);
+  }
 
   const onInputMappingsChange = useCallback<OnMappingChange>(
     (identifier, mapping) => {

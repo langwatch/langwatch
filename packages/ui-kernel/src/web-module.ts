@@ -1,5 +1,16 @@
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import type {
+  ReleaseFlagToken,
+  UiComponentToken,
+  UiDrawerToken,
+  UiExtensionToken,
+  UiHooksToken,
+  UiLend,
+  UiOperationsToken,
+  UiTokenIdentity,
+} from "@langwatch/browser-host/declarations";
 import type { DrawersDifferingFromMap } from "@langwatch/browser-host/drawer";
+import type { ComponentType } from "react";
 import type { output, ZodType } from "zod";
 
 import type { Merge } from "./ui-supply.types.ts";
@@ -39,7 +50,7 @@ export type WebScreen = Readonly<{
   /** The grant the shell's router checks before this screen renders (§10). */
   requires?: string;
   /** Release flags that must all be on for this screen to exist; off answers not-found. */
-  flags?: readonly string[];
+  flags?: readonly (string | ReleaseFlagToken)[];
 }>;
 
 export type WebScreens = Readonly<Record<string, WebScreen>>;
@@ -53,12 +64,12 @@ export type WebDrawer = Readonly<{
 }>;
 
 export type WebDrawers = Readonly<Record<string, WebDrawer>>;
-export type WebSurfacePublication = Readonly<{
-  load: () => Promise<unknown>;
-  provider?: unknown;
-  order?: number;
-}>;
-export type WebSurfacePublications = Readonly<Record<string, WebSurfacePublication>>;
+
+/** A chunk a token's owner lends, whose default export is the token's shape. */
+type Loaded<Shape> = () => Promise<{ readonly default: Shape }>;
+
+/** Only the module the token names lends it; an extension token is any module's. */
+type OwnedBy<Token, Name extends string> = Token & { readonly owner: Name };
 
 /** What a module's capability implementation is, as the composition receives it. */
 export type WebCapabilities = Readonly<Record<string, unknown>>;
@@ -83,7 +94,6 @@ export type WebHostDeclaration = Readonly<{
 type WebModuleDeclaration = Readonly<{
   screens: WebScreens;
   drawers: WebDrawers;
-  publications: WebSurfacePublications;
   mounts: readonly string[];
   hosts: WebHostDeclaration;
   capabilities: WebCapabilities;
@@ -92,7 +102,6 @@ type WebModuleDeclaration = Readonly<{
 type EmptyDeclaration = Readonly<{
   screens: Empty;
   drawers: Empty;
-  publications: Empty;
   mounts: readonly [];
   hosts: Readonly<{ requires: readonly []; mounts: Empty }>;
   capabilities: Empty;
@@ -107,15 +116,14 @@ export type WebModuleInstallation = Readonly<{
   config?: WebModuleConfig;
   screens: WebScreens;
   drawers: WebDrawers;
-  publications: WebSurfacePublications;
   mounts: readonly string[];
   hosts: WebHostDeclaration;
   capabilities: WebCapabilities;
+  /** What this module lends or registers by token, in declaration order. */
+  lends: readonly UiLend[];
   api?: unknown;
   /** The contracts whose cache tiers the api's reads follow (ADR-164). */
   apiContracts?: readonly CacheDeclaringContract[];
-  slots: readonly string[];
-  seatTypeCopy: boolean;
   failureInterceptors: readonly unknown[];
 }>;
 
@@ -169,12 +177,10 @@ export class WebModule<
       requirements: [],
       screens: {},
       drawers: {},
-      publications: {},
       mounts: [],
       hosts: { requires: [], mounts: {} },
       capabilities: {},
-      slots: [],
-      seatTypeCopy: false,
+      lends: [],
       failureInterceptors: [],
     });
   }
@@ -236,7 +242,51 @@ export class WebModule<
     Merge<Declaration, { readonly drawers: Drawers }>,
     Precise
   > {
-    return this.#next({ ...this.#installation, drawers });
+    return this.#next({
+      ...this.#installation,
+      drawers: { ...this.#installation.drawers, ...drawers },
+    });
+  }
+
+  /**
+   * Lends to peers by token: a component, operations or hooks token this module owns, or any
+   * module's extension token. The default is checked against the token's shape and, until the
+   * string path goes, also declared under the token's name for `declared(name)`.
+   */
+  lends<Props>(
+    token: OwnedBy<UiComponentToken<Props>, Name> | UiExtensionToken<Props>,
+    source: { load: Loaded<ComponentType<Props>> },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise>;
+  lends<Operations>(
+    token: OwnedBy<UiOperationsToken<Operations>, Name>,
+    source: { load: Loaded<Operations> },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise>;
+  lends<Hooks>(
+    token: OwnedBy<UiHooksToken<Hooks>, Name>,
+    source: { value: Hooks },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise>;
+  lends(
+    token: UiTokenIdentity,
+    source: { load: () => Promise<unknown> } | { value: unknown },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
+    const legacy = "load" in source ? { load: source.load } : source.value;
+    return this.#next({
+      ...this.#installation,
+      lends: [...this.#installation.lends, { token, ...source }],
+      capabilities: { ...this.#installation.capabilities, [token.name]: legacy },
+    });
+  }
+
+  /** Registers a drawer this module owns, under the wire name its token carries. */
+  drawer<Props>(
+    token: OwnedBy<UiDrawerToken<Props>, Name>,
+    source: { load: Loaded<ComponentType<Props>> },
+  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
+    return this.#next({
+      ...this.#installation,
+      drawers: { ...this.#installation.drawers, [token.key]: source },
+      lends: [...this.#installation.lends, { token, load: source.load }],
+    });
   }
 
   withCapabilities<const Capabilities extends WebCapabilities>(
@@ -248,7 +298,10 @@ export class WebModule<
     Merge<Declaration, { readonly capabilities: Capabilities }>,
     Precise
   > {
-    return this.#next({ ...this.#installation, capabilities });
+    return this.#next({
+      ...this.#installation,
+      capabilities: { ...this.#installation.capabilities, ...capabilities },
+    });
   }
 
   withApi<Api>(
@@ -307,19 +360,6 @@ export class WebModule<
     });
   }
 
-  publishSurfaces<const Publications extends WebSurfacePublications>(
-    publications: Publications,
-    ..._checked: [CheckedKeyedRecord<Publications>] extends [never] ? [never] : []
-  ): WebModule<
-    Name,
-    Requirements,
-    Config,
-    Merge<Declaration, { readonly publications: Publications }>,
-    Precise
-  > {
-    return this.#next({ ...this.#installation, publications });
-  }
-
   mountSurfaces<const Mounts extends readonly string[]>(
     mounts: Mounts,
     ..._checked: [CheckedLiteralTuple<Mounts>] extends [never] ? [never] : []
@@ -331,17 +371,6 @@ export class WebModule<
     Precise
   > {
     return this.#next({ ...this.#installation, mounts });
-  }
-
-  withSlots<const Slots extends readonly string[]>(
-    slots: Slots,
-    ..._checked: [CheckedLiteralTuple<Slots>] extends [never] ? [never] : []
-  ): WebModule<Name, Requirements, Config, Declaration, Precise> {
-    return this.#next({ ...this.#installation, slots });
-  }
-
-  withSeatTypeCopy(): WebModule<Name, Requirements, Config, Declaration, Precise> {
-    return this.#next({ ...this.#installation, seatTypeCopy: true });
   }
 
   withFailureInterceptors<const Interceptors extends readonly unknown[]>(
