@@ -110,6 +110,10 @@ export class RedisConnectionService {
         dnsLookup: (address, callback) => callback(null, address),
         scaleReads: "all",
       });
+      // A node's error reaches the cluster as "node error", on the same object.
+      connection.on("node error", (error: unknown) =>
+        redactCommandCredentials(error),
+      );
       this.attachLifecycleLogging({
         connection,
         context: { mode: "cluster", endpoints: config.endpoints.length },
@@ -192,12 +196,6 @@ export class RedisConnectionService {
         );
       }
     });
-    if (connection instanceof Cluster) {
-      connection.on("node error", (error: unknown) =>
-        redactCommandCredentials(error),
-      );
-    }
-
     if (!logger) return;
 
     connection.on("connect", () => logger.info(context, "connected"));
