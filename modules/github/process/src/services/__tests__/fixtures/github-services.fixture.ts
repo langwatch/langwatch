@@ -173,11 +173,11 @@ export class TestOrganizationService extends OrganizationService {
     return unsupported();
   }
 
-  addGroupBinding(): never {
+  addGroupGrant(): never {
     return unsupported();
   }
 
-  removeGroupBinding(): never {
+  removeGroupGrant(): never {
     return unsupported();
   }
 

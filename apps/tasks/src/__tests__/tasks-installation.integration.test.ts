@@ -156,6 +156,7 @@ describe("the tasks process installation", () => {
         "demo-data",
         "model-registry-sync",
         "process-manager-purge",
+        "backfill-project-created",
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",

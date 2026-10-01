@@ -543,10 +543,10 @@ class Organizations extends OrganizationService {
   listGroupBindings() {
     return this.notUsed();
   }
-  addGroupBinding() {
+  addGroupGrant() {
     return this.notUsed();
   }
-  removeGroupBinding() {
+  removeGroupGrant() {
     return this.notUsed();
   }
   applyGroupEdits() {
