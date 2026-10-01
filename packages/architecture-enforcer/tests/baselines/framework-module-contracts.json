@@ -1,7 +1,6 @@
 {
   "record": "dev/docs/ARCHITECTURE.md §10.1, framework packages depend on no module contract (Alex, 2026-10-01). Shrink-only: remove an edge in the change that drops the dependency.",
   "findings": {
-    "packages/audit-log-null -> @langwatch/audit-log-contract": 1,
     "packages/browser-host -> @langwatch/agent-contract": 1,
     "packages/browser-host -> @langwatch/annotation-contract": 1,
     "packages/browser-host -> @langwatch/automation-contract": 1,

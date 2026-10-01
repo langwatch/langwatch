@@ -26,9 +26,6 @@
       "path": "../packages/egress/tsconfig.build.json"
     },
     {
-      "path": "../packages/audit-log-null/tsconfig.build.json"
-    },
-    {
       "path": "../modules/audit-log/contract/tsconfig.build.json"
     },
     {

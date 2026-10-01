@@ -85,9 +85,6 @@
       "path": "modules/audit-log/contract/tsconfig.json"
     },
     {
-      "path": "packages/audit-log-null/tsconfig.json"
-    },
-    {
       "path": "modules/audit-log/process/tsconfig.json"
     },
     {
