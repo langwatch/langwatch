@@ -31,6 +31,7 @@ const TARGET_FILES = new Set([
   // Transport hosting: HTTP mux, API hosts and browser bundle (record section 4).
   "hosting/index.ts",
   "hosting/api-application.ts",
+  "hosting/api-door.ts",
   "hosting/api-discovery.ts",
   "hosting/browser-bundle.ts",
   "hosting/framed-document.ts",
