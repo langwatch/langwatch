@@ -5,13 +5,7 @@
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
-  "files": [
-    "./src/licensing.ts",
-    "./src/licensing.web.ts",
-    "./src/ui/sections/global-upgrade-modal/index.ts",
-    "./src/ui/sections/license-error-interceptor/index.ts",
-    "./src/ui/sections/seat-types/index.ts"
-  ],
+  "files": ["./src/licensing.web.ts", "./src/ui/sections/license-error-interceptor/index.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
