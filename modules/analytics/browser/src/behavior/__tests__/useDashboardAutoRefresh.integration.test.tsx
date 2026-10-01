@@ -13,7 +13,7 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,18 +24,22 @@ import {
 
 const MINUTE = DASHBOARD_AUTO_REFRESH_MS["1m"] as number;
 
-const advance = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
+const advance = (ms: number) =>
+  act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
 
 function renderAutoRefresh() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  return renderHook(() => useDashboardAutoRefresh(), { wrapper });
+  const rendered = renderHook(() => useDashboardAutoRefresh(), { wrapper });
+  return { ...rendered, client };
 }
 
 beforeEach(() => {
-  vi.useFakeTimers();
+  vi.useFakeTimers({ shouldAdvanceTime: true });
   // Polling needs a client that is not "server" and a focused tab; pin both for jsdom.
   environmentManager.setIsServer(() => false);
   focusManager.setFocused(true);
@@ -53,11 +57,13 @@ describe("given auto-refresh is set to every minute", () => {
   describe("when a minute passes", () => {
     /** @scenario "Every chart on the dashboard refreshes on a schedule" */
     it("polls on that interval and moves refreshedAt on each poll after the first", async () => {
-      const { result } = renderAutoRefresh();
+      const { result, client } = renderAutoRefresh();
       act(() => result.current.setOption("1m"));
       expect(result.current.option).toBe("1m");
       expect(result.current.refetchInterval).toBe(MINUTE);
-      await advance(0);
+      await waitFor(() => {
+        expect(client.getQueryData(["analytics", "dashboard-refresh-clock"])).toBe(0);
+      });
       expect(result.current.refreshedAt).toBeUndefined();
 
       await advance(MINUTE);

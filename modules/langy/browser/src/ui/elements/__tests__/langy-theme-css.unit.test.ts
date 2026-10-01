@@ -2,9 +2,12 @@
  * Pins the panel's ambient texture layer (spec: specs/langy/langy-panel-theme.feature);
  * the token half is `langy-theme.unit.test.ts`. Read as text: the rules are the subject.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
-import css from "../langy-theme.css?raw";
+const css = readFileSync(join(import.meta.dirname, "../langy-theme.css"), "utf8");
 
 describe("given the panel's ambient textures in langy-theme.css", () => {
   // One rule per selector in the sheet, so anchoring on the selector and

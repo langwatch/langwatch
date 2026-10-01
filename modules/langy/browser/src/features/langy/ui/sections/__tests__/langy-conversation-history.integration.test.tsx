@@ -328,6 +328,7 @@ import {
   type LangyRouteReading,
 } from "../../../../../model/langy-host.ts";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { useLangyDeletedConversationsStore } from "../../../behavior/stores/langy-deleted-conversations.store.ts";
 import { LangySidecar } from "../langy-panel.tsx";
 
 // ---------------------------------------------------------------------------
@@ -485,6 +486,7 @@ async function deleteRecentOption(option: HTMLElement): Promise<void> {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  useLangyDeletedConversationsStore.setState({ ids: new Set<string>() });
   projectRef.current = { id: "project-demo", slug: "demo" };
   chatRef.messages = [];
   chatRef.status = "ready";
