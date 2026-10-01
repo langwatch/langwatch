@@ -108,7 +108,7 @@ const OUR_REFUSALS: Record<
   sso_existing_account_unconfirmed: {
     title: "Your LangWatch account's address isn't confirmed",
     advice: () =>
-      "A LangWatch account already exists at that address and its address was never confirmed. This connection can link it once it has verified the address's domain and your identity provider marks the address as verified. Verify the domain on this connection, check that the provider sends email_verified as true, then run this again.",
+      "A LangWatch account already exists at that address and its address was never confirmed. This connection links it once it has verified the address's domain, unless your identity provider reports the address as unverified (email_verified false, or xms_edov false on Microsoft Entra ID). Verify the domain on this connection, check how the provider reports the address, then run this again.",
   },
   sso_sign_in_refused: {
     title: "LangWatch refused that sign-in",

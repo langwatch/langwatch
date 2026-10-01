@@ -61076,6 +61076,32 @@ organization, only a platform operator listed in `ADMIN_EMAILS` adds a domain
 without proof; other organization administrators still complete the DNS or
 file check.
 
+## Existing email and password accounts
+
+On a self-hosted installation, a connection set up in **Settings >
+Authentication** links a sign-in to an existing email and password account
+with the same address once the connection has verified the address's domain.
+This also covers accounts whose address was never confirmed, which is every
+account on an installation without [outbound email](/self-hosting/configuration/email).
+
+The identity provider does not have to send `email_verified`. Microsoft Entra
+ID never sends it, and SAML has no such attribute. A provider that reports the
+address as unverified, with `email_verified: false` or with Entra ID's
+`xms_edov: false`, is refused, and the sign-in shows "An account with this
+address already exists".
+
+On LangWatch Cloud, a sign-in links to an existing account only when the
+address is confirmed and the provider sends `email_verified: true`.
+
+### Microsoft Entra ID
+
+Register LangWatch as an OpenID Connect app in Entra ID and use the tenant
+issuer, `https://login.microsoftonline.com/<tenant-id>/v2.0`. LangWatch reads
+the address from the `email` claim, so each user needs a mail address in
+Entra ID. In **Token configuration**, you can add the optional `email` and
+`xms_edov` claims to the ID token. With `xms_edov`, a user whose address is on
+a domain the tenant has not verified is refused.
+
 ## Upgrading an existing installation
 
 Identity and access migrations run automatically as the app starts, one

@@ -8,13 +8,18 @@
  * app's own plugin list and database hooks, the production assertion gate
  * (`ssoAssertion()`) and
  * the production user resolver (`ssoProvisionedUsers()`), and the plugin's
- * whole OIDC callback. Only the identity provider stands in, as a stubbed
- * `fetch` answering discovery, token and JWKS with a signed id token.
+ * whole OIDC and SAML callbacks. Only the identity provider stands in: a
+ * stubbed `fetch` answering discovery, token and JWKS with a signed id token
+ * for OIDC, and a samlify identity provider signing the SAML response.
  */
+
+import { inflateRawSync } from "node:zlib";
 
 import { PrismaScimSsoUsers } from "@ee/scim/scim-sso-user.prisma.repository";
 import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
+import * as samlify from "samlify";
+import { generate } from "selfsigned";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
@@ -29,23 +34,37 @@ import {
   sessionClaims,
   ssoAssertion,
   ssoProvisionedUsers,
+  ssoRegisteredIssuers,
 } from "~/server/app-layer/identity/runtime";
 import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
+import { resolveTrustedOrigins } from "~/server/better-auth/trustedOrigins";
 import { prisma } from "~/server/db";
 
 const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8).toLowerCase();
 const DOMAIN = `${SUITE}.unconfirmed-link-test.example`;
 const IDP = `https://idp-${SUITE}.unconfirmed-link-test.example`;
+/** Microsoft Entra ID tenant issuers, the shape `xms_edov` is read for. One
+ *  tenant per connection, since an issuer routes to a single connection. */
+const ENTRA_HOST = "https://login.microsoftonline.com";
+const entra = (label: string) => `${ENTRA_HOST}/${SUITE}-${label}/v2.0`;
 const CLIENT_ID = "langwatch-test-client";
+const SAML_IDP = `https://saml-${SUITE}.unconfirmed-link-test.example`;
+const SP_ENTITY_ID = `${BASE_URL}/api/auth/sso/saml2/sp`;
+const POST_BINDING = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST";
+const REDIRECT_BINDING = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
 const organizationIds: string[] = [];
 const connectionIds: string[] = [];
 const userIds: string[] = [];
 
 let idToken = "";
+/** What Microsoft Graph's userinfo endpoint answers for the signed-in user:
+ *  the profile, with no verification claim. */
+let graphUserInfo: Record<string, unknown> = {};
+const GRAPH_USERINFO = "https://graph.microsoft.com/oidc/userinfo";
 let jwks: { keys: unknown[] } = { keys: [] };
 let realFetch: typeof globalThis.fetch;
 
@@ -90,22 +109,33 @@ async function mintIdToken(claims: Record<string, unknown>) {
   };
 }
 
+/**
+ * The ID token the provider signs. `emailVerified` left out sends no
+ * `email_verified` claim at all, the way Microsoft Entra ID signs its tokens;
+ * `claims` adds the rest (`xms_edov`).
+ */
 async function identityProviderAsserts({
   email,
   subject,
   emailVerified,
+  issuer = IDP,
+  claims = {},
 }: {
   email: string;
   subject: string;
-  emailVerified: boolean;
+  emailVerified?: boolean;
+  issuer?: string;
+  claims?: Record<string, unknown>;
 }) {
   const issuedAt = Math.floor(Date.now() / 1000);
+  graphUserInfo = { sub: subject, email, name: "Provider profile" };
   await mintIdToken({
-    iss: IDP,
+    iss: issuer,
     aud: CLIENT_ID,
     sub: subject,
     email,
-    email_verified: emailVerified,
+    ...(emailVerified === undefined ? {} : { email_verified: emailVerified }),
+    ...claims,
     name: "Provider profile",
     iat: issuedAt,
     exp: issuedAt + 300,
@@ -128,7 +158,18 @@ const auth = ({ cloud = false }: { cloud?: boolean } = {}) =>
     baseURL: BASE_URL,
     secret: "test-secret-test-secret-test-secret",
     database: identityStorageAdapter(),
-    trustedOrigins: [IDP, BASE_URL],
+    // The production resolution: the origins of the issuer the request names,
+    // and for Entra ID the Microsoft Graph origin its userinfo endpoint is on.
+    trustedOrigins: async (request) =>
+      resolveTrustedOrigins({
+        nextAuthUrl: BASE_URL,
+        baseHost: undefined,
+        trustedIdpOrigins: undefined,
+        idpSimulatorUrl: undefined,
+        registeredIssuers:
+          await ssoRegisteredIssuers().issuersForRequest(request),
+        isProduction: false,
+      }),
     plugins: plugins({
       backupCodeCount: 10,
       passkeySignUp: () => ({}) as PasskeySignUpRegistration,
@@ -164,16 +205,18 @@ const requestUrl = (input: RequestInfo | URL): string => {
 async function unconfirmedPasswordAccount({
   label,
   organizationId,
+  confirmed = false,
 }: {
   label: string;
   organizationId: string;
+  confirmed?: boolean;
 }) {
   const email = `${label}-${SUITE}@${DOMAIN}`;
   const user = await prisma.user.create({
     data: {
       email,
       name: "Password profile",
-      emailVerified: false,
+      emailVerified: confirmed,
     },
   });
   userIds.push(user.id);
@@ -198,11 +241,15 @@ async function connection({
   state,
   domainVerified,
   createdBy,
+  issuer = IDP,
+  protocol = "oidc",
 }: {
   organizationId: string;
   state: "ACTIVE" | "DRAFT";
   domainVerified: boolean;
   createdBy: string;
+  issuer?: string;
+  protocol?: "oidc" | "saml";
 }): Promise<string> {
   const id = `local_ssoc_${nanoid(16)}`;
   connectionIds.push(id);
@@ -211,7 +258,7 @@ async function connection({
     data: {
       id,
       organizationId,
-      type: "oidc",
+      type: protocol,
       state,
       claimedDomains: [DOMAIN],
       approvedDomains: [],
@@ -244,19 +291,46 @@ async function connection({
       updatedAt: now,
     },
   });
+  if (protocol === "saml") {
+    // The configuration `sso-engine-provider.ts` projects for a SAML
+    // connection: no verification attribute is mapped.
+    await prisma.ssoProvider.create({
+      data: {
+        id: `ssoprov_${nanoid(12)}`,
+        providerId: id,
+        issuer: SAML_IDP,
+        domain: DOMAIN,
+        samlConfig: JSON.stringify({
+          entryPoint: `${SAML_IDP}/sso`,
+          idpMetadata: { metadata: samlIdentity.metadata },
+          spMetadata: { entityID: SP_ENTITY_ID },
+          wantAssertionsSigned: true,
+          mapping: { id: "nameID", email: "email" },
+        }),
+      },
+    });
+    return id;
+  }
   await prisma.ssoProvider.create({
     data: {
       id: `ssoprov_${nanoid(12)}`,
       providerId: id,
-      issuer: IDP,
+      issuer,
       domain: DOMAIN,
+      // An Entra ID connection is stored the way `sso-engine-provider.ts`
+      // stores every connection, with only the discovery endpoint, so the
+      // engine reads the rest, userinfo included, from discovery at sign-in.
       oidcConfig: JSON.stringify({
         clientId: CLIENT_ID,
         clientSecret: "langwatch-test-secret",
-        discoveryEndpoint: `${IDP}/.well-known/openid-configuration`,
-        authorizationEndpoint: `${IDP}/authorize`,
-        tokenEndpoint: `${IDP}/token`,
-        jwksEndpoint: `${IDP}/jwks`,
+        discoveryEndpoint: `${issuer}/.well-known/openid-configuration`,
+        ...(issuer.startsWith(ENTRA_HOST)
+          ? {}
+          : {
+              authorizationEndpoint: `${issuer}/authorize`,
+              tokenEndpoint: `${issuer}/token`,
+              jwksEndpoint: `${issuer}/jwks`,
+            }),
         pkce: true,
         scopes: ["openid", "email", "profile"],
         mapping: { id: "sub", email: "email", emailVerified: "email_verified" },
@@ -272,24 +346,125 @@ async function setUp({
   label,
   state,
   domainVerified,
+  issuer,
+  protocol,
+  confirmed,
 }: {
   label: string;
   state: "ACTIVE" | "DRAFT";
   domainVerified: boolean;
+  issuer?: string;
+  protocol?: "oidc" | "saml";
+  confirmed?: boolean;
 }) {
   const organizationId = `unconfirmed-link-${label}-${SUITE}`;
   organizationIds.push(organizationId);
   await prisma.organization.create({
     data: { id: organizationId, name: label, slug: organizationId },
   });
-  const user = await unconfirmedPasswordAccount({ label, organizationId });
+  const user = await unconfirmedPasswordAccount({
+    label,
+    organizationId,
+    confirmed,
+  });
   const providerId = await connection({
     organizationId,
     state,
     domainVerified,
     createdBy: user.id,
+    issuer,
+    protocol,
   });
   return { user, providerId };
+}
+
+/** The SAML identity provider: a signing key and the metadata naming it. */
+let samlIdentity: {
+  idp: ReturnType<typeof samlify.IdentityProvider>;
+  metadata: string;
+};
+
+async function samlIdentityProvider() {
+  const pem = await generate([{ name: "commonName", value: "saml.test" }], {
+    notAfterDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    keySize: 2048,
+  });
+  const idp = samlify.IdentityProvider({
+    entityID: SAML_IDP,
+    privateKey: pem.private,
+    signingCert: pem.cert,
+    wantAuthnRequestsSigned: false,
+    singleSignOnService: [
+      { Binding: POST_BINDING, Location: `${SAML_IDP}/sso` },
+      { Binding: REDIRECT_BINDING, Location: `${SAML_IDP}/sso` },
+    ],
+  });
+  const body = pem.cert.replace(/-----[^-]+-----|\s/g, "");
+  const metadata = `<EntityDescriptor xmlns="urn:oasis:names:tc:SAML:2.0:metadata" entityID="${SAML_IDP}"><IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol"><KeyDescriptor use="signing"><KeyInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><X509Data><X509Certificate>${body}</X509Certificate></X509Data></KeyInfo></KeyDescriptor><SingleSignOnService Binding="${REDIRECT_BINDING}" Location="${SAML_IDP}/sso"/><SingleSignOnService Binding="${POST_BINDING}" Location="${SAML_IDP}/sso"/></IDPSSODescriptor></EntityDescriptor>`;
+  return { idp, metadata };
+}
+
+/**
+ * A service-provider-initiated SAML sign-in, the only kind production
+ * accepts: start it, answer the request the plugin issued with a signed
+ * response for `email`, and post that to the assertion consumer service.
+ */
+async function signInThroughSaml(providerId: string, email: string) {
+  const betterAuthInstance = auth();
+  const started = await betterAuthInstance.handler(
+    new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId,
+        callbackURL: `${BASE_URL}/dashboard`,
+      }),
+    }),
+  );
+  const authorize = new URL(
+    z.object({ url: z.string() }).parse(await started.json()).url,
+  );
+  const samlRequest = authorize.searchParams.get("SAMLRequest") ?? "";
+  const requestXml = inflateRawSync(
+    Buffer.from(samlRequest, "base64"),
+  ).toString("utf8");
+  const requestId = /\sID="([^"]+)"/.exec(requestXml)?.[1] ?? "";
+  const acs = `${BASE_URL}/api/auth/sso/saml2/sp/acs/${providerId}`;
+  const sp = samlify.ServiceProvider({
+    entityID: SP_ENTITY_ID,
+    wantAssertionsSigned: true,
+    assertionConsumerService: [{ Binding: POST_BINDING, Location: acs }],
+  });
+  const response = await samlIdentity.idp.createLoginResponse(
+    sp,
+    { extract: { request: { id: requestId } } },
+    "post",
+    { email },
+  );
+  const callback = await betterAuthInstance.handler(
+    new Request(acs, {
+      method: "POST",
+      redirect: "manual",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        cookie: started.headers.get("set-cookie") ?? "",
+      },
+      body: new URLSearchParams({
+        SAMLResponse: response.context,
+        RelayState: authorize.searchParams.get("RelayState") ?? "",
+      }),
+    }),
+  );
+  const location = callback.headers.get("location") ?? "";
+  const cookie = callback.headers
+    .getSetCookie()
+    .map((set) => set.split(";")[0])
+    .join("; ");
+  const session = await betterAuthInstance.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  const error = new URL(location, BASE_URL).searchParams.get("error");
+  return { location, session, error: normalizeErrorCode(error) };
 }
 
 async function signInThrough(
@@ -348,27 +523,80 @@ async function addressConfirmed(userId: string): Promise<boolean> {
   return user.emailVerified;
 }
 
+/**
+ * An Entra ID tenant's discovery document, as Microsoft serves it: sign-in
+ * endpoints under the tenant on `login.microsoftonline.com`, userinfo on
+ * Microsoft Graph.
+ */
+function entraDiscovery(issuer: string) {
+  const tenant = issuer.replace(/\/v2\.0$/, "");
+  return {
+    issuer,
+    authorization_endpoint: `${tenant}/oauth2/v2.0/authorize`,
+    token_endpoint: `${tenant}/oauth2/v2.0/token`,
+    jwks_uri: `${tenant}/discovery/v2.0/keys`,
+    userinfo_endpoint: GRAPH_USERINFO,
+    end_session_endpoint: `${tenant}/oauth2/v2.0/logout`,
+    response_types_supported: ["code", "id_token", "code id_token"],
+    subject_types_supported: ["pairwise"],
+    id_token_signing_alg_values_supported: ["RS256"],
+    scopes_supported: ["openid", "profile", "email", "offline_access"],
+    token_endpoint_auth_methods_supported: [
+      "client_secret_post",
+      "private_key_jwt",
+      "client_secret_basic",
+    ],
+    claims_supported: [
+      "sub",
+      "iss",
+      "aud",
+      "exp",
+      "iat",
+      "auth_time",
+      "nonce",
+      "preferred_username",
+      "name",
+      "tid",
+      "ver",
+      "email",
+    ],
+    tenant_region_scope: "EU",
+    cloud_instance_name: "microsoftonline.com",
+  };
+}
+
+const tokenResponse = () => ({
+  access_token: `access-${SUITE}`,
+  id_token: idToken,
+  token_type: "Bearer",
+  expires_in: 3600,
+});
+
 beforeAll(async () => {
+  samlIdentity = await samlIdentityProvider();
   realFetch = globalThis.fetch;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = requestUrl(input);
-    if (url.startsWith(`${IDP}/.well-known/openid-configuration`)) {
+    if (url.startsWith(GRAPH_USERINFO)) return respond(graphUserInfo);
+    if (url.startsWith(ENTRA_HOST)) {
+      if (url.includes("/.well-known/openid-configuration")) {
+        return respond(entraDiscovery(url.split("/.well-known/")[0] ?? ""));
+      }
+      if (url.includes("/oauth2/v2.0/token")) return respond(tokenResponse());
+      if (url.includes("/discovery/v2.0/keys")) return respond(jwks);
+    }
+    const issuer = url.startsWith(IDP) ? IDP : undefined;
+    if (!issuer) return realFetch(input, init);
+    if (url.startsWith(`${issuer}/.well-known/openid-configuration`)) {
       return respond({
-        issuer: IDP,
-        authorization_endpoint: `${IDP}/authorize`,
-        token_endpoint: `${IDP}/token`,
-        jwks_uri: `${IDP}/jwks`,
+        issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        jwks_uri: `${issuer}/jwks`,
       });
     }
-    if (url.startsWith(`${IDP}/token`)) {
-      return respond({
-        access_token: `access-${SUITE}`,
-        id_token: idToken,
-        token_type: "Bearer",
-        expires_in: 3600,
-      });
-    }
-    if (url.startsWith(`${IDP}/jwks`)) return respond(jwks);
+    if (url.startsWith(`${issuer}/token`)) return respond(tokenResponse());
+    if (url.startsWith(`${issuer}/jwks`)) return respond(jwks);
     return realFetch(input, init);
   }) as typeof globalThis.fetch;
 });
@@ -481,8 +709,8 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
-  describe("when the identity provider does not assert the address is verified", () => {
-    /** @scenario "An identity provider that does not vouch for the address does not link an unconfirmed account" */
+  describe("when the identity provider asserts the address is not verified", () => {
+    /** @scenario "An identity provider that says the address is not verified does not link an unconfirmed account" */
     it("refuses with the named code and leaves the account as it was", async () => {
       const { user, providerId } = await setUp({
         label: "no-vouch",
@@ -609,6 +837,135 @@ describe("given a password account whose address was never confirmed", () => {
     });
   });
 
+  describe("when Microsoft Entra ID signs it in without an email_verified claim", () => {
+    /** @scenario "Microsoft Entra ID links an unconfirmed password account without sending email_verified" */
+    it("links the existing account, confirms the address and reuses the binding", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-silent",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: entra("entra-silent"),
+      });
+      const subject = `entra-silent-${SUITE}`;
+      await identityProviderAsserts({
+        email: user.email,
+        subject,
+        issuer: entra("entra-silent"),
+        claims: { tid: `${SUITE}-tenant`, oid: subject },
+      });
+
+      const first = await signInThrough(providerId);
+
+      expect(first.error).toBeNull();
+      expect(first.session?.user.id).toBe(user.id);
+      expect(await addressConfirmed(user.id)).toBe(true);
+      expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+      const binding = await linkedAccounts(user.id, providerId);
+      expect(binding).toEqual([
+        { id: expect.any(String), providerAccountId: subject },
+      ]);
+
+      const repeated = await signInThrough(providerId);
+
+      expect(repeated.session?.user.id).toBe(user.id);
+      expect(await linkedAccounts(user.id, providerId)).toEqual(binding);
+    });
+  });
+
+  describe("when Microsoft Entra ID sends xms_edov true", () => {
+    /** @scenario "Microsoft Entra ID's xms_edov true links an unconfirmed password account" */
+    it("links the existing account and confirms the address", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-edov",
+        state: "DRAFT",
+        domainVerified: true,
+        issuer: entra("entra-edov"),
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-edov-${SUITE}`,
+        issuer: entra("entra-edov"),
+        claims: { xms_edov: true },
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBeNull();
+      expect(result.session?.user.id).toBe(user.id);
+      expect(await addressConfirmed(user.id)).toBe(true);
+      expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
+    });
+  });
+
+  describe("when Microsoft Entra ID sends xms_edov false", () => {
+    /** @scenario "Microsoft Entra ID's xms_edov false does not link an unconfirmed account" */
+    it("refuses with the named code and leaves the account as it was", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-edov-false",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: entra("entra-edov-false"),
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-edov-false-${SUITE}`,
+        issuer: entra("entra-edov-false"),
+        claims: { xms_edov: false },
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBe("sso_existing_account_unconfirmed");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+
+  describe("when a provider that sends no email_verified signs in before the domain is verified", () => {
+    /** @scenario "An unconfirmed account on a domain the connection has not verified is not linked" */
+    it("refuses with the named code and leaves the account as it was", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-unproved",
+        state: "DRAFT",
+        domainVerified: false,
+        issuer: entra("entra-unproved"),
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-unproved-${SUITE}`,
+        issuer: entra("entra-unproved"),
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBe("sso_existing_account_unconfirmed");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+
+  describe("when a SAML connection that verified the domain signs it in", () => {
+    /** @scenario "A SAML connection links an unconfirmed password account on a verified domain" */
+    it("links the existing account and confirms the address", async () => {
+      const { user, providerId } = await setUp({
+        label: "saml",
+        state: "ACTIVE",
+        domainVerified: true,
+        protocol: "saml",
+      });
+
+      const result = await signInThroughSaml(providerId, user.email);
+
+      expect(result.error).toBeNull();
+      expect(result.session?.user.id).toBe(user.id);
+      expect(await addressConfirmed(user.id)).toBe(true);
+      expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+      expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
+    });
+  });
+
   describe("when the installation is LangWatch Cloud", () => {
     /** @scenario "On LangWatch Cloud an unconfirmed password account is not linked by single sign-on" */
     it("keeps better-auth's own refusal and leaves the account as it was", async () => {
@@ -621,6 +978,60 @@ describe("given a password account whose address was never confirmed", () => {
         email: user.email,
         subject: `cloud-${SUITE}`,
         emailVerified: true,
+      });
+
+      const result = await signInThrough(providerId, { cloud: true });
+
+      expect(result.error).toBe("OAuthAccountNotLinked");
+      expect(result.session).toBeNull();
+      expect(await linkedAccounts(user.id, providerId)).toEqual([]);
+      expect(await addressConfirmed(user.id)).toBe(false);
+    });
+  });
+});
+
+describe("given a password account whose address is confirmed", () => {
+  describe("when Microsoft Entra ID signs it in without an email_verified claim", () => {
+    /** @scenario "A confirmed password account links when the provider sends no email_verified" */
+    it("links the existing account instead of refusing it", async () => {
+      const { user, providerId } = await setUp({
+        label: "entra-confirmed",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: entra("entra-confirmed"),
+        confirmed: true,
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `entra-confirmed-${SUITE}`,
+        issuer: entra("entra-confirmed"),
+      });
+
+      const result = await signInThrough(providerId);
+
+      expect(result.error).toBeNull();
+      expect(result.session?.user.id).toBe(user.id);
+      expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+      expect(await linkedAccounts(user.id, providerId)).toHaveLength(1);
+    });
+  });
+});
+
+describe("given a password account whose address was never confirmed, on LangWatch Cloud", () => {
+  describe("when Microsoft Entra ID signs it in without an email_verified claim", () => {
+    /** @scenario "On LangWatch Cloud a provider that sends no email_verified does not link an existing account" */
+    it("keeps better-auth's own refusal and leaves the account as it was", async () => {
+      const { user, providerId } = await setUp({
+        label: "cloud-entra",
+        state: "ACTIVE",
+        domainVerified: true,
+        issuer: entra("cloud-entra"),
+      });
+      await identityProviderAsserts({
+        email: user.email,
+        subject: `cloud-entra-${SUITE}`,
+        issuer: entra("cloud-entra"),
+        claims: { xms_edov: true },
       });
 
       const result = await signInThrough(providerId, { cloud: true });

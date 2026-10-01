@@ -23,6 +23,7 @@ import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
+import { aliasLegacyMicrosoftCallback } from "~/server/better-auth/legacy-callback-alias";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import {
   redirectFailedSignInCallback,
@@ -197,7 +198,7 @@ const betterAuthCatchAll = async (c: Context) => {
   const handle = () =>
     auth.handler(
       requestStatingCaller({
-        request: c.req.raw,
+        request: aliasLegacyMicrosoftCallback(c.req.raw),
         caller: getAuthRateLimitClientIpFromHonoContext(c),
       }),
     );

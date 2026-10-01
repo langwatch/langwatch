@@ -8,6 +8,8 @@ import type {
 import { extractEmailDomain } from "@ee/sso/matching";
 import { rowToConnection } from "@ee/sso/sso-connection-projection.prisma.repository";
 import {
+  type AssertedEmailVerification,
+  assertedEmailVerification,
   LIVE_IDENTIFIER_STATES,
   normalizeDomain,
   normalizeIdentifierValue,
@@ -41,9 +43,29 @@ function refuseUnconfirmed({
 }
 
 /**
+ * What the provider said about the address. SAML never says anything; OIDC
+ * is read from the signature-checked ID token and the userinfo response, the
+ * same claims the account-create hook reads (`signin-link-evidence.ts`).
+ */
+function emailVerificationOf(
+  input: SSOUserResolutionInput,
+): AssertedEmailVerification {
+  if (input.protocol !== "oidc") return "unasserted";
+  const issuer =
+    typeof input.verifiedIdTokenClaims.iss === "string"
+      ? input.verifiedIdTokenClaims.iss
+      : input.accountKey.issuer;
+  return assertedEmailVerification({
+    claimSources: [input.verifiedIdTokenClaims, input.providerClaims],
+    issuer,
+  });
+}
+
+/**
  * Selects existing users for admitted SAML or connection-owned SCIM
- * assertions, and, on self-hosted installations, links an OIDC assertion onto
- * an unconfirmed local account on a domain the connection proved.
+ * assertions, and, on self-hosted installations, links an assertion onto an
+ * existing local account on a domain the connection proved when the provider
+ * did not say the address is unverified.
  */
 export class PrismaScimSsoUsers {
   readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
@@ -89,14 +111,23 @@ export class PrismaScimSsoUsers {
     const user = candidates[0];
     if (!user) return CONTINUE;
 
-    // SAML supplies a signed email attribute, without an OIDC verification flag.
-    // The caller has already admitted that assertion through the domain gate.
-    if (input.protocol === "oidc" && !input.providerUser.emailVerified) {
+    // SAML supplies a signed email attribute and no verification flag, so it
+    // is always `unasserted`. The caller has already admitted the assertion
+    // through the domain gate.
+    // LangWatch Cloud takes only an explicit `email_verified: true` as the
+    // provider's word. A self-hosted installation refuses only a provider
+    // that says the address is NOT verified (see `#resolveUnconfirmedUser`).
+    const unvouched = this.#isHosted()
+      ? !input.providerUser.emailVerified
+      : emailVerificationOf(input) === "unverified";
+    if (input.protocol === "oidc" && unvouched) {
       return this.#resolveUnvouchedAddress(database, input, user);
     }
 
     if (user.emailVerified) {
-      return this.#resolveVerifiedSamlUser(database, input, user);
+      return input.protocol === "saml"
+        ? this.#resolveVerifiedSamlUser(database, input, user)
+        : this.#resolveConfirmedOidcUser(database, input, user);
     }
 
     if (!(await this.#directoryOwns(database, input.providerId, user.id))) {
@@ -189,10 +220,66 @@ export class PrismaScimSsoUsers {
   }
 
   /**
-   * An OIDC provider that does not assert the address is verified, for an
-   * address an account already holds. better-auth refuses the link either
-   * way; an unconfirmed account this connection's directory does not own gets
-   * the named refusal instead of "account not linked".
+   * A confirmed account, signed in by an OIDC provider that did not send
+   * `email_verified: true` (Microsoft Entra ID never sends it), on a
+   * self-hosted installation.
+   *
+   * better-auth links a confirmed account only on `email_verified: true`, so
+   * this selects the account itself when the connection has proved the
+   * address's domain, the same evidence that links an unconfirmed one below.
+   * A provider that sends the flag keeps better-auth's own link, and Cloud
+   * keeps better-auth's rule.
+   */
+  async #resolveConfirmedOidcUser(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    user: { id: string; deactivatedAt: Date | null },
+  ): Promise<SSOUserResolution> {
+    if (this.#isHosted() || input.providerUser.emailVerified) return CONTINUE;
+    if (user.deactivatedAt) return REFUSE;
+    if (await this.#holdsThisBinding(database, input, user.id)) {
+      return CONTINUE;
+    }
+    if (!(await this.#connectionProvesDomainOf(database, input))) {
+      return CONTINUE;
+    }
+    if (await this.#identityHeldElsewhere(database, input, user.id)) {
+      return REFUSE;
+    }
+    return { action: "link", userId: user.id, profile: "preserve" };
+  }
+
+  /** Whether another account holds a live identifier for the asserted
+   *  address or for this connection's subject. */
+  async #identityHeldElsewhere(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    userId: string,
+  ): Promise<boolean> {
+    const email = normalizeIdentifierValue(input.providerUser.email);
+    const conflict = await database.identifier.findFirst({
+      where: {
+        userId: { not: userId },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { value: { equals: email, mode: "insensitive" } },
+          {
+            issuer: input.accountKey.issuer,
+            providerAccountId: input.accountKey.accountId,
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    return conflict !== null;
+  }
+
+  /**
+   * An OIDC provider that does not vouch for an address an account already
+   * holds: it said the address is unverified, or, on LangWatch Cloud, said
+   * nothing. better-auth refuses the link either way; an unconfirmed account
+   * this connection's directory does not own gets the named refusal instead
+   * of "account not linked".
    */
   async #resolveUnvouchedAddress(
     database: Prisma.TransactionClient,
@@ -204,15 +291,14 @@ export class PrismaScimSsoUsers {
       return CONTINUE;
     }
     // A returning person: better-auth signs an existing binding in without
-    // asking whether the address was verified, which is what a provider that
-    // omits `email_verified` relies on after the first sign-in.
+    // asking whether the address was verified.
     if (await this.#holdsThisBinding(database, input, user.id)) {
       return CONTINUE;
     }
     return refuseUnconfirmed({
       providerId: input.providerId,
       detail:
-        "the provider did not assert the address is verified and the account's address is unconfirmed",
+        "the provider asserted the address is not verified and the account's address is unconfirmed",
     });
   }
 
@@ -236,19 +322,22 @@ export class PrismaScimSsoUsers {
 
   /**
    * An existing account whose address was never confirmed, asserted by an
-   * OIDC provider that says the address is verified.
+   * OIDC provider that did not say the address is unverified, or by SAML.
    *
    * On an installation that does not send email a password sign-up can never
    * confirm its address, so better-auth's own rule (link only onto a confirmed
    * address) refuses every such account, the registrant's setup test sign-in
    * included. The link is authorized by the domain instead: this connection
    * has verified the address's domain (DNS record, HTTPS file or licence), so
-   * the organization controls every address on it, and its identity provider
-   * is vouching for this one. That proves the provider's user owns the
-   * address. It does not prove who set the account's existing password, and
-   * that password stays usable after the link; the self-hosted scope below is
-   * what makes that acceptable. Without the proof, or without the provider's
-   * word, the link stays refused (ADR-027).
+   * the organization controls every address on it, and the assertion comes
+   * from the identity provider that organization configured. That proves the
+   * provider's user owns the address. A provider that sends no verification
+   * claim at all (Microsoft Entra ID without `xms_edov`, every SAML provider)
+   * is the organization's own directory speaking, so its silence is enough;
+   * an explicit "not verified" is not, and is refused before this point. It
+   * does not prove who set the account's existing password, and that password
+   * stays usable after the link; the self-hosted scope below is what makes
+   * that acceptable. Without the proof the link stays refused (ADR-027).
    *
    * The confirmation written here is uncommitted until the callback ends, so
    * the account-create hook that re-checks the link's evidence has to read
@@ -268,7 +357,7 @@ export class PrismaScimSsoUsers {
     input: SSOUserResolutionInput,
     user: { id: string; deactivatedAt: Date | null },
   ): Promise<SSOUserResolution> {
-    if (this.#isHosted() || input.protocol !== "oidc") return CONTINUE;
+    if (this.#isHosted()) return CONTINUE;
     if (user.deactivatedAt) return REFUSE;
     if (await this.#holdsThisBinding(database, input, user.id)) {
       return CONTINUE;
@@ -280,23 +369,9 @@ export class PrismaScimSsoUsers {
           "the connection has no qualified proof for the unconfirmed account's domain",
       });
     }
-
-    const email = normalizeIdentifierValue(input.providerUser.email);
-    const conflict = await database.identifier.findFirst({
-      where: {
-        userId: { not: user.id },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-        OR: [
-          { value: { equals: email, mode: "insensitive" } },
-          {
-            issuer: input.accountKey.issuer,
-            providerAccountId: input.accountKey.accountId,
-          },
-        ],
-      },
-      select: { id: true },
-    });
-    if (conflict) return REFUSE;
+    if (await this.#identityHeldElsewhere(database, input, user.id)) {
+      return REFUSE;
+    }
 
     // Inside the callback transaction, so a link that fails afterwards rolls
     // this back with it. better-auth confirms the address itself on the links
