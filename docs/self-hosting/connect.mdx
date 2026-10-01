@@ -7,7 +7,9 @@ keywords: connect, hosted services, self-hosted, license sync, activation code, 
 
 Connect lets a licensed self-hosted install call two LangWatch-hosted services, the Instant Evals judge and managed models, over outbound connections to two hosts. Everything else keeps running on your own infrastructure.
 
-Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches no hosted service at all, and there is no setting that changes that. An install on an offline license opens no connection to LangWatch, and you can check that against the license itself rather than against a configuration file.
+Your license decides what this install may call. A license that names a hosted service can reach it; a license that names none reaches no hosted service at all, and there is no setting that changes that. An install on an offline license reaches no hosted service and runs no license sync, and you can check that against the license itself rather than against a configuration file.
+
+An install on an offline license still sends the daily usage report unless you switch it off, see [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license).
 
 A service your license names is on. An organization admin switches off the ones they do not want in **Settings, Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
 
@@ -33,7 +35,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 | What is on | What this install sends to LangWatch |
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
-| Managed models | The prompts and completions of the calls you route to a `langwatch/` model. |
+| Managed models | The prompts and completions of the calls the gateway routes to the LangWatch slot: a `langwatch/` model, or a bare model that none of your providers serves. |
 | License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
@@ -149,11 +151,17 @@ curl https://<your-gateway>/v1/chat/completions \
   -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-Your own providers are untouched: a model spelled without the prefix goes to your own credentials as before. Calls to a `langwatch/` model are metered against the same cap as every other hosted service.
+Your own providers keep serving the models they list, and a model spelled with a provider prefix, for example `openai/gpt-5-mini`, never reaches LangWatch.
+
+A bare model name that none of your providers lists can fall through to the LangWatch slot, and in an organization with no providers of its own every call goes there. See [Managed models](/self-hosting/data-and-telemetry#managed-models) for the exact rule.
+
+Calls served by the LangWatch slot are metered against the same cap as every other hosted service.
 
 ## Air-gapped installs and existing licenses
 
-An install whose license names no hosted service opens no connection to LangWatch: no activation, no sync, no hosted service, and the licensed seat count is enforced as a hard cap. Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
+An install whose license names no hosted service runs no license sync and calls no hosted service, and the licensed seat count is enforced as a hard cap. It still sends the daily usage report, and opening **Settings, Connect** reads the organization's Connect usage from `gateway.langwatch.ai`. [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license) lists both.
+
+Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 
 The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
