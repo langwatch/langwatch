@@ -11,14 +11,35 @@
 
 import type { z } from "zod";
 
+import {
+  versionedAnswer,
+  withSince,
+  type VersionedAnswerSchema,
+  type VersionedInput,
+} from "./versioned-answer.ts";
+
 /** Every kind of procedure a contract declares. */
 export type TrpcContractKind = "query" | "mutation" | "subscription";
 
 /** How long the browser trusts a read (ADR-164); an undeclared read keeps the 30s default. */
 export type TrpcCacheTier = "live" | "session" | "reference";
 
-/** A read's cache policy: its tier, and whether a reload may paint it from disk. */
-export type TrpcCachePolicy = Readonly<{ tier: TrpcCacheTier; persist?: boolean }>;
+/**
+ * A read's cache policy: its tier, whether a reload may paint it from disk, and whether the
+ * host versions its answer (a caller holding the current version is answered `unchanged`).
+ */
+export type TrpcCachePolicy = Readonly<{
+  tier: TrpcCacheTier;
+  persist?: boolean;
+  versioned?: true;
+}>;
+
+/** The policy that makes a read versioned. */
+export type TrpcVersionedCachePolicy = Readonly<{
+  tier: TrpcCacheTier;
+  persist?: boolean;
+  versioned: true;
+}>;
 
 /** One declared procedure. `output` is absent when the procedure answers nothing. */
 export type TrpcContractMember<
@@ -30,7 +51,16 @@ export type TrpcContractMember<
   readonly input: Input;
   readonly output: Output;
   readonly cache?: TrpcCachePolicy;
+  /** A versioned read's own answer; `output` is then the envelope around it. */
+  readonly answer?: z.ZodType;
 }>;
+
+/** A versioned read: `since` joins its input, and `answer` is wrapped in the envelope. */
+export type TrpcVersionedMember<
+  Input extends z.ZodType,
+  Answer extends z.ZodType,
+> = TrpcContractMember<"query", Input, VersionedAnswerSchema<Answer>> &
+  Readonly<{ cache: TrpcVersionedCachePolicy; answer: Answer }>;
 
 /** The procedures of one namespace, keyed by the wire name. */
 export type TrpcContractMembers = Readonly<Record<string, TrpcContractMember>>;
@@ -66,6 +96,11 @@ export interface TrpcContractBuilder<
   Namespace extends string,
   Members extends TrpcContractMembers,
 > {
+  /** A versioned read: the host answers `{ unchanged: true }` for a held version. */
+  query<Name extends string>(
+    name: Name,
+    options: { cache: TrpcVersionedCachePolicy },
+  ): TrpcVersionedInputBuilder<Namespace, Members, Name>;
   /** A read; `cache` declares its browser cache tier (ADR-164). */
   query<Name extends string>(
     name: Name,
@@ -93,6 +128,29 @@ export interface TrpcContractInputBuilder<
   withInput<Input extends z.ZodType>(
     schema: Input,
   ): TrpcContractOutputBuilder<Namespace, Members, Name, Kind, Input>;
+}
+
+/** A versioned read still owing its input; `since` is added to it and never reaches the handler. */
+export interface TrpcVersionedInputBuilder<
+  Namespace extends string,
+  Members extends TrpcContractMembers,
+  Name extends string,
+> {
+  withInput<Input extends z.ZodObject>(
+    schema: Input,
+  ): TrpcVersionedOutputBuilder<Namespace, Members, Name, VersionedInput<Input>>;
+}
+
+/** A versioned read owing its answer, which the wire carries inside the envelope. */
+export interface TrpcVersionedOutputBuilder<
+  Namespace extends string,
+  Members extends TrpcContractMembers,
+  Name extends string,
+  Input extends z.ZodType,
+> {
+  withOutput<Answer extends z.ZodType>(
+    schema: Answer,
+  ): TrpcContractBuilder<Namespace, WithMember<Members, Name, TrpcVersionedMember<Input, Answer>>>;
 }
 
 /**
@@ -141,8 +199,33 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
     },
   });
 
+  const versioned = (name: string, cache: TrpcVersionedCachePolicy) => ({
+    withInput: (input: z.ZodObject) => {
+      assertUndeclared(namespace, name, members);
+      const address = `tRPC contract "${namespace}" read "${name}"`;
+      const withSinceInput = withSince({ address, input });
+
+      return {
+        withOutput: (answer: z.ZodType) =>
+          contractBuilder(namespace, {
+            ...members,
+            [name]: {
+              kind: "query",
+              input: withSinceInput,
+              output: versionedAnswer(answer),
+              answer,
+              cache,
+            },
+          }),
+      };
+    },
+  });
+
   return {
-    query: (name, options) => member(name, "query", options?.cache),
+    query: (name: string, options?: { cache?: TrpcCachePolicy }) =>
+      options?.cache?.versioned
+        ? versioned(name, { ...options.cache, versioned: true })
+        : member(name, "query", options?.cache),
     mutation: (name) => member(name, "mutation"),
     subscription: (name) => member(name, "subscription"),
     build: () => ({ namespace, members: Object.freeze({ ...members }) as Members }),

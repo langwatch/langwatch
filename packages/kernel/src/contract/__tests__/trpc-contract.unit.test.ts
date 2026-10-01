@@ -57,7 +57,8 @@ describe("defineTrpcContract", () => {
       // is imported by every browser that installs it, so one server import
       // here is `node:async_hooks` in the browser bundle — which is what
       // `defineRestMiddleware` living in rest/request.ts actually did.
-      expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual([]);
+      expect(valueImports(sourceOf("trpc-contract.ts"))).toEqual(["./versioned-answer.ts"]);
+      expect(valueImports(sourceOf("versioned-answer.ts"))).toEqual(["zod"]);
       expect(valueImports(sourceOf("rest-middleware.ts"))).toEqual([]);
       expect(valueImports(sourceOf("ui-tokens.ts"))).toEqual([]);
       expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
@@ -104,5 +105,43 @@ describe("defineTrpcContract cache policy", () => {
     it("leaves an undeclared read without one", () => {
       expect("cache" in contract.members.getMemberById).toBe(false);
     });
+  });
+});
+
+describe("defineTrpcContract versioned read", () => {
+  const contract = defineTrpcContract("organization")
+    .query("getScopeGraph", { cache: { tier: "session", persist: true, versioned: true } })
+    .withInput(z.object({}))
+    .withOutput(z.array(z.string()))
+    .build();
+
+  const member = contract.members.getScopeGraph;
+
+  /** @scenario "A contract declares a versioned read once, with its envelope" */
+  it("adds an optional since to the input and wraps the answer in the envelope", () => {
+    expect(member.input.validate({})).toBe(true);
+    expect(member.input.validate({ since: "v1" })).toBe(true);
+    expect(member.input.validate({ since: 7 })).toBe(false);
+
+    expect(member.output.validate({ unchanged: true })).toBe(true);
+    expect(member.output.validate({ version: "v1", data: ["a"] })).toBe(true);
+    expect(member.output.validate({ version: "v1", data: [1] })).toBe(false);
+    expect(member.output.validate(["a"])).toBe(false);
+  });
+
+  /** @scenario "A contract declares a versioned read once, with its envelope" */
+  it("carries the versioned cache policy and the answer it wraps", () => {
+    expect(member.cache).toEqual({ tier: "session", persist: true, versioned: true });
+    expect(member.answer.validate(["a"])).toBe(true);
+  });
+
+  /** @scenario "A contract declares a versioned read once, with its envelope" */
+  it("refuses a versioned read that already declares since", () => {
+    const declared = () =>
+      defineTrpcContract("organization")
+        .query("getScopeGraph", { cache: { tier: "session", versioned: true } })
+        .withInput(z.object({ since: z.string() }));
+
+    expect(declared).toThrow(/adds "since" to its input/);
   });
 });

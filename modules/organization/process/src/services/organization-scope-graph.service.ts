@@ -1,17 +1,10 @@
 /**
  * The scope graph the browser resolves every page against: the caller's organizations,
- * teams and projects, narrowed to what they can open, versioned by content hash so
- * a browser holding the current version is answered `unchanged` (ADR-164).
+ * teams and projects, narrowed to what they can open. The read is versioned: the tRPC host
+ * hashes this answer and answers `unchanged` for a browser holding the current version (ADR-164).
  */
-import { createHash } from "node:crypto";
-
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type {
-  OrganizationApiScopeGraphInput,
-  OrganizationCaller,
-  ScopeGraphAnswer,
-  ScopeGraphOrganization,
-} from "@langwatch/organization-contract";
+import type { OrganizationCaller, ScopeGraphOrganization } from "@langwatch/organization-contract";
 
 import { narrowScopeGraphToViewer } from "../rules/scope-graph-visibility.rules.ts";
 
@@ -32,10 +25,7 @@ export class OrganizationScopeGraphService {
 
   private constructor(private readonly deps: OrganizationScopeGraphDependencies) {}
 
-  async getScopeGraph(
-    input: OrganizationApiScopeGraphInput,
-    by: OrganizationCaller,
-  ): Promise<ScopeGraphAnswer> {
+  async getScopeGraph(by: OrganizationCaller): Promise<ScopeGraphOrganization[]> {
     const userId = by.id;
     const organizations = await this.deps.reader.findScopeGraphForUser({ userId });
 
@@ -47,26 +37,8 @@ export class OrganizationScopeGraphService {
         ? await this.deps.permissions.listBindingsForSynthesis({ orgIds, userId })
         : [];
 
-    const graph = organizations.map((organization) =>
+    return organizations.map((organization) =>
       narrowScopeGraphToViewer({ organization, userId, bindings }),
     );
-    const version = scopeGraphVersion({ userId, graph });
-
-    return input.since === version ? { unchanged: true } : { version, graph };
   }
-}
-
-/**
- * The hash `contentEtag` takes in packages/api/src/trpc/session-version.ts, user-prefixed so
- * no user's version matches another's. ponytail: restated, not imported (services may not
- * reach @langwatch/api/trpc); the framework `versioned` read replaces it.
- */
-function scopeGraphVersion({
-  userId,
-  graph,
-}: {
-  userId: string;
-  graph: readonly ScopeGraphOrganization[];
-}): string {
-  return `${userId}.${createHash("sha256").update(JSON.stringify(graph)).digest("base64url")}`;
 }

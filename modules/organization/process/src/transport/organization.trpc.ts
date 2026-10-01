@@ -133,7 +133,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .procedure("getScopeGraph")
   .withFacts(organizationSessionPersonFact)
   .noPermission(BEFORE_MEMBERSHIP)
-  .handle(({ app, input, actor }, person) => app.getScopeGraph(input, callerOf(actor, person)))
+  .handle(({ app, actor }, person) => app.getScopeGraph(callerOf(actor, person)))
 
   .procedure("update")
   .withPermission("organization:manage")

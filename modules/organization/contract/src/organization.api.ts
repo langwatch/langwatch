@@ -80,7 +80,7 @@ import type {
   PersonalWorkspace,
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
-import type { OrganizationApiScopeGraphInput, ScopeGraphAnswer } from "./scope-graph.ts";
+import type { ScopeGraphOrganization } from "./scope-graph.ts";
 import type { TeamWithProjects } from "./team.responses.ts";
 import type {
   CreateOrganizationTeamWithMembersInput,
@@ -587,11 +587,8 @@ export interface OrganizationApi {
     input: Readonly<{ isDemo: boolean }>,
     by: OrganizationCaller,
   ): Promise<FullyLoadedOrganization[]>;
-  /** The caller's scope graph, narrowed and versioned; `unchanged` when `since` is current. */
-  getScopeGraph(
-    input: OrganizationApiScopeGraphInput,
-    by: OrganizationCaller,
-  ): Promise<ScopeGraphAnswer>;
+  /** The caller's scope graph, narrowed; the tRPC host versions it. */
+  getScopeGraph(by: OrganizationCaller): Promise<ScopeGraphOrganization[]>;
   /** One organization with its members, addresses redacted for a non-administrator. */
   getOrganizationWithMembersForPicker(
     input: Readonly<{ organizationId: string; includeDeactivated: boolean }>,

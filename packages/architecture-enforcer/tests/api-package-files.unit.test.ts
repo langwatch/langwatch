@@ -71,6 +71,7 @@ const TARGET_FILES = new Set([
   "trpc/session-version.ts",
   "trpc/sse.ts",
   "trpc/throttle.ts",
+  "trpc/versioned-read.ts",
   // The browser door, folded in from @langwatch/platform-api-client.
   "web/index.ts",
   "web/module-api.ts",

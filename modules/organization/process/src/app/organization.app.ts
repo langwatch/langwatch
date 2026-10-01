@@ -116,8 +116,7 @@ import {
   type OrganizationMemberSeats,
   type LimitCheckResult,
   type LimitType,
-  type OrganizationApiScopeGraphInput,
-  type ScopeGraphAnswer,
+  type ScopeGraphOrganization,
 } from "@langwatch/organization-contract";
 import type * as organizationContractModule from "@langwatch/organization-contract";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -1464,12 +1463,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#visibility.listVisible(input, by);
   }
 
-  /** The caller's scope graph, narrowed and versioned; `unchanged` when `since` is current. */
-  getScopeGraph(
-    input: OrganizationApiScopeGraphInput,
-    by: OrganizationCaller,
-  ): Promise<ScopeGraphAnswer> {
-    return this.#scopeGraph.getScopeGraph(input, by);
+  /** The caller's scope graph, narrowed; the host versions it. */
+  getScopeGraph(by: OrganizationCaller): Promise<ScopeGraphOrganization[]> {
+    return this.#scopeGraph.getScopeGraph(by);
   }
 
   getOrganizationWithMembersForPicker(

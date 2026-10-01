@@ -5,7 +5,7 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
-import type { ScopeGraphAnswer, ScopeGraphOrganization } from "@langwatch/organization-contract";
+import type { ScopeGraphOrganization } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -21,9 +21,8 @@ import { OrganizationScopeGraphService } from "../organization-scope-graph.servi
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
-function graphOf(answer: ScopeGraphAnswer): ScopeGraphOrganization {
-  if (!("graph" in answer)) throw new Error("expected a graph, got unchanged");
-  const [organization] = answer.graph;
+function graphOf(graph: ScopeGraphOrganization[]): ScopeGraphOrganization {
+  const [organization] = graph;
   if (!organization) throw new Error("the caller's organization did not arrive");
   return organization;
 }
@@ -142,7 +141,7 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
   describe("when a member asks for their scope graph", () => {
     /** @scenario "A member receives only the teams they can open" */
     it("returns their own team and the team a binding reaches, nothing else", async () => {
-      const organization = graphOf(await service.getScopeGraph({}, { id: ids.caller }));
+      const organization = graphOf(await service.getScopeGraph({ id: ids.caller }));
 
       expect(organization.members).toEqual([{ role: "MEMBER" }]);
       expect(organization.teams.map((each) => each.id)).toEqual([team.own, team.bound]);
@@ -151,7 +150,7 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
 
     /** @scenario "A team reached through a binding carries the caller's membership" */
     it("synthesises the caller's membership on the team a binding reaches", async () => {
-      const organization = graphOf(await service.getScopeGraph({}, { id: ids.caller }));
+      const organization = graphOf(await service.getScopeGraph({ id: ids.caller }));
       const bound = organization.teams.find((each) => each.id === team.bound);
 
       expect(bound?.members).toEqual([{ userId: ids.caller }]);
@@ -160,7 +159,7 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
 
     /** @scenario "Archived and internal-governance projects stay out of the graph" */
     it("leaves out archived and internal-governance projects", async () => {
-      const organization = graphOf(await service.getScopeGraph({}, { id: ids.caller }));
+      const organization = graphOf(await service.getScopeGraph({ id: ids.caller }));
       const own = organization.teams.find((each) => each.id === team.own);
 
       expect(own?.projects.map((each) => each.id)).toEqual([project.app]);
@@ -168,7 +167,7 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
 
     /** @scenario "Another member's personal team stays out of the graph" */
     it("leaves out another member's personal team", async () => {
-      const organization = graphOf(await service.getScopeGraph({}, { id: ids.caller }));
+      const organization = graphOf(await service.getScopeGraph({ id: ids.caller }));
 
       expect(organization.teams.some((each) => each.isPersonal)).toBe(false);
     });
@@ -177,7 +176,7 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
   describe("when an organization administrator asks for their scope graph", () => {
     /** @scenario "An admin sees a member's personal team marked as theirs" */
     it("includes a member's personal team marked with its owner", async () => {
-      const organization = graphOf(await service.getScopeGraph({}, { id: ids.admin }));
+      const organization = graphOf(await service.getScopeGraph({ id: ids.admin }));
       const personal = organization.teams.find((each) => each.id === team["colleague-personal"]);
 
       expect(personal?.personalOf).toBe(ids.colleague);
@@ -187,30 +186,26 @@ describe.skipIf(!DB_URL)("OrganizationScopeGraphService over Postgres", () => {
 
   describe("when the browser already holds the current version", () => {
     /** @scenario "A browser holding the current version is answered unchanged" */
-    it("answers unchanged", async () => {
-      const first = await service.getScopeGraph({}, { id: ids.caller });
-      if (!("version" in first)) throw new Error("expected a version");
+    it("answers the same graph twice, so the host's hash of it is the held version", async () => {
+      const first = await service.getScopeGraph({ id: ids.caller });
+      const again = await service.getScopeGraph({ id: ids.caller });
 
-      expect(await service.getScopeGraph({ since: first.version }, { id: ids.caller })).toEqual({
-        unchanged: true,
-      });
+      expect(JSON.stringify(again)).toBe(JSON.stringify(first));
     });
   });
 
   describe("when a project the caller can see is renamed", () => {
     /** @scenario "A rename answers a new version" */
-    it("answers a new version with the new name", async () => {
-      const before = await service.getScopeGraph({}, { id: ids.caller });
-      if (!("version" in before)) throw new Error("expected a version");
+    it("answers a different graph carrying the new name", async () => {
+      const before = await service.getScopeGraph({ id: ids.caller });
 
       await prisma.project.update({
         where: { id: project.app ?? "" },
         data: { name: `renamed ${ns}` },
       });
-      const after = await service.getScopeGraph({ since: before.version }, { id: ids.caller });
+      const after = await service.getScopeGraph({ id: ids.caller });
 
-      if (!("version" in after)) throw new Error("expected a new version");
-      expect(after.version).not.toBe(before.version);
+      expect(JSON.stringify(after)).not.toBe(JSON.stringify(before));
       const own = graphOf(after).teams.find((each) => each.id === team.own);
       expect(own?.projects[0]?.name).toBe(`renamed ${ns}`);
     });

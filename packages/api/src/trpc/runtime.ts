@@ -74,6 +74,7 @@ import {
   type TrpcFailureTraceIds,
 } from "./audit.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
+import { answerVersioned, splitSince } from "./versioned-read.ts";
 
 const logger = createLogger("langwatch:trpc");
 const outputLogger = createLogger("langwatch:api:output-validation");
@@ -293,7 +294,7 @@ type StreamResult<Output extends z.ZodType> =
   | Promise<AsyncIterable<z.input<Output>>>;
 
 /** What a handler may answer: the declared output, one stream value, or nothing. */
-type MemberResult<Member extends TrpcContractMember> =
+type DeclaredResult<Member extends TrpcContractMember> =
   Member extends TrpcContractMember<infer Kind, z.ZodType, infer Output>
     ? Output extends z.ZodType
       ? Kind extends "subscription"
@@ -301,6 +302,20 @@ type MemberResult<Member extends TrpcContractMember> =
         : ValueResult<Output>
       : void | Promise<void>
     : never;
+
+/** A versioned read answers its own data; the host wraps it in the envelope. */
+type MemberResult<Member extends TrpcContractMember> = Member extends {
+  readonly answer: infer Answer extends z.ZodType;
+}
+  ? ValueResult<Answer>
+  : DeclaredResult<Member>;
+
+/** What a handler is handed as input: the parsed one, without the `since` a host strips. */
+type MemberHandlerInput<Member extends TrpcContractMember> = Member extends {
+  readonly answer: z.ZodType;
+}
+  ? Omit<z.output<Member["input"]>, "since">
+  : z.output<Member["input"]>;
 
 /** Names the procedures `build()` is still waiting for. */
 export type TrpcProceduresNotImplemented<Names extends string> = Readonly<{
@@ -480,7 +495,7 @@ export interface TrpcRouterImplementation<
 > {
   handle(
     handler: (
-      args: HandlerArgumentsFor<Caller, z.output<Contract["members"][Name]["input"]>, Api>,
+      args: HandlerArgumentsFor<Caller, MemberHandlerInput<Contract["members"][Name]>, Api>,
       ...facts: TrpcFactValues<Facts>
     ) => MemberResult<Contract["members"][Name]>,
   ): TrpcRouterBuilder<Api, Contract, Implemented | Name>;
@@ -958,6 +973,7 @@ export function createTrpcRuntime<
       procedure: request.procedure,
       kind: request.member.kind,
       output: request.member.output,
+      answer: request.member.answer,
       handler: request.handle,
     });
 
@@ -1287,29 +1303,44 @@ function validateDeclaredOutput({
 }
 
 /**
- * The handler, with its answer checked against the declaration. A stream is
- * checked one value at a time, because a subscription's shape drifts one event
- * at a time and a single wrong yield is what a client crashes on.
+ * The handler, with its answer checked against the declaration. A stream is checked one value at
+ * a time, because a single wrong yield is what a client crashes on. A versioned read's handler is
+ * never handed `since`; its data is hashed into the envelope.
  */
 function guardOutput({
   procedure,
   kind,
   output,
+  answer,
   handler,
 }: {
   procedure: string;
   kind: TrpcContractMember["kind"];
   output: z.ZodType | undefined;
+  answer: z.ZodType | undefined;
   handler: (args: never, ...facts: never[]) => unknown;
 }): (opts: ResolverOptions) => unknown {
-  const invoke = (opts: ResolverOptions): unknown => {
-    const { args, facts } = invocation(opts);
+  const invoke = (opts: ResolverOptions, input: unknown = opts.input): unknown => {
+    const { args, facts } = invocation(opts, input);
 
     return (handler as (args: HandlerArguments, ...values: unknown[]) => unknown)(args, ...facts);
   };
 
   if (!output) {
     return async (opts: ResolverOptions) => voidOutput({ procedure, value: await invoke(opts) });
+  }
+
+  if (answer && kind === "query") {
+    return async (opts: ResolverOptions) => {
+      const { since, input } = splitSince(opts.input);
+      const data = validateDeclaredOutput({
+        procedure,
+        schema: answer,
+        value: await invoke(opts, input),
+      });
+
+      return answerVersioned({ userId: resolvedAccessOf(opts.ctx)?.actor?.id ?? "", since, data });
+    };
   }
 
   if (kind === "subscription") {
@@ -1345,7 +1376,10 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
 }
 
 /** The handler's own arguments, and the facts that follow them. */
-function invocation(request: ResolverOptions): {
+function invocation(
+  request: ResolverOptions,
+  input: unknown = request.input,
+): {
   args: HandlerArguments;
   facts: readonly unknown[];
 } {
@@ -1355,7 +1389,7 @@ function invocation(request: ResolverOptions): {
 
   const { facts, ...access } = resolved;
 
-  return { args: { ...access, input: request.input, signal: request.signal }, facts };
+  return { args: { ...access, input, signal: request.signal }, facts };
 }
 
 /** Reads back what the access step wrote, and nothing it did not write. */

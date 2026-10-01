@@ -11,9 +11,20 @@ export type TrpcSessionVersions = Readonly<{
   getSessionVersion(input: { userId: string }): Promise<number>;
 }>;
 
-/** A strong hash of the answer, prefixed with the user so no user's tag matches another's. */
+/** A strong hash of an answer, prefixed with the user so no user's version matches another's. */
+export function contentVersion({
+  userId,
+  body,
+}: {
+  userId: string;
+  body: string | Uint8Array;
+}): string {
+  return `${userId}.${createHash("sha256").update(body).digest("base64url")}`;
+}
+
+/** The content version as an ETag. */
 export function contentEtag({ userId, body }: { userId: string; body: Uint8Array }): string {
-  return `"${userId}.${createHash("sha256").update(body).digest("base64url")}"`;
+  return `"${contentVersion({ userId, body })}"`;
 }
 
 /** `*` never matches: a tag must name this user and this body. */

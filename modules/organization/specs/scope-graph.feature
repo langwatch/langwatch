@@ -1,6 +1,9 @@
 Feature: The scope graph is the caller's organizations, narrowed and versioned
   organization.getScopeGraph returns only the skeleton the browser resolves a page against,
   narrowed as organization.getAll narrows it, and answers unchanged when the browser is current.
+  The read is versioned: the service returns the graph and the tRPC host hashes it into the version
+  (packages/api/specs/versioned-reads.feature). The two version scenarios below are bound here to
+  what the host's hash rests on: the same graph twice, and a different graph after a rename.
 
   @integration
   Scenario: A member receives only the teams they can open
