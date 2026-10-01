@@ -66,11 +66,21 @@ hold a few GiB. `haven up +langevals` (sticky) runs `services/langevals` with
 dependencies, which takes a few minutes. diffsuite's `-langevals` does the same
 for a branch stack it starts with `-up`.
 
-The five simulators (`mail`, `idp`, `storage`, `llm`, `voice`) each serve a console
-at `<name>.<slug>.langwatch.localhost`, appear as rows in the hub and the stack home,
-and log through `haven logs <name>`. `mail`, `idp` and `storage` run by default
-(`-mail`, `-idp`, `-storage` turn them off); `llm` and `voice` are opt-in
-(`+llm`, `+voice`).
+The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each serve a
+console at `<name>.<slug>.langwatch.localhost`, appear as rows in the hub and the stack
+home, and log through `haven logs <name>`. `mail`, `idp` and `storage` run by default
+(`-mail`, `-idp`, `-storage` turn them off); `llm`, `voice` and `analytics` are opt-in
+(`+llm`, `+voice`, `+analytics`).
+
+In a dev checkout every selected simulator runs in one `sims` lane, a second
+`service combined` process beside the `go` lane (gateway, nlp), so a simulator under
+load cannot starve the gateway. `haven restart sims` bounces them together. Point a
+load driver at `127.0.0.1:<port>` from `haven status`. Mail, storage and analytics
+start with sample content (haven sets `MAILSIM_SEED`, `STORAGESIM_SEED`,
+`ANALYTICSSIM_SEED` to 1). Each keeps a bounded recent history: `MAILSIM_MAX_MESSAGES`
+(10000), `ANALYTICSSIM_MAX_RECORDS` (5000), `LLMSIM_MAX_CALLS` (500); the `sims` skill
+has the rest. Without haven, `make service svc=combined args="mailsim storagesim llmsim analyticssim"`
+runs them in one process.
 
 Uploads need S3, which `storagesim` stands in for. It runs by default as the
 `storage` lane (`haven up -storage` turns it off), stores objects under haven's
@@ -100,15 +110,19 @@ containing `langy-echo` switches to Langy's echo mode, and one containing
 the rest. Gemini, Vertex, Azure, xAI and Groq still reach the real provider
 when `.env` holds their key.
 
-Scenario voice calls can run against `voicesim` instead of ElevenLabs and
-OpenAI: `haven up +voice` (sticky, off by default because it replaces a real
-provider). It answers the ElevenLabs signed-URL mint and conversation socket
-with a scripted agent, and OpenAI's `pcm` speech and transcription with tones
-and a fixed transcript, keeping no key. haven sets `ELEVENLABS_BASE_URL` for
-every lane unless `.env` or your shell names one, and never `OPENAI_BASE_URL`.
-Its console at `voice.<slug>.langwatch.localhost` shows each call's turns.
-The scenario child does not yet receive either base URL, so a voice run still
-reaches the real providers until the product forwards them.
+ElevenLabs voice calls can run against `voicesim`: `haven up +voice` (sticky,
+off by default because it replaces a real provider). It answers the ElevenLabs
+signed-URL mint and conversation socket with a scripted agent, and OpenAI's
+`pcm` speech and transcription with tones and a fixed transcript, checking no
+key. Unless `.env` or your shell names `ELEVENLABS_BASE_URL`, haven sets it to
+voicesim, adds a dummy `ELEVENLABS_API_KEY` when none is set, and sets the
+product's dev-only switch `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1`; the seed
+then stores the ElevenLabs provider row at voicesim. The switch admits only
+`127.0.0.1` or `localhost` with an explicit port; production never sets it.
+haven never sets `OPENAI_BASE_URL`: the product has no audio-only OpenAI seam,
+so the caller's OpenAI speech still reaches OpenAI. Its console at
+`voice.<slug>.langwatch.localhost` shows each call's turns (`VOICESIM_SEED=1`
+adds a sample call; `VOICESIM_MAX_CALLS` and `VOICESIM_MAX_EVENTS_PER_CALL` cap it).
 
 `https://langwatch.localhost` is the cross-worktree dashboard;
 `observability.langwatch.localhost` proxies local Grafana;

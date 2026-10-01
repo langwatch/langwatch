@@ -398,3 +398,21 @@ func TestSelectLogServicesFindsTheSimulatorsInTheGoLane(t *testing.T) {
 		t.Errorf("error = %v, want idp listed as selectable beside the go lane", err)
 	}
 }
+
+func TestSelectLogServicesFindsTheSimulatorsInTheSimsLane(t *testing.T) {
+	dir := t.TempDir()
+	base := time.Date(2026, 9, 30, 10, 0, 0, 0, time.UTC)
+	writeLog(t, dir,
+		"sims",
+		stamp(base)+` {"level":"info","service":"langwatch-service-analyticssim","msg":"analyticssim up"}`,
+		stamp(base.Add(time.Second))+` {"level":"info","service":"langwatch-service-mailsim","msg":"mailsim up"}`,
+	)
+	sources, err := selectLogServices(dir, []string{"analytics"})
+	if err != nil {
+		t.Fatalf("selectLogServices: %v", err)
+	}
+	lines, _, _ := readLogTails(dir, sources)
+	if len(lines) != 1 || !strings.Contains(lines[0].text, "analyticssim") {
+		t.Fatalf("lines = %v, want only analyticssim's line", lines)
+	}
+}

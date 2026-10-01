@@ -15,7 +15,7 @@ func analyticsEnv(st domain.Stack) []string {
 			port = svc.Port
 		}
 	}
-	return []string{fmt.Sprintf("ANALYTICSSIM_ADDR=:%d", port), "ANALYTICSSIM_STACK=" + st.Slug}
+	return []string{fmt.Sprintf("ANALYTICSSIM_ADDR=:%d", port), "ANALYTICSSIM_STACK=" + st.Slug, "ANALYTICSSIM_SEED=1"}
 }
 
 // analyticsChild is the supervised analyticssim lane. It keeps nothing on disk: its

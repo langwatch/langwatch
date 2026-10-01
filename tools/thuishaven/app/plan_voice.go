@@ -26,5 +26,5 @@ func voiceEnv(st domain.Stack) []string {
 			port = svc.Port
 		}
 	}
-	return []string{fmt.Sprintf("VOICESIM_ADDR=:%d", port), "VOICESIM_STACK=" + st.Slug}
+	return []string{fmt.Sprintf("VOICESIM_ADDR=:%d", port), "VOICESIM_STACK=" + st.Slug, "VOICESIM_SEED=1"}
 }

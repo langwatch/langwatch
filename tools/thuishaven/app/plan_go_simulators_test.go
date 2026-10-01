@@ -32,21 +32,22 @@ func simulatorStack(repo string, layout domain.Layout) domain.Stack {
 		{Name: "storage", Port: 45590, URL: "https://storage.test.langwatch.localhost"},
 		{Name: "voice", Port: 45591},
 		{Name: "llm", Port: 45595},
+		{Name: "analytics", Port: 45596},
 		{Name: "app", Port: 45560, URL: "https://app.test.langwatch.localhost"},
 	}}
 }
 
-// everySimulator selects all five simulators beside the data plane.
+// everySimulator selects all six simulators beside the data plane.
 func everySimulator() domain.Selection {
 	sel := domain.DefaultSelection()
-	sel.IDP, sel.Mail, sel.Storage, sel.Voice, sel.LLM = true, true, true, true, true
+	sel.IDP, sel.Mail, sel.Storage, sel.Voice, sel.LLM, sel.Analytics = true, true, true, true, true, true
 	return sel
 }
 
-var simulatorLanes = []string{"idp", "mail", "storage", "voice", "llm"}
+var simulatorLanes = []string{"idp", "mail", "storage", "voice", "llm", "analytics"}
 
-// @scenario "A dev checkout's go lane hosts the simulators"
-func TestTheGoLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
+// @scenario "A dev checkout's sims lane hosts the simulators"
+func TestTheSimsLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 	home := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: home, SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	repo := simulatorCheckout(t)
@@ -58,12 +59,16 @@ func TestTheGoLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 			t.Errorf("%s is still its own lane; the go lane hosts it", name)
 		}
 	}
-	lane, ok := findChild(children, GoLane)
-	if !ok {
-		t.Fatal("no go lane was planned")
+	goLane, ok := findChild(children, GoLane)
+	if !ok || !strings.Contains(goLane.Shell, `args="aigateway nlpgo"`) {
+		t.Errorf("go lane = %+v, want it to host only the gateway and nlp", goLane)
 	}
-	if !strings.Contains(lane.Shell, `args="aigateway nlpgo idpsim mailsim storagesim voicesim llmsim"`) {
-		t.Errorf("go lane runs %q, want it to host both simulators", lane.Shell)
+	lane, ok := findChild(children, SimsLane)
+	if !ok {
+		t.Fatal("no sims lane was planned")
+	}
+	if !strings.Contains(lane.Shell, `args="idpsim mailsim storagesim voicesim llmsim analyticssim"`) {
+		t.Errorf("sims lane runs %q, want it to host every simulator", lane.Shell)
 	}
 	want := map[string]string{
 		IDPAddrEnv:                ":45570",
@@ -80,14 +85,22 @@ func TestTheGoLaneHostsTheSimulatorsInADevCheckout(t *testing.T) {
 		"VOICESIM_ADDR":           ":45591",
 		"LLMSIM_ADDR":             ":45595",
 		"LLMSIM_STACK":            "test",
+		"ANALYTICSSIM_ADDR":       ":45596",
+		"ANALYTICSSIM_SEED":       "1",
+		"MAILSIM_SEED":            "1",
+		"STORAGESIM_SEED":         "1",
+		"VOICESIM_SEED":           "1",
 	}
 	for key, value := range want {
 		if got := valueOf(lane.Env, key); got != value {
-			t.Errorf("go lane %s = %q, want %q", key, got, value)
+			t.Errorf("sims lane %s = %q, want %q", key, got, value)
 		}
 	}
 	if valueOf(lane.Env, "SERVER_ADDR") != "" {
-		t.Error("the go lane carries SERVER_ADDR; one process cannot bind it for several listeners")
+		t.Error("the sims lane carries SERVER_ADDR; one process cannot bind it for several listeners")
+	}
+	if valueOf(goLane.Env, "MAILSIM_HTTP_ADDR") != "" {
+		t.Error("the go lane carries a simulator's env; the sims lane owns it")
 	}
 }
 
@@ -108,7 +121,7 @@ func TestAMonolithKeepsTheBundledSimulatorLanes(t *testing.T) {
 }
 
 // @scenario "The Go data-plane services are restarted as one lane"
-func TestTheSimulatorsRestartWithTheGoLaneTheyShare(t *testing.T) {
+func TestTheSimulatorsRestartWithTheSimsLaneTheyShare(t *testing.T) {
 	names := func(st domain.Stack) []string {
 		var out []string
 		for _, target := range restartTargets(st, "") {
@@ -120,10 +133,10 @@ func TestTheSimulatorsRestartWithTheGoLaneTheyShare(t *testing.T) {
 	bundled := names(simulatorStack(t.TempDir(), domain.LayoutModular))
 	for _, sim := range simulatorLanes {
 		if slices.Contains(hosted, sim) || !slices.Contains(bundled, sim) {
-			t.Errorf("%s: restartable %v where the go lane hosts it, %v where Haven bundles it", sim, hosted, bundled)
+			t.Errorf("%s: restartable %v where the sims lane hosts it, %v where Haven bundles it", sim, hosted, bundled)
 		}
 	}
-	if !slices.Contains(hosted, GoLane) {
-		t.Errorf("restartable = %v, want the go lane", hosted)
+	if !slices.Contains(hosted, GoLane) || !slices.Contains(hosted, SimsLane) {
+		t.Errorf("restartable = %v, want the go and sims lanes", hosted)
 	}
 }

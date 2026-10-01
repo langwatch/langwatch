@@ -38,6 +38,7 @@ func (o *Orchestrator) storageEnv(st domain.Stack) []string {
 		fmt.Sprintf("STORAGESIM_ADDR=:%d", port),
 		"STORAGESIM_DATA_DIR=" + dataDir,
 		"STORAGESIM_BUCKETS=langwatch",
+		"STORAGESIM_SEED=1",
 		"STORAGESIM_CORS_ORIGINS=" + appURL,
 	}
 }

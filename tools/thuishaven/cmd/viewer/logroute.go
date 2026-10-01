@@ -29,7 +29,7 @@ const AllApps = "all"
 // the front door, whose absence is what they would notice.
 var laneDefaults = map[string]string{
 	"app": "ui",
-	"api": "api", "go": "gateway", "ui": "ui", "langy": "langy",
+	"api": "api", "go": "gateway", "sims": "mail", "ui": "ui", "langy": "langy",
 	"langyagent": "langy", "idp": "idp", "design-system": "design-system",
 	"mail-room": "mail-room", "tasks": "tasks", "obs": "obs",
 	// Earlier lane names, still on disk in older captures.
@@ -133,6 +133,8 @@ func appFromServiceName(service string) (string, bool) {
 		return "voice", true
 	case strings.Contains(service, "llmsim"):
 		return "llm", true
+	case strings.Contains(service, "analyticssim"):
+		return "analytics", true
 	}
 	return "", false
 }

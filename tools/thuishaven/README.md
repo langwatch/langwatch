@@ -22,10 +22,19 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The five simulators (`mail`, `idp`, `storage`, `llm`, `voice`) each serve a
-console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and `storage` run
-by default; `llm` and `voice` need `haven up +llm +voice`. `haven logs <name>`
-reads any of them.
+The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each
+serve a console at `<name>.<slug>.langwatch.localhost`. `mail`, `idp` and
+`storage` run by default; `llm`, `voice` and `analytics` need `haven up +llm
++voice +analytics`. `haven logs <name>` reads any of them.
+
+In a checkout whose dev build links the simulators (`cmd/service/combined_dev.go`),
+every selected simulator runs in the `sims` lane: a second `service combined`
+process beside the `go` lane, which keeps only the gateway and the NLP engine. A
+simulator under load can therefore not starve the gateway. `haven restart sims`
+bounces them together and `haven logs <name>` still reads each one. Load drivers
+hit `127.0.0.1:<port>` (see `haven status`). Mail, storage and analytics start with
+a little sample content (`MAILSIM_SEED`, `STORAGESIM_SEED`, `ANALYTICSSIM_SEED`,
+set to 1 by haven); each simulator's delete endpoint empties it.
 
 Two more are there only when the worktree asked for them (`haven up
 +design-system +mail-room`) — developer tools rather than parts of the product:
