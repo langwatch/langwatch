@@ -396,6 +396,8 @@ describe("how many identity providers an organization may register", () => {
         licensed: true,
         licenseActivatedSinceStart: false,
         optedIn: true,
+        singleOrganization: false,
+        actorIsPlatformOperator: false,
       },
       now: () => 1_756_000_000_000,
     });

@@ -327,6 +327,7 @@ export {
   SsoDomainProofExpiredError,
   SsoDomainProofLapsedError,
   SsoDomainProofNotFoundError,
+  SsoExistingAccountUnconfirmedError,
   SsoIssuerUnreachableError,
   SsoLicenseRequiredError,
   SsoSamlMetadataInvalidError,

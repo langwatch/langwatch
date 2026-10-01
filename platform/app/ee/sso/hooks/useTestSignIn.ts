@@ -105,6 +105,11 @@ const OUR_REFUSALS: Record<
     advice: () =>
       "The published record stopped resolving, so the domain still signs in the people already using it and vouches for nobody new. Republish the record and we will pick it up — we have already asked for it to be checked again.",
   },
+  sso_existing_account_unconfirmed: {
+    title: "Your LangWatch account's address isn't confirmed",
+    advice: () =>
+      "A LangWatch account already exists at that address and its address was never confirmed. This connection can link it once it has verified the address's domain and your identity provider marks the address as verified. Verify the domain on this connection, check that the provider sends email_verified as true, then run this again.",
+  },
   sso_sign_in_refused: {
     title: "LangWatch refused that sign-in",
     advice: () =>

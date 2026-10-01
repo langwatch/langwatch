@@ -94,6 +94,11 @@ export const STABLE_AUTH_ERRORS = [
   "sso_setup_address_mismatch",
   "sso_domain_not_verified",
   "sso_domain_proof_lapsed",
+  // An unconfirmed account exists at the address and this sign-in cannot
+  // vouch for it (specs/identity/sso-link-unconfirmed-local-account.feature).
+  // Stable for the same reason: what has to change is a domain proof or the
+  // provider's claim, not the attempt.
+  "sso_existing_account_unconfirmed",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>

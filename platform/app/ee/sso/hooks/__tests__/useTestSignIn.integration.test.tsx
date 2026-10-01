@@ -138,6 +138,23 @@ describe("given a test sign-in our own gate refused", () => {
   });
 });
 
+describe("given a test sign-in refused because the administrator's account address is unconfirmed", () => {
+  describe("when the administrator is returned to the settings screen", () => {
+    /** @scenario "The refusal reaches the sign-in screen with words the reader can act on" */
+    it("tells them to verify the domain and check the provider's verified claim", () => {
+      landOn({ error: "sso_existing_account_unconfirmed" });
+      draw();
+
+      const words =
+        screen.getByTestId("test-sign-in-failure").textContent ?? "";
+      expect(words).toMatch(/account's address isn't confirmed/i);
+      expect(words).toMatch(/verify the domain on this connection/i);
+      expect(words).toMatch(/email_verified/);
+      expect(screen.queryByText(/sent you back with an error/i)).toBeNull();
+    });
+  });
+});
+
 describe("given a test sign-in the identity provider itself rejected", () => {
   beforeEach(() => {
     landOn({

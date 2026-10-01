@@ -654,11 +654,13 @@ function SetupJourneySteps({
 
       <SetupStep
         number={2}
-        title="Prove a domain is yours"
+        title={
+          provesWithLicense ? "Add your domain" : "Prove a domain is yours"
+        }
         state={progress.domain}
         summary={
           connection.verifiedDomains.length > 0
-            ? `${connection.verifiedDomains.join(", ")} proved`
+            ? `${connection.verifiedDomains.join(", ")} ${provesWithLicense ? "added" : "proved"}`
             : undefined
         }
       >

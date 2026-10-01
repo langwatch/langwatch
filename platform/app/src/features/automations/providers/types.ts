@@ -92,6 +92,12 @@ export interface ClientDef<S = unknown, TPreview = unknown> {
   /** Icon rendered in the type picker. Lucide / react-icons component. */
   readonly Icon: ComponentType<{ size?: number }>;
 
+  /** True when this provider's `ConfigForm` hosts the receive-cadence chooser
+   *  itself — because its templates depend on the choice, so the chooser sits
+   *  beside the template list it filters. The cadence facet reads this and
+   *  offers only the settle window, never a competing second control. */
+  readonly hasOwnReceiveChooser?: boolean;
+
   /** Initial empty slice for this provider. */
   initialSlice(): S;
 
@@ -135,6 +141,8 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
      *  webhook. `botToken` is the freshly-typed token, or null to reuse the
      *  saved automation's stored token. */
     botDestination?: { channelId: string; botToken: string | null } | null;
+    /** The Slack connection the test fire delivers through (ADR-093 §5a). */
+    slackIntegrationId?: string | null;
     /** Generic HTTP destination (ADR-040): the full request shape the test
      *  fire sends through the SSRF-fenced sender. */
     webhookDestination?: {
@@ -147,11 +155,11 @@ export interface NotifyClientDef<S = unknown, TPreview = unknown>
   /** Template strings contributed to the save payload (`templates`). */
   templatesFromSlice(slice: S): TemplateDraft;
   /** Render options the PREVIEW must mirror so it shows what will really be
-   *  delivered. Slack only renders the modern blocks (charts, tables, alert
-   *  banners) over a bot connection — without this the preview would show a
-   *  chart that the webhook is going to strip, or hide one the bot will send.
-   *  Omit when the provider's preview needs no delivery-specific options. */
-  previewOptions?(slice: S): { allowGatedBlocks?: boolean };
+   *  delivered: Slack renders charts, tables and banners only over a bot
+   *  connection. Omit when the preview needs no delivery-specific options. */
+  previewOptions?(params: { slice: S }): {
+    allowGatedBlocks?: boolean;
+  };
 }
 
 // ---- Registry entries ---------------------------------------------------

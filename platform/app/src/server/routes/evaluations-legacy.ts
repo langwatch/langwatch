@@ -1037,7 +1037,7 @@ export const getEvaluatorIncludingCustom = async (
  * fields.
  *
  * Without this, the legacy REST route fell through to the hardcoded global
- * `DEFAULT_MODEL` (`getLatestOpenAIChatFlagship()`), bypassing the project's
+ * `DEFAULT_MODEL` (what `openai/latest` resolves to), bypassing the project's
  * model cascade entirely for every API-triggered evaluation (issue #5468).
  *
  * The feature keys match the server-side evaluator-create path in

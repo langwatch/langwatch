@@ -21,9 +21,12 @@ import {
   probeAppFunctionStore,
 } from "~/server/analytics/lwql/provisioning";
 import { getApp } from "~/server/app-layer/app";
+import { resolveWorkerCallbackUrl } from "~/server/app-layer/langy/LangyCredentialService";
+import { resolveLangyActorSession } from "~/server/app-layer/langy/langyApiKeyActorSession";
 import { assertRedisReady } from "~/server/app-layer/redis-readiness";
 import { getMigrateStatus } from "~/server/clickhouse/goose";
 import { collectUsageStats } from "~/server/collectUsageStats";
+import { runLangyHealthCanary } from "~/server/health-probes/langy-canary.service";
 import { readInstallVersion } from "~/server/installVersion";
 import {
   hasEmailProvider,
@@ -32,6 +35,7 @@ import {
 import {
   buildSmtpTransportOptions,
   isSmtpConfigured,
+  smtpSendsCredentials,
 } from "~/server/mailer/providers/smtp";
 import { assertTestConnectionWithinBudget } from "~/server/modelProviders/modelProvider.service";
 import { validateProviderApiKey } from "~/server/modelProviders/providerValidation";
@@ -47,6 +51,8 @@ import {
   hostOf,
   portOf,
 } from "./checkup.service";
+import { probeLangyCanary } from "./langyCanaryProbe";
+import { checkupModelProviderRow } from "./modelProviderRows";
 import {
   type UsageReportPreview,
   usageReportPreview,
@@ -55,15 +61,23 @@ import {
 const PROBE_TIMEOUT_MS = 5_000;
 const CANARY_TIMEOUT_MS = 150_000;
 
-/** The checkup for one organization, on the process's own dependencies. */
+/**
+ * The checkup for one organization, on the process's own dependencies.
+ * `actorUserId` is the person who asked for it, which the Langy canary sends
+ * its turn as; null when the request carries no user.
+ */
 export function checkupFor({
   prisma,
   organizationId,
+  actorUserId = null,
 }: {
   prisma: PrismaClient;
   organizationId: string;
+  actorUserId?: string | null;
 }): CheckupService {
-  return new CheckupService(realCheckupDeps({ prisma, organizationId }));
+  return new CheckupService(
+    realCheckupDeps({ prisma, organizationId, actorUserId }),
+  );
 }
 
 /** The report this install would send right now, on the sender's own pieces. */
@@ -79,7 +93,11 @@ export async function realUsageReportPreview(
   });
 }
 
-type CheckupScope = { prisma: PrismaClient; organizationId: string };
+type CheckupScope = {
+  prisma: PrismaClient;
+  organizationId: string;
+  actorUserId?: string | null;
+};
 
 /** The organization's oldest project, which the write and canary probes use. */
 function firstProjectOf({ prisma, organizationId }: CheckupScope) {
@@ -144,8 +162,7 @@ function gatewayDeps(): Pick<CheckupDeps, "gateway"> {
   return {
     gateway: {
       baseUrl: gatewayBaseUrl,
-      expectedControlPlaneUrl:
-        process.env.GATEWAY_CONTROL_PLANE_URL ?? env.BASE_HOST ?? null,
+      controlPlaneUrls: appAddresses(),
       health: async () => {
         const response = await fetch(`${gatewayBaseUrl}/healthz`, {
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
@@ -155,6 +172,27 @@ function gatewayDeps(): Pick<CheckupDeps, "gateway"> {
       probeControlPlane: () => probeControlPlane(gatewayBaseUrl),
     },
   };
+}
+
+/**
+ * Every address this app is reached at: its public BASE_HOST first, then the
+ * in-cluster address the chart hands the Langy worker and the gateway
+ * (LANGY_WORKER_CALLBACK_URL, `http://<release>-app:5560` by default), and the
+ * control plane address set for a gateway run beside the app.
+ */
+function appAddresses(): string[] {
+  const candidates = [
+    env.BASE_HOST,
+    resolveWorkerCallbackUrl(),
+    process.env.GATEWAY_CONTROL_PLANE_URL,
+  ];
+  return [
+    ...new Set(
+      candidates.filter(
+        (url): url is string => typeof url === "string" && url.trim() !== "",
+      ),
+    ),
+  ];
 }
 
 function licensingDeps({
@@ -261,11 +299,7 @@ function modelProviderDeps({
         where: { organizationId, enabled: true },
         select: { id: true, provider: true, customKeys: true },
       });
-      return rows.map((row) => ({
-        id: row.id,
-        provider: row.provider,
-        customKeys: (row.customKeys ?? {}) as Record<string, string>,
-      }));
+      return rows.map(checkupModelProviderRow);
     },
     modelProviderBudget: () => assertTestConnectionWithinBudget(organizationId),
     testModelProvider: async (provider, customKeys) => {
@@ -286,9 +320,26 @@ function modelProviderDeps({
   };
 }
 
-function canaryDeps(scope: CheckupScope): Pick<CheckupDeps, "canary"> {
+function canaryDeps(
+  scope: CheckupScope,
+): Pick<CheckupDeps, "canary" | "langyCanary"> {
   const firstProject = firstProjectOf(scope);
   return {
+    langyCanary: () =>
+      probeLangyCanary({
+        actorUserId: scope.actorUserId ?? null,
+        organizationId: scope.organizationId,
+        project: firstProject,
+        resolveActor: async (userId) => {
+          const actor = await resolveLangyActorSession({
+            prisma: scope.prisma,
+            userId,
+            now: new Date(),
+          });
+          return actor.ok ? actor.session : null;
+        },
+        run: (input) => runLangyHealthCanary(input),
+      }),
     canary: async (name, params) => {
       const project = await firstProject();
       if (!project) return { status: 412, body: { message: "no project" } };
@@ -330,6 +381,7 @@ export function realCheckupDeps(scope: CheckupScope): CheckupDeps {
     email: {
       provider: emailProviderName(),
       smtpConfigured: isSmtpConfigured(),
+      smtpSendsCredentials: smtpSendsCredentials(),
       verifySmtp: async () => {
         await nodemailer.createTransport(buildSmtpTransportOptions()).verify();
       },

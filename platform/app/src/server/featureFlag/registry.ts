@@ -396,15 +396,11 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it — their licence is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
+      "Lets an organization set enterprise single sign-on up itself on the hosted service: register the identity provider, claim a domain, and prove it with a record it publishes once a LangWatch operator has approved the claim (spec: specs/identity/sso-onboarding-tiers.feature). Off = the settings entry is not offered and every self-serve command is refused by name, pointing the reader at talking to us. Self-hosted installations do not consult it. Their license is the authorization there. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=self_serve_sso, or target an organization from /ops/feature-flags.",
   },
-  {
-    key: "release_webhook_automations",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Offers the Webhook (generic HTTP request) delivery channel for automations (ADR-040). Gates the delivery-picker card, the save route accepting SEND_WEBHOOK, and the test-fire path. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_webhook_automations.",
-  },
+  // NOTE: `release_webhook_automations` (ADR-040) was retired — the webhook
+  // delivery channel is offered to every project, so there is no picker card,
+  // save route, or test-fire path left to gate.
   {
     key: "experiment_onboarding_langy_guided",
     scope: "PRODUCT",

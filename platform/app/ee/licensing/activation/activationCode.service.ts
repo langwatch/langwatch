@@ -21,6 +21,7 @@
  */
 
 import { CONNECT_SERVICES, type ConnectService } from "../connect/services";
+import { resolveMembersLite } from "../planTemplates";
 import {
   activationCodeHash,
   activationCodeHint,
@@ -154,7 +155,12 @@ export class ActivationCodeService {
       email: input.email,
       planType: input.planType,
       maxMembers: input.maxMembers,
-      maxMembersLite: input.maxMembersLite ?? 0,
+      // Resolved now, the way a license issued directly is, so the row shows
+      // the lite seats the minted license will carry.
+      maxMembersLite: resolveMembersLite({
+        planType: input.planType,
+        maxMembersLite: input.maxMembersLite,
+      }),
       licenseTermDays: input.licenseTermDays,
       services: input.services ?? [],
       expiresAt: input.expiresAt,

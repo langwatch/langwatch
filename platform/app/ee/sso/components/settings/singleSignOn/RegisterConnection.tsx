@@ -276,7 +276,7 @@ function ProviderPicker({
         </Text>
       </VStack>
       <SimpleGrid
-        columns={{ base: 2, md: 4 }}
+        minChildWidth={PROVIDER_TILE_MIN_WIDTH}
         gap={2}
         role="radiogroup"
         aria-label="Who signs your team in?"
@@ -289,7 +289,7 @@ function ProviderPicker({
           Or connect by protocol, if you already know which one you have.
         </Text>
         <SimpleGrid
-          columns={{ base: 2, md: 4 }}
+          minChildWidth={PROVIDER_TILE_MIN_WIDTH}
           gap={2}
           role="radiogroup"
           aria-label="Connect by protocol"
@@ -371,7 +371,7 @@ function CredentialsAct({
         <Text color="fg.muted" fontSize="sm">
           {preset.protocolIsChosen
             ? "These are the values your identity provider's app hands back."
-            : "Two ways to connect — pick whichever your identity provider's app gave you. Either one works."}
+            : "There are two ways to connect. Pick the one your identity provider's app gave you. Either one works."}
         </Text>
       </VStack>
       {/* A tile that IS a protocol has answered this already; asking again
@@ -516,6 +516,13 @@ function SamlFields({
   );
 }
 
+/**
+ * The narrowest a provider tile gets. Wide enough for the longest name
+ * ("Microsoft Entra ID") on one line beside its mark, so the grid drops a
+ * column before a name is cut. A name that still does not fit wraps.
+ */
+const PROVIDER_TILE_MIN_WIDTH = "12rem";
+
 /** One provider the administrator recognises: its own mark where the icon
  *  set has one, its initials where it does not, and the name. */
 function ProviderTile({
@@ -574,7 +581,7 @@ function ProviderTile({
           preset.monogram
         )}
       </Box>
-      <Text fontSize="sm" fontWeight="medium" lineClamp={1}>
+      <Text fontSize="sm" fontWeight="medium" lineHeight="short">
         {preset.name}
       </Text>
     </chakra.button>

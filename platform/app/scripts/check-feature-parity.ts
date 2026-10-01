@@ -363,13 +363,7 @@ const LEGACY_INERT: string[] = [
   "specs/ai-governance/sessions/sessions-inventory.feature",
   "specs/analytics/posthog-cost-control.feature",
   "specs/automations/dispatch-timing.feature",
-  "specs/automations/notification-templates.feature",
-  // ADR-093's design contract, every scenario @unimplemented on purpose: the
-  // ADR ships ahead of the implementation, and the reference PR (R0) binds
-  // these as it lands. Remove this entry with the first binding.
-  "specs/automations/source-merge.feature",
   "specs/automations/spam-prevention.feature",
-  "specs/automations/webhook-http-action.feature",
   "specs/batch-evaluation-results/experiment-cost-folding.feature",
   "specs/batch-evaluation-results/run-comparison.feature",
   "specs/batch-evaluation-results/target-metadata-api.feature",
@@ -511,7 +505,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/telemetry.feature",
   "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
@@ -736,6 +729,10 @@ const LEGACY_PARTIAL: string[] = [
   // assertion, so tagging them would misstate what covers them.
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
+  // Reason: left LEGACY_INERT when its two default-layout scenarios (trace
+  // excerpts, the default Slack message) gained bindings; the other
+  // nineteen Liquid-template scenarios stay untagged.
+  "specs/automations/notification-templates.feature",
   "specs/automations/process-manager-dispatch.feature",
   "specs/ci/path-filters.feature",
   // Reason: reached this branch from main already partially tagged, and its

@@ -123,3 +123,25 @@ export class DirectRegistrationUnavailableError extends HandledError {
     this.name = "DirectRegistrationUnavailableError";
   }
 }
+
+/**
+ * A signed-out sign-up request arrived from a web address other than the one
+ * the installation is configured for (`NEXTAUTH_URL`).
+ *
+ * The same refusal the `/api/auth/*` origin gate answers with, for the tRPC
+ * procedures that start or complete a sign-up. The usual cause is somebody
+ * reaching the installation on a second address (a port-forward, an internal
+ * hostname), and the way on is to use the configured one.
+ */
+export class InvalidAuthOriginError extends HandledError {
+  declare readonly code: "auth_invalid_origin";
+
+  constructor() {
+    super(
+      "auth_invalid_origin",
+      "This request came from a different web address than the one this installation is set up for.",
+      { httpStatus: 403, fault: "customer" },
+    );
+    this.name = "InvalidAuthOriginError";
+  }
+}

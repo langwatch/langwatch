@@ -227,6 +227,15 @@ jobs:
         if: "!cancelled()"
         run: ./tests/connect-env.sh
 
+      # release-please bumps the gateway and langyagent subchart versions on
+      # every release, and clickhouse-serverless on its own releases. The
+      # umbrella must still build its dependencies right after that bump,
+      # which a committed Chart.lock breaks (the 3.19.1 chart release failed
+      # on exactly this).
+      - name: "assert dependencies build after a subchart version bump"
+        if: "!cancelled()"
+        run: ./tests/dependency-build-after-subchart-bump.sh
+
   # The render job above proves the chart PARSES; these vitest suites
   # assert on what it EMITS (env selection per provider, identity guards,
   # migration postures, validation failures). They normally run inside the
