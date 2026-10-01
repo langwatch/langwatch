@@ -252,6 +252,14 @@ flows:
       - action: upload
         with:
           fixture: sample.csv
+      - action: select
+        with:
+          selector: '[role="dialog"] select >> nth=0'
+          option: input
+      - action: select
+        with:
+          selector: '[role="dialog"] select >> nth=1'
+          option: expected_output
       - action: click
         with:
           text: /^\s*Upload\s*$/

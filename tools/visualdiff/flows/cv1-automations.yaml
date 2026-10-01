@@ -31,13 +31,13 @@ flows:
           path: /{slug}/automations/alerts
       - action: expect
         with:
-          text: New alert
+          text: New automation
       - action: go
         with:
           path: /{slug}/automations/schedules
       - action: expect
         with:
-          text: New schedule
+          text: New report
       - action: go
         with:
           path: /{slug}/automations/automations

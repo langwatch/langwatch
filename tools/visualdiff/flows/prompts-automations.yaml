@@ -402,6 +402,9 @@ flows:
       - action: click
         with:
           text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: fill
         with:
           field: "Settle window"
@@ -416,7 +419,7 @@ flows:
           hasText: Every hour
       - action: click
         with:
-          text: /^\s*Email/
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -427,6 +430,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -446,14 +452,17 @@ flows:
     steps:
       - action: go
         with:
-          path: "/{slug}/automations/alerts"
+          path: "/{slug}/automations/automations"
       - action: click
         with:
-          text: "New alert"
+          text: "New automation"
       - action: fill
         with:
-          field: "High latency alert"
+          field: "High latency"
           value: "vd-alert-{uid}"
+      - action: click
+        with:
+          text: A graph
       - action: select
         with:
           field: "Custom graph"
@@ -464,15 +473,10 @@ flows:
           option: "Traces"
       - action: click
         with:
-          selector: '[role="combobox"]'
-          hasText: Pick a severity
+          text: /^\s*Continue\s*$/
       - action: click
         with:
-          selector: '[role="option"]'
-          hasText: /^\s*Warning\s*$/
-      - action: click
-        with:
-          text: /^\s*Email/
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -485,7 +489,10 @@ flows:
           text: /^\s*Done\s*$/
       - action: click
         with:
-          text: /^\s*Create alert\s*$/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -505,7 +512,7 @@ flows:
           path: "/{slug}/automations/schedules"
       - action: click
         with:
-          text: "New schedule"
+          text: "New report"
       - action: fill
         with:
           field: "Weekly quality digest"
@@ -541,7 +548,7 @@ flows:
           text: /^\s*Done\s*$/
       - action: click
         with:
-          text: /^\s*Create schedule\s*$/
+          text: /^\s*Create report\s*$/
       - action: expect
         with:
           api: "/api/triggers"
@@ -574,7 +581,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -585,6 +595,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -638,7 +651,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -649,6 +665,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -705,7 +724,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -716,6 +738,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/

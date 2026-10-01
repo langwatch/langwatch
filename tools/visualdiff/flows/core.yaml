@@ -4,11 +4,23 @@ flows:
   - id: automation-alert
     title: Create an alert on a custom graph's series
     steps:
-      - action: createAutomation
+      - action: go
         with:
-          name: VD Alert {uid}
-          kind: alert
-          submit: none
+          path: /{slug}/traces
+      - action: dismissTour
+      - action: click
+        with:
+          text: /^\s*Automate\s*$/
+      - action: expect
+        with:
+          testId: automation-name-input
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: VD Alert {uid}
+      - action: click
+        with:
+          text: A graph
       - action: select
         with:
           field: Custom graph
@@ -19,7 +31,10 @@ flows:
           option: /Traces/
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -32,7 +47,10 @@ flows:
           text: /^\s*Done\s*$/
       - action: click
         with:
-          text: Create alert
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
       - action: go
         with:
           path: /{slug}/automations/alerts
@@ -88,21 +106,60 @@ flows:
   - id: automation-create
     title: Create an automation using every part of its form
     steps:
-      - action: createAutomation
+      - action: go
         with:
-          name: VD Automation {uid}
-          cadence: Every 15 minutes
-          settleWindow: "45"
-          submit: none
+          path: /{slug}/traces
+      - action: dismissTour
       - action: click
         with:
-          text: Code
+          text: /^\s*Automate\s*$/
+      - action: expect
+        with:
+          testId: automation-name-input
+      - action: fill
+        with:
+          testId: automation-name-input
+          value: VD Automation {uid}
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
       - action: click
         with:
           text: status:error
       - action: click
         with:
-          text: Create automation
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: Add email
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+      - action: fill
+        with:
+          field: Settle window
+          value: "45"
+      - action: click
+        with:
+          selector: '[role="combobox"]'
+          hasText: /^\s*Immediate/
+      - action: click
+        with:
+          selector: '[role="option"]'
+          hasText: Every 15 minutes
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
       - action: go
         with:
           path: /{slug}/automations/automations
