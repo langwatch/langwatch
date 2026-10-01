@@ -249,3 +249,97 @@ Feature: Workflow service boundary
     Given an editor with a browser session
     When it posts a Studio event
     Then the app receives that session's user rather than nobody
+
+  @unit
+  Scenario: A workflow run calls LangWatch with a key minted for that run, never the project key
+    Given a member who may run workflows in a project
+    When the member starts a workflow run that calls LangWatch's own endpoints
+    Then the run carries a key minted for that run, bound to the project and owned by the member
+    And the project's legacy key is not in the run
+    And the key lives 15 minutes and is retired by the api-key sweep once it has lapsed
+
+  @unit
+  Scenario: Every call a run makes back into LangWatch acts as the user who started it
+    Given a member who holds some, but not all, of the permissions of a project
+    When the member's workflow run calls LangWatch with its minted key
+    Then each call is judged as that member
+    And the key carries no permission the member does not hold
+
+  @unit
+  Scenario: A run's key carries only the permissions the run uses
+    Given a graph with no evaluator node and no node that runs another workflow
+    When the run's key is minted
+    Then it carries trace creation alone
+    And an evaluator node adds evaluations, and a node that runs another workflow adds workflows
+
+  @unit
+  Scenario: A run is refused before it starts when its starter may not run evaluations
+    Given a member who does not hold evaluations:manage on the project
+    When the member starts a run whose graph has an evaluator node
+    Then api_key_permission_denied names evaluations:manage
+    And no key is minted and nothing is dispatched
+
+  @unit
+  Scenario: A long run keeps calling LangWatch past 15 minutes
+    Given a run that outlives the key it started with
+    When the run asks for a key with less than 5 minutes of life left on the one it holds
+    Then a fresh key is minted for the same member, project and permissions
+    And a key with at least 5 minutes left is reused, and never lent to a narrower or different run
+
+  Scenario: The run's key stops working after the run ends
+    Given a workflow run carrying its own minted key
+    When 15 minutes have passed since the key was minted
+    Then a call made with it is refused
+    And the api-key sweep revokes it
+    And a run that never finishes loses the key when its lifetime lapses
+
+  @unit
+  Scenario: A run nobody started calls LangWatch with a project key holding only what it needs
+    Given a monitor, an online evaluation or a scenario run that no member started
+    When its workflow, evaluator or scenario target is prepared to run
+    Then the run carries a 15 minute key with no owner, bound to the project
+    And the key holds only the permissions the graph or target uses
+    And the project's legacy key is not in the run
+
+  @unit
+  Scenario: A run nobody started in a personal workspace acts as the system, not the owner
+    Given a monitor in a member's personal workspace
+    When its run's key is minted
+    Then the key has no owner and no creator
+    And none of its calls act as the workspace owner or borrow their grants
+
+  @unit
+  Scenario: A starter who loses a permission is refused even while a key minted for them lives
+    Given a key minted for a member's run holding evaluations:manage, with most of its life left
+    And the member then loses evaluations:manage
+    When the member starts another run that needs it
+    Then api_key_permission_denied names evaluations:manage before the run starts
+    And the held key is not handed out
+
+  @unit
+  Scenario: A run started with a personal access token holds no more than that token
+    Given a member who holds workflows:manage on the project
+    And a personal access token of theirs that does not hold it
+    When the token starts a run whose graph runs another workflow
+    Then api_key_permission_denied names workflows:manage before the run starts
+    And no key is minted
+
+  @unit
+  Scenario: A run started with a CLI access token is bounded by the person alone
+    Given a member signed in through the CLI or the hosted MCP with a project-bound access token
+    When the token starts a run
+    Then the run names no calling key, since no key row stands behind the token
+    And the run's key is minted holding what the member and the run both hold
+
+  @unit
+  Scenario: A caller cannot ask for a run key that outlives an hour
+    Given a caller asking for a run key with more than an hour of life left
+    When the key is minted
+    Then the request is refused and no key is minted
+
+  @unit
+  Scenario: A dispatch never holds a key that lapses before the dispatch can end
+    Given a run dispatched to the Lambda fleet, whose invocation may last 900 seconds
+    When its run key is minted or reused
+    Then the key has at least 900 seconds plus a minute left when handed out
+    And a self-hosted dispatch's key has at least 15 minutes left

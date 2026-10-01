@@ -1,12 +1,15 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
   llmConfigSchema,
   normalizeWorkflowLlmConfig,
   parseStudioWorkflow,
+  runKeyPermissions,
   type LLMConfig,
   type ServerWorkflow,
   type StudioClientEvent,
   type StudioWorkflow,
+  type WorkflowRunPrincipal,
 } from "@langwatch/workflow-contract";
 
 import type {
@@ -20,12 +23,20 @@ const workflowLlmConfigSchema = llmConfigSchema.passthrough().nullish();
 type StudioWorkflowEventEnricherOptions = {
   projectEnvironment: WorkflowProjectEnvironment;
   llmParameters: WorkflowLlmParameters;
+  /** The key every run calls LangWatch with: its starter's, or an ownerless one. */
+  runKeys: Pick<ApiKeyApi, "mintRunKey">;
+  /** The life a dispatch's key must still have when handed out: the engine's own bound. */
+  dispatchKeyFloorMs: number;
 };
 
 type WorkflowEvent = Exclude<StudioClientEvent, { type: "is_alive" | "stop_execution" }>;
 
 export type StudioEventEnricher = {
-  enrich(input: { event: StudioClientEvent; projectId: string }): Promise<StudioClientEvent>;
+  enrich(input: {
+    event: StudioClientEvent;
+    projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
+  }): Promise<StudioClientEvent>;
 };
 
 /**
@@ -39,7 +50,11 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
 
   private constructor(private readonly options: StudioWorkflowEventEnricherOptions) {}
 
-  async enrich(input: { event: StudioClientEvent; projectId: string }): Promise<StudioClientEvent> {
+  async enrich(input: {
+    event: StudioClientEvent;
+    projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
+  }): Promise<StudioClientEvent> {
     const event = input.event;
     if (event.type === "is_alive" || event.type === "stop_execution") {
       return event;
@@ -48,6 +63,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
     const { workflow, resolutions } = await this.enrichWorkflow({
       event,
       projectId: input.projectId,
+      principal: input.principal,
     });
 
     return this.withWorkflow(event, workflow, resolutions);
@@ -56,6 +72,7 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
   private async enrichWorkflow(input: {
     event: Exclude<StudioClientEvent, { type: "is_alive" | "stop_execution" }>;
     projectId: string;
+    principal: WorkflowRunPrincipal | undefined;
   }): Promise<{
     workflow: ServerWorkflow;
     resolutions: readonly WorkflowLlmParameterResolution[];
@@ -76,12 +93,28 @@ export class StudioWorkflowEventEnricherService implements StudioEventEnricher {
       }),
     ]);
 
+    const apiKey = await this.options.runKeys.mintRunKey({
+      userId: input.principal?.userId ?? null,
+      ...(input.principal?.callerApiKeyId
+        ? { callerApiKeyId: input.principal.callerApiKeyId }
+        : {}),
+      projectId: input.projectId,
+      permissions: [
+        ...runKeyPermissions({
+          eventType: event.type,
+          nodeId: "node_id" in event.payload ? event.payload.node_id : undefined,
+          nodes: studioWorkflow.nodes,
+        }),
+      ],
+      minRemainingMs: this.options.dispatchKeyFloorMs,
+    });
+
     return {
       resolutions,
       workflow: {
         ...studioWorkflow,
         workflow_id: workflowId,
-        api_key: environment.apiKey,
+        api_key: apiKey,
         project_id: input.projectId,
         secrets: environment.secrets,
         nodes: await this.enrichNodes(studioWorkflow.nodes, resolutions),

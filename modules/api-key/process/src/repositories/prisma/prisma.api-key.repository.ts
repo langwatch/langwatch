@@ -67,6 +67,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: {
         organizationId: input.organizationId,
         revokedAt: null,
+        isSystemManaged: false,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
         OR: [{ userId: input.userId }, { userId: null, ingestSourceType: null }],
       },
@@ -78,6 +79,7 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
       where: {
         organizationId: input.organizationId,
         revokedAt: null,
+        isSystemManaged: false,
         name: { notIn: [...HIDDEN_SYSTEM_KEY_NAMES] },
       },
       orderBy: { createdAt: "desc" },
@@ -169,13 +171,18 @@ export class PrismaApiKeyRepository implements ApiKeyRepository {
    * not: null }` is explicit, not left to `lte`: a NULL treated as "before
    * now" would revoke every key of this name in the product at once.
    */
-  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
+  async revokeExpiredByName(input: {
+    name: string;
+    now: Instant;
+    systemManagedOnly?: boolean;
+  }): Promise<number> {
     const now = toDate(input.now);
     const { count } = await this.database.apiKey.updateMany({
       where: {
         name: input.name,
         revokedAt: null,
         expiresAt: { not: null, lte: now },
+        ...(input.systemManagedOnly ? { isSystemManaged: true } : {}),
       },
       data: { revokedAt: now },
     });

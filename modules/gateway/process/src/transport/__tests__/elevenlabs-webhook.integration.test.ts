@@ -161,6 +161,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
       "model-provider": modelProviders,
       trace: peer("trace"),
       secret: peer("secret"),
+      "api-key": peer("api key"),
     })
     .boot();
   const gateway = runtime.module(gatewayServer).provided;

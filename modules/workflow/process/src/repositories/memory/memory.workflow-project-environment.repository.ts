@@ -21,6 +21,6 @@ export class WorkflowProjectEnvironmentMemoryRepository extends WorkflowProjectE
   findEnvironment(input: { projectId: string }): Promise<StoredProjectEnvironment> {
     const row = this.store.environments.get(input.projectId);
 
-    return Promise.resolve({ apiKey: row?.apiKey ?? "", secrets: row?.secrets ?? [] });
+    return Promise.resolve({ secrets: row?.secrets ?? [] });
   }
 }

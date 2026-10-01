@@ -441,6 +441,7 @@ export class ScenarioApp implements ScenarioApi {
       agentTesting: AgentTestService.create({
         agents: peers.agents,
         projects: peers.projects,
+        apiKeys: peers.apiKeys,
         workflows: peers.workflows,
         prompts: peers.prompts,
         secrets: peers.secrets,

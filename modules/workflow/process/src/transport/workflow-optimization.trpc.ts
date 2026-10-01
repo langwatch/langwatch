@@ -17,11 +17,12 @@ export const workflowOptimizationTrpcTransport: TrpcRouterDeclaration<
    */
   .procedure("chat")
   .withPermission("workflows:manage")
-  .handle(({ app, input }) =>
+  .handle(({ app, input, actor }) =>
     app.runPublished({
       workflowId: input.workflowId,
       projectId: input.projectId,
       body: input.inputMessages[0] ?? {},
+      principal: { userId: actor.id },
     }),
   )
 

@@ -247,7 +247,10 @@ describe("the projects REST family over the application the composition builds",
     beforeEach(() => {
       recorded.mockClear();
       app = application().app;
-      app.connectLifecycle({ recordProjectCreated: { send: recorded } });
+      app.connectLifecycle({
+        recordProjectCreated: { send: recorded },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      });
     });
 
     /** @scenario "A project created through the REST API is recorded as created" */

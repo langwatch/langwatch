@@ -48,6 +48,10 @@ export type RestResolvedProjectCredential =
       ingestionTemplateId: string | null;
       /** Set when the key belongs to an agent session rather than a person. */
       isLangySessionKey?: boolean;
+      /** Set on an ownerless run key minted for a run nobody started: it acts as the system. */
+      isUnattendedRunKey?: boolean;
+      /** Set when a person's access token (CLI, hosted MCP) stands behind it: no key row exists. */
+      isPersonSession?: boolean;
       project: RestProjectIdentity;
     };
 

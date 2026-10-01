@@ -324,6 +324,50 @@ describe("given a configuration over one scenario and one agent", () => {
       expect(response.status).toBe(200);
       expect(mounted.commands.queued[0]?.actor).toEqual({ id: "user-runner", label: "cli" });
     });
+
+    /** @scenario "A scenario run started with a personal access token holds no more than that token" */
+    it("names the key the person called with, so the run's key holds no more than it", async () => {
+      const withKey = mountSuiteFamilies({ caller: { userId: "user-runner", apiKeyId: "pat-1" } });
+      const scenario = withKey.world.addScenario({ name: "Refund Flow" }).id;
+      const agent = withKey.world.addAgent().id;
+
+      const response = await withKey.api.post(`${BASE}/run`, {
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: [scenario],
+          targets: [{ type: "http", referenceId: agent }],
+        },
+        idempotencyKey: "run-plan-actor-4",
+      });
+
+      expect(response.status).toBe(200);
+      expect(withKey.commands.queued[0]?.actor).toEqual({
+        id: "user-runner",
+        label: "api",
+        apiKeyId: "pat-1",
+      });
+    });
+
+    /** @scenario "A scenario run started with a CLI access token is bounded by the person alone" */
+    it("names no key for a person's access token, so the person alone bounds the run's key", async () => {
+      const withToken = mountSuiteFamilies({
+        caller: { userId: "user-runner", apiKeyId: "cli-access-1", isPersonSession: true },
+      });
+      const scenario = withToken.world.addScenario({ name: "Refund Flow" }).id;
+      const agent = withToken.world.addAgent().id;
+
+      const response = await withToken.api.post(`${BASE}/run`, {
+        config: {
+          scope: { mode: "scenarios" },
+          scenarioIds: [scenario],
+          targets: [{ type: "http", referenceId: agent }],
+        },
+        idempotencyKey: "run-plan-actor-5",
+      });
+
+      expect(response.status).toBe(200);
+      expect(withToken.commands.queued[0]?.actor).toEqual({ id: "user-runner", label: "api" });
+    });
   });
 
   describe("when it names no target", () => {

@@ -83,7 +83,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["listTraceDestinations"]> {
     return prisma.project.findMany({
       where: { id: { in: projectIds } },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 }

@@ -127,11 +127,17 @@ export class ApiKeyGrantPolicyService {
     return input.permissions?.length ? [...input.permissions].toSorted() : void 0;
   }
 
+  /**
+   * A personal workspace admits no principal but its owner. The one exception is a key the
+   * platform mints for a run nobody started: it has no owner and acts as the system.
+   */
   async assertPersonalScopesOwnedBy(input: {
     scopes: ApiKeyScope[];
     organizationId: string;
     ownerUserId: string | null;
+    isSystemManaged: boolean;
   }): Promise<void> {
+    if (input.isSystemManaged && input.ownerUserId === null) return;
     for (const scope of input.scopes) {
       if (scope.scopeType === "ORGANIZATION") {
         continue;

@@ -2,6 +2,7 @@
  * The checkup's facts, each answered by the module that owns it.
  * Spec: specs/self-hosting/checkup/checkup.feature
  */
+import type { MintRunKeyInput } from "@langwatch/api-key-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { GatewayDeploymentAddresses } from "@langwatch/gateway-contract";
@@ -63,6 +64,7 @@ let world: UsageReportWorld;
 let probedProjects: string[];
 let provisionable: boolean[];
 let probes: MemoryCheckupProbeChannel;
+let mintedKeys: MintRunKeyInput[];
 let gatewayAddresses: GatewayDeploymentAddresses;
 
 function checkup() {
@@ -123,6 +125,12 @@ function service() {
       },
       lwql: { findAppFunctionsProvisionable: async () => provisionable },
       gateway: { ...world.peers().gateway, getDeploymentAddresses: () => gatewayAddresses },
+      apiKeys: {
+        mintRunKey: async (input) => {
+          mintedKeys.push(input);
+          return "sk-lw-canary";
+        },
+      },
     },
     repositories: { postgres: datastores, clickhouse: datastores, redis: datastores },
     channels: {
@@ -143,6 +151,7 @@ beforeEach(() => {
   probedProjects = [];
   provisionable = [true];
   probes = MemoryCheckupProbeChannel.create();
+  mintedKeys = [];
   gatewayAddresses = {
     baseUrl: void 0,
     publicUrl: void 0,
@@ -204,6 +213,17 @@ describe("OpsCheckupService", () => {
 
       expect(rows.find((row) => row.id === "storage_probe")?.verdict.outcome).toBe("verified");
       expect(probedProjects).toEqual(["project-1"]);
+    });
+  });
+
+  describe("given a canary runs against the oldest project", () => {
+    /** @scenario "A checkup canary runs with a minimal key of its own, never the project key" */
+    it("mints an ownerless key holding only what that canary calls", async () => {
+      await checkup().explicit({ checks: ["canary_collector"] });
+
+      expect(mintedKeys).toEqual([
+        { userId: null, projectId: "project-1", permissions: ["traces:create"] },
+      ]);
     });
   });
 

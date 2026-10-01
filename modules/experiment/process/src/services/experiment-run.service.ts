@@ -151,7 +151,6 @@ export class ExperimentRunService {
         experiments,
         evaluationReporting: peers.evaluation,
         sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-          projects: peers.projects,
           apiKeys: peers.apiKeys,
         }),
         connectedDispatch: peers.agents,

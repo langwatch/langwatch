@@ -107,6 +107,7 @@ export class WorkflowNlpExecutionService {
       body: await this.options.studioEvents.enrich({
         event,
         projectId: input.projectId,
+        principal: input.principal,
       }),
       origin,
       causalityDepth: input.causalityDepth,

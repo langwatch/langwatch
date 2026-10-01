@@ -55,6 +55,15 @@ export const copyWorkflowCommandSchema = z.object({
 });
 
 /**
+ * The member a run acts as, and the key they started it with. The key minted for the run is
+ * theirs, holding no more than they or that key do; a run that names nobody gets an ownerless key.
+ */
+export const workflowRunPrincipalSchema = z
+  .object({ userId: z.string().min(1), callerApiKeyId: z.string().min(1).optional() })
+  .strict();
+export type WorkflowRunPrincipal = z.infer<typeof workflowRunPrincipalSchema>;
+
+/**
  * Dispatch input shared by every workflow transport. The graph is resolved by
  * the service, so callers can only name the workflow and an optional version.
  */
@@ -67,6 +76,7 @@ export const runWorkflowCommandSchema = z.object({
   runEvaluations: z.boolean().optional(),
   origin: workflowRunOriginSchema.optional(),
   causalityDepth: z.number().int().nonnegative().optional(),
+  principal: workflowRunPrincipalSchema.optional(),
   parentTrace: z
     .object({
       traceId: z.string(),

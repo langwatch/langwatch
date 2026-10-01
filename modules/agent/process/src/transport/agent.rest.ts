@@ -25,6 +25,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
+  type RestResolvedProjectCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { z } from "zod";
@@ -33,6 +34,14 @@ export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-c
 
 /** The W3C trace context header a call carries, bound by the process from the request. */
 export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
+
+/** The API key a test run was started with, so the run's key holds no more; null if none. */
+export const agentCallerKey = defineRestMiddleware("agentCallerKey", z.string().min(1).nullable());
+
+/** The key that bounds the run: none for a project key, or a person's access token (no key row). */
+export function agentCallerKeyOf(credential: RestResolvedProjectCredential): string | null {
+  return credential.type === "apiKey" && !credential.isPersonSession ? credential.apiKeyId : null;
+}
 
 function response(
   agent: AgentOverview,
@@ -205,9 +214,14 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       .withPermission("scenarios:create")
       .withOutput(agentTestRunResponseSchema)
       .withDocs({ summary: "Schedule a scripted test run and return its run identifiers" })
-      .withMiddleware(projectRestFacts)
-      .handle(({ app, input, scope }, facts) =>
-        app.testRun({ agentId: input.id, projectId: scope.id, actorId: facts.actorId }),
+      .withMiddleware(projectRestFacts, agentCallerKey)
+      .handle(({ app, input, scope }, facts, callerKey) =>
+        app.testRun({
+          agentId: input.id,
+          projectId: scope.id,
+          actorId: facts.viewerUserId,
+          callerApiKeyId: callerKey,
+        }),
       )
 
       .post("/:id/call", "callConnectedAgent")

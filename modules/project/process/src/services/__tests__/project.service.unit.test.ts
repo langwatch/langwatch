@@ -610,7 +610,10 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
       });
-      created.connect({ recordProjectCreated: { send } });
+      created.connect({
+        recordProjectCreated: { send },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
+      });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
         input,
@@ -634,6 +637,7 @@ describe("ProjectService", () => {
       });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+        recordProjectLegacyKeyRevoked: { send: async () => undefined },
       });
 
       await expect(

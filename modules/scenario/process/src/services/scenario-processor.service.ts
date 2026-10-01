@@ -229,6 +229,8 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
         secretParameters: jobData.secretParameters,
       },
       target: jobData.target,
+      startedByUserId: jobData.startedByUserId,
+      startedByApiKeyId: jobData.startedByApiKeyId,
     });
     const childEnvironment = await preparation.childEnvironment;
     let childSession: ScenarioChildExecutionSession | null = null;

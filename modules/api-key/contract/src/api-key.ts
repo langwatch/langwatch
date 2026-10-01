@@ -55,6 +55,8 @@ export const apiKeySchema = z
     lastUsedAt: z.date().nullable(),
     ingestSourceType: z.string().nullable(),
     ingestionTemplateId: z.string().nullable(),
+    /** Minted by LangWatch for itself (a run, the gateway, Langy), never by a customer. */
+    isSystemManaged: z.boolean().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
     grants: z.array(apiKeyBindingSchema),

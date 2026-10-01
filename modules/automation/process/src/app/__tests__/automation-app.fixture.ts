@@ -116,7 +116,6 @@ export function createCanonicalAutomationApp(): {
     create: vi.fn(),
     updateSettings: vi.fn(),
     archive: vi.fn(),
-    regenerateLegacyProjectKey: vi.fn(),
     requestTopicClustering: vi.fn(),
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),

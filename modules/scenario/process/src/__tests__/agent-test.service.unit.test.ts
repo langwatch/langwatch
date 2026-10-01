@@ -100,6 +100,7 @@ function serviceFor(options: {
   const service = AgentTestService.create({
     agents,
     projects: { findById: vi.fn().mockResolvedValue(null) } as never,
+    apiKeys: { mintRunKey: vi.fn() },
     workflows: {} as never,
     prompts: {} as never,
     secrets: {} as never,

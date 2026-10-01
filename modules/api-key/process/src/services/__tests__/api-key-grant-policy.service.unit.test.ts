@@ -318,6 +318,38 @@ describe("ApiKeyGrantPolicyService", () => {
             scopes: [scope()],
             organizationId: ORG,
             ownerUserId: "user-1",
+            isSystemManaged: false,
+          }),
+        ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
+      });
+    });
+
+    /** @scenario "Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in" */
+    describe("given a system-managed key with no owner", () => {
+      it("allows a personal workspace without making the key the owner's", async () => {
+        const { service } = policyWith({ personalOwner: "user-2" });
+
+        await expect(
+          service.assertPersonalScopesOwnedBy({
+            scopes: [scope()],
+            organizationId: ORG,
+            ownerUserId: null,
+            isSystemManaged: true,
+          }),
+        ).resolves.toBeUndefined();
+      });
+    });
+
+    describe("given an ownerless key a person asked for", () => {
+      it("refuses a personal workspace", async () => {
+        const { service } = policyWith({ personalOwner: "user-2" });
+
+        await expect(
+          service.assertPersonalScopesOwnedBy({
+            scopes: [scope()],
+            organizationId: ORG,
+            ownerUserId: null,
+            isSystemManaged: false,
           }),
         ).rejects.toBeInstanceOf(ApiKeyScopeViolationError);
       });
@@ -332,6 +364,7 @@ describe("ApiKeyGrantPolicyService", () => {
             scopes: [scope()],
             organizationId: ORG,
             ownerUserId: "user-1",
+            isSystemManaged: false,
           }),
         ).resolves.toBeUndefined();
       });

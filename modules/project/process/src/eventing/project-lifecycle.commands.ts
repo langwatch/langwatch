@@ -4,16 +4,24 @@ import {
   PROJECT_AGGREGATE_TYPE,
   PROJECT_CREATED_EVENT_TYPE,
   PROJECT_CREATED_EVENT_VERSION,
+  PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
+  PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
 } from "@langwatch/project-contract";
 
 import {
   RECORD_PROJECT_CREATED_COMMAND_TYPE,
+  RECORD_PROJECT_LEGACY_KEY_REVOKED_COMMAND_TYPE,
   type ProjectCreatedEvent,
+  type ProjectLegacyKeyRevokedEvent,
+  type RecordProjectLegacyKeyRevokedCommandData,
+  recordProjectLegacyKeyRevokedCommandDataSchema,
   type RecordProjectCreatedCommandData,
   recordProjectCreatedCommandDataSchema,
 } from "./project-lifecycle.events.ts";
 
-/** Records that a project exists. A project is created once, so a redelivery records nothing new. */
+/**
+ * Records that a project exists. A project is created once, so a redelivery records nothing new.
+ */
 export class RecordProjectCreatedCommand implements CommandHandler<
   Command<RecordProjectCreatedCommandData>,
   ProjectCreatedEvent
@@ -47,6 +55,50 @@ export class RecordProjectCreatedCommand implements CommandHandler<
 
   static getSpanAttributes(
     payload: RecordProjectCreatedCommandData,
+  ): Record<string, string | number | boolean> {
+    return {
+      "payload.project.id": payload.projectId,
+      "payload.organization.id": payload.organizationId,
+    };
+  }
+}
+
+/** Records that a project's legacy key was revoked, which is what makes its status read stale. */
+export class RecordProjectLegacyKeyRevokedCommand implements CommandHandler<
+  Command<RecordProjectLegacyKeyRevokedCommandData>,
+  ProjectLegacyKeyRevokedEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_PROJECT_LEGACY_KEY_REVOKED_COMMAND_TYPE,
+    recordProjectLegacyKeyRevokedCommandDataSchema,
+    "Record that a project's legacy key was revoked",
+  );
+
+  async handle(
+    command: Command<RecordProjectLegacyKeyRevokedCommandData>,
+  ): Promise<ProjectLegacyKeyRevokedEvent[]> {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<ProjectLegacyKeyRevokedEvent>({
+        aggregateType: PROJECT_AGGREGATE_TYPE,
+        aggregateId: data.projectId,
+        tenantId: createTenantId(command.tenantId),
+        type: PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
+        version: PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.projectId}:legacy-key-revoked:${data.occurredAt}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordProjectLegacyKeyRevokedCommandData): string {
+    return payload.projectId;
+  }
+
+  static getSpanAttributes(
+    payload: RecordProjectLegacyKeyRevokedCommandData,
   ): Record<string, string | number | boolean> {
     return {
       "payload.project.id": payload.projectId,

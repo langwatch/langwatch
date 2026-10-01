@@ -1,6 +1,6 @@
 import {
   CLI_LOGIN_KEY_NAME_PREFIX,
-  HIDDEN_SYSTEM_KEY_NAMES,
+  isSystemApiKey,
   type ApiKeyRevocationCause,
 } from "@langwatch/api-key-contract";
 import { generate } from "@langwatch/ksuid";
@@ -35,6 +35,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       ...data,
       createdByDeviceLabel: data.createdByDeviceLabel ?? null,
       parentApiKeyId: data.parentApiKeyId ?? null,
+      isSystemManaged: data.isSystemManaged ?? false,
       id: generate(API_KEY_KSUID_RESOURCE).toString(),
       expiresAt: expiresAt ? toDate(expiresAt) : null,
       revokedAt: startsDisabled ? now : null,
@@ -74,7 +75,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       (key) =>
         key.organizationId === input.organizationId &&
         key.revokedAt === null &&
-        !HIDDEN_SYSTEM_KEY_NAMES.includes(key.name) &&
+        !isSystemApiKey(key) &&
         (key.userId === input.userId || (key.userId === null && key.ingestSourceType === null)),
     );
   }
@@ -84,7 +85,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
       (key) =>
         key.organizationId === input.organizationId &&
         key.revokedAt === null &&
-        !HIDDEN_SYSTEM_KEY_NAMES.includes(key.name),
+        !isSystemApiKey(key),
     );
   }
 
@@ -159,13 +160,18 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     );
   }
 
-  async revokeExpiredByName(input: { name: string; now: Instant }): Promise<number> {
+  async revokeExpiredByName(input: {
+    name: string;
+    now: Instant;
+    systemManagedOnly?: boolean;
+  }): Promise<number> {
     const now = toDate(input.now);
     const elapsed = this.#database
       .keys()
       .filter(
         (key) =>
           key.name === input.name &&
+          (!input.systemManagedOnly || key.isSystemManaged === true) &&
           key.revokedAt === null &&
           key.expiresAt !== null &&
           key.expiresAt.getTime() <= now.getTime(),

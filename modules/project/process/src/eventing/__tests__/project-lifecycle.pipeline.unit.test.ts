@@ -18,6 +18,7 @@ import {
 } from "@langwatch/organization-contract";
 import {
   PROJECT_CREATED_EVENT_TYPE,
+  PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE,
   type ProjectCreatedEventData,
   projectCreatedEventDataSchema,
 } from "@langwatch/project-contract";
@@ -25,7 +26,10 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { ProjectCreatedNoticeService } from "../../services/project-created-notice.service.ts";
-import { RecordProjectCreatedCommand } from "../project-lifecycle.commands.ts";
+import {
+  RecordProjectCreatedCommand,
+  RecordProjectLegacyKeyRevokedCommand,
+} from "../project-lifecycle.commands.ts";
 import type { RecordProjectCreatedCommandData } from "../project-lifecycle.events.ts";
 import { buildProjectLifecyclePipeline } from "../project-lifecycle.pipeline.ts";
 
@@ -49,6 +53,20 @@ describe("project's lifecycle pipeline", () => {
     expect(event?.aggregateId).toBe("project_1");
     expect(event?.data).toEqual(CREATED);
     expect(event?.idempotencyKey).toBe("project_1:created");
+  });
+
+  it("records a revoked legacy key as a fact carrying ids and no key", async () => {
+    const data = { ...CREATED, revokedByUserId: "user_1" };
+    const [event] = await new RecordProjectLegacyKeyRevokedCommand().handle({
+      tenantId: createTenantId("project_1"),
+      aggregateId: "project_1",
+      type: RecordProjectLegacyKeyRevokedCommand.schema.type,
+      data,
+    });
+
+    expect(event?.type).toBe(PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE);
+    expect(event?.aggregateId).toBe("project_1");
+    expect(event?.data).toEqual(data);
   });
 
   it("hosts no reaction on its own events", () => {
@@ -102,7 +120,10 @@ describe("given organization records a newly created personal workspace", () => 
     const lifecycle = eventing.register(
       buildProjectLifecyclePipeline({ recordProjectCreated: (input) => notice.record(input) }),
     );
-    notice.connect({ recordProjectCreated: lifecycle.commands.recordProjectCreated });
+    notice.connect({
+      recordProjectCreated: lifecycle.commands.recordProjectCreated,
+      recordProjectLegacyKeyRevoked: lifecycle.commands.recordProjectLegacyKeyRevoked,
+    });
     eventing.register(createdListener(heard));
 
     await organization.service.storeEvents(

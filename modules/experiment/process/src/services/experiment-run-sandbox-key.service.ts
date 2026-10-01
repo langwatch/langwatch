@@ -1,7 +1,7 @@
 /**
- * The run's own sandbox credential: minted once per run when a target executes Python, and
- * set onto a studio event's workflow so its code nodes authenticate as this run. One key
- * for the whole run — a key per row would leave a ledger of live credentials behind.
+ * The run's own sandbox credential, when a target executes Python, set onto a studio event's
+ * workflow so its code nodes authenticate as this run. api-key's run-key mint shares one key
+ * across the run's cells, so rows leave no ledger of live credentials behind.
  */
 
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
@@ -14,7 +14,7 @@ import type { LoadedWorkflow } from "./experiment-execution-data.service.ts";
  * Undefined if project has no organization or minting not configured.
  */
 export abstract class ExperimentSandboxCredential {
-  abstract findRunKey(input: { projectId: string }): Promise<string | undefined>;
+  abstract findRunKey(input: { projectId: string; userId: string | null }): Promise<string | undefined>;
 }
 
 export class ExperimentRunSandboxKeyService {
@@ -54,11 +54,13 @@ export class ExperimentRunSandboxKeyService {
   async findRunSandboxApiKey({
     sandboxCredentials,
     projectId,
+    userId,
     loadedAgents,
     loadedWorkflows,
   }: {
     sandboxCredentials: ExperimentSandboxCredential;
     projectId: string;
+    userId: string | null;
     loadedAgents: Map<string, TypedAgent>;
     loadedWorkflows?: Map<string, LoadedWorkflow>;
   }): Promise<string | undefined> {
@@ -66,10 +68,8 @@ export class ExperimentRunSandboxKeyService {
       return undefined;
     }
 
-    // Minting here has no signed-in member to authorize — a run mints for itself
-    // — so the port answers with the key or with nothing, and the caller injects
-    // nothing when it gets nothing.
-    return sandboxCredentials.findRunKey({ projectId });
+    // A run that cannot get a key still runs, so the caller injects nothing for nothing.
+    return sandboxCredentials.findRunKey({ projectId, userId });
   }
 
   /** Adds run's sandbox credential to studio event workflow for authentication. */

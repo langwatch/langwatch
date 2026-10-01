@@ -6,7 +6,7 @@
 
 /** Spec: specs/server/declarative-process-composition.feature */
 import { createApiFixture } from "@langwatch/api-fixture";
-import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
+import { AGENT_SANDBOX_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
@@ -81,9 +81,12 @@ describe("given the API-key module's eventing declaration", () => {
         {} as never,
       );
 
-      expect(revokeExpiredByName).toHaveBeenCalledTimes(1);
+      expect(revokeExpiredByName).toHaveBeenCalledTimes(2);
       expect(revokeExpiredByName.mock.calls[0]![0]).toMatchObject({
         name: AGENT_SANDBOX_API_KEY_NAME,
+      });
+      expect(revokeExpiredByName.mock.calls[1]![0]).toMatchObject({
+        name: WORKFLOW_RUN_API_KEY_NAME,
       });
     });
 

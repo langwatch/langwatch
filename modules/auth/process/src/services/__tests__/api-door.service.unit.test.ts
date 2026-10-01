@@ -22,7 +22,10 @@ const PROJECT = {
   ownerUserId: null,
 };
 
-function projectKey(apiKeyId: string, userId: string | null): ResolvedApiKeyCredential {
+function projectKey(
+  apiKeyId: string,
+  userId: string | null,
+): Extract<ResolvedApiKeyCredential, { type: "apiKey" }> {
   return {
     type: "apiKey",
     apiKeyId,
@@ -41,6 +44,7 @@ function organizationKey(apiKeyId: string, userId: string | null): OrganizationA
 const projectTokens = new Map<string, ResolvedApiKeyCredential>([
   ["sk-lw-owned", projectKey("key-owned", "user-1")],
   ["sk-lw-unowned", projectKey("key-unowned", null)],
+  ["sk-lw-unattended-run", { ...projectKey("key-run", null), isUnattendedRunKey: true }],
   ["legacy-key", { type: "legacyProjectKey", project: PROJECT }],
 ]);
 const organizationTokens = new Map<string, OrganizationApiKeyResolution>([
@@ -126,6 +130,18 @@ describe("the key doors' actor", () => {
 
     it("is no one on the key door", async () => {
       expect(await actorThrough(identities.apiKey, headers)).toBeNull();
+    });
+  });
+
+  /** @scenario "A run nobody started acts as the system actor at the door" */
+  describe("given the key of a run nobody started", () => {
+    it("is the system acting for an unattended run on the project door", async () => {
+      const headers = { authorization: "Bearer sk-lw-unattended-run", "x-project-id": "project-1" };
+
+      expect(await actorThrough(identities.project, headers)).toEqual({
+        type: "system",
+        name: "unattendedRun",
+      });
     });
   });
 

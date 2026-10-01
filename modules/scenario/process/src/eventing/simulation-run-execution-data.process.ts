@@ -137,6 +137,10 @@ export const executeRunIntentSchema = z.object({
    * them as they are; the prefetch is the only place that decrypts.
    */
   secretParameters: runSecretCiphertextSchema.optional(),
+  /** The member who started the run, from the queued event's actor; absent for unattended runs. */
+  startedByUserId: z.string().optional(),
+  /** The API key that member started it with, which also bounds the run's key. */
+  startedByApiKeyId: z.string().optional(),
 });
 export type ExecuteRunIntent = z.infer<typeof executeRunIntentSchema>;
 
@@ -214,6 +218,13 @@ export const simulationRunProcessEventViewSchema = z.object({
    * credential and carries no readable value for it must not execute.
    */
   secretParameterNames: z.array(z.string()).nullable().default(null),
+  /**
+   * The member who started the run, the actor the queued event records in its reserved
+   * namespace, or null when nobody did. Defaulted so older inbox rows still parse.
+   */
+  startedByUserId: z.string().nullable().default(null),
+  /** The API key the starter used, from the same namespace; null for a session or nobody. */
+  startedByApiKeyId: z.string().nullable().default(null),
 });
 export type SimulationRunProcessEventView = z.infer<typeof simulationRunProcessEventViewSchema>;
 

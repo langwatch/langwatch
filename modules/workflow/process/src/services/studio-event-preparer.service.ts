@@ -1,5 +1,6 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import type { StudioClientEvent, WorkflowRunPrincipal } from "@langwatch/workflow-contract";
 
 import type { WorkflowLlmParameters, WorkflowProjectEnvironment } from "../app/workflow.app.ts";
 import { StudioDatasetMaterializerService } from "./studio-dataset-materializer.service.ts";
@@ -11,6 +12,7 @@ import {
 export type StudioEventPreparationInput = {
   event: StudioClientEvent;
   projectId: string;
+  principal?: WorkflowRunPrincipal | undefined;
 };
 
 export type StudioEventPreparer = {
@@ -22,6 +24,8 @@ type StudioEventPreparerOptions = {
   datasets: DatasetApi;
   projectEnvironment: WorkflowProjectEnvironment;
   llmParameters: WorkflowLlmParameters;
+  runKeys: Pick<ApiKeyApi, "mintRunKey">;
+  dispatchKeyFloorMs: number;
 };
 
 export class StudioEventPreparerService implements StudioEventPreparer {
@@ -33,6 +37,8 @@ export class StudioEventPreparerService implements StudioEventPreparer {
     this.enricher = StudioWorkflowEventEnricherService.create({
       projectEnvironment: options.projectEnvironment,
       llmParameters: options.llmParameters,
+      runKeys: options.runKeys,
+      dispatchKeyFloorMs: options.dispatchKeyFloorMs,
     });
     this.materializer = StudioDatasetMaterializerService.create(options.datasets);
   }

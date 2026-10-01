@@ -26,6 +26,9 @@ export const SYSTEM_ACTORS = {
   /** A self-hosted license resolving to its managed gateway key. No person
    *  is present: the gateway asks on behalf of an install. */
   connectLicense: "system:connect-license",
+  /** A run nobody started (a monitor, an online evaluation, a scheduled suite) calling back
+   *  with its ownerless run key. Never the creator of the thing that started it. */
+  unattendedRun: "system:unattended-run",
 } as const satisfies Record<string, `system:${string}`>;
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;

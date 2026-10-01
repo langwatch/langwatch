@@ -27,6 +27,14 @@ Feature: API key lifecycle
     When a customer uses the reserved Langy session name
     Then creation, rename, read and revoke are rejected as not found or reserved
 
+  @unit
+  Scenario: A customer key named like a system key stays visible and manageable
+    Given a customer key created before "Workflow run" was reserved, carrying that name
+    When its owner lists, edits or revokes it
+    Then it is listed and the edit and revoke succeed
+    And only a key the system minted is hidden, and calls with it never act as the system
+    And no new key, and no rename, may take the name
+
   Scenario: Replacing grants is fail-safe
     When replacement grants are attached
     Then the previous grants are revoked only after the new grants exist
@@ -202,3 +210,10 @@ Feature: API key lifecycle
     Given a restricted key whose CUSTOM binding points at its own private role
     When the key is read back by id
     Then its permissions are the private role's permissions, as main reports them
+
+  @unit
+  Scenario: Only a platform-minted key with no owner may be bound to a personal workspace it is not owned in
+    Given a personal workspace owned by one member
+    When the platform mints a system-managed key with no owner bound to that workspace
+    Then the binding is accepted and the key acts as no person
+    And a key a person asked for, with no owner or another owner, is still refused there

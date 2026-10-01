@@ -66,11 +66,7 @@ export class TestProjectApi implements ProjectApi {
   create = unsupported<ProjectApi["create"]>("create");
   updateSettings = unsupported<ProjectApi["updateSettings"]>("updateSettings");
   archive = unsupported<ProjectApi["archive"]>("archive");
-  regenerateLegacyProjectKey = unsupported<ProjectApi["regenerateLegacyProjectKey"]>(
-    "regenerateLegacyProjectKey",
-  );
   findIdByLegacyApiKey = unsupported<ProjectApi["findIdByLegacyApiKey"]>("findIdByLegacyApiKey");
-  rotateLegacyApiKey = unsupported<ProjectApi["rotateLegacyApiKey"]>("rotateLegacyApiKey");
   findTraceSharingConfig =
     unsupported<ProjectApi["findTraceSharingConfig"]>("findTraceSharingConfig");
   findPersonalWorkspaceOwner = unsupported<ProjectApi["findPersonalWorkspaceOwner"]>(

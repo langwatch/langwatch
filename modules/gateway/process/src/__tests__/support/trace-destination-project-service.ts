@@ -15,7 +15,6 @@ import { TestProjectApi } from "./test-project-api.ts";
 const DESTINATION_SELECT = {
   id: true,
   teamId: true,
-  apiKey: true,
   archivedAt: true,
 } as const;
 

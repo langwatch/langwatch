@@ -6,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * composes the HTTP path, and no address at all refuses by name.
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -58,6 +59,7 @@ async function appAt({
       ),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: createApiFixture<DatasetApi>({}, "DatasetApi"),
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),

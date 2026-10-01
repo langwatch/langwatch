@@ -204,6 +204,14 @@ export class ApiDoorService {
 
 function projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {
   recordProjectCredential(request, credential.resolved);
+  const { resolved } = credential;
+  if (resolved.type === "apiKey" && resolved.userId === null && resolved.isUnattendedRunKey) {
+    return {
+      actor: { type: "system", name: "unattendedRun" },
+      scope: { tier: "project", id: credential.project.id },
+      markUsed: credential.markUsed,
+    };
+  }
 
   return ownedCaller({
     userId: credential.resolved.type === "apiKey" ? credential.resolved.userId : null,

@@ -318,3 +318,10 @@ Feature: The checkup page of a self-hosted install
     Then the payload is shown pretty printed
     And a copy button copies it
     And the two switches are beside it
+
+  @unit
+  Scenario: A checkup canary runs with a minimal key of its own, never the project key
+    Given an installation whose oldest project the canaries run against
+    When an administrator runs a canary check
+    Then the canary calls with a key minted for it, owned by nobody and bound to that project
+    And the key holds only what that canary's probe calls, and the project's legacy key is never read

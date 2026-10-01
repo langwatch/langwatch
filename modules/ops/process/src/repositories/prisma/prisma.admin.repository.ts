@@ -127,7 +127,6 @@ export const PROJECT_SAFE_SELECT = {
   id: true,
   name: true,
   slug: true,
-  apiKey: true,
   teamId: true,
   language: true,
   framework: true,

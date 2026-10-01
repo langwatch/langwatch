@@ -12,6 +12,7 @@ import {
   type ApiKeyTeam,
   type ApiKeyUser,
   type CreateApiKeyInput,
+  type MintRunKeyInput,
   type NamedApiKeyBinding,
   type UpdateApiKeyInput,
   ApiKeyApi,
@@ -42,16 +43,16 @@ import { credentialsSecret, Secret, sessionSecret, type ScopedSecrets } from "@l
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyRepositories } from "../repositories/api-key.repositories.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import {
-  RedisAgentSandboxKeyShareRepository,
-  type AgentSandboxKeySealing,
-  type AgentSandboxKeyShareRedis,
-} from "../repositories/redis/redis.agent-sandbox-key-share.repository.ts";
-import { AgentSandboxKeyMintService } from "../services/agent-sandbox-key-mint.service.ts";
+  RedisApiKeyAnswerCacheRepository,
+  type ApiKeyAnswerCacheRedis,
+} from "../repositories/redis/redis.api-key-answer-cache.repository.ts";
 import { ApiKeyGrantIdService } from "../services/api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
+import { RunKeyMintService } from "../services/run-key-mint.service.ts";
 
 /** Who an operation is performed by, and whose membership is proved. */
 export interface ApiKeyCaller {
@@ -74,11 +75,8 @@ export type ApiKeySetup = Readonly<{
     projects: ProjectApi;
   }>;
   secrets: ScopedSecrets;
-  /** Where a project's runs share their sandbox key: Redis, else this process's memory. */
-  members: Readonly<{
-    redis: AgentSandboxKeyShareRedis | null;
-    encryption: AgentSandboxKeySealing;
-  }>;
+  /** Where every pod shares its token answers: Redis, else this process's memory. */
+  members: Readonly<{ redis: ApiKeyAnswerCacheRedis | null }>;
 }>;
 
 /** What a key may create: the caller's own personal key, or an admin's key. */
@@ -143,7 +141,7 @@ export class ApiKeyApp implements ApiKeyApi {
     projects: ProjectApi,
   };
 
-  static readonly reads = ["redis", "encryption"] as const;
+  static readonly reads = ["redis"] as const;
   /** Main's pepper chain, first set wins: API_KEY_PEPPER, CREDENTIALS_SECRET, NEXTAUTH_SECRET. */
   static readonly secrets = {
     pepper: Secret.load("API_KEY_PEPPER", { optional: true }),
@@ -154,8 +152,12 @@ export class ApiKeyApp implements ApiKeyApi {
   static async create(setup: ApiKeySetup): Promise<ApiKeyApp> {
     const pepper = await apiKeyPepper(setup.secrets);
     const authorization = setup.dependencies.authorization;
+    const { redis } = setup.members;
     const service = ApiKeyService.create({
       repository: setup.repositories.apiKeys,
+      answers: redis
+        ? RedisApiKeyAnswerCacheRepository.create({ redis })
+        : MemoryApiKeyAnswerCacheRepository.create(),
       authz: authorization,
       grants: authorization,
       organizations: setup.dependencies.organizations,
@@ -172,31 +174,20 @@ export class ApiKeyApp implements ApiKeyApi {
       }),
       tokens: ApiKeyTokenService.create(pepper),
     });
-    const sandboxKeys = AgentSandboxKeyMintService.create({
-      apiKeys: service,
-      projects: setup.dependencies.projects,
-      share: RedisAgentSandboxKeyShareRepository.create({
-        redis: setup.members.redis,
-        sealing: setup.members.encryption,
-      }),
-    });
+    const runKeys = RunKeyMintService.create({ apiKeys: service, authz: authorization });
 
-    return new ApiKeyApp(service, authorization, sandboxKeys);
+    return new ApiKeyApp(service, authorization, runKeys);
   }
 
-  private constructor(
-    service: ApiKeyService,
-    authorization: AuthzApi,
-    sandboxKeys: AgentSandboxKeyMintService,
-  ) {
+  private constructor(service: ApiKeyService, authorization: AuthzApi, runKeys: RunKeyMintService) {
     this.#service = service;
     this.#authorization = authorization;
-    this.#sandboxKeys = sandboxKeys;
+    this.#runKeys = runKeys;
   }
 
   readonly #service: ApiKeyService;
   readonly #authorization: AuthzApi;
-  readonly #sandboxKeys: AgentSandboxKeyMintService;
+  readonly #runKeys: RunKeyMintService;
 
   /**
    * The service itself, for the one thing this application deliberately is not about: turning a
@@ -220,11 +211,8 @@ export class ApiKeyApp implements ApiKeyApi {
   ): Promise<ResolvedApiKeyCredential | null> {
     return this.#service.findResolvedToken(input);
   }
-  async regenerateLegacyProjectKey(input: { projectId: string }): Promise<string> {
-    return this.#service.regenerateLegacyProjectKey(input);
-  }
-  getOrMintAgentSandboxKey(input: { projectId: string; organizationId: string }): Promise<string> {
-    return this.#sandboxKeys.getOrMint(input);
+  mintRunKey(input: MintRunKeyInput): Promise<string> {
+    return this.#runKeys.mintRunKey(input);
   }
   async resolveOrganizationToken(
     input: OrganizationApiKeyResolutionInput,

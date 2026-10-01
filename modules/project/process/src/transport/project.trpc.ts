@@ -11,7 +11,6 @@ import {
   ProjectCreateTargetMissingError,
   TraceSharingDeniedError,
   projectTrpc,
-  type Project,
   type ProjectApi,
   type TopicClusteringRequest,
 } from "@langwatch/project-contract";
@@ -69,19 +68,16 @@ export interface ProjectBrowserApi {
     organizationId: string;
     actorUserId: string;
   }): Promise<void>;
-  /**
-   * The deployment's audit trail for the key rotation. Best effort: an audit
-   * failure must not stop the new key reaching the caller who rotated it.
-   */
-  recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void>;
-  /** The project, or `ProjectNotFoundError`. */
-  getProject(input: { projectId: string }): Promise<Project>;
   /** Archives a project other than the one the caller is in, after probing it on its own. */
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }>;
+  /** Whether the legacy project key still authenticates; never the key. */
+  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }>;
+  /** Revokes the legacy project key for good, audited; no key is returned. */
+  revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void>;
   /** Requests a clustering run, reporting a request that did not land. */
   triggerTopicClustering(input: {
     projectId: string;
@@ -140,15 +136,6 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       return { success: true as const, projectSlug: project.slug };
     })
 
-    /**
-     * The base key authenticates every ingestion call, so revealing it is
-     * gated like rotating it. `project:update` (a contributor permission) used
-     * to hand out a credential that outlives membership and can't be attributed back.
-     */
-    .procedure("getProjectAPIKey")
-    .withPermission("project:manage")
-    .handle(({ app, input }) => app.getProject({ projectId: input.projectId }))
-
     .procedure("getHasFirstMessage")
     .withPermission("project:view")
     .handle(async ({ app, input }) => {
@@ -157,18 +144,16 @@ export const projectTrpcTransport: TrpcRouterDeclaration<ProjectBrowserApi, type
       return { firstMessage: project?.firstMessage ?? false };
     })
 
-    .procedure("regenerateApiKey")
+    .procedure("getLegacyKeyStatus")
+    .withPermission("project:manage")
+    .handle(({ app, input }) => app.getLegacyKeyStatus({ projectId: input.projectId }))
+
+    .procedure("revokeProjectApiKey")
     .withPermission("project:manage")
     .handle(async ({ app, input, actor }) => {
-      const apiKey = await app.projects().regenerateLegacyProjectKey({
-        projectId: input.projectId,
-      });
+      await app.revokeProjectApiKey({ projectId: input.projectId, by: actor });
 
-      // Audit the security-critical action; non-fatal, so an audit failure
-      // cannot prevent returning the new key to the caller.
-      await app.recordApiKeyRegenerated({ userId: actor.id, projectId: input.projectId });
-
-      return { apiKey };
+      return { revoked: true as const };
     })
 
     /**

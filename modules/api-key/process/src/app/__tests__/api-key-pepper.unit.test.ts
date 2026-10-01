@@ -57,11 +57,8 @@ async function appOver({
       organizations: createApiFixture<OrganizationApi>({}),
       projects: createApiFixture<ProjectApi>({}),
     },
-    members: {
-      redis: null,
-      encryption: { encrypt: (plaintext) => plaintext, decrypt: (ciphertext) => ciphertext },
-    },
     secrets: resolver.scopeTo("api-key", Object.values(ApiKeyApp.secrets)),
+    members: { redis: null },
   });
 }
 

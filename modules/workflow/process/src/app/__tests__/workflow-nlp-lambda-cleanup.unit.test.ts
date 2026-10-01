@@ -6,6 +6,7 @@
 // @vitest-environment node
 import type { AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -55,6 +56,7 @@ async function appWith(fleet?: NlpLambdaFleet): Promise<WorkflowApp> {
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
       agents: createApiFixture<AgentApi>({}, "AgentApi"),
       authz: createApiFixture<AuthzApi>({}, "AuthzApi"),
+      apiKeys: createApiFixture<ApiKeyApi>({}, "ApiKeyApi"),
       experiments: createApiFixture<ExperimentApi>({}, "ExperimentApi"),
       datasets: members.datasets,
       monitors: createApiFixture<MonitorApi>({}, "MonitorApi"),

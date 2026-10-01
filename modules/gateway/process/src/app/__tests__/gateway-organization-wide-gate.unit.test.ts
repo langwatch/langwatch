@@ -40,6 +40,7 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma: createApiFixture<PrismaClient>({}),

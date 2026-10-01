@@ -11,7 +11,11 @@ import { workflowNlpLambdaCleanupEventing } from "#eventing/workflow-nlp-lambda-
 import { workflowRepositories } from "#repositories/workflow-repositories.registry";
 import { WorkflowPermissionService } from "#services/workflow-permission.service";
 import { workflowOptimizationTrpcTransport } from "#transport/workflow-optimization.trpc";
-import { workflowRunRest } from "#transport/workflow-run.rest";
+import {
+  workflowRunCallerKey,
+  workflowRunCallerKeyOf,
+  workflowRunRest,
+} from "#transport/workflow-run.rest";
 import { workflowStudioRest, workflowStudioSession } from "#transport/workflow-studio.rest";
 import { createWorkflowRest, workflowEvaluationRunCeiling } from "#transport/workflow.rest";
 import { workflowTrpcTransport } from "#transport/workflow.trpc";
@@ -29,6 +33,9 @@ export const workflowServer = defineServerModule("workflow")
   .withEventing(workflowNlpLambdaCleanupEventing)
   .withEventing(workflowLifecycleEventing)
   .withTransportFacts(({ dependencies }) => [
+    bindRestMiddleware(workflowRunCallerKey, (context) =>
+      workflowRunCallerKeyOf(projectCredentialOfRequest(context.req.raw)),
+    ),
     bindRestMiddleware(workflowStudioSession, (context) => {
       const caller = browserCallerOfRequest(context.req.raw);
 

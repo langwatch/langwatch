@@ -11,26 +11,22 @@ import {
   projectScopeSchema,
   projectUpdateInputSchema,
 } from "./project-trpc.schemas.ts";
+import { PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE } from "./project.events.ts";
 import {
-  projectApiKeyRotationSchema,
+  projectApiKeyRevokedSchema,
   projectArchivedSchema,
   projectFieldRedactionStatusSchema,
   projectFirstMessageSchema,
+  projectLegacyKeyStatusSchema,
   projectProvisionedSchema,
   projectSettingsSavedSchema,
   topicClusteringRequestSchema,
 } from "./project.responses.ts";
-import { projectSchema } from "./project.ts";
 
 export const projectTrpc = defineTrpcContract("project")
   .mutation("create")
   .withInput(projectCreateInputSchema)
   .withOutput(projectProvisionedSchema)
-
-  // The project row behind the settings page, base key included.
-  .query("getProjectAPIKey")
-  .withInput(projectScopeSchema)
-  .withOutput(projectSchema)
 
   // Whether the project has ever received a trace, which is what the setup
   // screens wait on.
@@ -38,9 +34,17 @@ export const projectTrpc = defineTrpcContract("project")
   .withInput(projectScopeSchema)
   .withOutput(projectFirstMessageSchema)
 
-  .mutation("regenerateApiKey")
+  // Whether the legacy project key still works. Never the key itself.
+  .query("getLegacyKeyStatus", {
+    invalidatedBy: [{ event: PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE, scope: "projectId" }],
+  })
   .withInput(projectScopeSchema)
-  .withOutput(projectApiKeyRotationSchema)
+  .withOutput(projectLegacyKeyStatusSchema)
+
+  // Revokes the legacy project key for good and shows no new key.
+  .mutation("revokeProjectApiKey")
+  .withInput(projectScopeSchema)
+  .withOutput(projectApiKeyRevokedSchema)
 
   .mutation("update")
   .withInput(projectUpdateInputSchema)

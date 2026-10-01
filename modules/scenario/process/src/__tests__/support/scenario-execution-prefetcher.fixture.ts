@@ -24,6 +24,7 @@ import {
   WorkflowNotFoundError,
   type WorkflowApi,
 } from "@langwatch/workflow-contract";
+import { vi } from "vitest";
 
 import {
   ScenarioExecutionPrefetcherService,
@@ -137,10 +138,10 @@ export interface ScenarioPrefetchFixture {
    */
   modelProviders?: ModelProviderApi;
   voiceTargets?: VoiceTargetReader;
-  /** The project's organization; absent, no sandbox key is minted, as main skipped it. */
+  /** The project's organization; absent, it is "organization_1". */
   organizationId?: string;
-  /** The sandbox-key mint; unconfigured, a call refuses by name. */
-  apiKeys?: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+  /** The run-key mint; unconfigured, every key is "run-key". */
+  apiKeys?: Partial<Pick<ApiKeyApi, "mintRunKey">>;
 }
 
 class TestScenarioSecretCipher implements ScenarioSecretCipher {
@@ -335,7 +336,7 @@ function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
 
 function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
   return createApiFixture<ProjectApi>({
-    findOrganizationId: async () => deps.organizationId,
+    findOrganizationId: async () => deps.organizationId ?? "organization_1",
     findById: async (projectId) => {
       const value = await deps.projectFetcher.findUnique(projectId);
       if (!value) return null;
@@ -450,7 +451,10 @@ export function createTestScenarioExecutionPrefetcherService(
       resolveIngestWaitTimeout: (input) =>
         deps.traceWaitBudgetResolver.resolveTraceWaitTimeoutMs(input),
     }),
-    apiKeys: deps.apiKeys ?? createApiFixture<ApiKeyApi>({}),
+    apiKeys: createApiFixture<ApiKeyApi>({
+      mintRunKey: vi.fn().mockResolvedValue("run-key"),
+      ...deps.apiKeys,
+    }),
     voiceTargets: deps.voiceTargets ?? {
       getVoiceTarget: async ({ agentId }) => ({
         type: "voice",

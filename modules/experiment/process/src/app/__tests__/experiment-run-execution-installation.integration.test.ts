@@ -922,7 +922,8 @@ describe.skipIf(!connection)("given a target on a model the engine reports witho
               attrs["langwatch.model.inputCostPerToken"] === 0.001 ? 0.5 : 0,
           }),
           "api-key": createApiFixture<ApiKeyApi>({
-            getOrMintAgentSandboxKey: async ({ projectId }) => {
+            mintRunKey: async ({ projectId, permissions }) => {
+              if (!permissions.includes("agentCache:manage")) return "run-key";
               minted.push(projectId);
               return "project-sandbox-key";
             },

@@ -201,12 +201,12 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     });
     const operations = ProjectOperationsService.create({
       projects,
-      apiKeys: dependencies.apiKeys,
+      auditLog: dependencies.auditLog,
+      lifecycle,
+      logger: members.logger,
       share: dependencies.share,
       topics: dependencies.topics,
       now: members.now ?? (() => nowInstant().epochMilliseconds),
-      auditLog: dependencies.auditLog,
-      logger: members.logger,
     });
     return new ProjectApp({
       projectService: projects,
@@ -302,10 +302,6 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#langy.provisionVirtualKey(input);
   }
 
-  recordApiKeyRegenerated(entry: { userId: string; projectId: string }): Promise<void> {
-    return this.#operations.recordApiKeyRegenerated(entry);
-  }
-
   /**
    * A clustering request that did not land. Reported rather than raised: the
    * door has already decided this is best effort, and the topic module
@@ -315,16 +311,20 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     this.#logger.error({ error, projectId: context.projectId }, "Topic clustering request failed.");
   }
 
-  getProject(input: { projectId: string }): Promise<Project> {
-    return this.#requests.getProject(input);
-  }
-
   archiveOtherProject(input: {
     projectId: string;
     projectToArchiveId: string;
     by: Readonly<{ id: string }>;
   }): Promise<{ alreadyArchived: boolean }> {
     return this.#requests.archiveOtherProject(input);
+  }
+
+  getLegacyKeyStatus(input: { projectId: string }): Promise<{ present: boolean }> {
+    return this.#operations.getLegacyKeyStatus(input);
+  }
+
+  revokeProjectApiKey(input: { projectId: string; by: Readonly<{ id: string }> }): Promise<void> {
+    return this.#operations.revokeLegacyProjectKey({ projectId: input.projectId }, input.by);
   }
 
   triggerTopicClustering(input: {
@@ -545,16 +545,8 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     return this.#operations.archive(input);
   }
 
-  regenerateLegacyProjectKey(input: Readonly<{ projectId: string }>): Promise<string> {
-    return this.#operations.regenerateLegacyProjectKey(input);
-  }
-
   findIdByLegacyApiKey(input: Readonly<{ token: string }>): Promise<string | null> {
     return this.#projectService.findIdByLegacyApiKey(input);
-  }
-
-  rotateLegacyApiKey(input: Readonly<{ projectId: string; token: string }>): Promise<boolean> {
-    return this.#projectService.rotateLegacyApiKey(input);
   }
 
   /** Both kill switches a trace share is minted under, read off this module's rows. */

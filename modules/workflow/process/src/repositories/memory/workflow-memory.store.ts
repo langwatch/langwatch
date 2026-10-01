@@ -7,7 +7,6 @@ import type { Workflow, WorkflowProjectPath, WorkflowVersion } from "@langwatch/
 
 /** A project's stored run environment, as the memory tier holds it. */
 export type StoredEnvironmentRow = {
-  apiKey: string;
   secrets: { name: string; encryptedValue: string }[];
 };
 

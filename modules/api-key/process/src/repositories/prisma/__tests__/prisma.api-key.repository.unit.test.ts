@@ -38,6 +38,9 @@ describe("PrismaApiKeyRepository", () => {
       await repository.findForOrganization({ organizationId: "org-1" });
 
       expect(excludedNames(findMany)).toEqual([...HIDDEN_SYSTEM_KEY_NAMES]);
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ isSystemManaged: false }) }),
+      );
     });
   });
 
@@ -48,6 +51,9 @@ describe("PrismaApiKeyRepository", () => {
       await repository.findForUser({ organizationId: "org-1", userId: "user-1" });
 
       expect(excludedNames(findMany)).toEqual([...HIDDEN_SYSTEM_KEY_NAMES]);
+      expect(findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ isSystemManaged: false }) }),
+      );
     });
   });
 

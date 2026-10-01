@@ -55,6 +55,7 @@ async function gatewayApp(): Promise<GatewayApp> {
       modelProviders: peer("modelProviders"),
       traces: peer("traces"),
       oneTimeReveals: peer("oneTimeReveals"),
+      apiKeys: peer("apiKeys"),
     },
     members: {
       prisma: prismaDouble({}) as PrismaClient,

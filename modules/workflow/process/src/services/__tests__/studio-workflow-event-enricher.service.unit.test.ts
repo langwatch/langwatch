@@ -1,3 +1,4 @@
+import type { MintRunKeyInput } from "@langwatch/api-key-contract";
 import {
   LlmModelNotSetError,
   studioClientEventSchema,
@@ -19,14 +20,21 @@ class FakeProjectEnvironment implements WorkflowProjectEnvironment {
 
   constructor(private readonly secrets: Record<string, string> = { OPENAI_API_KEY: "sk-abc123" }) {}
 
-  async get(input: {
-    projectId: string;
-  }): Promise<{ apiKey: string; secrets: Record<string, string> }> {
+  async get(input: { projectId: string }): Promise<{ secrets: Record<string, string> }> {
     this.projectIds.push(input.projectId);
-    return {
-      apiKey: "test-api-key",
-      secrets: this.secrets,
-    };
+    return { secrets: this.secrets };
+  }
+}
+
+const DISPATCH_FLOOR_MS = 960_000;
+
+class FakeRunKeys {
+  readonly calls: MintRunKeyInput[] = [];
+
+  async mintRunKey(input: MintRunKeyInput): Promise<string> {
+    this.calls.push(input);
+
+    return input.userId ? "minted-run-key" : "ownerless-run-key";
   }
 }
 
@@ -83,10 +91,13 @@ const createEnricher = (
   resolution: Partial<WorkflowLlmParameterResolution> = {},
   projectEnvironment = new FakeProjectEnvironment(),
   llmParameters = new FakeLlmParameters(resolution),
+  runKeys = new FakeRunKeys(),
 ) =>
   StudioWorkflowEventEnricherService.create({
     projectEnvironment,
     llmParameters,
+    runKeys,
+    dispatchKeyFloorMs: DISPATCH_FLOOR_MS,
   });
 
 describe("StudioWorkflowEventEnricherService", () => {
@@ -103,15 +114,93 @@ describe("StudioWorkflowEventEnricherService", () => {
     expect(llmParameters.calls).toEqual([]);
   });
 
-  it("adds the project API key and decrypted secrets", async () => {
+  it("adds a minted run key and the decrypted secrets", async () => {
     const result = await createEnricher().enrich({ event: event(), projectId });
     if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
 
     expect(result.payload.workflow).toMatchObject({
-      api_key: "test-api-key",
+      api_key: "ownerless-run-key",
       project_id: projectId,
       secrets: { OPENAI_API_KEY: "sk-abc123" },
     });
+  });
+
+  /** @scenario "A workflow run calls LangWatch with a key minted for that run, never the project key" */
+  it("puts a key minted for the starter in the run, not the project key", async () => {
+    const runKeys = new FakeRunKeys();
+    const result = await createEnricher({}, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+      principal: { userId: "user-1" },
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    expect(result.payload.workflow).toMatchObject({ api_key: "minted-run-key" });
+    expect(runKeys.calls).toEqual([
+      {
+        userId: "user-1",
+        projectId,
+        permissions: ["traces:create"],
+        minRemainingMs: DISPATCH_FLOOR_MS,
+      },
+    ]);
+  });
+
+  /** @scenario "A run started with a personal access token holds no more than that token" */
+  it("names the key the starter called with, so the run's key holds no more than it", async () => {
+    const runKeys = new FakeRunKeys();
+    await createEnricher({}, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+      principal: { userId: "user-1", callerApiKeyId: "pat-1" },
+    });
+
+    expect(runKeys.calls[0]).toMatchObject({ userId: "user-1", callerApiKeyId: "pat-1" });
+  });
+
+  /** @scenario "A workflow run calls LangWatch with a key minted for that run, never the project key" */
+  it("asks for evaluations only when the graph has an evaluator node", async () => {
+    const runKeys = new FakeRunKeys();
+    const evaluatorNode = { id: "eval", type: "evaluator", position: { x: 0, y: 0 }, data: {} };
+    await createEnricher({}, undefined, undefined, runKeys).enrich({
+      event: studioClientEventSchema.parse({
+        type: "execute_flow",
+        payload: {
+          trace_id: "trace-1",
+          workflow: {
+            spec_version: "1.5",
+            workflow_id: "workflow-1",
+            name: "Test Workflow",
+            icon: "test",
+            description: "test",
+            version: "1.0",
+            nodes: [evaluatorNode],
+            edges: [],
+            state: { execution: { status: "idle" } },
+          },
+          inputs: [{}],
+        },
+      }),
+      projectId,
+      principal: { userId: "user-1" },
+    });
+
+    expect(runKeys.calls[0]?.permissions).toEqual(["traces:create", "evaluations:manage"]);
+  });
+
+  /** @scenario "A run nobody started calls LangWatch with a project key holding only what it needs" */
+  it("mints an ownerless key for a run that names nobody, never the project key", async () => {
+    const runKeys = new FakeRunKeys();
+    const result = await createEnricher({}, undefined, undefined, runKeys).enrich({
+      event: event(),
+      projectId,
+    });
+    if (!("workflow" in result.payload)) throw new Error("expected workflow payload");
+
+    expect(result.payload.workflow).toMatchObject({ api_key: "ownerless-run-key" });
+    expect(runKeys.calls).toEqual([
+      { userId: null, projectId, permissions: ["traces:create"], minRemainingMs: DISPATCH_FLOOR_MS },
+    ]);
   });
 
   it("keeps empty project secrets", async () => {

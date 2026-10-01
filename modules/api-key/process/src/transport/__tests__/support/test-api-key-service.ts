@@ -23,7 +23,7 @@ export class TestApiKeyService implements ApiKeyApi {
   findResolvedToken = unsupported<ApiKeyApi["findResolvedToken"]>();
   findVerifiedToken = unsupported<ApiKeyApi["findVerifiedToken"]>();
   getByIdForCaller = unsupported<ApiKeyApi["getByIdForCaller"]>();
-  getOrMintAgentSandboxKey = unsupported<ApiKeyApi["getOrMintAgentSandboxKey"]>();
+  mintRunKey = unsupported<ApiKeyApi["mintRunKey"]>();
   getOrgMembers = unsupported<ApiKeyApi["getOrgMembers"]>();
   getOrgProjects = unsupported<ApiKeyApi["getOrgProjects"]>();
   getOrgTeams = unsupported<ApiKeyApi["getOrgTeams"]>();
@@ -42,7 +42,6 @@ export class TestApiKeyService implements ApiKeyApi {
   listOrganizationTeams = unsupported<ApiKeyApi["listOrganizationTeams"]>();
   markUsed = unsupported<ApiKeyApi["markUsed"]>();
   mintCliLoginKey = unsupported<ApiKeyApi["mintCliLoginKey"]>();
-  regenerateLegacyProjectKey = unsupported<ApiKeyApi["regenerateLegacyProjectKey"]>();
   resolveOrganizationToken = unsupported<ApiKeyApi["resolveOrganizationToken"]>();
   resolveVisibleProjects = unsupported<ApiKeyApi["resolveVisibleProjects"]>();
   revoke = unsupported<ApiKeyApi["revoke"]>();

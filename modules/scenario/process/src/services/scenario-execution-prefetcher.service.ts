@@ -28,6 +28,7 @@ import {
 import type { ScenarioService } from "./scenario.service.ts";
 export type { VoiceTargetReader } from "./scenario-target-prefetch.service.ts";
 import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
+import { ScenarioRunKeyService } from "./scenario-run-key.service.ts";
 import { ScenarioRunSecretsService } from "./scenario-run-secrets.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 
@@ -57,8 +58,8 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   modelProviders: ModelProviderApi;
   secrets: SecretApi;
   traces: TraceApi;
-  /** Mints the one agent sandbox key a code-agent run carries. */
-  apiKeys: Pick<ApiKeyApi, "getOrMintAgentSandboxKey">;
+  /** Mints the run's keys: the child's, and a code agent's sandbox key. */
+  apiKeys: Pick<ApiKeyApi, "mintRunKey">;
   voiceTargets: VoiceTargetReader | null;
 };
 
@@ -88,18 +89,19 @@ export class ScenarioExecutionPrefetcherService {
       langwatchEndpoint: options.config.langwatchEndpoint,
       voiceTargets: options.voiceTargets,
     });
+    const runKeys = ScenarioRunKeyService.create({ apiKeys: options.apiKeys });
     const completion = ScenarioPrefetchCompletionService.create({
       config: options.config,
       lookups,
       modelParameters,
       traces: options.traces,
-      projects: options.projects,
-      apiKeys: options.apiKeys,
+      runKeys,
     });
     const runSecrets = ScenarioRunSecretsService.create(options.secretCipher);
 
     return new ScenarioExecutionPrefetcherService({
       options,
+      runKeys,
       runSecrets,
       lookups,
       targets,
@@ -108,6 +110,7 @@ export class ScenarioExecutionPrefetcherService {
   }
 
   private readonly options: ScenarioExecutionPrefetcherServiceOptions;
+  private readonly runKeys: ScenarioRunKeyService;
   private readonly runSecrets: ScenarioRunSecretsService;
   private readonly lookups: ScenarioExecutionLookupService;
   private readonly targets: ScenarioTargetPrefetchService;
@@ -115,12 +118,14 @@ export class ScenarioExecutionPrefetcherService {
 
   private constructor(collaborators: {
     options: ScenarioExecutionPrefetcherServiceOptions;
+    runKeys: ScenarioRunKeyService;
     runSecrets: ScenarioRunSecretsService;
     lookups: ScenarioExecutionLookupService;
     targets: ScenarioTargetPrefetchService;
     completion: ScenarioPrefetchCompletionService;
   }) {
     this.options = collaborators.options;
+    this.runKeys = collaborators.runKeys;
     this.runSecrets = collaborators.runSecrets;
     this.lookups = collaborators.lookups;
     this.targets = collaborators.targets;
@@ -153,10 +158,21 @@ export class ScenarioExecutionPrefetcherService {
 
     const lookups = this.startLookups(input, runSecrets.values);
 
+    const runKey = lookups.adapter.then((adapter) =>
+      "success" in adapter
+        ? undefined
+        : this.runKeys.tokenFor({
+            projectId: context.projectId,
+            adapter,
+            startedByUserId: input.startedByUserId,
+            startedByApiKeyId: input.startedByApiKeyId,
+          }),
+    );
+
     return {
-      childEnvironment: Promise.all([lookups.scenario, lookups.project])
-        .then(([scenario, project]) => {
-          if (!project.success) {
+      childEnvironment: Promise.all([lookups.scenario, lookups.project, runKey])
+        .then(([scenario, project, apiKey]) => {
+          if (!project.success || apiKey === undefined) {
             return null;
           }
 
@@ -164,12 +180,19 @@ export class ScenarioExecutionPrefetcherService {
             labels: scenario.config.labels,
             telemetry: {
               endpoint: this.options.config.langwatchEndpoint,
-              apiKey: project.data.apiKey,
+              apiKey,
             },
           };
         })
         .catch(() => null),
-      result: this.completion.complete({ context, target, lookups }),
+      result: this.completion.complete({
+        context,
+        target,
+        lookups,
+        runKey,
+        startedByUserId: input.startedByUserId,
+        startedByApiKeyId: input.startedByApiKeyId,
+      }),
     };
   };
 

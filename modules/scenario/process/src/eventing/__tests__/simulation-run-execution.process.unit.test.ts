@@ -448,6 +448,44 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
     });
   });
 
+  describe("when the queued event records who started the run", () => {
+    function executeIntentFor(metadata?: Record<string, unknown>) {
+      const evolution = evolveEvent(
+        initialState,
+        makeEvent({
+          type: SIMULATION_RUN_EVENT_TYPES.QUEUED,
+          occurredAt: 10_000,
+          data: queuedData(metadata ? { metadata } : {}),
+        }),
+      );
+      return evolution.intents[0]?.payload;
+    }
+
+    /** @scenario "The run's starter travels from the queued event to the child's key" */
+    it("names the starter on the execute intent", () => {
+      expect(
+        executeIntentFor({ langwatch: { actorId: "user_1", actorLabel: "user" } }),
+      ).toMatchObject({ startedByUserId: "user_1" });
+    });
+
+    /** @scenario "A scenario run started with a personal access token holds no more than that token" */
+    it("names the key the starter used on the execute intent", () => {
+      expect(
+        executeIntentFor({
+          langwatch: { actorId: "user_1", actorLabel: "api", actorApiKeyId: "pat_1" },
+        }),
+      ).toMatchObject({ startedByUserId: "user_1", startedByApiKeyId: "pat_1" });
+    });
+
+    it("names nobody when the queued event records no actor", () => {
+      expect(executeIntentFor({ langwatch: { targetReferenceId: "agent_1" } })).not.toHaveProperty(
+        "startedByUserId",
+      );
+      expect(executeIntentFor()).not.toHaveProperty("startedByUserId");
+      expect(executeIntentFor()).not.toHaveProperty("startedByApiKeyId");
+    });
+  });
+
   describe("when the queued event records the run's secret parameters", () => {
     // They ride beside the metadata, encrypted, and stay encrypted through
     // this hop: the intent payload is persisted verbatim into outbox rows.
@@ -1068,6 +1106,8 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         parameters: null,
         secretParameters: null,
         secretParameterNames: null,
+        startedByUserId: null,
+        startedByApiKeyId: null,
         evaluators: null,
         hasOwnEvaluations: false,
       });

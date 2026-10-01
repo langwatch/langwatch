@@ -3,6 +3,7 @@
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -174,6 +175,7 @@ import type { GatewayLicensedKey } from "../repositories/gateway-virtual-key.rep
 import { PrismaGatewayConnectUpstreamRepository } from "../repositories/prisma/prisma.gateway-connect-upstream.repository.ts";
 import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
 import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
+import { PrismaGatewayTraceExportKeyRepository } from "../repositories/prisma/prisma.gateway-trace-export-key.repository.ts";
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
@@ -196,6 +198,7 @@ import { BudgetOverviewService } from "../services/gateway-budget-overview.servi
 import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
 import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import { GatewayConnectUpstreamService } from "../services/gateway-connect-upstream.service.ts";
+import { GatewayTraceExportKeyService } from "../services/gateway-trace-export-key.service.ts";
 import { GatewayElevenLabsCredentialService } from "../services/gateway-elevenlabs-credential.service.ts";
 import { GatewayElevenLabsWebhookService } from "../services/gateway-elevenlabs-webhook.service.ts";
 /**
@@ -765,6 +768,8 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
     traces: TraceApi,
     /** Parks a fresh key's secret for one later read, when its create asks for `revealOnce`. */
     oneTimeReveals: SecretApi,
+    /** Mints the ownerless key each trace project's gateway spans are exported with. */
+    apiKeys: ApiKeyApi,
   };
   static readonly config = gatewayConfig;
   static readonly publicConfig = gatewayBrowserConfig.project;
@@ -860,6 +865,11 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
         projects: setup.dependencies.projects,
       }),
       connectUpstream,
+      traceExportKeys: GatewayTraceExportKeyService.create({
+        repository: PrismaGatewayTraceExportKeyRepository.create(setup.members.prisma),
+        cipher: setup.members.encryption,
+        apiKeys: setup.dependencies.apiKeys,
+      }),
     });
     const guardrails = GatewayGuardrailEvaluationService.create({
       repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),

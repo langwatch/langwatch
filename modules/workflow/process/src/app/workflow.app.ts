@@ -1,7 +1,7 @@
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { LambdaClient } from "@aws-sdk/client-lambda";
 import { AgentApi } from "@langwatch/agent-contract";
-import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
+import { ApiKeyApi, ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { ProjectPermissionDeniedError, type AuthzPermission } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 /**
@@ -65,6 +65,7 @@ import {
   type WorkflowRelatedEntities,
   type WorkflowRunAnswer,
   type WorkflowRunOrigin,
+  type WorkflowRunPrincipal,
   type WorkflowSourceRow,
   type WorkflowVersion,
   type WorkflowVersionHistoryEntry,
@@ -112,6 +113,7 @@ import {
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import { buildStudioLambdaConfig } from "../rules/nlp-lambda-config.rules.ts";
 import { workflowPlatformUrl } from "../rules/workflow-platform-url.rules.ts";
+import { dispatchKeyFloorMs } from "../rules/workflow-run-key.rules.ts";
 import {
   DISPATCHABLE_STUDIO_EVENT_TYPES,
   findPostedJson,
@@ -313,7 +315,7 @@ export interface WorkflowInfrastructure {
   ids: WorkflowId;
   /** Upgrades a persisted graph before it becomes the workflow's current version. */
   dslMigration: WorkflowDslMigration;
-  /** Project credentials and decrypted secrets. */
+  /** The project's decrypted secrets. */
   projectEnvironment: WorkflowProjectEnvironment;
   /** Resolves process-specific LiteLLM credentials without exposing provider rows. */
   llmParameters: WorkflowLlmParameters;
@@ -602,6 +604,8 @@ export class WorkflowApp implements WorkflowApi {
     datasets: DatasetApi,
     /** Whether one person holds a permission on a project the caller names. */
     authz: AuthzApi,
+    /** Mints the key a run calls LangWatch back with. */
+    apiKeys: ApiKeyApi,
     /** Registers and runs a workflow's evaluation over its batch. */
     experiments: ExperimentApi,
     /** The monitors an archived workflow's evaluators back, deleted with it. */
@@ -637,6 +641,8 @@ export class WorkflowApp implements WorkflowApi {
       datasets,
       projectEnvironment,
       llmParameters,
+      runKeys: setup.dependencies.apiKeys,
+      dispatchKeyFloorMs: dispatchKeyFloorMs({ onLambda: engine.fleet !== undefined }),
     });
     const nlpRuntime = engine.runtime;
     const ids = KsuidWorkflowId.create();
@@ -798,6 +804,7 @@ export class WorkflowApp implements WorkflowApi {
   prepareStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#members.workflows.prepareStudioEvent(input);
   }
@@ -806,6 +813,7 @@ export class WorkflowApp implements WorkflowApi {
   enrichStudioEvent(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<StudioClientEvent> {
     return this.#members.workflows.enrichStudioEvent(input);
   }
@@ -951,11 +959,13 @@ export class WorkflowApp implements WorkflowApi {
     workflowId: string;
     projectId: string;
     body: Readonly<Record<string, unknown>>;
+    principal?: WorkflowRunPrincipal | undefined;
   }): Promise<WorkflowRunAnswer> {
     return this.#members.workflows.run({
       workflowId: input.workflowId,
       projectId: input.projectId,
       inputs: { ...input.body },
+      principal: input.principal,
     });
   }
 
@@ -1075,7 +1085,11 @@ export class WorkflowApp implements WorkflowApi {
     });
     if (!permitted) throw new ProjectPermissionDeniedError("workflows:manage");
 
-    const message = await this.#preparedForDispatch({ event: eventWithoutEnvs, projectId });
+    const message = await this.#preparedForDispatch({
+      event: eventWithoutEnvs,
+      projectId,
+      principal: { userId },
+    });
     if (!DISPATCHABLE_STUDIO_EVENT_TYPES.has(message.type)) {
       throw new WorkflowStudioEventInvalidError(`Unknown event type on server: ${message.type}`);
     }
@@ -1096,6 +1110,7 @@ export class WorkflowApp implements WorkflowApi {
   async #preparedForDispatch(input: {
     event: StudioClientEvent;
     projectId: string;
+    principal: WorkflowRunPrincipal;
   }): Promise<StudioClientEvent> {
     try {
       return await this.prepareStudioEvent(input);
@@ -1458,6 +1473,7 @@ export type WorkflowExecutionInput = {
   runEvaluations?: boolean;
   origin?: WorkflowRunOrigin;
   causalityDepth?: number;
+  principal?: WorkflowRunPrincipal | undefined;
   parentTrace?: { traceId: string; parentSpanId: string };
 };
 
@@ -1496,7 +1512,7 @@ export interface WorkflowDslMigration {
 
 /** Project credentials and decrypted secrets are application members. */
 export interface WorkflowProjectEnvironment {
-  get(input: { projectId: string }): Promise<{ apiKey: string; secrets: Record<string, string> }>;
+  get(input: { projectId: string }): Promise<{ secrets: Record<string, string> }>;
 }
 
 export type WorkflowLlmParameterResolution = {
@@ -1534,7 +1550,9 @@ export interface WorkflowAgentMapping {
 
 /** Matched on the handled CODE: the dataset module's own class is not this module's to name. */
 function isCallerFixable(error: unknown): boolean {
-  if (error instanceof LlmModelNotSetError) return true;
+  if (error instanceof LlmModelNotSetError || error instanceof ApiKeyPermissionDeniedError) {
+    return true;
+  }
   return (
     typeof error === "object" &&
     error !== null &&

@@ -47,6 +47,7 @@ import type { Instant } from "@langwatch/time";
 
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
+import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
 import { mintProjectSlug, projectIdSlugToken } from "../rules/project-slug-service.rules.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
@@ -538,6 +539,8 @@ export class ProjectService {
    * them itself would be a second owner of the same tables.
    */
   findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    if (isLegacyKeyRevoked(input.token)) return Promise.resolve(null);
+
     return this.repository.findIdByLegacyApiKey(input);
   }
 

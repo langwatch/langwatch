@@ -88,15 +88,8 @@ export class TestProjectApi implements ProjectApi {
   archive: ProjectApi["archive"] = (input) =>
     this.overrides.archive?.(input) ?? Promise.resolve({ alreadyArchived: false });
 
-  regenerateLegacyProjectKey: ProjectApi["regenerateLegacyProjectKey"] = (input) =>
-    this.overrides.regenerateLegacyProjectKey?.(input) ??
-    this.unimplemented("regenerateLegacyProjectKey");
-
   findIdByLegacyApiKey: ProjectApi["findIdByLegacyApiKey"] = (input) =>
     this.overrides.findIdByLegacyApiKey?.(input) ?? Promise.resolve(null);
-
-  rotateLegacyApiKey: ProjectApi["rotateLegacyApiKey"] = (input) =>
-    this.overrides.rotateLegacyApiKey?.(input) ?? this.unimplemented("rotateLegacyApiKey");
 
   findPersonalWorkspaceOwner: ProjectApi["findPersonalWorkspaceOwner"] = (input) =>
     this.overrides.findPersonalWorkspaceOwner?.(input) ?? Promise.resolve(null);

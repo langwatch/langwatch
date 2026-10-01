@@ -35,7 +35,11 @@ import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-co
 import { SuiteApp } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
-import { suiteSurfaceFact } from "../../rules/suite-wire-v1.rules.ts";
+import {
+  suiteCallerKeyFact,
+  suiteCallerKeyOf,
+  suiteSurfaceFact,
+} from "../../rules/suite-wire-v1.rules.ts";
 import { SuiteExecutionService } from "../../services/suite-execution.service.ts";
 import { createRunPlansRest } from "../run-plans.rest.ts";
 import { createSuitesAliasRest } from "../suites-alias.rest.ts";
@@ -426,7 +430,13 @@ export async function errorCodeOf(response: Response): Promise<string | undefine
 }
 
 /** Who the credential chain resolved the caller as. */
-export type RestFamilyCaller = { userId?: string | null | undefined };
+export type RestFamilyCaller = {
+  userId?: string | null | undefined;
+  /** The API key the caller presented; absent for a legacy project key. */
+  apiKeyId?: string | undefined;
+  /** The key is a person's access token (CLI, hosted MCP), as the project door marks it. */
+  isPersonSession?: boolean;
+};
 
 /** The three families, one application, one world. */
 export function mountSuiteFamilies(
@@ -486,6 +496,20 @@ export function mountSuiteFamilies(
         actorId: caller.userId ?? "project-key-1",
       })),
       bindRestHeader(suiteSurfaceFact, "x-langwatch-surface"),
+      bindRestMiddleware(suiteCallerKeyFact, () =>
+        caller.apiKeyId === undefined
+          ? null
+          : suiteCallerKeyOf({
+              type: "apiKey",
+              apiKeyId: caller.apiKeyId,
+              userId: caller.userId ?? null,
+              organizationId: TEST_PROJECT.organizationId,
+              ingestSourceType: null,
+              ingestionTemplateId: null,
+              ...(caller.isPersonSession ? { isPersonSession: true } : {}),
+              project: TEST_PROJECT,
+            }),
+      ),
     ],
   });
 

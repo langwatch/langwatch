@@ -20,7 +20,7 @@ export type RunSuite =
   | { found: false; reason: "not_a_suite_set" | "suite_missing" };
 
 type FetchProjectResult =
-  | { success: true; data: { apiKey: string } }
+  | { success: true; data: { id: string } }
   | { success: false; error: string };
 
 export class ScenarioExecutionLookupService {
@@ -115,11 +115,7 @@ export class ScenarioExecutionLookupService {
       return { success: false, error: `Project ${projectId} not found` };
     }
 
-    if (!project.apiKey) {
-      return { success: false, error: `Project ${projectId} missing API key` };
-    }
-
-    return { success: true, data: { apiKey: project.apiKey } };
+    return { success: true, data: { id: project.id } };
   }
 
   async getRunSuite({ setId, projectId }: { setId: string; projectId: string }): Promise<RunSuite> {

@@ -5,7 +5,6 @@ export {
 } from "./eventing/api-key.pipeline.ts";
 export type { AgentSandboxKeyReapDeps } from "./eventing/agent-sandbox-key-reap.intent.ts";
 export type { AgentSandboxKeyReapService } from "./services/agent-sandbox-key-reap.service.ts";
-export type { AgentSandboxKeyShareRedis } from "./repositories/redis/redis.agent-sandbox-key-share.repository.ts";
 export {
   AGENT_SANDBOX_KEY_REAP_INTERVAL_MS,
   AGENT_SANDBOX_KEY_REAP_PROCESS_NAME,

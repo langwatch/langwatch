@@ -63,7 +63,10 @@ export interface PromptUsageCount {
 /** Callable prompt operations shared by process peers after composition. */
 export interface PromptApi {
   /** Runs one browser playground request after transport authentication and authorization. */
-  executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>>;
+  executePlayground(
+    input: PromptExecuteRequest,
+    by?: PromptApiCaller,
+  ): Promise<AsyncIterable<PlaygroundStreamEvent>>;
   /** The deep link back into the prompt library for this project. */
   promptsPlatformUrl(input: { projectSlug: string }): string;
   getAllPrompts(input: {

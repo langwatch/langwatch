@@ -63,6 +63,7 @@ function process_() {
       "model-provider": createApiFixture({}, "ModelProviderApi"),
       experiment: createApiFixture({}, "ExperimentApi"),
       monitor: createApiFixture({}, "MonitorApi"),
+      "api-key": createApiFixture({}, "ApiKeyApi"),
     });
 }
 

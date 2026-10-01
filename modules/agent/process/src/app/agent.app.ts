@@ -428,14 +428,20 @@ export class AgentApp implements AgentApi {
     });
   }
 
-  async testRun(input: AgentReferenceInput & { actorId: string }): Promise<AgentTestRunResult> {
+  async testRun(
+    input: AgentReferenceInput & { actorId: string | null; callerApiKeyId?: string | null },
+  ): Promise<AgentTestRunResult> {
     const agent = await this.#withFields(
       await this.#agents.getById({ id: input.agentId, projectId: input.projectId }),
     );
+    const { actorId, callerApiKeyId } = input;
     return this.#scenarios.testAgentRun({
       projectId: input.projectId,
       agent,
-      actor: { id: input.actorId, label: "user" },
+      actor:
+        actorId === null
+          ? undefined
+          : { id: actorId, label: "user", ...(callerApiKeyId ? { apiKeyId: callerApiKeyId } : {}) },
     });
   }
 

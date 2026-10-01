@@ -18,3 +18,18 @@ export const projectCreatedEventDataSchema = z.object({
   backfilled: z.boolean().optional(),
 });
 export type ProjectCreatedEventData = z.infer<typeof projectCreatedEventDataSchema>;
+
+export const PROJECT_LEGACY_KEY_REVOKED_EVENT_TYPE = "lw.project.legacy_key_revoked" as const;
+export const PROJECT_LEGACY_KEY_REVOKED_EVENT_VERSION = "2026-10-01" as const;
+
+/** Ids only: the key, or any part of it, is never an event's data. */
+export const projectLegacyKeyRevokedEventDataSchema = z.object({
+  tenantId: z.string().min(1),
+  projectId: z.string().min(1),
+  organizationId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  revokedByUserId: z.string().min(1),
+});
+export type ProjectLegacyKeyRevokedEventData = z.infer<
+  typeof projectLegacyKeyRevokedEventDataSchema
+>;

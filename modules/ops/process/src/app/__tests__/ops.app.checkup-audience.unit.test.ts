@@ -4,6 +4,7 @@
  * Spec: modules/ops/specs/checkup-audience.feature
  */
 import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -81,6 +82,7 @@ function checkupService(): OpsCheckupService {
       }),
       providerTests: createApiFixture<ModelProviderApi>(),
       projectDirectory: createApiFixture<ProjectApi>(),
+      apiKeys: createApiFixture<ApiKeyApi>(),
       mail: { ...world.peers().mail, verifySmtp: async () => undefined },
       storage: {
         ...world.peers().storage,

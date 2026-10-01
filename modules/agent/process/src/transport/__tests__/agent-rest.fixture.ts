@@ -9,6 +9,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 /**
@@ -22,7 +23,7 @@ import { z } from "zod";
 import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
-import { createAgentRest } from "../agent.rest.ts";
+import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -54,10 +55,14 @@ export async function buildAgentApps(
     viewerUserId?: string | null;
     denyPermission?: string;
     relayMaxPayloadMb?: number;
+    scenarios?: ScenarioApi;
+    /** The caller key the project door resolves; null for a project key. */
+    callerKey?: string | null;
   } = {},
 ) {
   const { app, repositories } = createAgentAppFixture({
     users: createApiFixture<UserApi>({ getProfiles: async () => [] }),
+    ...(options.scenarios ? { scenarios: options.scenarios } : {}),
   });
   for (const agent of options.seed ?? []) {
     await repositories.agents.create({
@@ -118,6 +123,7 @@ export async function buildAgentApps(
       facts: [
         projectFacts,
         bindRestMiddleware(traceparent, (context) => context.req.header("traceparent") ?? null),
+        bindRestMiddleware(agentCallerKey, () => options.callerKey ?? null),
       ],
     }),
   );

@@ -23,7 +23,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { createAgentRest } from "../agent.rest.ts";
+import { agentCallerKey, createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -83,6 +83,7 @@ function buildApi(
           actorId: options.apiKeyUserId ?? "u_2",
         })),
         bindRestMiddleware(traceparent, (context) => context.req.header("traceparent") ?? null),
+        bindRestMiddleware(agentCallerKey, () => null),
       ],
     }),
   );

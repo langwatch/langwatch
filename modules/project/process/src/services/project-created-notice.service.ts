@@ -1,11 +1,18 @@
 import type { EventingCommandSender } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
 
-import type { RecordProjectCreatedCommandData } from "../eventing/project-lifecycle.events.ts";
+import type {
+  RecordProjectCreatedCommandData,
+  RecordProjectLegacyKeyRevokedCommandData,
+} from "../eventing/project-lifecycle.events.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 
 export type ProjectLifecycleSenders = Readonly<{
   recordProjectCreated: Pick<EventingCommandSender<RecordProjectCreatedCommandData>, "send">;
+  recordProjectLegacyKeyRevoked: Pick<
+    EventingCommandSender<RecordProjectLegacyKeyRevokedCommandData>,
+    "send"
+  >;
 }>;
 
 type NoticeLogger = Readonly<{
@@ -71,6 +78,26 @@ export class ProjectCreatedNoticeService {
       recorded += 1;
     }
     return recorded;
+  }
+
+  /** Best effort: the revocation has happened, so a failed record is logged, not raised. */
+  async legacyKeyRevoked(
+    input: Readonly<{ projectId: string; organizationId: string; revokedByUserId: string }>,
+  ): Promise<void> {
+    try {
+      const senders = this.#senders;
+      if (!senders) throw new Error("project_lifecycle is not registered in this process");
+      await senders.recordProjectLegacyKeyRevoked.send({
+        tenantId: input.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        ...input,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { projectId: input.projectId, error },
+        "recording the legacy key revocation failed; the status read refreshes on its own",
+      );
+    }
   }
 
   async #send(

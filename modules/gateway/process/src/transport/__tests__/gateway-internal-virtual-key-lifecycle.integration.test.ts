@@ -61,7 +61,7 @@ class SuiteProjectService extends TestProjectApi {
   ): ReturnType<ProjectApi["findTraceDestination"]> {
     return prisma.project.findUnique({
       where: { id: projectId },
-      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      select: { id: true, teamId: true, archivedAt: true },
     });
   }
 

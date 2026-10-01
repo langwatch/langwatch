@@ -299,7 +299,8 @@ function peersOf(overrides: PeerOverrides) {
     entitlement: createApiFixture<EntitlementApi>({ requestBound: async () => 1_000 }),
     evaluation: createApiFixture<EvaluationApi>({ reportEvaluation: async () => {} }),
     "api-key": createApiFixture<ApiKeyApi>({
-      getOrMintAgentSandboxKey: async () => "sandbox-key",
+      mintRunKey: async ({ permissions }) =>
+        permissions.includes("agentCache:manage") ? "sandbox-key" : "run-key",
     }),
     suite: createApiFixture<SuiteApi>({ assertConnectedAgentsRunnable: async () => {} }),
     "stored-object": createApiFixture<StoredObjectApi>({}),

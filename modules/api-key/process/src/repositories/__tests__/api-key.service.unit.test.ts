@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import { ApiKeyNotFoundError, type ApiKeyBinding } from "@langwatch/api-key-contract";
+import type { ApiKeyBinding } from "@langwatch/api-key-contract";
 import type {
   AuthzAccessBinding,
   AuthzApi,
@@ -25,6 +25,7 @@ import {
   type ApiKeyRow,
   type ApiKeyUpdateRecord,
 } from "../api-key.repository.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../memory/memory.api-key-answer-cache.repository.ts";
 
 class TestApiKeyBindingId implements ApiKeyGrantId {
   static create(): TestApiKeyBindingId {
@@ -263,16 +264,10 @@ class MemoryApiKeys extends ApiKeyRepository {
  */
 class MemoryProjects {
   legacyProjectId: string | null = null;
-  legacyProjectRotationSucceeds = true;
-  rotated: { projectId: string; token: string } | null = null;
   personalWorkspaceOwner: { ownerUserId: string | null } | null = null;
 
   findIdByLegacyApiKey(): Promise<string | null> {
     return Promise.resolve(this.legacyProjectId);
-  }
-  rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
-    this.rotated = input;
-    return Promise.resolve(this.legacyProjectRotationSucceeds);
   }
   findPersonalWorkspaceOwner(): Promise<{ ownerUserId: string | null } | null> {
     return Promise.resolve(this.personalWorkspaceOwner);
@@ -347,8 +342,6 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
     listByOrganization: vi.fn().mockResolvedValue({ data: [] }),
     listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: false }),
     findIdByLegacyApiKey: () => memory.findIdByLegacyApiKey(),
-    rotateLegacyApiKey: (input: { projectId: string; token: string }) =>
-      memory.rotateLegacyApiKey(input),
     findPersonalWorkspaceOwner: () => memory.findPersonalWorkspaceOwner(),
   });
 }
@@ -387,7 +380,11 @@ function createService(
   repository: ApiKeyRepository = new MemoryApiKeys(),
   options: ApiKeyDependencies = dependencies(),
 ): ApiKeyService {
-  return ApiKeyService.create({ repository, ...options });
+  return ApiKeyService.create({
+    repository,
+    answers: MemoryApiKeyAnswerCacheRepository.create(),
+    ...options,
+  });
 }
 
 describe("API-key service", () => {
@@ -553,36 +550,6 @@ describe("API-key service", () => {
     expect(repository.get(created.apiKey.id)!.hashedSecret).not.toBe(
       createHash("sha256").update(secret).digest("hex"),
     );
-  });
-
-  it("rotates the deprecated project credential through the project directory", async () => {
-    const memory = new MemoryProjects();
-    const service = createService(
-      new MemoryApiKeys(),
-      dependencies({ projects: projectPeer(memory) }),
-    );
-
-    const token = await service.regenerateLegacyProjectKey({
-      projectId: "project-1",
-    });
-    expect(token).toMatch(/^sk-lw-[A-Za-z0-9]{48}$/);
-    expect(memory.rotated).toEqual({
-      projectId: "project-1",
-      token,
-    });
-  });
-
-  it("throws when the project credential cannot be rotated", async () => {
-    const memory = new MemoryProjects();
-    memory.legacyProjectRotationSucceeds = false;
-    const service = createService(
-      new MemoryApiKeys(),
-      dependencies({ projects: projectPeer(memory) }),
-    );
-
-    await expect(
-      service.regenerateLegacyProjectKey({ projectId: "missing" }),
-    ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
   });
 
   it("defaults an unowned service key to organization ADMIN", async () => {

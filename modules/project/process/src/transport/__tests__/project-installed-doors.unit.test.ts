@@ -24,7 +24,6 @@ import { projectTrpcTransport } from "../project.trpc.ts";
 const ACTOR = { id: "user-1" };
 const PROJECT_ID = "project_1";
 const ORGANIZATION_ID = "organization-1";
-const ROTATED_KEY = "sk-lw-rotated";
 const CREATED_AT = new Date("2026-09-01T00:00:00.000Z");
 const CALLER_PROTECTIONS: Protections = {
   canSeeCapturedInput: false,
@@ -81,9 +80,7 @@ function installed(peers: Peers) {
           updatedAt: CREATED_AT,
         }),
       }),
-      "api-key": createApiFixture<ApiKeyApi>({
-        regenerateLegacyProjectKey: async () => ROTATED_KEY,
-      }),
+      "api-key": createApiFixture<ApiKeyApi>({}),
       share: createApiFixture<ShareApi>({}),
       topic: createApiFixture<TopicApi>({}),
       authz: createApiFixture<AuthzApi>({ hasPermission: async () => true }),
@@ -148,52 +145,26 @@ async function call(
 }
 
 describe("given the project module installed over memory repositories", () => {
-  describe("when the base key is rotated", () => {
-    /** @scenario "rotating the base key hands the new key back to the caller" */
-    it("answers with the key the rotation minted and records the rotation", async () => {
-      const recorded: RecordAuditLogCommand[] = [];
-      const { runtime, host } = await doors({ auditLog: recordingAuditLog(recorded) });
+  describe("when a project admin calls the removed key procedures", () => {
+    /** @scenario The procedures that revealed or rotated the project key are gone */
+    it.each(["project.getProjectAPIKey", "project.regenerateApiKey"])(
+      "answers %s as a procedure that does not exist",
+      async (path) => {
+        const { runtime, host } = await doors();
 
-      try {
-        expect(
-          await call(host, {
-            path: "project.regenerateApiKey",
+        try {
+          const answer = await call(host, {
+            path,
             type: "mutation",
             input: { projectId: PROJECT_ID },
-          }),
-        ).toEqual({ status: 200, body: { result: { data: { apiKey: ROTATED_KEY } } } });
-        expect(recorded).toEqual([
-          { action: "project.apiKey.regenerated", userId: ACTOR.id, projectId: PROJECT_ID },
-        ]);
-      } finally {
-        await runtime.stop();
-      }
-    });
-  });
+          });
 
-  describe("when the base key is rotated and the audit trail cannot be written", () => {
-    /** @scenario "a failing audit trail does not withhold the rotated key" */
-    it("still answers with the rotated key", async () => {
-      const { runtime, host } = await doors({
-        auditLog: createApiFixture<AuditLogApi>({
-          record: async () => {
-            throw new Error("audit store unreachable");
-          },
-        }),
-      });
-
-      try {
-        expect(
-          await call(host, {
-            path: "project.regenerateApiKey",
-            type: "mutation",
-            input: { projectId: PROJECT_ID },
-          }),
-        ).toEqual({ status: 200, body: { result: { data: { apiKey: ROTATED_KEY } } } });
-      } finally {
-        await runtime.stop();
-      }
-    });
+          expect(answer.status).toBe(404);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
   });
 
   describe("when a project is created into a new team", () => {

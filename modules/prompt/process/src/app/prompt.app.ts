@@ -300,11 +300,14 @@ export class PromptApp implements PromptApi {
     });
   }
 
-  executePlayground(input: PromptExecuteRequest): Promise<AsyncIterable<PlaygroundStreamEvent>> {
+  executePlayground(
+    input: PromptExecuteRequest,
+    by?: PromptCaller,
+  ): Promise<AsyncIterable<PlaygroundStreamEvent>> {
     const execution = this.#dependencies.execution;
     if (!execution) throw new PromptPlaygroundUnavailableError();
 
-    return execution.execute(input);
+    return execution.execute(input, by);
   }
 
   // -- the library -----------------------------------------------------------

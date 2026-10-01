@@ -7,6 +7,7 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
+import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
 import { ApiKeyGrantIdService } from "../api-key-grant-id.service.ts";
@@ -65,6 +66,7 @@ function setup(rows: ApiKeyRow[], options: { childrenUnreadable?: boolean } = {}
   const grants = createApiFixture<AuthzApi>({ revokeBindingsWhere: vi.fn(async () => 0) });
   const service = ApiKeyService.create({
     repository,
+    answers: MemoryApiKeyAnswerCacheRepository.create(),
     authz,
     grants,
     organizations: createApiFixture<OrganizationApi>({}),

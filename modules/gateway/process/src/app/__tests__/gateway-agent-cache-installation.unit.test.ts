@@ -34,6 +34,7 @@ function gatewayApp(): Promise<GatewayApp> {
       modelProviders: createApiFixture({}),
       traces: createApiFixture({}),
       oneTimeReveals: createApiFixture({}),
+      apiKeys: createApiFixture({}),
     },
     members: {
       prisma: createApiFixture<PrismaClient>({}),

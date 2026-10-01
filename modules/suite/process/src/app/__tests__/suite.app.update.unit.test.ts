@@ -113,7 +113,6 @@ const projectApi = createApiFixture<ProjectApi>({
   create: mockMethod(),
   updateSettings: mockMethod(),
   archive: mockMethod(),
-  regenerateLegacyProjectKey: mockMethod(),
   requestTopicClustering: mockMethod(),
   touchCodingAgentPullRequestSeen: mockMethod(),
 });
