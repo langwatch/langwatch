@@ -114,6 +114,9 @@ type Config struct {
 // PlanOptions decide which services `up` runs and how.
 type PlanOptions struct {
 	ShouldGoWatch bool // air hot-reload for the Go services instead of `go run`
+	// ShouldRunOneProcess runs a modular checkout's ui and api lanes as one app
+	// lane: Vite, api and worker in one Node process (ADR-168, B1).
+	ShouldRunOneProcess bool
 	// Selection is the worktree's sticky service choice (ADR-064): gateway,
 	// nlp, langy, idp. The three Node lanes — ui, api and workers — always run
 	// and are not selectable.

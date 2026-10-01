@@ -2,7 +2,7 @@
   "name": "@langwatch/dev-runtime",
   "version": "0.0.0",
   "private": true,
-  "description": "Contributor-only: the two Node applications in one local process.",
+  "description": "Contributor-only: the Node applications in one local process (dev:one adds the UI's Vite server, ADR-168).",
   "type": "module",
   "exports": {
     ".": {
@@ -12,6 +12,8 @@
   },
   "scripts": {
     "dev": "LANGWATCH_DEV_READY_PATTERN='\"msg\":\"backend ready\"' node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
+    "predev:one": "bash ../../dev/scripts/devscripts.sh ensure-built",
+    "dev:one": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/app.entrypoint.ts",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "typecheck": "tsc -b",
     "test": "vitest run"

@@ -16,6 +16,7 @@
     "dev:api": "node dev/scripts/dev-supervisor.mjs pnpm --filter @langwatch/platform-api dev",
     "dev:worker": "node dev/scripts/dev-supervisor.mjs pnpm --filter @langwatch/worker dev",
     "dev:backend": "node dev/scripts/dev-supervisor.mjs pnpm --filter @langwatch/dev-runtime dev",
+    "dev:one": "node dev/scripts/dev-supervisor.mjs pnpm --filter @langwatch/dev-runtime dev:one",
     "dev:go": "make service-watch svc=combined",
     "dev:concurrent": "pnpm --parallel --filter @langwatch/ui --filter @langwatch/platform-api --filter @langwatch/worker dev",
     "dev:cli": "pnpm --filter @langwatch/server dev",

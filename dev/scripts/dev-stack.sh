@@ -20,7 +20,12 @@
 #                                worker subprocesses, so it must not be
 #                                restarted with the rest of the Go code.
 #
-# The ui and backend lanes always run. The go lane is a convenience: it is
+#   app      tools/dev-runtime — with LANGWATCH_DEV_ONE_PROCESS=1, the ui and
+#                                backend lanes as ONE Node process: Vite on
+#                                PORT, api + worker re-linked in-process on a
+#                                backend change (ADR-168, B1). Same ports.
+#
+# The ui and backend lanes (or the app lane) always run. The go lane is a convenience: it is
 # skipped, with a line saying so, when the toolchain is absent, when its ports
 # are already held, or when both opt-out variables are set. Production is
 # unchanged — three Node deployments and separate Go services.
@@ -267,7 +272,10 @@ add_lane() {
   COMMANDS+=("bash $(shell_quote "$HERE/lane.sh") $1 $(shell_quote "$2")")
 }
 
-add_lane ui "$RUNTIME_ENV pnpm --silent --filter @langwatch/ui dev"
+ONE_PROCESS="${LANGWATCH_DEV_ONE_PROCESS:-}"
+if [ "$ONE_PROCESS" != "1" ]; then
+  add_lane ui "$RUNTIME_ENV pnpm --silent --filter @langwatch/ui dev"
+fi
 
 if [ -n "$GO_LANE_COMMAND" ]; then
   add_lane go "$GO_LANE_COMMAND"
@@ -280,7 +288,11 @@ fi
 # process. It boots the worker first, so the queue consumers are attached
 # before anything can enqueue. It does not migrate: the step above did, once,
 # and this lane restarts.
-add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"
+if [ "$ONE_PROCESS" = "1" ]; then
+  add_lane app "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev:one"
+else
+  add_lane backend "$RUNTIME_ENV pnpm --silent --filter @langwatch/dev-runtime dev"
+fi
 
 NAMES_STR=$(
   IFS=,
