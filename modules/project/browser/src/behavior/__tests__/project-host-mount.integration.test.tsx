@@ -65,7 +65,7 @@ const ORGANIZATION_GRAPH = {
 // mount DOES with the graph, not about the wire that carries it.
 const answer = vi.fn(() => ({ data: [ORGANIZATION_GRAPH] }));
 vi.mock("../project-api.ts", () => ({
-  api: { organization: { getAll: { useQuery: () => answer() } } },
+  projectApi: { organization: { getAll: { useQuery: () => answer() } } },
 }));
 
 const drawer = { openDrawer: vi.fn() };

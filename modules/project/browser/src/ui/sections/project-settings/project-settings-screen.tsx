@@ -31,7 +31,7 @@ import {
 } from "react-hook-form";
 
 import { ProjectDepartmentField } from "../../../behavior/lent-peers.tsx";
-import { api } from "../../../behavior/project-api.ts";
+import { projectApi } from "../../../behavior/project-api.ts";
 import type { OrganizationIntent } from "../../../model/prisma-types.ts";
 import {
   useProjectHost,
@@ -164,7 +164,7 @@ function OrganizationIdentityFields({
           />
         ) : (
           <Text>
-            {(organization as { supportContact?: string | null }).supportContact || (
+            {organization.supportContact || (
               <Text as="span" color="fg.subtle">
                 Not set
               </Text>
@@ -257,14 +257,14 @@ function SettingsForm({
     s3Bucket: organization.s3Bucket ?? "",
     presenceEnabled: organization.presenceEnabled,
     traceSharingEnabled: organization.traceSharingEnabled,
-    supportContact: (organization as { supportContact?: string | null }).supportContact ?? "",
+    supportContact: organization.supportContact ?? "",
     primaryIntent: organization.primaryIntent ?? "",
   });
   const { register, handleSubmit, getFieldState, control } = useForm({
     defaultValues,
   });
-  const updateOrganization = api.organization.update.useMutation();
-  const apiContext = api.useUtils();
+  const updateOrganization = projectApi.organization.update.useMutation();
+  const apiContext = projectApi.useUtils();
   const [showLlmOpsSetupDialog, setShowLlmOpsSetupDialog] = useState(false);
   const [showCreateProjectDialog, setShowCreateProjectDialog] = useState(false);
 
@@ -577,8 +577,8 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
     defaultValues,
   });
   const { register, handleSubmit, control, formState } = form;
-  const updateProject = api.project.update.useMutation();
-  const apiContext = api.useUtils();
+  const updateProject = projectApi.project.update.useMutation();
+  const apiContext = projectApi.useUtils();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
 

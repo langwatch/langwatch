@@ -22,7 +22,7 @@ import {
   type ProjectHostProject,
   type ProjectSuccessNotice,
 } from "../model/project-host.ts";
-import { api, type ProjectApiMap } from "./project-api.ts";
+import { projectApi, type ProjectApiMap } from "./project-api.ts";
 
 /** The graph as the read answers it: richer than the port's own organization. */
 type ProjectOrganizationGraph = ProjectApiMap["organization"]["getAll"]["query"]["output"][number];
@@ -127,7 +127,7 @@ export default function ProjectHostMount({ children }: { children?: ReactNode })
     return lent ? lazy(lent.capability.load) : void 0;
   }, [declarations]);
 
-  const organizations = api.organization.getAll.useQuery(
+  const organizations = projectApi.organization.getAll.useQuery(
     { isDemo: false },
     { enabled: !!session.currentUser() },
   );

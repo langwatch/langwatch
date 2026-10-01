@@ -11,7 +11,7 @@ import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useMemo, useState, type MouseEvent } from "react";
 
-import { api } from "../../behavior/project-api.ts";
+import { projectApi } from "../../behavior/project-api.ts";
 import { projectSwitchGroups, projectSwitchHref } from "../../model/project-switch.ts";
 import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
@@ -19,7 +19,7 @@ export default function ProjectSwitcher() {
   const { navigation, route } = useUiCapabilities();
   const { projectId } = useUiScope().activeScope();
   const [isOpen, setIsOpen] = useState(false);
-  const organizations = api.organization.getScopeGraph.useQuery({});
+  const organizations = projectApi.organization.getScopeGraph.useQuery({});
 
   const groups = useMemo(() => projectSwitchGroups(organizations.data ?? []), [organizations.data]);
   const current = groups

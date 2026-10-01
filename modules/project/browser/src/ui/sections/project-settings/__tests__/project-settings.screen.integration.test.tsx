@@ -17,8 +17,7 @@ vi.mock("../../../../behavior/project-api.ts", () => {
     governance: { resolveHome: { invalidate: calls.invalidate } },
   };
   return {
-    projectApi: { useUtils: () => utils },
-    api: {
+    projectApi: {
       useUtils: () => utils,
       organization: {
         update: {

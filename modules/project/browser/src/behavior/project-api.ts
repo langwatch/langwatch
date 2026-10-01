@@ -90,6 +90,3 @@ export type ProjectApiMap = {
 
 /** The project family's typed tRPC hooks. */
 export const projectApi = createModuleApi<ProjectApiMap>();
-
-/** The alias the screen moved with: `api.organization.update…`, unchanged. */
-export const api = projectApi;
