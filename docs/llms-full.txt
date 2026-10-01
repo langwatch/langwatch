@@ -10214,8 +10214,9 @@ gateway:
 
 <Warning>
   Both examples terminate TLS in front of the gateway and reach port 5563 over plain HTTP, so the
-  `Authorization` header that carries the virtual key crosses that last hop without encryption. The
-  ingress terminates at the ingress controller and the network load balancer terminates at the load
+  `Authorization` header that carries the virtual key crosses that last hop without encryption.
+
+  The ingress terminates at the ingress controller and the network load balancer terminates at the load
   balancer, which puts the plaintext hop inside the cluster network in the first case and between
   the load balancer and the pods in the second. Both assume that network is trusted. Where it is
   not, run a service mesh with mutual TLS between the terminator and the gateway pods.
@@ -62612,7 +62613,7 @@ The decision is made once at startup, so a license activated on a running server
 
 | Provider                          | `NEXTAUTH_PROVIDER` value | Requires                            |
 | --------------------------------- | ------------------------- | ----------------------------------- |
-| Email/Password                    | `email` (default)         | Nothing extra                       |
+| Email/Password                    | `email` (default)         | No extra settings                   |
 | Auth0                             | `auth0`                   | Client ID, Client Secret, Issuer    |
 | AWS Cognito                       | `cognito`                 | Client ID, Client Secret, Issuer    |
 | Azure AD                          | `azure-ad`                | Client ID, Client Secret, Tenant ID |
@@ -64799,8 +64800,8 @@ All traces, spans, evaluations, experiments, analytics. Hot storage on SSD, cold
 
 The API process (`apps/api`, built on Hono), the single external entry point
 for all traffic. It serves REST, tRPC and SSE, and also serves the prebuilt
-browser bundle (a Vite/React single-page app, `apps/ui`) as static assets —
-one container is the whole interactive tier:
+browser bundle (a Vite/React single-page app, `apps/ui`) as static assets.
+One container is the whole interactive tier:
 
 - **Web UI**: dashboards, trace explorer, prompt management, experiment views
 - **REST API + OTel ingestion**: receives spans from LangWatch SDKs
@@ -64812,7 +64813,7 @@ one container is the whole interactive tier:
 ### LangWatch Workers
 
 Same `langwatch/langwatch` image, started from `apps/worker` instead of
-`apps/api` (there is no in-process worker mode — the app and the workers are
+`apps/api` (there is no in-process worker mode: the app and the workers are
 always separate processes). Consumes jobs from a BullMQ queue in Redis and
 runs the event sourcing pipeline (see below).
 
