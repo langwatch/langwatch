@@ -4,7 +4,7 @@ import type { TrpcProcedureFactory, TrpcProcedureRequest } from "@langwatch/api/
  * permission the server binds to it — a rename here is a cache-key change
  * in every browser that calls it. Spec: dashboard-service.feature.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   dashboardTrpc,
   graphTrpc,

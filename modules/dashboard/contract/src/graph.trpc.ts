@@ -1,10 +1,10 @@
+import { triggerSchema } from "@langwatch/automation-contract";
 /**
  * Every `graphs.*` procedure, declared once: its name, its kind, what it
  * takes and what it answers, stated once in the package both sides import.
  * Spec: dashboard-service.feature.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
-import { triggerSchema } from "@langwatch/automation-contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { graphSchema } from "./graph.ts";
