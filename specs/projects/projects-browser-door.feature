@@ -24,17 +24,28 @@ Feature: The project.* browser namespace is served by the application the compos
     Given the project module installed over memory repositories
     When somebody creates a project into a new team
     Then they are answered with the slug of the project created
-    And Langy's virtual key is provisioned on a best-effort basis
 
   Scenario: the redaction status reads the caller's own protections
     Given the project module installed over memory repositories
     When somebody reads the project's field redaction status
     Then the answer is resolved from the caller's own captured-content protections
 
+  # Project records the creation as a fact; Langy mints from its own side, so project never
+  # names Langy (peer cycle cut, ARCHITECTURE.md §5 and §9).
+  Scenario: creating a project provisions Langy's virtual key from Langy's side
+    Given project has recorded a project somebody created
+    When Langy hears the creation
+    Then it mints the project's gateway key on the creator's behalf
+
+  Scenario: a project with no creator or recorded by a backfill gets no Langy key on creation
+    Given project has recorded a personal workspace's project or a backfilled one
+    When Langy hears the creation
+    Then it mints nothing, and the first chat mints the key instead
+
   Scenario: a Langy key that cannot be minted does not fail the project's creation
     Given the gateway key cannot be minted for a new project
-    When Langy is asked to provision the project's virtual key
-    Then the failure is reported and the request answers normally
+    When Langy hears the creation
+    Then the failure is reported and nothing is retried
 
   # Moves to the onboarding module, its own lane (Alex, 2026-09-24).
   @unimplemented
@@ -42,6 +53,37 @@ Feature: The project.* browser namespace is served by the application the compos
     Given the project module installed over memory repositories
     When somebody reads the project's setup checklist
     Then they are answered with the project's setup counts
+
+  Scenario: The storage secret field is write-only
+    Given somebody who manages an organization whose storage is configured
+    When the settings page opens
+    Then the secret field is empty and says a stored secret is replaced by typing a new one
+
+  Scenario: A blank storage secret leaves the stored secret unchanged
+    Given storage settings with a stored secret
+    When the settings form is saved with an endpoint and a key id but a blank secret
+    Then the stored secret is not touched
+
+  Scenario: A first-time storage setup with a blank secret is refused
+    Given storage settings with no stored secret
+    When the settings form is saved with an endpoint and a key id but a blank secret
+    Then the request is refused as invalid
+    And nothing is stored
+
+  Scenario: A new storage secret replaces the stored one
+    Given storage settings with a stored secret
+    When the settings form is saved with a new secret
+    Then the new secret is stored
+
+  Scenario: Clearing the storage settings clears the stored secret
+    Given storage settings with a stored secret
+    When the settings form is saved with every storage field blank
+    Then the stored secret is cleared
+
+  Scenario: A storage secret needs an endpoint and a key id
+    Given somebody saving the settings form
+    When they send a secret without an endpoint and a key id
+    Then the request is refused as invalid
 
   Scenario: stored-object credentials are written through the deployment's cipher
     Given somebody signed in to a project
