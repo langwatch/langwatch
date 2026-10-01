@@ -67,6 +67,7 @@ Feature: voicesim, a local stand-in for the voice providers a scenario call uses
     When the developer runs "haven up +voice"
     Then the overlay adds a dummy ELEVENLABS_API_KEY
     And the storage seed stores an ElevenLabs provider row whose base URL is voicesim
+    And the seed turns on release_voice_agents_enabled, so a new organization can create a voice agent
 
   Scenario: The product reaches a loopback voice host only under the dev switch
     Given the dev switch VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS is off

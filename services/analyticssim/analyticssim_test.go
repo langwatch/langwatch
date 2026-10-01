@@ -147,8 +147,10 @@ func TestPostHogJSEncodingsAreListed(t *testing.T) {
 	send(t, http.MethodPost, srv.URL+"/e/?compression=gzip-js", http.Header{"Content-Type": {"text/plain"}}, gzipped(t, event))
 	form := url.Values{"data": {base64.StdEncoding.EncodeToString([]byte(event))}}.Encode()
 	send(t, http.MethodPost, srv.URL+"/i/v0/e/?compression=base64", http.Header{"Content-Type": {"application/x-www-form-urlencoded"}}, []byte(form))
-	if got := records(t, c, Filter{ID: "anon-1", Kind: KindEvent}); len(got) != 2 {
-		t.Fatalf("got %d records, want 2", len(got))
+	// posthog-js's batch flush gzips without naming a compression.
+	send(t, http.MethodPost, srv.URL+"/e/", http.Header{"Content-Type": {"text/plain"}}, gzipped(t, event))
+	if got := records(t, c, Filter{ID: "anon-1", Kind: KindEvent}); len(got) != 3 {
+		t.Fatalf("got %d records, want 3", len(got))
 	}
 }
 

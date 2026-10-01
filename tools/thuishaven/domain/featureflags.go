@@ -27,6 +27,7 @@ var SeededFeatureFlags = []string{
 	"release_instant_evals",                     // LangWatchQL eval functions
 	"release_custom_chart_playground",           // the custom-chart playground and its widget routes
 	"release_ui_governance_billed_cost_enabled", // governance Costs and Platform preview pages
+	"release_voice_agents_enabled",              // voice agents, Talk to it and voice runs (voicesim)
 }
 
 // featureFlagSeedEditor is the FeatureFlag.lastEditedBy stamp haven writes, so an
