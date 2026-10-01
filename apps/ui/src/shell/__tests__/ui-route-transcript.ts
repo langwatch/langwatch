@@ -169,6 +169,7 @@ export const expectedUiRouteTranscript: readonly string[] = [
   "    route /ops/migrations -> pages/ops/migrations",
   "    redirect /ops/projections -> /ops/event-sourcing/projections (from /ops/projections) [pin replay=open]",
   "    route /ops/projections/:runId -> pages/ops/projections/[runId]",
+  "    route /ops/operators -> pages/ops/operators",
   "    route /ops/users -> pages/ops/users",
   "    route /ops/organizations -> pages/ops/organizations",
   "    route /ops/projects -> pages/ops/projects",

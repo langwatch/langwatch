@@ -1,11 +1,11 @@
+import type { Page, Request } from "playwright";
+
 /**
  * What the workbench page did with the turn's `ui` entries, read off its own network:
  * the claim and completion calls its Langy panel makes. The stream the adapter reads
  * says what was dispatched; the page's calls say what became of it.
  */
-import type { UiActionExecution } from "@langwatch/langy-browser-kit";
-import type { Page, Request } from "playwright";
-
+import type { UiActionExecution } from "../../src/shell/model/langy/ui-actions/execute-ui-action.ts";
 import type { UiActionEntry } from "./langy-agent";
 
 /** One `ui` entry the turn stream carried, and what the page made of it. */

@@ -113,9 +113,6 @@
       "path": "../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../modules/langy/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
@@ -144,9 +141,6 @@
     },
     {
       "path": "../../modules/organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/prompt/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../packages/react-rum/tsconfig.build.json"
@@ -179,9 +173,6 @@
       "path": "../../modules/user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/workflow/browser-kit/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/workflow/contract/tsconfig.build.json"
     },
     {
@@ -189,9 +180,6 @@
     },
     {
       "path": "../../modules/langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/onboarding/browser-kit/tsconfig.build.json"
     },
     {
       "path": "../../modules/onboarding/contract/tsconfig.build.json"

@@ -1,10 +1,6 @@
 // Temporal, before anything reads a clock. A runtime that ships it natively keeps its own.
 import "@langwatch/time/polyfill";
 import { createBrowserUiAnalytics } from "@langwatch/browser-host/browser-analytics";
-import {
-  createUiVersionedReads,
-  type UiBindableVersionedReads,
-} from "@langwatch/browser-host/cache-tiers";
 import type {
   UiDeployment,
   UiFeedback,
@@ -145,7 +141,6 @@ class BrowserUiShell extends UiShell {
     drawers,
     transport,
     sessionVersions,
-    versionedReads,
     hosts,
     rootCapabilities,
   }: {
@@ -157,7 +152,6 @@ class BrowserUiShell extends UiShell {
     drawers: UiDrawerRegistry;
     transport: UiFeatureApiTransport;
     sessionVersions: SessionVersionWatch;
-    versionedReads: UiBindableVersionedReads;
     hosts: readonly UiModuleHostMount[];
     rootCapabilities: UiRootCapabilities;
   }): BrowserUiShell {
@@ -173,7 +167,6 @@ class BrowserUiShell extends UiShell {
           hosts,
           transport,
           sessionVersions,
-          versionedReads,
           // Without these the shell resolves the REFUSING defaults, so the first
           // session read throws instead of answering. See ARCHITECTURE.md 10.1.
           session: browserUiCapabilitiesHook(rootCapabilities),
@@ -244,13 +237,10 @@ export async function startUi(): Promise<void> {
   const config = parseUiFeatureConfig(served);
   // Every answer's session version reaches the watch the shell invalidates reads from.
   const sessionVersions = SessionVersionWatch.create();
-  // The shell owns the QueryClient and binds it to these when it renders.
-  const versionedReads = createUiVersionedReads();
   // One client, declared to the supply and handed to the shell: a module that
   // declares a screen declares that it reads the platform, and this answers it.
   const transport = createUiFeatureApiClient({
     fetch: sessionVersionFetch({ watch: sessionVersions }),
-    versionedReads,
     isDevelopment: config.process.mode === "development",
   });
   const rootCapabilities = await loadUiRootCapabilities();
@@ -272,7 +262,6 @@ export async function startUi(): Promise<void> {
       drawers: installedModuleDrawers(installed.modules),
       transport,
       sessionVersions,
-      versionedReads,
       hosts: installedModuleHostMounts(installed.modules),
       rootCapabilities,
     }),

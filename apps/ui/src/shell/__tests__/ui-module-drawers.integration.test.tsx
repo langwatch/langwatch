@@ -4,7 +4,6 @@
  * one registry, and the address bar is what opens and stacks it.
  */
 import {
-  clearDrawerStack,
   CurrentDrawer,
   type UiEvaluatorEditorDrawerProps,
   useDrawer,
@@ -37,7 +36,6 @@ beforeAll(() => {
 
 afterEach(() => {
   cleanup();
-  clearDrawerStack();
   window.history.replaceState(null, "", "/");
 });
 

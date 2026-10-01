@@ -4,8 +4,9 @@
  * turn sees no entry rather than one that refuses when pressed.
  */
 
-import { isLangyDemoProject } from "@langwatch/langy-browser-kit";
 import type { NavigationOpsAccess } from "@langwatch/navigation-browser/navigation";
+
+import { isLangyDemoProject } from "./model/langy/langy-demo-project.ts";
 
 /**
  * `langy:create`, not `langy:view`: the palette hand-off queues an auto-send,

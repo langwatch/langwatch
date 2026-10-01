@@ -62,7 +62,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/installed-web-modules": "workspace:*",
     "@langwatch/langy-browser": "workspace:*",
-    "@langwatch/langy-browser-kit": "workspace:*",
     "@langwatch/model-provider-browser": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/monitor-browser": "workspace:*",
@@ -76,7 +75,6 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-browser": "workspace:*",
     "@langwatch/prompt-browser": "workspace:*",
-    "@langwatch/prompt-browser-kit": "workspace:*",
     "@langwatch/react-rum": "workspace:*",
     "@langwatch/rum-contract": "workspace:*",
     "@langwatch/scenario-browser": "workspace:*",
@@ -90,7 +88,6 @@
     "@langwatch/user-browser": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-browser": "workspace:*",
-    "@langwatch/workflow-browser-kit": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@trpc/client": "catalog:",
@@ -105,7 +102,8 @@
     "react-dom": "catalog:",
     "react-error-boundary": "catalog:",
     "react-router": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "zustand": "catalog:"
   },
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
@@ -113,7 +111,6 @@
     "@elevenlabs/client": "catalog:",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
-    "@langwatch/onboarding-browser-kit": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/scenario": "catalog:",

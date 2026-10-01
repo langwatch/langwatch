@@ -921,6 +921,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/ops/projections/[runId]",
           },
           // Instance administration, for every instance operator (ARCHITECTURE.md §3.5).
+          { path: "/ops/operators", page: "pages/ops/operators" },
           { path: "/ops/users", page: "pages/ops/users" },
           { path: "/ops/organizations", page: "pages/ops/organizations" },
           { path: "/ops/projects", page: "pages/ops/projects" },

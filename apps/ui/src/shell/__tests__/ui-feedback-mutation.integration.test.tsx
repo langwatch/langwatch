@@ -3,7 +3,6 @@
  * @vitest-environment jsdom
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
   UiCapabilityContextProvider,
   useUiCapabilities,
@@ -11,10 +10,11 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { toaster } from "@langwatch/design-system/toaster";
 import { UiErrorToaster } from "@langwatch/ui-kernel/error-toaster";
 import { QueryClient, QueryClientProvider, useMutation } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 // The Design System's toaster is a module singleton, so a toast raised by one
@@ -71,15 +71,13 @@ function mount() {
     feedback: BrowserUiFeedback.create(),
   };
 
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <QueryClientProvider client={new QueryClient()}>
-        <UiCapabilityContextProvider value={capabilities}>
-          <RunButton />
-          <UiErrorToaster />
-        </UiCapabilityContextProvider>
-      </QueryClientProvider>
-    </ChakraProvider>,
+  return renderWithDesignSystem(
+    <QueryClientProvider client={new QueryClient()}>
+      <UiCapabilityContextProvider value={capabilities}>
+        <RunButton />
+        <UiErrorToaster />
+      </UiCapabilityContextProvider>
+    </QueryClientProvider>,
   );
 }
 
