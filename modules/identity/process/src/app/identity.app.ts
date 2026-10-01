@@ -1,6 +1,6 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";

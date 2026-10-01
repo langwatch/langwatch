@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioNotFoundError } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";

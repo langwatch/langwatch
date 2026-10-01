@@ -37,7 +37,6 @@
     "@langwatch/dataset-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-client": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

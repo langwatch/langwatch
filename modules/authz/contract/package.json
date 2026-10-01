@@ -21,7 +21,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/actor": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

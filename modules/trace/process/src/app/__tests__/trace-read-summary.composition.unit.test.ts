@@ -1,5 +1,4 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -13,6 +12,7 @@ import { LocalFeatureApis } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { traceSummaryDataSchema, type TraceSummaryData } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";

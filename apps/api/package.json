@@ -33,7 +33,6 @@
     "@aws-sdk/client-s3": "catalog:",
     "@clickhouse/client": "catalog:",
     "@hono/node-server": "catalog:",
-    "@langwatch/actor": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-process": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
@@ -46,6 +45,7 @@
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
     "@langwatch/auth-process": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/authz-process": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
@@ -166,7 +166,6 @@
     "zod-validation-error": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

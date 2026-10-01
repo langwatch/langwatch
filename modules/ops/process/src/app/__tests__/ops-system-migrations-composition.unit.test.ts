@@ -1,16 +1,16 @@
-/**
- * @vitest-environment node
- * The migrations console as ops composes it: authz's and identity's registries in main's order,
- * and the cohort exclusion read off the ClickHouse member's routing table.
- * Spec: specs/migration/system-migrations-runner.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { AutomationApi } from "@langwatch/automation-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SystemMigration } from "@langwatch/system-migrations";
+/**
+ * @vitest-environment node
+ * The migrations console as ops composes it: authz's and identity's registries in main's order,
+ * and the cohort exclusion read off the ClickHouse member's routing table.
+ * Spec: specs/migration/system-migrations-runner.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PrismaSystemMigrationEnrollmentRepository } from "../../repositories/prisma/prisma.system-migration-enrollment.repository.ts";

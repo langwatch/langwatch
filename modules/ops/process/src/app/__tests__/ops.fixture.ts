@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * A real `OpsApp` over memory repositories, fixture peers and a literal
@@ -14,6 +13,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { OpsOperatorPermission } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";

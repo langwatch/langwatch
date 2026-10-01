@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see specs/projects/projects-browser-door.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
@@ -12,6 +7,11 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ShareApi } from "@langwatch/share-contract";
+/**
+ * @vitest-environment node
+ * @see specs/projects/projects-browser-door.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { Protections, TraceApi } from "@langwatch/trace-contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";

@@ -1,5 +1,5 @@
 import { AgentNotFoundError, agentOverviewSchema, type AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ScenarioWorkflowAgentSecretsService } from "../scenario-workflow-agent-secrets.service.ts";

@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 // Port of main's directoryDepartmentSync unit and integration tests, over the memory tier.
 import { describe, expect, it } from "vitest";

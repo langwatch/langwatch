@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ApiKeyNotFoundError, type ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   type AuthzService,
@@ -6,6 +5,7 @@ import {
   type AuthzEffectivePermissionsOutput,
 } from "@langwatch/authz-contract";
 import { type LangySessionKeyMetrics } from "@langwatch/langy-process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

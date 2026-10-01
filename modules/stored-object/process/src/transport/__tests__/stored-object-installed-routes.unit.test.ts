@@ -1,15 +1,15 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-/**
- * @vitest-environment node
- * @see modules/stored-object/specs/stored-object-file-routes.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { Logger } from "@langwatch/observability";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+/**
+ * @vitest-environment node
+ * @see modules/stored-object/specs/stored-object-file-routes.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { storedObjectServer } from "../../stored-object.server.ts";

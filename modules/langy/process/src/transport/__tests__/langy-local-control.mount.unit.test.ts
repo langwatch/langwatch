@@ -1,8 +1,8 @@
 import { createServer, type Server } from "node:http";
 
 import { WebSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LangyApi, LocalControlConnectCredentials } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 

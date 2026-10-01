@@ -133,9 +133,9 @@ COPY services/langyworker/scripts ./services/langyworker/scripts
 # (`pnpm -r --filter "langwatch..." --filter "@langwatch/langyworker..." exec pwd`):
 # langy-contract is bundled into the binary and imports these at runtime.
 COPY modules/authz/contract ./modules/authz/contract
-COPY packages/actor ./packages/actor
+COPY packages/authorization ./packages/authorization
 COPY packages/api ./packages/api
-COPY packages/api-fixture ./packages/api-fixture
+COPY packages/test-harness ./packages/test-harness
 COPY packages/config ./packages/config
 COPY packages/handled-error ./packages/handled-error
 COPY packages/module ./packages/module

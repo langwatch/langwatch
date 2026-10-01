@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** The summary service over its memory twins; the peers are scripted fixtures that throw on anything else. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi, GatewaySpendDay } from "@langwatch/gateway-contract";
 import type { InternalProject, ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** The summary service over its memory twins; the peers are scripted fixtures that throw on anything else. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
 import type {

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `bugReports.*` surface: the staff gate, the audit row written before
@@ -8,6 +7,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { OpsOperator } from "@langwatch/ops-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

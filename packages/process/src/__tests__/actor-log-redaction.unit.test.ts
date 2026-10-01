@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { ACTOR_SECRET_LOG_PATHS, type Actor } from "@langwatch/actor";
+import { ACTOR_SECRET_LOG_PATHS, type Actor } from "@langwatch/authorization";
 import { createLoggerFactory, type LoggerConfiguration } from "@langwatch/observability";
 import { processTelemetry } from "@langwatch/observability/node";
 import { REDACTED } from "@langwatch/secrets";

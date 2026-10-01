@@ -1,5 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AutomationClock,AutomationProjectDirectory } from "../../app/automation.members.ts";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import {

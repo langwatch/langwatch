@@ -4,7 +4,6 @@
  * Design: modules/experiment/specs/experiment-run-execution.md section 11.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -46,6 +45,7 @@ import type { PromptApi } from "@langwatch/prompt-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   memoryRedisDouble,
   memoryRedisStore,

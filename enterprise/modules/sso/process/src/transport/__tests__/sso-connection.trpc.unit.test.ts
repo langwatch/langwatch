@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Who reaches the back office's single sign-on surface, what it refuses by name,
@@ -11,6 +10,7 @@ import type {
   SsoConnectionHistoryApi,
   SsoSetupApi,
 } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

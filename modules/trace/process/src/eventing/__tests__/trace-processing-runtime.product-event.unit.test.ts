@@ -1,9 +1,9 @@
+import type { Project } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-projections.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { Project } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 const logger = vi.hoisted(() => ({

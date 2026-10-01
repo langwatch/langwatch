@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   ScenarioExecutionJob,
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   SimulationService,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { CancellationPublisher } from "../app/scenario.app.ts";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   SsoArrivalApi,
   SsoAuthenticationActivityApi,
@@ -11,6 +10,7 @@ import type {
  * @see specs/auth/phase-1-better-auth-config.feature
  */
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

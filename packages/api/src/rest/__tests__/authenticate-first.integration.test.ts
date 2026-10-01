@@ -6,11 +6,11 @@
 
 import { createHmac } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import { anyAuthenticated, type Authorize } from "../../access/access.ts";
 import {
   createErrorHandler,
@@ -48,7 +48,7 @@ function application() {
     record: vi.fn(async ({ id, raw }: { id: string; raw: string }) => ({ id, raw })),
   };
 
-  return { api: createApiFixture<NoteApi>(calls), calls };
+  return { api: createApiDouble<NoteApi>(calls), calls };
 }
 
 /** A key door: nothing presented is missing, anything but the key is invalid. */
@@ -269,7 +269,7 @@ describe("a request authenticated before its body is parsed", () => {
         sessions: SessionReader.create({
           verify: async (request) => (request.headers.has("cookie") ? { userId: "user-1" } : null),
         }),
-        authz: createApiFixture<Authorize>(),
+        authz: createApiDouble<Authorize>(),
         publicBaseUrl: "https://app.example",
       });
 

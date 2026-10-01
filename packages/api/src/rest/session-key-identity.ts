@@ -3,7 +3,7 @@
  * the key's headers, asks the minting module who holds it, and puts that actor and project on the
  * request, so no handler reads the headers. The module's verifier throws its own refusals.
  */
-import type { Actor } from "@langwatch/actor";
+import type { Actor } from "@langwatch/authorization";
 
 import { ProjectMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
 import type { RestCaller, RestIdentity } from "./runtime.ts";

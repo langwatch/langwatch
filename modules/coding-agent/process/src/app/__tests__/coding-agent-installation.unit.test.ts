@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The organization rollup, booted the way a process boots coding-agent: its
- * caller scope, visibility and audit come from peers, never from members.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -14,6 +8,12 @@ import type { GithubApi } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * The organization rollup, booted the way a process boots coding-agent: its
+ * caller scope, visibility and audit come from peers, never from members.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";

@@ -36,9 +36,6 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluator/client/tsconfig.build.json"
     },
     {

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemoryExperimentAttachmentLinkChannel } from "../../channels/memory/memory.experiment-attachment-link.channel.ts";
 import { ExperimentAttachmentInputService } from "../experiment-attachment-input.service.ts";

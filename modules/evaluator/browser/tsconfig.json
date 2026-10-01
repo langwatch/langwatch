@@ -42,9 +42,6 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../evaluation/contract/tsconfig.build.json"
     },
     {
@@ -55,6 +52,9 @@
     },
     {
       "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"

@@ -3,7 +3,6 @@
  */
 import { randomBytes } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   ModelDefaultScope,
@@ -28,6 +27,7 @@ import {
   type ProjectNamesByIdsInput,
   type ProjectWithTeam,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import {
   ModelProviderCatalog,

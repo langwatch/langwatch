@@ -1,12 +1,12 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * `departments.*` over the real tRPC runtime, pinned to main's wire
  * (platform/app/ee/governance/routers/departments.ts on origin/main).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 

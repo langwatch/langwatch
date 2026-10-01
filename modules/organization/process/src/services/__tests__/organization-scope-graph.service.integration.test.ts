@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see modules/organization/specs/scope-graph.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ScopeGraphOrganization } from "@langwatch/organization-contract";
@@ -13,6 +8,11 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+/**
+ * @vitest-environment node
+ * @see modules/organization/specs/scope-graph.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

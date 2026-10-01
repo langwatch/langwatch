@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
@@ -14,6 +13,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";

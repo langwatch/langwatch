@@ -3,8 +3,7 @@
  * this one object. Three operations name a ROLE rather than the organization
  * their check runs against, so those checks run here, where the row is.
  */
-import { ledgerActorFor, type LedgerActor } from "@langwatch/actor";
-import { PermissionDeniedError } from "@langwatch/authorization";
+import { ledgerActorFor, type LedgerActor, PermissionDeniedError } from "@langwatch/authorization";
 import {
   AuthzApi,
   bindingScopeCanGrantPermission,

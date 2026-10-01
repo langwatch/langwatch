@@ -1,16 +1,16 @@
-/**
- * The one run-key mint: the starter's own key, as narrow as the run, never wider than what they
- * hold, and reused only while it covers the caller's floor.
- *
- * @see modules/workflow/specs/workflow-service.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   RUN_KEY_LIFETIME_MS,
   RUN_KEY_MAX_REMAINING_MS,
   type ApiKeyApi,
 } from "@langwatch/api-key-contract";
 import { type AuthzApi, authzEffectivePermissionsOutputSchema } from "@langwatch/authz-contract";
+/**
+ * The one run-key mint: the starter's own key, as narrow as the run, never wider than what they
+ * hold, and reused only while it covers the caller's floor.
+ *
+ * @see modules/workflow/specs/workflow-service.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";

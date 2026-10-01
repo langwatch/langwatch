@@ -5,7 +5,6 @@
  * @see specs/automations/worker-automation-settlement-conversion.feature
  */
 import { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
@@ -22,6 +21,7 @@ import { LocalFeatureApis } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 

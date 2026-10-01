@@ -1,15 +1,15 @@
-/**
- * @vitest-environment node
- * Going live reads the test sign-in off the connection's own trail: the
- * account is evidence the journey holds, never a value a caller supplies.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   emptySsoConnection,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
   type SsoDomainVerification,
 } from "@langwatch/identity-contract";
+/**
+ * @vitest-environment node
+ * Going live reads the test sign-in off the connection's own trail: the
+ * account is evidence the journey holds, never a value a caller supplies.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { StubBreakGlassBindings } from "../../__tests__/support/in-memory-connections.ts";

@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * The experiment application: the rules that moved off its two doors onto it.
@@ -10,6 +9,7 @@ import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Experiment } from "@langwatch/experiment-contract";
 import type { Monitor } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

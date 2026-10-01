@@ -1,4 +1,4 @@
-import { ledgerActorFor } from "@langwatch/actor";
+import { ledgerActorFor } from "@langwatch/authorization";
 /**
  * Accepting an invitation: the membership write and the grant tail that follows it, both
  * idempotent so a retry repairs rather than duplicates.

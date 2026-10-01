@@ -1,10 +1,3 @@
-/**
- * `/api/v1/instant-evals` over the real REST runtime and the canonical error
- * envelope, with only `InstantEvalApi` a double: what the boundary parses,
- * hands the application, publishes, and refuses.
- * @see specs/instant-evals/instant-eval-api.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -20,6 +13,13 @@ import {
   type InstantEvalJudgmentWire,
   type InstantEvalRunWire,
 } from "@langwatch/instant-eval-contract";
+/**
+ * `/api/v1/instant-evals` over the real REST runtime and the canonical error
+ * envelope, with only `InstantEvalApi` a double: what the boundary parses,
+ * hands the application, publishes, and refuses.
+ * @see specs/instant-evals/instant-eval-api.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { instantEvalRest } from "../instant-eval.rest.ts";

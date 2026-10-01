@@ -1,11 +1,11 @@
-/**
- * @see specs/features/stored-object-legacy-id-only-owner.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { Logger } from "@langwatch/observability";
 import type { Encryption, ObjectStorage } from "@langwatch/process-stores/members";
 import { StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
+/**
+ * @see specs/features/stored-object-legacy-id-only-owner.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { buildStoredObjectInfrastructure } from "../stored-object-composition.build.ts";

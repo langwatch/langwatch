@@ -3,7 +3,7 @@
  * asks the owning module who holds it, and puts that person, their organization and the session
  * on the request, so no handler reads the header. The module's verifier throws its own refusals.
  */
-import type { Actor, CliSession } from "@langwatch/actor";
+import type { Actor, CliSession } from "@langwatch/authorization";
 
 import { OrganizationMissingCredentialsError, SurfaceUnconfiguredError } from "../errors.ts";
 import type { RestCaller, RestIdentity } from "./runtime.ts";

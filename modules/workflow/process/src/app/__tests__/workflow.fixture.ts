@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * What a test hands the workflow module in place of a process: every
  * members member it declares, each one throwing when a test reaches it
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  */
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioWorkflow, Workflow } from "@langwatch/workflow-contract";
 
 import type {

@@ -52,7 +52,6 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

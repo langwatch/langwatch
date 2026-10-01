@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /** @vitest-environment node */
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import {
@@ -14,6 +13,7 @@ import {
   type ExperimentPublishedMonitor,
   type PersistedEvaluationsV3State,
 } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

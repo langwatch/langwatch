@@ -29,7 +29,6 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",

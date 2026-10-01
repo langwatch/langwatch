@@ -1,6 +1,4 @@
 import { type TransportPeers } from "@langwatch/api";
-/** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
 import { serverModules } from "@langwatch/installed-server-modules";
@@ -26,6 +24,8 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/** The api installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13). */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const ROLE = "api";
 /** Every value is harmless and invented: nothing here is read from `.env`. */

@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type {
   PIIRedactionLevel,
   OtlpKeyValue,

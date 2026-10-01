@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * @see specs/self-hosting/connected-services/managed-models-provider.feature
- * The production composition writes the install's hosted provider slot through the gateway peer.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -12,6 +6,12 @@ import type { Encryption, RateLimiter } from "@langwatch/process-stores/members"
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * @see specs/self-hosting/connected-services/managed-models-provider.feature
+ * The production composition writes the install's hosted provider slot through the gateway peer.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { TEST_LICENSING_CONFIG, VALID_LICENSE_KEY } from "../../__tests__/testing.ts";

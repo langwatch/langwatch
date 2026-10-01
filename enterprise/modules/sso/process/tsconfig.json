@@ -50,10 +50,10 @@
       "path": "../../../../packages/secrets/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/api-fixture/tsconfig.build.json"
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/vitest-config/tsconfig.build.json"

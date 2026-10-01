@@ -1,14 +1,14 @@
-/**
- * `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent
- * transcript.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
 } from "@langwatch/api/rest";
+/**
+ * `GET /api/v1/traces/:traceId/transcript`: main's REST read of one trace's coding-agent
+ * transcript.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   type TraceApi,
   TraceIdAmbiguousError,

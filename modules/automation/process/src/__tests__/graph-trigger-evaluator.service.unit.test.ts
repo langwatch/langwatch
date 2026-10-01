@@ -1,11 +1,11 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CustomGraph,
   GraphTriggerEvaluationReason,
   Trigger,
   TriggerLatestEvaluation,
 } from "@langwatch/automation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

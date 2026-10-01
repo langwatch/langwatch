@@ -1,6 +1,6 @@
-/** @see specs/self-hosting/connected-services/connected-billing.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { INSTANT_EVAL_REQUEST_TYPE } from "@langwatch/instant-eval-contract";
+/** @see specs/self-hosting/connected-services/connected-billing.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

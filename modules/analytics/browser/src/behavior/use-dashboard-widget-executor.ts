@@ -11,7 +11,7 @@ import type {
   ChartQueryResult,
 } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { toChartQueryResult } from "@langwatch/analytics-contract/chart-frame-protocol";
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useMemo, useState } from "react";
 

@@ -1,12 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- * @see specs/self-hosting/connected-services/hosted-services.feature
- *
- * The control-plane end of a hosted call: the gateway resolved the caller and
- * sends it beside the caller's own JSON, which never names the key or tenant.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   createCanonicalFamilyErrorHandler,
   createRestRuntime,
@@ -16,6 +7,15 @@ import {
   ConnectServiceNotEntitledError,
   type LicensingApi,
 } from "@langwatch/enterprise-licensing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * @see specs/self-hosting/connected-services/hosted-services.feature
+ *
+ * The control-plane end of a hosted call: the gateway resolved the caller and
+ * sends it beside the caller's own JSON, which never names the key or tenant.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { connectHostedRest } from "../connect-hosted.rest.ts";

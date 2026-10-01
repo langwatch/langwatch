@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CanonicalLogRecord,
   LogApi,
   PreparedCanonicalLogRecord,
 } from "@langwatch/log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LogTraceContribution, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

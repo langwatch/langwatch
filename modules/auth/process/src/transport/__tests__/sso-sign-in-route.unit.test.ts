@@ -1,10 +1,10 @@
+import { SsoSignInRefusedError, type SsoAssertionApi } from "@langwatch/identity-contract";
 /**
  * The single sign-on door: `POST /api/auth/sign-in/sso` is mounted at all, and
  * what identity's assertion gate makes of a verified assertion on the way to a
  * session (ADR-117 §5).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { SsoSignInRefusedError, type SsoAssertionApi } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { resolveSsoUser } from "../../channels/http/http.better-auth.channel.ts";

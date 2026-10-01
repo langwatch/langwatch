@@ -23,7 +23,7 @@
     "@langwatch/browser": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
     "@langwatch/slack-contract": "workspace:*",
     "lucide-react": "catalog:",
     "zod": "catalog:"

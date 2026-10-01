@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * What a mounted model-provider declaration runs on in a test: the runtime's
@@ -10,6 +9,7 @@ import type {
   ModelProviderApi,
   ModelProviderCredentialVerdict,
 } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { createModelProviderTestApp } from "../../app/__tests__/model-provider.fixture.ts";
 import type {

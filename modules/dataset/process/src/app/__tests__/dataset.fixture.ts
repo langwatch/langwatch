@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
@@ -8,6 +7,7 @@ import { memoryObjectStorage } from "@langwatch/process-stores";
 import type { ObjectStorage } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import type { DatasetRepositories } from "../../repositories/dataset.repositories.ts";

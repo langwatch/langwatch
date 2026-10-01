@@ -1,9 +1,3 @@
-/**
- * The virtual-key services refuse with HandledErrors carrying the code and
- * status the platform family answered before: routing_policy_*, providers_*
- * and the rest, never a TRPCError the REST runtime cannot map.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   GatewayBudgetNotFoundError,
   GatewayOrganizationNotFoundError,
@@ -19,6 +13,12 @@ import {
 } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * The virtual-key services refuse with HandledErrors carrying the code and
+ * status the platform family answered before: routing_policy_*, providers_*
+ * and the rest, never a TRPCError the REST runtime cannot map.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { GatewayVirtualKeyRepository } from "../../repositories/gateway-virtual-key.repository.ts";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The Go data plane's door: HMAC gate, change feed, spend batch, guardrail verdict, real HTTP.
@@ -11,6 +10,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
 
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";

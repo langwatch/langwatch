@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
@@ -98,7 +98,11 @@ describe("AgentApp HTTP agent credentials", () => {
         app.update({
           id: agent.id,
           projectId,
-          config: { ...config, url: "https://elsewhere.test/chat", auth: { type: "bearer", token: "" } },
+          config: {
+            ...config,
+            url: "https://elsewhere.test/chat",
+            auth: { type: "bearer", token: "" },
+          },
         }),
       ).rejects.toMatchObject({
         code: "agent_stored_credentials_destination_mismatch",

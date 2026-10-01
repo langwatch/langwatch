@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * Restoring a version has two refusals persistence owns. Both were plain Errors reaching the

@@ -12,10 +12,10 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
-      "path": "../actor/tsconfig.build.json"
+      "path": "../api/tsconfig.build.json"
     },
     {
-      "path": "../api/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     },
     {
       "path": "../config/tsconfig.build.json"

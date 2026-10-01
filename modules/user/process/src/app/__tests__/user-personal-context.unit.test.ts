@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EnsuredPersonalWorkspace } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { userApiPersonalContextSchema } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { RoutingDecision } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { beforeEach, describe, expect, it } from "vitest";

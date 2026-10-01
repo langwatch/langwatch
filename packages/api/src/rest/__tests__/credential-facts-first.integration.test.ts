@@ -4,13 +4,13 @@
  * resolves after it. Spec: packages/api/specs/transport-conventions.feature.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import type { Context } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import { publicRoute } from "../../access/access.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
@@ -62,7 +62,7 @@ function deskApp() {
   const hono = createRestRuntime({
     identity: { authenticate: () => Promise.reject(new Error("public routes open no door")) },
   }).mount(desk.router(), {
-    app: () => createApiFixture<DeskApi>({ open }),
+    app: () => createApiDouble<DeskApi>({ open }),
     onError: createErrorHandler(),
     facts: [
       bindRestMiddleware(staff, (context) => {

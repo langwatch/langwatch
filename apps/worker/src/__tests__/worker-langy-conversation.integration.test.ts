@@ -1,10 +1,3 @@
-/**
- * The worker folds langy's conversation pipeline again: a created conversation is readable through
- * its projection. Live eventing over memory stores, langy's own rows in a migrated test database.
- * @vitest-environment node
- * @see modules/langy/specs/langy.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import {
@@ -39,6 +32,13 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The worker folds langy's conversation pipeline again: a created conversation is readable through
+ * its projection. Live eventing over memory stores, langy's own rows in a migrated test database.
+ * @vitest-environment node
+ * @see modules/langy/specs/langy.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, describe, expect, it } from "vitest";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;

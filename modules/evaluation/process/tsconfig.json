@@ -99,9 +99,6 @@
       "path": "../../workflow/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]

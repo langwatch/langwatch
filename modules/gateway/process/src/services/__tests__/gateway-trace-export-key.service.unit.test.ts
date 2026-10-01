@@ -1,13 +1,13 @@
-/**
- * The key a gateway trace project's spans are exported with.
- * Spec: specs/ai-gateway/governance/vk-config-bundle.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ApiKeyApi,
   type CreateApiKeyInput,
   TRACE_EXPORT_API_KEY_NAME,
 } from "@langwatch/api-key-contract";
+/**
+ * The key a gateway trace project's spans are exported with.
+ * Spec: specs/ai-gateway/governance/vk-config-bundle.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryGatewayTraceExportKeyRepository } from "../../repositories/memory/memory.gateway-trace-export-key.repository.ts";

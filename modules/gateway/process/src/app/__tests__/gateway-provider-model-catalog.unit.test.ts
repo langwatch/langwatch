@@ -10,9 +10,9 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { GatewayConfigAssemblyService } from "../../services/gateway-config-assembly.service.ts";

@@ -3,8 +3,8 @@
  * @see specs/agents/agent-test-run.feature
  */
 import type { AgentTestRunResult } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { buildAgentApps } from "./agent-rest.fixture.ts";

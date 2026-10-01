@@ -1,9 +1,3 @@
-/**
- * Content restricted to the project owner opens for the owner, and only for
- * them, whatever role they hold on the project.
- * @see specs/data-privacy/content-visibility.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EMPTY_AUDIENCE,
@@ -13,6 +7,12 @@ import {
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * Content restricted to the project owner opens for the owner, and only for
+ * them, whatever role they hold on the project.
+ * @see specs/data-privacy/content-visibility.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { TraceViewerProtectionService } from "../../trace-viewer-protection.service.ts";

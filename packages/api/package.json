@@ -65,7 +65,6 @@
   },
   "dependencies": {
     "@hono/node-server": "catalog:",
-    "@langwatch/actor": "workspace:*",
     "@langwatch/authorization": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
@@ -84,7 +83,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",

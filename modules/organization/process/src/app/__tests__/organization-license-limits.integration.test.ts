@@ -1,11 +1,3 @@
-/**
- * @vitest-environment node
- *
- * `licenseEnforcement.checkLimit` answers from the plan and the seats the
- * organization holds, over real rows: the read that used to refuse every call.
- * @see specs/licensing/enforcement-members.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
@@ -19,6 +11,14 @@ import {
 import { OrganizationUserRole } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+/**
+ * @vitest-environment node
+ *
+ * `licenseEnforcement.checkLimit` answers from the plan and the seats the
+ * organization holds, over real rows: the read that used to refuse every call.
+ * @see specs/licensing/enforcement-members.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

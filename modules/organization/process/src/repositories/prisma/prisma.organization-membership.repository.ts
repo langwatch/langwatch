@@ -1,5 +1,5 @@
-import type { LedgerActor } from "@langwatch/actor";
-import { ledgerActorFor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
+import { ledgerActorFor } from "@langwatch/authorization";
 import type {
   AuthzGrantCaller,
   AuthzGrantsService,

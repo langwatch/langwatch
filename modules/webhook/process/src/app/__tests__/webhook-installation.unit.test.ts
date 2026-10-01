@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The feature installs: a memory-tier process gets a working `WebhookApi` over installer-built
@@ -7,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";

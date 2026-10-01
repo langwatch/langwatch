@@ -1,5 +1,4 @@
-import type { Actor } from "@langwatch/actor";
-import type { AuthzPermission } from "@langwatch/authorization";
+import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import {
   HandledError,
   isZodLikeError,

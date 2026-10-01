@@ -1,9 +1,3 @@
-/**
- * `POST /api/v1/traces/search`: digest/json formats, evaluations, pagination,
- * the projection DSL and the date axis, all over real services - only
- * `TraceApi` itself is a double.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -11,6 +5,12 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+/**
+ * `POST /api/v1/traces/search`: digest/json formats, evaluations, pagination,
+ * the projection DSL and the date axis, all over real services - only
+ * `TraceApi` itself is a double.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   explorerHiddenOrigins,
   FilterParseError,

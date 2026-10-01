@@ -12,7 +12,7 @@ import {
   SCIM_USER_PUSHED_EVENT_TYPE,
   type ScimSyncLifecycleState,
 } from "@langwatch/enterprise-scim-contract";
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 
 /**
  * The remediation for every failed apply, and the reason no surface here

@@ -1,3 +1,6 @@
+import { NO_FAILED_ATTEMPTS } from "@langwatch/auth-contract";
+import type { Plan } from "@langwatch/entitlement-contract";
+import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  * The administrator's side of the two sign-in security rules, over the
@@ -5,10 +8,7 @@
  * @see specs/identity/org-account-lockout.feature
  * @see specs/identity/org-session-lifetime.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { NO_FAILED_ATTEMPTS } from "@langwatch/auth-contract";
-import type { Plan } from "@langwatch/entitlement-contract";
-import { UserNotInOrganizationError } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";

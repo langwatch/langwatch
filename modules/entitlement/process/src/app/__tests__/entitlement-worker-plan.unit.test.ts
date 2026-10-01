@@ -1,9 +1,3 @@
-/**
- * The background worker resolves a plan through the same entitlement peer the
- * interactive process installs, over the same billing and licensing sources.
- * @see specs/automations/worker-plan-resolution.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EntitlementApi, type EntitlementGrant, type Plan } from "@langwatch/entitlement-contract";
@@ -12,6 +6,12 @@ import { UNLIMITED } from "@langwatch/plans";
 import { createApp, MissingProviderError, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The background worker resolves a plan through the same entitlement peer the
+ * interactive process installs, over the same billing and licensing sources.
+ * @see specs/automations/worker-plan-resolution.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

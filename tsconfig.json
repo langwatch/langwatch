@@ -25,9 +25,6 @@
   "langwatchExtraReferences": [{ "path": "packages/mail/preview/tsconfig.json" }],
   "references": [
     {
-      "path": "packages/actor/tsconfig.test.json"
-    },
-    {
       "path": "modules/agent/browser/tsconfig.json"
     },
     {
@@ -68,9 +65,6 @@
     },
     {
       "path": "packages/api/tsconfig.type-tests.json"
-    },
-    {
-      "path": "packages/api-fixture/tsconfig.json"
     },
     {
       "path": "modules/api-key/browser/tsconfig.json"
@@ -305,9 +299,6 @@
     },
     {
       "path": "modules/entitlement/process/tsconfig.json"
-    },
-    {
-      "path": "packages/error-presentation/tsconfig.json"
     },
     {
       "path": "packages/error-views/tsconfig.json"

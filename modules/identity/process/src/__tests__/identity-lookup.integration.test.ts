@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AuditLogApi,
   RecordAuditLogCommand,
@@ -22,6 +21,7 @@ import {
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityEventsFor } from "../eventing/identity-events.intent.ts";

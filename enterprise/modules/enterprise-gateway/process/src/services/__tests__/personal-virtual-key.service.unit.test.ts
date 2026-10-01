@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   NoEligibleProvidersError,
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-gateway-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { gatewayKey } from "../../__tests__/support/gateway-virtual-key.fixture.ts";

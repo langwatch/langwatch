@@ -1,8 +1,8 @@
-/** @see specs/langy/langy-ui-actions.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LangyRestCaller } from "@langwatch/langy-contract";
+/** @see specs/langy/langy-ui-actions.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangyUiActionCatalogService } from "../langy-ui-action-catalog.service.ts";

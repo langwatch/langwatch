@@ -4,11 +4,11 @@
  * pruned against the installing graph's store.
  */
 
-/** Spec: specs/server/declarative-process-composition.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AGENT_SANDBOX_API_KEY_NAME, WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+/** Spec: specs/server/declarative-process-composition.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { apiKeyServer } from "../../api-key.server.ts";

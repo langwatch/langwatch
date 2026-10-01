@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import {
   bindRestHeader,
@@ -35,6 +34,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
@@ -24,6 +23,7 @@ import {
   SuiteTargetsRequiredError,
   suiteRunInputSchema,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

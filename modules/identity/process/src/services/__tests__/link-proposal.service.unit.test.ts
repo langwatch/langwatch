@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import {
   type IdentityActor,
@@ -7,6 +6,7 @@ import {
   LINK_REJECTED_EVENT_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
 } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityEventsFor } from "../../eventing/identity-events.intent.ts";

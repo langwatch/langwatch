@@ -93,9 +93,6 @@
       "path": "../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/prompt/contract/tsconfig.build.json"
     },
     {

@@ -23,7 +23,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useEffect } from "react";
 import { Eye, EyeOff, Trash2 } from "react-feather";
 import { type FieldErrors, type Resolver, useFieldArray, useForm } from "react-hook-form";

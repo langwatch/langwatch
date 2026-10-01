@@ -1,4 +1,4 @@
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 
 /** The registry's words for the code the route would refuse with, for a stood-down control. */
 export function refusalCopy(code: string): string {

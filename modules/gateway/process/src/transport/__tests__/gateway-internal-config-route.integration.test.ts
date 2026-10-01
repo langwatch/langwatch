@@ -19,8 +19,8 @@ import { GatewayConfigMaterialiserService } from "../../services/gateway-config-
 import type { VirtualKeyService } from "../../services/virtual-key.service.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { organizationApiOver } from "../../__tests__/support/prisma-organization-api.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";

@@ -799,9 +799,6 @@ importers:
       '@hono/node-server':
         specifier: 'catalog:'
         version: 2.0.10(hono@4.13.1)
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../packages/actor
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../modules/agent/contract
@@ -838,6 +835,9 @@ importers:
       '@langwatch/auth-process':
         specifier: workspace:*
         version: link:../../modules/auth/process
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../modules/authz/contract
@@ -1193,9 +1193,6 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(zod@4.6.5)
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../packages/api-fixture
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../packages/clickhouse-migrations
@@ -1750,9 +1747,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../packages/api-fixture
       '@langwatch/prompt-contract':
         specifier: workspace:*
         version: link:../../modules/prompt/contract
@@ -1861,9 +1855,6 @@ importers:
       '@langwatch/enterprise-scim-browser':
         specifier: workspace:*
         version: link:../../enterprise/modules/scim/browser
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../packages/error-presentation
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../modules/evaluation/contract
@@ -2569,9 +2560,6 @@ importers:
       '@ai-sdk/openai':
         specifier: 'catalog:'
         version: 3.0.79(zod@4.6.5)
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../packages/api-fixture
       '@langwatch/scenario':
         specifier: file:../../vendor/langwatch-scenario-1.7.0-dev.voice10.tgz
         version: file:vendor/langwatch-scenario-1.7.0-dev.voice10.tgz(@aws-sdk/credential-provider-node@3.972.81)(@elevenlabs/elevenlabs-js@2.58.0(bufferutil@4.1.0)(encoding@0.1.13))(@smithy/signature-v4@5.7.0)(ai@6.0.217(zod@4.6.5))(bufferutil@4.1.0)(supports-color@10.2.2)(vitest@5.0.1)
@@ -2870,9 +2858,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -2935,9 +2920,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -3030,9 +3012,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3104,9 +3083,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3164,9 +3140,6 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../../packages/error-presentation
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../../../modules/gateway/contract
@@ -3434,9 +3407,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../../packages/clickhouse-client
@@ -3568,12 +3538,12 @@ importers:
 
   enterprise/modules/licensing/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/enterprise-license-signing':
         specifier: workspace:*
         version: link:../../../packages/license-signing
@@ -3641,9 +3611,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -3844,9 +3811,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../../packages/process-stores
@@ -3964,9 +3928,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../../packages/test-harness
@@ -4089,9 +4050,6 @@ importers:
 
   enterprise/modules/scim/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
@@ -4101,6 +4059,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
@@ -4113,9 +4074,6 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../../packages/error-presentation
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../../../packages/eventing
@@ -4168,9 +4126,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/enterprise-governance-process':
         specifier: workspace:*
         version: link:../../governance/process
@@ -4336,12 +4291,12 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../../packages/api-fixture
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../../packages/vitest-config
@@ -4491,9 +4446,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -4576,9 +4528,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -4671,12 +4620,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -4740,9 +4683,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
@@ -5050,9 +4990,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5101,9 +5038,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -5202,15 +5136,15 @@ importers:
 
   modules/annotation/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../contract
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -5275,12 +5209,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
-      '@langwatch/authorization':
-        specifier: workspace:*
-        version: link:../../../packages/authorization
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5510,9 +5438,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5599,9 +5524,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5696,9 +5618,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -5775,9 +5694,6 @@ importers:
       '@better-auth/sso':
         specifier: 'catalog:'
         version: 1.7.1(@better-auth/core@1.7.1(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(@opentelemetry/api@1.9.1)(better-call@1.4.0(zod@4.6.5))(jose@6.2.3)(kysely@0.28.17)(nanostores@1.4.0))(@better-auth/utils@0.5.0)(@better-fetch/fetch@1.3.1)(better-auth@1.7.1(@opentelemetry/api@1.9.1)(@prisma/client@7.10.0(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.24.2(@types/node@26.2.0))(pg@8.22.0)(prisma@7.10.0(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(vitest@5.0.1))(better-call@1.4.0(zod@4.6.5))
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -5893,9 +5809,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -5987,9 +5900,6 @@ importers:
 
   modules/authz/contract:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -6027,9 +5937,6 @@ importers:
 
   modules/authz/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -6397,9 +6304,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -6598,9 +6502,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../../packages/group-queue
@@ -6702,9 +6603,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -6879,9 +6777,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -7035,9 +6930,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -7098,9 +6990,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -7336,9 +7225,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -7449,9 +7335,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -7610,9 +7493,6 @@ importers:
         specifier: 'catalog:'
         version: 5.0.0(zod@4.6.5)
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -7655,9 +7535,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -7670,6 +7547,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/model-provider-browser':
         specifier: workspace:*
         version: link:../../model-provider/browser
@@ -7929,9 +7809,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -7980,9 +7857,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -8331,9 +8205,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -8493,9 +8364,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -8541,9 +8409,6 @@ importers:
       '@langwatch/enterprise-gateway-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/enterprise-gateway/contract
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8778,18 +8643,12 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
       '@langwatch/clickhouse-migrations':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-migrations
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -8952,9 +8811,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9047,9 +8903,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9084,9 +8937,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -9102,9 +8952,6 @@ importers:
 
   modules/identity/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -9114,6 +8961,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -9202,9 +9052,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9345,9 +9192,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -9469,9 +9313,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -9781,9 +9622,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../feature-flag/process
@@ -9900,9 +9738,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -9998,9 +9836,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -10034,9 +9869,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/error-views':
         specifier: workspace:*
         version: link:../../../packages/error-views
@@ -10150,9 +9982,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -10250,9 +10079,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -10427,9 +10253,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -10923,9 +10746,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -11268,12 +11091,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/feature-flag-process':
         specifier: workspace:*
         version: link:../../feature-flag/process
@@ -11368,9 +11185,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -11447,9 +11264,6 @@ importers:
 
   modules/organization/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -11559,9 +11373,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -11666,9 +11477,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -11798,15 +11609,15 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -12071,9 +11882,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -12125,12 +11933,12 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../packages/handled-error
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
@@ -12378,12 +12186,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -12424,9 +12226,6 @@ importers:
 
   modules/role/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -12470,9 +12269,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -12630,9 +12426,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -12693,9 +12486,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client
@@ -13072,12 +12862,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -13200,12 +12984,12 @@ importers:
 
   modules/secret/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -13249,9 +13033,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -13347,12 +13131,12 @@ importers:
 
   modules/share/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../../../packages/actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -13399,9 +13183,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authz-process':
         specifier: workspace:*
         version: link:../../authz/process
@@ -13432,9 +13213,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
+      '@langwatch/handled-error':
         specifier: workspace:*
-        version: link:../../../packages/error-presentation
+        version: link:../../../packages/handled-error
       '@langwatch/slack-contract':
         specifier: workspace:*
         version: link:../contract
@@ -13558,9 +13339,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -13695,9 +13476,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
+      '@langwatch/test-harness':
         specifier: workspace:*
-        version: link:../../../packages/api-fixture
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -13881,9 +13662,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -14034,9 +13812,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -14106,9 +13881,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -14577,9 +14349,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
@@ -14637,9 +14406,6 @@ importers:
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/gateway-contract':
         specifier: workspace:*
         version: link:../../gateway/contract
@@ -14741,9 +14507,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -14844,9 +14607,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -14969,9 +14729,6 @@ importers:
       '@clickhouse/client':
         specifier: 'catalog:'
         version: 1.23.0
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
@@ -15029,9 +14786,6 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../../../packages/error-presentation
       '@langwatch/evaluator-client':
         specifier: workspace:*
         version: link:../../evaluator/client
@@ -15374,31 +15128,9 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../../../packages/api-fixture
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/actor:
-    dependencies:
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../vitest-config
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -15411,9 +15143,6 @@ importers:
       '@hono/node-server':
         specifier: 'catalog:'
         version: 2.0.10(hono@4.13.1)
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../actor
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../authorization
@@ -15463,9 +15192,6 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@langwatch/api-fixture':
-        specifier: workspace:*
-        version: link:../api-fixture
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config
@@ -15487,18 +15213,6 @@ importers:
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
-  packages/api-fixture:
-    devDependencies:
-      '@langwatch/vitest-config':
-        specifier: workspace:*
-        version: link:../vitest-config
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -15732,9 +15446,6 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../enterprise/modules/licensing/contract
-      '@langwatch/error-presentation':
-        specifier: workspace:*
-        version: link:../error-presentation
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../modules/evaluator/contract
@@ -16130,28 +15841,6 @@ importers:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
 
-  packages/error-presentation:
-    dependencies:
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../handled-error
-      '@langwatch/time':
-        specifier: workspace:*
-        version: link:../time
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@types/node':
-        specifier: ^26.0.1
-        version: 26.2.0
-      typescript:
-        specifier: 'catalog:'
-        version: 7.0.2
-      vitest:
-        specifier: 'catalog:'
-        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
-
   packages/error-views:
     dependencies:
       '@chakra-ui/react':
@@ -16160,9 +15849,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../design-system
-      '@langwatch/error-presentation':
+      '@langwatch/handled-error':
         specifier: workspace:*
-        version: link:../error-presentation
+        version: link:../handled-error
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -16292,6 +15981,9 @@ importers:
 
   packages/handled-error:
     dependencies:
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../time
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
@@ -16936,12 +16628,12 @@ importers:
 
   packages/process:
     dependencies:
-      '@langwatch/actor':
-        specifier: workspace:*
-        version: link:../actor
       '@langwatch/api':
         specifier: workspace:*
         version: link:../api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import Redis from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

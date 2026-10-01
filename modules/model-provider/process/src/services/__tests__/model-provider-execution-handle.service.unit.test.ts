@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ModelProviderExecutionHandleService } from "../model-provider-execution-handle.service.ts";

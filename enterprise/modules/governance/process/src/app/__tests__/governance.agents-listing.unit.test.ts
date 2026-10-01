@@ -1,5 +1,4 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -19,6 +18,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** `governanceAgents.requestListing` over memory rows, pinned to main's refusal when no pull pipeline runs. */
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";

@@ -1,9 +1,3 @@
-// gitleaks:allow — test fixture keys only (not real secrets)
-/**
- * Test license fixtures - pre-generated static constants.
- * License generation logic stays in lw-saas only.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type LicenseData,
   type LicensingServerConfig,
@@ -17,6 +11,12 @@ import { planQuantities } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+// gitleaks:allow — test fixture keys only (not real secrets)
+/**
+ * Test license fixtures - pre-generated static constants.
+ * License generation logic stays in lw-saas only.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { LicensingApp } from "../app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "../app/licensing.members.ts";

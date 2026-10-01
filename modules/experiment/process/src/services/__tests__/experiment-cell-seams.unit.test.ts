@@ -1,6 +1,6 @@
 import type { CallOutcome } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluationsV3State } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * Seams a cell crosses: behaviour that spans two collaborators, or proves
  * an injected dependency is wired rather than merely present.

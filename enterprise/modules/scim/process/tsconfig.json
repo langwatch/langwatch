@@ -17,9 +17,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/actor/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
@@ -27,6 +24,9 @@
     },
     {
       "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
@@ -39,9 +39,6 @@
     },
     {
       "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/error-presentation/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/eventing/tsconfig.build.json"
@@ -81,9 +78,6 @@
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../governance/process/tsconfig.build.json"

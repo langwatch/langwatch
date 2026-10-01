@@ -1,6 +1,5 @@
 import { InvokeWithResponseStreamCommand } from "@aws-sdk/client-lambda";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * A deployment that names its per-project fleet runs the studio on each project's own function,
@@ -19,6 +18,7 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

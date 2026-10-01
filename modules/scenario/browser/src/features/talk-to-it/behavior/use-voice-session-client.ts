@@ -1,5 +1,5 @@
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { scenarioClient } from "@langwatch/scenario-client";
 import { useMemo } from "react";
 

@@ -639,11 +639,11 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/authz run test
 
-      # @langwatch/actor is the actor vocabulary (who caused an action) —
+      # @langwatch/authorization is the actor vocabulary (who caused an action) —
       # dependency-free raw TypeScript, same shard-1 arrangement.
-      - name: Run @langwatch/actor unit tests
+      - name: Run @langwatch/authorization unit tests
         if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/actor run test
+        run: pnpm --filter @langwatch/authorization run test
 
       - name: Run @langwatch/authz-process unit tests
         if: matrix.app == 'platform-api'

@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { docsUrl } from "@langwatch/error-presentation/docs-url";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
 import { useState } from "react";
 

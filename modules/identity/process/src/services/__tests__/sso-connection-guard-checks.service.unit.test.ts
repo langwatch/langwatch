@@ -1,11 +1,11 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
 /**
  * One live connection of each kind per organization: the early refusal a registration meets.
  * @see specs/identity/sso-idp-termination.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { SsoConnectionRegistrationRepository } from "../../repositories/sso-connection-registration.repository.ts";

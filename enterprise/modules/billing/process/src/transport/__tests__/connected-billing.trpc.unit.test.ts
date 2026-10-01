@@ -1,12 +1,12 @@
+import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import type { BillingApi, BillingStaff } from "@langwatch/enterprise-billing-contract";
+import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contract";
 /**
  * @vitest-environment node
  * The `connectedBilling.*` surface: which staff member the mount hands billing for the operator
  * behind the request, and that an impersonator billing cannot name is refused.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
-import type { BillingApi, BillingStaff } from "@langwatch/enterprise-billing-contract";
-import { AdminSurfaceHiddenError, type OpsOperator } from "@langwatch/ops-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 

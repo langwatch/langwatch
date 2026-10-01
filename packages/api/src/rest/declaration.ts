@@ -3,8 +3,8 @@
  * answers, the door it is asked behind and the handler that answers it — with
  * declaration-time asserts that refuse an incoherent route where it is written.
  */
-import type { Actor } from "@langwatch/actor";
 import type {
+  Actor,
   AuthzDeclaredScopeId,
   AuthzPermission,
   ScopeTierField,

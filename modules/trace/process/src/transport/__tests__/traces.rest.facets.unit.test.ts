@@ -1,9 +1,3 @@
-/**
- * `GET /api/v1/traces/facets`: the discovery payload with no `field`, one
- * field's paged values with one - registered before `:traceId` so "facets"
- * is never read as a trace id.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -11,6 +5,12 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+/**
+ * `GET /api/v1/traces/facets`: the discovery payload with no `field`, one
+ * field's paged values with one - registered before `:traceId` so "facets"
+ * is never read as a trace id.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

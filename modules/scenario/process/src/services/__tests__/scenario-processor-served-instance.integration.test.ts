@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Processor path for succeeded job end-to-end: pool spawns child, child writes result
  * line to stdout, parent parses and records it. Child is real node script.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const childScript = vi.hoisted(() => ({ current: "" }));

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The organization-keyed pull-request usage door, driven through the runtime a
@@ -13,6 +12,7 @@ import {
 } from "@langwatch/api/rest";
 import type { CodingAgentApi, CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
 import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
 

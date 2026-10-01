@@ -4,8 +4,8 @@
  */
 import { EventEmitter } from "node:events";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { PresenceApi, ReadHint } from "@langwatch/presence-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ReadHintStreamService } from "../read-hint-stream.service.ts";

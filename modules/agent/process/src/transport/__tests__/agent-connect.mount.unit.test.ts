@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 
 import type { AgentApi, AgentConnectCredentials } from "@langwatch/agent-contract";
 import { WebSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 

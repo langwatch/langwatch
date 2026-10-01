@@ -1,13 +1,13 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
+import type { ShareApi } from "@langwatch/share-contract";
 /**
  * @vitest-environment node
  * `ProjectOperationsService`'s cross-entity half: saving the settings form
  * revokes outstanding trace shares when sharing is turned OFF. Characterized
  * here because it is the application's decision, not one door's.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
-import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";
 

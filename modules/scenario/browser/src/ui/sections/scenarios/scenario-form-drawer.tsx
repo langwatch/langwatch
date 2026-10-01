@@ -22,7 +22,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { scenarioClient } from "@langwatch/scenario-client";
 import {

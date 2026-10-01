@@ -1,7 +1,6 @@
 import { createServer, type Server } from "node:http";
 
 import { RawHttpHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -13,6 +12,7 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
 import { HostedMcpApi } from "@langwatch/hosted-mcp-contract";
 import { createApp } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hostedMcpServer } from "../../hosted-mcp.server.ts";

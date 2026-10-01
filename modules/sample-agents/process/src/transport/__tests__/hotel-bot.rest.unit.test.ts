@@ -1,11 +1,11 @@
-/** The hotel bot's door through the REST runtime: the caller's key in, a refusal out by code. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createCanonicalFamilyErrorHandler, createRestRuntime } from "@langwatch/api/rest";
 import {
   HotelBotDeclinedError,
   type HotelBotRunInput,
   type SampleAgentsApi,
 } from "@langwatch/sample-agents-contract";
+/** The hotel bot's door through the REST runtime: the caller's key in, a refusal out by code. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { hotelBotRest } from "../hotel-bot.rest.ts";

@@ -3,11 +3,11 @@
  * Spec: specs/ui/browser-query-caching.feature.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../../trpc/compose.ts";
@@ -63,7 +63,7 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_ada", "Ada"],
       ["user_bo", "Bo"],
     ]);
-    const authz = createApiFixture<Authorize & TrpcSessionVersions>({
+    const authz = createApiDouble<Authorize & TrpcSessionVersions>({
       getSessionVersion: async () => {
         reads += 1;
         return 7;

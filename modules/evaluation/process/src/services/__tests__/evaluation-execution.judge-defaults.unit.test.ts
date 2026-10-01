@@ -1,11 +1,11 @@
+import type { MappingState } from "@langwatch/dataset-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 /**
  * What an evaluator reads when no mapping was saved: an LLM judge gets the
  * whole trace (tool calls and results included), every other evaluator keeps
  * the trace's own fields. Spec: specs/evaluators/judges-read-tool-evidence.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { MappingState } from "@langwatch/dataset-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Trace } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * Evaluator application with memory persistence and stub collaborators;
  * repository is real but in-memory.
@@ -9,6 +8,7 @@ import type { ModelProviderResolution, ModelProviderApi } from "@langwatch/model
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { vi } from "vitest";

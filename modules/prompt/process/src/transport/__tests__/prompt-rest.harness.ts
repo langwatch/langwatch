@@ -1,8 +1,3 @@
-/**
- * The `/api/prompts` family over the runtime a process mounts it on, with the
- * two facts the process resolves bound to fixed answers.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -11,6 +6,11 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * The `/api/prompts` family over the runtime a process mounts it on, with the
+ * two facts the process resolves bound to fixed answers.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
 

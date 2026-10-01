@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -6,6 +5,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * back office did, so a refused attempt still leaves its row.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

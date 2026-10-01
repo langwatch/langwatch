@@ -1,6 +1,6 @@
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { MetricRequestCollectionResult } from "@langwatch/metric-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

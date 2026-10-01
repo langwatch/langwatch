@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

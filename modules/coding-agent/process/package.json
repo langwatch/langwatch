@@ -60,7 +60,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/metric-process": "workspace:*",
     "@langwatch/secrets": "workspace:*",

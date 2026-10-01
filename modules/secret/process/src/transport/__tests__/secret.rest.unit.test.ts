@@ -1,9 +1,9 @@
-import type { Actor } from "@langwatch/actor";
 import { createErrorHandler } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createRestRuntime } from "@langwatch/api/rest";
+import type { Actor } from "@langwatch/authorization";
 import type { AuthzApi, AuthzListTeamMemberBindingsInput } from "@langwatch/authz-contract";
 import { SecretApi, secretPublicSchema } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {

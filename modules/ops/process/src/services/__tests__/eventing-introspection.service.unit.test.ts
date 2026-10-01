@@ -1,9 +1,3 @@
-/**
- * State projections ran for months with no settable kill switch, because
- * this walk stopped at fold and map.
- * @see specs/ops/state-projection-visibility.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   defineAggregate,
   definePipeline,
@@ -14,6 +8,12 @@ import {
   type StateProjectionOptions,
   type StateProjectionStore,
 } from "@langwatch/eventing";
+/**
+ * State projections ran for months with no settable kill switch, because
+ * this walk stopped at fold and map.
+ * @see specs/ops/state-projection-visibility.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

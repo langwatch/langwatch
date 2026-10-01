@@ -3,9 +3,9 @@
  * @see modules/workflow/specs/workflow-service.feature
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

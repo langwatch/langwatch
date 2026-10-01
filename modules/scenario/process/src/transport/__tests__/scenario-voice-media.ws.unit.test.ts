@@ -6,8 +6,8 @@ import { request as httpRequest } from "node:http";
 import { type AddressInfo, Socket } from "node:net";
 
 import { RawSocketHost } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ScenarioApi, VoiceMediaUpgrade } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createScenarioVoiceMediaDoor } from "../scenario-voice-media.ws.ts";

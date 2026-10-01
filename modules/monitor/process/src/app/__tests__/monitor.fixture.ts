@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The monitor application over memory repositories, for a test that wants the
  * real decisions and none of the datastores. An operation the test did not
@@ -17,6 +16,7 @@ import {
   type EvaluatorApi,
 } from "@langwatch/evaluator-contract";
 import { ResourceScope } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";

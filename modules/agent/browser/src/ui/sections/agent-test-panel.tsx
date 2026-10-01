@@ -11,8 +11,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Play } from "lucide-react";
 import { useState } from "react";

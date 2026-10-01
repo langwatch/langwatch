@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,

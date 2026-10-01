@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AgentApi, AgentOverview } from "@langwatch/agent-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Workflow, WorkflowVersion } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
@@ -88,7 +88,11 @@ function build(
         createApiFixture<AgentOverview>({
           id: "agent-1",
           type: "http",
-          config: { url: "https://a.example", method: "POST", auth: { type: "bearer", token: TOKEN } },
+          config: {
+            url: "https://a.example",
+            method: "POST",
+            auth: { type: "bearer", token: TOKEN },
+          },
         }),
         createApiFixture<AgentOverview>({
           id: "agent-2",

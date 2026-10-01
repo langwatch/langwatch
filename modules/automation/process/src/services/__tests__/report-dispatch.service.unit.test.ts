@@ -3,7 +3,6 @@ import type {
   AnalyticsTimeseriesResult,
 } from "@langwatch/analytics-contract";
 import { buildSeriesName } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   CustomGraph,
   ReportChart,
@@ -11,6 +10,7 @@ import type {
   SlackPayload,
   Trigger,
 } from "@langwatch/automation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import type { TraceApi, TraceListItem } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

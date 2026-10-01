@@ -1,16 +1,16 @@
-/**
- * @vitest-environment node
- * `GatewayApp.authorizeKeyCaller`: any API key, including an organization key
- * that names no project, is authorized for organization-owned budget rows.
- * @see specs/ai-gateway/per-team-budget-reorganization.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * `GatewayApp.authorizeKeyCaller`: any API key, including an organization key
+ * that names no project, is authorized for organization-owned budget rows.
+ * @see specs/ai-gateway/per-team-budget-reorganization.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";

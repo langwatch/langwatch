@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   ExperimentRunPlan,
   WorkbenchActor,
   WorkbenchStateView,
 } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunProgressState } from "../../repositories/experiment-run-fold.repository.ts";

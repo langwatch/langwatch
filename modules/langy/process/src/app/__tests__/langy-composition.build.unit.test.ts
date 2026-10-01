@@ -1,15 +1,15 @@
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { LangyServerConfig } from "@langwatch/langy-contract";
+import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
 /**
  * @vitest-environment node
  * @see specs/langy/langy-model-selection.feature
  * @see specs/langy/langy-internal-control-plane.feature
  * @see modules/langy/specs/langy-virtual-key.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { LangyServerConfig } from "@langwatch/langy-contract";
-import { LANGY_VK_SECRET_NAME, type SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { UnavailableLangyWorkerChannel } from "../../channels/unavailable.langy-worker.channel.ts";

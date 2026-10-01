@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   GroupNotFoundError,
   MemberNotFoundError,
   type OrganizationApi,
 } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 
 const GROUP_SELECT = {

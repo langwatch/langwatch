@@ -1,5 +1,5 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import {
   LANGY_CHOICE_SELECTION_PART_TYPE,
   type LangyChoiceSelection,

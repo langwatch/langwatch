@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthApi, CliTokenRecordEntry } from "@langwatch/auth-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { DefaultGovernanceCliSessionInventoryService } from "../cli-session-inventory.service.ts";

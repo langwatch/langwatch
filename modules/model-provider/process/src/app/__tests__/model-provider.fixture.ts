@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The application a suite drives, over memory repositories and stand-ins
  * for what a deployment would supply: a registry with no managed providers,
@@ -9,6 +8,7 @@ import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { modelProviderConnectionPingChannels } from "../../channels/model-provider-connection-ping-channels.registry.ts";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";

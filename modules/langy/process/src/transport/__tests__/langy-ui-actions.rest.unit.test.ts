@@ -1,5 +1,3 @@
-/** @see specs/langy/langy-ui-actions.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   canonicalErrorResponse,
   createRestRuntime,
@@ -10,6 +8,8 @@ import type {
   LangyUiActionDispatchInput,
   LangyUiActionsListed,
 } from "@langwatch/langy-contract";
+/** @see specs/langy/langy-ui-actions.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { langyServer } from "../../langy.server.ts";

@@ -1,11 +1,11 @@
-/** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
   createRestRuntime,
   projectRestFacts,
 } from "@langwatch/api/rest";
+/** `PATCH /api/v1/traces/:traceId/metadata`: main's post-creation metadata amendment. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

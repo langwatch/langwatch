@@ -3,7 +3,7 @@
  */
 
 import { Alert, Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
-import { explainAnyError } from "@langwatch/error-presentation/presentation";
+import { explainAnyError } from "@langwatch/handled-error/presentation";
 import type { ReactNode } from "react";
 
 /**

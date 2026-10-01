@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * What the ops surface answers, over the real runtime and a real `OpsApp`.
@@ -9,6 +8,7 @@ import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@la
 import type { TrpcContract } from "@langwatch/module";
 import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import type { OpsCapability } from "@langwatch/ops-process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

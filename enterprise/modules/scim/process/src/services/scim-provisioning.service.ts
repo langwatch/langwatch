@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import type { AuthzGrantsService, GrantScopeTier, TeamUserRole } from "@langwatch/authz-contract";
 import {
   type ScimCreateUserRequest,

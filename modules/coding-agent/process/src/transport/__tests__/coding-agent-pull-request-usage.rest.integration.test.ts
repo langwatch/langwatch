@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * The project-scoped pull-request usage door: who it answers for, who it
- * refuses by name, and what it writes down about the read.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -12,6 +6,12 @@ import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contrac
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * The project-scoped pull-request usage door: who it answers for, who it
+ * refuses by name, and what it writes down about the read.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ErrorHandler } from "hono";

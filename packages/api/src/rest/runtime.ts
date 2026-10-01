@@ -1,4 +1,4 @@
-import { actorSchema, type Actor } from "@langwatch/actor";
+import { actorSchema, type Actor } from "@langwatch/authorization";
 import type {
   AuthzDeclaredScopeId,
   AuthzPermission,

@@ -5,9 +5,9 @@
  * could otherwise target another tenant's team or project.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 

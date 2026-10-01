@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { BillingApi } from "@langwatch/enterprise-billing-contract";
@@ -14,6 +13,7 @@ import type { RoleApi } from "@langwatch/role-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

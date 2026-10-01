@@ -3,7 +3,7 @@
  * application-owned AuthZ composition adapter); validation, failure
  * naming, and the offboarding proof stay in GrantsService.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   BindingMissingError,
   DuplicateBindingError,

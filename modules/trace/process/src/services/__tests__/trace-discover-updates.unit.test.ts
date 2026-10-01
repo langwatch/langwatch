@@ -1,10 +1,10 @@
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 /**
  * A finished background discover refresh tells the tenant's open tabs to refetch.
  * @see modules/trace/specs/trace-tenant-broadcast-worker-composition.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { PresenceProjectEvent } from "@langwatch/presence-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceListRead } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

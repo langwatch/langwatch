@@ -11,10 +11,10 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../actor/tsconfig.build.json"
+      "path": "../api/tsconfig.build.json"
     },
     {
-      "path": "../api/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     },
     {
       "path": "../config/tsconfig.build.json"

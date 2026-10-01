@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type GraphTriggerEvaluationReason,
   type GraphTriggerEvaluationResult,
@@ -12,6 +11,7 @@ import {
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * The `signed_up` PostHog milestone fires for every new user, unconditionally, before the
  * SSO domain auto-join even looks at the email — the two user-creation choke points
@@ -32,6 +31,7 @@ import type {
   SsoMigrationCallbackApi,
 } from "@langwatch/identity-contract";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {

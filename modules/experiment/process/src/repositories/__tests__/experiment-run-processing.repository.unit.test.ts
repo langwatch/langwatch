@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";

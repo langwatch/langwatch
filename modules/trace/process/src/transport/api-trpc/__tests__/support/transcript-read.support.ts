@@ -1,12 +1,12 @@
 // Real implementations everywhere; only the two stores are mocked.
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import {
   CONTENT_KEY_CATALOG,
   PRIVACY_DROPPED_MARKER_ATTR,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
 } from "@langwatch/data-privacy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { buildDisplayInput, stringifySpanIO } from "@langwatch/trace-contract";
 import { vi } from "vitest";
 

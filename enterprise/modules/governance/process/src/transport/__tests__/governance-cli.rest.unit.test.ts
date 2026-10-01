@@ -1,12 +1,4 @@
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * `/api/auth/cli`: who each route admits, in which order, and the
- * `{ error, error_description }` bodies released `langwatch` builds parse. The
- * bearer itself is refused at the CLI token door, in the framework's body.
- * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   canonicalErrorResponse,
   CliTokenIdentity,
@@ -29,6 +21,14 @@ import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { TeamNotFoundError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * `/api/auth/cli`: who each route admits, in which order, and the
+ * `{ error, error_description }` bodies released `langwatch` builds parse. The
+ * bearer itself is refused at the CLI token door, in the framework's body.
+ * Spec: specs/ai-gateway/cli-token-revoke-on-deactivation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/** Main's `governancePeopleScreen.service.ts`, over memory repositories. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** Main's `governancePeopleScreen.service.ts`, over memory repositories. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -1,7 +1,7 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { OrganizationGroupService } from "@langwatch/organization-contract";
 import type { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { OrganizationSeatRepository } from "../../../repositories/organization-seat.repository.ts";
 import type { InviteCreationThrottleService } from "../../../services/invite-creation-throttle.service.ts";

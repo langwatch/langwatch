@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import { createTenantId, type Event, type SubscriberDispatchDefinition } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

@@ -1,9 +1,9 @@
+import type { ProcessMembers } from "@langwatch/process-stores/members";
 /**
  * @vitest-environment node
  * The run's folds and stop signal every replica shares through the deployment's Redis.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ProcessMembers } from "@langwatch/process-stores/members";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRunProgressState } from "../../experiment-run-fold.repository.ts";

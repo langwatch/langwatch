@@ -4,13 +4,13 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { AgentNotFoundError, type AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioNotFoundError, type ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

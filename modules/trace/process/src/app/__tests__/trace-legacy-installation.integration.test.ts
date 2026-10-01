@@ -1,5 +1,4 @@
 import { ProjectInvalidCredentialsError, ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * Legacy `/api/trace/*` routes mounted over real application. Tests that
@@ -15,6 +14,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicApi } from "@langwatch/topic-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

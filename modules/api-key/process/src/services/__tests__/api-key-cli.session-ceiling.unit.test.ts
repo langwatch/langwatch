@@ -1,9 +1,9 @@
-/** Main's `applySessionCeiling` (cli-login-key-reaper.ts). Spec: modules/api-key/specs */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
+/** Main's `applySessionCeiling` (cli-login-key-reaper.ts). Spec: modules/api-key/specs */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";

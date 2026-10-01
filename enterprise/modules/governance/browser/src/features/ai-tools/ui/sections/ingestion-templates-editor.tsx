@@ -12,7 +12,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { docsUrl } from "@langwatch/error-presentation/docs-url";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 

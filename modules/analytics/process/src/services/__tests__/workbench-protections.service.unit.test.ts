@@ -1,6 +1,5 @@
 /** @vitest-environment node */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -9,6 +8,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type * as dataPrivacyContractModule from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

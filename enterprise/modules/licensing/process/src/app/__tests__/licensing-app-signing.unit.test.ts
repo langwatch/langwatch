@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
@@ -10,6 +5,11 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * @see enterprise/modules/licensing/specs/licensing.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import {

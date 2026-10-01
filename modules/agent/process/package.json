@@ -51,8 +51,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/actor": "workspace:*",
-    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@trpc/server": "catalog:",

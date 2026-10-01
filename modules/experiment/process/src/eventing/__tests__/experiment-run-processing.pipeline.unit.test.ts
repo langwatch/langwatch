@@ -1,15 +1,15 @@
-/**
- * @vitest-environment node
- * `experiment_run_processing` as a deployment without Redis composes it: the run-state fold
- * reads ClickHouse uncached, and the cell command and execution manager ride with it.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   ClickHouseQueryClient,
   type InsertRequest,
   type QueryDriver,
   type QueryResult,
 } from "@langwatch/clickhouse-client";
+/**
+ * @vitest-environment node
+ * `experiment_run_processing` as a deployment without Redis composes it: the run-state fold
+ * reads ClickHouse uncached, and the cell command and execution manager ride with it.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { experimentRunEventStreamChannels } from "../../channels/experiment-run-event-stream-channels.registry.ts";

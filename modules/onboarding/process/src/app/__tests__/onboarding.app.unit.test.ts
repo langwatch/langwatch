@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
@@ -25,6 +24,7 @@ import { ProjectNotFoundError, type ProjectApi } from "@langwatch/project-contra
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

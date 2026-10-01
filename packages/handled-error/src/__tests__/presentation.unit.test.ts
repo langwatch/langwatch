@@ -1,10 +1,10 @@
-import { APP_ERROR_CODES } from "@langwatch/error-presentation/app-codes";
+import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import {
   explainHandledError,
   explainSerializedError,
   UNKNOWN_ERROR_PRESENTATION,
-} from "@langwatch/error-presentation/presentation";
-import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
+} from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

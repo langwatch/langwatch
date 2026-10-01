@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { MetricApi } from "@langwatch/metric-contract";
 import { createApp } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

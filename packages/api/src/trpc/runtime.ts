@@ -3,8 +3,10 @@
  * half of a contract (`defineTrpcRouter`), the one execution path a mounted
  * procedure runs, and the wire shape a failed call arrives in.
  */
-import { actorSchema, toLedgerActor, type Actor } from "@langwatch/actor";
 import {
+  actorSchema,
+  toLedgerActor,
+  type Actor,
   declaredScopeIdSchema,
   type AuthzDeclaredScopeId,
   type AuthzPermission,

@@ -1,13 +1,13 @@
+import type { AuthzPermission } from "@langwatch/authorization";
+import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 /**
  * The per-scope permission contract for virtual keys: what each scope demands
  * to create, operate on and see a key, and that no scope reaches across
  * organizations.
  * @see specs/ai-gateway/governance/vk-scope-rbac.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzPermission } from "@langwatch/authorization";
-import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

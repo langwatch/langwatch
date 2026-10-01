@@ -1,9 +1,3 @@
-/**
- * Who reads what of the checkup: an install admin the details and the whole
- * install's report, everyone else the verdicts and their own organization's figures.
- * Spec: modules/ops/specs/checkup-audience.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
@@ -11,6 +5,12 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { CheckupAnswer, CheckupResult, OpsOperator } from "@langwatch/ops-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * Who reads what of the checkup: an install admin the details and the whole
+ * install's report, everyone else the verdicts and their own organization's figures.
+ * Spec: modules/ops/specs/checkup-audience.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";

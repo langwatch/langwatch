@@ -167,7 +167,6 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "catalog:",
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",

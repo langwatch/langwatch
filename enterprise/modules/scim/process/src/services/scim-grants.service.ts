@@ -15,7 +15,7 @@
  * fired-employee case and the deny has to hold before this call returns.
  * Additions are plain queued commands.
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   type AuthzGrantsService,
   type AuthzLedgerBindingAttach,

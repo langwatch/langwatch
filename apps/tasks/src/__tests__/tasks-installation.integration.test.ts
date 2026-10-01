@@ -1,9 +1,3 @@
-/**
- * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
- * @vitest-environment node
- * @see specs/platform/process-installation.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import {
@@ -35,6 +29,12 @@ import {
 } from "@langwatch/secrets";
 import { Task } from "@langwatch/task";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The tasks process installed as `main.ts` installs it, over memory stores (ARCHITECTURE.md §13).
+ * @vitest-environment node
+ * @see specs/platform/process-installation.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 const ROLE = "tasks";

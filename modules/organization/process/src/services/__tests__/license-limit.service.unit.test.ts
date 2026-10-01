@@ -1,3 +1,4 @@
+import type { LimitCheckResult } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  *
@@ -5,8 +6,7 @@
  * the report a client files when its pre-check refused somebody.
  * @see specs/licensing/enforcement-members.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { LimitCheckResult } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {

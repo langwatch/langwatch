@@ -1,3 +1,9 @@
+import type {
+  SsoArrivalApi,
+  SsoAuthenticationActivityApi,
+  SsoMigrationCallbackApi,
+} from "@langwatch/identity-contract";
+import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 /**
  * A native social button pressed by somebody whose organization's connection governs their
  * address, on both account seams: the refusal carries the connection so the error route can
@@ -5,13 +11,7 @@
  * @see specs/identity/native-social-at-a-claimed-domain.feature
  * @see specs/auth/phase-1-better-auth-config.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type {
-  SsoArrivalApi,
-  SsoAuthenticationActivityApi,
-  SsoMigrationCallbackApi,
-} from "@langwatch/identity-contract";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

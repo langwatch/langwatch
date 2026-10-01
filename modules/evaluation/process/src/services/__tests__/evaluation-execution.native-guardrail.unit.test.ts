@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   API_KEYS_AND_SECRETS_DETECTION,
   type EvaluatorApi,
@@ -6,6 +5,7 @@ import {
   type NativeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, type Mock, vi } from "vitest";
 

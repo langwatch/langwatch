@@ -1,6 +1,6 @@
-/** @see modules/model-provider/specs/model-provider.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+/** @see modules/model-provider/specs/model-provider.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestApp } from "./model-provider.fixture.ts";

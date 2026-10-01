@@ -1,10 +1,3 @@
-/**
- * Local surface's declared permission is enforced by the framework's own
- * project door; each route hands the door's actor and project to one operation
- * and answers its result as JSON, status 200, body unchanged.
- * @see specs/langy/langy-local-control.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { canonicalErrorResponse, createRestRuntime, type RestCaller } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -12,6 +5,13 @@ import {
   LangyConversationNotFoundError,
   LangyLocalRecordNotFoundError,
 } from "@langwatch/langy-contract";
+/**
+ * Local surface's declared permission is enforced by the framework's own
+ * project door; each route hands the door's actor and project to one operation
+ * and answers its result as JSON, status 200, body unchanged.
+ * @see specs/langy/langy-local-control.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { langyLocalRest } from "../langy-local.rest.ts";

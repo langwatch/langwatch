@@ -1,13 +1,13 @@
-/**
- * The pepper chain main hashed every key under: API_KEY_PEPPER, else CREDENTIALS_SECRET, else
- * NEXTAUTH_SECRET, refusing the boot when none is set (Alex, 2026-09-28).
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { API_KEY_PREFIX } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+/**
+ * The pepper chain main hashed every key under: API_KEY_PEPPER, else CREDENTIALS_SECRET, else
+ * NEXTAUTH_SECRET, refusing the boot when none is set (Alex, 2026-09-28).
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";

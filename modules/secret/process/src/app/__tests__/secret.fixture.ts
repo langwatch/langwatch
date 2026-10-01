@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { MemorySecretRepositories } from "../../repositories/memory/memory.secret.repositories.ts";
 import type { SecretRepositories } from "../../repositories/secret.repositories.ts";

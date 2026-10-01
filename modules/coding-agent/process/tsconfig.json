@@ -85,9 +85,6 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/group-queue/tsconfig.build.json"
     },
     {

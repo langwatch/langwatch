@@ -15,9 +15,9 @@ type BatchClearPIIFunction = (
   options: Record<string, unknown>,
 ) => Promise<(string | null)[]>;
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";
 import type { PiiClearing } from "../../rules/pii-analysis.rules.ts";

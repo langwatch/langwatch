@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type CliBootstrapResult,
   type GovernanceBudgetOverviewForUser,
@@ -6,6 +5,7 @@ import {
   PLATFORM_TOOL_POLICY_DEFAULTS,
   type PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { createUserTestApp, createUserTestOrganizations } from "./user.fixture.ts";

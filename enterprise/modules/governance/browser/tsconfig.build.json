@@ -48,9 +48,6 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/gateway/contract/tsconfig.build.json"
     },
     {

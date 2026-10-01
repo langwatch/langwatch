@@ -1,14 +1,14 @@
+import { WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
+import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 /**
  * @vitest-environment node
  * The API-key check, shared through one Redis twin by two pods: what it costs Postgres,
  * how long an answer is held, and that a revoke on one pod ends the key on the other at once.
  * @see modules/api-key/specs/auth-check-cache.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { WORKFLOW_RUN_API_KEY_NAME } from "@langwatch/api-key-contract";
-import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -252,8 +252,7 @@ describe("checking an API key through the shared answers", () => {
   describe("when a check's Postgres read outlasts the revoke's refusal", () => {
     /** @scenario "A fill never outlives a refusal written after its read began" */
     it("skips the fill, so another pod still refuses the key", async () => {
-      const { podA, podB, lifecycleOnA, answers, reads, mint, repository, secondsPass } =
-        harness();
+      const { podA, podB, lifecycleOnA, answers, reads, mint, repository, secondsPass } = harness();
       const { token, id, lookupId } = await mint({ organizationId: "acme" });
       const beforeRevoke = await repository.findByLookupId({ lookupId });
       const gate = opened();

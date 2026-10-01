@@ -1,10 +1,3 @@
-/**
- * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
- * The production composition reads the instance registry from Postgres, as main did on every
- * deployment.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
@@ -13,6 +6,13 @@ import type { Encryption, RateLimiter } from "@langwatch/process-stores/members"
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * @see enterprise/modules/licensing/specs/licensing.feature
+ * The production composition reads the instance registry from Postgres, as main did on every
+ * deployment.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 

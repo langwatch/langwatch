@@ -1,16 +1,15 @@
-/**
- * The declared `scenarios.*` path, as these tests need it: a runtime whose
- * authorization answers only granted permissions, an audit port that
- * records not writes, and a stub app that fails loudly on any unstubbed member.
- */
-import type { Actor } from "@langwatch/actor";
 import type {
   TrpcRouterDeclaration,
   TrpcRuntimeAuditEntry,
   TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authorization";
+/**
+ * The declared `scenarios.*` path, as these tests need it: a runtime whose
+ * authorization answers only granted permissions, an audit port that
+ * records not writes, and a stub app that fails loudly on any unstubbed member.
+ */
+import type { Actor, AuthzPermission } from "@langwatch/authorization";
 import type { TrpcContract } from "@langwatch/module";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";

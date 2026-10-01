@@ -1,9 +1,9 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
 import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 

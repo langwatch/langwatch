@@ -10,7 +10,7 @@ import type { UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { BrowserUiFeedback, resolveUiFailureCopy } from "@langwatch/browser-host/feedback";
 import { registerChunkReloadListener } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
-import { configureDocsRuntime } from "@langwatch/error-presentation/docs-url";
+import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import { webModules } from "@langwatch/installed-web-modules";
 import { createUi } from "@langwatch/browser";
 import { createUiApplication, type UiApplication } from "@langwatch/browser/application";

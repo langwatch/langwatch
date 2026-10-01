@@ -1,15 +1,15 @@
+import {
+  StoredObjectNotFoundError,
+  type StoredObjectApi,
+  type StoredObjectFileRead,
+} from "@langwatch/stored-object-contract";
 /**
  * @vitest-environment node
  * An avatar's bytes live in the stored-object store as a user-owned object in
  * the uploader's personal project, and the avatar door serves only those.
  * @see specs/settings/user-avatar.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import {
-  StoredObjectNotFoundError,
-  type StoredObjectApi,
-  type StoredObjectFileRead,
-} from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserAvatarNotFoundError } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 

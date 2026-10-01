@@ -21,7 +21,7 @@
       "path": "../design-system/tsconfig.build.json"
     },
     {
-      "path": "../error-presentation/tsconfig.build.json"
+      "path": "../handled-error/tsconfig.build.json"
     }
   ]
 }

@@ -1,5 +1,4 @@
 import { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
@@ -20,6 +19,7 @@ import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/pr
 import { ProjectApi } from "@langwatch/project-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";

@@ -1,12 +1,12 @@
+import { RestHost } from "@langwatch/api/rest";
+import type { LogApi } from "@langwatch/log-contract";
+import type { OtlpDoorRequest } from "@langwatch/otlp";
 /**
  * @vitest-environment node
  * The logs door mounted on the real REST host: which exporter paths reach the
  * receiver, and the wire each outcome is written in.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { RestHost } from "@langwatch/api/rest";
-import type { LogApi } from "@langwatch/log-contract";
-import type { OtlpDoorRequest } from "@langwatch/otlp";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { otlpLogsRest } from "../otlp-logs.rest.ts";

@@ -4,7 +4,7 @@ import {
   readErrorTraceId,
   readHandledError,
   safeProse,
-} from "@langwatch/error-presentation/read-handled-error";
+} from "@langwatch/handled-error/read-handled-error";
 /**
  * `readHandledError` sits on untrusted input: a rolling deploy, an older server, or a
  * Go service can all hand it a payload it wasn't written for, and none of those may

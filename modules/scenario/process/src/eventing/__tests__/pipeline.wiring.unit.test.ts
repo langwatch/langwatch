@@ -3,11 +3,11 @@
  * root are correctly registered (mismatch only shows on boot).
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   SCENARIO_EVALUATIONS_JOB,
   type RunScenarioEvaluationsDeps,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { ComputeRunMetricsCommand } from "../compute-run-metrics.commands.ts";

@@ -3,7 +3,7 @@
  * chain and preflight, telemetry, metrics. Order is load-bearing: config feeds secrets, both
  * precede telemetry.
  */
-import { ACTOR_SECRET_LOG_PATHS } from "@langwatch/actor";
+import { ACTOR_SECRET_LOG_PATHS } from "@langwatch/authorization";
 import { parseProcessConfig, type ConfigOwner, type ProcessConfigOf } from "@langwatch/config";
 import {
   refuseDoubleClaims,

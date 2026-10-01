@@ -6,7 +6,6 @@
 
 // @vitest-environment node
 import { ProjectMissingCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import {
   bindRestMiddleware,
@@ -25,6 +24,7 @@ import {
   VirtualKeyNotFoundError,
   virtualKeyBudgetInputSchema,
 } from "@langwatch/gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

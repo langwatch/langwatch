@@ -6,7 +6,7 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Flex, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Inbox } from "lucide-react";
 import { useMemo } from "react";
 

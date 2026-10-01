@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -17,6 +16,7 @@ import {
 } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/process";
 import { ScopedSecrets, signInProviderSecrets, type SecretHandle } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";

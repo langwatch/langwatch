@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AnomalyAlertDispatchRecord,
   AnomalyRule,
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";

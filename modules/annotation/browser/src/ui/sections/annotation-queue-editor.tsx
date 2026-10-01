@@ -14,7 +14,7 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 

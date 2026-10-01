@@ -1,10 +1,10 @@
+import type * as observabilityModule from "@langwatch/observability";
 /**
  * @vitest-environment node
  * A tracked-event body the caller got wrong is answered as a 400 and logged as a warning:
  * the client's mistake is not a server error.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type * as observabilityModule from "@langwatch/observability";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TrackedEventInvalidError } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, type RestCredentialBinding } from "@langwatch/api/rest";
 import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -12,6 +11,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ResourceScope } from "@langwatch/process";
 import type { Encryption } from "@langwatch/process-stores";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { describe, expect, it, vi } from "vitest";
 

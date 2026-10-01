@@ -1,5 +1,3 @@
-/** Spec: specs/migration/system-migrations-runner.feature */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   EventSourcing,
   EventStoreProducerOnly,
@@ -9,6 +7,8 @@ import {
 } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
 import type { MigrationPassSummary } from "@langwatch/system-migrations";
+/** Spec: specs/migration/system-migrations-runner.feature */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { opsServer } from "../../ops.server.ts";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EntitlementConfig,
   EntitlementSource,
@@ -8,6 +7,7 @@ import type {
   UsageUnit,
 } from "@langwatch/entitlement-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";

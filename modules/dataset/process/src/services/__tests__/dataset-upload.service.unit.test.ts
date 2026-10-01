@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * What an uploaded file BECOMES: rows parsed from CSV/JSONL/JSON array,

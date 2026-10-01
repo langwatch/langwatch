@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The `webhookEndpoints` transport over the real runtime and a real endpoint
  * store: the scope per procedure, the plan gate, and the secret-once contract.
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
 import { initTRPC } from "@trpc/server";

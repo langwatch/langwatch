@@ -117,9 +117,6 @@
       "path": "../../../../modules/user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {

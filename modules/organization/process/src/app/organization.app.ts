@@ -1,5 +1,5 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AuthzApi,
   type AuthzListTeamMemberBindingsInput,

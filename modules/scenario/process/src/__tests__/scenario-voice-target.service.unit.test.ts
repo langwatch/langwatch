@@ -1,5 +1,4 @@
 import { AgentNotFoundError, type AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { GatewayVoiceKeyMissingError, type GatewayApi } from "@langwatch/gateway-contract";
 import type {
   ModelProviderApi,
@@ -7,6 +6,7 @@ import type {
   ModelProviderSummary,
 } from "@langwatch/model-provider-contract";
 import { ScenarioTargetNotFoundError, type VoiceAgentConfig } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { ScenarioVoiceTargetService } from "../services/scenario-voice-target.service.ts";

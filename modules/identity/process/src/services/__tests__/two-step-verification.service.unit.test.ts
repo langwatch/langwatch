@@ -1,11 +1,11 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { IdentityEmailResolution } from "@langwatch/identity-contract";
 /**
  * @vitest-environment node
  * The account standing and the administrator's member list (D06).
  * @see specs/identity/mfa-and-session-shape.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { IdentityEmailResolution } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryOrganizationMfaRequirementMailChannel } from "../../channels/memory/memory.organization-mfa-requirement-mail.channel.ts";

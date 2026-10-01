@@ -26,10 +26,10 @@
     "test:integration": "vitest run .integration.test.ts"
   },
   "dependencies": {
-    "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
@@ -61,7 +61,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

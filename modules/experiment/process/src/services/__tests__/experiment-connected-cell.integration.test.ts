@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   EvaluatorConfig,
   EvaluationsV3State,
@@ -7,6 +6,7 @@ import type {
   ExecutionCell,
 } from "@langwatch/experiment-contract";
 import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * Tests ExperimentConnectedCellService.executeConnectedCell: running a

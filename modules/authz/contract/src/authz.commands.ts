@@ -1,4 +1,4 @@
-import { actorSchema } from "@langwatch/actor";
+import { actorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {

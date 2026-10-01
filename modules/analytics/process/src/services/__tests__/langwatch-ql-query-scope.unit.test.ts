@@ -1,9 +1,3 @@
-/**
- * The query door's scope: which projects one API key reads, and what it sees of them.
- * @see specs/lwql/api.feature
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
@@ -11,6 +5,12 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+/**
+ * The query door's scope: which projects one API key reads, and what it sees of them.
+ * @see specs/lwql/api.feature
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangWatchQLQueryScopeService } from "../langwatch-ql-query-scope.service.ts";

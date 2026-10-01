@@ -1,11 +1,4 @@
 import type { LangWatchQLSchema } from "@langwatch/analytics-contract";
-/**
- * The eval-function gate is Analytics' own answer, read from the project's
- * rollout — a caller never states it, and a statement that judges nothing
- * never pays for the read.
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -15,6 +8,13 @@ import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-
 import { resolveRequestBound } from "@langwatch/plans";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * The eval-function gate is Analytics' own answer, read from the project's
+ * rollout — a caller never states it, and a statement that judges nothing
+ * never pays for the read.
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

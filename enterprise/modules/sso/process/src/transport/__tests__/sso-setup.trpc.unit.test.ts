@@ -1,13 +1,13 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * What an organization's own administrator reads about its connection
  * (specs/identity/sso-connection-history.feature).
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
-import type { SsoMigrationView, SsoSetupApi, SsoSetupView } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 

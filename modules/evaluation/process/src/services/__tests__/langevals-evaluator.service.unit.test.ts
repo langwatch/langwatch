@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */
 import { EvaluatorExecutionError } from "@langwatch/evaluation-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HttpLangevalsChannel } from "../../channels/http/http.langevals.channel.ts";

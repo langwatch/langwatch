@@ -1,13 +1,13 @@
+import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
+import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
+import { ResourceScope } from "@langwatch/process";
+import { ScopedSecrets } from "@langwatch/secrets";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
  * @see enterprise/modules/licensing/specs/licensing.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { BearerIdentity, RestHost, type RestIdentity } from "@langwatch/api/rest";
-import { GatewayApi, GatewayInternalAuthenticationError } from "@langwatch/gateway-contract";
-import { ResourceScope } from "@langwatch/process";
-import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { TEST_LICENSING_CONFIG } from "../../__tests__/testing.ts";

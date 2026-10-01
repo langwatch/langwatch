@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

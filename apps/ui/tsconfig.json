@@ -95,9 +95,6 @@
       "path": "../../enterprise/modules/scim/browser/tsconfig.build.json"
     },
     {
-      "path": "../../packages/error-presentation/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/evaluation/contract/tsconfig.build.json"
     },
     {

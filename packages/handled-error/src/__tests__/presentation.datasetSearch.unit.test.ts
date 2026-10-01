@@ -1,5 +1,5 @@
-import { explainHandledError } from "@langwatch/error-presentation/presentation";
-import type { HandledErrorShape } from "@langwatch/error-presentation/read-handled-error";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 /**
  * The search refusal has to read as being about SEARCH. The registry is keyed by
  * code, so a search that reused the export refusal's code would answer the user

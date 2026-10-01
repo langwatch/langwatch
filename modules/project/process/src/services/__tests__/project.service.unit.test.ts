@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   OrganizationHasNoTeamError,
   OrganizationService as OrganizationServiceContract,
@@ -21,6 +20,7 @@ import {
   type ProjectWithTeam,
   type TraceDestinationProject,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

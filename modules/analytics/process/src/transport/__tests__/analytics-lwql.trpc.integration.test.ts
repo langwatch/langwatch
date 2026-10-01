@@ -1,11 +1,3 @@
-/**
- * @vitest-environment node
- * `analytics.lwql.*` on the real runtime over the real analytics application:
- * the rollout switch, the provisioning answer and the permission that is
- * checked before either. Only the flag store and the substrate are the test's.
- * @see specs/lwql/workbench.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   createTrpcRuntime,
   TrpcRootDefinition,
@@ -19,6 +11,14 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * `analytics.lwql.*` on the real runtime over the real analytics application:
+ * the rollout switch, the provisioning answer and the permission that is
+ * checked before either. Only the flag store and the substrate are the test's.
+ * @see specs/lwql/workbench.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

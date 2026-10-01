@@ -1,12 +1,12 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-/** @see specs voice-agents-v1.feature: a finished call records one trace per exchange. */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
+/** @see specs voice-agents-v1.feature: a finished call records one trace per exchange. */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { RecordSpanCommandData, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

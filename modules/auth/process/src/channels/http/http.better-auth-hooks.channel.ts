@@ -1,5 +1,5 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { extractEmailDomain, isSsoProviderMatch } from "@langwatch/auth-contract";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { GrantScopeTier, TeamUserRole, type AuthzGrantsService } from "@langwatch/authz-contract";
 import { isNativeSocialProvider } from "@langwatch/enterprise-sso-contract/sign-in-providers";
 import { HandledError } from "@langwatch/handled-error";

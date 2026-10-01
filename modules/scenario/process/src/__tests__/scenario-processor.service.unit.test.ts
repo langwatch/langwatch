@@ -1,10 +1,10 @@
 import { ChildProcess } from "node:child_process";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ScenarioExecutionService,
   type ScenarioExecutionPrefetchResult,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CancellationSubscriber } from "../app/scenario.app.ts";

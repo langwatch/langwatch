@@ -3,7 +3,7 @@
  * behind every grant mutation, waiting (bounded) for the projection to land
  * attach- and role-shaped writes before returning (ADR-007's breaker doctrine).
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   AuthzGrantNotConfirmedError,
   bindingScopeCanGrantPermission,

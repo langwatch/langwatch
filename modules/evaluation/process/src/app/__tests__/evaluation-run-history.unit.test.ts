@@ -1,5 +1,4 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  */
@@ -15,6 +14,7 @@ import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProcessMembers } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";

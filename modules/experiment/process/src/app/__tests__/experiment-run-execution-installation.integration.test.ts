@@ -7,7 +7,6 @@
 import { randomUUID } from "node:crypto";
 
 import { type AgentApi, type AgentOverview, AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
@@ -23,6 +22,7 @@ import { HandledError } from "@langwatch/handled-error";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import {
   parseStudioWorkflow,

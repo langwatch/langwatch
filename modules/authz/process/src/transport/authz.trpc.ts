@@ -1,7 +1,7 @@
-// Frontend query for caller's permissions; declared here to avoid package cycle.
-import type { Actor } from "@langwatch/actor";
-import { toLedgerActor } from "@langwatch/actor";
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+// Frontend query for caller's permissions; declared here to avoid package cycle.
+import type { Actor } from "@langwatch/authorization";
+import { toLedgerActor } from "@langwatch/authorization";
 import {
   AuthzApi,
   authzApplyMemberBindingsInputSchema,

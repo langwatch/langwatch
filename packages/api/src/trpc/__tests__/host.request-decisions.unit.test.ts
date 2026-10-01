@@ -3,13 +3,13 @@
  * @see specs/identity/auth-read-caching.feature
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { PermissionDecision } from "@langwatch/authorization";
 import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../compose.ts";
@@ -37,7 +37,7 @@ const reads = defineTrpcRouter(
 
 function served() {
   let permitted = true;
-  const authz = createApiFixture<Authorize>({
+  const authz = createApiDouble<Authorize>({
     getDecision: async (): Promise<PermissionDecision> => ({
       permitted,
       organizationRole: "MEMBER",

@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyBinding } from "@langwatch/api-key-contract";
 import type {
   AuthzAccessBinding,
@@ -13,6 +12,7 @@ import {
   projectWithTeamSchema,
   type ProjectApi,
 } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

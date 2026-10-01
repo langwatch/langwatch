@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * The installer over memory persistence, in both roles that boot it.
@@ -8,6 +7,7 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

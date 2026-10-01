@@ -4,7 +4,6 @@
  * main published: every status, JSON body, event-stream header and frame.
  */
 import { AgentOwnerOnlyError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   canonicalErrorResponse,
@@ -16,6 +15,7 @@ import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ExecutionSummary, Experiment, ExperimentRun } from "@langwatch/experiment-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 

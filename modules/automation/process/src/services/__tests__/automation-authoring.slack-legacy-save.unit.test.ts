@@ -1,9 +1,9 @@
-/** @vitest-environment node */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TriggerAction } from "@langwatch/automation-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SlackConnectionKind } from "@langwatch/slack-contract";
+/** @vitest-environment node */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";

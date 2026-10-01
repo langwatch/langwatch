@@ -1,4 +1,4 @@
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import { TraceApp, type TraceAppDependencies } from "../../trace.app.ts";
 

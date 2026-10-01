@@ -1,10 +1,3 @@
-/**
- * The worker records a span with the content its organization's privacy rule drops already gone.
- * Live eventing over memory stores; only the project's rows sit in a migrated test database.
- * @vitest-environment node
- * @see specs/data-privacy/content-drop.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { parseProcessConfig } from "@langwatch/config";
 import {
   DataPrivacyApi,
@@ -44,6 +37,13 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The worker records a span with the content its organization's privacy rule drops already gone.
+ * Live eventing over memory stores; only the project's rows sit in a migrated test database.
+ * @vitest-environment node
+ * @see specs/data-privacy/content-drop.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   spanReceivedEventDataSchema,

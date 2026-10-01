@@ -10,9 +10,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../actor/tsconfig.build.json"
-    },
-    {
       "path": "../authorization/tsconfig.build.json"
     },
     {
@@ -26,9 +23,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../api-fixture/tsconfig.build.json"
     },
     {
       "path": "../vitest-config/tsconfig.build.json"

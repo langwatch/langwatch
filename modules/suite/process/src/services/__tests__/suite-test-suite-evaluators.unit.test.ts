@@ -2,7 +2,6 @@
  * @vitest-environment node
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { EvaluatorApi, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type {
@@ -11,6 +10,7 @@ import type {
   ScenarioTestSuite,
   ScenarioTestSuiteUpdateInput,
 } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import type { SuiteExecution } from "../../app/suite.app.ts";

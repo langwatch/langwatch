@@ -1,8 +1,3 @@
-/**
- * The api installed as `main.ts` installs it, with evaluation on its live repositories over a real
- * ClickHouse and every other module over memory stores (ARCHITECTURE.md §13).
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { parseProcessConfig } from "@langwatch/config";
 import { EventSourcing } from "@langwatch/eventing";
@@ -28,6 +23,11 @@ import {
   type SecretHandle,
 } from "@langwatch/secrets";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * The api installed as `main.ts` installs it, with evaluation on its live repositories over a real
+ * ClickHouse and every other module over memory stores (ARCHITECTURE.md §13).
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 
 const ROLE = "api";

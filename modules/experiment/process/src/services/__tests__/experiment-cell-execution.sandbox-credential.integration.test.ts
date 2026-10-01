@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ExecutionCell } from "@langwatch/experiment-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * Pins the previously disconnected sandbox credential paths: `findRunSandboxApiKey`

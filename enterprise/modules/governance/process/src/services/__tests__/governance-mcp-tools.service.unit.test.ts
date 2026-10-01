@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type ApiKey,
   type ApiKeyApi,
@@ -8,6 +7,7 @@ import type { RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

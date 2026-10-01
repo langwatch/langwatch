@@ -6,7 +6,7 @@ import {
   ledgerActorFor,
   SYSTEM_ACTORS,
   toLedgerActor,
-} from "../index.ts";
+} from "../actor.ts";
 
 describe("the actor vocabulary", () => {
   describe("given a rich actor headed for the ledger", () => {

@@ -52,7 +52,6 @@
     "@langwatch/enterprise-managed-provider-browser": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/enterprise-scim-browser": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/evaluator-browser": "workspace:*",
     "@langwatch/experiment-browser": "workspace:*",

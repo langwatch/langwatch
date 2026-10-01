@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,
   PRIVACY_PII_INCOMPLETE_MARKER_ATTR,
@@ -6,6 +5,7 @@ import {
 } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ATTR_KEYS, type OtlpResource, type OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

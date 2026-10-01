@@ -1,11 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * The Cloud admin license registry: a non-operator is answered with a
- * not-found and commands nothing; an operator's reads and commands are
- * audited, refusals included, and no entry ever holds a license key.
- * @see specs/self-hosting/connected-services/license-registry.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   type IssuedLicenseView,
@@ -17,6 +9,14 @@ import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
 import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * The Cloud admin license registry: a non-operator is answered with a
+ * not-found and commands nothing; an operator's reads and commands are
+ * audited, refusals included, and no entry ever holds a license key.
+ * @see specs/self-hosting/connected-services/license-registry.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";

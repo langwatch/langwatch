@@ -7,7 +7,6 @@ import { generateKeyPairSync } from "node:crypto";
 
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -42,6 +41,7 @@ import { ScopedSecrets } from "@langwatch/secrets";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";

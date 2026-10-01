@@ -1,9 +1,3 @@
-/**
- * @vitest-environment node
- * A filter picker's other selections narrow its options through Trace's grammar.
- * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -12,6 +6,12 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * A filter picker's other selections narrow its options through Trace's grammar.
+ * Spec: modules/trace/specs/trace-legacy-filtered-search.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 

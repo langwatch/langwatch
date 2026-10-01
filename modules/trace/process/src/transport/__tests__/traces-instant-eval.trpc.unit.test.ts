@@ -1,11 +1,11 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { InstantEvalClassifierNotConfiguredError } from "@langwatch/instant-eval-contract";
 /**
  * @vitest-environment node
  * The Explorer's Instant Eval served under main's nested `traces.instantEval.*` wire.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import { InstantEvalClassifierNotConfiguredError } from "@langwatch/instant-eval-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   type ExplorerInstantEvalProgress,
   type TraceApi,

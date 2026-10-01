@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  *
@@ -7,6 +6,7 @@ import { createApiFixture } from "@langwatch/api-fixture";
  * @see specs/api-keys/project-key-read-access.feature
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 

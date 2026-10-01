@@ -1,5 +1,4 @@
 import type { AgentOverview } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
@@ -8,6 +7,7 @@ import {
   type ExperimentRunPlan,
 } from "@langwatch/experiment-contract";
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { StudioServerEvent, WorkflowApi } from "@langwatch/workflow-contract";
 /**
  * One cell of a pipeline-driven run: what it reads from the run's folds, and what it appends.

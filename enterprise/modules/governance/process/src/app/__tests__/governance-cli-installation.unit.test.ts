@@ -1,6 +1,5 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import { OrganizationInvalidCredentialsError } from "@langwatch/api";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import { BearerIdentity, RestHost } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
@@ -24,6 +23,7 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
  * @vitest-environment node
  */
 import { memoryRateLimiter } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";

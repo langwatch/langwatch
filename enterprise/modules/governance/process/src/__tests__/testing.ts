@@ -1,11 +1,11 @@
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { PROJECT_KIND, type InternalProject, type ProjectApi } from "@langwatch/project-contract";
 /**
  * Test-only access for Governance characterization suites: the collaborators
  * a suite needs, built here. Repositories and services stay private to the
  * feature server — a suite states which substrates it has, not which classes to construct.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { PROJECT_KIND, type InternalProject, type ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { GovernanceClickHouseResolver } from "../app/governance.members.ts";
 import {

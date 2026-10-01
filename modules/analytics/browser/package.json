@@ -33,7 +33,6 @@
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
-    "@langwatch/error-presentation": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/time": "workspace:*",

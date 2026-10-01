@@ -1,5 +1,4 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/dataset-contract";
 /**
@@ -17,6 +16,7 @@ import type { MonitorApi, MonitorWithEvaluator } from "@langwatch/monitor-contra
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { Workflow, WorkflowApi, WorkflowVersion } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";

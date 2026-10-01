@@ -28,7 +28,7 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
   ],
   "@langwatch/csv": sourceRoots,
-  "@langwatch/error-presentation": sourceRoots,
+  "@langwatch/handled-error": sourceRoots,
   "@langwatch/scenario-contract": sourceRoots,
   "@langwatch/analytics-process": [
     "dev/docs/**/*",

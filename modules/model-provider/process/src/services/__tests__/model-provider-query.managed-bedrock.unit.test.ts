@@ -1,9 +1,9 @@
+import type { ModelProvider } from "@langwatch/model-provider-contract";
 /**
  * The organization provider list shows a managed Bedrock as an enabled system row, as main did.
  * @see modules/model-provider/specs/model-provider.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import type { ModelProvider } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

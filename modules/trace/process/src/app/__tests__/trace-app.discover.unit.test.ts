@@ -2,7 +2,7 @@
  * The sidebar's facet read on the real `TraceApp`: no `query` is the tenant's cached
  * discovery; a `query`, empty included, counts every facet under it in the list's window.
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TracesListReader } from "../trace.app.ts";

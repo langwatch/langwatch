@@ -1,4 +1,4 @@
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 // @vitest-environment node
 /**
  * The docs-origin allowlist, asserted from a NON-development runtime.

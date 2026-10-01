@@ -6,10 +6,10 @@ import type {
   LangWatchQLValidationInput,
 } from "@langwatch/analytics-contract";
 import { EVERY_CATALOGUE_PERMISSION } from "@langwatch/analytics-process/testing";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 
 import type { DashboardRepositories } from "../../repositories/dashboard.repositories.ts";

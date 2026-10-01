@@ -1,6 +1,6 @@
 import { AgentSessionUnknownError } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { memorySessionState } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { instanceChannel } from "../../rules/connected-agent-keys.rules.ts";

@@ -18,9 +18,6 @@
   "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
   "references": [
     {
-      "path": "../../packages/actor/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/agent/contract/tsconfig.build.json"
     },
     {
@@ -55,6 +52,9 @@
     },
     {
       "path": "../../modules/auth/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/authorization/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/contract/tsconfig.build.json"
@@ -370,9 +370,6 @@
     },
     {
       "path": "../../modules/workflow/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/api-fixture/tsconfig.build.json"
     },
     {
       "path": "../../packages/clickhouse-migrations/tsconfig.build.json"

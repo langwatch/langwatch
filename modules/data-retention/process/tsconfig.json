@@ -57,9 +57,6 @@
       "path": "../../user/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api-fixture/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/authorization/tsconfig.build.json"
     },
     {

@@ -1,12 +1,12 @@
+import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 /**
  * @vitest-environment node
  *
  * `organization.update`: a blank S3 secret beside an endpoint leaves it unchanged.
  * Spec: specs/projects/projects-browser-door.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { bindTrpcFact, createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

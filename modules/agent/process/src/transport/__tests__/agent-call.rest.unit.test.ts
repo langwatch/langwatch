@@ -4,7 +4,6 @@ import {
   AgentOwnerOnlyError,
   type AgentApi,
 } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -14,6 +13,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
 /**
  * @vitest-environment node

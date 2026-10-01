@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

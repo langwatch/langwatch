@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { APP_ERROR_CODES } from "@langwatch/error-presentation/app-codes";
+import { APP_ERROR_CODES } from "@langwatch/handled-error/app-codes";
 import { describe, expect, it } from "vitest";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../../", import.meta.url));
@@ -181,6 +181,7 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "annotation_not_found",
   "annotation_queue_not_found",
   "annotation_score_not_found",
+  "batching_not_supported",
   "dashboard_widget_query_not_found",
   "invalid_agent_config",
   "nlp_lambda_fleet_not_composed",
@@ -247,6 +248,7 @@ const UNCOPIED_CODES_BACKLOG = new Set<string>([
   "workflow_not_published",
   "workflow_version_not_found",
   "workflow_version_required",
+  "llm_upstream_error",
 ]);
 
 /**

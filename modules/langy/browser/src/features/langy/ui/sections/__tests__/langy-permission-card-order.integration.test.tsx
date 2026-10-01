@@ -90,7 +90,7 @@ vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
 
-vi.mock("@langwatch/error-presentation/read-handled-error", async (importOriginal) => ({
+vi.mock("@langwatch/handled-error/read-handled-error", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   isHandledByGlobalHandler: () => false,
 }));

@@ -1,5 +1,5 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { OrganizationUserRole } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * The one lockout nothing inside the product can undo: a directory that
  * deprovisions the last administrator who can sign in.

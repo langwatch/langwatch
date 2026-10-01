@@ -3,7 +3,6 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -16,6 +15,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { CollapsingRunCommands } from "../../__tests__/support/collapsing-run-commands.ts";

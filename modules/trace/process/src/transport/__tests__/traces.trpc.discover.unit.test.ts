@@ -1,11 +1,11 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The sidebar's one facet read: the cached discovery while no query is active,
  * the filtered counts as soon as one is.
  * @see specs/traces-v2/search.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";

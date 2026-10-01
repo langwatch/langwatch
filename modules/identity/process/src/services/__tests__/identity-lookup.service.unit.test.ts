@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   AuditLogApi,
   RecordAuditLogCommand,
@@ -7,6 +6,7 @@ import type {
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import type { IdentityHistoryEntry, LinkProposalRecord } from "@langwatch/identity-contract";
 import type { RateLimiter } from "@langwatch/process-stores";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { StubPlatformOperators } from "../../__tests__/support/in-memory-connections.ts";

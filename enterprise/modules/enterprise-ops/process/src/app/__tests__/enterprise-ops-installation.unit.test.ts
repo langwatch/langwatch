@@ -1,8 +1,3 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-/**
- * @vitest-environment node
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
@@ -15,6 +10,11 @@ import {
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { createTestLogger } from "@langwatch/test-harness";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { enterpriseOpsServer } from "../../enterprise-ops.server.ts";

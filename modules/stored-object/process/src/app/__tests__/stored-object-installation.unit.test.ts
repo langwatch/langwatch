@@ -1,13 +1,13 @@
-/**
- * @vitest-environment node
- * @see modules/stored-object/specs/stored-objects.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { RateLimiter } from "@langwatch/process-stores/members";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
+/**
+ * @vitest-environment node
+ * @see modules/stored-object/specs/stored-objects.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { storedObjectServer } from "../../stored-object.server.ts";

@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 /**
  * The workflow module installs, in every role it serves, and the token the
@@ -6,6 +5,7 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
  */
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

@@ -1,7 +1,7 @@
 /**
  * @see specs/rbac/platform-operators.feature
  */
-import type { LedgerActor } from "@langwatch/actor";
+import type { LedgerActor } from "@langwatch/authorization";
 import { PLATFORM_GRANT_ERASURE_REASON, type PlatformOperator } from "@langwatch/authz-contract";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";

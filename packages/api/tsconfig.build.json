@@ -31,9 +31,6 @@
   ],
   "references": [
     {
-      "path": "../actor/tsconfig.build.json"
-    },
-    {
       "path": "../authorization/tsconfig.build.json"
     },
     {

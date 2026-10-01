@@ -1,16 +1,11 @@
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 /**
  * @vitest-environment node
  * `POST /api/workflows/:workflowId/run` over the real app and the runtime a process mounts
  * it on: the run's typed refusals keep their statuses, and an untyped failure stays opaque.
  */
-import {
-  bindRestMiddleware,
-  canonicalErrorResponse,
-  createRestRuntime,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -22,6 +17,7 @@ import { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { MemoryWorkflowRepositories } from "../../repositories/memory/memory.workflow.repositories.ts";

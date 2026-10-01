@@ -5,8 +5,8 @@
  * @see modules/analytics/specs/analytics-lwql-editor.feature
  */
 import type { LangWatchQLProtections } from "@langwatch/analytics-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see modules/github/specs/github-install-routes.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { BearerIdentity, RestHost, UnauthorizedError } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
@@ -14,6 +9,11 @@ import { createApp, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+/**
+ * @vitest-environment node
+ * @see modules/github/specs/github-install-routes.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { githubServer } from "../../github.server.ts";

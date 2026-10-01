@@ -3,11 +3,11 @@
  * Spec: specs/ui/browser-query-caching.feature.
  */
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { defineTrpcContract, moduleApi, schemaHashesOf } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { createApiDouble } from "../../__tests__/api-double.ts";
 import type { Authorize } from "../../access/access.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../../trpc/compose.ts";
@@ -49,7 +49,7 @@ describe("given a tRPC surface mounting a contract", () => {
   beforeEach(() => {
     const trpc = TrpcHost.create({
       sessions: SessionReader.create({ verify: async () => ({ userId: "user_ada" }) }),
-      authz: createApiFixture<Authorize>({
+      authz: createApiDouble<Authorize>({
         checkScopeLineage: async () => ({ kind: "consistent" }),
       }),
     });

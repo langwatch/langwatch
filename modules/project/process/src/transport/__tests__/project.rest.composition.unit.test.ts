@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 /**
  * @vitest-environment node
  * `/api/projects` against the real `ProjectApp`, not a stub — the stub
@@ -17,6 +16,7 @@ import { LocalFeatureApis, ResourceScope } from "@langwatch/process";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { ShareApi } from "@langwatch/share-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

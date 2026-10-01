@@ -1,4 +1,4 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   LicenseGenerationService,
   NodeLicenseCryptographyService,

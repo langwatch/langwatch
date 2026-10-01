@@ -1,6 +1,6 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { readHandledError } from "@langwatch/error-presentation/read-handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import type { SuiteTarget } from "@langwatch/suite-contract";
 import { useCallback } from "react";

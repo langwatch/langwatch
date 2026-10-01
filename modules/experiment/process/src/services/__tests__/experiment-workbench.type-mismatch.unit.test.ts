@@ -1,10 +1,10 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { ExperimentTypeMismatchError } from "@langwatch/experiment-contract";
 /**
  * Type check in repository; service relays refusal consistently.
  * @see specs/experiments-v3/workbench-versioning.feature
  */
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import type { ExperimentRepository } from "../../repositories/experiment.repository.ts";

@@ -1,9 +1,3 @@
-/**
- * The doubles every stored-object test builds on: an in-process byte backend,
- * a token codec that remembers what it minted, a fixed delivery capability,
- * and the row-and-stream reads the byte surface performs.
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzDenialReason, PermissionDecision } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { RateLimiter } from "@langwatch/process-stores/members";
@@ -13,6 +7,12 @@ import {
   type StoredObjectOwnerResolver,
   type StoredObjectStorageDestination,
 } from "@langwatch/stored-object-contract";
+/**
+ * The doubles every stored-object test builds on: an in-process byte backend,
+ * a token codec that remembers what it minted, a fixed delivery capability,
+ * and the row-and-stream reads the byte surface performs.
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type { ExternalImageChannel } from "../../channels/external-image.channel.ts";
 import { MemoryExternalImageChannel } from "../../channels/memory/memory.external-image.channel.ts";

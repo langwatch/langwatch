@@ -1,12 +1,12 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 

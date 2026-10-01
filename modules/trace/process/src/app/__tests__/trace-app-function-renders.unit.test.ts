@@ -4,7 +4,7 @@
  * whole trace, and a span read out of the trace-and-span pair.
  * @see specs/lwql/app-functions.feature
  */
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Span, Trace, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

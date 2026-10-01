@@ -1,8 +1,3 @@
-/**
- * @vitest-environment node
- * @see enterprise/modules/licensing/specs/licensing.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type {
   GatewayApi,
   GatewayBudgetResolutionTarget,
@@ -11,6 +6,11 @@ import type {
   GatewayVirtualKeyRecord,
 } from "@langwatch/gateway-contract";
 import { type Project, type ProjectApi, projectSchema } from "@langwatch/project-contract";
+/**
+ * @vitest-environment node
+ * @see enterprise/modules/licensing/specs/licensing.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

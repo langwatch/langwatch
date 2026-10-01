@@ -1,6 +1,5 @@
 /** The long-poll connect family answers main's relay bodies, byte for byte (ADR-129, §8). */
 import { INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   BearerIdentity,
   bindRestCredential,
@@ -16,6 +15,7 @@ import {
   LangySessionKeyWrongTypeError,
   LOCAL_CONTROL_PROTOCOL_VERSION,
 } from "@langwatch/langy-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {

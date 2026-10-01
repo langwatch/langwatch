@@ -3,7 +3,7 @@ import type {
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { EventSubscriberDefinition, ProcessManagerDefinition } from "@langwatch/eventing";
 
 import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../../app/automation.members.ts";

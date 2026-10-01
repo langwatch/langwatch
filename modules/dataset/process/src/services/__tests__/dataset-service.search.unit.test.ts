@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   datasetSchema,
   DatasetChunkCountMissingError,
@@ -6,6 +5,7 @@ import {
   type Dataset,
   type DatasetRecord,
 } from "@langwatch/dataset-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {

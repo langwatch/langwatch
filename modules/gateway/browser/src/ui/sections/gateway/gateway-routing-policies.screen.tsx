@@ -1,7 +1,7 @@
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
-import { docsUrl } from "@langwatch/error-presentation/docs-url";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Lightbulb, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 

@@ -1,6 +1,6 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { QueueSimulationRunInput, ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-version-on-runs.feature

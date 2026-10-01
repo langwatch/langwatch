@@ -2,7 +2,7 @@
  * Grant provenance: source (which surface) + actor (who caused it). Assert
  * on ledger writer emit to catch values that stop short of the fact.
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";

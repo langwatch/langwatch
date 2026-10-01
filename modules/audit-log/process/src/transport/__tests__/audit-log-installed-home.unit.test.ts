@@ -4,7 +4,6 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AnnotationApi, AnnotationQueueDetail } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import { SessionReader } from "@langwatch/api/rest";
 import { TrpcHost } from "@langwatch/api/trpc";
 import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
@@ -13,6 +12,7 @@ import type { Monitor, MonitorApi } from "@langwatch/monitor-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   WorkflowNotFoundError,
   type WorkflowApi,

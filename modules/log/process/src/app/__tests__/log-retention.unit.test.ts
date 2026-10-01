@@ -1,15 +1,15 @@
-/**
- * @vitest-environment node
- * log_processing declares each tenant's retention from data retention (ARCHITECTURE §9).
- * Spec: packages/eventing/specs/pipeline-retention.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { LOG_PROCESSING_PIPELINE_NAME } from "@langwatch/log-contract";
 import { createApp } from "@langwatch/process";
+/**
+ * @vitest-environment node
+ * log_processing declares each tenant's retention from data retention (ARCHITECTURE §9).
+ * Spec: packages/eventing/specs/pipeline-retention.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 

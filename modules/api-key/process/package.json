@@ -50,7 +50,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-fixture": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

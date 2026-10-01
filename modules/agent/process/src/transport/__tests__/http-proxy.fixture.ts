@@ -1,7 +1,7 @@
-import type { Actor } from "@langwatch/actor";
 import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import type { Actor } from "@langwatch/authorization";
 import type { SecretApi } from "@langwatch/secret-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
@@ -18,7 +18,9 @@ export function createHttpProxyCaller(
   // A saved agent here is not an HTTP one, so no stored credential fills the call.
   const testing = HttpAgentTestService.create({
     ...peers,
-    agents: createApiFixture<Pick<AgentService, "getById">>({ getById: async () => agentFixture() }),
+    agents: createApiFixture<Pick<AgentService, "getById">>({
+      getById: async () => agentFixture(),
+    }),
     secrets: createApiFixture<SecretApi>({ getValues: async () => ({}), list: async () => [] }),
   });
   const app = createApiFixture<AgentApi>({ executeHttpTest: (input) => testing.execute(input) });

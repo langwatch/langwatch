@@ -7,7 +7,7 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TRACE_FILTER_EXAMPLES, type GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

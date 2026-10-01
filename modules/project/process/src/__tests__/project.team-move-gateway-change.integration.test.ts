@@ -1,10 +1,3 @@
-/**
- * @vitest-environment node
- * A team move re-resolves the gateway budgets of the keys tracing to the moved
- * project: the move appends to the change feed the gateway long-polls.
- * @see specs/ai-gateway/per-team-budget-reorganization.feature
- */
-import { createApiFixture } from "@langwatch/api-fixture";
 import { TeamNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
@@ -14,6 +7,13 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createTestLogger } from "@langwatch/test-harness";
+/**
+ * @vitest-environment node
+ * A team move re-resolves the gateway budgets of the keys tracing to the moved
+ * project: the move appends to the change feed the gateway long-polls.
+ * @see specs/ai-gateway/per-team-budget-reorganization.feature
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";

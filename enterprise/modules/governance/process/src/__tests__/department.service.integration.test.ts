@@ -1,8 +1,8 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  * Spec: specs/ai-gateway/governance/departments.feature

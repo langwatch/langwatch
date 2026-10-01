@@ -1,10 +1,10 @@
-import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   type OrganizationUserRole,
   type organizationManagementRestInviteSchema,

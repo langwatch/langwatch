@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuthzApi, AuthzCanInput } from "@langwatch/authz-contract";
 import type {
   DomainClaimLicenseAuthority,
@@ -11,6 +10,7 @@ import {
   SsoConnectionNotFoundError,
   type SsoConnectionState,
 } from "@langwatch/identity-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 import type {
   SsoConnectionRegistrationRepository,

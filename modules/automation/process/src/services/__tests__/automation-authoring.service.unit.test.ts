@@ -1,4 +1,3 @@
-import { createApiFixture } from "@langwatch/api-fixture";
 import type { Trigger } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
@@ -9,6 +8,7 @@ import type { Trigger } from "@langwatch/automation-contract";
  */
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { SilentLogger } from "../../__tests__/fixtures/graph-activity.fixture.ts";

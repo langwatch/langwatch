@@ -1,5 +1,4 @@
 import type { Agent, AgentApi, AgentType } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -10,6 +9,7 @@ import {
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
 /**
