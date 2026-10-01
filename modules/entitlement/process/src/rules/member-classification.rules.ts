@@ -1,4 +1,4 @@
-import { OrganizationUserRole } from "@langwatch/authz-contract";
+import { OrganizationUserRole } from "@langwatch/authorization";
 export type MemberType = "FullMember" | "LiteMember";
 export type RoleChangeType = "no-change" | "lite-to-full" | "full-to-lite";
 export function isViewOnlyPermission(permission: string): boolean {
