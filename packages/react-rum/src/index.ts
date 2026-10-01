@@ -1,5 +1,15 @@
 /** React RUM: correlates browser traces with backend traces. See ADR-058. */
 
+export {
+  ATTR_BROWSER_ERROR_SOURCE,
+  BROWSER_ERROR_MAX_LENGTH,
+  BROWSER_ERROR_MAX_PER_WINDOW,
+  BROWSER_ERROR_WINDOW_MS,
+  createErrorGate,
+  describeErrorValue,
+  sanitiseErrorMessage,
+  startBrowserErrorCapture,
+} from "./browserErrors.ts";
 export { startBrowserTracing } from "./browserTracing.ts";
 export {
   ATTR_NAVIGATION_FROM_PATH,
