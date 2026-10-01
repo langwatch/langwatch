@@ -30,8 +30,8 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { prisma } from "~/server/db";
-import { models } from "../config/models";
 import { handleAuthRequest } from "../auth-request";
+import { models } from "../config/models";
 
 const BASE_URL = "http://localhost:3000";
 const CLIENT_ID = "azure-client";

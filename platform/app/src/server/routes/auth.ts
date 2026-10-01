@@ -18,8 +18,8 @@ import { getServerAuthSession } from "~/server/auth";
 import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
-import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { handleAuthRequest } from "~/server/better-auth/auth-request";
+import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import {
   redirectFailedSignInCallback,
