@@ -14,6 +14,7 @@ import {
   normalizeDomain,
   normalizeIdentifierValue,
   qualifySsoDomainOwnership,
+  SsoDomainNotVerifiedError,
   SsoExistingAccountUnconfirmedError,
 } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
@@ -35,6 +36,20 @@ function refuseUnconfirmed({
   detail: string;
 }): SSOUserResolution {
   const error = new SsoExistingAccountUnconfirmedError(detail);
+  logger.info(
+    { code: error.code, providerId },
+    `single sign-on link refused: ${detail}`,
+  );
+  return { action: "reject", code: error.code };
+}
+
+/** The refusal for a confirmed account the provider did not vouch for and
+ *  the connection has no domain proof for, so the screen can say which proof
+ *  is missing instead of "account already exists". */
+function refuseUnprovedDomain(providerId: string): SSOUserResolution {
+  const detail =
+    "the provider sent no email verification claim and the connection has no qualified proof for the address's domain";
+  const error = new SsoDomainNotVerifiedError(detail);
   logger.info(
     { code: error.code, providerId },
     `single sign-on link refused: ${detail}`,
@@ -207,33 +222,14 @@ export class PrismaScimSsoUsers {
     input: SSOUserResolutionInput,
     user: { id: string; deactivatedAt: Date | null },
   ): Promise<SSOUserResolution> {
-    if (input.protocol !== "saml") return CONTINUE;
     if (user.deactivatedAt) return REFUSE;
-    const userId = user.id;
-    const conflict = await database.identifier.findFirst({
-      where: {
-        userId: { not: userId },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-        OR: [
-          {
-            value: {
-              equals: normalizeIdentifierValue(input.providerUser.email),
-              mode: "insensitive",
-            },
-          },
-          {
-            issuer: input.accountKey.issuer,
-            providerAccountId: input.accountKey.accountId,
-          },
-        ],
-      },
-      select: { id: true },
-    });
-    if (conflict) return REFUSE;
+    if (await this.#identityHeldElsewhere(database, input, user.id)) {
+      return REFUSE;
+    }
 
     // Native linking rechecks the exact issuer/subject owner and provider.
     // A signed SAML attribute proves this assertion, not local email status.
-    return { action: "link", userId, profile: "preserve" };
+    return { action: "link", userId: user.id, profile: "preserve" };
   }
 
   /**
@@ -245,7 +241,11 @@ export class PrismaScimSsoUsers {
    * this selects the account itself when the connection has proved the
    * address's domain, the same evidence that links an unconfirmed one below.
    * A provider that sends the flag keeps better-auth's own link, and Cloud
-   * keeps better-auth's rule.
+   * keeps better-auth's rule. Entra ID's `xms_edov: true` counts as the
+   * provider's word, as it does for the account-create hook, so it links
+   * without a domain proof. Without either, the refusal names the missing
+   * domain proof: the person signing in is often the administrator testing
+   * the connection, and verifying the domain is what they can do next.
    */
   async #resolveConfirmedOidcUser(
     database: Prisma.TransactionClient,
@@ -257,8 +257,11 @@ export class PrismaScimSsoUsers {
     if (await this.#holdsThisBinding(database, input, user.id)) {
       return CONTINUE;
     }
-    if (!(await this.#connectionProvesDomainOf(database, input))) {
-      return CONTINUE;
+    if (
+      emailVerificationOf(input) !== "verified" &&
+      !(await this.#connectionProvesDomainOf(database, input))
+    ) {
+      return refuseUnprovedDomain(input.providerId);
     }
     if (await this.#identityHeldElsewhere(database, input, user.id)) {
       return REFUSE;

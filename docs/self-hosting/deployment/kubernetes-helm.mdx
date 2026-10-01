@@ -294,6 +294,8 @@ kubectl -n langwatch get ingress
 kubectl -n langwatch logs deploy/langwatch-app --tail=50
 ```
 
+Then follow [First run](/self-hosting/first-run) to create the first account, add the license and connect your identity provider.
+
 ## High-Availability Deployment
 
 For HA with replicated ClickHouse, multiple app/worker replicas, and PodDisruptionBudgets. This configuration requests approximately **~36 CPU and ~84 Gi RAM** across all pods:

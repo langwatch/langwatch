@@ -4,6 +4,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { HandledErrorAlert, readHandledError } from "~/features/errors";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { SignInError } from "~/pages/auth/error";
 import { api } from "~/utils/api";
 import { safeRedirectTarget, signIn, useSession } from "~/utils/auth-client";
@@ -530,6 +531,14 @@ function signInGreeting(recoveredEmail: string | null): {
   };
 }
 
+/** What the log-in door says about an unknown address where no confirmation
+ *  link can be sent. */
+const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
+  title: "There is no account for that email address yet",
+  describe:
+    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
+} as const;
+
 /**
  * The address routed to no account (ADR-117, revision 2026-08-25).
  *
@@ -545,6 +554,9 @@ function signInGreeting(recoveredEmail: string | null): {
  *
  * It sends the same confirmation link as the sign-up door. No password or
  * passkey control is mounted until that link returns its single-use proof.
+ *
+ * An installation with no email provider cannot send that link, so there the
+ * card offers nothing it cannot do and says what is missing instead.
  */
 function NoAccountYet({
   email,
@@ -565,6 +577,28 @@ function NoAccountYet({
 }) {
   const guidance = reasonCode ? signInRoutingReasonCopy(reasonCode) : null;
   const requestVerification = api.auth.requestSignUpVerification.useMutation();
+  // Only an explicit false: the read may still be on its way, and until it
+  // says otherwise the installation is assumed to send email as most do.
+  const cannotSendEmail = usePublicEnv().data?.HAS_EMAIL_PROVIDER_KEY === false;
+
+  if (cannotSendEmail) {
+    return (
+      <AuthCard
+        title={NO_ACCOUNT_WITHOUT_EMAIL_COPY.title}
+        intro={NO_ACCOUNT_WITHOUT_EMAIL_COPY.describe}
+        finePrint={<AuthFinePrint />}
+      >
+        <VStack width="full" align="stretch" gap="14px">
+          <div data-testid="unknown-identifier" hidden>
+            {email}
+          </div>
+          <AuthSecondaryButton onClick={onUseDifferentEmail}>
+            Use a different email
+          </AuthSecondaryButton>
+        </VStack>
+      </AuthCard>
+    );
+  }
 
   const beginSignUp = async () => {
     try {

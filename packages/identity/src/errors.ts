@@ -559,22 +559,14 @@ export class SsoIssuerUnreachableError extends SsoConnectionCommandRefusedError 
  * fix is to make one equal the other.
  */
 export class SsoIssuerMismatchError extends SsoConnectionCommandRefusedError {
-  constructor({
-    expected,
-    received,
-    at,
-  }: {
-    expected: string;
-    received: string;
-    at: "registration" | "sign-in";
-  }) {
+  constructor({ expected, received }: { expected: string; received: string }) {
     super("sso_issuer_mismatch", "sso_issuer_mismatch", {
       httpStatus: 422,
       fault: "customer",
       meta: { expected, received },
       reasons: [
         new Error(
-          `${at === "registration" ? "the discovery document" : "the id token"} names issuer ${received}, the connection holds ${expected}`,
+          `the discovery document names issuer ${received}, the connection was registered with ${expected}`,
         ),
       ],
     });

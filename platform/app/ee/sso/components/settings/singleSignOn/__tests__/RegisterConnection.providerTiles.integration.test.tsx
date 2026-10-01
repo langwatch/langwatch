@@ -90,4 +90,22 @@ describe("given the identity provider picker", () => {
       ).toBeDefined();
     });
   });
+
+  describe("when Microsoft Entra ID is picked", () => {
+    /** @scenario "The registration form says where Microsoft Entra ID shows its issuer" */
+    it("says where the issuer is found and points at App registrations", () => {
+      renderPicker();
+      fireEvent.click(screen.getByTestId("identity-provider-entra"));
+
+      expect(
+        screen.getByText(/OpenID Connect metadata document address/),
+      ).toBeDefined();
+      expect(
+        screen.getByText(/remove \/\.well-known\/openid-configuration/),
+      ).toBeDefined();
+      expect(
+        screen.getByText(/App registrations → New registration/),
+      ).toBeDefined();
+    });
+  });
 });

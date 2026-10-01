@@ -31,7 +31,8 @@ describe("deploymentSignInFor", () => {
     it.each([
       ["okta", "Okta"],
       ["google", "Google"],
-      ["oidc", "OpenID Connect"],
+      ["auth0", "Auth0"],
+      ["oidc", "single sign-on"],
     ])("names /api/auth/callback/%s", (provider, name) => {
       expect(deploymentSignInFor({ provider, baseUrl: BASE_URL })).toEqual({
         name,

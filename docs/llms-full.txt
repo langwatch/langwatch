@@ -60290,57 +60290,9 @@ Never commit secrets to version control. In production, use a secrets manager (A
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NEXTAUTH_PROVIDER` | Auth provider: `email`, `google`, `github`, `gitlab`, `azure-ad`, `okta`, `auth0`. Anything else, or a provider whose credentials are missing, starts in email mode. | `email` |
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
-### SSO Provider Variables
-
-Each SSO provider requires specific variables. See [SSO Configuration](/self-hosting/configuration/sso) for detailed setup guides.
-
-**Auth0:**
-
-| Variable | Description |
-|----------|-------------|
-| `AUTH0_CLIENT_ID` | Auth0 application client ID |
-| `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
-| `AUTH0_ISSUER` | Auth0 issuer URL (e.g. `https://your-tenant.auth0.com`) |
-
-**Azure AD:**
-
-| Variable | Description |
-|----------|-------------|
-| `AZURE_AD_CLIENT_ID` | Azure AD application client ID |
-| `AZURE_AD_CLIENT_SECRET` | Azure AD application client secret |
-| `AZURE_AD_TENANT_ID` | Azure AD tenant ID |
-
-**GitHub:**
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_CLIENT_ID` | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth app client secret |
-
-**GitLab:**
-
-| Variable | Description |
-|----------|-------------|
-| `GITLAB_CLIENT_ID` | GitLab OAuth app client ID |
-| `GITLAB_CLIENT_SECRET` | GitLab OAuth app client secret |
-
-**Google:**
-
-| Variable | Description |
-|----------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-
-**Okta:**
-
-| Variable | Description |
-|----------|-------------|
-| `OKTA_CLIENT_ID` | Okta application client ID |
-| `OKTA_CLIENT_SECRET` | Okta application client secret |
-| `OKTA_ISSUER` | Okta issuer URL |
+A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
 
 ## Services
 
@@ -61055,402 +61007,144 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-Configure an organization's identity provider in **Settings > Authentication >
-Identity provider**. The setup walks you through provider details, domain
-verification, a test sign-in and a recovery administrator. See the
-[SSO setup guide](/platform/sso) for the full journey and screenshots.
+## Setting up a connection
 
-This page also covers the deployment-wide provider configured through
-`NEXTAUTH_PROVIDER`. Keep the existing provider settings when upgrading an
-installation that already uses them. Changing an organization's connection
-and changing the deployment's default provider are separate actions.
+A connection is an organization's link to its identity provider, over OpenID
+Connect or SAML. To set one up, open **Settings > Authentication > Identity
+provider** as an organization administrator and give:
+
+- the provider's issuer, client id and client secret, or its SAML metadata
+- the email domain the connection signs in
+- a test sign-in through the provider
+- an administrator who can still sign in if the provider is unavailable
+
+See the [SSO setup guide](/platform/sso) for the full journey and screenshots,
+and [First run](/self-hosting/first-run) for the steps on a fresh install.
 
 On a licensed installation, a domain added in the setup page is verified right
 away, with no DNS record or file to publish. A domain belongs to one
 organization per installation. When the installation has more than one
 organization, only a platform operator listed in `ADMIN_EMAILS` adds a domain
-without proof; other organization administrators still complete the DNS or
-file check.
+without proof. Other organization administrators complete the DNS or file
+check.
+
+## Before you start
+
+- Activate an [Enterprise license](/self-hosting/licensing). Single sign-on
+  turns on without a restart once the license is active.
+- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
+  open LangWatch. The redirect URI the identity provider calls uses that
+  address.
+- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It
+  encrypts the stored client secrets, and a new value cannot decrypt the
+  existing ones.
+
+## Redirect URI
+
+Every connection has its own redirect URI, shown on the setup page:
+
+```
+https://<your LangWatch host>/api/auth/sso/callback/<connection id>
+```
+
+A SAML connection posts to its assertion consumer service instead, also shown
+on the setup page:
+
+```
+https://<your LangWatch host>/api/auth/sso/saml2/sp/acs/<connection id>
+```
+
+The connection id stays the same for the life of the connection, so the
+address registered in the identity provider does not change.
+
+To fix a wrong issuer, client id or client secret, or to replace SAML metadata,
+edit the connection with the pencil button next to its issuer on the setup
+page. Editing keeps the connection id, so the redirect URI, the domains and who
+the connection admits stay the same. A blank client secret keeps the current
+one.
+
+The new settings are checked the same way as at registration. If they are
+refused, the connection keeps its current settings. The protocol of a
+connection cannot be changed.
+
+## Issuer
+
+Enter the issuer exactly as it appears in the `iss` claim of the provider's
+ID tokens. When you register the connection, LangWatch fetches
+`<issuer>/.well-known/openid-configuration` and saves the `issuer` value from
+that response, so a trailing slash you typed or left out is corrected. If the
+response gives a different issuer, you get an error and the connection is not saved.
+
+| Provider | Issuer |
+|----------|--------|
+| Microsoft Entra ID | `https://login.microsoftonline.com/<tenant id>/v2.0` |
+| Okta | `https://<your org>.okta.com`, or `https://<your org>.okta.com/oauth2/<server id>` for a custom authorization server |
+| Auth0 | `https://<your tenant>.auth0.com/` |
+| Google Workspace | `https://accounts.google.com` |
+| AWS Cognito | `https://cognito-idp.<region>.amazonaws.com/<user pool id>` |
+| Keycloak | `https://<your host>/realms/<realm>` |
+| OneLogin | `https://<your subdomain>.onelogin.com/oidc/2` |
+| GitLab | `https://gitlab.com`, or your GitLab host |
+| Any other OpenID Connect provider | The address its discovery document is published under |
+
+Check an issuer by fetching its discovery document:
+
+```bash
+ISSUER="https://login.microsoftonline.com/<tenant id>/v2.0"
+curl "$ISSUER/.well-known/openid-configuration"
+```
+
+Register the client with the authorization code flow and the `openid`,
+`email` and `profile` scopes. GitHub sign-in is OAuth without OpenID Connect,
+so it cannot be a connection.
+
+### Microsoft Entra ID
+
+- Register LangWatch as an app in Entra ID and add the redirect URI under the
+  **Web** platform.
+- Use the issuer of the tenant that holds the app registration,
+  `https://login.microsoftonline.com/<tenant id>/v2.0`. You cannot register
+  the `common`, `organizations` or `consumers` endpoints: an ID token from them
+  has the user's own tenant in `iss`.
+- LangWatch reads the address from the `email` claim, so each user needs a
+  mail address in Entra ID. In **Token configuration**, add the optional
+  `email` and `xms_edov` claims to the ID token.
+
+If you see "Your identity provider names a different issuer" on the test
+sign-in, compare the two issuers it lists. A guest user's token can carry
+their home tenant. Set the issuer on the connection to the app's tenant
+issuer.
 
 ## Existing email and password accounts
 
-On a self-hosted installation, a connection set up in **Settings >
-Authentication** links a sign-in to an existing email and password account
-with the same address once the connection has verified the address's domain.
-This also covers accounts whose address was never confirmed, which is every
-account on an installation without [outbound email](/self-hosting/configuration/email).
+On a self-hosted installation, a sign-in through a connection links to an
+existing email and password account with the same address once the connection
+has verified the address's domain. This includes accounts whose address was
+never confirmed, which is every account on an installation without
+[outbound email](/self-hosting/configuration/email).
 
 The identity provider does not have to send `email_verified`. Microsoft Entra
-ID never sends it, and SAML has no such attribute. A provider that reports the
-address as unverified, with `email_verified: false` or with Entra ID's
-`xms_edov: false`, is refused, and the sign-in shows "An account with this
-address already exists".
+ID never sends it, and SAML has no such attribute. A sign-in where the provider
+reports the address as unverified, with `email_verified: false` or with Entra
+ID's `xms_edov: false`, is refused with "An account with this address already
+exists".
 
 On LangWatch Cloud, a sign-in links to an existing account only when the
 address is confirmed and the provider sends `email_verified: true`.
 
-### Microsoft Entra ID
-
-Register LangWatch as an OpenID Connect app in Entra ID and use the tenant
-issuer, `https://login.microsoftonline.com/<tenant-id>/v2.0`. LangWatch reads
-the address from the `email` claim, so each user needs a mail address in
-Entra ID. In **Token configuration**, you can add the optional `email` and
-`xms_edov` claims to the ID token. With `xms_edov`, a user whose address is on
-a domain the tenant has not verified is refused.
-
 ## Upgrading an existing installation
 
 Identity and access migrations run automatically as the app starts, one
-organization at a time. An organization that migrates cleanly is switched
-over immediately; one whose historical data needs attention is held on its
-existing sign-in path without blocking the deployment. Keep the current
-provider configuration and credentials during the upgrade. See the
+organization at a time. Each organization switches over as soon as it migrates
+cleanly. When an organization's historical data needs attention, it stays on
+its existing sign-in path and the deployment starts anyway. See the
 [upgrade guide](/self-hosting/upgrade#automatic-identity-and-access-migration)
 for what still blocks startup and how to check and retry a held organization.
 
-## Before you start
-
-- Activate an [Enterprise license](/self-hosting/licensing).
-- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
-  open LangWatch. Your provider's callback must use that address too.
-- Configure [outbound email](/self-hosting/configuration/email) and verify a
-  recovery administrator can receive a password-reset email.
-- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It protects
-  stored provider credentials; replacing it prevents existing values from
-  being decrypted.
-
-For organization-managed connections, follow the callback and SAML service
-provider details shown in the setup page. They identify that connection. The
-callback pattern below applies to the deployment-wide providers in this guide.
-
-<Warning>
-SSO requires an Enterprise license. A configured deployment-wide provider does
-not grant a license by itself. If the license gate refuses federation,
-LangWatch falls back to email sign-in. Existing users need working outbound
-email to recover through **Forgot password**.
-
-Before upgrading an installation where everyone uses SSO, activate the license
-or verify email recovery works. See [Editions and licensing](/self-hosting/licensing).
-</Warning>
-
-## Supported Providers
-
-| Provider | `NEXTAUTH_PROVIDER` value | Requires |
-|----------|--------------------------|----------|
-| Email/Password | `email` (default) | No additional configuration |
-| Auth0 | `auth0` | Client ID, Client Secret, Issuer |
-| AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
-| Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
-| GitHub | `github` | Client ID, Client Secret |
-| GitLab | `gitlab` | Client ID, Client Secret |
-| Google | `google` | Client ID, Client Secret |
-| Okta | `okta` | Client ID, Client Secret, Issuer |
-| OneLogin | `onelogin` | Client ID, Client Secret, Issuer |
-| Any other OpenID Connect provider | `oidc` | Client ID, Client Secret, Issuer |
-
-## OAuth Redirect URL
-
-When configuring your identity provider, set the redirect/callback URL to:
-
-```
-https://your-langwatch-domain.com/api/auth/callback/{provider}
-```
-
-Replace `{provider}` with: `auth0`, `azure-ad`, `cognito`, `github`, `gitlab`, `google`, `okta`, `onelogin`, or `oidc`. This is the same value you set as `NEXTAUTH_PROVIDER`.
-
-<Note>
-A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client credentials are missing, starts the deployment in email mode and logs which provider it could not mount. That keeps a licensed deployment signable-in while you correct the value, rather than pointing the sign-in page at an identity provider that was never wired up.
-</Note>
-
-## Provider Setup
-
-### Email/Password
-
-The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
-
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive.
-
-With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
-
-A licensed deployment-wide provider normally owns sign-in, so local password
-sign-in and reset are unavailable. Set `LOCAL_PASSWORDS_ENABLED=on` only when
-you intend the deployment to offer local passwords alongside that provider.
-This does not bypass an organization's SSO policy: an address routed through
-an active connection still needs that connection, unless it has a valid
-recovery-administrator binding.
-
-When federation is unavailable because the deployment is unlicensed, email
-sign-in and password reset remain available. Test recovery before relying on
-it during an outage.
-
-### Auth0
-
-1. Create an application in the [Auth0 Dashboard](https://manage.auth0.com/)
-2. Set **Allowed Callback URLs** to `https://your-domain.com/api/auth/callback/auth0`
-3. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: auth0
-    providers:
-      auth0:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: auth0ClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: auth0ClientSecret }
-        issuer:
-          value: "https://your-tenant.auth0.com"
-```
-
-Or via environment variables:
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `auth0` |
-| `AUTH0_CLIENT_ID` | Your Auth0 client ID |
-| `AUTH0_CLIENT_SECRET` | Your Auth0 client secret |
-| `AUTH0_ISSUER` | `https://your-tenant.auth0.com` |
-
-### AWS Cognito
-
-1. In the [Cognito console](https://console.aws.amazon.com/cognito/), open your user pool and give it a hosted-UI domain if it does not have one yet (**App integration > Domain**)
-2. Create an app client with a client secret, and set its **Allowed callback URL** to `https://your-domain.com/api/auth/callback/cognito`
-3. Under the app client's login pages, enable the **Authorization code grant** flow and the `openid`, `email` and `profile` scopes
-4. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: cognito
-    providers:
-      cognito:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: cognitoClientSecret }
-        issuer:
-          value: "https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_abc123"
-```
-
-Or via environment variables:
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `cognito` |
-| `COGNITO_CLIENT_ID` | Your app client ID |
-| `COGNITO_CLIENT_SECRET` | Your app client secret |
-| `COGNITO_ISSUER` | `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` |
-
-<Note>
-The issuer is the user pool's own issuer, not the hosted-UI domain. LangWatch reads the hosted-UI endpoints from the issuer's discovery document, so the domain never has to be configured separately. You can confirm a pool's issuer is reachable with:
-
-```bash
-curl https://cognito-idp.<region>.amazonaws.com/<userPoolId>/.well-known/openid-configuration
-```
-</Note>
-
-### Azure AD
-
-1. Register an application in [Azure Portal > App registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade)
-2. Add a **Redirect URI**: `https://your-domain.com/api/auth/callback/azure-ad`
-3. Create a client secret under **Certificates & secrets**
-4. Configure in Helm:
-
-```yaml
-app:
-  nextAuth:
-    provider: azure-ad
-    providers:
-      azureAd:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: azureClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: azureClientSecret }
-        tenantId:
-          value: "your-tenant-id"
-```
-
-<Note>
-The provider is `azure-ad` while its credentials sit under `providers.azureAd`. The first is the value LangWatch selects on, the second is the chart's key for the `AZURE_AD_*` variables.
-</Note>
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `azure-ad` |
-| `AZURE_AD_CLIENT_ID` | Application (client) ID |
-| `AZURE_AD_CLIENT_SECRET` | Client secret value |
-| `AZURE_AD_TENANT_ID` | Directory (tenant) ID |
-
-### GitHub
-
-1. Create an OAuth App in [GitHub Developer Settings](https://github.com/settings/developers)
-2. Set **Authorization callback URL** to `https://your-domain.com/api/auth/callback/github`
-3. Configure:
-
-```yaml
-app:
-  nextAuth:
-    provider: github
-    providers:
-      github:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: githubClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: githubClientSecret }
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `github` |
-| `GITHUB_CLIENT_ID` | OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | OAuth app client secret |
-
-### GitLab
-
-1. Create an application in [GitLab > Applications](https://gitlab.com/-/profile/applications)
-2. Set **Redirect URI** to `https://your-domain.com/api/auth/callback/gitlab`
-3. Select scopes: `read_user`, `openid`, `profile`, `email`
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `gitlab` |
-| `GITLAB_CLIENT_ID` | Application ID |
-| `GITLAB_CLIENT_SECRET` | Application secret |
-
-### Google
-
-1. Create credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Add an **Authorized redirect URI**: `https://your-domain.com/api/auth/callback/google`
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `google` |
-| `GOOGLE_CLIENT_ID` | OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | OAuth client secret |
-
-### Okta
-
-1. Create an application in [Okta Admin Console](https://developer.okta.com/)
-2. Set **Sign-in redirect URI** to `https://your-domain.com/api/auth/callback/okta`
-
-```yaml
-app:
-  nextAuth:
-    provider: okta
-    providers:
-      okta:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oktaClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oktaClientSecret }
-        issuer:
-          value: "https://your-org.okta.com"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `okta` |
-| `OKTA_CLIENT_ID` | Client ID |
-| `OKTA_CLIENT_SECRET` | Client secret |
-| `OKTA_ISSUER` | `https://your-org.okta.com` |
-
-### OneLogin
-
-1. In the [OneLogin Admin portal](https://www.onelogin.com/), add an **OpenID Connect (OIDC)** application
-2. Set the **Redirect URI** to `https://your-domain.com/api/auth/callback/onelogin`
-3. Under **SSO**, set the application type to **Web** so it is issued a client secret, and note the Client ID and Client Secret
-
-```yaml
-app:
-  nextAuth:
-    provider: onelogin
-    providers:
-      onelogin:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oneloginClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oneloginClientSecret }
-        issuer:
-          value: "https://your-subdomain.onelogin.com/oidc/2"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `onelogin` |
-| `ONELOGIN_CLIENT_ID` | Client ID |
-| `ONELOGIN_CLIENT_SECRET` | Client secret |
-| `ONELOGIN_ISSUER` | `https://your-subdomain.onelogin.com/oidc/2` |
-
-<Note>
-If OneLogin sits behind another identity provider, for example a Cognito user pool that federates to it, point LangWatch at whichever one it talks to directly and let that one handle the hop. LangWatch only needs one OIDC issuer.
-</Note>
-
-### Any other OpenID Connect provider
-
-Any provider that publishes an OpenID Connect discovery document and supports the authorization code flow with PKCE works without being named above: Keycloak, Authentik, Zitadel, Ping, JumpCloud, a self-hosted IdP, whatever you run.
-
-1. Register an OIDC client with your provider, with the authorization code flow and the `openid`, `email` and `profile` scopes
-2. Set its redirect URI to `https://your-domain.com/api/auth/callback/oidc`
-
-```yaml
-app:
-  nextAuth:
-    provider: oidc
-    providers:
-      oidc:
-        clientId:
-          secretKeyRef: { name: langwatch-sso, key: oidcClientId }
-        clientSecret:
-          secretKeyRef: { name: langwatch-sso, key: oidcClientSecret }
-        issuer:
-          value: "https://idp.example.com"
-```
-
-| Variable | Value |
-|----------|-------|
-| `NEXTAUTH_PROVIDER` | `oidc` |
-| `OIDC_CLIENT_ID` | Client ID |
-| `OIDC_CLIENT_SECRET` | Client secret |
-| `OIDC_ISSUER` | Whatever your provider publishes `.well-known/openid-configuration` under |
-
-<Note>
-Check the issuer is right by fetching its discovery document, which is exactly what LangWatch does at sign-in:
-
-```bash
-curl https://idp.example.com/.well-known/openid-configuration
-```
-
-JSON back means the issuer is right. LangWatch then reads `authorization_endpoint`, `token_endpoint` and `userinfo_endpoint` from that document, so all three have to be there, and the client you registered has to allow the authorization code flow with PKCE.
-</Note>
-
-## Domain-to-Organization Mapping
-
-For on-premises deployments with SSO, map email domains to organizations:
-
-```sql
--- Connect to PostgreSQL and run:
-UPDATE "Organization"
-SET "ssoProvider" = 'okta',
-    "ssoDomain" = 'yourcompany.com'
-WHERE "id" = 'your-org-id';
-```
-
-This ensures users with `@yourcompany.com` emails are automatically associated with the correct organization.
-
-## Migrating from Email/Password to SSO
-
-An SSO sign-in joins an existing email/password account only when that account's address is confirmed. Otherwise the sign-in is refused with "Account already exists", because an unconfirmed account may have been registered by somebody else.
-
-1. Before you switch the provider, have each email/password user confirm their address: **Settings > Security**, **Send the link again** next to their address, then open the link in the same browser. This needs [outbound email](/self-hosting/configuration/email).
-2. Enable SSO by setting the provider configuration above.
-3. Each confirmed user signs in through SSO and lands on their existing account, with the same data, projects and permissions.
-
-Setting `"pendingSsoSetup"` on a user only shows them a banner asking them to sign in through SSO. It does not link the account.
-
-<Note>
-Users keep their existing data, projects, and permissions after the SSO migration. The migration only changes their authentication method.
-</Note>
+Installations that configure a sign-in provider in the deployment settings
+keep working after an upgrade, with the same redirect URI. To move to a
+connection set up in **Settings**, follow
+[Move to your own identity provider](/platform/sso-update).
 
 ---
 
@@ -62043,7 +61737,7 @@ Topic-specific configuration pages:
 
 - [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
 - [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
-- [SSO](/self-hosting/configuration/sso) for OIDC / SAML wiring
+- [SSO](/self-hosting/configuration/sso) for OIDC and SAML connections
 - [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for `app.license.key`, which takes an activation code (needs outbound access to `connect.langwatch.ai`) or a signed license key (works offline)
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
 - [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
@@ -62090,6 +61784,8 @@ RV2=$(kubectl -n langwatch get secret langwatch-app-secrets -o jsonpath='{.metad
 ```
 
 The two `resourceVersion` values should be identical because the chart no longer renders the Secret on the operator-managed path.
+
+Then follow [First run](/self-hosting/first-run) to create the first account, add the license and connect your identity provider.
 
 ## Legacy: autogen.enabled=true under ArgoCD
 
@@ -62288,6 +61984,7 @@ For production, migrate to the [Kubernetes Helm chart](/self-hosting/deployment/
 
 ## Next Steps
 
+- [First run](/self-hosting/first-run): Create the first account, add the license and connect your identity provider
 - [Docker Images](/self-hosting/deployment/docker-images): Learn about each container image
 - [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm): Production deployment
 - [Environment Variables](/self-hosting/configuration/environment-variables): Full configuration reference
@@ -62731,6 +62428,8 @@ kubectl -n langwatch get ingress
 # Check logs
 kubectl -n langwatch logs deploy/langwatch-app --tail=50
 ```
+
+Then follow [First run](/self-hosting/first-run) to create the first account, add the license and connect your identity provider.
 
 ## High-Availability Deployment
 
@@ -63306,6 +63005,36 @@ If your Gateway is in a different namespace from the routes, set `allowedRoutes.
 ## Network policies
 
 `gateway.networkPolicy.enabled` is off by default. When you turn it on, the default `gateway.networkPolicy.ingressFrom` admits only the `ingress-nginx` namespace and Prometheus. Change it to the namespace where your proxy pods run, for example `envoy-gateway-system`, or the gateway refuses that traffic.
+
+---
+
+# FILE: ./self-hosting/first-run.mdx
+
+---
+title: First run
+description: "From a fresh install to single sign-on: the first account, the license and the identity provider connection."
+sidebarTitle: First run
+keywords: first run, setup, first account, license, activation code, sso, single sign-on, identity provider, self-hosted
+---
+
+## Steps
+
+These steps take a fresh install to single sign-on through your own identity provider. They apply to [Helm](/self-hosting/deployment/kubernetes-helm), [ArgoCD](/self-hosting/deployment/argocd) and [Docker Compose](/self-hosting/deployment/docker-compose) installs alike.
+
+1. **Install LangWatch.** No email provider is needed for these steps.
+2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey, since step 5 links single sign-on to the password account. The first account is an ordinary organization administrator. It has no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it.
+3. **Add the license.** Open **Settings > License**. Enter the activation code LangWatch sent you, which needs outbound HTTPS to `connect.langwatch.ai` (see [Connect](/self-hosting/connect)). On an install without that access, paste or upload the license key instead (see [Editions and licensing](/self-hosting/licensing)). Single sign-on turns on once the license is active, with no restart.
+4. **Connect your identity provider.** Open **Settings > Authentication > Identity provider** and follow the setup:
+   1. Register the connection with the issuer, client id and client secret from your identity provider, or with its SAML metadata.
+   2. Copy the redirect URI the page shows into your identity provider. It has the form `https://<your LangWatch host>/api/auth/sso/callback/<connection id>`. In Microsoft Entra ID, add it under the **Web** platform.
+   3. Add your domain.
+   4. Run the test sign-in.
+   5. Name an administrator who can still get in if the identity provider is unavailable.
+   6. Choose who the connection lets in.
+   7. Select **Go live**.
+5. **Sign in through single sign-on.** The administrator's password account links to the identity provider on its first single sign-on sign-in, which is the test sign-in in step 4. You keep the same account, organization and projects.
+
+See [SSO configuration](/self-hosting/configuration/sso) for the redirect URIs, the issuer each provider uses and how existing accounts link.
 
 ---
 
@@ -66030,8 +65759,8 @@ langevals:
     limits:   { cpu: 500m, memory: 4Gi }
 ```
 
-The limit is a ceiling, not a reservation, so a generous one costs nothing until
-an evaluator actually loads a model.
+The limit is a ceiling, not a reservation, so a generous one uses no extra
+memory until an evaluator actually loads a model.
 
 To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
 
@@ -66113,17 +65842,21 @@ kubectl -n langwatch exec deploy/langwatch-app -- \
 
 ### SSO callback URL mismatch
 
-The callback URL configured in your identity provider must exactly match:
+The redirect URI registered in your identity provider must exactly match the one shown on the connection's setup page:
 
 ```
-https://your-langwatch-domain.com/api/auth/callback/{provider}
+https://<your LangWatch host>/api/auth/sso/callback/<connection id>
 ```
 
 Check that `app.http.publicUrl` matches your actual domain (including `https://`).
 
-### "Email already exists" during SSO migration
+### Issuer mismatch on the test sign-in
 
-This happens when a user already has an email/password account. Follow the [SSO migration steps](/self-hosting/configuration/sso#migrating-from-emailpassword-to-sso) to link existing accounts.
+If you see "Your identity provider names a different issuer" on the test sign-in, compare the two issuers it lists: the connection's, and the one in the `iss` claim of the ID token. See [Issuer](/self-hosting/configuration/sso#issuer).
+
+### Existing account refused during SSO sign-in
+
+When SSO sign-in says "An account with this address already exists", the identity provider reported the address as unverified, or the connection has not verified the address's domain. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts).
 
 ### Sessions expire too quickly
 
@@ -67061,7 +66794,7 @@ The first start runs a migration preflight before the app reports ready. `--time
 
 **Provider setting.** The chart now passes `app.nextAuth.provider` to the app as `AUTH_PROVIDER`. `NEXTAUTH_PROVIDER` is still read and logs a deprecation warning. If you select the provider with `NEXTAUTH_PROVIDER` in `app.extraEnvs`, the chart leaves the setting to you, as before. Outside the chart, set `AUTH_PROVIDER`; when both are set it wins.
 
-**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Migrating from Email/Password to SSO](/self-hosting/configuration/sso) on the SSO page.
+**Moving password users to SSO.** An SSO sign-in joins an existing password account only once its address is confirmed. See [Existing email and password accounts](/self-hosting/configuration/sso#existing-email-and-password-accounts) for how linking works in the current release.
 
 **Okta and Auth0.** The id token is now verified: its `iss` must equal the `issuer` in the provider's discovery document. A provider behind a proxy that rewrites one but not the other stops signing people in until the two agree.
 

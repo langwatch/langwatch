@@ -10,6 +10,7 @@ import {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
+  SSO_IDP_EDITABLE_STATES,
   SSO_VERIFICATION_FILE_PATH,
   SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
@@ -18,14 +19,17 @@ import {
   type SsoArrivalPolicy,
   SsoConnectionAlreadyRegisteredError,
   SsoConnectionDomainTakenError,
+  SsoConnectionInvalidTransitionError,
   SsoConnectionNotFoundError,
   type SsoConnectionState,
+  SsoCredentialsRequiredError,
   type SsoDomainClaim,
   SsoDomainClaimPendingError,
   SsoDomainFetchFailedError,
   SsoDomainFileNotFoundError,
   SsoDomainLookupFailedError,
   SsoDomainProofNotFoundError,
+  type SsoIdpDialing,
   SsoLicenseRequiredError,
   type SsoMigrationRoute,
   type SsoSelfServeAvailability,
@@ -53,10 +57,15 @@ import {
   selfServeRegistrationCommandId,
   selfServeRegistrationConnectionId,
 } from "./sso-connection-id";
-import type { SsoCredentialStore } from "./sso-credential-store";
+import type {
+  SsoCredentialKind,
+  SsoCredentialStore,
+} from "./sso-credential-store";
 import { serviceProviderDetailsFor } from "./sso-engine-provider";
 import {
+  parseSamlIdpConfig,
   type SsoIdpRegistration,
+  type SsoIdpUpdate,
   type SsoIssuerDiscoveryPort,
   validateOidcRegistration,
   validateSamlRegistration,
@@ -67,6 +76,7 @@ import type {
   SelfServeDnsRecordLocation,
   SelfServeDomainClaimView,
   SelfServeGoLiveView,
+  SelfServeIdentityProviderView,
   SelfServeIssuedDnsRecord,
   SelfServeMigrationView,
   SelfServeSetupView,
@@ -214,6 +224,9 @@ export interface SsoTestSignInLookup {
   findLatestForConnection(args: {
     organizationId: string;
     connectionId: string;
+    /** The connection's current issuer. A sign-in through an issuer the
+     *  connection no longer dials is not evidence for the one it dials now. */
+    issuer: string | null;
   }): Promise<SsoTestSignIn | null>;
 }
 
@@ -334,6 +347,10 @@ export class SsoSelfServeService {
       organizationId,
     });
     const nowMs = this.now();
+    const deploymentSignIn = deploymentSignInFor({
+      provider: await this.deps.deploymentProvider?.(),
+      baseUrl: this.deps.baseUrl,
+    });
     return {
       availability,
       serviceProvider: {
@@ -341,15 +358,15 @@ export class SsoSelfServeService {
           baseUrl: this.deps.baseUrl,
           connectionId: state?.connectionId ?? null,
         }),
-        deploymentSignIn: deploymentSignInFor({
-          provider: await this.deps.deploymentProvider?.(),
-          baseUrl: this.deps.baseUrl,
-        }),
+        deploymentSignIn,
       },
-      serviceProviderBeforeRegistration: serviceProviderDetailsFor({
-        baseUrl: this.deps.baseUrl,
-        connectionId: null,
-      }),
+      serviceProviderBeforeRegistration: {
+        ...serviceProviderDetailsFor({
+          baseUrl: this.deps.baseUrl,
+          connectionId: null,
+        }),
+        deploymentSignIn,
+      },
       connection: toConnectionView(state),
       legacyRoute: legacy
         ? { domain: legacy.ssoDomain, provider: legacy.ssoProvider }
@@ -447,6 +464,7 @@ export class SsoSelfServeService {
       this.deps.testSignIns.findLatestForConnection({
         organizationId,
         connectionId: connection.connectionId,
+        issuer: connection.idpMetadata.issuer,
       }),
       this.liveBindings({ organizationId }),
     ]);
@@ -511,6 +529,7 @@ export class SsoSelfServeService {
     const testSignIn = await this.deps.testSignIns.findLatestForConnection({
       organizationId,
       connectionId,
+      issuer: state.idpMetadata.issuer,
     });
     if (testSignIn === null) {
       throw new SsoActivationTestSignInMissingError(
@@ -583,6 +602,205 @@ export class SsoSelfServeService {
     await this.deps.connections().renameConnection({
       ...this.command({ organizationId, connectionId, actor }),
       name,
+    });
+  }
+
+  /**
+   * The connection's current identity provider settings, for the edit form.
+   * Null for a connection with none of its own (a grandfathered one dials
+   * the deployment's legacy provider).
+   */
+  async getIdentityProvider({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<SelfServeIdentityProviderView | null> {
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (state.source !== "self-serve") return null;
+    const { idpMetadata } = state;
+    if (state.type === "oidc") {
+      return {
+        protocol: "oidc",
+        issuer: idpMetadata.issuer,
+        clientId:
+          idpMetadata.clientIdRef === null
+            ? null
+            : await this.deps.credentials.read({
+                organizationId,
+                ref: idpMetadata.clientIdRef,
+              }),
+        hasClientSecret: idpMetadata.secretRef !== null,
+      };
+    }
+    const [certRef] = idpMetadata.certRefs;
+    const stored =
+      certRef === undefined
+        ? null
+        : await this.deps.credentials.read({ organizationId, ref: certRef });
+    const config = stored === null ? null : parseSamlIdpConfig(stored);
+    return {
+      protocol: "saml",
+      entryPoint: config?.entryPoint ?? null,
+      entityId: config?.entityId ?? idpMetadata.issuer,
+      metadataXml: config?.metadataXml ?? null,
+      certificate: config?.certificate ?? null,
+    };
+  }
+
+  /**
+   * Replace an existing connection's identity provider settings, keeping
+   * the connection id.
+   *
+   * The id is what the redirect address at the identity provider is keyed
+   * by (`/api/auth/sso/callback/<connection id>`), so fixing a wrong issuer
+   * this way leaves that address, the domains and their proofs, the arrival
+   * policy and every linked account where they are. Discarding and
+   * registering again would mint a new id and a new address.
+   *
+   * Checked exactly as a registration is, before anything is stored: a
+   * refused issuer (unreachable, mismatched, multi-tenant) or unreadable
+   * metadata changes nothing. A value that matches the stored one keeps its
+   * reference, so saving the form unchanged records nothing.
+   */
+  async updateIdentityProvider({
+    organizationId,
+    connectionId,
+    idp,
+    actor,
+  }: {
+    organizationId: string;
+    connectionId: string;
+    idp: SsoIdpUpdate;
+    actor: SelfServeActor;
+  }): Promise<void> {
+    await this.requireAvailable({ organizationId });
+    const state = await this.requireOrganizationConnection({
+      organizationId,
+      connectionId,
+    });
+    if (idp.protocol !== state.type) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    // Refused here as well as by the aggregate, so a refused edit stores no
+    // credential records.
+    if (
+      state.source !== "self-serve" ||
+      !SSO_IDP_EDITABLE_STATES.includes(state.state)
+    ) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${connectionId} is ${state.source} in ${state.state}; its identity provider settings cannot be replaced`,
+      );
+    }
+    const dialing = await this.prepareIdpUpdate({ state, idp });
+    await this.deps.connections().updateConnectionIdp({
+      ...this.command({ organizationId, connectionId, actor }),
+      idp: dialing,
+    });
+  }
+
+  private async prepareIdpUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: SsoIdpUpdate;
+  }): Promise<SsoIdpDialing> {
+    return idp.protocol === "oidc"
+      ? this.prepareOidcUpdate({ state, idp })
+      : this.prepareSamlUpdate({ state, idp });
+  }
+
+  private async prepareOidcUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: Extract<SsoIdpUpdate, { protocol: "oidc" }>;
+  }): Promise<SsoIdpDialing> {
+    const current = state.idpMetadata;
+    const clientSecret = blankToNull(idp.clientSecret);
+    if (clientSecret === null && current.secretRef === null) {
+      throw new SsoCredentialsRequiredError(
+        "an openid connect connection needs a client secret",
+      );
+    }
+    const { issuer } = await validateOidcRegistration({
+      // A blank secret keeps the stored one, which satisfies the presence
+      // check the registration makes.
+      registration: { ...idp, clientSecret: clientSecret ?? "stored" },
+      discovery: this.deps.discovery,
+    });
+    const [clientIdRef, secretRef] = await Promise.all([
+      this.keptOrStoredCredential({
+        state,
+        ref: current.clientIdRef,
+        kind: "oidc-client-id",
+        value: idp.clientId,
+      }),
+      clientSecret === null
+        ? current.secretRef
+        : this.keptOrStoredCredential({
+            state,
+            ref: current.secretRef,
+            kind: "oidc-client-secret",
+            value: clientSecret,
+          }),
+    ]);
+    return { issuer, clientIdRef, secretRef, certRefs: [] };
+  }
+
+  private async prepareSamlUpdate({
+    state,
+    idp,
+  }: {
+    state: SsoConnectionState;
+    idp: Extract<SsoIdpUpdate, { protocol: "saml" }>;
+  }): Promise<SsoIdpDialing> {
+    const config = validateSamlRegistration(idp);
+    const certRef = await this.keptOrStoredCredential({
+      state,
+      ref: state.idpMetadata.certRefs[0] ?? null,
+      kind: "saml-idp-config",
+      value: JSON.stringify(config),
+    });
+    return {
+      issuer: config.entityId,
+      clientIdRef: null,
+      secretRef: null,
+      certRefs: [certRef],
+    };
+  }
+
+  /** The stored reference when it already holds this value, otherwise a new
+   *  one. A changed value always gets a new reference, so the log records
+   *  when a credential changed. */
+  private async keptOrStoredCredential({
+    state: { organizationId, connectionId },
+    ref,
+    kind,
+    value,
+  }: {
+    state: SsoConnectionState;
+    ref: string | null;
+    kind: SsoCredentialKind;
+    value: string;
+  }): Promise<string> {
+    if (ref !== null) {
+      const stored = await this.deps.credentials.read({ organizationId, ref });
+      if (stored === value) return ref;
+    }
+    return this.deps.credentials.put({
+      organizationId,
+      connectionId,
+      kind,
+      value,
     });
   }
 
@@ -1428,6 +1646,10 @@ export class SsoSelfServeService {
       source: "self-serve" as const,
     };
   }
+}
+
+function blankToNull(value: string | null): string | null {
+  return value === null || value.trim() === "" ? null : value;
 }
 
 function toConnectionView(

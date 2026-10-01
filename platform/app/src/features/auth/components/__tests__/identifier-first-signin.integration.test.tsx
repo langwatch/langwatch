@@ -989,4 +989,39 @@ describe("given the identifier-first sign-in screen", () => {
       expect(screen.queryByTestId("unknown-identifier")).toBeNull();
     });
   });
+
+  describe("when no account holds the address and the installation cannot send email", () => {
+    beforeEach(() => {
+      publicEnvRef.current = { IS_SAAS: false, HAS_EMAIL_PROVIDER_KEY: false };
+      routeMock.mockResolvedValue(unknownIdentifier);
+    });
+
+    /** @scenario "An address with no account on an installation that cannot send email is told what is missing" */
+    it("says what is missing and offers no confirmation link", async () => {
+      renderScreen();
+      await enterEmail("colleague@example.com");
+
+      expect(
+        await screen.findByText(/no account for that email address yet/i),
+      ).toBeTruthy();
+      expect(screen.getByText(/set up an email provider/i)).toBeTruthy();
+      expect(screen.getByText(/single sign-on/i)).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: /send confirmation link/i }),
+      ).toBeNull();
+      expect(requestSignUpVerificationMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An address with no account on an installation that cannot send email is told what is missing" */
+    it("goes back to the address step for a mistyped address", async () => {
+      renderScreen();
+      await enterEmail("colleague@example.com");
+      await userEvent.click(
+        await screen.findByRole("button", { name: /use a different email/i }),
+      );
+
+      expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+      expect(screen.queryByTestId("unknown-identifier")).toBeNull();
+    });
+  });
 });

@@ -29,7 +29,7 @@ function partsOf(
   const value = issuer?.trim() ?? "";
   if (value.slice(0, 8).toLowerCase() !== "https://") return null;
   const rest = value.slice(8);
-  const queryAt = firstIndexOf(rest, ["?", "#"]);
+  const queryAt = rest.search(/[?#]/);
   const address = queryAt === -1 ? rest : rest.slice(0, queryAt);
   const pathAt = address.indexOf("/");
   const host = pathAt === -1 ? address : address.slice(0, pathAt);
@@ -38,13 +38,6 @@ function partsOf(
     host: host.toLowerCase(),
     path: pathAt === -1 ? "" : address.slice(pathAt),
   };
-}
-
-function firstIndexOf(value: string, characters: readonly string[]): number {
-  const found = characters
-    .map((character) => value.indexOf(character))
-    .filter((index) => index !== -1);
-  return found.length === 0 ? -1 : Math.min(...found);
 }
 
 /** The path segments, without empty ones from repeated or edge slashes. */

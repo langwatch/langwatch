@@ -13,6 +13,8 @@ import { MICROSOFT_LEGACY_CALLBACK_ID } from "@ee/sso/providers";
 const LEGACY_PATH = `/api/auth/callback/${MICROSOFT_LEGACY_CALLBACK_ID}`;
 const PROVIDER_PATH = "/api/auth/callback/microsoft";
 
+/** Serves a request to the legacy `/api/auth/callback/azure-ad` path as the
+ *  Microsoft provider's callback, and returns any other request unchanged. */
 export function aliasLegacyMicrosoftCallback(request: Request): Request {
   const url = new URL(request.url);
   if (url.pathname !== LEGACY_PATH) return request;

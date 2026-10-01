@@ -12,6 +12,7 @@ import type {
   SsoCredentialKind,
   SsoCredentialStore,
 } from "../../sso-credential-store";
+import type { SsoIssuerDiscoveryPort } from "../../sso-idp-registration";
 import {
   type SsoLegacyIdentityRetirementPort,
   type SsoMigrationFinalizationReadPort,
@@ -112,6 +113,11 @@ export class InMemoryCredentials implements SsoCredentialStore {
     return ref;
   }
 
+  /** How many credential records were stored. */
+  get count(): number {
+    return this.held.size;
+  }
+
   async read({
     organizationId,
     ref,
@@ -134,6 +140,9 @@ interface SelfServeFixtureOptions {
   migrations?: SsoMigrationProgressReadPort;
   migrationEvidence?: SsoMigrationFinalizationReadPort;
   legacyRetirement?: SsoLegacyIdentityRetirementPort;
+  /** What an issuer's discovery document answers. Reachable and naming no
+   *  issuer unless a scenario says otherwise. */
+  discovery?: SsoIssuerDiscoveryPort;
 }
 
 /** Real services and guards over the production reducer, with I/O held in memory. */
@@ -149,6 +158,7 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
   const testSignIns = new StubTestSignIns();
   const breakGlassReads = new StubBreakGlassReads();
   const members = options.members ?? new StubMembers();
+  const credentials = new InMemoryCredentials();
   const committed: {
     command: SsoConnectionCommand;
     facts: SsoConnectionFactInput[];
@@ -203,8 +213,10 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
     context,
     proofs,
     files,
-    credentials: new InMemoryCredentials(),
-    discovery: { discover: async () => ({ reachable: true }) },
+    credentials,
+    discovery: options.discovery ?? {
+      discover: async () => ({ reachable: true }),
+    },
     baseUrl: "https://app.langwatch.test",
     testSignIns,
     licenseProof: {
@@ -231,5 +243,6 @@ export function createSsoSelfServeFixture(options: SelfServeFixtureOptions) {
     members,
     committed,
     ledger,
+    credentials,
   };
 }

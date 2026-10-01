@@ -677,6 +677,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Self-Hosting Overview](https://langwatch.ai/docs/self-hosting/overview.md): Deploy LangWatch on your own infrastructure for full data control
+- [First run](https://langwatch.ai/docs/self-hosting/first-run.md): From a fresh install to single sign-on: the first account, the license and the identity provider connection.
 - [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing.md): What self-hosted LangWatch gives you for free, what an Enterprise license adds, and how to activate one
 - [Connect: hosted services for a self-hosted install](https://langwatch.ai/docs/self-hosting/connect.md): Let a licensed install call LangWatch-hosted services over two outbound hosts, metered against your contract and capped from Settings
 - [Data and telemetry: every outbound connection of a self-hosted install](https://langwatch.ai/docs/self-hosting/data-and-telemetry.md): Every connection a self-hosted install can open to LangWatch and to third parties, what each one carries, and the switch that stops it
