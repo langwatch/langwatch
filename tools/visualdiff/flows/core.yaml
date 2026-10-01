@@ -134,10 +134,10 @@ flows:
     steps:
       - action: go
         with:
-          path: /{slug}/agent-testing
+          path: /{slug}/agents
       - action: click
         with:
-          text: Setup agent
+          text: New Agent
       - action: click
         with:
           testId: agent-type-http
@@ -151,7 +151,7 @@ flows:
           value: https://example.com/chat
       - action: click
         with:
-          text: /^\s*Save\s*$/
+          testId: save-agent-button
       - action: expect
         with:
           api: /api/agents
@@ -212,13 +212,23 @@ flows:
       - action: click
         with:
           testId: evaluator-category-expected_answer
+      - action: click
+        with:
+          testId: evaluator-type-langevals-exact_match
       - action: fill
         with:
-          field: Name
+          testId: evaluator-name-input
+          value: VD Evaluator {uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          field: Enter evaluation name
           value: VD Monitor {uid}
       - action: click
         with:
-          text: Create Online Evaluation
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
       - action: expect
         with:
           text: VD Monitor {uid}
