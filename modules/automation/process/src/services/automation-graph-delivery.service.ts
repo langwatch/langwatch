@@ -1,9 +1,6 @@
-import type { WebhookDeliveryInput } from "@langwatch/automation-contract";
-
 import type { AutomationGraphDelivery } from "../app/automation.members.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -12,19 +9,13 @@ export class AutomationGraphDeliveryService implements AutomationGraphDelivery {
   private constructor(
     private readonly triggers: TriggerRepository,
     private readonly suppressions: EmailSuppressionRepository,
-    private readonly webhookDeliveries: WebhookDeliveryRepository,
   ) {}
 
   static create(input: {
     triggers: TriggerRepository;
     suppressions: EmailSuppressionRepository;
-    webhookDeliveries: WebhookDeliveryRepository;
   }): AutomationGraphDeliveryService {
-    return new AutomationGraphDeliveryService(
-      input.triggers,
-      input.suppressions,
-      input.webhookDeliveries,
-    );
+    return new AutomationGraphDeliveryService(input.triggers, input.suppressions);
   }
 
   async filterSuppressed(input: {
@@ -47,9 +38,5 @@ export class AutomationGraphDeliveryService implements AutomationGraphDelivery {
 
   claimSend(input: { triggerId: string; traceId: string; projectId: string }): Promise<boolean> {
     return this.triggers.claimSend(input);
-  }
-
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void> {
-    return this.webhookDeliveries.create(input);
   }
 }

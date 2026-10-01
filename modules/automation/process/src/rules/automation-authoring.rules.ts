@@ -9,12 +9,12 @@ import {
   InvalidEmailRecipientError,
   NOTIFY_TRIGGER_ACTIONS,
   TriggerActionUnsupportedError,
-  WEBHOOK_HEADER_VALUE_KEPT,
   type AutomationAction,
   type AutomationFilters,
   type BuildGraphAlertTriggerDataInput,
   type NotificationCadence,
 } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 
 /** The three prefixes a filter key uses to name the monitor it is about. */
 const MONITOR_FILTER_PREFIXES = ["check_", "eval_", "evaluation_"] as const;

@@ -266,7 +266,6 @@ export class GraphAlertDispatchService {
       defaultBody: ALERT_TRIGGER_DEFAULTS.webhookBody,
     });
     await this.delivery.sendWebhook({
-      recorder: (record) => this.persistence.recordWebhookDelivery(record),
       projectId: input.project.id,
       triggerId: input.trigger.id,
       eventId: `evt_${destinationHash(`event:${input.fireDigest}`)}`,

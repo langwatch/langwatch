@@ -10,6 +10,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { TraceApi } from "@langwatch/trace-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { vi } from "vitest";
 
 import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
@@ -218,6 +219,7 @@ export function createCanonicalAutomationApp(): {
         },
         auditLog,
         traces: createApiFixture<TraceApi>({}),
+        webhooks: createApiFixture<WebhookApi>({}),
       },
       infrastructure: members,
       config: {

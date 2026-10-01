@@ -9,6 +9,10 @@ import {
   WebhookEventsClickHouseRepository,
   type WebhookRoutedClickHouse,
 } from "../clickhouse/clickhouse.webhook-events.repository.ts";
+import {
+  RedisWebhookDispatchCapRepository,
+  type WebhookDispatchCounter,
+} from "../redis/redis.webhook-dispatch-cap.repository.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
   PrismaWebhookEndpointRepository,
@@ -23,7 +27,7 @@ import {
   type WebhookTenantsDatabase,
 } from "./prisma.webhook-tenants.repository.ts";
 
-/** Every model the live tier's four repositories read, and nothing else. */
+/** Every model the live tier's Postgres repositories read, and nothing else. */
 export type WebhookLiveDatabase = WebhookEndpointDatabase &
   WebhookRetentionDatabase &
   WebhookTenantsDatabase;
@@ -55,16 +59,18 @@ class CipherWebhookSecrets implements WebhookSecret {
 }
 
 export class PostgresWebhookRepositories {
-  static readonly requires = ["prisma", "clickhouse", "encryption"] as const;
+  static readonly requires = ["prisma", "clickhouse", "encryption", "redis"] as const;
 
   static create(
     members: Readonly<{
       prisma: WebhookLiveDatabase;
       clickhouse: WebhookRoutedClickHouse;
       encryption: WebhookSecret;
+      redis: WebhookDispatchCounter;
     }>,
   ): WebhookRepositories {
     return {
+      dispatchCaps: RedisWebhookDispatchCapRepository.create({ connection: members.redis }),
       endpoints: PrismaWebhookEndpointRepository.create({
         prisma: members.prisma,
         ids: new LiveWebhookIds(),

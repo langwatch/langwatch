@@ -1,11 +1,4 @@
 import type { MessageAttributeValue } from "@aws-sdk/client-sqs";
-import {
-  assertDispatchBudget,
-  signWebhookPayload,
-  WEBHOOK_DELIVERY_ID_HEADER,
-  WEBHOOK_SIGNATURE_HEADER,
-  type WebhookDispatchRateLimiter,
-} from "@langwatch/egress";
 import { nowInstant } from "@langwatch/time";
 
 import {
@@ -17,6 +10,9 @@ import {
   type SqsDestinationConfig,
   type SqsWebhookSender,
 } from "../channels/webhook-destination.channel.ts";
+import { WEBHOOK_DELIVERY_ID_HEADER } from "../rules/webhook-delivery-classification.rules.ts";
+import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../rules/webhook-signature.rules.ts";
+import { type WebhookDispatchCapService } from "./webhook-dispatch-cap.service.ts";
 
 export type {
   AwsClientConfigResolver,
@@ -327,11 +323,11 @@ export interface SqsWebhookDestinationServiceOptions extends SqsDestinationConfi
   /** The process-owned SQS transport. */
   channel: SqsWebhookSender;
   /**
-   * Where the hourly dispatch cap is counted. Optional only because the
-   * cap is a limit, not a gate: a process without a shared counter delivers
-   * uncapped rather than refusing every queue endpoint it holds.
+   * The hourly dispatch cap. Optional only because the cap is a limit, not
+   * a gate: a process without one delivers uncapped rather than refusing
+   * every queue endpoint it holds.
    */
-  rateLimiter?: WebhookDispatchRateLimiter | undefined;
+  caps?: WebhookDispatchCapService | undefined;
 }
 
 export class SqsWebhookDestinationService implements WebhookDestination {
@@ -376,14 +372,13 @@ export class SqsWebhookDestinationService implements WebhookDestination {
   }
 
   async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
-    const { channel, rateLimiter } = this.config;
+    const { channel, caps } = this.config;
     // The same cap the HTTPS transport answers to, called here directly
     // because a queue send never passes through the HTTP sender that used
     // to own it. Without this line a queue endpoint would be uncapped. A
     // test fire is exempt, exactly as it is on the HTTPS side.
-    if (!request.isTestFire && rateLimiter) {
-      await assertDispatchBudget({
-        rateLimiter,
+    if (!request.isTestFire && caps) {
+      await caps.assertWithinCap({
         scopeId: request.organizationId,
         label: `Webhook endpoint ${request.endpointId}`,
       });

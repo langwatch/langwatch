@@ -3,7 +3,6 @@ import type {
   EmailSuppression,
   Trigger,
   TriggerFire,
-  WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import type { Instant } from "@langwatch/time";
 
@@ -26,12 +25,6 @@ export interface StoredGraphTriggerSent {
   resolvedAt: Instant | null;
 }
 
-/** One webhook attempt, with the project it belongs to beside the wire row. */
-export interface StoredWebhookDelivery {
-  projectId: string;
-  row: WebhookDeliveryRow;
-}
-
 /**
  * The one store every memory automation repository reads and writes, so a row
  * one of them writes is the row the next one answers from - the way one
@@ -47,7 +40,6 @@ export class MemoryAutomationStore {
   readonly fires: (TriggerFire & { projectId: string })[] = [];
   readonly suppressions: EmailSuppression[] = [];
   readonly customGraphs: (CustomGraph & { dashboardId: string | null })[] = [];
-  readonly webhookDeliveries: StoredWebhookDelivery[] = [];
   readonly graphTriggerSent: StoredGraphTriggerSent[] = [];
   /** The project names an unsubscribe page renders, by project id. */
   readonly projectNames = new Map<string, string>();

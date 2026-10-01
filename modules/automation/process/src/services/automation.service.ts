@@ -22,13 +22,13 @@ import {
   type TestFireInput,
   type TestFireResult,
   type TestFireTemplateDraft,
-  type WebhookDeliveryInput,
   type WebhookDeliveryRow,
   type AutomationPersistCapCount,
   type AutomationPersistCapDecision,
   type AutomationUsageCount,
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationClock } from "../app/automation.members.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
@@ -36,13 +36,15 @@ import type { EmailSuppressionNameRepository } from "../repositories/email-suppr
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerFireHistoryRepository } from "../repositories/trigger-fire-history.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
 import type { UnsubscribeTokenVerifier } from "../services/unsubscribe-token.service.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 import type { AutomationTemplateService } from "./automation-template.service.ts";
 import type { AutomationPersistCapService } from "./persist-cap.service.ts";
 import type { ReportScheduleService } from "./report-schedule.service.ts";
 import type { AutomationGraphService } from "./trigger-graph.service.ts";
+
+/** The webhook module's log of this module's webhook attempts (ADR-167). */
+type WebhookDeliveryLog = Pick<WebhookApi, "findDeliveriesBySource">;
 
 const normalize = (email: string): string => email.trim().toLowerCase();
 
@@ -51,6 +53,7 @@ const normalize = (email: string): string => email.trim().toLowerCase();
  * by the graph-activity and settlement-ledger ports. Folded out of the
  * contract package per ADR-133; the sole definition, server-side.
  */
+
 export class AutomationService {
   private readonly activeCache: ActiveTriggerCacheService;
   private readonly triggers: TriggerRepository;
@@ -61,7 +64,7 @@ export class AutomationService {
   private readonly reportSchedules: ReportScheduleService;
   private readonly clock: AutomationClock;
   private readonly customGraphs: CustomGraphRepository;
-  private readonly webhookDeliveries: WebhookDeliveryRepository;
+  private readonly webhookDeliveries: WebhookDeliveryLog;
   private readonly graph: AutomationGraphService;
   private readonly templates: AutomationTemplateService;
   private readonly persistCaps: AutomationPersistCapService;
@@ -88,7 +91,7 @@ export class AutomationService {
     reportSchedules: ReportScheduleService;
     clock: AutomationClock;
     customGraphs: CustomGraphRepository;
-    webhookDeliveries: WebhookDeliveryRepository;
+    webhookDeliveries: WebhookDeliveryLog;
     graph: AutomationGraphService;
     templates: AutomationTemplateService;
     persistCaps: AutomationPersistCapService;
@@ -117,7 +120,7 @@ export class AutomationService {
     reportSchedules: ReportScheduleService;
     clock: AutomationClock;
     customGraphs: CustomGraphRepository;
-    webhookDeliveries: WebhookDeliveryRepository;
+    webhookDeliveries: WebhookDeliveryLog;
     graph: AutomationGraphService;
     templates: AutomationTemplateService;
     persistCaps: AutomationPersistCapService;
@@ -465,19 +468,16 @@ export class AutomationService {
     return this.customGraphs.findAllNamesByIds(input);
   }
 
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void> {
-    return this.webhookDeliveries.create(input);
-  }
-
-  getRecentWebhookDeliveries(input: {
+  async getRecentWebhookDeliveries(input: {
     projectId: string;
     triggerId: string;
     limit: number;
   }): Promise<WebhookDeliveryRow[]> {
-    return this.webhookDeliveries.findAllRecentByTriggerId(input);
-  }
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number> {
-    return this.webhookDeliveries.pruneExpired(now);
+    const rows = await this.webhookDeliveries.findDeliveriesBySource({
+      projectId: input.projectId,
+      source: { module: "automation", ref: input.triggerId },
+      limit: input.limit,
+    });
+    return rows.map(({ ref, ...row }) => ({ ...row, triggerId: ref }));
   }
 }

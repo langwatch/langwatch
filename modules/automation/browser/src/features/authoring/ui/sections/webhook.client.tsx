@@ -1,17 +1,19 @@
 import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
 import {
   type SavedTriggerRow,
-  isReservedWebhookHeader,
-  findWebhookUrlProblemMessage,
-  WEBHOOK_HEADER_VALUE_KEPT,
-  WEBHOOK_METHODS,
   type WebhookActionParams,
-  type WebhookMethod,
   type WebhookPreview,
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import {
+  findWebhookUrlProblemMessage,
+  isReservedWebhookHeader,
+  WEBHOOK_HEADER_VALUE_KEPT,
+  WEBHOOK_METHODS,
+  type WebhookMethod,
+} from "@langwatch/webhook-contract";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 

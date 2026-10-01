@@ -21,7 +21,7 @@ import {
   WebhookEventNotFoundError,
 } from "@langwatch/webhook-contract";
 
-import { HttpWebhookDispatchChannel } from "../channels/http/http.webhook-dispatch.channel.ts";
+import { HttpDestinationChannel } from "../channels/http/http.destination.channel.ts";
 import { MemorySqsWebhookDestinationChannel } from "../channels/memory/memory.sqs-webhook-destination.channel.ts";
 import {
   SqsWebhookDestinationChannel,
@@ -41,11 +41,14 @@ import {
   type WebhookDeliveryProcessDeps,
 } from "../services/webhook-delivery.service.ts";
 import { WebhookDestinationDispatchService } from "../services/webhook-destination-dispatch.service.ts";
+import { WebhookDispatchCapService } from "../services/webhook-dispatch-cap.service.ts";
+import { WebhookEgressService } from "../services/webhook-egress.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookGovernanceDeliveryService } from "../services/webhook-governance-delivery.service.ts";
 import { WebhookHealthService } from "../services/webhook-health.service.ts";
+import { WebhookRequestService } from "../services/webhook-request.service.ts";
 import { WebhookTestBoundsService } from "../services/webhook-test-bounds.service.ts";
 
 /** Synthetic test-fire ids; sent once and never read back by kind. */
@@ -132,9 +135,11 @@ export interface WebhookAppDependencies {
   testFireBounds: Pick<WebhookTestBoundsService, "assertTestFireWithinBounds">;
   /** The live-delivery endpoint stream a replay appends to, over the kernel's process store. */
   endpointStream?: WebhookEndpointStreamService;
+  /** One attempt to a customer URL for another module's outbox (ADR-167 step 1). */
+  requests?: WebhookRequestService;
 }
 
-const storeReads = reads("rateLimiter", "redis");
+const storeReads = reads("rateLimiter");
 
 type WebhookSetup = FeatureSetup<
   typeof WebhookApp.dependencies,
@@ -162,22 +167,25 @@ export class WebhookApp implements WebhookApiContract {
    *  {@link WebhookApp.create} (`WebhookAccessService`). */
   static readonly dependencies = { entitlement: EntitlementApi };
   /** The test-fire door's per-organization counter. */
-  static readonly reads = ["rateLimiter", "redis", "isSaas", "outboundProxy"] as const;
+  static readonly reads = ["rateLimiter", "isSaas", "outboundProxy"] as const;
   static readonly config = webhookConfig;
 
   static create(input: WebhookSetup): WebhookApp {
     const { entitlement } = input.dependencies;
     const access = WebhookAccessService.create(entitlement);
-    const http = HttpWebhookDispatchChannel.create({
-      redis: input.members.redis,
-      rejectUnauthorized: input.members.isSaas,
+    const caps = WebhookDispatchCapService.create({ caps: input.repositories.dispatchCaps });
+    const egress = WebhookEgressService.create({
+      caps,
+      http: HttpDestinationChannel.create({
+        tls: { rejectUnauthorized: input.members.isSaas },
+      }),
     });
     const aws = AwsClientConfiguration.create({
       outboundProxy: sqsProxyResolver(parseOutboundProxyConfig(input.members.outboundProxy)),
     });
     const deliver = WebhookDeliveryService.dispatchThrough({
       destinations: WebhookDestinationDispatchService.create({
-        egress: http,
+        egress,
         allowInsecureLocal: input.config.allowInsecureLocalUrls,
         sqs:
           input.tier === "memory"
@@ -185,7 +193,7 @@ export class WebhookApp implements WebhookApiContract {
             : SqsWebhookDestinationChannel.create({
                 awsClientConfig: (config) => aws.build(config),
               }),
-        rateLimiter: http.rateLimiter,
+        caps,
       }),
     });
 
@@ -201,6 +209,10 @@ export class WebhookApp implements WebhookApiContract {
       testFireBounds: WebhookTestBoundsService.create({
         entitlement: input.dependencies.entitlement,
         rateLimiter: input.members.rateLimiter,
+      }),
+      requests: WebhookRequestService.create({
+        egress,
+        deliveries: input.repositories.endpoints,
       }),
     });
     app.#delivery = {
@@ -307,6 +319,9 @@ export class WebhookApp implements WebhookApiContract {
     this.#dependencies.endpoints.findDeliverable(input);
   getDeliveries: WebhookApiContract["getDeliveries"] = (input) =>
     this.#dependencies.endpoints.getDeliveries(input);
+  sendRequest: WebhookApiContract["sendRequest"] = (input) => this.requests.send(input);
+  findDeliveriesBySource: WebhookApiContract["findDeliveriesBySource"] = (input) =>
+    this.requests.findBySource(input);
   getHealth: WebhookApiContract["getHealth"] = (input) => this.health.health(input);
   testFire: WebhookApiContract["testFire"] = async ({ organizationId, endpointId }) => {
     const { endpoints, dispatch, testFireBounds } = this.#dependencies;
@@ -430,6 +445,12 @@ export class WebhookApp implements WebhookApiContract {
   }
 
   /** One endpoint's delivery health. */
+  get requests(): WebhookRequestService {
+    const { requests } = this.#dependencies;
+    if (!requests) throw new Error("webhook requests need the sender its create composes");
+    return requests;
+  }
+
   get health(): Pick<WebhookHealthService, "health"> {
     const { health } = this.#dependencies;
     if (!health) {

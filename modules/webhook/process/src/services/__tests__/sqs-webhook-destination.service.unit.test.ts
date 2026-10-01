@@ -1,4 +1,3 @@
-import { WEBHOOK_SIGNATURE_HEADER, type WebhookDispatchRateLimiter } from "@langwatch/egress";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WebhookDispatchRequest } from "../../app/webhook.app.ts";
@@ -6,17 +5,20 @@ import type {
   SqsDestinationConfig,
   SqsWebhookSender,
 } from "../../channels/webhook-destination.channel.ts";
+import type { WebhookDispatchCapRepository } from "../../repositories/webhook-dispatch-cap.repository.ts";
 import { inspectSqsQueueUrl, parseSqsQueueUrl } from "../../rules/sqs-queue-url.rules.ts";
+import { WEBHOOK_SIGNATURE_HEADER } from "../../rules/webhook-signature.rules.ts";
 import {
   SQS_MAX_MESSAGE_BYTES,
   SqsWebhookDestinationService,
 } from "../sqs-webhook-destination.service.ts";
+import { WebhookDispatchCapService } from "../webhook-dispatch-cap.service.ts";
 
-// The queue channel and the rate limiter are the two boundaries; everything
+// The queue channel and the cap counter are the two boundaries; everything
 // else in these tests is the real envelope, the real signature and the real
 // classification.
-const limitMock = vi.fn<WebhookDispatchRateLimiter["limit"]>();
-const rateLimiter: WebhookDispatchRateLimiter = { limit: limitMock };
+const limitMock = vi.fn<WebhookDispatchCapRepository["countAttempt"]>();
+const caps = WebhookDispatchCapService.create({ caps: { countAttempt: limitMock } });
 
 const QUEUE_URL = "https://sqs.eu-central-1.amazonaws.com/381491922238/lw-dev-billing-webhooks";
 
@@ -70,7 +72,7 @@ describe("SqsWebhookDestinationService", () => {
       allowed: true,
       remaining: 999,
       resetAt: Date.now() + 3_600_000,
-    } as never);
+    });
   });
 
   afterEach(() => {
@@ -84,7 +86,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -109,7 +111,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -134,7 +136,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -153,7 +155,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -178,7 +180,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -214,12 +216,12 @@ describe("SqsWebhookDestinationService", () => {
         allowed: false,
         remaining: 0,
         resetAt: Date.now() + 60_000,
-      } as never);
+      });
       const { channel, sent } = fakeQueue();
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",
@@ -237,9 +239,7 @@ describe("SqsWebhookDestinationService", () => {
         retryable: true,
       });
       expect(sent).toHaveLength(0);
-      expect(limitMock).toHaveBeenCalledWith(
-        expect.objectContaining({ key: "webhook-dispatch:org_1" }),
-      );
+      expect(limitMock).toHaveBeenCalledWith(expect.objectContaining({ scopeId: "org_1" }));
     });
 
     it("exempts a test fire, exactly as the HTTPS transport does", async () => {
@@ -313,7 +313,7 @@ describe("SqsWebhookDestinationService", () => {
       const destination = SqsWebhookDestinationService.create({
         config: {
           channel,
-          rateLimiter,
+          caps,
           queueUrl: QUEUE_URL,
           accessKeyId: "AKIA1",
           secretAccessKey: "s3cr3t",

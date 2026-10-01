@@ -336,9 +336,9 @@ class SettlementDelivery extends AutomationNotificationDelivery {
   }
   async sendWebhook(input: {
     eventId: string;
-  }): Promise<{ eventId: string; status: number; body: string }> {
+  }): Promise<{ dispatchId: string; status: number }> {
     this.webhooks.push(input);
-    return { eventId: input.eventId, status: 200, body: "ok" };
+    return { dispatchId: input.eventId, status: 200 };
   }
 }
 

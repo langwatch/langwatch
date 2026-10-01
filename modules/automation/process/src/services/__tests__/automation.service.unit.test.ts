@@ -4,12 +4,11 @@ import type {
   TriggerFire,
   TriggerFireStats,
   TriggerSummary,
-  WebhookDeliveryInput,
-  WebhookDeliveryRow,
 } from "@langwatch/automation-contract";
 import { TriggerNotFoundError } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAutomationTestRuntime } from "../../__tests__/testing.ts";
@@ -22,7 +21,6 @@ import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
 import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
-import { WebhookDeliveryRepository } from "../../repositories/webhook-delivery.repository.ts";
 import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationService } from "../automation.service.ts";
@@ -56,10 +54,8 @@ class EmptyCustomGraphs extends CustomGraphRepository {
     return Promise.resolve([]);
   }
 }
-class EmptyWebhookDeliveries extends WebhookDeliveryRepository {
-  create = vi.fn(async (_input: WebhookDeliveryInput) => undefined);
-  findAllRecentByTriggerId = vi.fn(async () => [] as WebhookDeliveryRow[]);
-  pruneExpired = vi.fn(async () => 0);
+class EmptyWebhookDeliveries {
+  findDeliveriesBySource = vi.fn<WebhookApi["findDeliveriesBySource"]>(async () => []);
 }
 const suppression = (email: string, triggerId: string | null): EmailSuppression => ({
   id: `${email}-${triggerId ?? "all"}`,
@@ -430,12 +426,12 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
   });
 
   /** @scenario "One automation capability owns subordinate lifecycles" */
-  it("owns webhook delivery recording, reads, and pruning", async () => {
+  it("reads a trigger's webhook attempts from the webhook module's log", async () => {
     const webhookDeliveries = new EmptyWebhookDeliveries();
-    webhookDeliveries.findAllRecentByTriggerId.mockResolvedValue([
+    webhookDeliveries.findDeliveriesBySource.mockResolvedValue([
       {
         id: "row-1",
-        triggerId: "t",
+        ref: "t",
         dispatchId: "d1",
         responseStatus: 200,
         latencyMs: 42,
@@ -445,19 +441,7 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
         firedAt: new Date("2026-01-01T00:00:00Z"),
       },
     ]);
-    webhookDeliveries.pruneExpired.mockResolvedValue(7);
     const service = makeService(new Triggers(), new Fires(), webhookDeliveries);
-    const input: WebhookDeliveryInput = {
-      projectId: "p",
-      triggerId: "t",
-      dispatchId: "d1",
-      responseStatus: 200,
-      latencyMs: 42,
-      outcome: "success",
-    };
-
-    await service.recordWebhookDelivery(input);
-    expect(webhookDeliveries.create).toHaveBeenCalledWith(input);
     expect(
       await service.getRecentWebhookDeliveries({
         projectId: "p",
@@ -465,12 +449,11 @@ describe("AutomationService trigger and fire-history lifecycle", () => {
         limit: 25,
       }),
     ).toMatchObject([{ dispatchId: "d1", triggerId: "t" }]);
-    expect(webhookDeliveries.findAllRecentByTriggerId).toHaveBeenCalledWith({
+    expect(webhookDeliveries.findDeliveriesBySource).toHaveBeenCalledWith({
       projectId: "p",
-      triggerId: "t",
+      source: { module: "automation", ref: "t" },
       limit: 25,
     });
-    expect(await service.pruneWebhookDeliveries()).toBe(7);
   });
 });
 

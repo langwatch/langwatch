@@ -35,12 +35,7 @@ import {
   PrismaTriggerRepository,
   type TriggerDatabase,
 } from "./repositories/prisma/prisma.trigger.repository.ts";
-import {
-  PrismaWebhookDeliveryRepository,
-  type WebhookDeliveryDatabase,
-} from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 import type { TriggerRepository } from "./repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 import { AutomationMatchRecordMetricsService } from "./services/automation-match-record-metrics.service.ts";
@@ -211,13 +206,6 @@ export function createAutomationGraphTriggerSent(
   database: GraphTriggerSentDatabase,
 ): GraphTriggerSentRepository {
   return PrismaGraphTriggerSentRepository.create(database);
-}
-
-/** The webhook deliveries an automation records and later prunes. */
-export function createAutomationWebhookDeliveries(
-  database: WebhookDeliveryDatabase,
-): WebhookDeliveryRepository {
-  return PrismaWebhookDeliveryRepository.create(database);
 }
 
 /** The custom graphs a report schedule renders from. */

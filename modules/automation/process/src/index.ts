@@ -6,7 +6,6 @@ export {
   createAutomationGraphTriggerSent,
   createAutomationTraceTriggerCatalogue,
   createAutomationTriggers,
-  createAutomationWebhookDeliveries,
 } from "./automation.server.ts";
 export { SlackWebhookDeliveryChannel } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
@@ -47,10 +46,8 @@ export {
   PERSIST_TRIGGER_ACTIONS,
 } from "@langwatch/automation-contract";
 export type {
-  WebhookDeliveryRecorder,
   WebhookDeliveryRequest,
   WebhookDeliveryTransport,
-  WebhookSendResult,
 } from "./channels/http/http.webhook-delivery.channel.ts";
 export { SlackWebApiDeliveryChannel } from "./channels/slack/slack.web-api-delivery.channel.ts";
 export type { SlackApiTransport } from "./channels/slack/slack.web-api-delivery.channel.ts";
@@ -166,7 +163,6 @@ export {
 } from "./services/graph-trigger-heartbeat.service.ts";
 export { type TriggerDatabase } from "./repositories/prisma/prisma.trigger.repository.ts";
 export { type GraphTriggerSentDatabase } from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-export { type WebhookDeliveryDatabase } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 export type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export type { AutomationClock } from "./app/automation.members.ts";

@@ -44,13 +44,13 @@ import {
   type TestFireResult,
   type TestFireWebhookDestination,
   type Trigger,
-  WEBHOOK_HEADER_VALUE_KEPT,
 } from "@langwatch/automation-contract";
 import { isDispatchError } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import { generate as ksuid } from "@langwatch/ksuid";
 import type { Monitor, MonitorApi } from "@langwatch/monitor-contract";
 import { nowInstant, toDate } from "@langwatch/time";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import { z } from "zod";
 
 import type {

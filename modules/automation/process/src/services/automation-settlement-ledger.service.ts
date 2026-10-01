@@ -2,7 +2,6 @@ import type {
   AutomationPersistCapBreach,
   AutomationPersistCapDecision,
   TriggerSummary,
-  WebhookDeliveryInput,
 } from "@langwatch/automation-contract";
 import { type Instant } from "@langwatch/time";
 
@@ -15,7 +14,6 @@ import {
 } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { EmailSuppressionRepository } from "../repositories/email-suppression.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "../repositories/webhook-delivery.repository.ts";
 import { decidePersistCap } from "../rules/persist-cap.rules.ts";
 import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
 
@@ -27,7 +25,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
   static create(input: {
     triggers: TriggerRepository;
     suppressions: EmailSuppressionRepository;
-    webhookDeliveries: WebhookDeliveryRepository;
     clock: AutomationClock;
     persistCaps: AutomationPersistCapRepository;
     persistCap: AutomationSettlementPersistCap;
@@ -37,7 +34,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
       triggers: input.triggers,
       active: ActiveTriggerCacheService.create({ triggers: input.triggers, clock: input.clock }),
       suppressions: input.suppressions,
-      webhookDeliveries: input.webhookDeliveries,
       persistCaps: input.persistCaps,
       persistCap: input.persistCap,
       breach: input.breach,
@@ -50,8 +46,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
 
   private readonly suppressions: EmailSuppressionRepository;
 
-  private readonly webhookDeliveries: WebhookDeliveryRepository;
-
   private readonly persistCaps: AutomationPersistCapRepository;
 
   private readonly persistCap: AutomationSettlementPersistCap;
@@ -62,7 +56,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     triggers,
     active,
     suppressions,
-    webhookDeliveries,
     persistCaps,
     persistCap,
     breach,
@@ -70,7 +63,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     triggers: TriggerRepository;
     active: ActiveTriggerCacheService;
     suppressions: EmailSuppressionRepository;
-    webhookDeliveries: WebhookDeliveryRepository;
     persistCaps: AutomationPersistCapRepository;
     persistCap: AutomationSettlementPersistCap;
     breach: AutomationSettlementBreach;
@@ -82,8 +74,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     this.active = active;
 
     this.suppressions = suppressions;
-
-    this.webhookDeliveries = webhookDeliveries;
 
     this.persistCaps = persistCaps;
 
@@ -132,10 +122,6 @@ export class AutomationSettlementLedgerService extends AutomationSettlementLedge
     const blocked = new Set(rows.map((row) => normalizeEmail(row.email)));
 
     return input.emails.filter((email) => !blocked.has(normalizeEmail(email)));
-  }
-
-  recordWebhookDelivery(input: WebhookDeliveryInput): Promise<void> {
-    return this.webhookDeliveries.create(input);
   }
 
   resolvePersistDailyCap(projectId: string): Promise<number> {

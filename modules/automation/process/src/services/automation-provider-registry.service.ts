@@ -9,12 +9,12 @@ import {
   MissingSlackBotTokenError,
   slackProvider as slackShared,
   TriggerAction,
-  WEBHOOK_HEADER_VALUE_KEPT,
   webhookActionParamsSchema,
   webhookProvider as webhookShared,
   type SharedDef,
   type SlackActionParams,
 } from "@langwatch/automation-contract";
+import { WEBHOOK_HEADER_VALUE_KEPT } from "@langwatch/webhook-contract";
 import type { ZodTypeAny } from "zod";
 
 import {

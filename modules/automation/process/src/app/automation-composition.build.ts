@@ -21,7 +21,6 @@ import {
   type DatasetApi,
   type DatasetRecordEntry,
 } from "@langwatch/dataset-contract";
-import { WebhookEgressService } from "@langwatch/egress";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
@@ -31,12 +30,12 @@ import type { Encryption } from "@langwatch/process-stores/members";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import { traceSchema, type TraceApi, type TraceRecord } from "@langwatch/trace-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
 
 import type { AutomationGraphNotifier } from "../channels/automation-graph-alert.channel.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationRunawayNotice } from "../channels/automation-runaway-notice.channel.ts";
 import { AutomationTestFire } from "../channels/automation-test-fire.channel.ts";
-import { EgressWebhookDeliveryTransport } from "../channels/http/http.webhook-egress.channel.ts";
 import type { ReportDispatcher } from "../eventing/report-schedule.intent.ts";
 import { AutomationPersistActionRepository } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationPersistCapRepository } from "../repositories/automation-persist-cap.repository.ts";
@@ -101,27 +100,21 @@ export type AutomationProcessMembers = Readonly<{
   logger: Logger;
   encryption: Encryption;
   publicBaseUrl: string | undefined;
-  /** SaaS verifies a webhook receiver's certificate; self-hosted receivers often self-sign. */
-  isSaas: boolean;
 }>;
 
 type AutomationInfrastructureInput = Readonly<{
   members: AutomationProcessMembers;
   /** Every mail automation sends goes out through notification, which writes the envelope. */
   notifications: Pick<NotificationService, "sendEmail">;
+  /** Where a webhook action's attempt is sent and logged (ADR-167). */
+  webhooks: Pick<WebhookApi, "sendRequest">;
   auditLog: AuditLogApi;
   verifier: AutomationInfrastructure["verifier"];
   /** The key the verifier checks with, so every link this process mails verifies. */
   unsubscribeSigningSecret: string | undefined;
   repositories: Pick<
     AutomationRepositories,
-    | "triggers"
-    | "suppressions"
-    | "webhookDeliveries"
-    | "persistCaps"
-    | "callCounter"
-    | "webhookRateLimits"
-    | "emailCaps"
+    "triggers" | "suppressions" | "persistCaps" | "callCounter" | "emailCaps"
   >;
   caps: Readonly<{ emailHourlyCap: number; tenantDailyCap: number }>;
 }>;
@@ -200,22 +193,18 @@ export function buildGraphAlertNotifier(
 }
 
 /**
- * Mail, Slack and webhook delivery through notification and the fenced webhook sender
- * (main's worker-webhook-egress.composition.ts). No public origin, no delivery.
+ * Mail, Slack and webhook delivery through notification, Slack and the webhook module's
+ * `sendRequest` (ADR-167). No public origin, no delivery.
  */
 function buildNotificationDelivery(
   input: Pick<
     AutomationInfrastructureInput,
-    "members" | "notifications" | "unsubscribeSigningSecret" | "repositories"
+    "members" | "notifications" | "webhooks" | "unsubscribeSigningSecret"
   >,
 ): AutomationNotificationDelivery {
   const { members } = input;
   if (!members.publicBaseUrl) return new UnavailableNotificationDelivery();
 
-  const egress = WebhookEgressService.create({
-    rateLimiter: input.repositories.webhookRateLimits,
-    tls: { rejectUnauthorized: members.isSaas },
-  });
   return AutomationNotificationDeliveryService.create({
     mailer: input.notifications,
     renderer: ReactEmailMailRenderer.create(),
@@ -223,7 +212,7 @@ function buildNotificationDelivery(
     ...(input.unsubscribeSigningSecret === undefined
       ? {}
       : { unsubscribeSigningSecret: input.unsubscribeSigningSecret }),
-    webhookTransport: EgressWebhookDeliveryTransport.create(egress),
+    webhookTransport: input.webhooks,
     logger: members.logger,
   });
 }
@@ -454,7 +443,7 @@ class AuditLogAutomationAuditSink implements AutomationAuditSink {
 /** Every repository this feature's settlement half reads or writes, from the module's registry. */
 export type AutomationSettlementRepositories = Pick<
   AutomationRepositories,
-  "triggers" | "suppressions" | "webhookDeliveries" | "graphTriggerSent"
+  "triggers" | "suppressions" | "graphTriggerSent"
 >;
 
 /**
@@ -562,7 +551,6 @@ export function createAutomationSettlement(input: {
   const ledger = AutomationSettlementLedgerService.create({
     triggers: repositories.triggers,
     suppressions: repositories.suppressions,
-    webhookDeliveries: repositories.webhookDeliveries,
     clock,
     persistCaps: input.persistCapSlots,
     persistCap: persistCaps
@@ -615,7 +603,6 @@ export function createAutomationSettlement(input: {
         analytics: input.analytics,
         logger: input.logger,
       }),
-      repositories.webhookDeliveries,
       input.graphActivity,
     ),
   };
@@ -653,7 +640,6 @@ class LateContainmentBreach extends AutomationSettlementBreach {
 class ComposedScheduledIntents extends AutomationScheduledIntent {
   constructor(
     private readonly heartbeat: GraphTriggerHeartbeatService,
-    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
     private readonly graphActivity: AutomationGraphActivity | undefined,
   ) {
     super();
@@ -679,10 +665,6 @@ class ComposedScheduledIntents extends AutomationScheduledIntent {
     }
 
     return this.graphActivity.evaluateGraphTrigger(candidate);
-  }
-
-  pruneWebhookDeliveries(now?: Instant): Promise<number> {
-    return this.deliveries.pruneExpired(now);
   }
 }
 

@@ -7,7 +7,6 @@ import { SlackWebhookDeliveryChannel } from "./slack/slack.webhook-delivery.chan
 export type {
   WebhookDeliveryRequest,
   WebhookDeliveryTransport,
-  WebhookSendResult,
 } from "./http/http.webhook-delivery.channel.ts";
 export type { SlackApiTransport } from "./slack/slack.web-api-delivery.channel.ts";
 export type {

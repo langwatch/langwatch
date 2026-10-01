@@ -49,19 +49,9 @@ export {
   type SlackTemplateType,
 } from "./providers/slack.ts";
 export {
-  WEBHOOK_HEADER_VALUE_KEPT,
-  WEBHOOK_METHODS,
-  findWebhookUrlProblem,
-  isReservedWebhookHeader,
-  sanitizeWebhookHeaders,
-  findWebhookUrlProblemMessage,
   webhookActionParamsSchema,
-  webhookMethodSchema,
   type WebhookActionParams,
-  type WebhookMethod,
   type WebhookPreview,
-  type WebhookUrlProblem,
-  type WebhookUrlProblemCode,
 } from "./providers/webhook.ts";
 
 export const providerActionValues = [

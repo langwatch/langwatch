@@ -31,6 +31,8 @@ import type {
   WebhookEndpointRepository,
   WebhookEndpointServiceOptions,
   WebhookEndpointStatusSnapshot,
+  WebhookRequestAttempt,
+  WebhookRequestAttemptRow,
 } from "../webhook-endpoint.repository.ts";
 import {
   type MemoryWebhookDatabase,
@@ -663,6 +665,26 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRepositor
           .map((row) => row.organizationId),
       ),
     ];
+  }
+
+  async recordRequestAttempt(attempt: WebhookRequestAttempt): Promise<void> {
+    this.#database.addRequestDelivery({
+      ...attempt,
+      id: this.#database.nextDeliveryId(),
+      firedAt: nowInstant(),
+    });
+  }
+
+  async findRequestAttempts(input: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+  }): Promise<WebhookRequestAttemptRow[]> {
+    return this.#database
+      .requestDeliveries()
+      .filter((row) => row.projectId === input.projectId && row.triggerId === input.triggerId)
+      .toSorted((a, b) => b.firedAt.epochMilliseconds - a.firedAt.epochMilliseconds)
+      .slice(0, input.limit);
   }
 
   async recordDeliveryAttempt(params: {
