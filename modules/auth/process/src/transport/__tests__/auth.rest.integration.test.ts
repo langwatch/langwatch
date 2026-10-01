@@ -42,9 +42,9 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,

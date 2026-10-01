@@ -84,9 +84,9 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -97,7 +97,7 @@ function family(router = langyLocalControlConnectRest, mount = "") {
     verify: (presented) => app.verifyLocalControlSessionKey(presented),
   });
   host.mount(router.router(), () => app, {
-    facts: [bindRestCredential("sessionKey", () => door)],
+    facts: [bindRestCredential("session_key", () => door)],
   });
   const request = (path: string, init: RequestInit = {}) =>
     host.app.request(`http://api.test/api/v1/langy/control${mount}/connect${path}`, init);

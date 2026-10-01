@@ -295,13 +295,13 @@ describe("given a door credential that declares a session", () => {
   it("accepts session from a router-level or a route-level withCredential", () => {
     expect(
       located(
-        '  .withCredential("cliToken", { session: widgetSessionSchema })',
+        '  .withCredential("cli_token", { session: widgetSessionSchema })',
         '  .get("/widgets/me", "getWidget")',
         "  .handle(async ({ app, session }) => app.getWidget(session))",
         '  .get("/widgets/you", "getYou")',
         "  .handle(async ({ app, session }) => app.getYou(session))",
         '  .post("/widgets/own", "ownWidget")',
-        '  .withCredential("cliToken", { session: otherSchema })',
+        '  .withCredential("cli_token", { session: otherSchema })',
         "  .handle(async ({ app, session }) => app.ownWidget(session))",
       ),
     ).toEqual([]);
@@ -310,12 +310,12 @@ describe("given a door credential that declares a session", () => {
   it("reports session when the door declares none, or the route's own credential drops it", () => {
     expect(
       located(
-        '  .withCredential("cliToken", { session: widgetSessionSchema })',
+        '  .withCredential("cli_token", { session: widgetSessionSchema })',
         '  .get("/widgets/me", "getWidget")',
-        '  .withCredential("apiKey")',
+        '  .withCredential("api_key")',
         "  .handle(async ({ app, session }) => app.getWidget(session))",
         '  .post("/widgets/own", "ownWidget")',
-        '  .withCredential("apiKey", {})',
+        '  .withCredential("api_key", {})',
         "  .handle(async ({ app, session }) => app.ownWidget(session))",
       ),
     ).toEqual([

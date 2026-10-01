@@ -133,7 +133,7 @@ function mountFamily({
   });
   const runtime = createRestRuntime({
     identity: { authenticate: projectDoor, identify: projectDoor },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency,
   });
 

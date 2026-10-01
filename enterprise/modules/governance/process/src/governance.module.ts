@@ -124,7 +124,7 @@ export const governanceProcessModule = defineProcessModule("governance")
         return { viewerUserId: credential.type === "legacyProjectKey" ? null : credential.userId };
       }),
       bindRestHeader(governanceRestSurface, "X-LangWatch-Surface"),
-      bindRestCredential("cliToken", () => app.cliTokenDoor),
+      bindRestCredential("cli_token", () => app.cliTokenDoor),
     ];
   })
   .withEventing(pulledUsageEventing)

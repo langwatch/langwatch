@@ -114,7 +114,7 @@ function refuse<Status extends 501>(
 export const gatewayInternalRest = defineRestRouter(GatewayInternalDoorApi)
   .withNamespace("gateway-internal")
   .withVersion(MANAGEMENT_API_VERSION)
-  .withCredential("internalSecret")
+  .withCredential("internal_secret")
   .withAddressing("literal", { v1Twin: false })
 
   // §4.7: probe for /health. Riding the signed channel is the point — a 200 here

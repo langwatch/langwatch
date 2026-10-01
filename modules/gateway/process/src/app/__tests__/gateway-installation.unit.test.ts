@@ -220,9 +220,9 @@ function servedInternalDoor(state: InstalledGateway, app: GatewayModule) {
     identities: {
       project: closed,
       organization: closed,
-      apiKey: closed,
-      scimToken: closed,
-      "instance-admin": closed,
+      api_key: closed,
+      scim_token: closed,
+      instance_admin: closed,
       browser: closed,
     },
     bearers: () => closed,
@@ -260,7 +260,7 @@ function signedHealthRequest(): Request {
 function isInternalCredential(binding: object): binding is RestCredentialBinding {
   return (
     "credential" in binding &&
-    binding.credential === "internalSecret" &&
+    binding.credential === "internal_secret" &&
     "resolveIdentity" in binding &&
     typeof binding.resolveIdentity === "function"
   );

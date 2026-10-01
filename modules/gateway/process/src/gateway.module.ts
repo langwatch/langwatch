@@ -72,7 +72,7 @@ export const gatewayProcessModule = defineProcessModule("gateway")
     return [
       // The gateway control plane is signed rather than bearer-authenticated.
       // It owns the same declared secret as the data-plane client.
-      bindRestCredential("internalSecret", () => app.internalDoor()),
+      bindRestCredential("internal_secret", () => app.internalDoor()),
       // Organization-owned rows take any API key; the application asks the
       // permission at the reach the operation needs.
       bindRestMiddleware(gatewayKeyCaller, (context) => keyCredentialOfRequest(context.req.raw)),

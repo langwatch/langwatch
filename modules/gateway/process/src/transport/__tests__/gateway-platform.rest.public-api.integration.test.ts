@@ -110,7 +110,7 @@ function mount(overrides: Partial<GatewayApi> = {}, refuse?: () => never) {
   });
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: passthroughIdempotency,
   });
   const hono = runtime.mount(gatewayPlatformRest.router(), {

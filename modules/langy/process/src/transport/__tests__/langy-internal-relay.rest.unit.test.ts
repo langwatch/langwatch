@@ -103,7 +103,7 @@ async function relayRoute() {
   });
   const hono = createRestRuntime({
     identity: app.internalDoor,
-    doors: { internalSecret: app.internalDoor },
+    doors: { internal_secret: app.internalDoor },
   }).mount(langyInternalRest.router(), {
     app: () => app,
     onError: (error, context) => canonicalErrorResponse(error, context),

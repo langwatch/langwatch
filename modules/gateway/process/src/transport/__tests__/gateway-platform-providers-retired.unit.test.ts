@@ -64,7 +64,7 @@ function mountedPlatform() {
     // receipt: no test here replays anything.
     idempotency: runOnce,
     identity: { authenticate: projectDoor, identify: projectDoor },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
   });
 
   return runtime.mount(gatewayPlatformRest.router(), {

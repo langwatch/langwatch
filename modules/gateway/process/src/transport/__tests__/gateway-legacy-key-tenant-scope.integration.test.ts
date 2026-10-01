@@ -221,7 +221,7 @@ async function mountAsLegacyProjectKey() {
   });
   const runtime = createRestRuntime({
     identity: { authenticate: door, identify: door },
-    doors: { apiKey: { authenticate: keyDoor, identify: keyDoor } },
+    doors: { api_key: { authenticate: keyDoor, identify: keyDoor } },
     idempotency: async ({ handler }) => {
       const response = await handler();
       return { isReplayed: false, status: response.status, response };

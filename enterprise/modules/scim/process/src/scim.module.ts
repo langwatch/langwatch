@@ -59,7 +59,7 @@ export const scimProcessModule = defineProcessModule("scim")
         signature: context.req.header(SCIM_WEBHOOK_SIGNATURE_HEADER) ?? null,
         authorization: context.req.header("authorization") ?? null,
       })),
-      bindRestCredential("scimToken", () => app.directoryDoor),
+      bindRestCredential("scim_token", () => app.directoryDoor),
     ];
   })
   .withEventing(scimEventing)

@@ -62,9 +62,9 @@ Feature: Composing a process declaratively
   @integration
   Scenario: A route declares the credential kind it answers behind
     Given a family whose default credential is "organization"
-    And a route that declares "instance-admin"
+    And a route that declares "instance_admin"
     When a caller reaches that route
-    Then the runtime resolves the instance-admin credential
+    Then the runtime resolves the instance_admin credential
     And the handler reads the actor and scope that kind resolves
 
   @integration

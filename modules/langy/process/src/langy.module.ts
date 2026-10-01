@@ -100,8 +100,8 @@ export const langyProcessModule = defineProcessModule("langy")
     if (!(app instanceof LangyModule))
       throw new TypeError("Langy transport requires its constructed application");
     return [
-      bindRestCredential("internalSecret", () => app.internalDoor),
-      bindRestCredential("sessionKey", () => app.sessionKeyDoor),
+      bindRestCredential("internal_secret", () => app.internalDoor),
+      bindRestCredential("session_key", () => app.sessionKeyDoor),
     ];
   })
   .withEventing(langyConversationEventing)

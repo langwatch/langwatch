@@ -16,6 +16,6 @@ export const licensingProcessModule = defineProcessModule("licensing")
   // The Go data plane signs hosted calls with the gateway's own secret, so the
   // family answers behind the gateway's door rather than a rebuilt one.
   .withTransportFacts(({ dependencies }) => [
-    bindRestCredential("internalSecret", () => dependencies.gateway.internalDoor()),
+    bindRestCredential("internal_secret", () => dependencies.gateway.internalDoor()),
   ])
   .withEventing(licenseSyncEventing);
