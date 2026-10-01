@@ -1,4 +1,5 @@
-import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
+import { PermissionDeniedError } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
