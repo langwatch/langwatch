@@ -207,3 +207,11 @@ export * from "./trace-captured-span.commands.ts";
 
 export * from "./trace-rest.schemas.ts";
 export * from "./trace-project-milestones.events.ts";
+export * from "./explorer/trace-query-config.ts";
+export * from "./explorer/lens-eval-column-id.ts";
+export * from "./explorer/get-suggestion-state.ts";
+export * from "./explorer/suggestion-ui.ts";
+export * from "./explorer/trace-row-kind.ts";
+export * from "./explorer/origin-display.ts";
+export * from "./explorer/suggestion-items.ts";
+export * from "./trace-browser-slices.ts";

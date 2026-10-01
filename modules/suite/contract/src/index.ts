@@ -17,3 +17,4 @@ export * from "./suite-run.events.ts";
 export * from "./suite-run.event-guards.ts";
 export * from "./suite-evaluators.ts";
 export * from "./suite-rest.schemas.ts";
+export * from "./suite-run-history-slice.ts";
