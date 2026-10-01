@@ -36,11 +36,14 @@ const logger = createLogger("langwatch:sso:gate");
  * current, and for the Cloud override leg, where a lapsed license steps aside
  * so the Stripe subscription underneath takes over.
  *
- * The gate is decided once per process (Decision 3, "startup semantics"):
- * the underlying computation is memoized, but ONLY on successful resolution
- * (resolved `true` or `false` from a completed scan). A thrown DB error is
- * never cached — the memo is evicted on rejection so the next request
- * retries and self-heals as soon as the DB answers (Decision 6).
+ * The gate is memoized per process. An allow is kept for the life of the
+ * process: a license we signed keeps SSO on (Decision 1). A deny is kept for
+ * {@link DENIED_GATE_TTL_MS} and then asked again, so a license activated on
+ * any replica (the License page, or an activation code redeemed at boot)
+ * turns SSO on in every replica within a minute, with no restart. The process
+ * that stored the license calls {@link invalidateSsoGate} and sees it at once.
+ * A thrown DB error is never cached: the memo is evicted on rejection so the
+ * next request retries and self-heals as soon as the DB answers (Decision 6).
  */
 
 const defaultRepository = new SsoLicenseRepository(prisma);
@@ -59,13 +62,33 @@ export function __setSsoLicenseRepositoryForTests(
 const getRepository = (): ISsoLicenseRepository =>
   repositoryOverride ?? defaultRepository;
 
-// Memoized once-per-process gate promise. Reset only by
-// `__resetSsoGateForTests()` (test-only — production has no reset, matching
-// "frozen until restart" semantics).
+/**
+ * How long a deny is trusted before the licensing store is read again. Short
+ * enough that an activation on another replica reaches this one quickly, long
+ * enough that a deployment without a license reads the store about once a
+ * minute rather than on every sign-in request.
+ */
+export const DENIED_GATE_TTL_MS = 60_000;
+
 let memoizedGate: Promise<boolean> | null = null;
+/** When the memo resolved to a deny; null while pending or once allowed. */
+let deniedAt: number | null = null;
+/** The email-mode warning is logged once per process, not once per re-read. */
+let warnedEmailMode = false;
+
+/**
+ * Forgets the gate's answer, so the next request decides again. Called by the
+ * process that just stored a license, which then sees SSO on at once instead
+ * of after {@link DENIED_GATE_TTL_MS}.
+ */
+export function invalidateSsoGate(): void {
+  memoizedGate = null;
+  deniedAt = null;
+}
 
 export function __resetSsoGateForTests(): void {
-  memoizedGate = null;
+  invalidateSsoGate();
+  warnedEmailMode = false;
   repositoryOverride = null;
 }
 
@@ -217,17 +240,26 @@ async function computeGate(): Promise<boolean> {
 export async function platformSSOAllowed(): Promise<boolean> {
   if (env.IS_SAAS) return true;
 
+  if (deniedAt !== null && Date.now() - deniedAt >= DENIED_GATE_TTL_MS) {
+    invalidateSsoGate();
+  }
+
   if (!memoizedGate) {
-    memoizedGate = computeGate()
+    const pending = computeGate()
       .then((allowed) => {
-        // Logged once, at gate resolution (Decision 8a) — not per request
-        // (that's the separate per-blocked-request log, Decision 8d, which
-        // lives at the hook call site where the request path is known).
-        if (!allowed && env.NEXTAUTH_PROVIDER !== "email") {
+        // Only this computation may stamp the deny: an invalidation that
+        // landed while it was in flight has already replaced the memo.
+        if (memoizedGate === pending) deniedAt = allowed ? null : Date.now();
+        // Logged once per process (Decision 8a), not on every re-read and not
+        // per request (that's the separate per-blocked-request log, Decision
+        // 8d, which lives at the hook call site where the request path is
+        // known).
+        if (!allowed && env.NEXTAUTH_PROVIDER !== "email" && !warnedEmailMode) {
+          warnedEmailMode = true;
           logger.warn(
             {},
-            "SSO is configured but no genuine license was found — starting in email mode; " +
-              "set LANGWATCH_LICENSE_KEY or activate an organization license to enable SSO",
+            "SSO is configured but no genuine license was found, so sign-in uses email mode; " +
+              "set LANGWATCH_LICENSE_KEY or activate an organization license, and SSO turns on within a minute",
           );
         }
         return allowed;
@@ -236,9 +268,10 @@ export async function platformSSOAllowed(): Promise<boolean> {
         // Evict on reject (Decision 6): the next call recomputes from
         // scratch instead of freezing a DB-blip denial for the rest of the
         // process.
-        memoizedGate = null;
+        if (memoizedGate === pending) memoizedGate = null;
         throw err;
       });
+    memoizedGate = pending;
   }
 
   try {

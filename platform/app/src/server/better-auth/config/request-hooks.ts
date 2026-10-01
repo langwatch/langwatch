@@ -388,8 +388,8 @@ export function requestHooks({
       // picker is not enforcement — a pinned legacy callback URL never renders
       // one, and this is still the only interception point that sees the
       // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
-      // the gate inside the policy is the same per-process memo, so a license
-      // still takes effect on restart and never mid-flight.
+      // the gate inside the policy is the same per-process memo, so a request
+      // never sees the license change under it mid-flight.
       await enforceFederationRoutes({
         url,
         pathname,

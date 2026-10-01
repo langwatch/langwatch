@@ -2881,7 +2881,7 @@ const presentations = {
     // and an internals leak on a screen an administrator opens.
     title: "Single sign-on needs an active license",
     describe: () =>
-      "Activate an enterprise license on this installation, then restart it, and you can set single sign-on up here.",
+      "Activate an enterprise license on this installation, and you can set single sign-on up here. A license activated a moment ago reaches every server within a minute.",
   },
   sso_domain_claim_pending: {
     // Reached by one claim only now: one on a domain somebody else already

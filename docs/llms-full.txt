@@ -64510,8 +64510,10 @@ app:
 A signed license key set through configuration entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
 </Step>
 
-<Step title="Restart the deployment">
-The SSO decision is made once at startup. Plan entitlements apply immediately, but **SSO only turns on after a restart**. The activation confirmation in the UI says so too.
+<Step title="SSO turns on">
+Plan entitlements apply immediately. SSO turns on at once on the server that stored the license, and within a minute on every other replica, with no restart. The activation confirmation in the UI says so too.
+
+`LANGWATCH_LICENSE_KEY` and `app.license.key` are read at startup, so a change to the variable takes a restart.
 </Step>
 </Steps>
 
@@ -64520,7 +64522,7 @@ The SSO decision is made once at startup. Plan entitlements apply immediately, b
 When `LANGWATCH_LICENSE_KEY` or `app.license.key` holds an activation code, the app redeems it at startup, before it decides SSO. It stores the signed license on the organization, the oldest one if there are several, so SSO is on in that same boot.
 
 - If an organization already holds a license, the code is not redeemed again, so a restart is a no-op. To change the license later, use **Settings → License** or put the signed license key in the variable.
-- On a fresh install with no organization yet, the code is redeemed when the first organization is created. Restart the app after that to turn on SSO.
+- On a fresh install with no organization yet, the code is redeemed when the first organization is created, and SSO turns on without a restart.
 - If redemption is refused, the app logs the reason and still starts. Causes: an unknown, expired or already used code, a code bound to another install, no outbound access to `connect.langwatch.ai`, or `LANGWATCH_CONNECT_DISABLED` set.
 
 The startup log names the form it found in the variable and what it did with it.

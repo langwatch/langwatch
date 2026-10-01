@@ -275,8 +275,8 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
   }
 
   // LANGWATCH_LICENSE_KEY may hold an activation code instead of a signed
-  // license key. It is redeemed here, before the server listens, because the
-  // SSO gate is decided once on the first request and has to see the license.
+  // license key. It is redeemed here, before the server listens, so the first
+  // request already has SSO on.
   // Never throws: a refusal is logged and the app boots without the license.
   await activateConfiguredLicenseForInstall();
 

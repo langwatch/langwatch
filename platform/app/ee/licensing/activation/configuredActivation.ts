@@ -7,8 +7,8 @@
  * License page makes, and the license it returns is stored on the oldest
  * organization, so the install ends up exactly where a UI activation leaves it.
  *
- * It runs before the server listens, so the SSO gate, which is decided once
- * per process on the first request, already sees the license. It never throws:
+ * It runs before the server listens, so the SSO gate already sees the license
+ * on the first request. It never throws:
  * a refused or unreachable redemption is logged with its reason and the app
  * boots without the license. An install that already holds a valid license
  * does not redeem again, which makes every later boot a no-op.
@@ -20,6 +20,7 @@ import { createLogger } from "@langwatch/observability";
 import { env } from "~/env.mjs";
 import { prisma } from "~/server/db";
 import { getLicenseHandler } from "~/server/subscriptionHandler";
+import { invalidateSsoGate } from "../../sso/sso-gate";
 import { readConnectConfig } from "../connect/install/connectConfig";
 import { getConnectLicenseClient } from "../connect/install/connectLicenseClient";
 import { installInstanceId } from "../connect/install/instanceIdentity";
@@ -216,9 +217,11 @@ export async function activateConfiguredLicenseForInstall(): Promise<ConfiguredA
           organizationId,
           license,
         );
-        return result.success
-          ? { success: true }
-          : { success: false, error: result.error };
+        if (!result.success) return { success: false, error: result.error };
+        // A redemption on first organization creation happens on a running
+        // server, so the gate has to read the new license now.
+        invalidateSsoGate();
+        return { success: true };
       },
       isValidLicense: (license) =>
         validateLicense({ licenseKey: license }).valid,

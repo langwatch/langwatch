@@ -20,9 +20,10 @@ import {
  * lives. Every semantic ADR-027 decided carries over unchanged:
  *
  *   - the gate is still `platformSSOAllowed()`, still THE one gate module,
- *     still memoized once per process. Policy is evaluated per request over a
- *     FROZEN gate value, which is what startup semantics means: nothing here
- *     re-decides a license, so activating one still takes a restart.
+ *     still memoized per process. Policy is evaluated per request over the
+ *     gate's memo: nothing here re-decides a license. An allow stays; a deny
+ *     is re-read after the gate's TTL, so an activation reaches every
+ *     replica without a restart.
  *   - DENY is still email mode exactly: no federated method appears in the
  *     default set, so none can appear in a routing decision.
  *   - a provider the build never mounted still lands on email mode, via

@@ -57,8 +57,8 @@ const logger = createLogger("langwatch:identity:sso-self-serve");
  * What the installation's licence may authorize (D05 tier 2).
  *
  * The answer is ADR-027's gate, unchanged and for the same reason: it is
- * decided once per process, so a licence activated while the installation is
- * running does not change what this process federates until it restarts.
+ * memoized per process, and a licence activated while the installation is
+ * running reaches it within the gate's deny TTL.
  * Reusing the gate rather than reading a licence here is deliberate — two
  * modules deciding what "licensed" means would eventually disagree, and the
  * disagreement would be about who gets single sign-on.
@@ -144,11 +144,11 @@ function isGenuine(licenseKey: string): boolean {
  * Which tier an organization gets, assembled from the deployment, the frozen
  * licence gate and the per-organization flag.
  *
- * `licenseActivatedSinceStart` is the honest half of the restart story: the
- * gate is frozen, so a licence activated a minute ago is genuine and still
- * changes nothing until the installation restarts. Reading the store live
- * here is what lets the surface say "restart" instead of "no licence", which
- * are two very different things to be told when you have just paid.
+ * `licenseActivationPending` covers the minute between an activation and the
+ * gate re-reading it on this replica: the licence is genuine but the gate
+ * still denies. Reading the store live here is what lets the surface say
+ * "within a minute" instead of "no licence", which are two very different
+ * things to be told when you have just paid.
  */
 export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
   constructor(
@@ -156,9 +156,9 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
       featureFlags: FeatureFlagService;
       licenseProof: SsoLicenseProofPort;
       isHosted?: () => boolean;
-      /** The frozen gate. Injected so a test can hold an installation that
-       *  started unlicensed without restarting a process. */
-      licensedAtStartup?: () => Promise<boolean>;
+      /** The licence gate. Injected so a test can hold a gate that still
+       *  denies after a licence was stored. */
+      licenseGate?: () => Promise<boolean>;
       /** The same port the guards ask, so the screen and the rule agree on
        *  how many organizations the installation holds. */
       licenseAuthority: Pick<
@@ -178,9 +178,7 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
   }): Promise<SsoSelfServeContext> {
     const isHosted = this.deps.isHosted ?? (() => !!env.IS_SAAS);
     const deployment = isHosted() ? "hosted" : "self-hosted";
-    const licensed = await (
-      this.deps.licensedAtStartup ?? platformSSOAllowed
-    )();
+    const licensed = await (this.deps.licenseGate ?? platformSSOAllowed)();
     const { singleOrganization, actorIsPlatformOperator } =
       deployment === "self-hosted" && licensed
         ? await this.whoTheLicenseSpeaksFor({ actorId })
@@ -190,7 +188,7 @@ export class SsoSelfServeContextResolver implements SsoSelfServeContextPort {
       actorIsPlatformOperator,
       deployment,
       licensed: deployment === "self-hosted" ? licensed : false,
-      licenseActivatedSinceStart:
+      licenseActivationPending:
         deployment === "self-hosted" && !licensed
           ? (await this.deps.licenseProof.currentLicenseKey()) !== null
           : false,

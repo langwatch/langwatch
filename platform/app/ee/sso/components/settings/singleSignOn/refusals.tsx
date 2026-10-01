@@ -51,11 +51,11 @@ export function LoadFailure({ error, what }: { error: unknown; what: string }) {
 const REFUSAL_COPY = {
   license_required: {
     title: "Single sign-on needs an active license",
-    body: "Activate an enterprise license on this installation, then restart it, and you can set single sign-on up here.",
+    body: "Activate an enterprise license on this installation, and you can set single sign-on up here.",
   },
-  license_restart_required: {
-    title: "Restart to finish activating single sign-on",
-    body: "The license is active. This installation decides what it federates when it starts, so single sign-on becomes available after the next restart.",
+  license_activation_pending: {
+    title: "Single sign-on is turning on",
+    body: "The license is active. Every server in this installation picks it up within a minute. Reload this page then.",
   },
   not_opted_in: {
     title: "Setting single sign-on up yourself isn't switched on yet",

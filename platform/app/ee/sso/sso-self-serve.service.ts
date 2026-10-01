@@ -1233,8 +1233,8 @@ export class SsoSelfServeService {
 
   /**
    * Setup is available, or the reader is told what would change that. The
-   * three refusals are the three honest answers: activate a licence, restart
-   * for the licence you activated, or talk to us.
+   * three refusals are the three answers: activate a licence, wait a minute
+   * for the licence you activated to reach every replica, or talk to us.
    */
   private async requireAvailable({
     organizationId,
@@ -1253,8 +1253,8 @@ export class SsoSelfServeService {
       );
     }
     throw new SsoLicenseRequiredError(
-      availability.refusal === "license_restart_required"
-        ? `organization ${organizationId}: a license was activated after this process started`
+      availability.refusal === "license_activation_pending"
+        ? `organization ${organizationId}: a license was activated and has not reached this process's gate yet`
         : `organization ${organizationId}: the installation holds no genuine license`,
     );
   }
