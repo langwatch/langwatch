@@ -7,16 +7,16 @@ description: How many rows and questions a run takes, how long it runs, what a r
 
 ## Limits
 
-| What | Limit |
-|---|---|
-| Rows per run | 1,000 unless you pass `--limit`; 10,000 through the API unless you pass `limit`; 10,000 at most on the free plan, 100,000 on a paid plan |
-| Questions per run | 10 |
-| Levels on a score scale | 10 |
-| Options on a category question | 255 |
-| Text per row | About 31,000 tokens, less what your questions take; the `traces` digest is cut to 8,000 |
-| Rows `sample` reads | 25 |
-| Verdicts per `results` page | 1,000 |
-| Time `status --wait` waits | 45 minutes, or the number of minutes you give it |
+| What                           | Limit                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Rows per run                   | 1,000 unless you pass `--limit`; 10,000 through the API unless you pass `limit`; 10,000 at most on the free plan, 100,000 on a paid plan |
+| Questions per run              | 10                                                                                                                                       |
+| Levels on a score scale        | 10                                                                                                                                       |
+| Options on a category question | 255                                                                                                                                      |
+| Text per row                   | About 31,000 tokens, less what your questions take; the `traces` digest is cut to 8,000                                                  |
+| Rows `sample` reads            | 25                                                                                                                                       |
+| Verdicts per `results` page    | 1,000                                                                                                                                    |
+| Time `status --wait` waits     | 45 minutes, or the number of minutes you give it                                                                                         |
 
 Ask for more rows than your plan allows and the run is refused with `instant_eval_row_cap_exceeded`, with the cap and the plan in the refusal. When the rows in the window outnumber the limit, the run judges up to the limit and reports `isCapped`, so narrow the window or the filter when the answer has to cover every row.
 

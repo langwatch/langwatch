@@ -1,0 +1,1228 @@
+# Analytics on main's addresses: overview cards, the period switch, the users and topics pages,
+# every chart kind the builder offers, dashboard rename/reorder/widget edits read back after a
+# reload, and saved charts reopened.
+#
+# Labels, headings and test ids come from origin/main (platform/app/src/components/analytics,
+# components/PeriodSelector.tsx, pages/[project]/analytics). Every name carries {uid}, except where
+# a setup-made row is found by its own fixed name (a setup {uid} is not the flow's).
+# Not scripted, with the reason:
+#  - CSV and PNG export: main's analytics pages and dashboards have no export control to click;
+#  - a saved LangWatchQL chart or the workbench: main has no workbench page, and the saved-chart
+#    REST route is project-scoped (/api/v1/projects/:projectId/...) with no fixture carrying the id;
+#  - topic data: topics are clustered offline, so the topics page is read as its cards, not rows.
+flows:
+  - id: analytics-overview-cards
+    title: The analytics overview shows its user, LLM, evaluation and topic cards
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: expect
+        with:
+          text: Top Topics
+      - action: expect
+        with:
+          text: Thread Metrics
+      - action: expect
+        with:
+          text: LLM Metrics
+      - action: expect
+        with:
+          text: Evaluations Summary
+      - action: expect
+        with:
+          text: Error Trend
+      - action: expect
+        with:
+          text: Latency Trend
+      - action: expect
+        with:
+          text: Custom Dashboards
+      - action: expect
+        with:
+          count: "[role=tab]"
+          min: "3"
+
+  - id: analytics-overview-tabs
+    title: The overview's user card switches between traces, threads and users
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: click
+        with:
+          selector: "[role=tab]"
+          text: /Threads/
+      - action: expect
+        with:
+          count: '[role=tab][aria-selected="true"]:has-text("Threads")'
+          equals: "1"
+      - action: click
+        with:
+          selector: "[role=tab]"
+          text: /Users/
+      - action: expect
+        with:
+          count: '[role=tab][aria-selected="true"]:has-text("Users")'
+          equals: "1"
+
+  - id: analytics-overview-period-switch
+    title: Switch the overview's time range from the picker and see it again after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: expect
+        with:
+          text: Last 30 days
+      - action: click
+        with:
+          selector: button
+          text: /Last 30 days/
+      - action: expect
+        with:
+          text: Select Date Range
+      - action: click
+        with:
+          selector: button
+          text: /^\s*Last 7 days\s*$/
+      - action: wait
+        with:
+          millis: "1500"
+      - action: expect
+        with:
+          count: 'button:has-text("Last 7 days")'
+          equals: "1"
+      - action: go
+        with:
+          path: /{slug}/analytics?period=7d
+      - action: expect
+        with:
+          text: Last 7 days
+      - action: go
+        with:
+          path: /{slug}/analytics?period=90d
+      - action: expect
+        with:
+          text: Last 90 days
+
+  - id: analytics-overview-period-custom-range
+    title: Type a start date into the picker and read the range back on the trigger
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: click
+        with:
+          selector: button
+          text: /Last 30 days/
+      - action: fill
+        with:
+          selector: 'input[type="datetime-local"]'
+          value: "2026-01-01T00:00"
+      - action: expect
+        with:
+          text: /Jan 1 - /
+
+  - id: analytics-overview-navigation
+    title: The analytics menu and the overview's links reach users, topics, LLM metrics and back
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: click
+        with:
+          label: View LLM Metrics
+      - action: expect
+        with:
+          url: /analytics/metrics
+      - action: click
+        with:
+          selector: a
+          text: /^\s*Users\s*$/
+      - action: expect
+        with:
+          url: /analytics/users
+      - action: click
+        with:
+          selector: a
+          text: /^\s*Topics\s*$/
+      - action: expect
+        with:
+          url: /analytics/topics
+      - action: click
+        with:
+          selector: a
+          text: /^\s*Overview\s*$/
+      - action: expect
+        with:
+          url: /\/analytics$/
+
+  - id: analytics-overview-dashboard-card
+    title: A dashboard shows as a card on the overview and opens its report
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-overview-card
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics
+      - action: expect
+        with:
+          text: vd-overview-card
+      - action: click
+        with:
+          selector: a
+          text: vd-overview-card
+      - action: expect
+        with:
+          url: /analytics/reports
+
+  - id: analytics-users-page
+    title: The users page shows its user, thread, leaderboard and feedback cards
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/users
+      - action: expect
+        with:
+          text: User Traces
+      - action: expect
+        with:
+          text: User Threads
+      - action: expect
+        with:
+          text: Daily Users
+      - action: expect
+        with:
+          text: Daily Threads
+      - action: expect
+        with:
+          text: Max Traces Per Thread
+      - action: expect
+        with:
+          text: User Leaderboard
+      - action: expect
+        with:
+          text: Traces by Label
+      - action: expect
+        with:
+          text: Traces by Customer
+      - action: expect
+        with:
+          text: User Feedbacks
+
+  - id: analytics-users-period-switch
+    title: Switch the users page's time range and see it again after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/users
+      - action: click
+        with:
+          selector: button
+          text: /Last 30 days/
+      - action: click
+        with:
+          selector: button
+          text: /^\s*Last 90 days\s*$/
+      - action: wait
+        with:
+          millis: "1500"
+      - action: expect
+        with:
+          count: 'button:has-text("Last 90 days")'
+          equals: "1"
+      - action: go
+        with:
+          path: /{slug}/analytics/users?period=90d
+      - action: expect
+        with:
+          text: Last 90 days
+      - action: expect
+        with:
+          text: User Leaderboard
+
+  - id: analytics-topics-page
+    title: The topics page shows its topic list and topic charts
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/topics
+      - action: expect
+        with:
+          text: Top Topics
+      - action: expect
+        with:
+          text: Threads Per Topic
+      - action: expect
+        with:
+          text: Most Discussed Topics
+
+  - id: analytics-topics-period-switch
+    title: Switch the topics page's time range and see it again after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/topics
+      - action: click
+        with:
+          selector: button
+          text: /Last 30 days/
+      - action: click
+        with:
+          selector: button
+          text: /^\s*Last 7 days\s*$/
+      - action: wait
+        with:
+          millis: "1500"
+      - action: expect
+        with:
+          count: 'button:has-text("Last 7 days")'
+          equals: "1"
+      - action: go
+        with:
+          path: /{slug}/analytics/topics?period=7d
+      - action: expect
+        with:
+          text: Last 7 days
+      - action: expect
+        with:
+          text: Threads Per Topic
+
+  - id: analytics-chart-kind-summary
+    title: Build a summary on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-summary
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Summary\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-summary-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-summary-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: summary
+
+  - id: analytics-chart-kind-line
+    title: Build a line chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-line
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-line-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-line-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: line
+
+  - id: analytics-chart-kind-area
+    title: Build a area chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-area
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Area Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-area-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-area-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: area
+
+  - id: analytics-chart-kind-stacked-area
+    title: Build a stacked area chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-stacked-area
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Stacked Area Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-stacked-area-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-stacked-area-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: stacked_area
+
+  - id: analytics-chart-kind-bar
+    title: Build a bar chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-bar
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Bar Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-bar-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-bar-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: bar
+
+  - id: analytics-chart-kind-stacked-bar
+    title: Build a stacked bar chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-stacked-bar
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Stacked Bar Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-stacked-bar-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-stacked-bar-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: stacked_bar
+
+  - id: analytics-chart-kind-horizontal-bar
+    title: Build a horizontal bar chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-horizontal-bar
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Horizontal Bar Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-horizontal-bar-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-horizontal-bar-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: horizontal_bar
+
+  - id: analytics-chart-kind-scatter
+    title: Build a scatter chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-scatter
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Scatter Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-scatter-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-scatter-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: scatter
+
+  - id: analytics-chart-kind-pie
+    title: Build a pie chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-pie
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Pie Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-pie-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-pie-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: pie
+
+  - id: analytics-chart-kind-donut
+    title: Build a donut chart on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-donut
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Donut Chart\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-donut-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-donut-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: donnut
+
+  - id: analytics-chart-kind-monitor-graph
+    title: Build a monitor graph on a dashboard, save it and read its kind back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-monitor-graph
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom?dashboard={dashId}
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Monitor Graph\s*$/
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-monitor-graph-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-monitor-graph-{uid}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.graph.graphType
+          equals: monitor_graph
+
+  - id: analytics-chart-kind-edit-reads-back
+    title: Change a saved chart's kind in the builder, update it and read the kind back
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-kind-edit
+        as:
+          dashId: id
+      - post: /api/graphs
+        body:
+          name: vd-graph-kind-edit
+          dashboardId: "{dashId}"
+          graph:
+            graphType: line
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+        as:
+          graphId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom/{graphId}?dashboard={dashId}
+      - action: expect
+        with:
+          text: Line Chart
+      - action: click
+        with:
+          selector: "[role=combobox]"
+          text: /Line Chart/
+      - action: click
+        with:
+          selector: "[role=option]"
+          text: /^\s*Horizontal Bar Chart\s*$/
+      - action: click
+        with:
+          selector: 'button:text-is("Update")'
+      - action: expect
+        with:
+          url: /analytics/reports
+      - action: expect
+        with:
+          api: /api/graphs/{graphId}
+          field: graph.graphType
+          equals: horizontal_bar
+      - action: go
+        with:
+          path: /{slug}/analytics/custom/{graphId}?dashboard={dashId}
+      - action: expect
+        with:
+          text: Horizontal Bar Chart
+
+  - id: analytics-saved-chart-reopen-and-rename
+    title: Reopen a saved chart from its own address, rename it and read the name back
+    setup:
+      - post: /api/graphs
+        body:
+          name: vd-saved-chart-seed
+          graph:
+            graphType: bar
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+        as:
+          graphId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom/{graphId}
+      - action: expect
+        with:
+          text: Bar Chart
+      - action: fill
+        with:
+          selector: 'input[name="title"]'
+          value: vd-saved-chart-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Update")'
+      - action: expect
+        with:
+          api: /api/graphs/{graphId}
+          field: name
+          equals: vd-saved-chart-{uid}
+      - action: expect
+        with:
+          api: /api/graphs/{graphId}
+          field: graph.graphType
+          equals: bar
+
+  - id: analytics-saved-chart-missing
+    title: A saved chart that does not exist says so instead of an empty builder
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom/vd-missing-{uid}
+      - action: expect
+        with:
+          text: Graph not found
+      - action: expect
+        with:
+          text: does not exist or you do not have access
+
+  - id: dashboard-reorder-dashboards-reads-back
+    title: Move a dashboard up in the sidebar and see the order again after a reload
+    isolated: true
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-reorder-first
+      - post: /api/dashboards
+        body:
+          name: vd-reorder-second
+    steps:
+      - action: go
+        with:
+          path: /{isolatedSlug}/analytics/reports
+      - action: expect
+        with:
+          count: 'xpath=//a[normalize-space()="vd-reorder-first"]/following::a[normalize-space()="vd-reorder-second"]'
+          equals: "1"
+      - action: click
+        with:
+          selector: 'xpath=//a[normalize-space()="vd-reorder-second"]/following-sibling::button[contains(@class,"menu-btn")]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Move Up\s*$/
+      - action: expect
+        with:
+          count: 'xpath=//a[normalize-space()="vd-reorder-second"]/following::a[normalize-space()="vd-reorder-first"]'
+          equals: "1"
+      - action: go
+        with:
+          path: /{isolatedSlug}/analytics/reports
+      - action: expect
+        with:
+          count: 'xpath=//a[normalize-space()="vd-reorder-second"]/following::a[normalize-space()="vd-reorder-first"]'
+          equals: "1"
+
+  - id: dashboard-reorder-graphs-reads-back
+    title: Drag a chart below its neighbour on a dashboard and read the order back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-graph-order
+        as:
+          dashId: id
+      - post: /api/graphs
+        body:
+          name: vd-graph-order-first
+          dashboardId: "{dashId}"
+          gridColumn: 0
+          gridRow: 0
+          graph:
+            graphType: line
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+      - post: /api/graphs
+        body:
+          name: vd-graph-order-second
+          dashboardId: "{dashId}"
+          gridColumn: 0
+          gridRow: 3
+          graph:
+            graphType: line
+            includePrevious: false
+            timeScale: 60
+            series:
+              - metric: metadata.trace_id
+                aggregation: cardinality
+                name: Traces
+                colorSet: orangeTones
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          count: .chart-grid-item
+          equals: "2"
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.name
+          equals: vd-graph-order-first
+      - action: drag
+        with:
+          fromSelector: ".chart-grid-item:nth-of-type(1) .chart-grid-drag-handle"
+          toSelector: ".chart-grid-item:nth-of-type(2) .chart-grid-drag-handle"
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.name
+          equals: vd-graph-order-second
+          timeout: "15000"
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          api: /api/graphs?dashboardId={dashId}
+          field: 0.name
+          equals: vd-graph-order-second
+
+  - id: dashboard-widget-queries-edit-reads-back
+    title: Add a query to a dashboard widget, remove one, and see the count after each reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-widget-queries
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
+      - action: click
+        with:
+          text: Add chart
+      - action: click
+        with:
+          label: Rename New widget
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-widget-queries-{uid}
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: Add query
+      - action: expect
+        with:
+          text: Queries (2)
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-widget-queries-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-widget-queries-{uid}
+      - action: click
+        with:
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Edit( Graph)?\s*$/
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: expect
+        with:
+          text: Queries (2)
+      - action: click
+        with:
+          label: /^Delete query /
+      - action: expect
+        with:
+          text: Queries (1)
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: click
+        with:
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Edit( Graph)?\s*$/
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: expect
+        with:
+          text: Queries (1)
+
+  - id: dashboard-widget-rename-reads-back
+    title: Rename a dashboard widget twice and read each name back after a reload
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-dash-widget-rename
+        as:
+          dashId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          count: 'button:not([href]):has-text("Add chart")'
+          min: "1"
+          timeout: "30000"
+      - action: click
+        with:
+          text: Add chart
+      - action: click
+        with:
+          label: Rename New widget
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-widget-a-{uid}
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-widget-a-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-widget-a-{uid}
+      - action: click
+        with:
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Edit( Graph)?\s*$/
+      - action: click
+        with:
+          label: Rename vd-widget-a-{uid}
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-widget-b-{uid}
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-widget-b-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports?dashboard={dashId}
+      - action: expect
+        with:
+          text: vd-widget-b-{uid}
+      - action: expect
+        with:
+          text: vd-widget-a-{uid}
+          equals: "0"
+
+  - id: dashboard-lifecycle-reload-readback
+    title: Create a dashboard, add a widget, rename the dashboard, delete it, reloading after each
+    setup:
+      - post: /api/dashboards
+        body:
+          name: vd-lifecycle-keeper
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/reports
+      - action: click
+        with:
+          text: Add Dashboard
+      - action: fill
+        with:
+          field: Dashboard name
+          value: vd-life-{uid}
+      - action: click
+        with:
+          selector: button
+          text: /^\s*Create Dashboard\s*$/
+      - action: expect
+        with:
+          api: /api/dashboards
+          contains: vd-life-{uid}
+      - action: click
+        with:
+          text: Add chart
+      - action: click
+        with:
+          label: Rename New widget
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-life-widget-{uid}
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: vd-life-widget-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports
+      - action: click
+        with:
+          selector: a
+          text: vd-life-{uid}
+      - action: expect
+        with:
+          text: vd-life-widget-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//a[normalize-space()="vd-life-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Rename\s*$/
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: vd-life-renamed-{uid}
+      - action: click
+        with:
+          text: /^\s*Custom\s*$/
+      - action: expect
+        with:
+          api: /api/dashboards
+          contains: vd-life-renamed-{uid}
+      - action: go
+        with:
+          path: /{slug}/analytics/reports
+      - action: expect
+        with:
+          text: vd-life-renamed-{uid}
+      - action: click
+        with:
+          selector: 'xpath=//a[normalize-space()="vd-life-renamed-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          text: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^Delete$/
+      - action: go
+        with:
+          path: /{slug}/analytics/reports
+      - action: expect
+        with:
+          text: vd-life-renamed-{uid}
+          equals: "0"
+      - action: expect
+        with:
+          text: vd-lifecycle-keeper

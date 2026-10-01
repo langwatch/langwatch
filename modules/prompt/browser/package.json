@@ -1,0 +1,83 @@
+{
+  "name": "@langwatch/prompt-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Prompt UI primitives and presentation helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/prompt.web.ts",
+      "types": "./dist/prompt.web.d.ts",
+      "default": "./src/prompt.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-browser": "workspace:*",
+    "@langwatch/onboarding-browser-kit": "workspace:*",
+    "@langwatch/prompt-browser-kit": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@xyflow/react": "catalog:",
+    "ajv": "catalog:",
+    "clsx": "2.1.1",
+    "diff": "catalog:",
+    "immer": "^11.1.8",
+    "langwatch": "workspace:*",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "rich-textarea": "^0.27.0",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:",
+    "zod-validation-error": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

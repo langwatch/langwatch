@@ -1,5 +1,7 @@
 import chalk from "chalk";
+
 import { OrganizationApiService } from "@/client-sdk/services/organization/organization-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement } from "../management/_shared";
@@ -9,9 +11,7 @@ import { orDash, printFacts, runManagement } from "../management/_shared";
  * bindings. Personal workspaces are not listed: they are not access an
  * administrator manages.
  */
-export const getMemberCommand = async (
-  userId: string,
-): Promise<CommandResult | void> =>
+export const getMemberCommand = async (userId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch member",
     pending: `Fetching member "${userId}"...`,

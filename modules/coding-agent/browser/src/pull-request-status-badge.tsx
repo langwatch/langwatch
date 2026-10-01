@@ -1,0 +1,87 @@
+import { readableDate } from "@langwatch/coding-agent-browser-kit";
+import { Badge } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { IconType } from "react-icons";
+import {
+  LuGitMerge,
+  LuGitPullRequest,
+  LuGitPullRequestClosed,
+  LuGitPullRequestDraft,
+} from "react-icons/lu";
+
+import { PULL_REQUEST_STATUS_LABELS, type PullRequestStatus } from "./pull-request-status.ts";
+
+/**
+ * A pull request's state, drawn the way GitHub draws it: a solid badge in
+ * the state's own color, with GitHub's own mark. A snapshot answer is drawn
+ * back so it never passes for a live one, and its tooltip says how old it is.
+ */
+
+/** GitHub's own colors for the four states. */
+const STATUS_PALETTES: Record<PullRequestStatus, string> = {
+  merged: "purple",
+  open: "green",
+  closed: "red",
+  draft: "gray",
+};
+
+/** The mark GitHub puts next to each state. The label carries the meaning. */
+const STATUS_ICONS: Record<PullRequestStatus, IconType> = {
+  merged: LuGitMerge,
+  open: LuGitPullRequest,
+  closed: LuGitPullRequestClosed,
+  draft: LuGitPullRequestDraft,
+};
+
+export function PullRequestStatusBadge({
+  status,
+  source,
+  mappedAt = null,
+}: {
+  status: PullRequestStatus;
+  source: "live" | "snapshot" | "payload";
+  mappedAt?: string | null;
+}) {
+  const label = PULL_REQUEST_STATUS_LABELS[status];
+
+  if (source === "snapshot") {
+    const asOf = mappedAt ? readableDate(mappedAt).toLocaleDateString() : null;
+    return (
+      <Tooltip
+        content={
+          asOf
+            ? `Last known status, from ${asOf}. GitHub is not answering right now.`
+            : "Last known status. GitHub is not answering right now."
+        }
+      >
+        <Badge
+          size="sm"
+          variant="outline"
+          colorPalette="gray"
+          color="fg.subtle"
+          data-status-source="snapshot"
+          data-status={status}
+          // How stale the answer is only exists in the hover, so it gets a tab
+          // stop too.
+          tabIndex={0}
+        >
+          {label}
+        </Badge>
+      </Tooltip>
+    );
+  }
+
+  const Icon = STATUS_ICONS[status];
+  return (
+    <Badge
+      size="sm"
+      variant="solid"
+      colorPalette={STATUS_PALETTES[status]}
+      data-status-source={source}
+      data-status={status}
+    >
+      <Icon size={12} aria-hidden />
+      {label}
+    </Badge>
+  );
+}

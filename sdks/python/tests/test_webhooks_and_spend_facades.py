@@ -424,7 +424,7 @@ def test_the_facade_offers_every_filter_the_published_contract_publishes():
     had covered. Read against the published document rather than the server
     source, because the document is what a caller reads."""
     spec_path = (
-        Path(__file__).parents[3] / "platform/app/src/app/api/openapiLangWatch.json"
+        Path(__file__).parents[3] / "docs/api-reference/openapiLangWatch.json"
     )
     assert spec_path.exists(), (
         f"{spec_path} is missing, so this check would pass without checking "

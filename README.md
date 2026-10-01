@@ -74,7 +74,7 @@ Read [CONTRIBUTING.md](https://github.com/langwatch/langwatch/blob/main/CONTRIBU
 
 ## License
 
-Apache 2.0. The enterprise modules under [`platform/app/ee/`](platform/app/ee/) need a commercial license in production, and the SDKs are MIT. See [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing) and [`LICENSE.md`](LICENSE.md).
+Apache 2.0. The enterprise modules under [`enterprise/`](enterprise/) need a commercial license in production, and the SDKs are MIT. See [Editions and licensing](https://langwatch.ai/docs/self-hosting/licensing) and [`LICENSE.md`](LICENSE.md).
 
 ## Security
 

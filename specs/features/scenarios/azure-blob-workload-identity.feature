@@ -481,6 +481,23 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     And the same operations attempted with shared-key auth are rejected by the account
 
   # ---------------------------------------------------------------
+  # Worker/App configuration parity
+  # ---------------------------------------------------------------
+
+  @unit
+  Scenario: Azure dataset normalization reads the same AZURE_BLOB_* block as the App
+    Given the AZURE_BLOB_* environment block the App composes its Azure Blob config from
+    When the worker resolves its own configuration
+    Then the worker's Azure Blob account settings match the App's
+
+  @unit
+  Scenario: The worker refuses the insecure token endpoint escape hatch in production, like the App does
+    Given AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS is set
+    And NODE_ENV is "production"
+    When the worker resolves its own configuration
+    Then allowInsecureTokenEndpointForTests is false
+
+  # ---------------------------------------------------------------
   # Documentation
   # ---------------------------------------------------------------
 

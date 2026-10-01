@@ -1,19 +1,15 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
-from ..models.create_agent_response_201_not_selectable_reason_type_1 import (
-    CreateAgentResponse201NotSelectableReasonType1,
-)
-from ..models.create_agent_response_201_not_selectable_reason_type_2_type_1 import (
-    CreateAgentResponse201NotSelectableReasonType2Type1,
-)
-from ..models.create_agent_response_201_not_selectable_reason_type_3_type_1 import (
-    CreateAgentResponse201NotSelectableReasonType3Type1,
+from ..models.create_agent_response_201_not_selectable_reason_type_0 import (
+    CreateAgentResponse201NotSelectableReasonType0,
 )
 from ..models.create_agent_response_201_status import CreateAgentResponse201Status
 from ..models.create_agent_response_201_type import CreateAgentResponse201Type
@@ -43,7 +39,8 @@ class CreateAgentResponse201:
             against it. Null when the agent is shared.
         host_label (None | str): The machine a development agent registered from with a project or service key. Null
             when the agent is personal or shared.
-        last_seen_at (None | str): When an instance of a connected agent was last connected. Null for every other kind.
+        last_seen_at (datetime.datetime | None): When an instance of a connected agent was last connected. Null for
+            every other kind.
         parameters (list[CreateAgentResponse201ParametersItem]): The run parameters a connected agent declares from its
             function signature: name, type, options, default and description. Empty for every other kind.
         owner (CreateAgentResponse201OwnerType0 | None): The person a personal development agent belongs to. Null when
@@ -55,11 +52,10 @@ class CreateAgentResponse201:
         selectable (bool): Whether the credential making this request can run simulations against the agent. False for a
             personal development agent that belongs to somebody else, which is listed all the same so it can be told apart
             from the other agents of the same name.
-        not_selectable_reason (CreateAgentResponse201NotSelectableReasonType1 |
-            CreateAgentResponse201NotSelectableReasonType2Type1 | CreateAgentResponse201NotSelectableReasonType3Type1 |
-            None): Why the agent cannot be run by this credential. Null when it can.
-        created_at (str):
-        updated_at (str):
+        not_selectable_reason (CreateAgentResponse201NotSelectableReasonType0 | None): Why the agent cannot be run by
+            this credential. Null when it can.
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
         platform_url (str):
     """
 
@@ -70,20 +66,15 @@ class CreateAgentResponse201:
     environment: None | str
     owner_user_id: None | str
     host_label: None | str
-    last_seen_at: None | str
+    last_seen_at: datetime.datetime | None
     parameters: list[CreateAgentResponse201ParametersItem]
     owner: CreateAgentResponse201OwnerType0 | None
     status: CreateAgentResponse201Status
     instances: list[CreateAgentResponse201InstancesItem]
     selectable: bool
-    not_selectable_reason: (
-        CreateAgentResponse201NotSelectableReasonType1
-        | CreateAgentResponse201NotSelectableReasonType2Type1
-        | CreateAgentResponse201NotSelectableReasonType3Type1
-        | None
-    )
-    created_at: str
-    updated_at: str
+    not_selectable_reason: CreateAgentResponse201NotSelectableReasonType0 | None
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     platform_url: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -113,7 +104,10 @@ class CreateAgentResponse201:
         host_label = self.host_label
 
         last_seen_at: None | str
-        last_seen_at = self.last_seen_at
+        if isinstance(self.last_seen_at, datetime.datetime):
+            last_seen_at = self.last_seen_at.isoformat()
+        else:
+            last_seen_at = self.last_seen_at
 
         parameters = []
         for parameters_item_data in self.parameters:
@@ -136,18 +130,14 @@ class CreateAgentResponse201:
         selectable = self.selectable
 
         not_selectable_reason: None | str
-        if isinstance(self.not_selectable_reason, CreateAgentResponse201NotSelectableReasonType1):
-            not_selectable_reason = self.not_selectable_reason.value
-        elif isinstance(self.not_selectable_reason, CreateAgentResponse201NotSelectableReasonType2Type1):
-            not_selectable_reason = self.not_selectable_reason.value
-        elif isinstance(self.not_selectable_reason, CreateAgentResponse201NotSelectableReasonType3Type1):
+        if isinstance(self.not_selectable_reason, CreateAgentResponse201NotSelectableReasonType0):
             not_selectable_reason = self.not_selectable_reason.value
         else:
             not_selectable_reason = self.not_selectable_reason
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         platform_url = self.platform_url
 
@@ -227,10 +217,18 @@ class CreateAgentResponse201:
 
         host_label = _parse_host_label(d.pop("hostLabel"))
 
-        def _parse_last_seen_at(data: object) -> None | str:
+        def _parse_last_seen_at(data: object) -> datetime.datetime | None:
             if data is None:
                 return data
-            return cast(None | str, data)
+            try:
+                if not isinstance(data, str):
+                    raise TypeError()
+                last_seen_at_type_0 = isoparse(data)
+
+                return last_seen_at_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            return cast(datetime.datetime | None, data)
 
         last_seen_at = _parse_last_seen_at(d.pop("lastSeenAt"))
 
@@ -267,53 +265,24 @@ class CreateAgentResponse201:
 
         selectable = d.pop("selectable")
 
-        def _parse_not_selectable_reason(
-            data: object,
-        ) -> (
-            CreateAgentResponse201NotSelectableReasonType1
-            | CreateAgentResponse201NotSelectableReasonType2Type1
-            | CreateAgentResponse201NotSelectableReasonType3Type1
-            | None
-        ):
+        def _parse_not_selectable_reason(data: object) -> CreateAgentResponse201NotSelectableReasonType0 | None:
             if data is None:
                 return data
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                not_selectable_reason_type_1 = CreateAgentResponse201NotSelectableReasonType1(data)
+                not_selectable_reason_type_0 = CreateAgentResponse201NotSelectableReasonType0(data)
 
-                return not_selectable_reason_type_1
+                return not_selectable_reason_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                not_selectable_reason_type_2_type_1 = CreateAgentResponse201NotSelectableReasonType2Type1(data)
-
-                return not_selectable_reason_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                not_selectable_reason_type_3_type_1 = CreateAgentResponse201NotSelectableReasonType3Type1(data)
-
-                return not_selectable_reason_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                CreateAgentResponse201NotSelectableReasonType1
-                | CreateAgentResponse201NotSelectableReasonType2Type1
-                | CreateAgentResponse201NotSelectableReasonType3Type1
-                | None,
-                data,
-            )
+            return cast(CreateAgentResponse201NotSelectableReasonType0 | None, data)
 
         not_selectable_reason = _parse_not_selectable_reason(d.pop("notSelectableReason"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         platform_url = d.pop("platformUrl")
 

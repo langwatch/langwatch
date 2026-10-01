@@ -2,28 +2,10 @@
  * Per-turn orchestration over one pi AgentSession: system-prompt
  * recomposition, event fan-out, abort, preemption, and the terminal-last
  * invariant.
- *
- * Prior-art notes (agentic-pi, @ai-sdk/harness-pi):
- * - session event listeners run synchronously inside `session.prompt()`; a
- *   throw there would reject the prompt, so every listener body is contained.
- * - `session.abort()` from inside a listener or a command handler is
- *   fire-and-forget (`void ... .catch()`): awaiting its `waitForIdle` from a
- *   listener deadlocks.
- * - `prompt()` resolving is decoupled from a clean finish: the terminal
- *   outcome is derived from OUR abort/shutdown flags first, then the last
- *   assistant message's `stopReason`/`errorMessage` (the harness-pi rule:
- *   `stopReason === "error" | "aborted"` is terminal), so a provider error is
- *   never reported as ok.
  */
 
 import { buildHandoffDigest } from "./digest.js";
 import { TurnEventMapper, type SessionEventLike } from "./events.js";
-import {
-  boundText,
-  type GuidedTurnEvent,
-  type TerminalEvent,
-  type TurnCommand,
-} from "./protocol.js";
 import {
   GUIDED_ONBOARDING_SKILL_NAME,
   isGuidedKickoffPrompt,
@@ -37,6 +19,12 @@ import {
   decideGuidedContinuation,
   guidedSegment,
 } from "./guided-turn-end.js";
+import {
+  boundText,
+  type GuidedTurnEvent,
+  type TerminalEvent,
+  type TurnCommand,
+} from "./protocol.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
@@ -71,7 +59,7 @@ type TurnState = {
   segment: number;
   /** Continuation messages appended to that segment so far; one is the limit. */
   continuations: number;
-  /** Continuation messages appended to the turn over all its segments; MAX_TURN_CONTINUATIONS is the cap. */
+  /** Continuation messages over all the turn's segments; MAX_TURN_CONTINUATIONS is the cap. */
   turnContinuations: number;
 };
 
@@ -93,10 +81,9 @@ export type TurnRunnerOptions = {
    */
   turnContext?: TurnContext;
   /**
-   * True when the session continued a persisted transcript at boot. A turn's
-   * `resumeToken` (the shutdown-handoff digest) is then skipped: the session's
-   * own history is the single copy of the conversation, and prepending a
-   * digest of it would re-tell the story and break the byte-stable prefix.
+   * True when the session continued a persisted transcript at boot: a
+   * turn's `resumeToken` is then skipped, since prepending a digest of the
+   * session's own history would re-tell the story and break the prefix.
    */
   sessionResumed?: boolean;
   /**
@@ -127,7 +114,9 @@ export class TurnRunner {
         void this.options.writer.emit(mapped);
       }
     } catch (error) {
-      this.warn(`event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`);
+      this.warn(
+        `event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -291,15 +280,9 @@ export class TurnRunner {
   }
 
   /**
-   * The guided turn end guard. A turn on the guided path that ended clean but
-   * on none of the calls the skill allows (a card still waiting, the closing
-   * line, the one line of a failed step) gets one continuation message,
-   * appended to the same turn, naming what it still owes; the model goes on
-   * and the terminal is derived again. A second bare end is reported and
-   * left. A card answered inside the turn starts a new segment with a
-   * continuation of its own, capped over the turn. A newer turn from the
-   * user, submitted meanwhile, takes precedence: the turn is theirs to
-   * continue then, not the guard's.
+   * The guided turn end guard: a clean turn ending on none of the calls the
+   * skill allows gets one continuation naming what it still owes; a second
+   * bare end is reported and left. A newer turn submitted meanwhile wins.
    */
   private async continueGuidedTurn({
     command,
@@ -349,10 +332,8 @@ export class TurnRunner {
   }
 
   /**
-   * The guard's report goes to the manager as a protocol event, ahead of the
-   * turn's terminal. The manager does not read worker stderr, so a log line
-   * written here would be lost; it logs the event under its name, with the
-   * turn id, the segment and what the turn owed.
+   * The guard's report goes to the manager as a protocol event, ahead of
+   * the turn's terminal — worker stderr is not read, so this is the sink.
    */
   private async reportGuidedTurn({
     state,
@@ -380,7 +361,9 @@ export class TurnRunner {
       try {
         seed = buildHandoffDigest({ messages: session.agent.state.messages });
       } catch (error) {
-        this.warn(`handoff digest failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.warn(
+          `handoff digest failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       return { type: "handoff", turnId: state.turnId, seed };
     }
@@ -392,7 +375,7 @@ export class TurnRunner {
         type: "turn_done",
         turnId: state.turnId,
         outcome: "error",
-        errorMessage: boundText({ text: thrown instanceof Error ? thrown.message : String(thrown) }),
+        errorMessage: boundText({ text: describeThrown(thrown) }),
       };
     }
     const assistantError = lastAssistantError(session.agent.state.messages);
@@ -409,6 +392,12 @@ export class TurnRunner {
     }
     return { type: "turn_done", turnId: state.turnId, outcome: "ok" };
   }
+}
+
+/** A caught value's message, without risking an `[object Object]` stringification. */
+function describeThrown(thrown: unknown): string {
+  if (thrown instanceof Error) return thrown.message;
+  return typeof thrown === "string" ? thrown : "unknown error";
 }
 
 type AssistantError = { kind: "error" | "aborted"; message: string };

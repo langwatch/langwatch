@@ -1,8 +1,9 @@
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export type ModelDefaultScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
@@ -15,7 +16,7 @@ export interface ModelDefaultScopeRef {
 export interface ConfigRow {
   id: string;
   config: Record<string, string>;
-  scopes: Array<{ type: ModelDefaultScopeType; id: string; name: string }>;
+  scopes: { type: ModelDefaultScopeType; id: string; name: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -77,11 +78,10 @@ export class ModelDefaultsApiService {
   ): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        { ...buildRequestHeaders({ apiKey: this.apiKey }), "Content-Type": "application/json" },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {
@@ -91,6 +91,7 @@ export class ModelDefaultsApiService {
         parsed = JSON.parse(errorText);
       } catch {
         // leave as raw text
+        void 0;
       }
       const message = formatApiErrorMessage({
         error: parsed,
@@ -116,34 +117,28 @@ export class ModelDefaultsApiService {
   }
 
   async getSnapshot(): Promise<ModelDefaultsSnapshot> {
-    return this.request<ModelDefaultsSnapshot>("/api/model-defaults");
+    return this.request<ModelDefaultsSnapshot>("/api/v1/model-defaults");
   }
 
   async createConfig(body: CreateConfigBody): Promise<{ id: string }> {
-    return this.request<{ id: string }>("/api/model-defaults", {
+    return this.request<{ id: string }>("/api/v1/model-defaults", {
       method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async updateConfig(id: string, body: UpdateConfigBody): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(body),
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/v1/model-defaults/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      allowNoContent: true,
+    });
   }
 
   async deleteConfig(id: string): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/v1/model-defaults/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      allowNoContent: true,
+    });
   }
 }

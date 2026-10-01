@@ -1,18 +1,18 @@
 {
+  "extends": "../../tsconfig.shared.json",
   "compilerOptions": {
-    "target": "ES2022",
+    // This package emits declarations only (tsup writes the JavaScript), so
+    // `noEmit` from the shared base is turned back off for them.
+    "noEmit": false,
+    "emitDeclarationOnly": true,
     "module": "ESNext",
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
-    "strict": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "bundler",
     "rootDir": "../..",
     // The evaluator catalog we import (services/langevals/ts-integration/evaluators.generated.ts)
     // is Zod-first and imports `zod`, but lives outside this package's
@@ -27,13 +27,23 @@
     "ignoreDeprecations": "6.0",
     "isolatedModules": true,
     "jsx": "preserve",
-    "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
-  "include": [
-    ".eslintrc.cjs",
-    "**/*.ts",
-  ],
-  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
+  "include": [".eslintrc.cjs", "**/*.ts"],
+  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],
+  "references": [
+    {
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redaction/tsconfig.build.json"
+    }
+  ]
 }

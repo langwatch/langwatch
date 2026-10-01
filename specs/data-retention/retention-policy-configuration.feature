@@ -142,3 +142,48 @@ Feature: Data retention policy configuration
     Given a user who is not a platform administrator
     When they open the add-retention-policy drawer
     Then the retention options do not include "no retention"
+
+  # What the settings page itself does, as opposed to how the server resolves a
+  # rule. These are the parts a reader touches: the plan gate that decides
+  # whether the controls appear at all, the scope filter that lives in the page
+  # address so a link carries it, and the fan-out that removes every category a
+  # scope had set in one action.
+
+  @integration
+  Scenario: A free plan sees the policies and is offered no way to change them
+    Given an organization whose plan does not unlock configurable retention
+    When an admin opens the retention policies page
+    Then the page says configurable retention is a paid-plan feature
+    And no control to add a retention policy is offered
+
+  @integration
+  Scenario: The empty page names the default a policy would override
+    Given no retention policy exists anywhere the admin can read
+    When the admin opens the retention policies page
+    Then the page names the platform default of 49 days
+
+  @integration
+  Scenario: The scope filter is carried by the page address
+    Given retention policies at more than one scope
+    When the admin narrows the page to their current team
+    Then the address carries that team, so the same view can be linked to
+
+  @integration
+  Scenario: An address naming a scope with no policies says the filter is why
+    Given retention policies exist, but none at the scope the address names
+    When the admin opens that address
+    Then the page says no policies match the current scope filter
+
+  @integration
+  Scenario: Removing a scope's policy removes every category it had set
+    Given a scope with a retention policy covering more than one category
+    When the admin removes that scope's policy and confirms
+    Then every category the scope had set is removed
+    And the admin is told once that the policy was removed
+
+  @integration
+  Scenario: A removal that fails names the action rather than a code
+    Given a scope with a retention policy
+    When removing it fails
+    Then the admin is told the retention policy could not be removed
+    And no message claims the removal succeeded

@@ -18,9 +18,7 @@ go get github.com/anthropics/anthropic-sdk-go
 
 ## Usage
 
-<Info>
-Set `LANGWATCH_API_KEY` and `ANTHROPIC_API_KEY` environment variables before running.
-</Info>
+<Info>Set `LANGWATCH_API_KEY` and `ANTHROPIC_API_KEY` environment variables before running.</Info>
 
 ```go
 package main
@@ -81,7 +79,8 @@ The middleware captures input and output content **by default** (`langwatch.Data
 </Note>
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
+  when your application exits.
 </Warning>
 
 ## Related

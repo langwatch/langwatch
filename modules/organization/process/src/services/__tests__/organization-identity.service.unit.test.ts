@@ -1,0 +1,141 @@
+import { describe, expect, it } from "vitest";
+
+import { GroupIdentityService } from "../group-identity.service.ts";
+import { PersonalWorkspaceIdentityService } from "../personal-workspace-identity.service.ts";
+import { TeamIdentityService } from "../team-identity.service.ts";
+
+/**
+ * Every value asserted below is written into a row the customer then owns,
+ * so each assertion pins a persisted format — the KSUID prefixes are what
+ * the platform application has always minted; a second root must match.
+ */
+describe("PersonalWorkspaceIdentityService", () => {
+  describe("when a personal workspace is created", () => {
+    /** @scenario "A personal workspace is born with packaged identifiers" */
+    it("mints the resource-prefixed identifiers the platform has always written", () => {
+      const resources = PersonalWorkspaceIdentityService.create().create({
+        userId: "USER_ABCDEFGHIJKLMNOP",
+        organizationId: "organization_1",
+      });
+
+      expect(resources.teamId).toMatch(/^team_/);
+      expect(resources.projectId).toMatch(/^project_/);
+      expect(resources.ownerBindingId).toMatch(/^rolebinding_/);
+      expect(resources.projectApiKey).toMatch(/^pkey_.{40}$/);
+    });
+
+    /** @scenario "A personal workspace is born with packaged identifiers" */
+    it("seeds both slugs from the lower-cased first twelve characters of the user id", () => {
+      const resources = PersonalWorkspaceIdentityService.create().create({
+        userId: "USER_ABCDEFGHIJKLMNOP",
+        organizationId: "organization_1",
+      });
+
+      expect(resources.teamSlug).toMatch(/^personal-user_abcdefg-[0-9a-z_-]{6}$/);
+      expect(resources.projectSlug).toMatch(/^personal-user_abcdefg-[0-9a-z_-]{6}$/);
+    });
+
+    /** @scenario "A personal workspace is born with packaged identifiers" */
+    it("gives the team and the project separate slugs", () => {
+      const resources = PersonalWorkspaceIdentityService.create().create({
+        userId: "user_1",
+        organizationId: "organization_1",
+      });
+
+      expect(resources.teamSlug).not.toBe(resources.projectSlug);
+    });
+
+    /** @scenario "A personal workspace is born with packaged identifiers" */
+    it("mints a distinct set for every call", () => {
+      const adapter = PersonalWorkspaceIdentityService.create();
+      const input = { userId: "user_1", organizationId: "organization_1" };
+
+      const first = adapter.create(input);
+      const second = adapter.create(input);
+
+      expect(first.teamId).not.toBe(second.teamId);
+      expect(first.projectId).not.toBe(second.projectId);
+      expect(first.ownerBindingId).not.toBe(second.ownerBindingId);
+      expect(first.projectApiKey).not.toBe(second.projectApiKey);
+    });
+  });
+});
+
+describe("TeamIdentityService", () => {
+  describe("when a shared team is created", () => {
+    /** @scenario "A shared team is born with packaged identifiers" */
+    it("mints a team-prefixed KSUID", () => {
+      const { teamId } = TeamIdentityService.create().createTeam({ name: "Platform" });
+
+      expect(teamId).toMatch(/^team_[0-9A-Za-z]+$/);
+    });
+
+    /** @scenario "A shared team is born with packaged identifiers" */
+    it("suffixes the slug with the random tail of the team id", () => {
+      const { teamId, slug } = TeamIdentityService.create().createTeam({ name: "Platform" });
+
+      expect(slug).toBe(`platform-${teamId.slice(-6)}`);
+    });
+
+    it("tells apart the slugs of teams created in the same moment", () => {
+      const service = TeamIdentityService.create();
+      const first = service.createTeam({ name: "Platform" });
+      const second = service.createTeam({ name: "Platform" });
+
+      expect(first.slug).not.toBe(second.slug);
+    });
+
+    /** @scenario "A team or group slug survives a URL" */
+    it("reduces separators, accents and symbols to a single dash-joined ASCII word", () => {
+      const { teamId, slug } = TeamIdentityService.create().createTeam({
+        name: "Crème_Brûlée: R&D?",
+      });
+
+      expect(slug).toBe(`creme-brulee-r-d-${teamId.slice(-6)}`);
+    });
+  });
+
+  describe("when a role binding is minted for a team", () => {
+    /** @scenario "A shared team is born with packaged identifiers" */
+    it("uses the same rolebinding resource every other binding carries", () => {
+      const adapter = TeamIdentityService.create();
+
+      expect(adapter.createBindingId()).toMatch(/^rolebinding_/);
+      expect(adapter.createBindingId()).not.toBe(adapter.createBindingId());
+    });
+  });
+});
+
+describe("GroupIdentityService", () => {
+  describe("when a group is created", () => {
+    /** @scenario "An organization group is born with packaged identifiers" */
+    it("mints a group-prefixed KSUID", () => {
+      const adapter = GroupIdentityService.create();
+
+      expect(adapter.createGroupId()).toMatch(/^group_/);
+      expect(adapter.createGroupId()).not.toBe(adapter.createGroupId());
+    });
+
+    /** @scenario "An organization group is born with packaged identifiers" */
+    it("mints role bindings under the shared rolebinding resource", () => {
+      expect(GroupIdentityService.create().createBindingId()).toMatch(/^rolebinding_/);
+    });
+
+    /** @scenario "A team or group slug survives a URL" */
+    it("returns a base slug with no identifier tail for the service to disambiguate", () => {
+      expect(GroupIdentityService.create().slugify("Crème_Brûlée: R&D?")).toBe("creme-brulee-r-d");
+    });
+
+    /** @scenario "A team or group slug survives a URL" */
+    it("slugs a name identically for a group and for a team", () => {
+      const { teamId, slug } = TeamIdentityService.create().createTeam({
+        name: "Platform Engineering",
+      });
+
+      expect(GroupIdentityService.create().slugify("Platform Engineering")).toBe(
+        "platform-engineering",
+      );
+      expect(slug).toBe(`platform-engineering-${teamId.slice(-6)}`);
+    });
+  });
+});

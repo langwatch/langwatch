@@ -1,14 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Protocol smoke test, no real LLM required: spawns the worker with a scratch
- * HOME whose model config points at a DEAD endpoint, then asserts the
- * protocol order on a real pipe:
- *
- *   ready -> pong -> turn_started -> turn_done{outcome:"error"}
- *
- * Usage:
- *   bun run scripts/smoke.ts                          # spawns `node dist/src/main.js` (run `pnpm build` first)
- *   bun run scripts/smoke.ts --bin=./out/langy-worker # spawns a compiled binary
+ * Protocol smoke test against a dead LLM endpoint:
+ * ready -> pong -> turn_started -> turn_done{outcome:"error"}
+ * Usage: bun run scripts/smoke.ts [--bin=<worker>]
  */
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -52,18 +46,21 @@ const child = spawn(command as string, commandArgs, {
   },
 });
 
-const events: Array<Record<string, unknown>> = [];
+const events: Record<string, unknown>[] = [];
 let buffer = "";
 let failed = false;
 
 const deadline = setTimeout(() => {
-  console.error("smoke: TIMEOUT after 60s; events so far:", events.map((e) => e.type));
+  console.error(
+    "smoke: TIMEOUT after 60s; events so far:",
+    events.map((e) => e.type),
+  );
   failed = true;
   child.kill("SIGKILL");
 }, 60_000);
 
 child.stderr.on("data", (chunk: Buffer) => {
-  process.stderr.write(`[worker stderr] ${chunk}`);
+  process.stderr.write(`[worker stderr] ${chunk.toString("utf8")}`);
 });
 
 // A spawn that never starts emits `error`, not `exit`, so the report and the
@@ -124,8 +121,7 @@ child.on("exit", (code) => {
     return true;
   });
   const terminal = events.find((e) => e.type === "turn_done");
-  const terminalOk =
-    terminal?.turnId === "smoke-1" && terminal?.outcome === "error";
+  const terminalOk = terminal?.turnId === "smoke-1" && terminal?.outcome === "error";
   const turnEvents = events.filter((e) => e.turnId === "smoke-1");
   const terminalIsLastForTurn =
     turnEvents.length > 0 && turnEvents[turnEvents.length - 1]?.type === "turn_done";
@@ -133,7 +129,8 @@ child.on("exit", (code) => {
 
   rmSync(home, { recursive: true, force: true });
 
-  if (failed || !ordered || !terminalOk || !terminalIsLastForTurn || !readyFirst) {
+  const smokePassed = !failed && ordered && terminalOk && terminalIsLastForTurn && readyFirst;
+  if (!smokePassed) {
     console.error("smoke: FAIL", {
       code,
       types,

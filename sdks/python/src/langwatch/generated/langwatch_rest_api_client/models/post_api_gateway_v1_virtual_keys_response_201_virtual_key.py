@@ -17,7 +17,6 @@ from ..models.post_api_gateway_v1_virtual_keys_response_201_virtual_key_routing_
 from ..models.post_api_gateway_v1_virtual_keys_response_201_virtual_key_status import (
     PostApiGatewayV1VirtualKeysResponse201VirtualKeyStatus,
 )
-from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_gateway_v1_virtual_keys_response_201_virtual_key_metadata import (
@@ -43,29 +42,23 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
         purpose (PostApiGatewayV1VirtualKeysResponse201VirtualKeyPurpose):
         display_prefix (str):
         principal_user_id (None | str):
-        trace_project_id (None | str): The project this key's traces and costs land in, which is the project its spend
-            is attributed to. Not a scope: it grants no access to the key. Decided when the key is written and stored on it,
-            so editing what the key is scoped to never moves it; send `trace_project_id` on an update to move it. Null only
-            on a key created before this was stored, in an organization that had no governance project to fall back to;
-            those keys export no spans until they are given a destination.
-        trace_project_archived (bool): True when the project in `trace_project_id` has been deleted. The key goes on
-            sending its traces there, so the data stays whole and reappears if the project is restored, and traffic is never
-            refused for it. Nothing else on the key says the destination is gone.
+        trace_project_id (None | str): The project this key's traces and costs land in. Not a scope: it grants no access
+            to the key. Null only on a key created before this was stored.
+        trace_project_archived (bool): True when the project in trace_project_id has been deleted. The key goes on
+            sending its traces there.
         external_id (None | str):
         metadata (PostApiGatewayV1VirtualKeysResponse201VirtualKeyMetadata):
         scopes (list[PostApiGatewayV1VirtualKeysResponse201VirtualKeyScopesItem]):
         routing_policy_id (None | str):
         routing_mode (PostApiGatewayV1VirtualKeysResponse201VirtualKeyRoutingMode):
+        config (Any):
         revision (str):
         created_at (datetime.datetime):
         updated_at (datetime.datetime):
         last_used_at (datetime.datetime | None):
         revoked_at (datetime.datetime | None):
-        expires_at (datetime.datetime | None): When the key stops serving, or null for a key that never expires.
-            Requests presented after this moment are refused with `virtual_key_expired`. `status` stays `active` past the
-            date on purpose: the three status values are what clients switch on, and the key stays editable so the date can
-            be extended.
-        config (Any | Unset):
+        expires_at (datetime.datetime | None): When the key stops serving, or null for a key that never expires. status
+            stays active past the date on purpose.
     """
 
     id: str
@@ -83,13 +76,13 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
     scopes: list[PostApiGatewayV1VirtualKeysResponse201VirtualKeyScopesItem]
     routing_policy_id: None | str
     routing_mode: PostApiGatewayV1VirtualKeysResponse201VirtualKeyRoutingMode
+    config: Any
     revision: str
     created_at: datetime.datetime
     updated_at: datetime.datetime
     last_used_at: datetime.datetime | None
     revoked_at: datetime.datetime | None
     expires_at: datetime.datetime | None
-    config: Any | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -131,6 +124,8 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         routing_mode = self.routing_mode.value
 
+        config = self.config
+
         revision = self.revision
 
         created_at = self.created_at.isoformat()
@@ -155,8 +150,6 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
         else:
             expires_at = self.expires_at
 
-        config = self.config
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -176,6 +169,7 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
                 "scopes": scopes,
                 "routing_policy_id": routing_policy_id,
                 "routing_mode": routing_mode,
+                "config": config,
                 "revision": revision,
                 "created_at": created_at,
                 "updated_at": updated_at,
@@ -184,8 +178,6 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
                 "expires_at": expires_at,
             }
         )
-        if config is not UNSET:
-            field_dict["config"] = config
 
         return field_dict
 
@@ -259,6 +251,8 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         routing_mode = PostApiGatewayV1VirtualKeysResponse201VirtualKeyRoutingMode(d.pop("routing_mode"))
 
+        config = d.pop("config")
+
         revision = d.pop("revision")
 
         created_at = isoparse(d.pop("created_at"))
@@ -310,8 +304,6 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
 
         expires_at = _parse_expires_at(d.pop("expires_at"))
 
-        config = d.pop("config", UNSET)
-
         post_api_gateway_v1_virtual_keys_response_201_virtual_key = cls(
             id=id,
             organization_id=organization_id,
@@ -328,13 +320,13 @@ class PostApiGatewayV1VirtualKeysResponse201VirtualKey:
             scopes=scopes,
             routing_policy_id=routing_policy_id,
             routing_mode=routing_mode,
+            config=config,
             revision=revision,
             created_at=created_at,
             updated_at=updated_at,
             last_used_at=last_used_at,
             revoked_at=revoked_at,
             expires_at=expires_at,
-            config=config,
         )
 
         post_api_gateway_v1_virtual_keys_response_201_virtual_key.additional_properties = d

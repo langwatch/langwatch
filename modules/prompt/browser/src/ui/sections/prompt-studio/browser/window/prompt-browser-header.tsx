@@ -1,0 +1,47 @@
+import { Box } from "@langwatch/design-system/primitives";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { useFormContext } from "react-hook-form";
+
+import { useHandleSavePrompt } from "../../../../../behavior/use-handle-save-prompt.ts";
+import { useHasUnsavedChanges } from "../../../../../behavior/use-has-unsaved-changes.ts";
+import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
+import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt.ts";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
+import { PromptEditorHeader } from "../../prompt-editor-header.tsx";
+import { useTabId } from "../../studio-internals.ts";
+
+/**
+ * Header bar for the prompt browser: handle, model selector, and action
+ * buttons, built on the shared PromptEditorHeader for parity with the drawer.
+ */
+export function PromptBrowserHeader() {
+  const formMethods = useFormContext<PromptConfigFormValues>();
+  const { handleSaveVersion } = useHandleSavePrompt();
+  const tabId = useTabId();
+  const hasUnsavedChanges = useHasUnsavedChanges(tabId);
+  const openHistoryOnLoad = useDraggableTabsBrowserStore(({ windows }) => {
+    const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
+    return tab?.data.meta.openHistoryOnLoad;
+  });
+
+  /**
+   * handleOnRestore
+   * Single Responsibility: Restores form values when a version is selected from history.
+   * @param params - The versioned prompt data to restore
+   */
+  const handleOnRestore = async (params: WireVersionedPrompt) => {
+    const newFormValues = versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
+    formMethods.reset(newFormValues);
+  };
+
+  return (
+    <Box width="full">
+      <PromptEditorHeader
+        onSave={handleSaveVersion}
+        hasUnsavedChanges={hasUnsavedChanges}
+        onVersionRestore={handleOnRestore}
+        openHistoryOnLoad={openHistoryOnLoad}
+      />
+    </Box>
+  );
+}

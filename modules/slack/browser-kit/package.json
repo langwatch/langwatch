@@ -1,0 +1,35 @@
+{
+  "name": "@langwatch/slack-browser-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peer-importable browser pieces owned by the Slack module, rendered by automation, integration and langy.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/slack-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

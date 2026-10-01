@@ -1,0 +1,21 @@
+import { Text } from "@langwatch/design-system/primitives";
+
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import { dash } from "../../../../../../elements/explorer/trace-table/registry/cells/dash-placeholder.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
+
+export const ServiceCell = {
+  id: "service",
+  label: "Service",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle" truncate whiteSpace={undefined}>
+      {row.serviceName || dash}
+    </MonoCell>
+  ),
+  renderComfortable: ({ row }) => (
+    <Text textStyle="sm" color="fg.muted" truncate>
+      {row.serviceName || dash}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;

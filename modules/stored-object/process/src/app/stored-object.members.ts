@@ -1,0 +1,182 @@
+import type { Readable } from "node:stream";
+
+import type { ObjectDigest, SignedObjectUpload } from "@langwatch/process-stores/members";
+import type {
+  StoredObjectByteStream,
+  StoredObjectDeliveryAudience,
+  StoredObjectDeliveryCapability,
+  StoredObjectFileRow,
+  StoredObjectId,
+  StoredObjectProjectId,
+  StoredObjectStorageDestination,
+} from "@langwatch/stored-object-contract";
+import type { Instant } from "@langwatch/time";
+
+/** A probe's answer before the purpose decides the gate and is dropped. */
+export type StoredObjectProbe =
+  | Readonly<{ status: "not_found" }>
+  | Readonly<{ status: "available" | "missing"; mediaType: string; purpose: string }>;
+
+/** The contract's byte read, narrowed to the Node stream this process's byte backends hand over. */
+export type StoredObjectFileStreamRead =
+  | { row: StoredObjectFileRow; stream: Readable }
+  | { row: StoredObjectFileRow; status: "missing" };
+
+/** One object's bytes as the file door serves them: safe media type, length and headers. */
+/**
+ * Who asked: a project key, pinned to its own project and reading every file
+ * there as on main, or a signed-in person held to their project permissions.
+ */
+export type StoredObjectFileCaller = Readonly<{
+  apiKeyProjectId?: string | undefined;
+  userId?: string | undefined;
+}>;
+
+/** One file-door read: who asked, which object, and the owner and filename the URL named. */
+export type StoredObjectFileReadInput = Readonly<{
+  caller: StoredObjectFileCaller;
+  id: string;
+  claimedProjectId?: string | undefined;
+  requestedFilename?: string | undefined;
+}>;
+
+export type StoredObjectFileBytes = Readonly<{
+  stream: Readable;
+  mediaType: string;
+  byteLength: number;
+  headers: Readonly<Record<string, string>>;
+}>;
+
+/** The legacy index's reads the byte surface and the probe perform (ADR-158 §5). */
+export interface StoredObjectFileReader {
+  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectProbe>;
+  /** Throws `StoredObjectNotFoundError` when the project holds no such row. */
+  getById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectFileStreamRead>;
+}
+
+export type StoredObjectOwnerLookupSpan = Readonly<{
+  setAttribute(name: string, value: string | number | boolean): void;
+}>;
+
+/**
+ * Process observability stays at composition while the Stored Object owner
+ * lookup records its fixed database-operation attributes through this seam.
+ */
+export interface StoredObjectOwnerLookupTelemetry {
+  withLookupSpan<Result>(
+    input: { id: string },
+    operation: (span: StoredObjectOwnerLookupSpan) => Promise<Result>,
+  ): Promise<Result>;
+}
+
+/**
+ * S3 connection details for one project; separate from bucket selection.
+ */
+export type StoredObjectS3Credentials = Readonly<{
+  accessKeyId: string;
+  secretAccessKey: string;
+  sessionToken?: string;
+}>;
+
+export type StoredObjectS3Target = Readonly<{
+  endpoint?: string;
+  region?: string;
+  credentials?: StoredObjectS3Credentials;
+}>;
+
+/** Resolves the S3 connection one project's objects are reached through. */
+export interface StoredObjectS3TargetResolver {
+  resolve(projectId: string): Promise<StoredObjectS3Target>;
+}
+
+/** The one operation the legacy stored-object index needs, as the driver exposes it. */
+export type StoredObjectsClickHouseClient = Readonly<{
+  query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    format: "JSONEachRow";
+    unscoped?: { reason: string };
+  }): Promise<{ json<Result>(): Promise<Result[]> }>;
+}>;
+
+/** Resolves the client one project's stored-object rows live on. */
+export interface StoredObjectsClickHouse {
+  resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient>;
+}
+
+/** What the legacy index reports about its own work. */
+export interface StoredObjectsTelemetry {
+  /** A read reached the storage backend and it failed for anything but a 404. */
+  recordReadFailure(): void;
+}
+
+export type StoredObjectStorageAddress = Readonly<{
+  provider: string;
+  destinationId: string;
+  relativeId: string;
+}>;
+
+/** Where a new object's bytes go, and the largest single PUT that backend takes. */
+export type StoredObjectPlacement = Readonly<{
+  address: StoredObjectStorageAddress;
+  maxSinglePutBytes: number;
+}>;
+
+/** The objectStorage member, spoken in the addresses a stored-object row records. */
+export abstract class StoredObjectStorage {
+  abstract place(input: {
+    projectId: StoredObjectProjectId;
+    objectId: StoredObjectId;
+  }): Promise<StoredObjectPlacement>;
+
+  /** Streams the body to `address`, counting and hashing; refuses past `byteLength`. */
+  abstract write(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+    body: StoredObjectByteStream;
+    byteLength: number;
+    mediaType: string;
+  }): Promise<ObjectDigest>;
+
+  abstract signUpload(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+    byteLength: number;
+    mediaType: string;
+    expiresAt: Instant;
+  }): Promise<SignedObjectUpload>;
+
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getStat(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+  }): Promise<ObjectDigest>;
+
+  /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
+  abstract getBytes(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+  }): Promise<StoredObjectByteStream>;
+
+  abstract delete(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+  }): Promise<void>;
+
+  /** Where this project's bytes are written. */
+  abstract resolveDestination(input: {
+    projectId: StoredObjectProjectId;
+  }): Promise<StoredObjectStorageDestination>;
+
+  /** Writes a small object where the project's bytes go, then removes it. */
+  abstract probe(input: { projectId: StoredObjectProjectId }): Promise<void>;
+}
+
+export abstract class StoredObjectDelivery {
+  abstract mint(input: {
+    projectId: StoredObjectProjectId;
+    id: StoredObjectId;
+    audience: StoredObjectDeliveryAudience;
+    generation: number;
+  }): Promise<StoredObjectDeliveryCapability>;
+}

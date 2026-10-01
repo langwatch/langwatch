@@ -7,7 +7,7 @@ Feature: Studio Evaluator Node Drawer
   # canvas (evaluator editor drawer, localConfig, Apply/Save/Discard).
   # Need a studio-canvas component test against the evaluator drawer
   # flow. The standalone EvaluatorEditorDrawer already has its own
-  # tests (`platform/app/src/components/evaluators/__tests__/`) but not
+  # tests (`[gone] src/components/evaluators/__tests__/`) but not
   # in the workflow-studio context where localConfig diverges from DB.
 
   # Context:

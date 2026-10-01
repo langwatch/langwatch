@@ -1,0 +1,312 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { normalizeIdentifierValue } from "@langwatch/identity-contract";
+import {
+  type OrganizationInvite,
+  type OrganizationPendingInviteApplied,
+  OrganizationUserRole,
+  InviteNotFoundError,
+} from "@langwatch/organization-contract";
+
+import type { OrganizationInviteMail } from "../app/organization.members.ts";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import {
+  type InviteAssignableRoles,
+  type InviteServiceDependencies,
+} from "../rules/invite-contracts.rules.ts";
+import {
+  resolveInviteDisplayStatus,
+  type InviteDisplayStatus,
+} from "../rules/invite-display-status.rules.ts";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import { InviteAcceptanceService } from "./invite-acceptance.service.ts";
+import { InviteCreationService } from "./invite-creation.service.ts";
+import { InviteLifecycleService } from "./invite-lifecycle.service.ts";
+import { InviteTeamAssignmentService } from "./invite-team-assignment.service.ts";
+
+/**
+ * Team assignment input for invite creation.
+ */
+export class InviteService {
+  private readonly creation: InviteCreationService;
+  private readonly teams: InviteTeamAssignmentService;
+  private readonly lifecycle: InviteLifecycleService;
+  private readonly acceptance: InviteAcceptanceService;
+
+  private constructor(private readonly deps: InviteServiceDependencies) {
+    this.creation = InviteCreationService.create(deps);
+    this.teams = InviteTeamAssignmentService.create(deps);
+    this.lifecycle = InviteLifecycleService.create(deps);
+    this.acceptance = InviteAcceptanceService.create(deps);
+  }
+
+  static create(deps: InviteServiceDependencies): InviteService {
+    return new InviteService(deps);
+  }
+
+  /**
+   * Whether the signed-in person may accept an invitation targeting
+   * `inviteEmail`, and through which identifier (D11).
+   */
+  static matchInviteToAcceptor({
+    inviteEmail,
+    sessionEmail,
+    matchable,
+  }: {
+    inviteEmail: string;
+    sessionEmail: string;
+    matchable: { identifierId: string; value: string }[] | null;
+  }): { matches: boolean; viaIdentifierId: string | null } {
+    if (matchable === null) {
+      return {
+        matches: sessionEmail.toLowerCase() === inviteEmail.trim().toLowerCase(),
+        viaIdentifierId: null,
+      };
+    }
+
+    const normalizedInviteEmail = normalizeIdentifierValue(inviteEmail);
+    const hit = matchable.find((candidate) => candidate.value === normalizedInviteEmail);
+
+    return {
+      matches: hit !== undefined,
+      viaIdentifierId: hit?.identifierId ?? null,
+    };
+  }
+
+  /**
+   * The invited address as somebody signed in as the wrong account is allowed to
+   * see it: first character, then the domain — `s•••@acme.com`.
+   */
+  static maskInvitedAddress(email: string): string {
+    const trimmed = email.trim();
+    const at = trimmed.lastIndexOf("@");
+    if (at <= 0 || at === trimmed.length - 1) {
+      return "•••";
+    }
+
+    const local = trimmed.slice(0, at);
+    const domain = trimmed.slice(at + 1);
+
+    return `${local[0]}•••@${domain}`;
+  }
+
+  private get invites(): OrganizationInviteRepository {
+    return this.deps.invites;
+  }
+
+  private get planProvider(): PlanProvider {
+    return this.deps.plans;
+  }
+
+  private get roleService(): InviteAssignableRoles {
+    return this.deps.roles;
+  }
+
+  private get mailer(): OrganizationInviteMail | undefined {
+    return this.deps.mail;
+  }
+
+  private get writer(): AuthzApi {
+    return this.deps.grants;
+  }
+
+  /**
+   * The same service bound to another repository — the batch path rebinds onto
+   * the transaction it opened, so the duplicate check and the insert run on
+   * the connection that transaction owns.
+   */
+  private onRepository(invites: OrganizationInviteRepository): InviteService {
+    return new InviteService({ ...this.deps, invites });
+  }
+
+  async hasOpenInvite(
+    params: Parameters<InviteCreationService["hasOpenInvite"]>[0],
+  ): ReturnType<InviteCreationService["hasOpenInvite"]> {
+    return this.creation.hasOpenInvite(params);
+  }
+
+  async assertNotAlreadyMembers(
+    params: Parameters<InviteCreationService["assertNotAlreadyMembers"]>[0],
+  ): Promise<void> {
+    await this.creation.assertNotAlreadyMembers(params);
+  }
+
+  async validateTeamIds(
+    params: Parameters<InviteTeamAssignmentService["validateTeamIds"]>[0],
+  ): Promise<void> {
+    await this.teams.validateTeamIds(params);
+  }
+
+  async checkLicenseLimits(
+    params: Parameters<InviteCreationService["checkLicenseLimits"]>[0],
+  ): Promise<void> {
+    await this.creation.checkLicenseLimits(params);
+  }
+
+  async createAdminInviteRecord(
+    params: Parameters<InviteCreationService["createAdminInviteRecord"]>[0],
+  ): ReturnType<InviteCreationService["createAdminInviteRecord"]> {
+    return this.creation.createAdminInviteRecord(params);
+  }
+
+  async sendInviteEmail(
+    params: Parameters<InviteCreationService["sendInviteEmail"]>[0],
+  ): ReturnType<InviteCreationService["sendInviteEmail"]> {
+    return this.creation.sendInviteEmail(params);
+  }
+
+  async createInvites(
+    params: Parameters<InviteCreationService["createInvites"]>[0],
+  ): ReturnType<InviteCreationService["createInvites"]> {
+    return this.creation.createInvites(params);
+  }
+
+  async applyInvite(
+    params: Parameters<InviteAcceptanceService["applyInvite"]>[0],
+  ): ReturnType<InviteAcceptanceService["applyInvite"]> {
+    return this.acceptance.applyInvite(params);
+  }
+
+  async listInvites({ organizationId }: { organizationId: string }): Promise<
+    (OrganizationInvite & {
+      inviteUrl: string;
+      displayStatus: InviteDisplayStatus;
+      requestedByUser: {
+        id: string;
+        name: string | null;
+        email: string | null;
+      } | null;
+    })[]
+  > {
+    const invites = await this.invites.findListableInvites({ organizationId });
+
+    return invites.map((invite) => ({
+      ...invite,
+      inviteUrl: buildInviteAcceptUrl(this.deps.baseHost, invite.inviteCode),
+      displayStatus: resolveInviteDisplayStatus(invite),
+    }));
+  }
+
+  /**
+   * Revocation is a state, not a delete (D11): the row stays, visible as REVOKED, and the
+   * code on it stops opening anything. Organization-scoped: an invite id from another
+   * organization reads as not found, never as someone else's invite.
+   */
+  async revokeInvite({
+    organizationId,
+    inviteId,
+  }: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<{ success: true }> {
+    const revoked = await this.invites.revokeOpenInvite({ inviteId, organizationId });
+    if (revoked === 0) {
+      throw new InviteNotFoundError("Invitation not found");
+    }
+
+    return { success: true };
+  }
+
+  /** Candidate landing projects' slugs for the invitee, the invited teams' first. */
+  async findLandingProjectSlugs(invite: OrganizationInvite): Promise<string[]> {
+    // Collect all invited team IDs from either format
+    const invitedTeamIds = (() => {
+      if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+        const assignments = invite.teamAssignments as { teamId: string }[];
+
+        return assignments.map((a) => a.teamId).filter(Boolean);
+      }
+
+      return invite.teamIds
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    })();
+
+    const teamSlugs =
+      invitedTeamIds.length > 0
+        ? await this.invites.findProjectSlugsForTeams({ teamIds: invitedTeamIds })
+        : [];
+    if (teamSlugs.length > 0) return teamSlugs;
+
+    // Org-wide fallback only for roles with broad access (ADMIN/MEMBER)
+    if (invite.role === OrganizationUserRole.ADMIN || invite.role === OrganizationUserRole.MEMBER) {
+      return this.invites.findProjectSlugsInOrganization({ organizationId: invite.organizationId });
+    }
+
+    return [];
+  }
+
+  /**
+   * Finds a PENDING, non-expired invite matching the given organization and
+   * email (case-insensitive). Returns null when no such invite exists.
+   */
+  async resendInvite(
+    params: Parameters<InviteLifecycleService["resendInvite"]>[0],
+  ): ReturnType<InviteLifecycleService["resendInvite"]> {
+    return this.lifecycle.resendInvite(params);
+  }
+
+  async extendInvite(
+    params: Parameters<InviteLifecycleService["extendInvite"]>[0],
+  ): ReturnType<InviteLifecycleService["extendInvite"]> {
+    return this.lifecycle.extendInvite(params);
+  }
+
+  async requestFreshInvite(
+    params: Parameters<InviteLifecycleService["requestFreshInvite"]>[0],
+  ): ReturnType<InviteLifecycleService["requestFreshInvite"]> {
+    return this.lifecycle.requestFreshInvite(params);
+  }
+
+  async createPaymentPendingInvite(
+    params: Parameters<InviteLifecycleService["createPaymentPendingInvite"]>[0],
+  ): ReturnType<InviteLifecycleService["createPaymentPendingInvite"]> {
+    return this.lifecycle.createPaymentPendingInvite(params);
+  }
+
+  createPaymentPendingInvites(
+    params: Parameters<InviteLifecycleService["createPaymentPendingInvites"]>[0],
+  ): Promise<void> {
+    return this.lifecycle.createPaymentPendingInvites(params);
+  }
+
+  cancelPaymentPendingInvites(
+    params: Parameters<InviteLifecycleService["cancelPaymentPendingInvites"]>[0],
+  ): Promise<void> {
+    return this.lifecycle.cancelPaymentPendingInvites(params);
+  }
+
+  async approvePaymentPendingInvites(
+    params: Parameters<InviteLifecycleService["approvePaymentPendingInvites"]>[0],
+  ): ReturnType<InviteLifecycleService["approvePaymentPendingInvites"]> {
+    return this.lifecycle.approvePaymentPendingInvites(params);
+  }
+
+  /**
+   * ONE verb rather than find-then-apply, because the pair is one decision:
+   * an invitation that exists is the one that wins, and its role and team
+   * assignments replace a default membership entirely.
+   */
+  async applyPendingInvite({
+    userId,
+    organizationId,
+    email,
+  }: {
+    userId: string;
+    organizationId: string;
+    email: string;
+  }): Promise<OrganizationPendingInviteApplied> {
+    const pending = await this.invites
+      .getPendingInviteForEmail({ organizationId, email })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "invite_not_found") return undefined;
+        throw error;
+      });
+    if (!pending) return { applied: false };
+
+    await this.applyInvite({ userId, invite: pending });
+    return { applied: true, inviteId: pending.id };
+  }
+}

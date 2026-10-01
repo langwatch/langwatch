@@ -14,18 +14,21 @@ The provider keys stay in LangWatch, under **Settings > Model Providers**. Your 
 
 Open **AI Gateway > Virtual Keys** and click **New virtual key**. The drawer has these fields:
 
-| Field | What it sets |
-|---|---|
-| **Name** | The name shown in the list, up to 128 characters. |
-| **Description**, **Tags** | Optional. Tags are `key=value` pairs shown on the list row. |
-| **Ownership** | **Project**, **Personal**, **Team** or **Organization**. See [Ownership and scopes](#ownership-and-scopes). |
-| **Budget** | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
-| **Provider access** | **All providers**, or a selection. Expand a provider to restrict the key to specific models. |
-| **Routing** | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies. |
-| **Expires** | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. A date in the past is refused. |
+| Field                     | What it sets                                                                                                                                                                     |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**                  | The name shown in the list, up to 128 characters.                                                                                                                                |
+| **Description**, **Tags** | Optional. Tags are `key=value` pairs shown on the list row.                                                                                                                      |
+| **Ownership**             | **Project**, **Personal**, **Team** or **Organization**. See [Ownership and scopes](#ownership-and-scopes).                                                                      |
+| **Budget**                | An amount in USD per day, week or month. Leave it empty for no cap on the key itself. Below the field, **Inherited budgets** lists every budget that already applies to the key. |
+| **Provider access**       | **All providers**, or a selection. Expand a provider to restrict the key to specific models.                                                                                     |
+| **Routing**               | **Default: no fallback**, **Fall back to all eligible providers**, or one of your routing policies.                                                                              |
+| **Expires**               | **Never**, **1 day**, **7 days**, **30 days**, **6 months**, **1 year**, or a custom date. A date in the past is refused.                                                        |
 
 <Frame caption="The create drawer. Inherited budgets lists the organization budget that already applies to a project key.">
-  <img src="/images/ai-gateway/vk-create-drawer.png" alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing" />
+  <img
+    src="/images/ai-gateway/vk-create-drawer.png"
+    alt="The New virtual key drawer with ownership, budget, inherited budgets, provider access and routing"
+  />
 </Frame>
 
 Click **Create**. The secret is shown once, with a **Copy** button. LangWatch stores only a hash of it. The list shows the prefix, for example `vk-lw-01HZX9N`.
@@ -33,19 +36,22 @@ Click **Create**. The secret is shown once, with a **Copy** button. LangWatch st
 **All providers** means the key reaches every provider its scopes can see, including providers you add later. An explicit selection stays as picked until you edit the key.
 
 <Frame caption="The Virtual Keys list: name, prefix, status, scopes, routing, spend this month and last use. A red bar under the spend marks a key past a budget.">
-  <img src="/images/ai-gateway/vk-list-spend.png" alt="The Virtual Keys list with active and expired keys and the Spent this month column" />
+  <img
+    src="/images/ai-gateway/vk-list-spend.png"
+    alt="The Virtual Keys list with active and expired keys and the Spent this month column"
+  />
 </Frame>
 
 ## Ownership and scopes
 
 Ownership decides who can see and manage the key, which providers it reaches and where its traces and costs land.
 
-| Ownership | Scope | Traces and costs land in |
-|---|---|---|
-| **Project** | The project | That project |
-| **Personal** | Your personal workspace project, with you as the principal | Your personal workspace |
-| **Team** | The team | A project you pick in the drawer |
-| **Organization** | The organization | A project you pick in the drawer |
+| Ownership        | Scope                                                      | Traces and costs land in         |
+| ---------------- | ---------------------------------------------------------- | -------------------------------- |
+| **Project**      | The project                                                | That project                     |
+| **Personal**     | Your personal workspace project, with you as the principal | Your personal workspace          |
+| **Team**         | The team                                                   | A project you pick in the drawer |
+| **Organization** | The organization                                           | A project you pick in the drawer |
 
 A key reaches the provider credentials configured on its scope and above it: a project key sees the project's, the team's and the organization's credentials.
 
@@ -57,20 +63,20 @@ A key is `vk-lw-` followed by a 26-character Crockford base32 ULID, 32 character
 
 Send the key in one of these headers:
 
-| Header | Used by |
-|---|---|
-| `Authorization: Bearer vk-lw-...` | OpenAI SDKs, curl, most tools |
-| `X-Api-Key: vk-lw-...` | Anthropic SDKs and Claude Code |
-| `X-Goog-Api-Key: vk-lw-...` | Gemini SDKs and Gemini CLI |
-| `Xi-Api-Key: vk-lw-...` | ElevenLabs SDKs |
+| Header                            | Used by                        |
+| --------------------------------- | ------------------------------ |
+| `Authorization: Bearer vk-lw-...` | OpenAI SDKs, curl, most tools  |
+| `X-Api-Key: vk-lw-...`            | Anthropic SDKs and Claude Code |
+| `X-Goog-Api-Key: vk-lw-...`       | Gemini SDKs and Gemini CLI     |
+| `Xi-Api-Key: vk-lw-...`           | ElevenLabs SDKs                |
 
 ## Edit a key
 
 Open the key from the list and click **Edit**. Ownership is read-only after creation. The edit drawer has the create fields plus two sections:
 
-| Section | What it sets |
-|---|---|
-| **Rate limits** | Requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits). |
+| Section            | What it sets                                                                            |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| **Rate limits**    | Requests per minute and requests per day. See [Rate limits](/ai-gateway/rate-limits).   |
 | **Realtime voice** | The maximum number of open realtime sessions. See [Realtime](/ai-gateway/api/realtime). |
 
 The drawer also shows a **Cache control** section. The gateway does not read it: caching is set by [cache rules](/ai-gateway/cache-control), which match on model, key or tag.
@@ -83,12 +89,12 @@ The key detail page shows the spend of the last 30 days, the provider chain in t
 
 ## Rotate, disable, expire and revoke
 
-| Action | Effect | Error the caller gets |
-|---|---|---|
-| **Rotate** | A new secret is shown once. The old secret keeps working for 24 hours. The key id, scopes and budgets stay the same. | None during the grace period |
-| **Disable** | Requests are rejected until you click **Enable**. Budgets, configuration and a running rotation grace stay intact. | 403 `virtual_key_disabled` |
-| **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret. | 403 `virtual_key_expired` |
-| **Revoke** | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked` |
+| Action      | Effect                                                                                                                        | Error the caller gets        |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| **Rotate**  | A new secret is shown once. The old secret keeps working for 24 hours. The key id, scopes and budgets stay the same.          | None during the grace period |
+| **Disable** | Requests are rejected until you click **Enable**. Budgets, configuration and a running rotation grace stay intact.            | 403 `virtual_key_disabled`   |
+| **Expires** | The key stops serving at the date. Extend the date to put it back in service with the same secret.                            | 403 `virtual_key_expired`    |
+| **Revoke**  | The secret stops working now. There is no grace period and no way back. The key's own budgets are archived with their ledger. | 403 `virtual_key_revoked`    |
 
 A secret the gateway does not know, for example a mistyped one, gets 401 `invalid_api_key`. The 24-hour rotation grace is fixed. A revoked key cannot be rotated.
 
@@ -136,15 +142,15 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/virtual-keys \
 
 The response is `{ "virtual_key": { "id": "vk_..." }, "secret": "vk-lw-..." }`. Send an `Idempotency-Key` header to make the create safe to retry: a replay returns the original response, including the secret. To do that, LangWatch keeps the first response for 24 hours, encrypted with AES-256-GCM under the deployment's `CREDENTIALS_SECRET`, and deletes it when it expires. A replay carries the `X-Idempotent-Replay` header. Send a different key for every distinct create, and treat the key itself as a secret.
 
-| Method and path | Permission |
-|---|---|
-| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
-| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create`, plus `virtualKeys:manage` at every scope the key names |
-| `GET /api/gateway/v1/virtual-keys/:id` | `virtualKeys:view` |
-| `GET /api/gateway/v1/virtual-keys/:id/spend` | `gatewayUsage:view` |
-| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names |
-| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
-| `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update` |
-| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
+| Method and path                                               | Permission                                                                     |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `GET /api/gateway/v1/virtual-keys`                            | `virtualKeys:view`                                                             |
+| `POST /api/gateway/v1/virtual-keys`                           | `virtualKeys:create`, plus `virtualKeys:manage` at every scope the key names   |
+| `GET /api/gateway/v1/virtual-keys/:id`                        | `virtualKeys:view`                                                             |
+| `GET /api/gateway/v1/virtual-keys/:id/spend`                  | `gatewayUsage:view`                                                            |
+| `PATCH /api/gateway/v1/virtual-keys/:id`                      | `virtualKeys:update`, plus `virtualKeys:manage` at every scope the patch names |
+| `POST /api/gateway/v1/virtual-keys/:id/rotate`                | `virtualKeys:rotate`                                                           |
+| `POST /api/gateway/v1/virtual-keys/:id/disable`, `.../enable` | `virtualKeys:update`                                                           |
+| `POST /api/gateway/v1/virtual-keys/:id/revoke`                | `virtualKeys:delete`                                                           |
 
 Field by field: [Virtual keys API reference](/api-reference/gateway-virtual-keys/overview). Roles and permissions: [RBAC](/ai-gateway/rbac).

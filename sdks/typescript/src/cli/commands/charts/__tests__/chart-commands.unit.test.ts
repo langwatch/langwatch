@@ -1,12 +1,13 @@
 import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChartsApiError } from "@/client-sdk/services/charts/charts-api.service";
+
+import { ChartsApiError, ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 
 vi.mock("@/client-sdk/services/charts/charts-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     ChartsApiService: vi.fn(),
@@ -35,7 +36,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 import { createChartCommand } from "../create";
 import { deleteChartCommand } from "../delete";
 import { getChartCommand } from "../get";
@@ -164,9 +164,7 @@ describe("createChartCommand()", () => {
 
   describe("when no statement is supplied", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        createChartCommand({ name: "No SQL" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createChartCommand({ name: "No SQL" })).rejects.toThrow(ProcessExitError);
       expect(mocks.create).not.toHaveBeenCalled();
     });
   });
@@ -175,9 +173,7 @@ describe("createChartCommand()", () => {
 describe("updateChartCommand()", () => {
   describe("when nothing is supplied to change", () => {
     it("refuses locally, matching the API's own refusal of an empty update", async () => {
-      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(updateChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.update).not.toHaveBeenCalled();
     });
   });
@@ -229,9 +225,9 @@ describe("runChartCommand()", () => {
 
   describe("when only one of --start/--end is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(
-        runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { start: "2026-08-01T00:00:00Z" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
     });
@@ -241,9 +237,9 @@ describe("runChartCommand()", () => {
     it("refuses locally, naming the offered steps, without calling the API", async () => {
       const errorSpy = vi.mocked(console.error);
 
-      await expect(
-        runChartCommand("chart-1", { granularity: "86400" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runChartCommand("chart-1", { granularity: "86400" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mocks.get).not.toHaveBeenCalled();
       expect(mocks.runQuery).not.toHaveBeenCalled();
@@ -311,9 +307,7 @@ describe("placeChartCommand()", () => {
 
   describe("when no dashboard id is given", () => {
     it("refuses locally without calling the API", async () => {
-      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(placeChartCommand("chart-1", {})).rejects.toThrow(ProcessExitError);
       expect(mocks.place).not.toHaveBeenCalled();
     });
   });
@@ -370,10 +364,7 @@ describe("the chart family while the workbench switch is off", () => {
   describe("when the platform answers every verb with lwql_not_enabled", () => {
     /** @scenario "Every CLI verb this slice adds refuses while the workbench switch is off, and writes nothing" */
     it("every verb exits non-zero, surfacing the refusal instead of swallowing it", async () => {
-      const flagOff = new ChartsApiError(
-        "Failed: lwql_not_enabled",
-        "workbench switch off",
-      );
+      const flagOff = new ChartsApiError("Failed: lwql_not_enabled", "workbench switch off");
       mocks.list.mockRejectedValue(flagOff);
       mocks.get.mockRejectedValue(flagOff);
       mocks.create.mockRejectedValue(flagOff);
@@ -390,10 +381,7 @@ describe("the chart family while the workbench switch is off", () => {
         ["update", () => updateChartCommand("chart-1", { name: "y" })],
         ["delete", () => deleteChartCommand("chart-1")],
         ["run", () => runChartCommand("chart-1", {})],
-        [
-          "place",
-          () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" }),
-        ],
+        ["place", () => placeChartCommand("chart-1", { dashboardId: "dashboard-1" })],
         ["unplace", () => unplaceChartCommand("chart-1")],
       ];
 
@@ -417,10 +405,9 @@ describe("the chart family while the workbench switch is off", () => {
 });
 
 /**
- * `chart schema` read `.views.length` straight off the response, so a payload
- * without `views` crashed with a TypeError that the error reader then filed as
- * `network_error` and told the user to check their connection. The shape is
- * checked before it is read, and the refusal names the fix.
+ * `chart schema` read `.views.length` straight off the response, so a payload without `views`
+ * crashed with a TypeError that the error reader then filed as `network_error` and told the user to
+ * check their connection. The shape is checked before it is read, and the refusal names the fix.
  */
 describe("given the analytics schema comes back in an unexpected shape", () => {
   /** @scenario "chart schema names a payload it does not recognise" */

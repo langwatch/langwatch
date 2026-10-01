@@ -1,24 +1,25 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
 
 // Read the configuration from llms.txt.json
-const config = JSON.parse(fs.readFileSync('llms.txt.json', 'utf8'));
+const config = JSON.parse(fs.readFileSync("llms.txt.json", "utf8"));
 
 // Shown at the top of llms.txt and llms-full.txt so every agent journey
 // through the docs learns it can report issues straight to the team.
-const AGENT_REPORT_NOTE = "For agents: if anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved` to send the problem (or your whole session, via --session <transcript.jsonl>, redacted locally) to the LangWatch team. No login needed, and it directly shapes what gets fixed. `npx langwatch report --help` has the details.";
+const AGENT_REPORT_NOTE =
+  "For agents: if anything in these docs is wrong, confusing, or fails when you try it, ask your user for permission and run `npx langwatch report --user-approved` to send the problem (or your whole session, via --session <transcript.jsonl>, redacted locally) to the LangWatch team. No login needed, and it directly shapes what gets fixed. `npx langwatch report --help` has the details.";
 const includePaths = config.includePaths;
 const excludePaths = config.excludePaths || [];
 
 // Read docs.json for navigation structure
-const docsConfig = JSON.parse(fs.readFileSync('docs.json', 'utf8'));
+const docsConfig = JSON.parse(fs.readFileSync("docs.json", "utf8"));
 
 // Output files
-const outputFile = 'llms-full.txt';
-const rootOutputFile = 'llms.txt';
+const outputFile = "llms-full.txt";
+const rootOutputFile = "llms.txt";
 
 // Clear the output file if it exists
 fs.writeFileSync(outputFile, "# LangWatch\n\n" + AGENT_REPORT_NOTE + "\n");
@@ -31,7 +32,7 @@ function extractFrontmatter(filePath) {
       return { title: null, description: null };
     }
 
-    const content = fs.readFileSync(filePath, 'utf8');
+    const content = fs.readFileSync(filePath, "utf8");
     const frontmatterMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
 
     if (!frontmatterMatch) {
@@ -43,8 +44,8 @@ function extractFrontmatter(filePath) {
     const descriptionMatch = frontmatter.match(/^description:\s*(.*)$/m);
 
     return {
-      title: titleMatch ? titleMatch[1].replace(/^["']|["']$/g, '') : null,
-      description: descriptionMatch ? descriptionMatch[1].replace(/^["']|["']$/g, '') : null
+      title: titleMatch ? titleMatch[1].replace(/^["']|["']$/g, "") : null,
+      description: descriptionMatch ? descriptionMatch[1].replace(/^["']|["']$/g, "") : null,
     };
   } catch (err) {
     console.error(`Error reading frontmatter from ${filePath}: ${err.message}`);
@@ -55,49 +56,41 @@ function extractFrontmatter(filePath) {
 // Function to generate title from filename
 function generateTitleFromFilename(filename) {
   return filename
-    .replace(/\.mdx?$/, '')
-    .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+    .replace(/\.mdx?$/, "")
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+// One direct page reference as its index line
+function navigationPageLine(page) {
+  const cleanPage = page.startsWith("/") ? page.substring(1) : page;
+  const { title, description } = extractFrontmatter(`${cleanPage}.mdx`);
+  const displayTitle = title || generateTitleFromFilename(path.basename(cleanPage));
+  const url = `https://langwatch.ai/docs/${cleanPage}.md`;
+  return description
+    ? `- [${displayTitle}](${url}): ${description}`
+    : `- [${displayTitle}](${url})`;
 }
 
 // Function to process navigation pages recursively
 function processNavigationPages(pages, level = 0, output = []) {
-  const prefix = '#'.repeat(Math.min(3 + level, 6)); // Start at ### and go up to ######
+  const prefix = "#".repeat(Math.min(3 + level, 6)); // Start at ### and go up to ######
 
   pages.forEach((page, index) => {
-    const isLastItem = index === pages.length - 1;
     const nextItem = pages[index + 1];
-    const isNextItemGroup = nextItem && typeof nextItem === 'object' && nextItem.group;
+    const isNextItemGroup = nextItem && typeof nextItem === "object" && nextItem.group;
 
-    if (typeof page === 'string') {
-      // It's a direct page reference
-      const cleanPage = page.startsWith('/') ? page.substring(1) : page;
-      const filePath = `${cleanPage}.mdx`;
-      const { title, description } = extractFrontmatter(filePath);
-      const displayTitle = title || generateTitleFromFilename(path.basename(cleanPage));
-      const url = `https://langwatch.ai/docs/${cleanPage}.md`;
-
-      if (description) {
-        output.push(`- [${displayTitle}](${url}): ${description}`);
-      } else {
-        output.push(`- [${displayTitle}](${url})`);
-      }
-
+    if (typeof page === "string") {
+      output.push(navigationPageLine(page));
       // Add spacing after page if next item is a group
-      if (isNextItemGroup) {
-        output.push('');
-      }
+      if (isNextItemGroup) output.push("");
     } else if (page.group && page.pages) {
-      // It's a group with nested pages
       output.push(`${prefix} ${page.group}`);
-      output.push(''); // Add empty line after group title
+      output.push(""); // Add empty line after group title
       processNavigationPages(page.pages, level + 1, output);
-
       // Add spacing after group if not the last item
-      if (!isLastItem) {
-        output.push('');
-      }
+      if (index !== pages.length - 1) output.push("");
     }
   });
 
@@ -107,10 +100,10 @@ function processNavigationPages(pages, level = 0, output = []) {
 // Function to generate root llms.txt
 function generateRootLlmsTxt() {
   // Get all anchors that have groups
-  const anchors = docsConfig.navigation.anchors.filter(anchor => anchor.groups);
+  const anchors = docsConfig.navigation.anchors.filter((anchor) => anchor.groups);
 
   if (anchors.length === 0) {
-    console.error('No anchors with groups found in docs.json');
+    console.error("No anchors with groups found in docs.json");
     return;
   }
 
@@ -135,28 +128,41 @@ ${AGENT_REPORT_NOTE}
     anchor.groups.forEach((group, groupIndex) => {
       content += `## ${group.group}\n\n`;
       const lines = processNavigationPages(group.pages);
-      content += lines.join('\n');
+      content += lines.join("\n");
 
       const isLastGroup = groupIndex === anchor.groups.length - 1;
       const isLastAnchor = anchorIndex === anchors.length - 1;
 
       if (!isLastGroup || !isLastAnchor) {
-        content += '\n\n';
+        content += "\n\n";
       } else {
-        content += '\n';
+        content += "\n";
       }
     });
   });
 
   // Remove trailing newlines and add single newline at end
-  content = content.replace(/\n\n+$/, '\n');
+  content = content.replace(/\n\n+$/, "\n");
 
   fs.writeFileSync(rootOutputFile, content);
   console.log(`Root llms.txt file generated: ${rootOutputFile}`);
 }
 
+// A /snippets import's file content; undefined for any other import or a missing file
+function readSnippetImport(importPath) {
+  if (!importPath.startsWith("/snippets/")) return undefined;
+  const absoluteImportPath = path.join(process.cwd(), importPath.substring(1));
+  try {
+    if (fs.existsSync(absoluteImportPath)) return fs.readFileSync(absoluteImportPath, "utf8");
+    console.warn(`Warning: Import file not found: ${absoluteImportPath}`);
+  } catch (err) {
+    console.error(`Error reading import file ${absoluteImportPath}: ${err.message}`);
+  }
+  return undefined;
+}
+
 // Function to process imports in an MDX file
-function processImports(content, filePath) {
+function processImports(content, _filePath) {
   // Find all import statements
   const importRegex = /import\s+(\w+)\s+from\s+["']([^"']+)["'];?/g;
   let modifiedContent = content;
@@ -166,33 +172,16 @@ function processImports(content, filePath) {
   let match;
   while ((match = importRegex.exec(content)) !== null) {
     const importName = match[1];
-    const importPath = match[2];
-
-    // Handle only imports from /snippets
-    if (importPath.startsWith('/snippets/')) {
-      const absoluteImportPath = path.join(process.cwd(), importPath.substring(1));
-
-      try {
-        if (fs.existsSync(absoluteImportPath)) {
-          // Read the imported file
-          const importedContent = fs.readFileSync(absoluteImportPath, 'utf8');
-          imports[importName] = importedContent;
-          if (importName == "LLMsTxtProtip") {
-            imports[importName] = ""
-          }
-        } else {
-          console.warn(`Warning: Import file not found: ${absoluteImportPath}`);
-        }
-      } catch (err) {
-        console.error(`Error reading import file ${absoluteImportPath}: ${err.message}`);
-      }
+    const importedContent = readSnippetImport(match[2]);
+    if (importedContent !== undefined) {
+      imports[importName] = importName == "LLMsTxtProtip" ? "" : importedContent;
     }
   }
 
   // Replace component references with their content
-  Object.keys(imports).forEach(componentName => {
+  Object.keys(imports).forEach((componentName) => {
     // Simple replacement for <ComponentName /> pattern
-    const componentRegex = new RegExp(`<${componentName}\\s*\\/>`, 'g');
+    const componentRegex = new RegExp(`<${componentName}\\s*\\/>`, "g");
     modifiedContent = modifiedContent.replace(componentRegex, imports[componentName]);
   });
 
@@ -201,33 +190,33 @@ function processImports(content, filePath) {
   // code and must survive inside ```code``` fences.
   modifiedContent = modifiedContent
     .split(/(```[\s\S]*?```)/g)
-    .map((segment) => (segment.startsWith('```') ? segment : segment.replace(importRegex, '')))
-    .join('');
+    .map((segment) => (segment.startsWith("```") ? segment : segment.replace(importRegex, "")))
+    .join("");
 
   // Replace <Tab title="X"> with ### X
-  modifiedContent = modifiedContent.replace(/<Tab\s+title="([^"]+)">/g, '### $1\n');
+  modifiedContent = modifiedContent.replace(/<Tab\s+title="([^"]+)">/g, "### $1\n");
 
   // Remove </Tab> tags
-  modifiedContent = modifiedContent.replace(/<\/Tab>/g, '');
+  modifiedContent = modifiedContent.replace(/<\/Tab>/g, "");
 
   // Remove <Tabs> and </Tabs> tags
-  modifiedContent = modifiedContent.replace(/<Tabs>|<\/Tabs>/g, '');
+  modifiedContent = modifiedContent.replace(/<Tabs>|<\/Tabs>/g, "");
 
   // Remove too many sequential newlines
-  modifiedContent = modifiedContent.replace(/\n\n\n\n+/g, '\n\n');
+  modifiedContent = modifiedContent.replace(/\n\n\n\n+/g, "\n\n");
 
   return modifiedContent;
 }
 
 // Process each include path
-includePaths.forEach(includePath => {
+includePaths.forEach((includePath) => {
   try {
     // Create a find command to locate the files (sort for stable cross-platform ordering)
     let findCmd = `find . -type f -path "./${includePath}" 2>/dev/null | sort`;
 
     // Add exclude patterns if any
     if (excludePaths.length > 0) {
-      excludePaths.forEach(excludePath => {
+      excludePaths.forEach((excludePath) => {
         findCmd += ` | grep -Fv "${excludePath}"`;
       });
     }
@@ -236,27 +225,27 @@ includePaths.forEach(includePath => {
     const files = execSync(findCmd)
       .toString()
       .trim()
-      .split('\n')
-      .filter(file => file); // Remove empty lines
+      .split("\n")
+      .filter((file) => file); // Remove empty lines
 
     // Process each matching file
-    files.forEach(file => {
+    files.forEach((file) => {
       console.log(`Processing: ${file}`);
       try {
-        let content = fs.readFileSync(file, 'utf8');
+        let content = fs.readFileSync(file, "utf8");
 
         // Process imports for MDX files
-        if (file.endsWith('.mdx')) {
+        if (file.endsWith(".mdx")) {
           content = processImports(content, file);
         }
 
         // Remove trailing whitespaces
-        content = content.replace(/[ \t]+$/gm, '');
+        content = content.replace(/[ \t]+$/gm, "");
 
         // Append to output file
         fs.appendFileSync(outputFile, `# FILE: ${file}\n\n`);
         fs.appendFileSync(outputFile, content);
-        fs.appendFileSync(outputFile, '\n---\n\n');
+        fs.appendFileSync(outputFile, "\n---\n\n");
       } catch (err) {
         console.error(`Error reading ${file}: ${err.message}`);
       }
@@ -268,8 +257,8 @@ includePaths.forEach(includePath => {
 });
 
 // Remove extra blank line at EOF
-let finalContent = fs.readFileSync(outputFile, 'utf8');
-if (finalContent.endsWith('\n\n')) {
+let finalContent = fs.readFileSync(outputFile, "utf8");
+if (finalContent.endsWith("\n\n")) {
   finalContent = finalContent.substring(0, finalContent.length - 1);
   fs.writeFileSync(outputFile, finalContent);
 }

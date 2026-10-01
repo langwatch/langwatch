@@ -1,6 +1,7 @@
 import inspect
 import json
-import os
+import subprocess
+from pathlib import Path
 from typing import Any, Dict, Literal, Union, get_args, get_origin
 from langevals_core.base_evaluator import (
     EvalCategories,
@@ -15,9 +16,6 @@ from langevals.utils import (
     get_evaluator_definitions,
     load_evaluator_packages,
 )
-
-os.system("npm list -g prettier &> /dev/null || npm install -g prettier")
-
 
 # ---------------------------------------------------------------------------
 # Zod emission. Each evaluator's settings model is rendered directly as a Zod
@@ -177,7 +175,8 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
 
 
 # Fixed result schemas mirroring langevals_core.base_evaluator. These shapes are
-# stable, so they are emitted verbatim rather than reflected.
+# stable, so they are emitted verbatim rather than reflected. Pydantic sends an
+# unset Optional field as null, so those fields are nullish, not optional.
 RESULT_SCHEMAS = """export const moneySchema = z.object({
   currency: z.string(),
   amount: z.number(),
@@ -185,18 +184,18 @@ RESULT_SCHEMAS = """export const moneySchema = z.object({
 
 export const evaluationResultSchema = z.object({
   status: z.literal("processed"),
-  score: z.number().optional(),
-  passed: z.boolean().optional(),
-  label: z.string().optional(),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  score: z.number().nullish(),
+  passed: z.boolean().nullish(),
+  label: z.string().nullish(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
   raw_response: z.any().optional(),
 });
 
 export const evaluationResultSkippedSchema = z.object({
   status: z.literal("skipped"),
-  details: z.string().optional(),
-  cost: moneySchema.optional(),
+  details: z.string().nullish(),
+  cost: moneySchema.nullish(),
 });
 
 export const evaluationResultErrorSchema = z.object({
@@ -317,10 +316,16 @@ def main():
 
     ts_content = generate_definitions(evaluators_info)
 
-    with open("ts-integration/evaluators.generated.ts", "w") as ts_file:
+    output_path = Path("ts-integration/evaluators.generated.ts")
+    with output_path.open("w") as ts_file:
         ts_file.write(ts_content)
 
-    os.system("prettier ts-integration/evaluators.generated.ts --write &> /dev/null")
+    repository_root = Path(__file__).resolve().parents[3]
+    subprocess.run(
+        ["pnpm", "exec", "oxfmt", "--write", str(output_path.resolve())],
+        cwd=repository_root,
+        check=True,
+    )
 
     print("Zod evaluator schemas generated successfully.")
 

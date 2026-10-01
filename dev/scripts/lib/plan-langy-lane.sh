@@ -2,15 +2,15 @@
 # Decide whether `pnpm dev` starts the Langy agent manager, and on which port.
 #
 # The decision has more branches than the other Go lanes, so it lives here
-# rather than inline in start.sh: langyagent takes its listen port from PORT
+# rather than inline in dev-stack.sh: langyagent takes its listen port from PORT
 # (which the launcher already uses for the app) and fails fast without its
 # secret and its two roots, so a lane started into a setup that cannot run it
 # restarts for as long as the stack is up.
 #
-# Usage from platform/app/scripts/start.sh:
+# Usage from dev/scripts/dev-stack.sh:
 #
-#   . "$(dirname "$0")/../../../dev/scripts/lib/plan-langy-lane.sh"
-#   plan_langy_lane "$(dirname "$0")/.." "$_APP_PORT"
+#   . "$(dirname "$0")/lib/plan-langy-lane.sh"
+#   plan_langy_lane "$REPO_ROOT" "$_APP_PORT"
 #   # reads LANGY_LANE_DECISION, LANGY_LANE_REASON, LANGY_LANE_PORT
 #
 # See specs/setup/dev-langy-agent-lane.feature.
@@ -30,6 +30,12 @@ LANGY_LOCAL_REAPER_INTERVAL_MS=2000
 # free. It is also what the standalone server package defaults to.
 LANGY_PORT_OFFSET=4
 
+# The harness that runs a turn. `pi` is the only one the manager can spawn —
+# services/langyagent has no other code path — so this is a label for the
+# startup line rather than a choice, and the line exists because which harness
+# a local turn runs under was previously only discoverable from the source.
+LANGY_HARNESS=pi
+
 # Overridable so the lane can be planned in a test without a Go toolchain, a
 # live listener, or a particular python on PATH.
 _langy_have_go() { command -v go >/dev/null 2>&1; }
@@ -37,16 +43,14 @@ _langy_port_listening() { lsof -i ":$1" -sTCP:LISTEN >/dev/null 2>&1; }
 
 # True when the manager will have a value for the setting.
 #
-# This reads fewer files than the address does, and the difference is the point.
 # The address is resolved the way the APP reads it, because the app decides
-# where to dial, and the app loads the haven overlay. These settings are read by
-# the MANAGER, and `make service` sources .env alone. A value that lives only in
-# .env.portless would count as present here, start the lane, and the manager
-# would still exit for a missing setting, on every restart.
+# where to dial. These settings are read by the MANAGER, and `make service`
+# sources .env alone — which is the same file, so the two now agree by
+# construction rather than by this function reading one layer fewer.
 _langy_setting_present() {
-  local var="$1" app_dir="$2"
+  local var="$1" repo_root="$2"
   [ -n "${!var:-}" ] && return 0
-  _service_address_from_env_file "$var" "$app_dir/.env" >/dev/null
+  _service_address_from_env_file "$var" "$repo_root/.env" >/dev/null
 }
 
 _langy_skip() {
@@ -79,7 +83,7 @@ _langy_python_shim_dir() {
 }
 
 plan_langy_lane() {
-  local app_dir="${1:-.}"
+  local repo_root="${1:-.}"
   local app_port="${2:-5560}"
 
   LANGY_LANE_DECISION="skip"
@@ -91,7 +95,7 @@ plan_langy_lane() {
     return 0
   fi
 
-  resolve_service_address LANGY_AGENT_URL "$app_dir" langy
+  resolve_service_address LANGY_AGENT_URL "$repo_root" langy
 
   local port=""
   if [ -z "${LANGY_AGENT_URL:-}" ]; then
@@ -119,12 +123,12 @@ plan_langy_lane() {
 
   local var missing=""
   for var in LANGY_INTERNAL_SECRET SESSIONS_ROOT LANGY_WORKSPACE_ROOT; do
-    if ! _langy_setting_present "$var" "$app_dir"; then
+    if ! _langy_setting_present "$var" "$repo_root"; then
       missing="${missing:+$missing, }${var}"
     fi
   done
   if [ -n "$missing" ]; then
-    _langy_skip "skipped (platform/app/.env has no ${missing}); run \`bash dev/scripts/dogfood/langy-local.sh\` for the block to paste"
+    _langy_skip "skipped (.env has no ${missing}); run \`bash dev/scripts/dogfood/langy-local.sh\` for the block to paste"
     return 0
   fi
 
@@ -136,14 +140,35 @@ plan_langy_lane() {
   # which reaches the reader as "Langy stopped mid-reply" and says nothing
   # about a missing build. Name the repo's copy and say when it is not there.
   local repo
-  repo="$(cd "$app_dir/../.." 2>/dev/null && pwd)"
-  LANGY_LANE_WORKER_BINARY="${repo}/services/langyworker/out/langy-worker"
+  repo="$(cd "$repo_root" 2>/dev/null && pwd)"
+  LANGY_LANE_WORKER_BINARY="${repo}/.bin/langy-worker/langy-worker"
   if [ ! -x "$LANGY_LANE_WORKER_BINARY" ]; then
     LANGY_LANE_REASON="${LANGY_LANE_REASON}, chats need \`pnpm --filter @langwatch/langyworker build:binary\` first"
   fi
 
   LANGY_LANE_PYTHON_SHIM="$(_langy_python_shim_dir "$repo" || true)"
+  LANGY_LANE_ISOLATION=uid-sandbox
+  case "$(env_file_key_value "$repo_root/.env" LANGY_UNSAFE_DEV_DISABLE_ISOLATION || true)" in
+    true | 1) LANGY_LANE_ISOLATION=disabled ;;
+  esac
   return 0
+}
+
+# The one line that says what Langy is running with, printed before the stack
+# starts. Three things decide whether a local turn answers — where the manager
+# is, which harness runs the turn, and whether the per-worker isolation a laptop
+# cannot provide has been turned off — and none of them was visible anywhere.
+langy_lane_summary() {
+  if [ "${LANGY_LANE_DECISION:-skip}" != "start" ]; then
+    printf '  ! langyagent: %s\n' "${LANGY_LANE_REASON:-skipped}"
+    return 0
+  fi
+  printf '  ✓ langyagent: harness=%s isolation=%s url=%s worker=%s\n' \
+    "$LANGY_HARNESS" \
+    "$LANGY_LANE_ISOLATION" \
+    "${LANGY_AGENT_URL}" \
+    "${LANGY_LANE_WORKER_BINARY}"
+  printf '  ✓ langyagent: %s\n' "$LANGY_LANE_REASON"
 }
 
 # The command the lane runs. Every cap is applied only when the developer has
@@ -160,5 +185,5 @@ LANGY_PI_WORKER_BINARY_PATH=\"\${LANGY_PI_WORKER_BINARY_PATH:-${LANGY_LANE_WORKE
 LANGY_MAX_WORKERS=\"\${LANGY_MAX_WORKERS:-${LANGY_LOCAL_MAX_WORKERS}}\" \
 LANGY_WORKER_IDLE_MS=\"\${LANGY_WORKER_IDLE_MS:-${LANGY_LOCAL_WORKER_IDLE_MS}}\" \
 LANGY_REAPER_INTERVAL_MS=\"\${LANGY_REAPER_INTERVAL_MS:-${LANGY_LOCAL_REAPER_INTERVAL_MS}}\" \
-make -C ${repo_from_app} service svc=langyagent"
+make -C \"${repo_from_app}\" service svc=langyagent"
 }

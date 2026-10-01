@@ -1,0 +1,58 @@
+import type { GithubInstallationRow } from "../github-installations.repository.ts";
+import type {
+  GithubBranchCheckRow,
+  GithubPullRequestRow,
+} from "../github-pull-requests.repository.ts";
+
+/**
+ * The rows the two memory twins share, under the same keys Postgres addresses
+ * them by. Host and repository name are folded here for the same reason the
+ * Prisma repository folds them: one repository must not map twice.
+ */
+export class MemoryGithubDatabase {
+  readonly installations = new Map<string, GithubInstallationRow>();
+  readonly pullRequests = new Map<string, GithubPullRequestRow>();
+  readonly branchChecks = new Map<string, GithubBranchCheckRow>();
+  /** Every short-lived row the Redis tier keeps: value plus its deadline in epoch milliseconds. */
+  readonly expiring = new Map<string, { value: string; expiresAt: number }>();
+
+  static create(): MemoryGithubDatabase {
+    return new MemoryGithubDatabase();
+  }
+
+  static normalizeFullName(repositoryFullName: string): string {
+    return repositoryFullName.toLowerCase();
+  }
+
+  static normalizeHost(repositoryHost: string): string {
+    return repositoryHost.toLowerCase();
+  }
+
+  static pullRequestKey(input: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    prNumber: number;
+  }): string {
+    return [
+      input.organizationId,
+      MemoryGithubDatabase.normalizeHost(input.repositoryHost),
+      MemoryGithubDatabase.normalizeFullName(input.repositoryFullName),
+      String(input.prNumber),
+    ].join("\0");
+  }
+
+  static branchCheckKey(input: {
+    organizationId: string;
+    repositoryHost: string;
+    repositoryFullName: string;
+    headBranch: string;
+  }): string {
+    return [
+      input.organizationId,
+      MemoryGithubDatabase.normalizeHost(input.repositoryHost),
+      MemoryGithubDatabase.normalizeFullName(input.repositoryFullName),
+      input.headBranch,
+    ].join("\0");
+  }
+}

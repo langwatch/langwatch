@@ -1,0 +1,74 @@
+{
+  "name": "@langwatch/user-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The personal workspace a person opens on themselves: their AI tools, their usage, their credentials and their coding-agent activity.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/user.web.ts",
+      "types": "./dist/user.web.d.ts",
+      "default": "./src/user.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/coding-agent-browser-kit": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-gateway-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@paper-design/shaders-react": "catalog:",
+    "lucide-react": "catalog:",
+    "numeral": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/node": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

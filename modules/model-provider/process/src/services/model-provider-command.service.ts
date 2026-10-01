@@ -1,0 +1,532 @@
+import { HandledError } from "@langwatch/handled-error";
+import {
+  ModelProviderAnchorRequiredError,
+  ModelProviderDeprecatedError,
+  ModelProviderInvalidError,
+  ModelProviderNotFoundError,
+  ModelProviderRoutingHandleInvalidError,
+  ModelProviderRoutingHandleTakenError,
+  ModelProviderScopesRequiredError,
+  ModelProviderSkipPermissionsPatternInvalidError,
+  detectInvalidSkipPattern,
+  modelProviderApiKeyValidationInputSchema,
+  modelProviderDeleteInputSchema,
+  modelProviderSchema,
+  modelProviderTestConnectionInputSchema,
+  modelProviderWriteInputSchema,
+  type ModelDefaultScope,
+  type ModelProvider,
+  type ModelProviderApiKeyValidation,
+  type ModelProviderApiKeyValidationInput,
+  type ModelProviderCredentialVerdict,
+  type ModelProviderDeleteInput,
+  type ModelProviderTestConnectionInput,
+  type ModelProviderWriteInput,
+} from "@langwatch/model-provider-contract";
+import { nowInstant, toDate } from "@langwatch/time";
+
+import type {
+  ModelProviderCatalog,
+  ModelProviderConnectionRateLimiter,
+  ModelProviderCredentialPolicy,
+  ModelProviderIdService,
+} from "../app/model-provider.members.ts";
+import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
+import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
+import type { ModelProviderConnectionPingService } from "./model-provider-connection-ping.service.ts";
+import type { ModelProviderOnboardingDefaultsService } from "./model-provider-onboarding-defaults.service.ts";
+import type { ModelProviderScopeService } from "./model-provider-scope.service.ts";
+import type { ModelProviderWriteAuthorizationService } from "./model-provider-write-authorization.service.ts";
+
+type ModelProviderCommandOptions = {
+  repository: ModelProviderRepository;
+  defaults: ModelDefaultRepository;
+  credentialPolicy: ModelProviderCredentialPolicy;
+  catalog: ModelProviderCatalog;
+  connectionRateLimiter: ModelProviderConnectionRateLimiter;
+  connectionPing: ModelProviderConnectionPingService;
+  writeAuthorization: ModelProviderWriteAuthorizationService;
+  onboardingDefaults: ModelProviderOnboardingDefaultsService;
+  ids: ModelProviderIdService;
+  scopes: ModelProviderScopeService;
+};
+
+type ProviderModelsForWrite = {
+  customModels: ModelProvider["customModels"];
+  customEmbeddingsModels: ModelProvider["customEmbeddingsModels"];
+};
+
+type ProviderRateLimitsForWrite = {
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  fallbackPriorityGlobal: number | null;
+};
+
+export class ModelProviderCommandService {
+  private constructor(private readonly options: ModelProviderCommandOptions) {}
+
+  static create(options: ModelProviderCommandOptions): ModelProviderCommandService {
+    return new ModelProviderCommandService(options);
+  }
+
+  async upsert(input: ModelProviderWriteInput): Promise<ModelProvider> {
+    this.assertTenantAnchor(input);
+
+    const parsed = modelProviderWriteInputSchema.parse(input);
+    this.assertKnownProvider(parsed.provider);
+    const routingHandle = this.normalizeRoutingHandle(parsed.routingHandle);
+    this.assertValidSkipPermissionsPatterns(parsed.langySkipPermissionsModels);
+    const existing = await this.getExistingProvider(parsed);
+    const scopes = this.scopesForWrite(parsed, existing);
+    await this.authorizeWrite(parsed.actorId, existing?.scopes, scopes);
+    const organizationId = await this.resolveOrganizationId(parsed, existing, scopes);
+    const provider = await this.providerValue({
+      parsed,
+      existing,
+      scopes,
+      organizationId,
+      routingHandle,
+    });
+    const saved = await this.saveProvider(provider, existing, routingHandle);
+
+    await this.seedOnboardingDefaults(existing, saved);
+    await this.saveProjectDefault(parsed);
+
+    return saved;
+  }
+
+  /** The project key's legacy shape: the provider string names the one row it already holds. */
+  async upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
+    const [existing] = await this.findOwnProjectRows(input);
+    return this.upsert(existing ? { ...input, id: existing.id } : input);
+  }
+
+  private findOwnProjectRows(input: ModelProviderWriteInput): Promise<ModelProvider[]> {
+    if (!input.projectId) return Promise.resolve([]);
+
+    return this.options.repository
+      .getByProviderForProject({
+        provider: input.provider,
+        projectScopes: [{ scopeType: "PROJECT", scopeId: input.projectId }],
+      })
+      .then((row) => [row])
+      .catch((error: unknown) => {
+        if (error instanceof ModelProviderNotFoundError) return [];
+        throw error;
+      });
+  }
+
+  async delete(input: ModelProviderDeleteInput): Promise<void> {
+    this.assertTenantAnchor(input);
+
+    const parsed = modelProviderDeleteInputSchema.parse(input);
+    const organizationId = await this.options.scopes
+      .getAnchorOrganizationId({
+        projectId: parsed.projectId,
+        organizationId: parsed.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
+    const existingByProvider = async () => {
+      if (!parsed.projectId) throw new ModelProviderNotFoundError();
+      const projectScopes = await this.options.scopes
+        .getProjectScopes(parsed.projectId)
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found")
+            throw new ModelProviderNotFoundError();
+          throw error;
+        });
+      return this.options.repository.getByProviderForProject({
+        provider: parsed.provider,
+        projectScopes,
+      });
+    };
+    const existing = parsed.id
+      ? await this.options.repository.getById({ id: parsed.id, organizationId })
+      : await existingByProvider();
+
+    if (parsed.actorId) {
+      await this.options.writeAuthorization.assertCanWrite(parsed.actorId, existing.scopes);
+    }
+
+    await this.options.repository.delete({
+      id: existing.id,
+      organizationId: existing.organizationId,
+      projectId: parsed.projectId,
+    });
+  }
+
+  async validateApiKey(
+    input: ModelProviderApiKeyValidationInput,
+  ): Promise<ModelProviderApiKeyValidation> {
+    const parsed = modelProviderApiKeyValidationInputSchema.parse(input);
+    this.assertKnownProvider(parsed.provider);
+
+    return this.options.catalog.validateApiKey(parsed.provider, parsed.customKeys);
+  }
+
+  async testConnection(
+    input: ModelProviderTestConnectionInput,
+  ): Promise<ModelProviderCredentialVerdict> {
+    const parsed = modelProviderTestConnectionInputSchema.parse(input);
+    const organizationId = await this.options.scopes
+      .getAnchorOrganizationId({
+        projectId: parsed.projectId,
+        organizationId: parsed.organizationId,
+      })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "project_not_found")
+          throw new ModelProviderNotFoundError();
+        throw error;
+      });
+
+    const provider = await this.options.repository.getById({
+      id: parsed.modelProviderId,
+      organizationId,
+    });
+    if (provider.scopes.length === 0) {
+      throw new ModelProviderNotFoundError();
+    }
+
+    if (parsed.actorId) {
+      await this.options.writeAuthorization.assertCanWrite(parsed.actorId, provider.scopes);
+    }
+
+    await this.options.connectionRateLimiter.assertAvailable({ organizationId });
+
+    const credential = await this.options.catalog.testConnection(
+      provider.provider,
+      provider.customKeys ?? {},
+    );
+    return this.options.connectionPing.verify({
+      row: provider,
+      projectId: parsed.projectId,
+      credential,
+    });
+  }
+
+  private assertTenantAnchor(input: { projectId?: string; organizationId?: string }): void {
+    if (!input.projectId && !input.organizationId) {
+      throw new ModelProviderAnchorRequiredError("project_or_organization");
+    }
+  }
+
+  private assertKnownProvider(provider: string): void {
+    if (!this.options.catalog.exists(provider)) {
+      throw new ModelProviderInvalidError(`Unknown provider: ${provider}`);
+    }
+  }
+
+  private normalizeRoutingHandle(handle: string | null | undefined): string | null | undefined {
+    if (handle === undefined) {
+      return undefined;
+    }
+
+    const normalized = this.options.catalog.normalizeRoutingHandle(handle);
+    const problem = this.options.catalog.classifyRoutingHandleProblem(normalized);
+    if (problem) {
+      throw new ModelProviderRoutingHandleInvalidError({
+        handle: normalized ?? "",
+        problem,
+      });
+    }
+
+    return normalized;
+  }
+
+  /**
+   * Checked before any database work: a line that never compiles matches
+   * nothing, so storing it would leave the operator believing a model is
+   * trusted when the gate always says no.
+   */
+  private assertValidSkipPermissionsPatterns(patterns: readonly string[] | null | undefined): void {
+    if (!patterns) {
+      return;
+    }
+
+    const invalid = detectInvalidSkipPattern(patterns);
+    if (invalid) {
+      throw new ModelProviderSkipPermissionsPatternInvalidError(invalid);
+    }
+  }
+
+  private async getExistingProvider(input: ModelProviderWriteInput): Promise<ModelProvider | null> {
+    const projectScopes = input.projectId
+      ? await this.options.scopes.getProjectScopes(input.projectId).catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") return undefined;
+          throw error;
+        })
+      : undefined;
+    const existing = input.id
+      ? await this.options.repository.getById({
+          id: input.id,
+          organizationId: input.organizationId,
+          ...(projectScopes ? { projectScopes } : {}),
+        })
+      : null;
+
+    if (!existing) {
+      const deprecation = this.options.catalog.pickProviderDeprecation(input.provider);
+      if (deprecation) {
+        throw new ModelProviderDeprecatedError({
+          provider: input.provider,
+          replacement: deprecation.replacement,
+        });
+      }
+    }
+
+    return existing;
+  }
+
+  private scopesForWrite(
+    input: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+  ): ModelDefaultScope[] {
+    if (input.scopes) {
+      return input.scopes;
+    }
+
+    if (input.projectId) {
+      return [{ scopeType: "PROJECT", scopeId: input.projectId }];
+    }
+
+    if (existing) {
+      return existing.scopes;
+    }
+
+    throw new ModelProviderScopesRequiredError();
+  }
+
+  private async authorizeWrite(
+    actorId: string | undefined,
+    oldScopes: ModelDefaultScope[] | undefined,
+    scopes: ModelDefaultScope[],
+  ): Promise<void> {
+    if (!actorId) {
+      return;
+    }
+
+    await this.options.writeAuthorization.assertCanWrite(actorId, [
+      ...(oldScopes ?? []),
+      ...scopes,
+    ]);
+  }
+
+  private async resolveOrganizationId(
+    input: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+    scopes: ModelDefaultScope[],
+  ): Promise<string> {
+    const organizationId =
+      existing?.organizationId ??
+      (await this.options.scopes
+        .getAnchorOrganizationId({
+          projectId: input.projectId,
+          organizationId: input.organizationId,
+        })
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "project_not_found") {
+            throw new ModelProviderInvalidError(
+              "Provider scope does not resolve to an organization",
+            );
+          }
+          throw error;
+        }));
+
+    const scopeOrganizationId = await this.options.scopes.getOrganizationIdForScopes(scopes);
+    if (organizationId !== scopeOrganizationId) {
+      throw new ModelProviderInvalidError("Provider scopes must belong to one organization");
+    }
+
+    return organizationId;
+  }
+
+  private async providerValue(input: {
+    parsed: ModelProviderWriteInput;
+    existing: ModelProvider | null;
+    scopes: ModelDefaultScope[];
+    organizationId: string;
+    routingHandle: string | null | undefined;
+  }): Promise<ModelProvider> {
+    const { parsed, existing, scopes, organizationId, routingHandle } = input;
+    const customKeys = await this.credentialsForWrite(parsed, existing);
+    const extraHeaders = this.headersForWrite(parsed, existing);
+    const models = this.modelsForWrite(parsed, existing);
+    const rateLimits = this.rateLimitsForWrite(parsed, existing);
+    const now = toDate(nowInstant());
+
+    return modelProviderSchema.parse({
+      id: existing?.id ?? parsed.id ?? this.options.ids.generate({ type: "provider" }),
+      organizationId,
+      provider: parsed.provider,
+      name: parsed.name ?? existing?.name ?? humanize(parsed.provider),
+      enabled: parsed.enabled,
+      defaultModel: parsed.defaultModel,
+      routingHandle:
+        routingHandle === undefined ? (existing?.routingHandle ?? null) : routingHandle,
+      scopes,
+      customKeys,
+      ...models,
+      extraHeaders,
+      ...rateLimits,
+      providerConfig:
+        parsed.providerConfig === undefined
+          ? (existing?.providerConfig ?? null)
+          : parsed.providerConfig,
+      langySkipPermissionsModels: deriveSkipPermissionsForWrite(parsed, existing),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+  }
+
+  private modelsForWrite(
+    parsed: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+  ): ProviderModelsForWrite {
+    return {
+      customModels:
+        parsed.customModels === undefined
+          ? (existing?.customModels ?? [])
+          : (parsed.customModels ?? []),
+      customEmbeddingsModels:
+        parsed.customEmbeddingsModels === undefined
+          ? (existing?.customEmbeddingsModels ?? [])
+          : (parsed.customEmbeddingsModels ?? []),
+    };
+  }
+
+  private rateLimitsForWrite(
+    parsed: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+  ): ProviderRateLimitsForWrite {
+    return {
+      rateLimitRpm:
+        parsed.rateLimitRpm === undefined ? (existing?.rateLimitRpm ?? null) : parsed.rateLimitRpm,
+      rateLimitTpm:
+        parsed.rateLimitTpm === undefined ? (existing?.rateLimitTpm ?? null) : parsed.rateLimitTpm,
+      rateLimitRpd:
+        parsed.rateLimitRpd === undefined ? (existing?.rateLimitRpd ?? null) : parsed.rateLimitRpd,
+      fallbackPriorityGlobal:
+        parsed.fallbackPriorityGlobal === undefined
+          ? (existing?.fallbackPriorityGlobal ?? null)
+          : parsed.fallbackPriorityGlobal,
+    };
+  }
+
+  private async credentialsForWrite(
+    input: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+  ): Promise<Record<string, unknown> | null> {
+    if (input.customKeys === undefined) {
+      return existing?.customKeys ?? null;
+    }
+
+    const normalized = this.options.credentialPolicy.normalizeKeys(
+      input.provider,
+      input.customKeys,
+    );
+    const storedCredentialsAreUnreadable =
+      existing &&
+      existing.customKeys === null &&
+      (await this.options.repository.hasStoredCredentials(existing.id));
+    this.options.credentialPolicy.assertCredentialsCanBeSaved({
+      provider: input.provider,
+      incoming: normalized,
+      stored: existing?.customKeys ?? null,
+      storedCredentialsUnreadable: Boolean(storedCredentialsAreUnreadable),
+    });
+
+    return this.options.credentialPolicy.merge({
+      incoming: normalized,
+      stored: existing?.customKeys ?? null,
+    });
+  }
+
+  private headersForWrite(
+    input: ModelProviderWriteInput,
+    existing: ModelProvider | null,
+  ): { key: string; value: string }[] {
+    if (input.extraHeaders === undefined) {
+      return existing?.extraHeaders ?? [];
+    }
+
+    return this.options.credentialPolicy.mergeHeaders({
+      incoming: input.extraHeaders ?? [],
+      stored: existing?.extraHeaders ?? [],
+    });
+  }
+
+  private async saveProvider(
+    provider: ModelProvider,
+    existing: ModelProvider | null,
+    routingHandle: string | null | undefined,
+  ): Promise<ModelProvider> {
+    try {
+      return existing
+        ? await this.options.repository.update(provider)
+        : await this.options.repository.create(provider);
+    } catch (error) {
+      if (routingHandle !== undefined && this.options.repository.isRoutingHandleConflict(error)) {
+        throw new ModelProviderRoutingHandleTakenError({ handle: routingHandle ?? "" });
+      }
+
+      throw error;
+    }
+  }
+
+  /** A row created disabled, or turned off and back on, is seeded on the enable flip. */
+  private async seedOnboardingDefaults(
+    existing: ModelProvider | null,
+    saved: ModelProvider,
+  ): Promise<void> {
+    if (!existing || (saved.enabled && !existing.enabled)) {
+      await this.options.onboardingDefaults.seed({
+        provider: saved.provider,
+        scopes: saved.scopes,
+      });
+    }
+  }
+
+  private async saveProjectDefault(input: ModelProviderWriteInput): Promise<void> {
+    if (input.defaultModel !== undefined && input.projectId) {
+      const organizationId = await this.options.scopes.getOrganizationIdForScope({
+        scopeType: "PROJECT",
+        scopeId: input.projectId,
+      });
+      await this.options.defaults.set({
+        id: this.options.ids.generate({ type: "default" }),
+        organizationId,
+        scope: { scopeType: "PROJECT", scopeId: input.projectId },
+        key: "DEFAULT",
+        model: input.defaultModel,
+        authorId: null,
+      });
+    }
+  }
+}
+
+function humanize(provider: string): string {
+  return provider.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+/**
+ * The skip-permissions list this write stores. Omitting the field leaves
+ * the stored list alone; an empty list clears it, so the registry default
+ * applies — stored as null, not an empty array reading as "trust nothing".
+ */
+function deriveSkipPermissionsForWrite(
+  parsed: ModelProviderWriteInput,
+  existing: ModelProvider | null,
+): string[] | null {
+  if (parsed.langySkipPermissionsModels === undefined) {
+    return existing?.langySkipPermissionsModels ?? null;
+  }
+
+  return (parsed.langySkipPermissionsModels?.length ?? 0) > 0
+    ? (parsed.langySkipPermissionsModels ?? null)
+    : null;
+}

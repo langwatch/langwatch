@@ -2,8 +2,8 @@
 .PHONY: down logs clean ps quickstart quickstart-help worktree refresh-dev-s3
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local
-.PHONY: herrgen herrgen-check
-.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
+.PHONY: herrgen herrgen-check test-scripts-run lint-rules-run
+.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -24,7 +24,7 @@ help:
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
 	@echo "  Local dev by hostname (thuishaven):"
-	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
+	@echo "    make haven install                  go install the haven binary, then check this machine has what haven needs"
 	@echo "    make haven up                       start this worktree's stack (bootstraps itself)"
 	@echo "    make haven status                   every stack + shared-server health, one shot"
 	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"
@@ -44,11 +44,11 @@ help:
 	@echo "    make herrgen-check                  fail if those generated codes are stale (CI)"
 	@echo ""
 	@echo "  Lint (deterministic house rules — no AI involved):"
-	@echo "    make lint-rules                     ast-grep + semgrep over the whole repo"
-	@echo "    make lint-rules-changed             ...over this branch's changes only (what CI gates on)"
-	@echo "    make lint-rules-test                prove every rule still matches its fixture"
+	@echo "    make lint-rules                     semgrep over the whole repo (oxlint is pnpm lint)"
+	@echo "    make lint-rules-changed             ...over lines this branch changed (what CI reports)"
+	@echo "    make lint-rules-test                prove the semgrep ruleset parses"
 	@echo "    make go-lint                        golangci-lint at the pinned version CI uses"
-	@echo "    make go-lint-changed                ...new/changed lines only"
+	@echo "    make go-lint-changed                ...uncommitted edits only"
 	@echo ""
 	@echo "  Boxd workflows (multi-step orchestration over the boxd CLI):"
 	@echo "    make boxd-help                      full boxd target reference"
@@ -71,7 +71,7 @@ help:
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
-	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/runbooks/boxd-makefile.md"
 
 # The demo applications keep their own Makefile; this only picks the folder
 # and forwards `lang`.
@@ -110,7 +110,7 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Sources every var from platform/app/.env into the Go process's environment.
+# Sources every var from .env into the Go process's environment.
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
@@ -134,45 +134,66 @@ setup-hooks:
 # the default port, and wrong everywhere else with no error anywhere: the
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
-DEV_ENV_FILE ?= platform/app/.env
+DEV_ENV_FILE ?= .env
+# Both targets build with -tags dev, which links the simulators (cmd/service/
+# combined_dev.go); release images build untagged. SIM_CONSOLES are the consoles
+# the run embeds (ADR-160): a simulator's own, or those `combined` hosts.
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim
+SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
+BUILD_SIM_CONSOLES = for sim in $(SIM_CONSOLES); do test -f services/$$sim/web/dist/index.html \
+	|| pnpm exec nx run @langwatch/$$sim-web:build --outputStyle=static || echo "$$sim-web did not build; its console names the fix"; done
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
+	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
 		{ test -f $(DEV_ENV_FILE) \
 			&& set -a && . $(DEV_ENV_FILE) && set +a \
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
-		exec go run ./cmd/service $(svc)
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
+		if [ -n "$$LANGWATCH_LANE" ]; then mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service \
+			&& exec .bin/$(svc)/$(svc) $(svc) $(args); else \
+			set -o pipefail; go run -tags dev ./cmd/service $(svc) $(args) 2>&1 \
+				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
-# Run a Go service with live reload on file changes.
+# Run a Go service with live reload on file changes. A rebuild that fails
+# leaves the running process alone and prints the compile error; only a
+# successful build restarts. The quiet window before a rebuild is
+# LANGWATCH_DEV_WATCH_DEBOUNCE_MS, the same knob the Node lane debounces on.
+# include_dir names the three Go trees the service builds from: exclude_dir
+# only matches paths directly under the root, so without it air walks every
+# nested node_modules and one dangling package link ends the whole lane.
 # Usage: make service-watch svc=aigateway
+#        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
+	@$(BUILD_SIM_CONSOLES)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
-		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
-			--build.bin "./tmp/$(svc) $(svc)" \
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
+		air --build.cmd "mkdir -p .bin/$(svc) && go build -tags dev -o .bin/$(svc)/$(svc) ./cmd/service" \
+			--build.full_bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
-			--build.exclude_dir "tmp,vendor,node_modules"
+			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
+			--build.include_dir "cmd,pkg,services" \
+			--build.exclude_dir ".bin,tmp,vendor,node_modules,services/langyworker/node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./dev/scripts/dev.sh <preset>` directly. Preset list:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Refresh AWS SSO credentials in platform/app/.env so `make quickstart
+# Refresh AWS SSO credentials in .env so `make quickstart
 # dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
-# platform/app/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+# .env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
-	@bash platform/app/scripts/refresh-dev-s3-env.sh
+	@bash dev/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
@@ -187,6 +208,9 @@ refresh-dev-s3:
 # git / docker / external CLIs against the real filesystem and need
 # fixtures.
 test-scripts:
+	@pnpm exec nx run workspace:test:scripts --outputStyle=static
+
+test-scripts-run:
 	@if ! command -v bats >/dev/null 2>&1; then \
 		echo "ERROR: bats not installed. Install with:" >&2; \
 		echo "  macOS:  brew install bats-core" >&2; \
@@ -205,75 +229,87 @@ test-scripts:
 # drift check, and go-ci.yaml's `generated` job calls this same target, so what
 # CI runs and what you run cannot drift apart.
 herrgen:
-	@go run ./cmd/herrgen
+	@pnpm exec nx run go-cmd:herrgen --outputStyle=static
 
 herrgen-check:
 	@go run ./cmd/herrgen -check
 # ── Deterministic house rules ──────────────────────────────────────────────
 #
-# The ast-grep and semgrep rulesets encode house rules that used to be
-# enforced only by the AI reviewer, once per PR, as a comment. They are
-# ordinary linters; these targets are how a human runs them.
+# Every JavaScript/TypeScript house rule is a langwatch oxlint rule (`pnpm
+# lint`). The semgrep ruleset holds the two that oxlint cannot: PII in logger
+# calls (CodeRabbit loads it) and hard-coded database names in ClickHouse
+# migrations. See dev/lint/README.md.
 #
-# Versions are PINNED to what .github/workflows/coderabbit-config-check.yml
+# SEMGREP_VERSION is PINNED to what .github/workflows/coderabbit-config-check.yml
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
-AST_GREP_VERSION := 0.42.3
 SEMGREP_VERSION  := 1.164.0
-GOLANGCI_VERSION := v2.11.4
-
-# Resolve the pinned tools without caring how the developer installs Python
-# tools. `uv` is preferred (isolated, no venv juggling); an already-correct
-# binary on PATH is accepted; otherwise we say exactly what to run.
-define _need_astgrep
-	@if command -v ast-grep >/dev/null 2>&1 && \
-	    ast-grep --version 2>/dev/null | grep -q "$(AST_GREP_VERSION)"; then :; \
-	elif command -v uv >/dev/null 2>&1; then :; \
-	else \
-		echo "ERROR: ast-grep $(AST_GREP_VERSION) not found and uv is unavailable." >&2; \
-		echo "  brew install uv   # then re-run; uv fetches the pinned version" >&2; \
-		echo "  or: pipx install 'ast-grep-cli==$(AST_GREP_VERSION)'" >&2; \
-		exit 1; \
-	fi
-endef
+GOLANGCI_VERSION := v2.13.2
 
 # uvx runs the pinned version without installing it globally, so a developer
-# with a different ast-grep on PATH still gets the CI behaviour.
-AST_GREP := $(shell if command -v ast-grep >/dev/null 2>&1 && ast-grep --version 2>/dev/null | grep -q "$(AST_GREP_VERSION)"; then echo ast-grep; else echo "uvx --from ast-grep-cli==$(AST_GREP_VERSION) ast-grep"; fi)
-SEMGREP  := $(shell if command -v semgrep >/dev/null 2>&1; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
+# with a different semgrep on PATH still gets the CI behaviour.
+SEMGREP := $(shell if command -v semgrep >/dev/null 2>&1 && semgrep --version 2>/dev/null | grep -q "$(SEMGREP_VERSION)"; then echo semgrep; else echo "uvx --from semgrep==$(SEMGREP_VERSION) semgrep"; fi)
 
 lint-rules:
-	$(call _need_astgrep)
-	@echo "==> ast-grep (dev/lint/ast-grep/rules)"
-	@$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml
-	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
-	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error .
+	@pnpm exec nx run workspace:lint:rules --outputStyle=static
 
-# What CI gates on. Scans only files this branch changed, so a large
-# pre-existing baseline never blocks work on an unrelated file.
+lint-rules-run:
+	@echo "==> semgrep (dev/lint/semgrep/langwatch.yml)"
+	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error --exclude platform .
+
+# What CI reports on: findings on lines this branch changed.
 lint-rules-changed:
-	$(call _need_astgrep)
-	@files=$$(git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.ts' '*.tsx'); \
-	if [ -z "$$files" ]; then echo "No changed TS/TSX files."; exit 0; fi; \
-	echo "==> ast-grep over $$(echo "$$files" | wc -l | tr -d ' ') changed file(s)"; \
-	$(AST_GREP) scan -c dev/lint/ast-grep/sgconfig.yml $$files
+	@echo "==> semgrep over lines changed since origin/main"
+	@$(SEMGREP) --config dev/lint/semgrep/langwatch.yml --quiet --error \
+		--baseline-commit "$$(git merge-base HEAD origin/main)" .
 
 lint-rules-test:
-	$(call _need_astgrep)
-	@cd dev/lint/ast-grep && $(AST_GREP) test -c sgconfig.yml -t rule-tests
+	@$(SEMGREP) --validate --config dev/lint/semgrep/langwatch.yml
 
 # golangci-lint's config is version: "2"; a v1 binary refuses it outright,
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+# The workspace modules golangci-lint covers (go.work also holds the SDK and the
+# ClickHouse operator, linted by their own workflows). Each runs in its module.
+GO_LINT_MODULES ?= cmd pkg services tools
 
-go-lint:
-	@echo "==> golangci-lint $(GOLANGCI_VERSION)"
-	@$(GOLANGCI) run $(GO_LINT_PKGS)
+# golangci-lint reads package export data through whatever `go` it finds, and
+# the pinned linter (built with Go 1.25, upstream ships "latest-1") cannot
+# read the format a Go newer than go.work's emits. CI never sees this because
+# it installs from go-version-file: go.work; a laptop ahead of the repo does.
+# Pinning GOTOOLCHAIN to go.work's version makes both environments identical.
+GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.work)
 
+# A slot bounds how many runs, not how many cores each takes: locally the linter
+# and its `go list` builds get 2 cores, CI (CI=true) every core. Override: GO_LINT_JOBS=8.
+GO_LINT_JOBS ?= $(if $(CI),$(shell getconf _NPROCESSORS_ONLN),2)
+GO_LINT_ENV := env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) GOMAXPROCS=$(GO_LINT_JOBS) GOFLAGS="$(GOFLAGS) -p=$(GO_LINT_JOBS)"
+
+# golangci-lint saturates cores the same way a whole-tree typecheck does, so it
+# takes a slot from the same machine-wide counter (`haven slot run`) before it
+# runs, and queues behind a typecheck already running rather than piling onto
+# it. go-lint-changed stays direct: it scans only the packages of uncommitted
+# edits, not the whole tree, and is not the cost this queue exists for.
+go-lint-slot:
+	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
+	@$(HAVEN) slot run --label golangci-lint --timeout 10m -- sh -c 'rc=0; for m in $(GO_LINT_MODULES); do \
+		(cd "$$m" && $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners ./...) || rc=1; done; exit $$rc'
+
+go-lint: go-lint-slot
+
+# Lints only the packages of uncommitted .go edits (untracked included) and
+# reports only issues on those lines; it never diffs against a branch. Each
+# module's packages are linted from inside that module, in one slot.
 go-lint-changed:
-	@echo "==> golangci-lint $(GOLANGCI_VERSION) (new/changed lines only)"
-	@$(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
+	@dirs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
+		| grep -E '^(services/(aigateway|analyticssim|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
+		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "$$d"; done); \
+	if [ -z "$$dirs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
+	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$dirs" | wc -l | tr -d ' ') packages)"; \
+	$(HAVEN) slot run --label golangci-lint --timeout 10m -- sh -c 'rc=0; for m in $(GO_LINT_MODULES); do \
+		pkgs=$$(echo "$$0" | sed -n "s#^$$m/#./#p"); [ -z "$$pkgs" ] && continue; \
+		(cd "$$m" && $(GO_LINT_ENV) $(GOLANGCI) run --concurrency $(GO_LINT_JOBS) --allow-serial-runners --new-from-rev=HEAD $$pkgs) || rc=1; \
+	done; exit $$rc' "$$dirs"
 
 # Stop all services
 down:
@@ -309,24 +345,24 @@ else
 	@:
 endif
 
-# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
-# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
-# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
-# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
-# → http://localhost:5561) and doesn't collide with langevals on :5562.
-# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
-# the local app.
+# The whole local stack in one terminal: the three applications (ui, api,
+# workers) plus the Go aigateway and nlpgo engines. `pnpm dev` starts all five
+# itself now — dev/scripts/dev-stack.sh derives every port and skips a Go lane
+# that is already listening — so this target is one line pointing at it, kept
+# because `make start` is in the README and in muscle memory.
 start:
-	cd platform/app && pnpm concurrently --kill-others \
-		'pnpm dev' \
-		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
+	pnpm dev
 
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose -f infra/compose.yml --project-directory . up -d postgres
 
+# A watching typecheck of one application (default apps/api):
+#   make tsc-watch app=apps/ui
+# It never takes a check-queue slot — a `--watch` run would hold one for the
+# whole session, which is exactly what the queue exists to prevent.
 tsc-watch:
-	cd platform/app && pnpm tsc-watch
+	pnpm exec tsc --noEmit --watch --preserveWatchOutput -p $(or $(app),apps/api)/tsconfig.json
 
 # Single entry point — interactive launcher or non-interactive mode runner.
 # (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
@@ -389,15 +425,26 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
+# Check that every operation the frozen document lists is still served.
+#
+# The DOCUMENT IS FROZEN. `specs/api-reference/openapi-document.json` is served
+# by three routes and the SDKs generate clients from it, so nothing here
+# writes it; the check only reads it.
+#
+# All THREE clients are generated and committed. Go is named explicitly because
+# it was once missing from this target and drifted eight spec commits behind
+# while TypeScript and Python stayed current. GOWORK=off because sdks/go/client
+# is its own module and is deliberately absent from the repo-root go.work.
+#
+# To regenerate the CLIENTS from the document as it stands, run the three
+# commands the output names.
 sync-all-openapi:
-	cd platform/app && pnpm run task generateOpenAPISpec
-	cd sdks/typescript && pnpm run generate:openapi-types
-	cd sdks/python && make generate/api-client
-	# The Go client is generated and committed like the other two, and was
-	# missing here — which is why it drifted eight spec commits behind while
-	# TypeScript and Python stayed current. GOWORK=off because sdks/go/client
-	# is its own module and is deliberately absent from the repo-root go.work.
-	cd sdks/go/client && GOWORK=off go generate ./...
+	@pnpm --filter @langwatch/platform-api run openapi:check
+	@echo ""
+	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
+	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
+	@echo "    cd sdks/python && make generate/api-client"
+	@echo "    cd sdks/go/client && GOWORK=off go generate ./..."
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

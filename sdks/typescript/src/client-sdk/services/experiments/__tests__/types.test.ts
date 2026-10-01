@@ -2,6 +2,8 @@
  * Unit tests for evaluation types and Zod schemas
  */
 import { describe, it, expect } from "vitest";
+import { z } from "zod";
+
 import {
   evaluationStatusSchema,
   targetTypeSchema,
@@ -12,7 +14,7 @@ import {
 } from "../types";
 
 describe("Evaluation Types", () => {
-  describe("evaluationStatusSchema", () => {
+  describe("when validating with evaluationStatusSchema", () => {
     it("accepts valid statuses", () => {
       expect(evaluationStatusSchema.parse("processed")).toBe("processed");
       expect(evaluationStatusSchema.parse("error")).toBe("error");
@@ -20,13 +22,13 @@ describe("Evaluation Types", () => {
     });
 
     it("rejects invalid statuses", () => {
-      expect(() => evaluationStatusSchema.parse("invalid")).toThrow();
-      expect(() => evaluationStatusSchema.parse("")).toThrow();
-      expect(() => evaluationStatusSchema.parse(123)).toThrow();
+      expect(() => evaluationStatusSchema.parse("invalid")).toThrow(z.ZodError);
+      expect(() => evaluationStatusSchema.parse("")).toThrow(z.ZodError);
+      expect(() => evaluationStatusSchema.parse(123)).toThrow(z.ZodError);
     });
   });
 
-  describe("targetTypeSchema", () => {
+  describe("when validating with targetTypeSchema", () => {
     it("accepts valid target types", () => {
       expect(targetTypeSchema.parse("prompt")).toBe("prompt");
       expect(targetTypeSchema.parse("agent")).toBe("agent");
@@ -34,12 +36,12 @@ describe("Evaluation Types", () => {
     });
 
     it("rejects invalid target types", () => {
-      expect(() => targetTypeSchema.parse("invalid")).toThrow();
-      expect(() => targetTypeSchema.parse("llm")).toThrow();
+      expect(() => targetTypeSchema.parse("invalid")).toThrow(z.ZodError);
+      expect(() => targetTypeSchema.parse("llm")).toThrow(z.ZodError);
     });
   });
 
-  describe("targetMetadataSchema", () => {
+  describe("when validating with targetMetadataSchema", () => {
     it("accepts valid metadata objects", () => {
       const metadata = {
         model: "gpt-4",
@@ -57,18 +59,18 @@ describe("Evaluation Types", () => {
       const invalid = {
         config: { nested: "value" },
       };
-      expect(() => targetMetadataSchema.parse(invalid)).toThrow();
+      expect(() => targetMetadataSchema.parse(invalid)).toThrow(z.ZodError);
     });
 
     it("rejects arrays as values", () => {
       const invalid = {
         tags: ["a", "b"],
       };
-      expect(() => targetMetadataSchema.parse(invalid)).toThrow();
+      expect(() => targetMetadataSchema.parse(invalid)).toThrow(z.ZodError);
     });
   });
 
-  describe("targetInfoSchema", () => {
+  describe("when validating with targetInfoSchema", () => {
     it("parses valid target info", () => {
       const target = {
         id: "target-1",
@@ -99,12 +101,12 @@ describe("Evaluation Types", () => {
     });
 
     it("requires id and name", () => {
-      expect(() => targetInfoSchema.parse({ id: "1" })).toThrow();
-      expect(() => targetInfoSchema.parse({ name: "test" })).toThrow();
+      expect(() => targetInfoSchema.parse({ id: "1" })).toThrow(z.ZodError);
+      expect(() => targetInfoSchema.parse({ name: "test" })).toThrow(z.ZodError);
     });
   });
 
-  describe("evaluationResultSchema", () => {
+  describe("when validating with evaluationResultSchema", () => {
     it("parses minimal evaluation result", () => {
       const result = {
         name: "accuracy",
@@ -164,7 +166,7 @@ describe("Evaluation Types", () => {
     });
   });
 
-  describe("batchEntrySchema", () => {
+  describe("when validating with batchEntrySchema", () => {
     it("parses valid batch entry", () => {
       const entry = {
         index: 0,
@@ -187,8 +189,8 @@ describe("Evaluation Types", () => {
     });
 
     it("requires all mandatory fields", () => {
-      expect(() => batchEntrySchema.parse({ index: 0 })).toThrow();
-      expect(() => batchEntrySchema.parse({ index: 0, entry: {} })).toThrow();
+      expect(() => batchEntrySchema.parse({ index: 0 })).toThrow(z.ZodError);
+      expect(() => batchEntrySchema.parse({ index: 0, entry: {} })).toThrow(z.ZodError);
     });
 
     it("accepts complex entry objects", () => {

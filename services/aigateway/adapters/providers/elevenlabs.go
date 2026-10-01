@@ -296,7 +296,7 @@ func (r *BifrostRouter) doElevenLabsAudio(
 	if client == nil {
 		client = fallbackElevenLabsAudioClient(r.endpointPolicy)
 	}
-	httpResp, err := client.Do(httpReq) //nolint:gosec // vetted by the endpoint policy at dispatch and again at dial time
+	httpResp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": "the ElevenLabs audio request failed: " + err.Error(),

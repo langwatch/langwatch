@@ -52,6 +52,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the column holds the conversation markdown, with the system prompt once and one section per turn
     And the column type is reported as the hydrated type rather than the key's type
 
+  @unit
+  Scenario: conversation reads like the chat view and llm_readable_thread holds the agent's steps
+    Given a thread whose turns called tools
+    When conversation(ConversationId) and llm_readable_thread(ConversationId, 8000) are hydrated
+    Then conversation is rendered in the conversation view, with no budget
+    And llm_readable_thread is rendered in the steps view under its own budget, over the whole thread
+
   @integration
   Scenario: Submitted SQL using an app function is still recorded verbatim
     Given a statement projecting llm_readable_trace(TraceId, 8000) AS text with a trailing comment
@@ -265,19 +272,6 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the rendered conversation holds the text from those messages
 
   @unit
-  Scenario: Questions that leave no room for text are refused before anything is judged
-    Given eval questions that alone fill the judge's state
-    When the statement is hydrated
-    Then it fails with instant_eval_questions_too_long and nothing is sent to the judge
-
-  @unit
-  Scenario: A conversation over the judge's budget is measured with the judge's own ratio
-    Given a conversation that fits four bytes a token but not the judge's denser ratio
-    When the statement is hydrated
-    Then it is re-rendered under the judge's budget before it is sent
-    And the row is reported truncated
-
-  @unit
   Scenario: A bounded conversation keeps both ends and names what it dropped
     Given a thread whose turns do not fit the requested token budget
     When conversation_bounded hydrates
@@ -287,13 +281,6 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   # ---------------------------------------------------------------------------
   # Failure
   # ---------------------------------------------------------------------------
-
-  @unit
-  Scenario: A cancelled query keeps the judgements it made
-    Given a judged query whose caller cancels after one row was answered
-    When hydration returns
-    Then the answered verdict and its usage are kept
-    And the result names the rows that were never judged
 
   @unit
   Scenario: A read past the byte budget is refused, not completed
@@ -307,12 +294,6 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Given a page of traces read in chunks
     When the caller cancels after the first chunk
     Then no further chunk is read
-
-  @unit
-  Scenario: A judged query reports the time its judging took
-    Given a statement whose eval calls take longer than the database read
-    When the query answers
-    Then its elapsed time covers the read and the judging, not the database alone
 
   @unit
   Scenario: A failed fetch is a platform failure, not a wrong answer

@@ -1,8 +1,11 @@
 import { chmodSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { TurnEventMapper } from "../events.js";
 import {
   BASH_TOOL_NAME,
   CODE_ACCESS_TOOL_NAME,
@@ -17,7 +20,6 @@ import {
   readCodeAccess,
   renderWorkspaceFacts,
 } from "./local-workspace.js";
-import { TurnEventMapper } from "../events.js";
 import { createTurnContext, type TurnContext } from "./turn-context.js";
 
 type RegisteredTool = {
@@ -328,11 +330,9 @@ describe("the sandbox file tools while a folder is connected", () => {
 
   /** @scenario "The sandbox file tools are withdrawn while a folder is connected" */
   it("changes only the sandbox file tools, whatever else the set holds", () => {
-    expect(activeToolsFor({ connected: true, active: ["read", "bash", "local_read", "skill"] })).toEqual([
-      "bash",
-      "local_read",
-      "skill",
-    ]);
+    expect(
+      activeToolsFor({ connected: true, active: ["read", "bash", "local_read", "skill"] }),
+    ).toEqual(["bash", "local_read", "skill"]);
     expect(activeToolsFor({ connected: false, active: ["bash", "local_read", "ls"] })).toEqual([
       "bash",
       "local_read",
@@ -418,6 +418,46 @@ describe("the folder facts code_access renders", () => {
   });
 });
 
+/** One app whose workspace read says "not found" a given number of times first. */
+function appWithLaggingProjection(notFoundReads: number) {
+  let workspaceReads = 0;
+  const fetchMock = vi.fn(async (url: string) => {
+    const path = new URL(url).pathname;
+    if (path === "/api/langy/local/workspace") {
+      workspaceReads += 1;
+      if (workspaceReads <= notFoundReads) {
+        return {
+          ok: false,
+          status: 404,
+          json: async () => ({ error: { code: "langy_conversation_not_found" } }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          connected: false,
+          codeAccessPreference: null,
+          github: { installed: false },
+        }),
+      };
+    }
+    if (path === "/api/langy/local/requests") {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          request: { id: "req_1", expiresAt: "2026-09-03T10:00:00.000Z" },
+          command: "npx langwatch@latest langy --share-control",
+        }),
+      };
+    }
+    throw new Error(`no fake answer for ${path}`);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { fetchMock, workspaceReads: () => workspaceReads };
+}
+
 describe("the local workspace tools", () => {
   describe("given the extension is registered", () => {
     /** @scenario "The worker carries one local tool for each built-in it mirrors" */
@@ -425,12 +465,12 @@ describe("the local workspace tools", () => {
       const tools = registeredTools();
 
       // Plus the shell under its standard name, which this extension owns.
-      expect([...tools.keys()].sort()).toEqual(
-        [BASH_TOOL_NAME, CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
+      expect([...tools.keys()].toSorted()).toEqual(
+        [BASH_TOOL_NAME, CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].toSorted(),
       );
 
       const parameterNames = (name: string) =>
-        Object.keys(tools.get(name)!.parameters.properties).sort();
+        Object.keys(tools.get(name)!.parameters.properties).toSorted();
       expect(parameterNames("local_read")).toEqual(["limit", "offset", "path"]);
       expect(parameterNames("local_write")).toEqual(["content", "path"]);
       expect(parameterNames("local_edit")).toEqual(["edits", "path"]);
@@ -449,10 +489,7 @@ describe("the local workspace tools", () => {
       expect(parameterNames("local_langwatch_env")).toEqual(["path"]);
       // The quiet third way out is opt-in: a skill with a fallback for it
       // passes `offer_describe`, an ordinary ask leaves it off.
-      expect(parameterNames(CODE_ACCESS_TOOL_NAME)).toEqual([
-        "offer_describe",
-        "reason",
-      ]);
+      expect(parameterNames(CODE_ACCESS_TOOL_NAME)).toEqual(["offer_describe", "reason"]);
 
       for (const name of LOCAL_TOOL_NAMES) {
         expect(tools.get(name)!.description).toContain("on the user's machine");
@@ -472,9 +509,7 @@ describe("the local workspace tools", () => {
         ],
       });
 
-      const result = await registeredTools()
-        .get("local_ls")!
-        .execute("t1", { path: "." });
+      const result = await registeredTools().get("local_ls")!.execute("t1", { path: "." });
 
       expect(textOf(result)).toBe("src\npackage.json");
       expect(calls[0]?.method).toBe("POST");
@@ -586,12 +621,12 @@ describe("the local workspace tools", () => {
     it("returns the pushback that names the code access step", async () => {
       vi.stubGlobal(
         "fetch",
-        vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) }) as unknown as Response),
+        vi.fn(
+          async () => ({ ok: false, status: 404, json: async () => ({}) }) as unknown as Response,
+        ),
       );
 
-      const text = textOf(
-        await registeredTools().get("local_ls")!.execute("t5", { path: "." }),
-      );
+      const text = textOf(await registeredTools().get("local_ls")!.execute("t5", { path: "." }));
 
       expect(text).toBe(OFFLINE_PUSHBACK);
       expect(text).toContain("langy --share-control");
@@ -630,9 +665,7 @@ describe("the local workspace tools", () => {
       expect(text).not.toContain("not connected any more");
       expect(text).not.toContain("langy --share-control");
       expect(
-        fetchMock.mock.calls.some(([url]) =>
-          String(url).includes("/api/langy/local/workspace"),
-        ),
+        fetchMock.mock.calls.some(([url]) => String(url).includes("/api/langy/local/workspace")),
       ).toBe(true);
     }, 15_000);
   });
@@ -698,9 +731,37 @@ describe("the local workspace tools", () => {
       controller.abort();
 
       await expect(running).rejects.toThrow("cancelled");
+      expect(calls.some((call) => call.url.endsWith("/api/langy/local/calls/call_6/cancel"))).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("when code access is asked for in the conversation's first seconds", () => {
+    /** @scenario "A code access check that beats the conversation projection waits for it" */
+    it("repeats the read until the projection answers, then raises the card", async () => {
+      const app = appWithLaggingProjection(2);
+
+      const text = await readCodeAccess({ retry: { windowMs: 2_000, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBe(3);
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
+      expect(text).toContain("npx langwatch@latest langy --share-control");
+    });
+
+    /** @scenario "A code access check whose conversation never appears says the app did not answer" */
+    it("gives the usual pushback once the window is over", async () => {
+      const app = appWithLaggingProjection(Number.MAX_SAFE_INTEGER);
+
+      const text = await readCodeAccess({ retry: { windowMs: 40, beatMs: 5 } });
+
+      expect(app.workspaceReads()).toBeGreaterThan(1);
+      expect(text).toBe(
+        "LangWatch did not answer the code access check. Tell the user in one line and end your turn.",
+      );
       expect(
-        calls.some((call) => call.url.endsWith("/api/langy/local/calls/call_6/cancel")),
-      ).toBe(true);
+        app.fetchMock.mock.calls.some(([url]) => String(url).includes("/api/langy/local/requests")),
+      ).toBe(false);
     });
   });
 
@@ -797,9 +858,7 @@ describe("the local workspace tools", () => {
         ],
       });
 
-      const text = textOf(
-        await registeredTools().get(CODE_ACCESS_TOOL_NAME)!.execute("t7", {}),
-      );
+      const text = textOf(await registeredTools().get(CODE_ACCESS_TOOL_NAME)!.execute("t7", {}));
 
       expect(text).toContain("/Users/dev/acme-app");
       expect(text).toContain("main");
@@ -820,9 +879,7 @@ describe("the local workspace tools", () => {
         ],
       });
 
-      const text = textOf(
-        await registeredTools().get(CODE_ACCESS_TOOL_NAME)!.execute("t8", {}),
-      );
+      const text = textOf(await registeredTools().get(CODE_ACCESS_TOOL_NAME)!.execute("t8", {}));
 
       expect(text).toContain("remembered GitHub");
       expect(text).toContain("github skill");
@@ -860,11 +917,9 @@ describe("the local workspace tools", () => {
       // The panel reads this first line to tell a call that RAISED the card
       // from one the tool answered itself, and draws a card only for the
       // first. `LANGY_CODE_ACCESS_CARD_ANSWER` in
-      // platform/app/src/features/langy/logic/langyCodeAccessTool.ts is the
+      // modules/langy/browser (langyCodeAccessTool) is the
       // same words; change one and change the other.
-      expect(text.startsWith("The code access card is shown to the user.")).toBe(
-        true,
-      );
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
       expect(text).toContain("npx langwatch@latest langy --share-control");
       expect(text).toContain("END YOUR TURN");
       expect(text).toContain("Say in one line what you will change");
@@ -894,9 +949,7 @@ describe("the local workspace tools", () => {
           .execute("t10", { reason: "wire tracing in", offer_describe: true }),
       );
 
-      expect(text.startsWith("The code access card is shown to the user.")).toBe(
-        true,
-      );
+      expect(text.startsWith("The code access card is shown to the user.")).toBe(true);
       expect(text).toContain("END YOUR TURN now, without another word");
       expect(text).not.toContain("Say in one line");
       expect(text).toContain("would rather describe the agent");

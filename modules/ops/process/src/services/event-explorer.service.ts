@@ -1,0 +1,226 @@
+import { createTenantId } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
+import { toEpochMs } from "@langwatch/time";
+
+import type { OpsEventingIntrospection } from "../app/ops.app.ts";
+import type { EventExplorerRepository } from "../repositories/event-explorer.repository.ts";
+
+const logger = createLogger("langwatch:ops:event-explorer");
+
+export class EventExplorerService {
+  static create({
+    repo,
+    introspection,
+  }: {
+    repo: EventExplorerRepository;
+    introspection: OpsEventingIntrospection;
+  }): EventExplorerService {
+    return new EventExplorerService(repo, introspection);
+  }
+
+  private constructor(
+    readonly repo: EventExplorerRepository,
+    private readonly introspection: OpsEventingIntrospection,
+  ) {}
+
+  async discoverAggregates(params: {
+    projectionNames: string[];
+    since: string;
+    tenantIds: string[];
+  }): Promise<{
+    projections: {
+      projectionName: string;
+      aggregateCount: number;
+      tenantBreakdown: {
+        tenantId: string;
+        aggregateCount: number;
+      }[];
+    }[];
+  }> {
+    const allProjections = this.introspection.projections();
+    const selected = allProjections.filter((p) =>
+      params.projectionNames.includes(p.projectionName),
+    );
+
+    if (selected.length === 0) {
+      return { projections: [] };
+    }
+
+    const aggregateTypes = [...new Set(selected.map((p) => p.aggregateType))];
+    const sinceMs = toEpochMs(params.since);
+
+    const rows = await this.repo.findAggregates({
+      aggregateTypes,
+      sinceMs,
+      tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,
+    });
+
+    const byAggregateType = new Map<string, { tenantId: string; aggregateCount: number }[]>();
+    for (const row of rows) {
+      const list = byAggregateType.get(row.aggregateType) ?? [];
+      list.push({
+        tenantId: row.tenantId,
+        aggregateCount: row.aggregateCount,
+      });
+      byAggregateType.set(row.aggregateType, list);
+    }
+
+    const projections: {
+      projectionName: string;
+      aggregateCount: number;
+      tenantBreakdown: {
+        tenantId: string;
+        aggregateCount: number;
+      }[];
+    }[] = [];
+
+    for (const projection of selected) {
+      const tenantBreakdown = byAggregateType.get(projection.aggregateType) ?? [];
+      const aggregateCount = tenantBreakdown.reduce((sum, t) => sum + t.aggregateCount, 0);
+      projections.push({
+        projectionName: projection.projectionName,
+        aggregateCount,
+        tenantBreakdown,
+      });
+    }
+
+    return { projections };
+  }
+
+  async searchAggregates(params: {
+    query: string;
+    tenantIds: string[];
+    sinceMs?: number;
+  }): Promise<AggregateSearchResult[]> {
+    return this.repo.searchAggregates({
+      query: params.query,
+      tenantIds: params.tenantIds.length > 0 ? params.tenantIds : undefined,
+      sinceMs: params.sinceMs,
+    });
+  }
+
+  async getAggregateEvents(params: {
+    aggregateId: string;
+    tenantId: string;
+    limit: number;
+  }): Promise<
+    {
+      eventId: string;
+      eventType: string;
+      eventTimestamp: string;
+      payload: unknown;
+    }[]
+  > {
+    const rows = await this.repo.findEventsByAggregate(params);
+
+    return rows.map((row) => {
+      let parsedPayload: unknown;
+      try {
+        parsedPayload = JSON.parse(row.payload);
+      } catch {
+        parsedPayload = row.payload;
+      }
+
+      return {
+        eventId: row.eventId,
+        eventType: row.eventType,
+        eventTimestamp: row.eventTimestamp,
+        payload: parsedPayload,
+      };
+    });
+  }
+
+  async computeProjectionState(params: {
+    aggregateId: string;
+    tenantId: string;
+    projectionName: string;
+    eventIndex: number;
+  }): Promise<{
+    state: unknown;
+    appliedEventCount: number;
+    projectionName: string;
+    aggregateType: string;
+  }> {
+    const projections = this.introspection.projections();
+    const projection = projections.find((p) => p.projectionName === params.projectionName);
+
+    if (!projection) {
+      return {
+        state: null,
+        appliedEventCount: 0,
+        projectionName: params.projectionName,
+        aggregateType: "",
+      };
+    }
+
+    const limit = params.eventIndex + 1;
+    const rows = await this.repo.findEventsByAggregate({
+      aggregateId: params.aggregateId,
+      tenantId: params.tenantId,
+      limit,
+    });
+
+    const dejaViewProjections = this.introspection.dejaViewProjections();
+    const dejaViewProj = dejaViewProjections.find(
+      (p) => p.projectionName === params.projectionName,
+    );
+
+    if (!dejaViewProj) {
+      return {
+        state: null,
+        appliedEventCount: rows.length,
+        projectionName: params.projectionName,
+        aggregateType: projection.aggregateType,
+      };
+    }
+
+    const events = rows.map((row) => ({
+      row,
+      event: {
+        id: row.eventId,
+        aggregateId: params.aggregateId,
+        aggregateType: projection.aggregateType,
+        tenantId: createTenantId(params.tenantId),
+        createdAt: parseInt(row.eventTimestamp, 10),
+        occurredAt: parseInt(row.eventTimestamp, 10),
+        type: row.eventType,
+        version: "",
+        data: parsePayload(row.payload),
+      },
+    }));
+    const folded = dejaViewProj.replay<{ state: unknown; applied: number }>((fold) => {
+      let state = fold.init();
+      let applied = 0;
+      for (const { row, event } of events) {
+        if (!dejaViewProj.eventTypes.includes(row.eventType)) continue;
+        try {
+          state = fold.apply(state, event);
+          applied++;
+        } catch (err) {
+          logger.warn(
+            { error: err, eventId: row.eventId, projectionName: params.projectionName },
+            "Skipping event that failed to apply during projection state computation",
+          );
+        }
+      }
+      return { state, applied };
+    });
+
+    return {
+      state: folded.state,
+      appliedEventCount: folded.applied,
+      projectionName: params.projectionName,
+      aggregateType: projection.aggregateType,
+    };
+  }
+}
+
+/** A stored payload as the fold reads it; one that does not parse folds as an empty object. */
+function parsePayload(payload: string): unknown {
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return {};
+  }
+}

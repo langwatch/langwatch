@@ -1,0 +1,379 @@
+/**
+ * Test harness for personal-workspace screens.
+ * Provides faked infrastructure and records interactions for assertions.
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import { render, type RenderResult } from "@testing-library/react";
+import { useMemo, useState, type ReactElement, type ReactNode } from "react";
+
+import {
+  PersonalWorkspaceHostApi,
+  PersonalWorkspaceHostProvider,
+  type HeldPasskey,
+  type LinkSignInMethodOutcome,
+  type PasskeyOutcome,
+  type PersonalActor,
+  type PersonalDeployment,
+  type PersonalFailureNotice,
+  type PersonalOrganization,
+  type PersonalOrganizationRole,
+  type PersonalProject,
+  type PersonalRouteReading,
+  type PersonalScope,
+  type PersonalSuccessNotice,
+  type TwoStepAnswer,
+  type TwoStepSetup,
+} from "./model/personal-workspace-host.ts";
+
+export type PersonalQuery = Readonly<Record<string, string | undefined>>;
+
+/** Everything a screen wrote through the host, in the order it wrote it. */
+export type PersonalHostRecording = {
+  navigations: string[];
+  /** The passkey ceremonies a screen ran, and what it named them with. */
+  passkeyCeremonies: (
+    | { kind: "register" }
+    | { kind: "rename"; id: string; name: string }
+    | { kind: "remove"; id: string }
+  )[];
+  /** The providers a screen asked to link an additional sign-in method with. */
+  linkedProviders: string[];
+  /** The two-step ceremonies a screen ran, and what it sent with each. */
+  twoStepCeremonies: (
+    | { kind: "start"; password?: string }
+    | { kind: "confirm"; code: string }
+    | { kind: "regenerate"; password?: string }
+  )[];
+  /** How many times a screen asked for the signed-in reader to be re-read. */
+  sessionRefreshes: number;
+  queries: { next: PersonalQuery; replace: boolean }[];
+  successes: PersonalSuccessNotice[];
+  failures: PersonalFailureNotice[];
+  /** The questions a screen handed to the assistant. */
+  assistantPrompts: string[];
+};
+
+/**
+ * The organization the personal workspace is inside, unless a test says
+ * otherwise. The same row the platform suites handed
+ * `useOrganizationTeamProject`.
+ */
+export const FAKE_ORGANIZATION: PersonalOrganization = {
+  id: "org-1",
+  name: "ACME",
+  slug: "acme",
+  teams: [
+    {
+      id: "team-1",
+      name: "Platform",
+      projects: [{ id: "proj-1", name: "Web App", slug: "web-app", teamId: "team-1" }],
+    },
+  ],
+};
+
+export const FAKE_ACTOR: PersonalActor = {
+  id: "user-1",
+  name: "Carol",
+  email: "carol@acme.example",
+  image: null,
+};
+
+const DEFAULT_DEPLOYMENT: PersonalDeployment = {
+  isSaas: true,
+  appBaseUrl: "https://app.langwatch.ai",
+  passkeysEnabled: true,
+  authProvider: "email",
+};
+
+export type FakePersonalHostOptions = {
+  /** The grants the viewer holds, read through the authz hierarchy rule. */
+  permissions?: readonly string[];
+  /**
+   * The frontend flags that are on. `"all"` is the default because the platform
+   * suites mocked `useFeatureFlag` to answer yes; name a list when the flag
+   * itself is what a test is about.
+   */
+  enabledFlags?: readonly string[] | "all";
+  /** `null` means the scope has not resolved, which several screens gate on. */
+  organization?: PersonalOrganization | null;
+  /** `null` means no project is in scope, which the project screens gate on. */
+  project?: PersonalProject | null;
+  /** False is the "we have not looked yet" state the project screens hold. */
+  isScopeResolved?: boolean;
+  currentUser?: PersonalActor | null;
+  /** `"EXTERNAL"` is what makes a viewer a lite member. */
+  organizationRole?: PersonalOrganizationRole;
+  deployment?: PersonalDeployment;
+  /** Path parameters the screen was opened with, for example `{ project: "web-app" }`. */
+  params?: Readonly<Record<string, string | undefined>>;
+  /** The query string the screen opens on. */
+  query?: PersonalQuery;
+  /** Whether this reader may hand a question to the assistant. */
+  canAskAssistant?: boolean;
+  /** The passkeys the account holds, as the ceremonies leave them. */
+  passkeys?: readonly HeldPasskey[];
+  /** How the next passkey ceremony ends. Success unless a test says otherwise. */
+  passkeyOutcome?: PasskeyOutcome;
+  /** How the next attempt to link a sign-in method ends. */
+  linkOutcome?: LinkSignInMethodOutcome;
+  /** How starting a setup ends: a setup link and two codes unless a test says otherwise. */
+  twoStepStart?: TwoStepAnswer<TwoStepSetup>;
+  /** How confirming a two-step setup ends. Confirmed unless a test says otherwise. */
+  twoStepConfirm?: TwoStepAnswer<{ confirmed: true }>;
+  /** How issuing fresh backup codes ends. Two new codes unless a test says otherwise. */
+  backupCodesRegeneration?: TwoStepAnswer<{ backupCodes: readonly string[] }>;
+};
+
+/** The setup a fake host starts, unless a test names another. */
+export const FAKE_TWO_STEP_SETUP: TwoStepSetup = {
+  setupUri: "otpauth://totp/LangWatch:carol@acme.example?secret=JBSWY3DPEHPK3PXP&issuer=LangWatch",
+  backupCodes: ["11111111", "22222222"],
+};
+
+export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
+  static create(options: FakePersonalHostOptions = {}): FakePersonalWorkspaceHost {
+    return new FakePersonalWorkspaceHost({
+      options,
+      recording: {
+        navigations: [],
+        passkeyCeremonies: [],
+        linkedProviders: [],
+        twoStepCeremonies: [],
+        sessionRefreshes: 0,
+        queries: [],
+        successes: [],
+        failures: [],
+        assistantPrompts: [],
+      },
+      query: options.query ?? {},
+    });
+  }
+
+  /** Shared with every host derived from this one, so one read sees them all. */
+  readonly recording: PersonalHostRecording;
+  readonly query: PersonalQuery;
+
+  private readonly options: FakePersonalHostOptions;
+  private readonly granted: ReadonlySet<string>;
+  private readonly commitQuery: ((next: PersonalQuery) => void) | undefined;
+  private readonly routeReading: PersonalRouteReading;
+
+  private constructor({
+    options,
+    recording,
+    query,
+    commitQuery,
+  }: {
+    options: FakePersonalHostOptions;
+    recording: PersonalHostRecording;
+    query: PersonalQuery;
+    commitQuery?: (next: PersonalQuery) => void;
+  }) {
+    super();
+    this.options = options;
+    this.recording = recording;
+    this.query = query;
+    this.commitQuery = commitQuery;
+    this.granted = new Set(options.permissions ?? []);
+    this.routeReading = { params: options.params ?? {}, query };
+  }
+
+  /** The same host reading a different query, and able to write one back. */
+  withQuery({
+    query,
+    commitQuery,
+  }: {
+    query: PersonalQuery;
+    commitQuery: (next: PersonalQuery) => void;
+  }): FakePersonalWorkspaceHost {
+    return new FakePersonalWorkspaceHost({
+      options: this.options,
+      recording: this.recording,
+      query,
+      commitQuery,
+    });
+  }
+
+  scope(): PersonalScope {
+    return {
+      organizationId: this.organization()?.id ?? null,
+      projectId: this.project()?.id ?? null,
+    };
+  }
+
+  organization(): PersonalOrganization | undefined {
+    const configured = this.options.organization;
+    if (configured === void 0) return FAKE_ORGANIZATION;
+    return configured ?? void 0;
+  }
+
+  project(): PersonalProject | undefined {
+    const configured = this.options.project;
+    if (configured === void 0) return this.organization()?.teams[0]?.projects[0];
+    return configured ?? void 0;
+  }
+
+  isScopeResolved(): boolean {
+    return this.options.isScopeResolved ?? true;
+  }
+
+  currentUser(): PersonalActor | null {
+    const configured = this.options.currentUser;
+    return configured === void 0 ? FAKE_ACTOR : configured;
+  }
+
+  organizationRole(): PersonalOrganizationRole {
+    return this.options.organizationRole;
+  }
+
+  hasPermission(permission: string): boolean {
+    return permissionSatisfiedBy({ granted: this.granted, requested: permission });
+  }
+
+  isFeatureEnabled(flag: string): boolean {
+    const flags = this.options.enabledFlags ?? "all";
+    return flags === "all" || flags.includes(flag);
+  }
+
+  deployment(): PersonalDeployment {
+    return this.options.deployment ?? DEFAULT_DEPLOYMENT;
+  }
+
+  route(): PersonalRouteReading {
+    return this.routeReading;
+  }
+
+  setQuery(next: PersonalQuery, options?: { replace?: boolean }): void {
+    this.recording.queries.push({ next, replace: options?.replace ?? false });
+    this.commitQuery?.(next);
+  }
+
+  navigate(to: string): void {
+    this.recording.navigations.push(to);
+  }
+
+  async refreshSession(): Promise<void> {
+    this.recording.sessionRefreshes += 1;
+  }
+
+  async listPasskeys(): Promise<readonly HeldPasskey[]> {
+    return this.options.passkeys ?? [];
+  }
+
+  async registerPasskey(): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "register" });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async renamePasskey({ id, name }: { id: string; name: string }): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "rename", id, name });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async removePasskey({ id }: { id: string }): Promise<PasskeyOutcome> {
+    this.recording.passkeyCeremonies.push({ kind: "remove", id });
+    return this.options.passkeyOutcome ?? { ok: true };
+  }
+
+  async linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome> {
+    this.recording.linkedProviders.push(provider);
+    return this.options.linkOutcome ?? { ok: true };
+  }
+
+  async startTwoStepSetup({
+    password,
+  }: {
+    password?: string;
+  }): Promise<TwoStepAnswer<TwoStepSetup>> {
+    this.recording.twoStepCeremonies.push({ kind: "start", password });
+    return this.options.twoStepStart ?? { ok: true, value: FAKE_TWO_STEP_SETUP };
+  }
+
+  async confirmTwoStepSetup({
+    code,
+  }: {
+    code: string;
+  }): Promise<TwoStepAnswer<{ confirmed: true }>> {
+    this.recording.twoStepCeremonies.push({ kind: "confirm", code });
+    return this.options.twoStepConfirm ?? { ok: true, value: { confirmed: true } };
+  }
+
+  async regenerateBackupCodes({
+    password,
+  }: {
+    password?: string;
+  }): Promise<TwoStepAnswer<{ backupCodes: readonly string[] }>> {
+    this.recording.twoStepCeremonies.push({ kind: "regenerate", password });
+    return (
+      this.options.backupCodesRegeneration ?? {
+        ok: true,
+        value: { backupCodes: ["33333333", "44444444"] },
+      }
+    );
+  }
+
+  canAskAssistant(): boolean {
+    return this.options.canAskAssistant ?? false;
+  }
+
+  askAssistant(prompt: string): void {
+    this.recording.assistantPrompts.push(prompt);
+  }
+
+  succeeded(notice: PersonalSuccessNotice): void {
+    this.recording.successes.push(notice);
+  }
+
+  failed(failure: PersonalFailureNotice): void {
+    this.recording.failures.push(failure);
+  }
+}
+
+export function fakePersonalWorkspaceHost(
+  options: FakePersonalHostOptions = {},
+): FakePersonalWorkspaceHost {
+  return FakePersonalWorkspaceHost.create(options);
+}
+
+/**
+ * The address, held where React can see it change. `setQuery` replaces the
+ * whole query string — a key left out is a key removed — which is the
+ * contract the settings screen relies on to drop `?tab=` on the default tab.
+ */
+function PersonalHostHarness({
+  host,
+  children,
+}: {
+  host: FakePersonalWorkspaceHost;
+  children: ReactNode;
+}) {
+  const [query, setQuery] = useState<PersonalQuery>(host.query);
+  const live = useMemo(
+    () => host.withQuery({ query, commitQuery: (next) => setQuery(next) }),
+    [host, query],
+  );
+  return <PersonalWorkspaceHostProvider value={live}>{children}</PersonalWorkspaceHostProvider>;
+}
+
+/**
+ * The tree a screen is mounted inside, as a Testing Library wrapper — not a
+ * wrapped element, so `rerender` keeps the host and query state since
+ * Testing Library re-applies the wrapper on every re-render.
+ */
+export function personalWorkspaceHostWrapper(host: FakePersonalWorkspaceHost) {
+  return ({ children }: { children: ReactNode }) => (
+    <ChakraProvider value={defaultSystem}>
+      <PersonalHostHarness host={host}>{children}</PersonalHostHarness>
+    </ChakraProvider>
+  );
+}
+
+/** Mounts a personal-workspace screen the way its frontend feature mounts it. */
+export function renderWithPersonalWorkspaceHost(
+  element: ReactElement,
+  { host }: { host: FakePersonalWorkspaceHost },
+): RenderResult {
+  return render(element, { wrapper: personalWorkspaceHostWrapper(host) });
+}

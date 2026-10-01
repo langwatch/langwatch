@@ -1,7 +1,6 @@
 package app
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -10,7 +9,7 @@ import (
 // @scenario "A worktree running the idp lane routes it by hostname"
 func TestIDPLaneFollowsTheSelection(t *testing.T) {
 	plan := func(sel domain.Selection) []Child {
-		o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+		o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 		st := domain.Stack{Slug: "test", Services: []domain.Service{
 			{Name: "idp", Port: 5565, DNSPort: 5566, URL: "https://idp.test.langwatch.localhost"},
 		}}
@@ -38,8 +37,8 @@ func TestIDPLaneFollowsTheSelection(t *testing.T) {
 		if !ok {
 			t.Fatal("no idp lane was planned for a selection that asked for one")
 		}
-		if !strings.Contains(idp.Shell, "svc=idpsim") {
-			t.Errorf("the idp lane runs %q, not the idpsim service", idp.Shell)
+		if idp.Shell != "exec '/bin/haven' 'simulator' 'idp'" {
+			t.Errorf("the idp lane runs %q, not Haven's bundled simulator", idp.Shell)
 		}
 		var hasAddr, hasBase, hasDNS bool
 		for _, e := range idp.Env {

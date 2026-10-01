@@ -40,39 +40,39 @@ app:
       enabled: false
   resources:
     requests: { cpu: 500m, memory: 2Gi }
-    limits:   { cpu: 2, memory: 4Gi }
+    limits: { cpu: 2, memory: 4Gi }
   podDisruptionBudget: { minAvailable: 1 }
   http:
-    baseHost: "https://langwatch.example.com"   # TODO: replace with your actual domain
-    publicUrl: "https://langwatch.example.com"  # TODO: replace with your actual domain
+    baseHost: "https://langwatch.example.com" # TODO: replace with your actual domain
+    publicUrl: "https://langwatch.example.com" # TODO: replace with your actual domain
 
 workers:
   enabled: true
   replicaCount: 2
   resources:
     requests: { cpu: 500m, memory: 2Gi }
-    limits:   { cpu: 2, memory: 4Gi }
+    limits: { cpu: 2, memory: 4Gi }
 
 langwatch_nlp:
   replicaCount: 1
   resources:
     requests: { cpu: 250m, memory: 256Mi }
-    limits:   { cpu: 1, memory: 1Gi }
+    limits: { cpu: 1, memory: 1Gi }
 
 langevals:
   replicaCount: 1
   resources:
     requests: { cpu: 1, memory: 4Gi }
-    limits:   { cpu: 2, memory: 8Gi }
+    limits: { cpu: 2, memory: 8Gi }
 
 ingress:
   enabled: true
   className: "nginx"
   tls:
     - secretName: langwatch-tls
-      hosts: [langwatch.example.com]  # TODO: replace with your actual domain
+      hosts: [langwatch.example.com] # TODO: replace with your actual domain
   hosts:
-    - host: langwatch.example.com  # TODO: replace with your actual domain
+    - host: langwatch.example.com # TODO: replace with your actual domain
       http:
         paths:
           - { path: /, pathType: Prefix }

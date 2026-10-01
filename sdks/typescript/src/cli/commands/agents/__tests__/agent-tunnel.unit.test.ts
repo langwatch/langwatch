@@ -1,14 +1,22 @@
 import { EventEmitter } from "node:events";
 import * as os from "node:os";
 import * as path from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
-// The tunnel path verifies the binary it is about to run on every start, and
-// the mock below points at the node executable. Verification fails closed on
-// an unlisted platform, so the tests pin platform and arch to darwin-x64, a
-// named UNVERIFIED_PLATFORMS exception, and verification skips
-// deterministically on any host. These tests exercise the session flow
-// rather than the checksum.
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type Mock,
+  vi,
+} from "vitest";
+
+// The tunnel path verifies the binary on every start; the mock points at the
+// node executable. Tests pin platform/arch to darwin-x64, a named
+// UNVERIFIED_PLATFORMS exception, so verification skips deterministically.
 const realPlatform = process.platform;
 const realArch = process.arch;
 beforeAll(() => {
@@ -33,8 +41,7 @@ afterAll(() => {
 });
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     AgentsApiService: vi.fn(),
@@ -67,6 +74,7 @@ vi.mock("cloudflared", () => ({
 }));
 
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { agentTunnelCommand, startAgentTunnelSession } from "../tunnel";
 import { DEV_SECRET_HEADER } from "../tunnel/write-back";
 
@@ -129,9 +137,9 @@ describe("agent tunnel session", () => {
       data: [makeAgent()],
       pagination: { page: 1, limit: 100, total: 1, totalPages: 1 },
     });
-    mockUpdate = vi.fn().mockImplementation((_id, params) =>
-      Promise.resolve(makeAgent({ config: params.config })),
-    );
+    mockUpdate = vi
+      .fn()
+      .mockImplementation((_id, params) => Promise.resolve(makeAgent({ config: params.config })));
     vi.mocked(AgentsApiService).mockImplementation(function () {
       return {
         list: mockList,
@@ -188,9 +196,8 @@ describe("agent tunnel session", () => {
         agent: "agent_abc123",
       });
 
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       await session.shutdown(0);
@@ -202,9 +209,7 @@ describe("agent tunnel session", () => {
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
       expect(
-        (restored.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (restored.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       // A second shutdown does not PATCH again.
@@ -228,12 +233,8 @@ describe("agent tunnel session", () => {
       // The advice points at the UI, which edits the URL field alone. It
       // must never name `agent update --config`: that command replaces the
       // whole config, so a url-only payload would wipe headers and auth.
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("LangWatch UI"),
-      );
-      expect(console.error).not.toHaveBeenCalledWith(
-        expect.stringContaining("--config"),
-      );
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining("LangWatch UI"));
+      expect(console.error).not.toHaveBeenCalledWith(expect.stringContaining("--config"));
       await expect(session.done).resolves.toBe(0);
     });
   });
@@ -284,16 +285,13 @@ describe("agent tunnel session", () => {
       });
 
       expect(quickMock).not.toHaveBeenCalled();
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       expect(written.url).toBe("https://my-own-tunnel.example.com/agent");
       // The auth proxy sits outside a bring-your-own tunnel's chain, so no
       // session secret header is written either.
       expect(
-        (written.headers as { key: string }[]).find(
-          (h) => h.key === DEV_SECRET_HEADER,
-        ),
+        (written.headers as { key: string }[]).find((h) => h.key === DEV_SECRET_HEADER),
       ).toBeUndefined();
 
       await session.shutdown(0);
@@ -327,9 +325,9 @@ describe("agent tunnel session", () => {
 
   describe("when neither --port nor --url is passed", () => {
     it("fails with guidance instead of guessing a port", async () => {
-      await expect(
-        startAgentTunnelSession({ agent: "agent_abc123" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(startAgentTunnelSession({ agent: "agent_abc123" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 
@@ -362,9 +360,8 @@ describe("agent tunnel session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       fakeTunnels[0]?.emit("exit", 1, null);
@@ -387,12 +384,8 @@ describe("agent tunnel session", () => {
     "unhandledRejection",
   ] as const;
 
-  const withDetachedProcessListeners = async (
-    fn: () => Promise<void>,
-  ): Promise<void> => {
-    const prior = PROCESS_EVENTS.map(
-      (event) => [event, process.rawListeners(event)] as const,
-    );
+  const withDetachedProcessListeners = async (fn: () => Promise<void>): Promise<void> => {
+    const prior = PROCESS_EVENTS.map((event) => [event, process.rawListeners(event)] as const);
     for (const [event] of prior) process.removeAllListeners(event);
     try {
       await fn();
@@ -407,10 +400,9 @@ describe("agent tunnel session", () => {
   };
 
   /**
-   * Start the command, wait for the write-back, and arm the restore GET.
-   * The outcome promise is wrapped in an object: returning it bare would make
-   * `await startCommandUntilWriteBack()` flatten into awaiting the command
-   * itself, which only ends after the signal this helper's caller sends.
+   * Starts the command, waits for write-back, arms the restore GET. The
+   * outcome promise is wrapped in an object -- bare, it would flatten
+   * `await startCommandUntilWriteBack()` into awaiting the command itself.
    */
   const startCommandUntilWriteBack = async (): Promise<{
     outcome: Promise<unknown>;
@@ -421,9 +413,8 @@ describe("agent tunnel session", () => {
     }).catch((error: unknown) => error);
 
     await vi.waitFor(() => expect(mockUpdate).toHaveBeenCalled());
-    const written = (
-      mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-    )[1].config;
+    const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+      .config;
     mockGet.mockResolvedValue(makeAgent({ config: written }));
     return { outcome };
   };
@@ -445,18 +436,12 @@ describe("agent tunnel session", () => {
     /** @scenario "A bring-your-own tunnel session stays up instead of exiting at once" */
     it("keeps the event loop alive until a signal ends the session", async () => {
       await withDetachedProcessListeners(async () => {
-        // A caller-supplied tunnel starts neither a tunnel child process nor
-        // the local auth proxy, and the health monitor's timer is unref'd, so
-        // the command's own keep-alive is all that stands between the banner
-        // and an immediate exit that would strand the agent on the tunnel URL.
-        // `getActiveResourcesInfo` lists only what keeps the event loop alive,
-        // which is exactly that question. Comparing the count across the
-        // shutdown, rather than against a count taken before the command
-        // started, keeps the test's own timers out of the difference.
+        // A caller-supplied tunnel starts no child process and the health
+        // monitor's timer is unref'd, so the command's own keep-alive is all
+        // that stops an immediate exit. `getActiveResourcesInfo` measures
+        // that; comparing across shutdown keeps the test's own timers out.
         const countRefdTimers = (): number =>
-          process
-            .getActiveResourcesInfo()
-            .filter((resource) => resource === "Timeout").length;
+          process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
 
         const outcome = agentTunnelCommand({
           port: "8000",
@@ -471,10 +456,7 @@ describe("agent tunnel session", () => {
         const whileRunning = countRefdTimers();
 
         const written = (
-          mockUpdate.mock.calls[0] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
         )[1].config;
         mockGet.mockResolvedValue(makeAgent({ config: written }));
         process.emit("SIGINT");
@@ -482,10 +464,7 @@ describe("agent tunnel session", () => {
         expect(await outcome).toBeInstanceOf(ProcessExitError);
         expect(whileRunning).toBeGreaterThan(countRefdTimers());
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -504,10 +483,7 @@ describe("agent tunnel session", () => {
         expect((outcome as ProcessExitError).code).toBe(0);
         expect(mockUpdate).toHaveBeenCalledTimes(2);
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -526,10 +502,7 @@ describe("agent tunnel session", () => {
         expect((outcome as ProcessExitError).code).toBe(1);
         expect(mockUpdate).toHaveBeenCalledTimes(2);
         const restored = (
-          mockUpdate.mock.calls[1] as [
-            string,
-            { config: Record<string, unknown> },
-          ]
+          mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
         )[1].config;
         expect(restored.url).toBe("https://staging.example.com/agent");
       });
@@ -543,9 +516,8 @@ describe("agent tunnel session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
 
       let releaseGet!: (agent: unknown) => void;
       mockGet.mockImplementation(
@@ -573,9 +545,8 @@ describe("agent tunnel session", () => {
         port: "8000",
         agent: "agent_abc123",
       });
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       fakeTunnels[0]?.emit("error", new Error("edge dropped the connection"));
@@ -647,9 +618,8 @@ describe("agent tunnel session", () => {
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
       quickMock.mockImplementation(() => {
         throw new Error("no more tunnels");
@@ -677,9 +647,7 @@ describe("agent tunnel session", () => {
       );
 
       await vi.waitFor(() => {
-        expect(console.error).toHaveBeenCalledWith(
-          expect.stringContaining("stopped answering"),
-        );
+        expect(console.error).toHaveBeenCalledWith(expect.stringContaining("stopped answering"));
       });
       expect(quickMock).not.toHaveBeenCalled();
       // The session stays up: only the apply PATCH happened.
@@ -694,17 +662,16 @@ describe("agent tunnel session", () => {
     it("refreshes devTunnel.heartbeatAt through the agents service", async () => {
       // The auth proxy rejects the unauthenticated probe with 401, which still
       // proves the whole chain is up, so it counts as healthy.
-      vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
-        new Response("unauthorized", { status: 401 }),
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () => new Response("unauthorized", { status: 401 }),
       );
 
       const session = await startAgentTunnelSession(
         { port: "8000", agent: "agent_abc123" },
         { healthIntervalMs: 5 },
       );
-      const written = (
-        mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const written = (mockUpdate.mock.calls[0] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       mockGet.mockResolvedValue(makeAgent({ config: written }));
 
       await vi.waitFor(() => {
@@ -713,8 +680,9 @@ describe("agent tunnel session", () => {
           .find(
             ([, params]) =>
               (
-                (params as { config: Record<string, unknown> }).config
-                  .devTunnel as { heartbeatAt?: string } | undefined
+                (params as { config: Record<string, unknown> }).config.devTunnel as
+                  | { heartbeatAt?: string }
+                  | undefined
               )?.heartbeatAt !== undefined,
           );
         expect(heartbeat).toBeDefined();
@@ -756,9 +724,8 @@ describe("agent tunnel session", () => {
       expect(restored.url).toBe("https://staging.example.com/agent");
       expect(restored.devTunnel).toBeUndefined();
 
-      const applied = (
-        mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }]
-      )[1].config;
+      const applied = (mockUpdate.mock.calls[1] as [string, { config: Record<string, unknown> }])[1]
+        .config;
       expect(applied.url).toBe(`${TUNNEL_URL}/agent`);
       expect(applied.devTunnel).toMatchObject({
         previousUrl: "https://staging.example.com/agent",

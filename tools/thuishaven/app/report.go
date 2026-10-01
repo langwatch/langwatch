@@ -19,7 +19,7 @@ type health struct {
 // per-service health, RAM footprint) plus the shared machinery (proxy, daemon,
 // observability, the managed database servers) in a single one-shot report.
 // asJSON is the agent-friendly form.
-func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
+func (o *Orchestrator) Status(asJSON bool, worktreeDir string, reveal bool) error {
 	ctx := context.Background()
 	stacks := o.store.Stacks()
 	scheme, port := o.proxy.Endpoint()
@@ -45,6 +45,7 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 		ok, detail := o.rds.Health(ctx)
 		servers["redis"] = health{OK: ok, Detail: detail}
 	}
+	nxDaemons := o.NxDaemons()
 	stackRSS := o.StackRSSByLauncher()
 	live, rss := o.stackFootprint(stackRSS)
 	selection, haveSelection := o.store.ReadSelection(worktreeDir)
@@ -66,6 +67,8 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 			"servers":       servers,
 			"footprint":     map[string]any{"live": live, "rssBytes": rss},
 			"selection":     selection,
+			"overlay":       o.worktreeOverlay(worktreeDir, reveal),
+			"nxDaemons":     nxDaemons,
 		})
 	}
 
@@ -108,9 +111,65 @@ func (o *Orchestrator) Status(asJSON bool, worktreeDir string) error {
 		}
 		fmt.Printf("%s %s — %s\n", ok(h.OK), name, h.Detail)
 	}
+	for _, d := range nxDaemons {
+		fmt.Printf("ok   nx daemon pid %d (%s, ~%s)\n", d.PID, d.Worktree, domain.HumanBytes(d.RSS))
+	}
+	o.printWorktreeOverlay(worktreeDir, reveal)
 	fmt.Printf("\nstacks: %d (%d live, ~%s RAM)   dashboard %s   tld: .%s\n",
 		len(stacks), live, domain.HumanBytes(int64(rss)), shared(domain.HubService), o.cfg.Naming.TLD)
 	return nil
+}
+
+// worktreeOverlay is what this worktree's stack resolved to. Nothing writes it
+// to a file any more, so the report is where a person reads it back: without it
+// the only way to see the URLs and database this stack is actually using would
+// be to attach to a lane and print its environment. Masked exactly like `haven
+// env` unless reveal is set — this is the JSON form an agent pipes around, so
+// it must never be the unmasked one by default (see domain.SecretClasses).
+func (o *Orchestrator) worktreeOverlay(worktreeDir string, reveal bool) map[string]string {
+	if worktreeDir == "" {
+		return nil
+	}
+	st, ok := o.stackByWorktree(worktreeDir)
+	if !ok {
+		return nil
+	}
+	env := domain.EnvMap(st.OverlayEnv())
+	if reveal {
+		return env
+	}
+	classes := domain.SecretClasses(worktreeDir)
+	masked := make(map[string]string, len(env))
+	for key, value := range env {
+		masked[key] = domain.MaskEnvValue(classes, key, value)
+	}
+	return masked
+}
+
+// printWorktreeOverlay renders the same set for a human, keys sorted, and says
+// where to get it into a shell. Silent when this worktree has no stack.
+func (o *Orchestrator) printWorktreeOverlay(worktreeDir string, reveal bool) {
+	if worktreeDir == "" {
+		return
+	}
+	st, ok := o.stackByWorktree(worktreeDir)
+	if !ok {
+		return
+	}
+	env := st.OverlayEnv()
+	values := domain.EnvMap(env)
+	var classes map[string]domain.SecretClass
+	if !reveal {
+		classes = domain.SecretClasses(worktreeDir)
+	}
+	fmt.Printf("\nthis worktree resolved to (eval \"$(haven env --reveal)\" to load it in a shell):\n")
+	for _, key := range overlayKeys(env) {
+		value := values[key]
+		if !reveal {
+			value = domain.MaskEnvValue(classes, key, value)
+		}
+		fmt.Printf("  %-38s %s\n", key, value)
+	}
 }
 
 // stackStatus is a stack as the JSON report renders it: the persisted record
@@ -124,6 +183,18 @@ type stackStatus struct {
 	Live bool `json:"live"`
 	// Services shadows the embedded record's list to add per-service liveness.
 	Services []serviceStatus `json:"services"`
+	// Lanes are the three Node applications the stack supervises. The routed
+	// Services list cannot answer this on its own: `ui` and (additively) `api`
+	// have their own hostnames, but the worker lane holds only a loopback
+	// metrics port, so a reader asking "is this stack actually running the
+	// whole application" had nowhere to look for it.
+	Lanes []laneStatus `json:"lanes"`
+}
+
+// laneStatus is one supervised Node lane plus whether its port answers.
+type laneStatus struct {
+	domain.Lane
+	Listening bool `json:"listening"`
 }
 
 // serviceStatus is one routed service plus whether anything is actually
@@ -145,10 +216,15 @@ func (o *Orchestrator) stackStatuses(stacks []domain.Stack) []stackStatus {
 		for _, svc := range s.Services {
 			svcs = append(svcs, serviceStatus{Service: svc, Listening: svc.Port != 0 && o.sys.PortInUse(svc.Port)})
 		}
+		lanes := make([]laneStatus, 0, len(s.Lanes()))
+		for _, lane := range s.Lanes() {
+			lanes = append(lanes, laneStatus{Lane: lane, Listening: lane.Port != 0 && o.sys.PortInUse(lane.Port)})
+		}
 		out = append(out, stackStatus{
 			Stack:    s,
 			Live:     s.LauncherPID != 0 && o.sys.ProcessAlive(s.LauncherPID),
 			Services: svcs,
+			Lanes:    lanes,
 		})
 	}
 	return out

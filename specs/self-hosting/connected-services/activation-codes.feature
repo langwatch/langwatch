@@ -151,7 +151,7 @@ Feature: Activating a self-hosted install with a code
     When LangWatch answers with a signed license
     Then the install validates and stores it the way it stores a pasted one
 
-  @unimplemented @unit
+  @unit
   Scenario: An install with connect switched off refuses to redeem
     Given an install with connect switched off
     When an operator enters a code

@@ -1,12 +1,5 @@
 /**
- * The frames the SDK and the platform exchange over the agent socket.
- *
- * Every frame is one JSON text message with a `type` and the protocol
- * version. The shapes here match the contract table in ADR-128 and the
- * platform's own frame module; the validators are small and hand-written
- * because this file is part of the public `langwatch/agent` surface, where no
- * schema library may cross as a value.
- *
+ * Frames exchanged over the agent socket; shapes match ADR-128.
  * @see dev/docs/adr/128-connected-agents.md
  */
 
@@ -92,7 +85,10 @@ export interface DeregisterFrame {
 /** Everything the SDK sends. */
 export type ClientFrame = RegisterFrame | AckFrame | ResultFrame | DeregisterFrame;
 
-/** Who can target the agent: everyone, the owner of the registering key, or the project through this machine. */
+/**
+ * Who can target the agent: everyone, the owner of the registering key, or
+ * the project through this machine.
+ */
 export type RegisteredAgentScope =
   | { kind: "shared" }
   | { kind: "owner" }
@@ -170,25 +166,40 @@ const isStringList = (value: unknown): value is string[] =>
 const readScope = (value: unknown): RegisteredAgentScope => {
   if (!isRecord(value)) return { kind: "shared" };
   if (value.kind === "owner") return { kind: "owner" };
-  if (value.kind === "host" && isString(value.hostLabel)) return { kind: "host", hostLabel: value.hostLabel };
+  if (value.kind === "host" && isString(value.hostLabel))
+    return { kind: "host", hostLabel: value.hostLabel };
   return { kind: "shared" };
 };
 
+/** One agent of a registered frame, or null when the entry is malformed. */
+const readRegisteredAgent = (entry: unknown): RegisteredAgent | null => {
+  if (!isRecord(entry)) return null;
+  if (!isString(entry.name)) return null;
+  let id: string | null = null;
+  if (isString(entry.id)) {
+    id = entry.id;
+  } else if (isString(entry.agentId)) {
+    id = entry.agentId;
+  }
+  if (id === null) return null;
+  return {
+    name: entry.name,
+    environment: isString(entry.environment) ? entry.environment : "",
+    id,
+    url: isString(entry.url) ? entry.url : "",
+    parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
+    scope: readScope(entry.scope),
+  };
+};
+
 const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null => {
-  if (!Array.isArray(frame.agents) || !isString(frame.instanceId)) return null;
+  if (!Array.isArray(frame.agents)) return null;
+  if (!isString(frame.instanceId)) return null;
   const agents: RegisteredAgent[] = [];
   for (const entry of frame.agents) {
-    if (!isRecord(entry) || !isString(entry.name)) return null;
-    const id = isString(entry.id) ? entry.id : isString(entry.agentId) ? entry.agentId : null;
-    if (id === null) return null;
-    agents.push({
-      name: entry.name,
-      environment: isString(entry.environment) ? entry.environment : "",
-      id,
-      url: isString(entry.url) ? entry.url : "",
-      parameterNotes: isStringList(entry.parameterNotes) ? entry.parameterNotes : [],
-      scope: readScope(entry.scope),
-    });
+    const agent = readRegisteredAgent(entry);
+    if (agent === null) return null;
+    agents.push(agent);
   }
   return {
     type: "registered",
@@ -230,7 +241,8 @@ const readDeadline = (value: unknown): number | null => {
 };
 
 const readCall = (frame: Record<string, unknown>): CallFrame | null => {
-  if (!isString(frame.callId) || !isString(frame.agentId)) return null;
+  if (!isString(frame.callId)) return null;
+  if (!isString(frame.agentId)) return null;
   const messages = isMessageList(frame.messages) ? frame.messages : [];
   const run = isRecord(frame.run) ? frame.run : {};
   return {
@@ -254,10 +266,9 @@ const readCall = (frame: Record<string, unknown>): CallFrame | null => {
 };
 
 /**
- * Reads one text message from the platform into a typed frame, or null when
- * the message is not a frame this protocol version knows. Unknown types and
- * malformed frames are dropped rather than thrown, so a newer platform never
- * crashes an older SDK.
+ * Reads one text message into a typed frame, or null when this protocol
+ * version doesn't know it. Unknown/malformed frames are dropped, not thrown,
+ * so a newer platform never crashes an older SDK.
  */
 export function parseServerFrame(raw: string): ServerFrame | null {
   let parsed: unknown;
@@ -266,7 +277,8 @@ export function parseServerFrame(raw: string): ServerFrame | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !isString(parsed.type)) return null;
+  if (!isRecord(parsed)) return null;
+  if (!isString(parsed.type)) return null;
   switch (parsed.type) {
     case "registered":
       return readRegistered(parsed);

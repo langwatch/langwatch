@@ -1,14 +1,6 @@
 /**
- * The ids every call to the app carries.
- *
- * The routes under `/api/langy/local` and `/api/langy/waits` take the
- * conversation and the turn in each request: the session key proves who the
- * caller is, the ids say where the card belongs. The conversation is fixed for
- * the life of the worker and arrives in the environment; the turn changes with
- * each turn command, so the runner writes it into a holder the tools read when
- * they call. The holder also carries the turn's settled calls, for a tool
- * whose answer depends on what ran before it in the same turn, and whether
- * the conversation is on the guided path, for the skill tool.
+ * The ids every call to the app carries: the conversation (fixed for the
+ * worker's life) and the turn (written by the runner per turn command).
  */
 
 /** A call of the turn that has settled, as the runner records it off pi's events. */
@@ -25,10 +17,9 @@ export type TurnContext = {
   /** The settled calls of the turn in flight, in order; empty between turns. */
   calls: readonly SettledCall[];
   /**
-   * The conversation is on the guided path: the turn in flight carries the
-   * kickoff brief, in its message or in the seed of a resumed conversation,
-   * or the transcript does. Read once per turn by the runner, before the
-   * prompt goes out. False between turns.
+   * The conversation is on the guided path (the kickoff brief is in the
+   * turn's message, its resume seed, or the transcript). Read once per turn
+   * before the prompt goes out; false between turns.
    */
   guided: boolean;
 };

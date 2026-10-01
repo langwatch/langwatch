@@ -1,0 +1,286 @@
+import type { LookupOperatorActivityRow, VerifiedUserDomain } from "@langwatch/identity-contract";
+import {
+  IDENTITY_LOOKUP_AUDIT_PREFIX,
+  qualifySsoDomainOwnership,
+} from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import {
+  type IdentityLookupRepository,
+  type LookupConnectionRow,
+  type LookupDomainClaimRow,
+  type LookupIdentifierRow,
+  type LookupInvitationRow,
+  type LookupMembershipRow,
+  type LookupUserRow,
+} from "../identity-lookup.repository.ts";
+import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
+
+/** The identifier states that count as proof of who somebody works for. */
+const VERIFIED_IDENTIFIER_STATES = ["VERIFIED", "PRIMARY"] as const;
+
+/** How many rows a single-address lookup reads before it stops. */
+const MATCH_CEILING = 50;
+
+/** The models this surface reads, and no others. */
+export type PrismaIdentityLookupDatabase = Pick<
+  PrismaClient,
+  | "identifier"
+  | "user"
+  | "organizationUser"
+  | "organizationInvite"
+  | "ssoConnection"
+  | "organization"
+  | "auditLog"
+>;
+
+export class PrismaIdentityLookupRepository implements IdentityLookupRepository {
+  static create(database: PrismaIdentityLookupDatabase): PrismaIdentityLookupRepository {
+    return new PrismaIdentityLookupRepository(database);
+  }
+
+  private constructor(private readonly prisma: PrismaIdentityLookupDatabase) {}
+
+  async findIdentifiersByValue({
+    value,
+  }: {
+    value: string;
+  }): Promise<readonly LookupIdentifierRow[]> {
+    const rows = await this.prisma.identifier.findMany({
+      where: { value },
+      orderBy: { attachedAt: "desc" },
+      take: MATCH_CEILING,
+    });
+    return rows.map(toIdentifierRow);
+  }
+
+  async findIdentifiersForUser({
+    userId,
+  }: {
+    userId: string;
+  }): Promise<readonly LookupIdentifierRow[]> {
+    const rows = await this.prisma.identifier.findMany({
+      where: { userId },
+      orderBy: { attachedAt: "desc" },
+    });
+    return rows.map(toIdentifierRow);
+  }
+
+  async findUsers({ userIds }: { userIds: readonly string[] }): Promise<readonly LookupUserRow[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.user.findMany({
+      where: { id: { in: [...userIds] } },
+      select: { id: true, name: true, email: true },
+    });
+    return rows.map((row) => ({ userId: row.id, name: row.name, email: row.email }));
+  }
+
+  async findVerifiedDomains({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<readonly VerifiedUserDomain[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.identifier.findMany({
+      where: {
+        userId: { in: [...userIds] },
+        state: { in: [...VERIFIED_IDENTIFIER_STATES] },
+        domain: { not: null },
+      },
+      select: { userId: true, domain: true },
+      distinct: ["userId", "domain"],
+    });
+    return rows.flatMap((row) => (row.domain ? [{ userId: row.userId, domain: row.domain }] : []));
+  }
+
+  async findMemberships({
+    userIds,
+  }: {
+    userIds: readonly string[];
+  }): Promise<readonly LookupMembershipRow[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { userId: { in: [...userIds] } },
+      select: {
+        userId: true,
+        organizationId: true,
+        role: true,
+        organization: { select: { name: true } },
+      },
+    });
+    return rows.map((row) => ({
+      userId: row.userId,
+      organizationId: row.organizationId,
+      organizationName: row.organization?.name ?? null,
+      role: row.role,
+    }));
+  }
+
+  async findInvitations({ email }: { email: string }): Promise<readonly LookupInvitationRow[]> {
+    const rows = await this.prisma.organizationInvite.findMany({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: {
+        id: true,
+        email: true,
+        organizationId: true,
+        status: true,
+        expiration: true,
+        organization: { select: { name: true } },
+        requestedByUser: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => ({
+      inviteId: row.id,
+      email: row.email,
+      organizationId: row.organizationId,
+      organizationName: row.organization?.name ?? null,
+      invitedByName: row.requestedByUser?.name ?? null,
+      status: row.status,
+      expiresAtMs: row.expiration?.getTime() ?? null,
+    }));
+  }
+
+  async findConnectionForDomain({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<LookupConnectionRow | null> {
+    const row = await this.prisma.ssoConnection.findFirst({
+      where: { verifiedDomains: { has: domain } },
+    });
+    if (!row) return null;
+    const state = PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: state.organizationId },
+      select: { name: true },
+    });
+    return {
+      connectionId: state.connectionId,
+      organizationId: state.organizationId,
+      organizationName: organization?.name ?? null,
+      state: state.state,
+      providerId: state.idpMetadata.providerId,
+      ownershipProof: qualifySsoDomainOwnership({ state, domain }).status,
+      routeKind: state.source === "legacy-grandfathered" ? "legacy-configuration" : "connection",
+    };
+  }
+
+  async findClaimsAwaitingReview({
+    domains,
+  }: {
+    domains: readonly string[];
+  }): Promise<readonly LookupDomainClaimRow[]> {
+    if (domains.length === 0) return [];
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { claimedDomains: { hasSome: [...domains] } },
+      select: CLAIM_SELECT,
+      orderBy: { updatedAt: "asc" },
+    });
+    return rows.flatMap((row) => toClaimRows(row, domains));
+  }
+
+  async findClaimQueue({ limit }: { limit: number }): Promise<readonly LookupDomainClaimRow[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { NOT: { claimedDomains: { isEmpty: true } } },
+      select: CLAIM_SELECT,
+      orderBy: { updatedAt: "asc" },
+      take: limit,
+    });
+    return rows.flatMap((row) => toClaimRows(row, null));
+  }
+
+  async findOrganizationNames({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
+    const unique = [...new Set(organizationIds)];
+    if (unique.length === 0) return new Map();
+    const rows = await this.prisma.organization.findMany({
+      where: { id: { in: unique } },
+      select: { id: true, name: true },
+    });
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  async findRecentOperatorActivity({
+    limit,
+  }: {
+    limit: number;
+  }): Promise<readonly LookupOperatorActivityRow[]> {
+    const rows = await this.prisma.auditLog.findMany({
+      where: { action: { startsWith: IDENTITY_LOOKUP_AUDIT_PREFIX } },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: { id: true, userId: true, action: true, args: true, createdAt: true },
+    });
+    const operatorIds = rows.flatMap((row) => (row.userId ? [row.userId] : []));
+    const operators = await this.findUsers({ userIds: operatorIds });
+    const named = new Map(operators.map((operator) => [operator.userId, operator.name]));
+    return rows.map((row) => ({
+      auditId: row.id,
+      operatorUserId: row.userId,
+      operatorName: row.userId ? (named.get(row.userId) ?? null) : null,
+      act: row.action.slice(IDENTITY_LOOKUP_AUDIT_PREFIX.length),
+      address: findAddress(row.args),
+      atMs: row.createdAt.getTime(),
+    }));
+  }
+}
+
+/** The address off an audit row's arguments, when it carried one. */
+function findAddress(args: unknown): string | null {
+  if (!args || typeof args !== "object") return null;
+  const address = (args as { address?: unknown }).address;
+  return typeof address === "string" && address.length > 0 ? address : null;
+}
+
+const CLAIM_SELECT = {
+  id: true,
+  organizationId: true,
+  claimedDomains: true,
+  updatedAt: true,
+} as const;
+
+function toClaimRows(
+  row: { id: string; organizationId: string; claimedDomains: string[]; updatedAt: Date },
+  domains: readonly string[] | null,
+): LookupDomainClaimRow[] {
+  return row.claimedDomains
+    .filter((domain) => domains === null || domains.includes(domain))
+    .map((domain) => ({
+      connectionId: row.id,
+      organizationId: row.organizationId,
+      domain,
+      waitingSinceMs: row.updatedAt.getTime(),
+    }));
+}
+
+interface IdentifierRowShape {
+  id: string;
+  userId: string;
+  provider: string;
+  value: string | null;
+  domain: string | null;
+  state: string;
+  connectionId: string | null;
+  verifiedAt: Date | null;
+  attachedAt: Date;
+  detachedAt: Date | null;
+}
+
+function toIdentifierRow(row: IdentifierRowShape): LookupIdentifierRow {
+  return {
+    identifierId: row.id,
+    userId: row.userId,
+    provider: row.provider,
+    value: row.value,
+    domain: row.domain,
+    state: row.state,
+    connectionId: row.connectionId,
+    verifiedAtMs: row.verifiedAt?.getTime() ?? null,
+    attachedAtMs: row.attachedAt.getTime(),
+    detachedAtMs: row.detachedAt?.getTime() ?? null,
+  };
+}

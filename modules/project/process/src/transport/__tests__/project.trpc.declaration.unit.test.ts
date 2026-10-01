@@ -1,0 +1,97 @@
+/**
+ * @vitest-environment node
+ * The namespace the project mounts: wire names, kinds, declared answers
+ * and the access each procedure carries. Read back off the declaration itself,
+ * so nothing here depends on the shape of a tRPC internal.
+ */
+import type { TrpcAccess, TrpcProcedureRequest } from "@langwatch/api/trpc";
+import { projectTrpc } from "@langwatch/project-contract";
+import { describe, expect, it } from "vitest";
+
+import { projectTrpcTransport } from "../project.trpc.ts";
+
+/** What a declaration asks a runtime to build, collected instead of built. */
+type Declared = Readonly<{ router(factory: never, app: never): unknown }>;
+
+function declaredAccess(transport: Declared): Record<string, TrpcAccess> {
+  const declared: Record<string, TrpcAccess> = {};
+  const factory = {
+    procedure: (request: TrpcProcedureRequest<object>) => {
+      declared[request.procedure] = request.access;
+
+      return null;
+    },
+    router: (record: Readonly<Record<string, unknown>>) => record,
+  };
+
+  transport.router(factory as never, (() => ({})) as never);
+
+  return declared;
+}
+
+describe("the project tRPC declarations", () => {
+  describe("given the contract the browser reads", () => {
+    it("keeps the namespace and the procedure names of each surface", () => {
+      expect(projectTrpc.namespace).toBe("project");
+      expect(Object.keys(projectTrpc.members).toSorted()).toEqual([
+        "archiveById",
+        "create",
+        "getFieldRedactionStatus",
+        "getHasFirstMessage",
+        "getProjectAPIKey",
+        "regenerateApiKey",
+        "triggerTopicClustering",
+        "update",
+      ]);
+    });
+
+    it("reads with a query and changes with a mutation", () => {
+      expect(
+        Object.fromEntries(
+          Object.entries(projectTrpc.members).map(([name, member]) => [name, member.kind]),
+        ),
+      ).toEqual({
+        create: "mutation",
+        getProjectAPIKey: "query",
+        getHasFirstMessage: "query",
+        regenerateApiKey: "mutation",
+        update: "mutation",
+        getFieldRedactionStatus: "query",
+        archiveById: "mutation",
+        triggerTopicClustering: "mutation",
+      });
+    });
+
+    it("declares an answer for every procedure", () => {
+      for (const [name, member] of Object.entries(projectTrpc.members)) {
+        expect([name, member.output !== undefined]).toEqual([name, true]);
+      }
+    });
+  });
+
+  describe("given the server half a process mounts", () => {
+    it("keeps the gate each project procedure has always carried", () => {
+      expect(declaredAccess(projectTrpcTransport)).toEqual({
+        // The tier a create is judged at depends on what it asked for, so the
+        // handler resolves it and the declaration records both permissions.
+        "project.create": {
+          kind: "service-authorized",
+          reason: expect.any(String),
+          permissions: ["project:create", "organization:manage"],
+          enforces: { teamId: expect.any(String), organizationId: expect.any(String) },
+        },
+        // The base key is a project-level write credential, so reading it
+        // costs what it grants.
+        // Reading the base key is gated the same as rotating it: the key
+        // authenticates every ingestion call the project accepts.
+        "project.getProjectAPIKey": { kind: "permission", permission: "project:manage" },
+        "project.getHasFirstMessage": { kind: "permission", permission: "project:view" },
+        "project.regenerateApiKey": { kind: "permission", permission: "project:manage" },
+        "project.update": { kind: "permission", permission: "project:update" },
+        "project.getFieldRedactionStatus": { kind: "permission", permission: "project:view" },
+        "project.archiveById": { kind: "permission", permission: "project:delete" },
+        "project.triggerTopicClustering": { kind: "permission", permission: "project:update" },
+      });
+    });
+  });
+});

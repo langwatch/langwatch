@@ -1,0 +1,240 @@
+import {
+  type CodingAgentProjectionPersistence,
+  CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+  type CodingAgentProcessingEvent,
+  spanFactsContributedEventSchema,
+  logFactsContributedEventSchema,
+  metricFactsContributedEventSchema,
+} from "@langwatch/coding-agent-contract";
+import {
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type EventingSetup,
+  type Projection,
+  type RegisteredCommand,
+  type RetentionPolicyResolver,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
+import {
+  CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+  canonicalLogRecordSchema,
+} from "@langwatch/log-contract";
+import {
+  canonicalMetricDataPointSchema,
+  METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+} from "@langwatch/metric-contract";
+import type { TraceApi } from "@langwatch/trace-contract";
+
+import type { CodingAgentApp } from "../app/coding-agent.app.ts";
+import type {
+  CodingAgentClock,
+  CodingAgentCostEstimator,
+  CodingAgentCostMetrics,
+  CodingAgentProjectActivity,
+  CodingAgentPullRequestMapping,
+} from "../app/coding-agent.members.ts";
+import type { CodingAgentSessionFoldCacheRepository } from "../repositories/coding-agent-session-fold-cache.repository.ts";
+import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
+import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
+import {
+  EventingCodingAgentSessionEventsAppendService,
+  EventingCodingAgentTraceSessionAppendService,
+  EventingSessionMetricSeriesAppendService,
+} from "../services/coding-agent-projection-append.service.ts";
+import type { CodingAgentReceivedFactsService } from "../services/coding-agent-received-facts.service.ts";
+import { CodingAgentSessionSeenService } from "../services/coding-agent-session-seen.service.ts";
+import { EventingCodingAgentSessionStoreService } from "../services/coding-agent-session-store.service.ts";
+import { EventingContributeLogFactsService } from "../services/contribute-log-facts.service.ts";
+import { EventingContributeMetricFactsService } from "../services/contribute-metric-facts.service.ts";
+import { EventingContributeSpanFactsService } from "../services/contribute-span-facts.service.ts";
+import { createCodingAgentCostDriftSubscriber } from "./coding-agent-cost-drift.subscriber.ts";
+import { CodingAgentSessionEventsMapProjection } from "./coding-agent-session-events.projection.ts";
+import {
+  CodingAgentSessionFoldProjection,
+  type CodingAgentSessionState,
+} from "./coding-agent-session.projection.ts";
+import { CodingAgentTraceSessionsMapProjection } from "./coding-agent-trace-sessions.projection.ts";
+import { createPullRequestMappingSubscriber } from "./pull-request-mapping.subscriber.ts";
+import { SessionMetricSeriesMapProjection } from "./session-metric-series.projection.ts";
+
+const metricPointIdOf = canonicalMetricDataPointSchema.pick({ pointId: true });
+
+export interface CodingAgentProcessingPipelineDeps {
+  traceCanonicalisation: Pick<TraceApi, "classifyClaudeCall">;
+  modelProviders: CodingAgentCostEstimator;
+  costMetrics: CodingAgentCostMetrics;
+  projections: CodingAgentProjectionPersistence;
+  projects: CodingAgentProjectActivity;
+  clock: CodingAgentClock;
+  /** The platform default a tenant with no retention override is stamped with, read per write. */
+  defaultRetentionDays: () => number;
+  /** Each tenant's retention, stamped in place of the default (§9); absent, the default stands. */
+  retention?: RetentionPolicyResolver;
+  sessionContextMemo: CodingAgentSessionContextMemoRepository;
+  sessionFoldCache: CodingAgentSessionFoldCacheRepository;
+  /** Absent where there is no GitHub connection to ask: no mapping subscriber is mounted. */
+  github?: CodingAgentPullRequestMapping;
+  /** Lifts what log and metric received into this pipeline's contribution commands. */
+  receivedFacts: Pick<
+    CodingAgentReceivedFactsService,
+    "contributeReceivedLogRecord" | "contributeReceivedMetricPoint"
+  >;
+}
+
+/**
+ * The session-keyed coding-agent pipeline from ADR-056. Source subscribers
+ * contribute bounded span/log/metric facts; projections persist the fold,
+ * trace map, metric series and events. GitHub mapping is the only post-fold effect.
+ */
+export class EventingCodingAgentProcessingAdapter {
+  private constructor(private readonly deps: CodingAgentProcessingPipelineDeps) {}
+
+  static create(deps: CodingAgentProcessingPipelineDeps): EventingCodingAgentProcessingAdapter {
+    return new EventingCodingAgentProcessingAdapter(deps);
+  }
+
+  build(): StaticPipelineDefinition<
+    CodingAgentProcessingEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
+    const deps = this.deps;
+    const sessionSeen = CodingAgentSessionSeenService.create({
+      projects: deps.projects,
+      clock: deps.clock,
+    });
+    const sessionStore = deps.sessionFoldCache.cached<CodingAgentSessionState>(
+      EventingCodingAgentSessionStoreService.create({
+        persistence: deps.projections,
+        defaultRetentionDays: deps.defaultRetentionDays,
+        onSessionsStored: (tenantIds) => sessionSeen.record(tenantIds),
+      }),
+    );
+
+    const github = deps.github;
+    const contextMemo = deps.sessionContextMemo;
+    const builder = definePipeline({
+      name: "coding_agent_processing",
+      aggregate: defineAggregate({
+        type: "coding_agent_session",
+      }),
+    })
+      .withEvents([
+        spanFactsContributedEventSchema,
+        logFactsContributedEventSchema,
+        metricFactsContributedEventSchema,
+      ])
+      .withClickHouseFoldProjection(
+        CodingAgentSessionFoldProjection.create({
+          store: sessionStore,
+          traceCanonicalisation: deps.traceCanonicalisation,
+          modelProviders: deps.modelProviders,
+        }),
+      )
+      .withClickHouseMapProjection(
+        CodingAgentTraceSessionsMapProjection.create({
+          store: EventingCodingAgentTraceSessionAppendService.create({
+            persistence: deps.projections,
+            defaultRetentionDays: deps.defaultRetentionDays,
+          }),
+        }),
+      )
+      .withClickHouseMapProjection(
+        SessionMetricSeriesMapProjection.create({
+          store: EventingSessionMetricSeriesAppendService.create({
+            persistence: deps.projections,
+            defaultRetentionDays: deps.defaultRetentionDays,
+          }),
+        }),
+      )
+      .withClickHouseMapProjection(
+        CodingAgentSessionEventsMapProjection.create({
+          store: EventingCodingAgentSessionEventsAppendService.create({
+            persistence: deps.projections,
+            defaultRetentionDays: deps.defaultRetentionDays,
+          }),
+        }),
+      )
+      .withEventSubscriber(
+        "codingAgentCostDrift",
+        createCodingAgentCostDriftSubscriber({
+          metrics: deps.costMetrics,
+          modelProviders: deps.modelProviders,
+          traceCanonicalisation: deps.traceCanonicalisation,
+        }),
+      )
+      .withPeerSubscriber("codingAgentLogFactsDispatch", {
+        eventType: CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
+        data: canonicalLogRecordSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `coding-agent-log-facts:${event.tenantId}:${String(event.aggregateId)}`,
+            ttlMs: 60_000,
+          },
+        },
+        handle: (record) => deps.receivedFacts.contributeReceivedLogRecord(record),
+      })
+      .withPeerSubscriber("codingAgentMetricFactsDispatch", {
+        eventType: METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
+        data: canonicalMetricDataPointSchema,
+        options: {
+          deduplication: {
+            makeId: (event) =>
+              `coding-agent-metric-facts:${event.tenantId}:${metricPointIdOf.parse(event.data).pointId}`,
+            ttlMs: 60_000,
+          },
+        },
+        handle: (point) => deps.receivedFacts.contributeReceivedMetricPoint(point),
+      })
+      // ADR-066 pillar 2: coalesce contributions preserving order; sharding would break
+      // order-dependent model-call derivations. The log lane fills the session-context
+      // memo from a declaration; the span lane only reads it.
+      .withCommandInstance({
+        name: "contributeSpanFacts",
+        handlerClass: EventingContributeSpanFactsService,
+        instance: EventingContributeSpanFactsService.create({ contextMemo }),
+        options: { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
+      })
+      .withCommandInstance({
+        name: "contributeLogFacts",
+        handlerClass: EventingContributeLogFactsService,
+        instance: EventingContributeLogFactsService.create({ contextMemo }),
+        options: { coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH },
+      })
+      .withCommandInstance({
+        name: "contributeMetricFacts",
+        handlerClass: EventingContributeMetricFactsService,
+        instance: EventingContributeMetricFactsService.create(),
+        options: {
+          coalesceMaxBatch: CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
+        },
+      });
+
+    const configured = github
+      ? builder.withProjectionSubscriber(
+          "pullRequestMapping",
+          createPullRequestMappingSubscriber(github),
+        )
+      : builder;
+
+    return (deps.retention ? configured.withRetention(deps.retention) : configured).build();
+  }
+}
+
+/** The definition this module registers, named so its eventing declaration can hold one. */
+export type CodingAgentProcessingPipeline = ReturnType<
+  EventingCodingAgentProcessingAdapter["build"]
+>;
+
+/**
+ * The registration: the app builds the definition once, and the senders are
+ * bound back to it once the runtime has built them. The api only sends.
+ */
+export const codingAgentEventing = defineEventingModule({
+  pipeline: "coding_agent_processing",
+  build: ({ app }: EventingSetup<CodingAgentRepositories, CodingAgentApp>) =>
+    app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

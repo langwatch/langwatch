@@ -1,0 +1,63 @@
+{
+  "name": "@langwatch/scenario-child",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The scenario child process, as its own program and its own bundle.",
+  "files": [
+    "scripts"
+  ],
+  "type": "module",
+  "exports": {
+    "./package.json": "./package.json",
+    "./bundle-optional-externals": "./scripts/bundle-optional-externals.mjs"
+  },
+  "scripts": {
+    "build": "node scripts/build-child.mjs",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/openai-compatible": "catalog:",
+    "@ai-sdk/provider": "^3.0.13",
+    "@elevenlabs/elevenlabs-js": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/scenario": "catalog:",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-process": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/api-logs": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/exporter-logs-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-logs": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@prisma/client": "catalog:",
+    "ai": "catalog:",
+    "jsonpath-plus": "catalog:",
+    "langwatch": "workspace:*",
+    "pino": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

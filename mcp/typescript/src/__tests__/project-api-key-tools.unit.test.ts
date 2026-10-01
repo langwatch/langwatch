@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../langwatch-api-projects.js", () => ({
+vi.mock("../langwatch-api-projects.ts", () => ({
   listProjects: vi.fn(),
   getProject: vi.fn(),
   createProject: vi.fn(),
@@ -8,34 +8,28 @@ vi.mock("../langwatch-api-projects.js", () => ({
   archiveProject: vi.fn(),
 }));
 
-vi.mock("../langwatch-api-api-keys.js", () => ({
+vi.mock("../langwatch-api-api-keys.ts", () => ({
   listApiKeys: vi.fn(),
   createApiKey: vi.fn(),
   revokeApiKey: vi.fn(),
 }));
 
+import { listApiKeys, createApiKey, revokeApiKey } from "../langwatch-api-api-keys.ts";
 import {
   listProjects,
   getProject,
   createProject,
   updateProject,
   archiveProject,
-} from "../langwatch-api-projects.js";
-
-import {
-  listApiKeys,
-  createApiKey,
-  revokeApiKey,
-} from "../langwatch-api-api-keys.js";
-
-import { handleListProjects } from "../tools/list-projects.js";
-import { handleGetProject } from "../tools/get-project.js";
-import { handleCreateProject } from "../tools/create-project.js";
-import { handleUpdateProject } from "../tools/update-project.js";
-import { handleArchiveProject } from "../tools/archive-project.js";
-import { handleListApiKeys } from "../tools/list-api-keys.js";
-import { handleCreateApiKey } from "../tools/create-api-key.js";
-import { handleRevokeApiKey } from "../tools/revoke-api-key.js";
+} from "../langwatch-api-projects.ts";
+import { handleArchiveProject } from "../tools/archive-project.ts";
+import { handleCreateApiKey } from "../tools/create-api-key.ts";
+import { handleCreateProject } from "../tools/create-project.ts";
+import { handleGetProject } from "../tools/get-project.ts";
+import { handleListApiKeys } from "../tools/list-api-keys.ts";
+import { handleListProjects } from "../tools/list-projects.ts";
+import { handleRevokeApiKey } from "../tools/revoke-api-key.ts";
+import { handleUpdateProject } from "../tools/update-project.ts";
 
 const mockListProjects = vi.mocked(listProjects);
 const mockGetProject = vi.mocked(getProject);
@@ -298,9 +292,7 @@ describe("handleCreateApiKey()", () => {
     const result = await handleCreateApiKey({
       keyType: "personal",
       name: "My New Key",
-      bindings: [
-        { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" },
-      ],
+      bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" }],
     });
 
     expect(result).toContain("created successfully");
@@ -384,7 +376,9 @@ describe("handleListProjects() edge cases", () => {
   describe("when API call throws", () => {
     it("propagates the error", async () => {
       mockListProjects.mockRejectedValue(
-        new Error('LangWatch API error 403: {"error":"Forbidden","message":"Insufficient permissions"}'),
+        new Error(
+          'LangWatch API error 403: {"error":"Forbidden","message":"Insufficient permissions"}',
+        ),
       );
 
       await expect(handleListProjects()).rejects.toThrow("403");

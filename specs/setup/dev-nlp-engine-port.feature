@@ -7,9 +7,8 @@ Feature: The NLP engine `pnpm dev` starts is the one the app talks to
   # `pnpm dev` starts the Go NLP engine itself, and the app reaches it at
   # LANGWATCH_NLP_SERVICE. The two ends resolve that address from different
   # places: the launcher is a shell script that runs first and sees only the
-  # calling shell, while the app loads platform/app/.env (then the .env.portless
-  # haven overlay) with override afterwards. A pinned address is therefore
-  # invisible to the launcher and authoritative for the app.
+  # calling shell, while the app loads .env afterwards. A pinned address is
+  # therefore invisible to the launcher and authoritative for the app.
   #
   # Left alone that splits the stack in half. Observed on a worktree at
   # PORT=5590 with .env pinning port 5571: the launcher derived 5591, started a
@@ -24,22 +23,15 @@ Feature: The NLP engine `pnpm dev` starts is the one the app talks to
 
   @unit
   Scenario: The engine follows the address pinned in the app's env file
-    Given platform/app/.env pins the NLP address to port 5571
+    Given .env pins the NLP address to port 5571
     And this worktree runs on port slot 5590
     When the launcher resolves the NLP address
     Then it resolves to the pinned port 5571
     And it says which file that came from
 
   @unit
-  Scenario: The haven overlay wins over the plain env file
-    Given platform/app/.env pins one NLP address
-    And the haven overlay pins another
-    When the launcher resolves the NLP address
-    Then it resolves to the overlay's address, the one the app loads last
-
-  @unit
   Scenario: An address pinned in a file beats one exported for a single run
-    Given platform/app/.env pins the NLP address
+    Given .env pins the NLP address
     And a different address is exported into the shell
     When the launcher resolves the NLP address
     Then it resolves to the pinned one, because that is what the app will read
@@ -52,22 +44,14 @@ Feature: The NLP engine `pnpm dev` starts is the one the app talks to
     And it says nothing
 
   @unit
-  Scenario: An overlay that clears the address is not read past
-    Given platform/app/.env pins the NLP address
-    And the haven overlay assigns it an empty value
-    When the launcher resolves the NLP address
-    Then it leaves the address unset for the launcher to derive from the port
-    And it does not fall back to the address in the plain env file
-
-  @unit
-  Scenario: An overlay that clears the address drops one exported for a single run
+  Scenario: An env file that clears the address drops one exported for a single run
     Given an NLP address exported into the shell
-    And the haven overlay assigns it an empty value
+    And .env assigns it an empty value
     When the launcher resolves the NLP address
     Then it leaves the address unset, because the file beats the exported value
 
   @unit
   Scenario: A commented-out pin is not an address
-    Given platform/app/.env has its NLP address commented out
+    Given .env has its NLP address commented out
     When the launcher resolves the NLP address
     Then it leaves the address unset for the launcher to derive from the port

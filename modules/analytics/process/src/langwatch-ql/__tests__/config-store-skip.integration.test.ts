@@ -1,0 +1,282 @@
+/** Provisioning yields to an access model a users.d config store already defines (ADR-159). */
+import { createHash } from "node:crypto";
+
+import type { ClickHouseClient } from "@clickhouse/client";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { ClickHouseLangWatchQLProvisioningRepository } from "../../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessModelDefinitionService } from "../../services/langwatch-ql-access-model-definition.service.ts";
+import {
+  LangWatchQLAccessModelService,
+  type LangWatchQLNames,
+} from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
+import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
+import {
+  CLICKHOUSE_ERROR_CODE,
+  type LangWatchQLClickHouseHarness,
+  type LangWatchQLPostgresHarness,
+  mapPostgresIntoClickHouse,
+  startLangWatchQLClickHouse,
+  startLangWatchQLPostgres,
+} from "./lwql-clickhouse-harness.ts";
+
+const provisioning = (client: ClickHouseClient) =>
+  ClickHouseLangWatchQLProvisioningRepository.create({
+    statements: {
+      async command(statement) {
+        await client.command({ query: statement });
+      },
+      async rows(sql, params) {
+        const result = await client.query({
+          query: sql,
+          format: "JSONEachRow",
+          ...(params ? { query_params: { ...params } } : {}),
+        });
+        return result.json<Record<string, unknown>>();
+      },
+      async insert({ table, rows }) {
+        await client.insert({ table, values: [...rows], format: "JSONEachRow" });
+      },
+    },
+  });
+
+const accessModel = LangWatchQLAccessModelService.create();
+const accessModelDefinition = LangWatchQLAccessModelDefinitionService.create();
+const viewProvisioning = LangWatchQLViewProvisioningService.create();
+
+// The names the app self-provisions on every distribution; these are the ones a
+// config store would define, so the test targets them deliberately.
+const CONFIG_STORE_USER = "langwatch_lwql";
+const CONFIG_STORE_PROFILE = "lwql_restricted";
+const CONFIG_STORE_COLLECTION = "lwql_postgres";
+const RESTRICTED_PASSWORD = "restricted-provision-secret";
+const READER_PASSWORD = "reader-provision-secret";
+
+/** A `users.d` file defining the LWQL identity and profile in the config store. */
+const USERS_XML = `<clickhouse>
+    <profiles>
+        <${CONFIG_STORE_PROFILE}>
+            <readonly>1</readonly>
+        </${CONFIG_STORE_PROFILE}>
+    </profiles>
+    <users>
+        <${CONFIG_STORE_USER}>
+            <password>xml-owned-password</password>
+            <profile>${CONFIG_STORE_PROFILE}</profile>
+            <networks><ip>::/0</ip></networks>
+            <quota>default</quota>
+        </${CONFIG_STORE_USER}>
+    </users>
+</clickhouse>
+`;
+
+/** A `config.d` file defining the LWQL named collection in the config store. */
+const NAMED_COLLECTION_XML = `<clickhouse>
+    <named_collections>
+        <${CONFIG_STORE_COLLECTION}>
+            <host>host.docker.internal</host>
+            <port>5432</port>
+            <database>lwqltest</database>
+            <user>lwql_ro</user>
+            <password>xml-owned-reader-password</password>
+        </${CONFIG_STORE_COLLECTION}>
+    </named_collections>
+</clickhouse>
+`;
+
+describe("given a ClickHouse whose config store already owns LangWatchQL entities", () => {
+  let harness: LangWatchQLClickHouseHarness;
+  let postgres: LangWatchQLPostgresHarness;
+  let names: LangWatchQLNames;
+
+  beforeAll(async () => {
+    // The catalog's PostgreSQL-resident views cannot be created until their
+    // engine tables exist, and those read a live PostgreSQL. Stood up first for
+    // that reason, exactly as `catalogStatements.integration.test.ts` does — not
+    // because this suite is about PostgreSQL.
+    postgres = await startLangWatchQLPostgres();
+    harness = await startLangWatchQLClickHouse({
+      suite: "config-store-skip",
+      // The shipped migrations, so every fact table the catalog reads exists;
+      // the fixture set is a subset and the views would not resolve over it.
+      facts: "migrated",
+      extraConfigFiles: [
+        {
+          name: "lwql-config-store-user.xml",
+          target: "/etc/clickhouse-server/users.d/zzz-lwql-config-store-user.xml",
+          contents: USERS_XML,
+        },
+        {
+          name: "lwql-config-store-collection.xml",
+          target: "/etc/clickhouse-server/config.d/lwql-config-store.xml",
+          contents: NAMED_COLLECTION_XML,
+        },
+      ],
+    });
+    // Maps the approved PostgreSQL views in as engine tables under the
+    // LangWatchQL database, so the catalog views the provisioning creates below
+    // have their PostgreSQL-resident sources to read.
+    await mapPostgresIntoClickHouse({ harness, postgres });
+    // Provision under the exact names the config store owns, so the identity,
+    // profile and collection statements land on read-only entities.
+    names = {
+      ...harness.names,
+      restrictedUser: CONFIG_STORE_USER,
+      settingsProfile: CONFIG_STORE_PROFILE,
+    };
+  }, 600_000);
+
+  afterAll(async () => {
+    await harness?.stop();
+    await postgres?.stop();
+  });
+
+  describe("when the shipped provisioning runs against it", () => {
+    // # Issue #8258
+    /** @scenario "A config-defined LangWatchQL entity is skipped, not fatal" */
+    it("skips the config-owned entities, provisions the rest, and never throws", async () => {
+      // The operator inventory names, at warn, what will be skipped.
+      const preflight = await provisioning(harness.admin).inventoryConfigStore({
+        names,
+      });
+      expect(preflight).toEqual(
+        expect.arrayContaining([
+          { kind: "user", name: CONFIG_STORE_USER },
+          { kind: "settings_profile", name: CONFIG_STORE_PROFILE },
+        ]),
+      );
+
+      // The shipped provisioning statements, composed from the same pieces
+      // `selfHostedClickHouseProvisioningStatements` uses: structural setup, the
+      // named collection and the whole access model, all rendered from the one
+      // shared definition (#8258). Composed directly rather than through that
+      // wrapper because its single-database guard is a production invariant the
+      const definition = accessModelDefinition.build({
+        names,
+        passwordSha256Hex: createHash("sha256").update(RESTRICTED_PASSWORD).digest("hex"),
+        namedCollection: {
+          collection: CONFIG_STORE_COLLECTION,
+          host: "host.docker.internal",
+          port: 5432,
+          database: "lwqltest",
+          user: "lwql_ro",
+          password: READER_PASSWORD,
+        },
+        sourceDatabase: harness.factDatabase,
+      });
+      const statements = [
+        ...accessModel.setupStatements({
+          names,
+          sourceDatabase: harness.factDatabase,
+          // Kept out so the proof is about config-store tolerance, not the
+          // replica-store probe.
+          includeAppFunctions: false,
+        }),
+        ...accessModelDefinition.renderNamedCollectionDdl(definition),
+        ...viewProvisioning.setupStatements({
+          names,
+          sourceDatabase: harness.factDatabase,
+          dedup: SHIPPED_LWQL_DEDUP,
+        }),
+        ...accessModelDefinition.renderDdl(definition),
+      ];
+
+      // The whole point: no throw, even though several statements target
+      // read-only config-store entities.
+      const { skipped } = await provisioning(harness.admin).runStatements({
+        statements,
+        // The real inventory: a 495 is tolerated only when the statement's OWN
+        // target is inventoried by kind and name. The 495-failing statements
+        // here — the CREATE USER, the CREATE SETTINGS PROFILE, and the GRANTs
+        // to the config-owned user — target langwatch_lwql or lwql_restricted,
+        // so they are tolerated. The key-map row policy is NOT config-owned
+        configStoreEntities: preflight,
+      });
+
+      // Both kinds of config-store rejection were tolerated and named.
+      expect(
+        skipped.some(
+          (s) =>
+            s.kind === "CREATE USER" && s.code === CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+        ),
+        "the config-owned user CREATE was skipped as 495",
+      ).toBe(true);
+      // The named-collection code the server raises varies by path/version
+      // (669 doesn't-exist, 670 already-exists, 671 immutable); accept any.
+      const namedCollectionCodes = [
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+        CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+      ] as number[];
+      expect(
+        skipped.some(
+          (s) => s.kind === "DROP NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
+        ),
+        "the config-owned named collection DROP was skipped as 669/670/671",
+      ).toBe(true);
+      expect(
+        skipped.some(
+          (s) => s.kind === "CREATE NAMED COLLECTION" && namedCollectionCodes.includes(s.code),
+        ),
+        "the config-owned named collection CREATE was skipped as 669/670/671",
+      ).toBe(true);
+      // The key-map row policy is not config-owned, so it was created, never
+      // skipped — the config-owned user named in its `TO` clause must not
+      // launder a missing policy into a tolerated skip.
+      expect(
+        skipped.some((s) => s.kind === "CREATE ROW POLICY"),
+        "no row-policy statement was skipped",
+      ).toBe(false);
+      // Every skip is one of the four tolerated codes, never a laundered failure.
+      for (const skip of skipped) {
+        expect([
+          CLICKHOUSE_ERROR_CODE.ACCESS_STORAGE_READONLY,
+          CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_DOESNT_EXIST,
+          CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_ALREADY_EXISTS,
+          CLICKHOUSE_ERROR_CODE.NAMED_COLLECTION_IS_IMMUTABLE,
+        ]).toContain(skip.code);
+        // The recorded skip is a statement kind only, never the DDL that carries
+        // the restricted password.
+        expect(skip.kind).not.toContain(RESTRICTED_PASSWORD);
+      }
+
+      // Provisioning continued: the LangWatchQL views exist despite the skips.
+      const viewRows = (await (
+        await harness.admin.query({
+          query: `SELECT name FROM system.tables WHERE database = '${harness.names.database}' AND engine = 'View'`,
+          format: "JSONEachRow",
+        })
+      ).json()) as { name: string }[];
+      const viewNames = new Set(viewRows.map((row) => row.name));
+      for (const view of LWQL_VIEW_CATALOG) {
+        expect(viewNames.has(view.name), `view ${view.name} was provisioned`).toBe(true);
+      }
+
+      // Provisioning created the key-map row policy in the SQL store: its own
+      // target was never config-owned, so tenant isolation is in place — the
+      // exact statement the loose match would have skipped.
+      const policyRows = (await (
+        await harness.admin.query({
+          query: `SELECT short_name FROM system.row_policies WHERE short_name = '${names.keyMapTable}_self'`,
+          format: "JSONEachRow",
+        })
+      ).json()) as { short_name: string }[];
+      expect(policyRows.length, "the key-map row policy was created, not skipped").toBeGreaterThan(
+        0,
+      );
+
+      // The config-store identity is still the one that exists, untouched.
+      const userRows = (await (
+        await harness.admin.query({
+          query: `SELECT storage FROM system.users WHERE name = '${CONFIG_STORE_USER}'`,
+          format: "JSONEachRow",
+        })
+      ).json()) as { storage: string }[];
+      // The config-store identity is the only one — the app never created an
+      // SQL-storage twin, because its CREATE USER was skipped.
+      expect(userRows).toEqual([{ storage: "users_xml" }]);
+    });
+  });
+});

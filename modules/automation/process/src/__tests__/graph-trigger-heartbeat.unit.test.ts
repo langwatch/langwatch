@@ -1,0 +1,318 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { TriggerSummary } from "@langwatch/automation-contract";
+import { type Instant, Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  HeartbeatTriggerRepository,
+  SilentAutomationLogger,
+} from "../repositories/__tests__/support/heartbeat.fakes.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import {
+  type GraphTriggerHeartbeatDeps,
+  GraphTriggerHeartbeatService,
+} from "../services/graph-trigger-heartbeat.service.ts";
+
+const TriggerAction = { SEND_EMAIL: "SEND_EMAIL" } as const;
+const TriggerKind = { ALERT: "ALERT" } as const;
+type HeartbeatCandidateSources = {
+  loadProjectsWithGraphTriggers(): Promise<string[]>;
+  loadProjectsWithOpenGraphTriggerSent(): Promise<Set<string>>;
+};
+
+async function decideGraphTriggerHeartbeat(input: {
+  deps: GraphTriggerHeartbeatDeps;
+  sources: HeartbeatCandidateSources;
+  now: Instant;
+}) {
+  input.deps.triggerSent.findProjectsWithGraphTriggers = () =>
+    input.sources.loadProjectsWithGraphTriggers();
+  input.deps.triggerSent.findProjectsWithOpenGraphTriggerSent = () =>
+    input.sources.loadProjectsWithOpenGraphTriggerSent();
+
+  return GraphTriggerHeartbeatService.create(input.deps).decide({ now: input.now });
+}
+
+const PROJECT_A = "proj-a";
+const PROJECT_B = "proj-b";
+const TRIGGER_NO_DATA = "trig-no-data";
+const TRIGGER_OPEN = "trig-open";
+const TRIGGER_NORMAL = "trig-normal";
+
+function makeTrigger(
+  id: string,
+  projectId: string,
+  actionParams: Record<string, unknown>,
+  customGraphId = `graph-${id}`,
+): TriggerSummary {
+  return {
+    id,
+    projectId,
+    name: id,
+    action: TriggerAction.SEND_EMAIL,
+    triggerKind: TriggerKind.ALERT,
+    actionParams,
+    filters: {},
+    alertType: null,
+    message: null,
+    customGraphId,
+    notificationCadence: "immediate",
+    filterQuery: null,
+    traceDebounceMs: 30_000,
+    templates: {
+      slackTemplateType: null,
+      slackTemplate: null,
+      emailSubjectTemplate: null,
+      emailBodyTemplate: null,
+    },
+  };
+}
+
+function makeTriggersService(perProject: Record<string, TriggerSummary[]>) {
+  return new HeartbeatTriggerRepository(perProject);
+}
+
+function makeSources(overrides: {
+  graphProjects?: string[];
+  openSentProjects?: Set<string>;
+}): HeartbeatCandidateSources {
+  return {
+    loadProjectsWithGraphTriggers: async () => overrides.graphProjects ?? [],
+    loadProjectsWithOpenGraphTriggerSent: async () =>
+      overrides.openSentProjects ?? new Set<string>(),
+  };
+}
+
+function makeTriggerSentStub(
+  perProjectOpenTriggers: Record<string, string[]>,
+): GraphTriggerSentRepository {
+  return {
+    findProjectsWithGraphTriggers: async () => [],
+    findProjectsWithOpenGraphTriggerSent: async () => new Set(),
+    findGraphTriggerSource: async () => "trace",
+    findOpenTriggerIdsForProject: async (projectId) =>
+      new Set(perProjectOpenTriggers[projectId] ?? []),
+    findOpenForGraphAlert: async () => null,
+    findLatestForGraphAlert: async () => null,
+    claimOpenForGraphAlert: async () => "already-claimed" as const,
+    deleteOpenClaim: async () => undefined,
+    markResolvedById: async () => undefined,
+  };
+}
+
+function makeRecencyStub(maxOccurredAtMsByProject: Record<string, number | null>): {
+  analytics: AnalyticsApi;
+  callsByProject: Record<string, number>;
+} {
+  const callsByProject: Record<string, number> = {};
+  const analytics = createApiFixture<AnalyticsApi>({
+    findLastOccurredAt: vi.fn(async (input: Parameters<AnalyticsApi["findLastOccurredAt"]>[0]) => {
+      callsByProject[input.projectId] = (callsByProject[input.projectId] ?? 0) + 1;
+      const ms = maxOccurredAtMsByProject[input.projectId];
+      return ms === null || ms === undefined ? [] : [Temporal.Instant.fromEpochMilliseconds(ms)];
+    }),
+  });
+  return { analytics, callsByProject };
+}
+
+describe("decideGraphTriggerHeartbeat", () => {
+  const now = Temporal.Instant.from("2026-06-20T12:00:00Z");
+
+  let triggerSentStub: GraphTriggerSentRepository;
+  let chStub: ReturnType<typeof makeRecencyStub>;
+  let deps: GraphTriggerHeartbeatDeps;
+
+  beforeEach(() => {
+    triggerSentStub = makeTriggerSentStub({});
+    chStub = makeRecencyStub({});
+  });
+
+  describe("given no candidate projects", () => {
+    it("returns no enqueues", async () => {
+      const triggers = makeTriggersService({});
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({ graphProjects: [] }),
+        now,
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("given a project with only normal (non-absence) triggers", () => {
+    it("emits no enqueues — real-time path handles them", async () => {
+      const triggers = makeTriggersService({
+        [PROJECT_A]: [
+          makeTrigger(TRIGGER_NORMAL, PROJECT_A, {
+            threshold: 50,
+            operator: "gt",
+            timePeriod: 60,
+          }),
+        ],
+      });
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({ graphProjects: [PROJECT_A] }),
+        now,
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("given a no-data trigger with no recent activity", () => {
+    it("enqueues a heartbeat-absence eval", async () => {
+      chStub = makeRecencyStub({ [PROJECT_A]: null });
+      const triggers = makeTriggersService({
+        [PROJECT_A]: [
+          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
+            threshold: 1,
+            operator: "lt",
+            timePeriod: 5,
+          }),
+        ],
+      });
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({ graphProjects: [PROJECT_A] }),
+        now,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.reason).toBe("heartbeat-absence");
+      expect(result[0]?.triggerId).toBe(TRIGGER_NO_DATA);
+      expect(result[0]?.projectId).toBe(PROJECT_A);
+    });
+  });
+
+  describe("given a no-data trigger but the project has very recent activity", () => {
+    it("skips the enqueue — real-time path handles it", async () => {
+      const recentMs = now.epochMilliseconds - 30_000;
+      chStub = makeRecencyStub({ [PROJECT_A]: recentMs });
+      const triggers = makeTriggersService({
+        [PROJECT_A]: [
+          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
+            threshold: 1,
+            operator: "lt",
+            timePeriod: 5,
+          }),
+        ],
+      });
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({ graphProjects: [PROJECT_A] }),
+        now,
+      });
+
+      expect(result).toEqual([]);
+      expect(chStub.callsByProject[PROJECT_A]).toBe(1);
+    });
+  });
+
+  describe("given an open TriggerSent and the project has gone silent", () => {
+    it("enqueues a heartbeat-resolve eval", async () => {
+      chStub = makeRecencyStub({ [PROJECT_B]: null });
+      triggerSentStub = makeTriggerSentStub({ [PROJECT_B]: [TRIGGER_OPEN] });
+      const triggers = makeTriggersService({
+        [PROJECT_B]: [
+          makeTrigger(TRIGGER_OPEN, PROJECT_B, {
+            threshold: 100,
+            operator: "gt",
+            timePeriod: 5,
+          }),
+        ],
+      });
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({
+          openSentProjects: new Set([PROJECT_B]),
+        }),
+        now,
+      });
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.reason).toBe("heartbeat-resolve");
+      expect(result[0]?.triggerId).toBe(TRIGGER_OPEN);
+    });
+  });
+
+  describe("given multiple projects, batched ClickHouse pre-filter", () => {
+    it("issues one CH query per project per tick", async () => {
+      chStub = makeRecencyStub({
+        [PROJECT_A]: null,
+        [PROJECT_B]: null,
+      });
+      const triggers = makeTriggersService({
+        [PROJECT_A]: [
+          makeTrigger(TRIGGER_NO_DATA, PROJECT_A, {
+            threshold: 1,
+            operator: "lt",
+            timePeriod: 5,
+          }),
+        ],
+        [PROJECT_B]: [
+          makeTrigger(TRIGGER_NO_DATA, PROJECT_B, {
+            threshold: 1,
+            operator: "lt",
+            timePeriod: 5,
+          }),
+        ],
+      });
+      deps = {
+        triggers,
+        triggerSent: triggerSentStub,
+        analytics: chStub.analytics,
+        logger: new SilentAutomationLogger(),
+      };
+
+      const result = await decideGraphTriggerHeartbeat({
+        deps,
+        sources: makeSources({
+          graphProjects: [PROJECT_A, PROJECT_B],
+        }),
+        now,
+      });
+
+      expect(result).toHaveLength(2);
+      expect(chStub.callsByProject[PROJECT_A]).toBe(1);
+      expect(chStub.callsByProject[PROJECT_B]).toBe(1);
+    });
+  });
+});

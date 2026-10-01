@@ -1,0 +1,12 @@
+import type { End } from "@langwatch/workflow-contract";
+import type { Node, NodeProps } from "@xyflow/react";
+import { forwardRef, type Ref } from "react";
+
+import { ComponentNode } from "./workflow-nodes.tsx";
+
+export const EndNode = forwardRef(function EndNode(
+  props: NodeProps<Node<End>>,
+  ref: Ref<HTMLDivElement>,
+) {
+  return <ComponentNode ref={ref} {...props} inputsTitle="Results" />;
+});

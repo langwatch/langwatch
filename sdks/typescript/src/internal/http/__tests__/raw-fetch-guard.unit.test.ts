@@ -1,13 +1,12 @@
-/**
- * Every request the SDK sends to the LangWatch API goes through
- * `langwatchFetch`, which is what applies the redirect rule. A raw `fetch(`
- * call, or a `fetchImpl = fetch` default, anywhere else in `src` bypasses
- * that rule, so this test walks the source and fails on any it finds outside
- * the short list of calls that talk to something other than LangWatch.
- */
-import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
+
+/**
+ * Every SDK request goes through `langwatchFetch`, which applies the
+ * redirect rule -- a raw `fetch(` or `fetchImpl = fetch` default elsewhere
+ * bypasses it, so this test walks `src` and fails on any found outside the allowed list.
+ */
+import { describe, expect, it } from "vitest";
 
 const SRC_ROOT = resolve(__dirname, "..", "..", "..");
 
@@ -28,7 +27,8 @@ const TRANSPORT = "internal/http/langwatchFetch.ts";
 const SKIPPED_DIRS = new Set(["internal/generated"]);
 
 /** A call, a parameter default, or a fallback to the global. */
-const RAW_FETCH = /(?<![\w.$])fetch\(|(?<![\w.$])=\s*fetch\s*[,;)]|\?\?\s*globalThis\.fetch\b|globalThis\.fetch\(/;
+const RAW_FETCH =
+  /(?<![\w.$])fetch\(|(?<![\w.$])=\s*fetch\s*[,;)]|\?\?\s*globalThis\.fetch\b|globalThis\.fetch\(/;
 
 const isComment = (line: string): boolean => /^\s*(\*|\/\/|\/\*)/.test(line);
 
@@ -38,10 +38,12 @@ const isSource = (file: string): boolean =>
 const walk = ({ dir, out = [] }: { dir: string; out?: string[] }): string[] => {
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) {
-      if (entry !== "__tests__" && !SKIPPED_DIRS.has(relative(SRC_ROOT, path))) {
-        walk({ dir: path, out });
-      }
+    const stats = statSync(path);
+    if (stats.isDirectory()) {
+      if (entry === "__tests__") continue;
+      const relativePath = relative(SRC_ROOT, path);
+      if (SKIPPED_DIRS.has(relativePath)) continue;
+      walk({ dir: path, out });
     } else if (isSource(path)) {
       out.push(path);
     }
@@ -52,7 +54,7 @@ const walk = ({ dir, out = [] }: { dir: string; out?: string[] }): string[] => {
 /** Every file that calls fetch directly, with how many such lines it has. */
 const rawFetchCounts = (): Map<string, number> => {
   const counts = new Map<string, number>();
-  for (const file of walk({ dir: SRC_ROOT }).sort()) {
+  for (const file of walk({ dir: SRC_ROOT }).toSorted()) {
     const calls = readFileSync(file, "utf8")
       .split("\n")
       .filter((line) => !isComment(line) && RAW_FETCH.test(line)).length;

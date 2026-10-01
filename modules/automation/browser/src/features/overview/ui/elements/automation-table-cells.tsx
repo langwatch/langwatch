@@ -1,0 +1,513 @@
+import {
+  CADENCE_LABELS,
+  CADENCE_WINDOW_MS,
+  type NotificationCadence,
+} from "@langwatch/automation-contract";
+import {
+  Badge,
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { type TimeInput, nowInstant, toEpochMs } from "@langwatch/time";
+import { HelpCircle, Plus } from "lucide-react";
+import { Fragment } from "react";
+
+import { readableDate } from "../../../../model/display-formatters.ts";
+import { resolveSeriesLabel } from "../../../../model/graph-series.ts";
+import { ClampedText } from "../../../../ui/elements/clamped-text.tsx";
+import { FilterDisplay } from "../../../../ui/elements/filter-display.tsx";
+import type { TriggerActionParams } from "../../model/trigger-action-params.ts";
+
+const OPERATOR_LABELS: Record<string, string> = {
+  gt: "greater than",
+  lt: "less than",
+  gte: "greater than or equal",
+  lte: "less than or equal",
+  eq: "equal to",
+};
+
+const TIME_PERIOD_LABELS: Record<number, string> = {
+  1: "1 minute",
+  5: "5 minutes",
+  15: "15 minutes",
+  30: "30 minutes",
+  60: "1 hour",
+  1440: "1 day",
+};
+
+export interface AutomationListTrigger {
+  active: boolean;
+  notificationCadence: string;
+}
+
+export interface AutomationTriggerStats {
+  lastFiredAt: TimeInput | null;
+}
+
+export interface AutomationReportSchedule {
+  nextRunAt: TimeInput | null;
+  lastRunAt: TimeInput | null;
+}
+
+export type FormatTimeAgo = (timestamp: number) => string | undefined;
+
+/** Column header with a help tooltip explaining the metric. */
+export function MetricHeader({ label, help }: { label: string; help: string }) {
+  return (
+    <HStack gap={1}>
+      <Text as="span">{label}</Text>
+      <Tooltip content={help}>
+        <Box color="fg.muted" display="inline-flex" cursor="help">
+          <HelpCircle size={12} />
+        </Box>
+      </Tooltip>
+    </HStack>
+  );
+}
+
+/**
+ * Second line under "Last fired" for automations on a digest schedule:
+ * shows when the next bundled send is due (relative to the latest fire),
+ * or the schedule itself when nothing recent is pending.
+ */
+function DigestScheduleHint({
+  active,
+  cadence,
+  lastFiredAt,
+}: {
+  active: boolean;
+  cadence: string;
+  lastFiredAt: TimeInput | null;
+}) {
+  const windowMs = CADENCE_WINDOW_MS[cadence as NotificationCadence] ?? 0;
+  if (!active || windowMs <= 0) return null;
+
+  const dueAt = lastFiredAt ? toEpochMs(lastFiredAt) + windowMs : null;
+  const now = nowInstant().epochMilliseconds;
+  const label =
+    dueAt && dueAt > now
+      ? `Next digest due in ~${Math.max(1, Math.ceil((dueAt - now) / 60_000))}m`
+      : `Digest: ${CADENCE_LABELS[cadence as NotificationCadence]?.toLowerCase() ?? cadence}`;
+
+  return (
+    <Tooltip content="New matches are bundled into one message on this schedule.">
+      <Text textStyle="xs" color="fg.muted" cursor="help">
+        {label}
+      </Text>
+    </Tooltip>
+  );
+}
+
+export function LastFiredCell({
+  trigger,
+  stats,
+  formatTimeAgo,
+}: {
+  trigger: AutomationListTrigger;
+  stats: AutomationTriggerStats | undefined;
+  formatTimeAgo: FormatTimeAgo;
+}) {
+  return (
+    <VStack align="start" gap={0.5}>
+      {stats?.lastFiredAt ? (
+        <Text as="span">{formatTimeAgo(toEpochMs(stats.lastFiredAt))}</Text>
+      ) : (
+        <Text as="span" color="fg.muted">
+          —
+        </Text>
+      )}
+      <DigestScheduleHint
+        active={trigger.active}
+        cadence={trigger.notificationCadence}
+        lastFiredAt={stats?.lastFiredAt ?? null}
+      />
+    </VStack>
+  );
+}
+
+export function FiringStatus({ firing }: { firing: boolean }) {
+  return firing ? (
+    <HStack gap={1.5}>
+      <Box width="8px" height="8px" borderRadius="full" bg="red.solid" />
+      <Text as="span" textStyle="sm" color="red.fg">
+        Firing
+      </Text>
+    </HStack>
+  ) : (
+    <Text as="span" textStyle="sm" color="fg.muted">
+      OK
+    </Text>
+  );
+}
+
+/**
+ * Section header for one automation kind: an accent-coloured icon chip
+ * gives it identity; the summary is scannable, full detail lives in the
+ * `(?)` tooltip (`copywriting.md`). `accent` is a shared Chakra token.
+ */
+export function SectionHeader({
+  icon,
+  accent,
+  title,
+  count,
+  details,
+  addLabel,
+  onAdd,
+}: {
+  icon: React.ReactNode;
+  accent: string;
+  title: string;
+  count: number;
+  details: string;
+  addLabel: string;
+  onAdd: () => void;
+}) {
+  return (
+    <HStack width="full" align="center" gap={3} flexWrap="wrap">
+      <Box
+        colorPalette={accent}
+        bg="colorPalette.subtle"
+        color="colorPalette.fg"
+        borderRadius="lg"
+        padding={2}
+        display="flex"
+        flexShrink={0}
+      >
+        {icon}
+      </Box>
+      <HStack gap={2} align="center" flex="1 0 auto">
+        <Heading size="md">{title}</Heading>
+        <Badge colorPalette={accent} variant="subtle" borderRadius="full">
+          {count}
+        </Badge>
+        <Tooltip content={details}>
+          <Box color="fg.muted" display="inline-flex" cursor="help">
+            <HelpCircle size={13} />
+          </Box>
+        </Tooltip>
+      </HStack>
+      <Button
+        size="sm"
+        variant="outline"
+        colorPalette={accent}
+        data-testid={`automation-add-${title.toLowerCase()}`}
+        onClick={onAdd}
+        flexShrink={0}
+      >
+        <Plus size={14} /> {addLabel}
+      </Button>
+    </HStack>
+  );
+}
+
+// A report's next and last run from the scheduler; these are the only honest answer to "when
+// does this actually go out?" since cron only describes the schedule, scheduler owns instants.
+export function ReportRunCells({
+  schedule,
+  loading,
+  formatTimeAgo,
+}: {
+  schedule?: AutomationReportSchedule;
+  loading: boolean;
+  formatTimeAgo: FormatTimeAgo;
+}) {
+  if (loading) {
+    return (
+      <>
+        <Table.Cell>
+          <Text textStyle="sm" color="fg.muted">
+            …
+          </Text>
+        </Table.Cell>
+        <Table.Cell>
+          <Text textStyle="sm" color="fg.muted">
+            …
+          </Text>
+        </Table.Cell>
+      </>
+    );
+  }
+  return (
+    <>
+      <Table.Cell whiteSpace="nowrap">
+        {schedule?.nextRunAt ? (
+          <Tooltip content={readableDate(schedule.nextRunAt).toLocaleString()}>
+            <Text textStyle="sm" cursor="help">
+              {formatTimeAgo(toEpochMs(schedule.nextRunAt))}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text textStyle="sm" color="fg.muted">
+            {schedule ? "Paused" : "Not scheduled"}
+          </Text>
+        )}
+      </Table.Cell>
+      <Table.Cell whiteSpace="nowrap">
+        {schedule?.lastRunAt ? (
+          <Tooltip content={readableDate(schedule.lastRunAt).toLocaleString()}>
+            <Text textStyle="sm" cursor="help">
+              {formatTimeAgo(toEpochMs(schedule.lastRunAt))}
+            </Text>
+          </Tooltip>
+        ) : (
+          <Text textStyle="sm" color="fg.muted">
+            Not yet
+          </Text>
+        )}
+      </Table.Cell>
+    </>
+  );
+}
+
+/** Bordered table frame that scrolls horizontally instead of squishing
+ *  columns on narrow viewports. The `css` block is the one place the three
+ *  automation tables get their shared polish — a quiet uppercase header on a
+ *  tinted strip, generous row height, and a soft hover — so no per-page table
+ *  markup has to repeat it. */
+export function TableShell({ children }: { children: React.ReactNode }) {
+  return (
+    <Box border="1px solid" borderColor="border" borderRadius="lg" overflow="hidden" bg="bg.panel">
+      <Box
+        overflowX="auto"
+        css={{
+          // Percentage widths only bind under a fixed layout above a floor;
+          // without one the Name column collapses to its longest word. 880px is
+          // what a 1440px laptop leaves beside the sidebar; below it, scroll.
+          // A two-word header wraps rather than spilling into its neighbour.
+          "& table": { tableLayout: "fixed", minWidth: "880px" },
+          "& thead th": {
+            backgroundColor: "var(--chakra-colors-bg-subtle)",
+            fontSize: "11px",
+            fontWeight: 600,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+            color: "var(--chakra-colors-fg-muted)",
+            verticalAlign: "bottom",
+            paddingTop: "0.6rem",
+            paddingBottom: "0.6rem",
+            borderBottomColor: "var(--chakra-colors-border)",
+          },
+          "& tbody td": {
+            paddingTop: "0.85rem",
+            paddingBottom: "0.85rem",
+            verticalAlign: "middle",
+            borderColor: "var(--chakra-colors-border-muted)",
+          },
+          "& tbody tr:last-of-type td": { borderBottom: "none" },
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
+}
+
+/** Muted one-liner shown in place of a table when a section is empty and has
+ *  no dedicated use-case strip. */
+export function EmptyHint({ children }: { children: React.ReactNode }) {
+  return (
+    <Box border="1px dashed" borderColor="border" borderRadius="lg" padding={6} textAlign="center">
+      <Text textStyle="sm" color="fg.muted">
+        {children}
+      </Text>
+    </Box>
+  );
+}
+
+/** The "Watches" cell of a graph-watching row, named "Graph · <name>" as the wizard names it. */
+export function GraphWatchCell({
+  graphName,
+  graph,
+  seriesName,
+}: {
+  graphName: string | null;
+  graph?: unknown;
+  seriesName?: string;
+}) {
+  const seriesLabel = seriesName ? (resolveSeriesLabel(graph, seriesName) ?? seriesName) : null;
+  return (
+    <VStack align="start" gap={0}>
+      {graphName ? (
+        <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+          {`Graph · ${graphName}`}
+        </Text>
+      ) : (
+        <Text textStyle="sm" color="fg.muted">
+          Graph deleted
+        </Text>
+      )}
+      {seriesLabel ? (
+        <Text textStyle="xs" color="fg.muted" lineClamp={1}>
+          {seriesLabel}
+        </Text>
+      ) : null}
+    </VStack>
+  );
+}
+
+/** The firing rule under a graph-watching row's "Watches" cell. Mirrors the
+ *  dashboard "Configure Alert" copy (`greater than`, `over 5 minutes`). */
+export function AlertRuleCell({ actionParams }: { actionParams: TriggerActionParams }) {
+  const operator = actionParams.operator ? OPERATOR_LABELS[actionParams.operator] : null;
+  const window = actionParams.timePeriod ? TIME_PERIOD_LABELS[actionParams.timePeriod] : null;
+  if (!operator && actionParams.threshold === undefined) {
+    return (
+      <Text textStyle="sm" color="fg.muted">
+        —
+      </Text>
+    );
+  }
+  return (
+    <Text textStyle="sm">
+      {operator ? `${operator} ` : ""}
+      {actionParams.threshold !== undefined ? actionParams.threshold : ""}
+      {window ? ` · over ${window}` : ""}
+    </Text>
+  );
+}
+
+/**
+ * The subject cell of a trace-filter row: the matches-every-trace notice the
+ * caller decides on, which monitors apply, and the saved query (or the legacy
+ * structured filters).
+ */
+export function TraceFilterCell({
+  notice,
+  checks,
+  filterQuery,
+  filters,
+}: {
+  notice: React.ReactNode;
+  checks: React.ReactNode;
+  filterQuery: string | null;
+  filters: unknown;
+}) {
+  return (
+    <VStack gap={2} align="stretch" minWidth={0}>
+      <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
+        Trace filter
+      </Text>
+      {notice}
+      {checks}
+      {traceSubjectOf({ filterQuery, filters })}
+    </VStack>
+  );
+}
+
+/** ADR-043: the search query when set, else the legacy structured filters, else nothing. */
+function traceSubjectOf({
+  filterQuery,
+  filters,
+}: {
+  filterQuery: string | null;
+  filters: unknown;
+}): React.ReactNode {
+  if (filterQuery) {
+    return (
+      <ClampedText lineClamp={2}>
+        <Code size="sm" variant="surface" display="block" minWidth={0} wordBreak="break-word">
+          {filterQuery}
+        </Code>
+      </ClampedText>
+    );
+  }
+  if (typeof filters === "string" && filters && filters !== "{}") {
+    return <FilterDisplay filters={filters} hasBorder={true} shouldClampValues={false} />;
+  }
+  return null;
+}
+
+/** Email addresses that wrap at their seams (after `@`, before a `.`), never mid-word. */
+export function EmailList({ emails }: { emails: string[] }) {
+  return (
+    <>
+      {emails.map((email, i) => (
+        <Fragment key={`${i}-${email}`}>
+          {i > 0 ? ", " : null}
+          <span>
+            {email
+              .split(/(?=\.)|(?<=@)/)
+              .flatMap((part, j) => (j === 0 ? [part] : [<wbr key={`${j}-${part}`} />, part]))}
+          </span>
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+/** Report "Sends" cell — what the report is about (the subject facet): a
+ *  dashboard, a named custom graph, or a top-N trace table. */
+export function ReportSubjectCell({
+  actionParams,
+  graphNameById,
+}: {
+  actionParams: TriggerActionParams;
+  graphNameById: Map<string, string>;
+}) {
+  const source = (
+    actionParams as {
+      source?: { kind?: string; topN?: number; customGraphId?: string };
+    }
+  ).source;
+  if (source?.kind === "customGraph") {
+    const name = source.customGraphId ? graphNameById.get(source.customGraphId) : undefined;
+    return (
+      <VStack align="start" gap={0}>
+        <Text textStyle="sm" fontWeight="medium">
+          Custom graph
+        </Text>
+        <Text textStyle="xs" color="fg.muted" lineClamp={1}>
+          {name ?? "graph"}
+        </Text>
+      </VStack>
+    );
+  }
+  if (source?.kind === "dashboard") {
+    return (
+      <Text textStyle="sm" fontWeight="medium">
+        Analytics dashboard
+      </Text>
+    );
+  }
+  return (
+    <VStack align="start" gap={0}>
+      <Text textStyle="sm" fontWeight="medium">
+        Top {source?.topN ?? 5} traces
+      </Text>
+      <Text textStyle="xs" color="fg.muted">
+        matching your filters
+      </Text>
+    </VStack>
+  );
+}
+
+/** Weekday names for `describeSchedule`, in cron `dow` order (0 = Sunday). */
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Humanises the cron shapes the report drawer emits (weekly / daily /
+ *  monthly). Anything else falls back to the raw expression — a shape lookup
+ *  for the presets we generate, not a general cron parser. */
+export function describeSchedule(cron: string, timezone: string): string {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return `${cron} (${timezone})`;
+  const [min, hour, dom, , dow] = parts;
+  const at = `${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+  if (dom === "*" && dow !== "*") {
+    const day = WEEKDAYS[Number(dow) % 7] ?? `day ${dow}`;
+    return `Weekly · ${day} ${at} ${timezone}`;
+  }
+  if (dom === "*" && dow === "*") {
+    return `Daily · ${at} ${timezone}`;
+  }
+  if (dom !== "*" && dow === "*") {
+    return `Monthly · day ${dom} ${at} ${timezone}`;
+  }
+  return `${cron} (${timezone})`;
+}

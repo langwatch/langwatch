@@ -8,7 +8,7 @@ from langwatch.telemetry.tracing import _is_transient_error
 
 
 def _status_error(status_code: int) -> httpx.HTTPStatusError:
-    request = httpx.Request("POST", "https://example.invalid/api/trace/t/share")
+    request = httpx.Request("POST", "https://example.invalid/api/v1/trace/t/share")
     response = httpx.Response(status_code, request=request)
     return httpx.HTTPStatusError("boom", request=request, response=response)
 

@@ -1,0 +1,42 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"],
+    "incremental": true,
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  // The suite, plus the sources it exercises. `node:fs` compiles here and
+  // nowhere else: the import-free guard has to read its subject off disk,
+  // while the contract itself must stay loadable by a browser.
+  "include": ["src/**/*.ts", "src/**/__tests__/**/*.ts"],
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    }
+  ]
+}

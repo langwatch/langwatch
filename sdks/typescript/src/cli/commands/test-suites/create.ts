@@ -1,12 +1,13 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { parseSuiteFieldDefinitionFlags } from "../../utils/suiteFieldFlags";
-import { createCliTestSuitesService } from "./cli-test-suites-service";
-import { type EvaluatorFlagRef, readEvaluators } from "./evaluatorFlags";
-import { printEvaluators, printSuiteFields } from "./renderSuiteDetails";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { parseSuiteFieldDefinitionFlags } from "../../utils/suiteFieldFlags.ts";
+import { createCliTestSuitesService } from "./cli-test-suites-service.ts";
+import { type EvaluatorFlagRef, readEvaluators } from "./evaluatorFlags.ts";
+import { printEvaluators, printSuiteFields } from "./renderSuiteDetails.ts";
 
 export interface CreateTestSuiteOptions {
   /** `--field identifier:type`, one per occurrence. */
@@ -18,10 +19,9 @@ export interface CreateTestSuiteOptions {
 }
 
 /**
- * Creates a test suite. It starts with no scenarios: they join it by being
- * filed into it, and the targets a run goes against travel with the run. The
- * fields and the evaluators it declares can be given on creation.
- *
+ * Creates a test suite with no scenarios -- they join by being filed into
+ * it, and a run's targets travel with the run. Fields and evaluators can be
+ * given on creation.
  * @see specs/features/test-suite-cli.feature
  */
 export const createTestSuiteCommand = async (
@@ -69,4 +69,3 @@ export const createTestSuiteCommand = async (
     process.exit(1);
   }
 };
-

@@ -382,3 +382,34 @@ Feature: Brokered realtime voice sessions on the AI Gateway
       # The tools of a hosted agent live at the vendor, and an OpenAI session
       # declares its own. Enforcing either needs the relay, which stays behind
       # its four gates.
+
+  Rule: The reconciler runs on the worker, not only in principle
+
+    # It was built and never started, which is indistinguishable from working
+    # for any workspace whose post-call webhook does arrive — and silent for
+    # every workspace whose does not, where nothing is ever billed.
+
+    @integration
+    Scenario: The worker starts the voice reconciler when it boots
+      Given a worker installed with the gateway module
+      When its eventing pipelines register
+      Then the voice reconciler is a process manager scheduled once a minute
+      # A scheduled process manager ticks once across the fleet and drains with
+      # the worker; the api role constructs none of it (ARCHITECTURE.md section 9).
+
+    @unit
+    Scenario: A provider with no readable voice key leaves its sessions open
+      Given an open session whose conversation id the mint recorded
+      And model-provider stores no custom keys for the session's provider row
+      When the voice reconciler ticks
+      Then the vendor is not asked, nothing is confirmed, and the session stays OPEN
+      # The gateway holds no cipher: the keys are model-provider's to decrypt,
+      # and a row it cannot answer for is the next tick's, not a zero-cost close.
+
+    @integration
+    Scenario: Talk to it reads its ElevenLabs key through model-provider
+      Given an organization-scoped ElevenLabs provider row storing an API key
+      When the installed api asks the gateway for that row's ElevenLabs credential
+      Then it answers the stored key and the vendor's default host
+      And a Twilio credential read of the same row is refused as voice_key_missing
+

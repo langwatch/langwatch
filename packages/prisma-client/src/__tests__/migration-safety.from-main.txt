@@ -1,0 +1,5 @@
+# Migrations merged in from main, which the scanner skips: main shipped them and
+# Prisma checksums them, so they can never be edited here. One per line: the
+# migration name, the git blob sha of its migration.sql, then main's PR number.
+# The test refuses any entry whose file no longer hashes to that sha. ADR-155.
+20260924160000_instance_identity_drop_startup_notice 078ee64a0c3d699267f689d086b0d28f8c891218 # #8305

@@ -1,0 +1,52 @@
+/**
+ * The flows the Agent Testing page owns: the suite the address names, the view state a
+ * shared link carries, and the two drawers that start work.
+ * @see specs/features/agent-testing/page-structure.feature
+ */
+
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { useEffect } from "react";
+
+import type { AgentTestingSelection } from "../../../behavior/agent-testing/use-agent-testing-routing.ts";
+import { useAgentTestingStore } from "../../../behavior/agent-testing/use-agent-testing-store.ts";
+import { api } from "../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
+import { useOpenNewRunPlan } from "./run/run-plan-dialog-host.tsx";
+
+/** The id of the suite the address names, or nothing for any other selection. */
+export function useSelectedSuiteTestSuiteId(selection: AgentTestingSelection): string | null {
+  const { project } = useOrganizationTeamProject();
+
+  // The rail reads the same list, so this is the cached copy rather than a
+  // second read. It is only here to turn the address of a suite into its id.
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+
+  if (selection.kind !== "suite") return null;
+  return testSuites?.find((testSuite) => testSuite.slug === selection.slug)?.id ?? null;
+}
+
+/**
+ * The view mode is the one piece of view state the address carries, so a
+ * shared link opens the results the way they were shared.
+ */
+export function useHydrateViewFromUrl(): void {
+  const router = useRouter();
+  const hydrateFromUrl = useAgentTestingStore((state) => state.hydrateFromUrl);
+  const viewParam = router.query.view;
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    hydrateFromUrl(router.query);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, viewParam, hydrateFromUrl]);
+}
+
+/**
+ * New run plan opens the run dialog with the scope still to be chosen.
+ */
+export function useNewRunPlanFlow(): () => void {
+  return useOpenNewRunPlan();
+}

@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 if TYPE_CHECKING:
     from ..models.approve_langy_control_request_response_200_conversation import (
@@ -27,7 +26,6 @@ class ApproveLangyControlRequestResponse200:
     session_key: str
     endpoint: str
     conversation: ApproveLangyControlRequestResponse200Conversation
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         session_key = self.session_key
@@ -37,7 +35,7 @@ class ApproveLangyControlRequestResponse200:
         conversation = self.conversation.to_dict()
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "sessionKey": session_key,
@@ -67,21 +65,4 @@ class ApproveLangyControlRequestResponse200:
             conversation=conversation,
         )
 
-        approve_langy_control_request_response_200.additional_properties = d
         return approve_langy_control_request_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

@@ -1,0 +1,64 @@
+# Langy panel controls the first file leaves out: docking and floating the panel, and the model
+# picker beside the composer. Labels and test ids are the ones the panel draws. Needs
+# release_langy_enabled on for the project, as langy.yaml. Unrun until a check.
+flows:
+  - id: cv2-langy-dock-then-float-panel
+    title: Float the docked Langy panel, then dock it to the side again, keeping the composer both times
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/traces"
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: expect
+        with:
+          label: Langy assistant
+      - action: expect
+        with:
+          label: Float the panel
+      - action: click
+        with:
+          label: Float the panel
+      - action: expect
+        with:
+          label: Dock to the side
+      - action: expect
+        with:
+          count: "[data-langy-composer] textarea"
+      - action: expect
+        with:
+          url: /traces
+      - action: click
+        with:
+          label: Dock to the side
+      - action: expect
+        with:
+          label: Float the panel
+      - action: expect
+        with:
+          count: "[data-langy-composer] textarea"
+
+  - id: cv2-langy-model-picker-lists-models
+    title: Open the model picker beside the composer and find at least one model to choose
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/traces"
+      - action: click
+        with:
+          label: Open Langy assistant
+          optional: "true"
+      - action: expect
+        with:
+          testId: langy-model-picker
+          timeout: "20000"
+      - action: click
+        with:
+          testId: langy-model-picker
+      - action: expect
+        with:
+          count: '[role="menuitem"], [role="menuitemradio"], [role="option"]'
+          min: "1"
+          timeout: "20000"

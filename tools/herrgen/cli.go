@@ -12,7 +12,7 @@ import (
 )
 
 // defaultOut is where the control plane reads the codes from.
-const defaultOut = "packages/handled-error/src/codes.generated.ts"
+const defaultOut = "packages/error-presentation/src/codes.generated.ts"
 
 // Run is the herrgen CLI: it parses the Go tree's herr codes and writes the
 // TypeScript the control plane type-checks against. It returns the process exit
@@ -42,7 +42,7 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	// would then demand the emptied file be committed.
 	if empty := emptyHalves(entries, nodeCodes); empty != "" {
 		fmt.Fprintf(stderr,
-			"no %s found under %s — is -root the repository root?\nIt must be the directory whose go.mod covers the Go services.\n",
+			"no %s found under %s — is -root the repository root?\nIt must be the directory holding go.work, whose pkg/go.mod names the repository.\n",
 			empty, *root)
 		return 2
 	}

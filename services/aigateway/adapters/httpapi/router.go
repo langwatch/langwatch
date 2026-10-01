@@ -229,7 +229,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// secret (`LW_GATEWAY_INTERNAL_SECRET`). Currently used by the
 	// LangWatch governance ingestion pipeline to validate and execute
 	// OTTL statements over inbound OTLP payloads. See
-	// `platform/app/ee/governance/services/activity-monitor/ottlGatewayClient.ts`
+	// `enterprise/packages/composition/api/src/governance/ottl-gateway.client.ts`
 	// for the matching client.
 	if deps.OTTLServer != nil {
 		r.Route("/internal", func(in chi.Router) {
@@ -477,6 +477,7 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 		// Memory threshold: files up to 10 MB stay in memory, larger ones
 		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
+		//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxTranscriptionBodyBytes
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
@@ -1497,6 +1498,18 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 		return nil, nil, func() {}, false
 	}
 	peeked = peeked[:n]
+
+	// OpenAI clients write `model` after `input`, so a large body can carry it
+	// past the window; the whole body is materialized for the provider anyway.
+	if n == peekSize && app.PeekModel(peeked) == "" {
+		rest, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(clog.Get(r.Context()), w, r.Context(),
+				herr.New(r.Context(), bodyReadErrorCode(err), herr.M{"message": err.Error()}))
+			return nil, nil, func() {}, false
+		}
+		peeked = append(peeked, rest...)
+	}
 
 	buf := bodyPool.Get().(*bytes.Buffer)
 	body := io.MultiReader(bytes.NewReader(peeked), r.Body)

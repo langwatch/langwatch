@@ -1,7 +1,7 @@
 # Studio evaluations panel — Gherkin Spec
-# Implementation: platform/app/src/optimization_studio/components/ResultsPanel.tsx
+# Implementation: modules/workflow/browser/src/ui/sections/optimization_studio/results-panel.tsx
 # (EvaluationResults) and
-# platform/app/src/components/batch-evaluation-results/BatchSummaryFooter.tsx
+# modules/experiment/browser/src/ui/sections/batch-results/batch-summary-footer.tsx
 #
 # The evaluations panel at the bottom of the studio shows the runs of the
 # workflow's experiment inline, but the full experiment results page has

@@ -1,0 +1,66 @@
+import { routingDecisionSchema } from "@langwatch/identity-contract";
+/**
+ * Every `auth.*` procedure, declared once (D13, ADR-117 §6). The names
+ * are the browser's cache keys, so they are the wire names the signed-out
+ * screens have always called.
+ */
+import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { z } from "zod";
+
+import {
+  addressConfirmationSchema,
+  frontDoorAskedSchema,
+  frontDoorOwnAddressSentSchema,
+  inviteLandingSchema,
+  priorSessionSchema,
+  signUpEnrollmentSchema,
+  signUpVerificationRequestSchema,
+} from "./front-door.responses.ts";
+import {
+  frontDoorEmailInputSchema,
+  frontDoorInviteCodeInputSchema,
+  frontDoorOwnAddressInputSchema,
+  frontDoorRouteInputSchema,
+  signUpEnrollmentInputSchema,
+} from "./front-door.schemas.ts";
+
+export const authTrpc = defineTrpcContract("auth")
+  /** The methods a proven address may enrol; the proof is validated, not spent. */
+  .mutation("signUpEnrollment")
+  .withInput(signUpEnrollmentInputSchema)
+  .withOutput(signUpEnrollmentSchema)
+
+  /**
+   * A mutation rather than a query on purpose: a query would be cached and
+   * refetched per address, and a per-address cache entry is an
+   * account-existence oracle built out of network timing.
+   */
+  .mutation("route")
+  .withInput(frontDoorRouteInputSchema)
+  .withOutput(routingDecisionSchema)
+
+  .mutation("requestSignUpVerification")
+  .withInput(frontDoorEmailInputSchema)
+  .withOutput(signUpVerificationRequestSchema)
+
+  .query("inviteLanding")
+  .withInput(frontDoorInviteCodeInputSchema)
+  .withOutput(inviteLandingSchema)
+
+  .mutation("requestFreshInvite")
+  .withInput(frontDoorInviteCodeInputSchema)
+  .withOutput(frontDoorAskedSchema)
+
+  .query("myAddressConfirmation")
+  .withInput(z.void())
+  .withOutput(addressConfirmationSchema)
+
+  .mutation("sendMyAddressConfirmation")
+  .withInput(frontDoorOwnAddressInputSchema)
+  .withOutput(frontDoorOwnAddressSentSchema)
+
+  /** Reads only the cookie the caller presented, so it can describe no one else's session. */
+  .query("priorSession")
+  .withInput(z.void())
+  .withOutput(priorSessionSchema)
+  .build();

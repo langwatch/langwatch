@@ -1,7 +1,7 @@
 // Command herrgen mirrors the Go services' herr error codes into the
 // TypeScript the control plane type-checks against.
 //
-// Usage: herrgen [-root .] [-out packages/handled-error/src/codes.generated.ts] [-check]
+// Usage: herrgen [-root .] [-out packages/error-presentation/src/codes.generated.ts] [-check]
 //
 // The rules live in tools/herrgen; this is only the process shell.
 package main

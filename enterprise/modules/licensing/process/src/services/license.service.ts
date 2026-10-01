@@ -1,0 +1,376 @@
+import { createHash } from "node:crypto";
+
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
+import {
+  LICENSE_ERRORS,
+  LicensingService as LicensingServiceContract,
+  OrganizationNotFoundError,
+  resolvePlanDefaults,
+  type LicensePlanLimits,
+  type LicenseStatus,
+  type PlanInfo,
+  type PlatformLicenseAccess,
+  type PlatformLicenseInspection,
+  type RemoveLicenseResult,
+  type StoreLicenseResult,
+} from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { licenseResourceCounts } from "@langwatch/plans";
+import { nowInstant, Temporal, toEpochMs, type Instant } from "@langwatch/time";
+
+import type {
+  LicenseLogger,
+  LicenseRetention,
+  LicenseUsage,
+  LicenseStorage,
+} from "../app/licensing.members.ts";
+import { connectServicesNamedBy } from "../rules/connect-entitlement.rules.ts";
+import { LicensePlanSourceService } from "./license-plan-source.service.ts";
+
+/** An organization that no longer exists holds no licence: the status read answers unlicensed. */
+const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
+  if (HandledError.isHandled(error) && error.code === "organization_not_found")
+    return { licenseKey: null };
+  throw error;
+};
+
+export type LicenseRetentionConfiguration = {
+  categories: readonly string[];
+  defaultDays: number;
+};
+
+export type LicenseServiceConfigurationInput = {
+  retention?: LicenseRetentionConfiguration;
+  now?: () => Instant;
+};
+
+/** Immutable runtime configuration; environment resolution stays in composition. */
+export class LicenseServiceConfiguration {
+  private constructor(
+    readonly retention: LicenseRetentionConfiguration | undefined,
+    readonly now: () => Instant,
+  ) {}
+
+  static create(input: LicenseServiceConfigurationInput = {}): LicenseServiceConfiguration {
+    return new LicenseServiceConfiguration(input.retention, input.now ?? nowInstant);
+  }
+}
+
+class SilentLicenseLogger implements LicenseLogger {
+  error(): void {}
+}
+
+export type LicenseServiceOptions = {
+  repository: LicenseStorage;
+  cryptography: LicenseCryptography;
+  usage?: LicenseUsage;
+  retention?: LicenseRetention;
+  logger?: LicenseLogger;
+  configuration?: LicenseServiceConfiguration;
+  /** `LANGWATCH_LICENSE_KEY`, which licensing alone claims; absent where none is set. */
+  instanceLicenseKey?: string | undefined;
+};
+
+type LicenseResourceCounts = {
+  currentMembers: number;
+  maxMembers: number;
+  currentMembersLite: number;
+  maxMembersLite: number;
+  currentMessagesPerMonth: number;
+  maxMessagesPerMonth: number;
+};
+
+/** Signed-license plan source and lifecycle service. */
+export class LicenseService extends LicensingServiceContract {
+  private readonly repository: LicenseStorage;
+  private readonly cryptography: LicenseCryptography;
+  private readonly usage: LicenseUsage | undefined;
+  private readonly retention: LicenseRetention | undefined;
+  private readonly logger: LicenseLogger;
+  private readonly configuration: LicenseServiceConfiguration;
+  /**
+   * The plan half, composed rather than restated. `getActivePlan` and `getSelfHostedPlan` are
+   * the two questions the entitlement source asks, and a process that resolves plans composes
+   * the same service directly over the licence read alone.
+   */
+  private readonly plans: LicensePlanSourceService;
+  private platformSsoGate: Promise<boolean> | undefined;
+  private readonly instanceLicenseKey: string | undefined;
+
+  private constructor(options: LicenseServiceOptions) {
+    super();
+    this.repository = options.repository;
+    this.cryptography = options.cryptography;
+    this.instanceLicenseKey = options.instanceLicenseKey;
+    this.plans = LicensePlanSourceService.create({
+      licenses: options.repository,
+      cryptography: options.cryptography,
+    });
+    this.usage = options.usage;
+    this.retention = options.retention;
+    this.logger = options.logger ?? new SilentLicenseLogger();
+    this.configuration = options.configuration ?? LicenseServiceConfiguration.create();
+  }
+
+  static create(options: LicenseServiceOptions): LicenseService {
+    return new LicenseService(options);
+  }
+
+  async inspectPlatformAccess(): Promise<PlatformLicenseAccess> {
+    return (await this.scanPlatformLicenses()).access;
+  }
+
+  /** `sha256:` of the licence key that permits the platform, empty where none does: the
+   *  evidence a licence-proved domain records, so the key itself never leaves licensing. */
+  async findPlatformLicenseDigests(): Promise<string[]> {
+    const { permitting } = await this.scanPlatformLicenses();
+    if (permitting === undefined) return [];
+    return [`sha256:${createHash("sha256").update(permitting).digest("hex")}`];
+  }
+
+  /** The instance key first, then every stored one, until one permits the platform. */
+  private async scanPlatformLicenses(): Promise<{
+    access: PlatformLicenseAccess;
+    permitting?: string;
+  }> {
+    const inspections: PlatformLicenseInspection[] = [];
+    const permits = (
+      licenseKey: string,
+      source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
+    ): boolean => {
+      const inspection = this.inspectPlatformLicense(licenseKey, source);
+      inspections.push(inspection);
+      return inspection.valid;
+    };
+    if (this.instanceLicenseKey && permits(this.instanceLicenseKey, { source: "instance" })) {
+      return { access: { allowed: true, inspections }, permitting: this.instanceLicenseKey };
+    }
+
+    const candidates = await this.repository.findOrganizationsWithLicense();
+    for (const candidate of candidates) {
+      const source = { source: "organization" as const, organizationId: candidate.organizationId };
+      if (permits(candidate.licenseKey, source)) {
+        return { access: { allowed: true, inspections }, permitting: candidate.licenseKey };
+      }
+    }
+
+    return { access: { allowed: false, inspections } };
+  }
+
+  /**
+   * Whether a signed license anywhere on this deployment permits platform single
+   * sign-on. Decided once per process; a failed scan is not remembered (ADR-027).
+   */
+  async isPlatformSsoLicensed({ isSaas }: { isSaas: boolean }): Promise<boolean> {
+    if (isSaas) return true;
+    this.platformSsoGate ??= this.inspectPlatformAccess().then(
+      (access) => access.allowed,
+      (error: unknown) => {
+        this.platformSsoGate = undefined;
+        throw error;
+      },
+    );
+    try {
+      return await this.platformSsoGate;
+    } catch (error) {
+      this.logger.error(
+        { error },
+        "the platform single sign-on license scan failed; denying for now",
+      );
+      return false;
+    }
+  }
+
+  async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    return this.plans.getActivePlan(organizationId);
+  }
+
+  async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
+    return this.plans.getSelfHostedPlan(organizationId);
+  }
+
+  async validateAndStoreLicense({
+    organizationId,
+    licenseKey,
+  }: {
+    organizationId: string;
+    licenseKey: string;
+  }): Promise<StoreLicenseResult> {
+    const result = this.cryptography.validateLicense({ licenseKey });
+    if (!result.valid) {
+      return { success: false, error: result.error };
+    }
+
+    // A key that names an organization activates on that organization only.
+    // A key minted before the claim existed carries none, and stays a bearer
+    // token until it is reissued — see the migration note in
+    // enterprise/modules/licensing/specs/licensing.feature.
+    if (
+      result.licenseData.organizationId !== void 0 &&
+      result.licenseData.organizationId !== organizationId
+    ) {
+      return { success: false, error: LICENSE_ERRORS.ORGANIZATION_MISMATCH };
+    }
+
+    if (!(await this.repository.organizationExists(organizationId))) {
+      throw new OrganizationNotFoundError();
+    }
+
+    await this.repository.storeLicense(organizationId, {
+      licenseKey,
+      expiresAt: Temporal.Instant.fromEpochMilliseconds(toEpochMs(result.licenseData.expiresAt)),
+      validatedAt: this.configuration.now(),
+    });
+    await this.provisionMissingRetentionPolicies(organizationId);
+
+    return { success: true, planInfo: result.planInfo };
+  }
+
+  async getLicenseStatus(organizationId: string): Promise<LicenseStatus> {
+    const { licenseKey } = await this.repository
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
+    if (!licenseKey) {
+      return { hasLicense: false, valid: false };
+    }
+
+    const validation = this.cryptography.validateLicense({ licenseKey });
+    if (validation.valid) {
+      return {
+        hasLicense: true,
+        valid: true,
+        plan: validation.licenseData.plan.type,
+        planName: validation.licenseData.plan.name,
+        expiresAt: validation.licenseData.expiresAt,
+        organizationName: validation.licenseData.organizationName,
+        connected: connectServicesNamedBy(validation.licenseData.connectServices).length > 0,
+        ...(await this.getResourceCounts(organizationId, validation.licenseData.plan)),
+      };
+    }
+
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
+    if (!signedLicense) {
+      return { hasLicense: true, valid: false, corrupted: true };
+    }
+
+    const { data } = signedLicense;
+
+    return {
+      hasLicense: true,
+      valid: false,
+      expired:
+        this.cryptography.verifySignature(signedLicense) &&
+        this.cryptography.isExpired(data.expiresAt),
+      plan: data.plan.type,
+      planName: data.plan.name,
+      expiresAt: data.expiresAt,
+      organizationName: data.organizationName,
+      ...(await this.getResourceCounts(organizationId, data.plan)),
+    };
+  }
+
+  async removeLicense(organizationId: string): Promise<RemoveLicenseResult> {
+    if (!(await this.repository.organizationExists(organizationId))) {
+      throw new OrganizationNotFoundError();
+    }
+
+    await this.repository.removeLicense(organizationId);
+
+    return { removed: true };
+  }
+
+  private async getResourceCounts(
+    organizationId: string,
+    plan: LicensePlanLimits,
+  ): Promise<LicenseResourceCounts> {
+    const resolved = resolvePlanDefaults(plan);
+    const messagesPromise = this.usage
+      ? this.usage
+          .getCurrentMonthCount({ organizationId })
+          .then((count) => (typeof count === "number" ? count : 0))
+      : Promise.resolve(0);
+    const [currentMembers, currentMembersLite, currentMessagesPerMonth] = await Promise.all([
+      this.repository.getMemberCount(organizationId),
+      this.repository.getMembersLiteCount(organizationId),
+      messagesPromise,
+    ]);
+
+    return licenseResourceCounts({
+      members: { current: currentMembers, max: resolved.maxMembers },
+      membersLite: { current: currentMembersLite, max: resolved.maxMembersLite },
+      messagesPerMonth: { current: currentMessagesPerMonth, max: resolved.maxMessagesPerMonth },
+    });
+  }
+
+  private inspectPlatformLicense(
+    licenseKey: string,
+    source: Pick<PlatformLicenseInspection, "source" | "organizationId">,
+  ): PlatformLicenseInspection {
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
+    if (!signedLicense) {
+      return { ...source, valid: false, reason: "invalid_format" };
+    }
+
+    if (!this.cryptography.verifySignature(signedLicense)) {
+      return { ...source, valid: false, reason: "invalid_signature" };
+    }
+
+    // A stored key that names another organization is not this organization's
+    // entitlement, however genuine the signature is.
+    const claimed = signedLicense.data.organizationId;
+    if (
+      claimed !== void 0 &&
+      source.organizationId !== void 0 &&
+      claimed !== source.organizationId
+    ) {
+      return { ...source, valid: false, reason: "organization_mismatch" };
+    }
+
+    return {
+      ...source,
+      valid: true,
+      expiresAt: signedLicense.data.expiresAt,
+      organizationName: signedLicense.data.organizationName,
+      expired: this.cryptography.isExpired(signedLicense.data.expiresAt),
+    };
+  }
+
+  private async provisionMissingRetentionPolicies(organizationId: string): Promise<void> {
+    const retentionConfiguration = this.configuration.retention;
+    if (!this.retention || !retentionConfiguration) {
+      return;
+    }
+
+    try {
+      const existing = await this.retention.listOrganizationRules(organizationId);
+      const covered = new Set(
+        existing
+          .filter((rule) => rule.scopeType === "ORGANIZATION" && rule.scopeId === organizationId)
+          .map((rule) => rule.category),
+      );
+      for (const category of retentionConfiguration.categories) {
+        if (covered.has(category)) {
+          continue;
+        }
+
+        try {
+          await this.retention.setForOrganization({
+            organizationId,
+            category,
+            retentionDays: retentionConfiguration.defaultDays,
+          });
+        } catch (error) {
+          this.logger.error(
+            { organizationId, category, error },
+            "[license] Failed to provision retention policy on license activation",
+          );
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        { organizationId, error },
+        "[license] Failed to provision retention policies on license activation",
+      );
+    }
+  }
+}

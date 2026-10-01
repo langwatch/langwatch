@@ -1,0 +1,153 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"errorFilter":"HTTP"} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 2,
+      "message": "HTTP 500 from upstream",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 1,
+      "name": "eval",
+    },
+    {
+      "count": 1,
+      "name": "unknown",
+    },
+  ],
+  "totalAffected": 2,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"errorFilter":"nothing"} by pipeline and normalised error 1`] = `
+{
+  "byError": [],
+  "byPipeline": [],
+  "totalAffected": 0,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"errorFilter":"timeout"} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 1,
+      "message": "Timeout after 30000ms",
+    },
+    {
+      "count": 1,
+      "message": "Timeout after 12ms",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 2,
+      "name": "trace",
+    },
+  ],
+  "totalAffected": 2,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"pipelineFilter":"eval"} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 1,
+      "message": "HTTP 500 from upstream",
+    },
+    {
+      "count": 1,
+      "message": "Unknown error",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 2,
+      "name": "eval",
+    },
+  ],
+  "totalAffected": 2,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"pipelineFilter":"trace","errorFilter":"12ms"} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 1,
+      "message": "Timeout after 12ms",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 1,
+      "name": "trace",
+    },
+  ],
+  "totalAffected": 1,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {"pipelineFilter":"unknown"} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 1,
+      "message": "HTTP 500 from upstream",
+    },
+    {
+      "count": 1,
+      "message": "Unknown error",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 2,
+      "name": "unknown",
+    },
+  ],
+  "totalAffected": 2,
+}
+`;
+
+exports[`QueueRedisRepository.drainAllBlockedPreview > previews {} by pipeline and normalised error 1`] = `
+{
+  "byError": [
+    {
+      "count": 2,
+      "message": "HTTP 500 from upstream",
+    },
+    {
+      "count": 2,
+      "message": "Unknown error",
+    },
+    {
+      "count": 1,
+      "message": "Timeout after 30000ms",
+    },
+    {
+      "count": 1,
+      "message": "Timeout after 12ms",
+    },
+  ],
+  "byPipeline": [
+    {
+      "count": 2,
+      "name": "trace",
+    },
+    {
+      "count": 2,
+      "name": "eval",
+    },
+    {
+      "count": 2,
+      "name": "unknown",
+    },
+  ],
+  "totalAffected": 6,
+}
+`;

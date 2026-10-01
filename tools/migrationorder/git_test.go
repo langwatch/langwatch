@@ -10,7 +10,7 @@ import (
 	"github.com/langwatch/langwatch/tools/migrationorder"
 )
 
-const clickhouseDir = "platform/app/src/server/clickhouse/migrations"
+const clickhouseDir = "packages/clickhouse-migrations/migrations"
 
 func gitIn(t *testing.T, root string, args ...string) {
 	t.Helper()
@@ -40,11 +40,16 @@ func commitMigration(t *testing.T, root, name string) {
 
 func commitMigrationAt(t *testing.T, root, directory, name string) {
 	t.Helper()
+	commitMigrationContent(t, root, directory, name, "SELECT 1;\n")
+}
+
+func commitMigrationContent(t *testing.T, root, directory, name, content string) {
+	t.Helper()
 	path := filepath.Join(root, filepath.FromSlash(directory), name)
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(path, []byte("SELECT 1;\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	gitIn(t, root, "add", ".")
@@ -137,6 +142,118 @@ func TestRepoInputsRelocatedSet(t *testing.T) {
 	}
 }
 
+func TestRepoInputsFindsPrismaMigrationsInTheOldRoot(t *testing.T) {
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260827120000_old_root/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "Prisma"
+	})
+	if index < 0 {
+		t.Fatalf("no Prisma input in %+v", inputs)
+	}
+
+	want := []string{"platform/app/prisma/migrations/20260827120000_old_root"}
+	if !slices.Equal(inputs[index].Misplaced, want) {
+		t.Fatalf("Misplaced = %v, want %v", inputs[index].Misplaced, want)
+	}
+}
+
+func TestRepoInputsPortOfAMigrationReleasedOnMain(t *testing.T) {
+	// main released a migration from its old root. A long-running branch forked
+	// earlier and numbered its own migration above it; a PR into that branch
+	// ports main's migration under its exact name, because databases that ran
+	// the release already recorded it under that name.
+	const prismaDir = "packages/prisma-client/prisma/migrations"
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260901000000_shared/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "long-branch")
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(filepath.FromSlash(prismaDir))), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "mv", "platform/app/prisma/migrations", prismaDir)
+	gitIn(t, root, "commit", "-q", "-m", "move migrations")
+	commitMigrationAt(t, root, prismaDir, "20260929100100_branch_own/migration.sql")
+	gitIn(t, root, "checkout", "-q", "main")
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260928120001_released/migration.sql")
+	gitIn(t, root, "checkout", "-q", "long-branch")
+	gitIn(t, root, "checkout", "-q", "-b", "port")
+	commitMigrationAt(t, root, prismaDir, "20260928120001_released/migration.sql")
+
+	prismaFindings := func(released ...string) []migrationorder.Finding {
+		t.Helper()
+		inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "long-branch", released...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+			return in.Set.Name == "Prisma"
+		})
+		if index < 0 {
+			t.Fatalf("no Prisma input in %+v", inputs)
+		}
+		return migrationorder.Check(inputs[index])
+	}
+
+	if findings := prismaFindings(); len(findings) != 1 || findings[0].Entry != "20260928120001_released" {
+		t.Errorf("without the release line, want one finding for the port, got %+v", findings)
+	}
+	if findings := prismaFindings("main"); len(findings) != 0 {
+		t.Errorf("with main as a release line, the port is history, got findings %+v", findings)
+	}
+}
+
+func TestRepoInputsPortWithDifferentSQLThanTheRelease(t *testing.T) {
+	// The PR carries a migration under a name main released, but with other SQL.
+	// Databases that ran the release recorded that name for main's SQL, so the
+	// port would never run there: the name alone does not make it history.
+	const prismaDir = "packages/prisma-client/prisma/migrations"
+	root := initRepo(t)
+	commitMigrationAt(t, root, "platform/app/prisma/migrations", "20260901000000_shared/migration.sql")
+	gitIn(t, root, "checkout", "-q", "-b", "long-branch")
+	if err := os.MkdirAll(filepath.Join(root, filepath.Dir(filepath.FromSlash(prismaDir))), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, root, "mv", "platform/app/prisma/migrations", prismaDir)
+	gitIn(t, root, "commit", "-q", "-m", "move migrations")
+	gitIn(t, root, "checkout", "-q", "main")
+	commitMigrationContent(t, root, "platform/app/prisma/migrations",
+		"20260928120001_released/migration.sql", "ALTER TABLE a ADD COLUMN b TEXT;\n")
+	gitIn(t, root, "checkout", "-q", "long-branch")
+	gitIn(t, root, "checkout", "-q", "-b", "port")
+	commitMigrationContent(t, root, prismaDir,
+		"20260928120001_released/migration.sql", "DROP TABLE a;\n")
+
+	inputs, err := migrationorder.Repo{Root: root}.Inputs(t.Context(), "long-branch", "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := slices.IndexFunc(inputs, func(in migrationorder.Input) bool {
+		return in.Set.Name == "Prisma"
+	})
+	if index < 0 {
+		t.Fatalf("no Prisma input in %+v", inputs)
+	}
+
+	want := []migrationorder.Divergence{{
+		Entry: "20260928120001_released",
+		Ref:   "main",
+		Path:  "platform/app/prisma/migrations/20260928120001_released",
+	}}
+	if !slices.Equal(inputs[index].Diverged, want) {
+		t.Fatalf("Diverged = %+v, want %+v", inputs[index].Diverged, want)
+	}
+	findings := migrationorder.Check(inputs[index])
+	if len(findings) != 1 || findings[0].Entry != "20260928120001_released" {
+		t.Fatalf("want one finding for the changed port, got %+v", findings)
+	}
+}
+
 func TestTopLevelEntries(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -147,30 +264,30 @@ func TestTopLevelEntries(t *testing.T) {
 		{
 			name: "prisma directories dedupe to one entry and the lock file is dropped",
 			paths: []string{
-				"platform/app/prisma/migrations/20260102000000_new/migration.sql",
-				"platform/app/prisma/migrations/20260102000000_new/README.md",
-				"platform/app/prisma/migrations/20260101000000_old/migration.sql",
-				"platform/app/prisma/migrations/migration_lock.toml",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/migration.sql",
+				"packages/prisma-client/prisma/migrations/20260102000000_new/README.md",
+				"packages/prisma-client/prisma/migrations/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/migrations/migration_lock.toml",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      []string{"20260101000000_old", "20260102000000_new"},
 		},
 		{
 			name: "clickhouse files are taken flat and sorted",
 			paths: []string{
-				"platform/app/src/server/clickhouse/migrations/00041_b.sql",
-				"platform/app/src/server/clickhouse/migrations/00040_a.sql",
+				"packages/clickhouse-migrations/migrations/00041_b.sql",
+				"packages/clickhouse-migrations/migrations/00040_a.sql",
 			},
-			directory: "platform/app/src/server/clickhouse/migrations",
+			directory: "packages/clickhouse-migrations/migrations",
 			want:      []string{"00040_a.sql", "00041_b.sql"},
 		},
 		{
 			name: "paths outside the directory are ignored, prefix-alikes included",
 			paths: []string{
-				"platform/app/prisma/migrations_archive/20260101000000_old/migration.sql",
-				"platform/app/prisma/schema.prisma",
+				"packages/prisma-client/prisma/migrations_archive/20260101000000_old/migration.sql",
+				"packages/prisma-client/prisma/schema.prisma",
 			},
-			directory: "platform/app/prisma/migrations",
+			directory: "packages/prisma-client/prisma/migrations",
 			want:      nil,
 		},
 	}

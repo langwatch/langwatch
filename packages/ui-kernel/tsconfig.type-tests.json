@@ -1,0 +1,30 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts", "type-tests/**/*.ts"],
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    }
+  ]
+}

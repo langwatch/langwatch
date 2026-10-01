@@ -69,12 +69,12 @@ await scenario.run({
 
 **`langwatch` namespace fields** (strict Zod schema at the API layer):
 
-| Field | Type | Required | Purpose |
-|---|---|---|---|
-| `targetReferenceId` | `string` | yes | ID of the agent/prompt target this run was executed against |
-| `targetType` | `"prompt" \| "http" \| "code"` | yes | Target kind, matches `scenarioJobSchema.target.type` |
-| `simulationSuiteId` | `string` | no | `SimulationSuite.id` — which suite dispatched this run |
-| `scenarioVersion` | `number` | no | `Scenario.version` at the moment the run was queued; absent on runs recorded before scenario versioning existed |
+| Field               | Type                           | Required | Purpose                                                                                                         |
+| ------------------- | ------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------- |
+| `targetReferenceId` | `string`                       | yes      | ID of the agent/prompt target this run was executed against                                                     |
+| `targetType`        | `"prompt" \| "http" \| "code"` | yes      | Target kind, matches `scenarioJobSchema.target.type`                                                            |
+| `simulationSuiteId` | `string`                       | no       | `SimulationSuite.id` — which suite dispatched this run                                                          |
+| `scenarioVersion`   | `number`                       | no       | `Scenario.version` at the moment the run was queued; absent on runs recorded before scenario versioning existed |
 
 The entire `langwatch` object is optional on metadata (SDK users never send it).
 
@@ -87,6 +87,7 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 ## Consequences
 
 **Positive:**
+
 - Users can attach arbitrary context to scenario runs
 - LangWatch can store orchestration context without polluting the SDK's core schema
 - Namespace convention prevents collisions
@@ -94,10 +95,12 @@ The entire `langwatch` object is optional on metadata (SDK users never send it).
 - Future platform metadata needs use the same `langwatch` namespace without schema changes
 
 **Negative:**
+
 - User metadata is untyped beyond "JSON-serializable"
 - ES `dynamic: true` on `metadata.langwatch` means any field sent there gets indexed; the Zod schema guards against this at the API layer, but bulk-inserted documents bypass it
 
 **Neutral:**
+
 - The server remains a dumb pipe
 - The `@langwatch/scenario` SDK needs a release for both JS and Python packages
 
@@ -127,11 +130,11 @@ the same way.
 
 Each source sets it like this:
 
-| Source | How |
-|---|---|
-| Platform run dialog | The note field of the run dialog. |
-| Command line | `--note` on `langwatch suite run` and `langwatch scenario run`. |
-| SDK or CI | `scenario.run({ metadata: { note: process.env.GITHUB_SHA } })`. |
+| Source              | How                                                             |
+| ------------------- | --------------------------------------------------------------- |
+| Platform run dialog | The note field of the run dialog.                               |
+| Command line        | `--note` on `langwatch suite run` and `langwatch scenario run`. |
+| SDK or CI           | `scenario.run({ metadata: { note: process.env.GITHUB_SHA } })`. |
 
 **Write path.** For runs the platform starts, the note is stamped at queue time
 onto every run in the batch, so a run carries its note from its first moment.
@@ -161,6 +164,6 @@ Specs: `specs/suites/run-notes.feature`,
 
 ## References
 
-- Related ADRs: [ADR-002: Event Sourcing](002-event-sourcing.md), [ADR-007: Event Sourcing Architecture](007-event-sourcing-architecture.md)
+- Related architecture: [Eventing framework boundary](../../../packages/eventing/adrs/20260820-eventing-framework-boundary.md)
 - GitHub issue: #1707
 - SDK sub-issue: langwatch/scenario#228

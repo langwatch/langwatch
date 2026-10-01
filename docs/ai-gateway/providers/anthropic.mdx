@@ -8,15 +8,18 @@ sidebarTitle: Anthropic
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **Anthropic**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-| Field | Value |
-|---|---|
-| `ANTHROPIC_API_KEY` | Your Anthropic API key. Required unless you set a base URL. |
+| Field                | Value                                                                              |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`  | Your Anthropic API key. Required unless you set a base URL.                        |
 | `ANTHROPIC_BASE_URL` | Optional. An Anthropic-compatible endpoint to call instead of `api.anthropic.com`. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
 <Frame caption="The Anthropic row: name, scope, ANTHROPIC_API_KEY, the optional base URL and the routing handle.">
-  <img src="/images/ai-gateway/model-provider-anthropic-form.png" alt="The Anthropic model provider drawer with ANTHROPIC_API_KEY filled in, ANTHROPIC_BASE_URL empty and the routing handle anthropic" />
+  <img
+    src="/images/ai-gateway/model-provider-anthropic-form.png"
+    alt="The Anthropic model provider drawer with ANTHROPIC_API_KEY filled in, ANTHROPIC_BASE_URL empty and the routing handle anthropic"
+  />
 </Frame>
 
 ## Model names
@@ -61,11 +64,11 @@ An OpenAI SDK call to `/v1/chat/completions` with an Anthropic model also works:
 
 ## Endpoints
 
-| Endpoint | Served |
-|---|---|
-| `POST /v1/messages` | Yes, forwarded as is |
-| `POST /v1/chat/completions` | Yes, translated to Messages |
-| `POST /v1/embeddings` | No. Anthropic has no embeddings API; the gateway returns Anthropic's rejection |
-| `GET /v1/models` | Yes, from the Anthropic catalog |
+| Endpoint                    | Served                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `POST /v1/messages`         | Yes, forwarded as is                                                           |
+| `POST /v1/chat/completions` | Yes, translated to Messages                                                    |
+| `POST /v1/embeddings`       | No. Anthropic has no embeddings API; the gateway returns Anthropic's rejection |
+| `GET /v1/models`            | Yes, from the Anthropic catalog                                                |
 
 `cache_control` blocks pass through unchanged and the cache read and write token counts come back in `usage`. See [Cache control](/ai-gateway/cache-control).

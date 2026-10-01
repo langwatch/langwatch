@@ -1,0 +1,1122 @@
+import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import type { Command, CommandHandler } from "../../commands/command.ts";
+import type { CommandSchema } from "../../commands/commandSchema.ts";
+import type {
+  CommandRegistration,
+  SealedCommand,
+  TenantScopedPayload,
+} from "../../commands/sealedCommand.ts";
+import type { AggregateType } from "../../domain/aggregateType.ts";
+import type { CommandType } from "../../domain/commandType.ts";
+import type { Event } from "../../domain/types.ts";
+import { type KillSwitch } from "../../kill-switch/index.ts";
+import type {
+  DeduplicationConfig,
+  DeduplicationStrategy,
+  EventSourcedQueueProcessor,
+  QueueSendOptions,
+} from "../../queues/index.ts";
+import { resolveDeduplicationStrategy } from "../../queues/index.ts";
+import type { JobDelivery } from "../../queues/queue.types.ts";
+import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
+import { mapValidationIssues } from "../../utils/errors.ts";
+import {
+  type CommandHandlerOptions,
+  parseQueuedCommandPayload,
+  processCommand,
+  processCommandBatch,
+} from "../commands/commandDispatcher.ts";
+import { ConfigurationError, ValidationError } from "../errorHandling.ts";
+import {
+  JOB_ROUTING_FIELD,
+  type JobLane,
+  type JobRegistryEntry,
+  readJobRouting,
+  routeJob,
+  sealJobLane,
+  toRecord,
+} from "./jobLane.ts";
+
+const logger = createLogger("langwatch:event-sourcing:queue-manager");
+
+/**
+ * Missing occurredAt defaults to Date.now() instead of epoch (which was causing false old-age
+ * metrics). Present values pass through untouched; GroupQueue validates them against the clock.
+ */
+function occurredAtScore(payload: { occurredAt?: unknown }): number {
+  const occurredAt = payload.occurredAt;
+  return occurredAt === undefined || occurredAt === null
+    ? nowInstant().epochMilliseconds
+    : (occurredAt as number);
+}
+
+export type { JobRegistryEntry } from "./jobLane.ts";
+
+/** The facade a lane hands its callers: sends a typed payload, routed before it is queued. */
+interface JobSender<P> {
+  send: (payload: P, options?: QueueSendOptions<P>) => Promise<void>;
+  sendBatch: (payloads: P[], options?: QueueSendOptions<P>) => Promise<void>;
+  close: () => Promise<void>;
+  waitUntilReady: () => Promise<void>;
+}
+
+/** Runs a coalesced batch under its first event's tenant; a batch is never empty. */
+function withBatchTenant<E extends Event>(
+  events: E[],
+  run: (tenantId: E["tenantId"]) => Promise<void>,
+): Promise<void> {
+  const [first] = events;
+  return first ? run(first.tenantId) : Promise.resolve();
+}
+
+const projectionSubscriberPayloadSchema = z.object({ event: z.unknown(), foldState: z.unknown() });
+
+/** A send's dedup config over the queued envelope: its id was computed at send, in `__routing`. */
+function routedDeduplication<P>(
+  deduplication: DeduplicationConfig<P>,
+): DeduplicationConfig<Record<string, unknown>> {
+  return {
+    ...deduplication,
+    makeId: (envelope) => {
+      const dedupId = readJobRouting(envelope)?.dedupId;
+      if (dedupId === undefined) {
+        throw new ConfigurationError(
+          "QueueManager",
+          "A deduplicated job was queued without its id",
+        );
+      }
+      return dedupId;
+    },
+  };
+}
+
+interface CommandRegistryEntry<EventType extends Event, Payload extends TenantScopedPayload> {
+  handler: CommandHandler<Command<Payload>, EventType>;
+  schema: CommandSchema<Payload, CommandType>;
+  getAggregateId: (payload: Payload) => string;
+  getGroupKey?: (payload: Payload) => string;
+  options: CommandHandlerOptions<Payload>;
+  commandName: string;
+  commandType: CommandType;
+  spanAttributes?: (payload: Payload) => Record<string, string | number | boolean>;
+}
+
+/**
+ * The command queue's domain key: grouped by aggregate when
+ * `serializeByAggregate` opts in, otherwise by the command's own group
+ * key (falling back to its aggregate id).
+ */
+function resolveCommandDomainKey<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
+  payload: Payload,
+): string {
+  if (cmdEntry.options.serializeByAggregate) return cmdEntry.getAggregateId(payload);
+  if (cmdEntry.getGroupKey) return cmdEntry.getGroupKey(payload);
+  return cmdEntry.getAggregateId(payload);
+}
+
+/** The payload as the command's schema reads it; a `ValidationError` when it fails the schema. */
+function validateCommandPayload<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
+  payload: Record<string, unknown>,
+): Payload {
+  const validation = cmdEntry.schema.validate(payload);
+  if (validation.success) return validation.data;
+  throw new ValidationError({
+    reason: `Invalid payload for command type "${cmdEntry.commandType}". Validation failed.`,
+    field: "payload",
+    context: {
+      commandType: cmdEntry.commandType,
+      zodIssues: mapValidationIssues(validation.error.issues),
+    },
+  });
+}
+
+/** A caller's per-send options, whose dedup id it computes over the payload it passed in. */
+function sendOptionsOverRaw<Payload>(
+  options: QueueSendOptions<Record<string, unknown>> | undefined,
+  rawOf: (payload: Payload) => Record<string, unknown>,
+): QueueSendOptions<Payload> | undefined {
+  const deduplication = options?.deduplication;
+  if (!deduplication) return options ? { delay: options.delay } : undefined;
+  return {
+    delay: options.delay,
+    deduplication: { ...deduplication, makeId: (payload) => deduplication.makeId(rawOf(payload)) },
+  };
+}
+
+/**
+ * Wraps a command's base facade with pre-send schema validation and the
+ * migration preflight that claims groups BEFORE staging. Order matters:
+ * an invalid payload never reaches preflight, and a refusal stops the send.
+ */
+function buildValidatingCommandFacade<EventType extends Event, Payload extends TenantScopedPayload>(
+  cmdEntry: CommandRegistryEntry<EventType, Payload>,
+  baseFacade: JobSender<Payload>,
+  registerPreflight: (
+    identities: readonly { tenantId: string; aggregateId: string }[],
+  ) => Promise<void>,
+): EventSourcedQueueProcessor<Record<string, unknown>> {
+  const identityOf = (payload: Payload) => ({
+    tenantId: String(payload.tenantId),
+    aggregateId: String(cmdEntry.getAggregateId(payload)),
+  });
+  return {
+    send: async (
+      payload: Record<string, unknown>,
+      options?: QueueSendOptions<Record<string, unknown>>,
+    ) => {
+      const validated = validateCommandPayload(cmdEntry, payload);
+      await registerPreflight([identityOf(validated)]);
+      return baseFacade.send(
+        validated,
+        sendOptionsOverRaw(options, () => payload),
+      );
+    },
+    sendBatch: async (
+      payloads: Record<string, unknown>[],
+      options?: QueueSendOptions<Record<string, unknown>>,
+    ) => {
+      const validated = payloads.map((payload) => validateCommandPayload(cmdEntry, payload));
+      await registerPreflight(validated.map(identityOf));
+      const rawOf = new Map(validated.map((payload, index) => [payload, payloads[index] ?? {}]));
+      return baseFacade.sendBatch(
+        validated,
+        sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
+      );
+    },
+    close: baseFacade.close,
+    waitUntilReady: baseFacade.waitUntilReady,
+  };
+}
+
+type ProjectionQueueRequest<EventType extends Event> = Parameters<
+  QueueManager<EventType>["initializeProjectionQueues"]
+>[0];
+
+interface QueuedEventConsumerDefinition<E extends Event> {
+  name: string;
+  handler: { handle: (event: E) => Promise<void> };
+  options: {
+    eventTypes?: readonly string[];
+    delay?: number;
+    deduplication?: DeduplicationStrategy<E>;
+    concurrency?: number;
+    spanAttributes?: (event: E) => Record<string, string | number | boolean>;
+    disabled?: boolean;
+    /** Answers undefined for an event it does not key, which then takes the aggregate's key. */
+    groupKeyFn?: (event: E) => string | undefined;
+    coalesceMaxBatch?: number;
+    onExhausted?: ExhaustedOutcome;
+  };
+}
+
+/**
+ * Manages queue facades for event handlers, projections, commands, and
+ * subscribers: per-job-type facades that inject routing metadata
+ * (__pipelineName, __jobType, __jobName) into the global shared queue.
+ */
+export class QueueManager<EventType extends Event = Event> {
+  private readonly aggregateType: AggregateType;
+  private readonly pipelineName: string;
+  private readonly logger: Logger;
+  private readonly globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+  private readonly globalJobRegistry?: Map<string, JobRegistryEntry>;
+  private readonly killSwitch?: KillSwitch;
+  private readonly parseEvent: (value: unknown) => EventType;
+  private readonly eventQueues = new Map<string, EventSourcedQueueProcessor<EventType>>();
+  private readonly projectionSubscriberQueues = new Map<
+    string,
+    EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }>
+  >();
+  private readonly commandQueues = new Map<
+    string,
+    EventSourcedQueueProcessor<Record<string, unknown>>
+  >();
+  private readonly jobQueueClosers = new Map<string, () => Promise<void>>();
+  private handlerCount = 0;
+  private subscriberCount = 0;
+  private stateProjectionCount = 0;
+  private projectionCount = 0;
+  private projectionSubscriberCount = 0;
+
+  constructor({
+    aggregateType,
+    pipelineName,
+    globalQueue,
+    globalJobRegistry,
+    killSwitch,
+    parseEvent,
+    logger = createLogger("langwatch:event-sourcing:queue-manager"),
+  }: {
+    aggregateType: AggregateType;
+    pipelineName: string;
+    /** Parses a queued event with its pipeline's schema for its type (§9). */
+    parseEvent: (value: unknown) => EventType;
+    globalQueue?: EventSourcedQueueProcessor<Record<string, unknown>>;
+    globalJobRegistry?: Map<string, JobRegistryEntry>;
+    killSwitch?: KillSwitch;
+    logger?: Logger;
+  }) {
+    this.logger = logger;
+    this.aggregateType = aggregateType;
+    this.pipelineName = pipelineName;
+    this.globalQueue = globalQueue;
+    this.globalJobRegistry = globalJobRegistry;
+    this.killSwitch = killSwitch;
+    this.parseEvent = parseEvent;
+  }
+
+  private createDefaultDeduplicationId(event: EventType): string {
+    return `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
+  }
+
+  /**
+   * Builds a hierarchical group key function: `${tenantId}/${jobPath}/${domainKey}`.
+   * jobPath reflects pipeline topology; domainKey defaults to
+   * `${aggregateType}:${aggregateId}`, overridable via a custom fn.
+   */
+  private buildGroupKey<Payload>({
+    jobPath,
+    getTenantId,
+    domainKeyFn,
+  }: {
+    jobPath: string;
+    getTenantId: (payload: Payload) => string;
+    domainKeyFn: (payload: Payload) => string;
+  }): (payload: Payload) => string {
+    return (payload: Payload) => `${getTenantId(payload)}/${jobPath}/${domainKeyFn(payload)}`;
+  }
+
+  /** The same key `buildGroupKey` produces, from an identity instead of a payload. */
+  private buildPreflightGroupKey(
+    jobPath: string,
+  ): NonNullable<JobRegistryEntry["preflightGroupKey"]> {
+    return ({ tenantId, aggregateId }) =>
+      `${tenantId}/${jobPath}/${this.aggregateType}:${aggregateId}`;
+  }
+
+  /**
+   * Names every group this pipeline's aggregates may reach before a command
+   * is staged, so a migration's allow-list is complete. A custom-group-key
+   * job contributes `undefined`, which the queue refuses — failing closed.
+   */
+  private async registerPreflightAggregateTargets(
+    identities: readonly { tenantId: string; aggregateId: string }[],
+  ): Promise<void> {
+    const register = this.globalQueue?.registerPreflightGroups;
+    const registry = this.globalJobRegistry;
+    if (!register || !registry) return;
+
+    await register.call(this.globalQueue, () => {
+      const pipelinePrefix = `${this.pipelineName}:`;
+      const entries = [...registry.entries()].filter(([key]) => key.startsWith(pipelinePrefix));
+      return identities.flatMap((identity) =>
+        entries.map(([, entry]) => entry.preflightGroupKey?.(identity)),
+      );
+    });
+  }
+
+  private key(
+    type:
+      | "handler"
+      | "subscriber"
+      | "stateProjection"
+      | "projection"
+      | "command"
+      | "reactor"
+      | "projectionRebuild"
+      | "stateProjectionRebuild"
+      | "job",
+    name: string,
+  ): string {
+    return `${type}:${name}`;
+  }
+
+  /**
+   * Builds a globally unique registry key for this pipeline's job entry.
+   */
+  private registryKey(jobType: string, jobName: string): string {
+    return `${this.pipelineName}:${jobType}:${jobName}`;
+  }
+
+  /**
+   * Registers a lane's sealed entry and answers its facade: each send computes the payload's
+   * routing from the typed value and carries it in `__routing` beside the job path (§9).
+   */
+  private createFacade<P extends object>(
+    jobType: string,
+    jobName: string,
+    lane: JobLane<P>,
+  ): JobSender<P> {
+    if (!this.globalQueue || !this.globalJobRegistry) {
+      throw new ConfigurationError(
+        "QueueManager",
+        "Cannot create facade without global queue and registry",
+      );
+    }
+    const globalQueue = this.globalQueue;
+    const pipelineName = this.pipelineName;
+    const namespaceDedupId = (id: string) => `${pipelineName}/${jobType}/${jobName}/${id}`;
+    this.globalJobRegistry.set(
+      this.registryKey(jobType, jobName),
+      sealJobLane(lane, namespaceDedupId, `${pipelineName}:${jobType}:${jobName}`),
+    );
+
+    const envelopeOf = (payload: P, deduplication: DeduplicationConfig<P> | undefined) => ({
+      ...toRecord(payload),
+      __pipelineName: pipelineName,
+      __jobType: jobType,
+      __jobName: jobName,
+      [JOB_ROUTING_FIELD]: routeJob({ lane, payload, deduplication, namespaceDedupId }),
+    });
+    const sendOptionsOf = (options: QueueSendOptions<P> | undefined) => {
+      const deduplication = options?.deduplication ?? lane.deduplication;
+      return {
+        deduplication,
+        queued: {
+          delay: options?.delay ?? lane.delay,
+          deduplication: deduplication ? routedDeduplication(deduplication) : undefined,
+        },
+      };
+    };
+
+    return {
+      send: async (payload, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
+        await globalQueue.send(envelopeOf(payload, deduplication), queued);
+      },
+      sendBatch: async (payloads, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
+        await globalQueue.sendBatch(
+          payloads.map((payload) => envelopeOf(payload, deduplication)),
+          queued,
+        );
+      },
+      // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
+      close: async () => undefined,
+      waitUntilReady: () => globalQueue.waitUntilReady(),
+    };
+  }
+
+  // An arrow instance property, not a prototype method: tests hold a
+  // QueueManager reference and extract this member (e.g. via vi.spyOn) to
+  // assert on its calls, which is unsafe against a method-shorthand member.
+  initializeHandlerQueues = (
+    mapProjections: Record<string, QueuedEventConsumerDefinition<EventType>>,
+    onEvent: (
+      handlerName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+    onEventBatch?: (
+      handlerName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+  ): void => {
+    this.initializeEventConsumerQueues({
+      definitions: mapProjections,
+      onEvent,
+      onEventBatch,
+      jobType: "handler",
+      jobPath: "map",
+      incrementCount: () => this.handlerCount++,
+    });
+  };
+
+  initializeSubscriberQueues(
+    subscribers: Record<string, QueuedEventConsumerDefinition<EventType>>,
+    onEvent: (
+      subscriberName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+  ): void {
+    this.initializeEventConsumerQueues({
+      definitions: subscribers,
+      onEvent,
+      jobType: "subscriber",
+      jobPath: "subscriber",
+      incrementCount: () => this.subscriberCount++,
+    });
+  }
+
+  private initializeEventConsumerQueues({
+    definitions,
+    onEvent,
+    onEventBatch,
+    jobType,
+    jobPath,
+    incrementCount,
+  }: {
+    definitions: Record<string, QueuedEventConsumerDefinition<EventType>>;
+    onEvent: (
+      consumerName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      consumerName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    jobType: "handler" | "subscriber";
+    jobPath: "map" | "subscriber";
+    incrementCount: () => void;
+  }): void {
+    if (!this.globalQueue) return;
+
+    for (const handlerName of Object.keys(definitions)) {
+      const handlerDef = definitions[handlerName];
+      if (!handlerDef) {
+        continue;
+      }
+
+      const customGroupKeyFn = handlerDef.options.groupKeyFn;
+      const getTenantId = (event: EventType) => String(event.tenantId);
+      const aggregateKey = (event: EventType) =>
+        `${event.aggregateType}:${String(event.aggregateId)}`;
+      const groupKeyFn = this.buildGroupKey({
+        jobPath: `${jobPath}/${handlerName}`,
+        getTenantId,
+        domainKeyFn: customGroupKeyFn
+          ? (event: EventType) => customGroupKeyFn(event) ?? aggregateKey(event)
+          : aggregateKey,
+      });
+      const lane: JobLane<EventType> = {
+        parse: this.parseEvent,
+        groupKeyFn,
+        getTenantId,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
+        scoreFn: (event: EventType) => event.occurredAt ?? event.createdAt,
+        process: async (event: EventType) => {
+          await onEvent(handlerName, event, {
+            tenantId: event.tenantId,
+          });
+        },
+        processBatch:
+          onEventBatch &&
+          handlerDef.options.coalesceMaxBatch &&
+          handlerDef.options.coalesceMaxBatch > 1
+            ? (events: EventType[]) =>
+                withBatchTenant(events, (tenantId) =>
+                  onEventBatch(handlerName, events, { tenantId }),
+                )
+            : undefined,
+        coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
+        onExhausted: handlerDef.options.onExhausted,
+        delay: handlerDef.options.delay,
+        deduplication: resolveDeduplicationStrategy(
+          handlerDef.options.deduplication,
+          customGroupKeyFn
+            ? (event: EventType) => `${String(event.tenantId)}:${customGroupKeyFn(event)}`
+            : this.createDefaultDeduplicationId.bind(this),
+        ),
+        spanAttributes: handlerDef.options.spanAttributes,
+      };
+
+      const facade = this.createFacade(jobType, handlerName, lane);
+      this.eventQueues.set(this.key(jobType, handlerName), facade);
+      incrementCount();
+    }
+  }
+
+  // An arrow instance property: tests hold a QueueManager reference and
+  // extract this member (e.g. via vi.spyOn) to assert on its calls, which is
+  // unsafe against a method-shorthand member.
+  initializeProjectionQueues = ({
+    projections,
+    onEvent,
+    onEventBatch,
+    onRebuild,
+    lane = { queueType: "projection", jobPath: "fold" },
+  }: {
+    projections: Record<
+      string,
+      {
+        name: string;
+        groupKeyFn?: (event: EventType) => string;
+        scoreFn?: (event: EventType) => number;
+        coalesceMaxBatch?: number;
+        onExhausted?: ExhaustedOutcome;
+        options?: { disabled?: boolean };
+      }
+    >;
+    onEvent: (
+      projectionName: string,
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    onEventBatch?: (
+      projectionName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    /** Rebuilds the missed event's aggregate; its job shares the aggregate's group. */
+    onRebuild?: (
+      projectionName: string,
+      missed: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>;
+    lane?: {
+      queueType: "projection" | "stateProjection";
+      jobPath: "fold" | "state";
+    };
+  }): void => {
+    if (!this.globalQueue) {
+      return;
+    }
+
+    for (const [projectionName] of Object.entries(projections)) {
+      const projectionDef = projections[projectionName];
+      if (!projectionDef) {
+        continue;
+      }
+
+      const customGroupKeyFn = projectionDef.groupKeyFn;
+      const getTenantId = (event: EventType) => String(event.tenantId);
+      const groupKeyFn = this.buildGroupKey({
+        jobPath: `${lane.jobPath}/${projectionName}`,
+        getTenantId,
+        domainKeyFn: customGroupKeyFn
+          ? (event: EventType) => customGroupKeyFn(event)
+          : (event: EventType) => `${event.aggregateType}:${String(event.aggregateId)}`,
+      });
+      const coalesceMaxBatch = projectionDef.coalesceMaxBatch;
+      const jobLane: JobLane<EventType> = {
+        parse: this.parseEvent,
+        groupKeyFn,
+        getTenantId,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(`${lane.jobPath}/${projectionName}`),
+        scoreFn:
+          projectionDef.scoreFn ?? ((event: EventType) => event.occurredAt ?? event.createdAt),
+        process: async (event: EventType, delivery?: JobDelivery) => {
+          await onEvent(projectionName, event, {
+            tenantId: event.tenantId,
+            deliveryAttempt: delivery?.attempt,
+          });
+        },
+        // Same-group fold events are coalesced into one load/apply/store cycle.
+        // All events in a batch share the group (= same projection + aggregate),
+        // so the tenant is taken from the first event.
+        processBatch:
+          onEventBatch && coalesceMaxBatch && coalesceMaxBatch > 1
+            ? (events: EventType[], delivery?: JobDelivery) =>
+                withBatchTenant(events, (tenantId) =>
+                  onEventBatch(projectionName, events, {
+                    tenantId,
+                    deliveryAttempt: delivery?.attempt,
+                    isDeliveryContinuation: delivery?.isContinuation,
+                  }),
+                )
+            : undefined,
+        coalesceMaxBatch,
+        onExhausted: projectionDef.onExhausted,
+        spanAttributes: (event: EventType) => ({
+          "projection.name": projectionName,
+          "event.type": event.type,
+          "event.id": event.id,
+          "event.aggregate_id": String(event.aggregateId),
+        }),
+      };
+
+      const facade = this.createFacade(lane.queueType, projectionName, jobLane);
+      this.eventQueues.set(this.key(lane.queueType, projectionName), facade);
+      this.registerRebuildQueue({ queueType: lane.queueType, projectionName, jobLane, onRebuild });
+      if (lane.queueType === "stateProjection") {
+        this.stateProjectionCount++;
+      } else {
+        this.projectionCount++;
+      }
+    }
+  };
+
+  /** Registers the lane's rebuild job kind, keyed like the lane so it runs in aggregate order. */
+  private registerRebuildQueue({
+    queueType,
+    projectionName,
+    jobLane,
+    onRebuild,
+  }: {
+    queueType: "projection" | "stateProjection";
+    projectionName: string;
+    jobLane: JobLane<EventType>;
+    onRebuild: ProjectionQueueRequest<EventType>["onRebuild"];
+  }): void {
+    if (!onRebuild) return;
+    const rebuildType = queueType === "projection" ? "projectionRebuild" : "stateProjectionRebuild";
+    const facade = this.createFacade(rebuildType, projectionName, {
+      parse: this.parseEvent,
+      groupKeyFn: jobLane.groupKeyFn,
+      getTenantId: jobLane.getTenantId,
+      preflightGroupKey: jobLane.preflightGroupKey,
+      // Behind whatever the lane already holds: the rebuild reads the log when it runs.
+      scoreFn: () => nowInstant().epochMilliseconds,
+      process: async (missed: EventType, delivery?: JobDelivery) => {
+        await onRebuild(projectionName, missed, {
+          tenantId: missed.tenantId,
+          deliveryAttempt: delivery?.attempt,
+        });
+      },
+      spanAttributes: (missed: EventType) => ({
+        "projection.name": projectionName,
+        "projection.rebuild": true,
+        "event.id": missed.id,
+        "event.aggregate_id": String(missed.aggregateId),
+      }),
+    });
+    this.eventQueues.set(this.key(rebuildType, projectionName), facade);
+  }
+
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  initializeStateProjectionQueues = (
+    request: Omit<ProjectionQueueRequest<EventType>, "lane">,
+  ): void => {
+    this.initializeProjectionQueues({
+      ...request,
+      lane: { queueType: "stateProjection", jobPath: "state" },
+    });
+  };
+
+  initializeCommandQueues(
+    commands: readonly SealedCommand<EventType>[],
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
+    _pipelineName: string,
+  ): void {
+    if (!this.globalQueue) {
+      return;
+    }
+
+    // Step 1: resolve every command's name; a later registration of one name replaces the earlier
+    const commandRegistry = new Map<string, () => void>();
+    for (const command of commands) {
+      command.open((registration) =>
+        this.registerCommandHandlerEntry(registration, commandRegistry, storeEvents),
+      );
+    }
+
+    // Step 2: Register each command in the global queue and create facades
+    for (const registerQueue of commandRegistry.values()) {
+      registerQueue();
+    }
+  }
+
+  /** Registers a command's handler-registry entry (step 1 of `initializeCommandQueues`). */
+  private registerCommandHandlerEntry<
+    Payload extends TenantScopedPayload,
+    Type extends CommandType,
+  >(
+    registration: CommandRegistration<Payload, Type, EventType>,
+    commandRegistry: Map<string, () => void>,
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
+  ): void {
+    const handlerClass = registration.handlerClass;
+    const schema = handlerClass.schema;
+    const commandType = schema.type;
+    const handlerInstance = registration.createHandler();
+
+    const getAggregateId =
+      registration.options?.getAggregateId ?? handlerClass.getAggregateId.bind(handlerClass);
+
+    const getGroupKey =
+      registration.options?.getGroupKey ?? handlerClass.getGroupKey?.bind(handlerClass);
+
+    const commandName = handlerClass.dispatcherName ?? registration.name;
+    const commandKey = this.key("command", commandName);
+
+    if (this.commandQueues.has(commandKey)) {
+      throw new ConfigurationError(
+        "QueueManager",
+        `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
+        { commandName },
+      );
+    }
+
+    const entry: CommandRegistryEntry<EventType, Payload> = {
+      handler: handlerInstance,
+      schema,
+      getAggregateId,
+      getGroupKey,
+      options: registration.options ?? {},
+      commandName,
+      commandType,
+      spanAttributes:
+        registration.options?.spanAttributes ?? handlerClass.getSpanAttributes?.bind(handlerClass),
+    };
+    commandRegistry.set(commandName, () =>
+      this.registerCommandQueueEntry(commandName, entry, storeEvents),
+    );
+  }
+
+  /** Registers one command's queue facade and job entry (step 2 of `initializeCommandQueues`). */
+  private registerCommandQueueEntry<Payload extends TenantScopedPayload>(
+    cmdName: string,
+    cmdEntry: CommandRegistryEntry<EventType, Payload>,
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
+  ): void {
+    const lane = this.buildCommandJobLane(cmdName, cmdEntry, storeEvents);
+    const baseFacade = this.createFacade("command", cmdName, lane);
+    const validatingFacade = buildValidatingCommandFacade(cmdEntry, baseFacade, (identities) =>
+      this.registerPreflightAggregateTargets(identities),
+    );
+    this.commandQueues.set(this.key("command", cmdName), validatingFacade);
+  }
+
+  /** Builds the job lane (parse, group key, score, process/processBatch) for one command. */
+  private buildCommandJobLane<Payload extends TenantScopedPayload>(
+    cmdName: string,
+    cmdEntry: CommandRegistryEntry<EventType, Payload>,
+    storeEvents: (events: EventType[], context: EventStoreReadContext<EventType>) => Promise<void>,
+  ): JobLane<Payload> {
+    const rawDedup = resolveDeduplicationStrategy(
+      cmdEntry.options.deduplication,
+      (payload: Payload) => {
+        const key = cmdEntry.getGroupKey
+          ? cmdEntry.getGroupKey(payload)
+          : cmdEntry.getAggregateId(payload);
+        return `${String(payload.tenantId)}:${this.aggregateType}:${String(key)}`;
+      },
+    );
+
+    const getTenantId = (payload: Payload) => String(payload.tenantId);
+    const commandGroupKeyFn = this.buildGroupKey({
+      jobPath: cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
+      getTenantId,
+      domainKeyFn: (payload: Payload) => {
+        const key = resolveCommandDomainKey(cmdEntry, payload);
+        return `${this.aggregateType}:${String(key)}`;
+      },
+    });
+    const coalesceMaxBatch = cmdEntry.options.coalesceMaxBatch;
+    // A resolver decides per payload, so whether it coalesces is only known at
+    // dispatch — its presence is the opt-in. A plain number opts in above 1.
+    const coalescesAppends = typeof coalesceMaxBatch === "function" || (coalesceMaxBatch ?? 1) > 1;
+
+    // ADR-066 (bounded coalescing): a grouped producer (`serializeByAggregate`
+    // or a custom `getGroupKey`) that doesn't coalesce can flood the event
+    // log with one tiny insert per item under high fan-in. Logged at
+    // registration so the gap is found before it shows up as ClickHouse
+    // small-parts pressure.
+    const isGroupedProducer =
+      Boolean(cmdEntry.options.serializeByAggregate) || Boolean(cmdEntry.getGroupKey);
+    if (isGroupedProducer && !coalescesAppends) {
+      this.logger.info(
+        { pipeline: this.pipelineName, command: cmdName },
+        "grouped command producer registered without append coalescing",
+      );
+    }
+
+    // Shared across the single and batched processors — same command and
+    // store; only the payload arity differs.
+    const commandProcessParams = {
+      commandType: cmdEntry.commandType,
+      commandSchema: cmdEntry.schema,
+      handler: cmdEntry.handler,
+      getAggregateId: cmdEntry.getAggregateId,
+      storeEventsFn: storeEvents,
+      aggregateType: this.aggregateType,
+      commandName: cmdEntry.commandName,
+      pipelineName: this.pipelineName,
+      killSwitch: this.killSwitch,
+      killSwitchOptions: cmdEntry.options.killSwitch,
+      logger,
+    };
+
+    return {
+      // The lane's parse is the command's only dispatch-time validation (§9, Alex 2026-09-27).
+      parse: (payload) => parseQueuedCommandPayload(commandProcessParams, payload),
+      groupKeyFn: commandGroupKeyFn,
+      getTenantId,
+      preflightGroupKey:
+        cmdEntry.options.serializeByAggregate || !cmdEntry.getGroupKey
+          ? this.buildPreflightGroupKey(
+              cmdEntry.options.serializeByAggregate ? "command" : `command/${cmdName}`,
+            )
+          : undefined,
+      scoreFn: cmdEntry.options.serializeByAggregate
+        ? () => nowInstant().epochMilliseconds
+        : (payload: Payload) => occurredAtScore(toRecord(payload)),
+      process: async (payload: Payload, delivery?: JobDelivery) => {
+        await processCommand({ ...commandProcessParams, payload, jobId: delivery?.jobId });
+      },
+      // ADR-066 pillar 2: when the command opts into coalescing, fold a hot
+      // aggregate's queued same-command jobs into one multi-row insert. The
+      // GroupQueue only drains same-`__jobName` siblings, so every payload
+      // here is this command type. Left undefined otherwise (per-job path).
+      processBatch: coalescesAppends
+        ? async (payloads: Payload[], delivery?: JobDelivery) => {
+            await processCommandBatch({
+              ...commandProcessParams,
+              payloads,
+              jobIds: delivery?.jobIds,
+            });
+          }
+        : undefined,
+      coalesceMaxBatch,
+      coalesceMaxBytes: cmdEntry.options.coalesceMaxBytes,
+      onExhausted: cmdEntry.options.onExhausted,
+      delay: cmdEntry.options.delay,
+      deduplication: rawDedup,
+      spanAttributes: cmdEntry.spanAttributes,
+    };
+  }
+
+  initializeProjectionSubscriberQueues(
+    subscribers: Record<
+      string,
+      {
+        name: string;
+        parentProjection: string;
+        parentType: "fold" | "map";
+        handler: {
+          handle: (payload: { event: EventType; foldState: unknown }) => Promise<void>;
+        };
+        groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
+        options?: {
+          disabled?: boolean;
+          delay?: number;
+          deduplication?: DeduplicationStrategy<{
+            event: EventType;
+            foldState: unknown;
+          }>;
+        };
+      }
+    >,
+    onEvent: (
+      subscriberName: string,
+      payload: { event: EventType; foldState: unknown },
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
+  ): void {
+    if (!this.globalQueue) {
+      return;
+    }
+
+    for (const [subscriberName, subscriberDef] of Object.entries(subscribers)) {
+      const customGroupKeyFn = subscriberDef.groupKeyFn;
+      const getTenantId = (payload: { event: EventType; foldState: unknown }) =>
+        String(payload.event.tenantId);
+      const subscriberGroupKeyFn = this.buildGroupKey({
+        jobPath: `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
+        getTenantId,
+        domainKeyFn: customGroupKeyFn
+          ? (payload: { event: EventType; foldState: unknown }) => customGroupKeyFn(payload)
+          : (payload: { event: EventType; foldState: unknown }) =>
+              `${payload.event.aggregateType}:${String(payload.event.aggregateId)}`,
+      });
+      const lane: JobLane<{ event: EventType; foldState: unknown }> = {
+        parse: (payload) => {
+          const { event, foldState } = projectionSubscriberPayloadSchema.parse(payload);
+          return { event: this.parseEvent(event), foldState };
+        },
+        groupKeyFn: subscriberGroupKeyFn,
+        getTenantId,
+        preflightGroupKey: customGroupKeyFn
+          ? undefined
+          : this.buildPreflightGroupKey(
+              `${subscriberDef.parentType}/${subscriberDef.parentProjection}/reactor/${subscriberName}`,
+            ),
+        scoreFn: (payload: { event: EventType; foldState: unknown }) => payload.event.createdAt,
+        process: async (payload: { event: EventType; foldState: unknown }) => {
+          await onEvent(subscriberName, payload, {
+            tenantId: payload.event.tenantId,
+          });
+        },
+        delay: subscriberDef.options?.delay,
+        deduplication: subscriberDef.options?.deduplication
+          ? resolveDeduplicationStrategy(subscriberDef.options.deduplication, (payload) =>
+              this.createDefaultDeduplicationId(payload.event),
+            )
+          : undefined,
+        spanAttributes: (payload: { event: EventType; foldState: unknown }) => ({
+          "subscriber.name": subscriberName,
+          "event.type": payload.event.type,
+          "event.id": payload.event.id,
+          "event.aggregate_id": String(payload.event.aggregateId),
+        }),
+      };
+
+      // `reactor` is the physical GroupQueue segment for projection-subscriber
+      // jobs: `<tenantId>/<fold|map>/<projection>/reactor/<name>`.
+      const facade = this.createFacade("reactor", subscriberName, lane);
+      this.projectionSubscriberQueues.set(this.key("reactor", subscriberName), facade);
+      this.projectionSubscriberCount++;
+    }
+  }
+
+  hasHandlerQueues(): boolean {
+    return this.handlerCount > 0;
+  }
+
+  hasSubscriberQueues(): boolean {
+    return this.subscriberCount > 0;
+  }
+
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  hasProjectionQueues = (): boolean => {
+    return this.projectionCount > 0;
+  };
+
+  hasStateProjectionQueues(): boolean {
+    return this.stateProjectionCount > 0;
+  }
+
+  hasProjectionSubscriberQueues(): boolean {
+    return this.projectionSubscriberCount > 0;
+  }
+
+  getHandlerQueue(handlerName: string): EventSourcedQueueProcessor<EventType> | undefined {
+    return this.eventQueues.get(this.key("handler", handlerName));
+  }
+
+  getSubscriberQueue(subscriberName: string): EventSourcedQueueProcessor<EventType> | undefined {
+    return this.eventQueues.get(this.key("subscriber", subscriberName));
+  }
+
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  getProjectionQueue = (
+    projectionName: string,
+  ): EventSourcedQueueProcessor<EventType> | undefined => {
+    return this.eventQueues.get(this.key("projection", projectionName));
+  };
+
+  getStateProjectionQueue(
+    projectionName: string,
+  ): EventSourcedQueueProcessor<EventType> | undefined {
+    return this.eventQueues.get(this.key("stateProjection", projectionName));
+  }
+
+  /** The job lane that rebuilds one aggregate of a fold or state projection, in its group. */
+  getRebuildQueue({
+    kind,
+    projectionName,
+  }: {
+    kind: "fold" | "state";
+    projectionName: string;
+  }): EventSourcedQueueProcessor<EventType> | undefined {
+    const type = kind === "fold" ? "projectionRebuild" : "stateProjectionRebuild";
+    return this.eventQueues.get(this.key(type, projectionName));
+  }
+
+  getProjectionSubscriberQueue(
+    subscriberName: string,
+  ): EventSourcedQueueProcessor<{ event: EventType; foldState: unknown }> | undefined {
+    return this.projectionSubscriberQueues.get(this.key("reactor", subscriberName));
+  }
+
+  getCommandQueue<Payload extends Record<string, unknown>>(
+    commandName: string,
+  ): EventSourcedQueueProcessor<Payload> | undefined {
+    return this.commandQueues.get(this.key("command", commandName)) as
+      | EventSourcedQueueProcessor<Payload>
+      | undefined;
+  }
+
+  getCommandQueues(): Map<string, EventSourcedQueueProcessor<Record<string, unknown>>> {
+    const result = new Map<string, EventSourcedQueueProcessor<Record<string, unknown>>>();
+    const prefix = "command:";
+    for (const [key, value] of this.commandQueues) {
+      if (key.startsWith(prefix)) {
+        result.set(key.slice(prefix.length), value);
+      }
+    }
+    return result;
+  }
+
+  private queueCount(): number {
+    return (
+      this.eventQueues.size +
+      this.projectionSubscriberQueues.size +
+      this.commandQueues.size +
+      this.jobQueueClosers.size
+    );
+  }
+
+  async waitUntilReady(): Promise<void> {
+    if (this.globalQueue) {
+      await this.globalQueue.waitUntilReady();
+    }
+    this.logger.debug({ queueCount: this.queueCount() }, "All queues ready");
+  }
+
+  async close(): Promise<void> {
+    // Global queue lifecycle is owned by EventSourcing — facade close is a no-op.
+    // We still call close on all facades for consistent behavior.
+    await Promise.allSettled([
+      ...[
+        ...this.eventQueues.values(),
+        ...this.projectionSubscriberQueues.values(),
+        ...this.commandQueues.values(),
+      ].map((queue) => queue.close()),
+      ...[...this.jobQueueClosers.values()].map((close) => close()),
+    ]);
+    this.logger.debug({ queueCount: this.queueCount() }, "All queues closed");
+  }
+
+  /**
+   * Registers a standalone job in the global queue — independent work
+   * (e.g. deferred evaluation checks), not tied to event processing.
+   * Returns `null` when the global queue is unavailable.
+   */
+  registerJob<P extends Record<string, unknown>>({
+    name,
+    parse,
+    process,
+    delay,
+    deduplication,
+    groupKeyFn,
+    scoreFn,
+    spanAttributes,
+  }: {
+    name: string;
+    /** Reads a dequeued payload; the queue hands the job nothing it has not parsed (§9). */
+    parse: (payload: unknown) => P;
+    process: (payload: P) => Promise<void>;
+    delay?: number;
+    deduplication?: DeduplicationConfig<P>;
+    groupKeyFn?: (payload: P) => string;
+    scoreFn?: (payload: P) => number;
+    spanAttributes?: (payload: P) => Record<string, string | number | boolean>;
+  }): EventSourcedQueueProcessor<P> | null {
+    if (!this.globalQueue || !this.globalJobRegistry) {
+      return null;
+    }
+
+    const getTenantId = (payload: P) => String(payload.tenantId);
+    const lane: JobLane<P> = {
+      parse,
+      groupKeyFn: groupKeyFn
+        ? this.buildGroupKey({
+            jobPath: `job/${name}`,
+            getTenantId,
+            domainKeyFn: groupKeyFn,
+          })
+        : (payload: P) => `${String(payload.tenantId)}/job/${name}`,
+      getTenantId,
+      preflightGroupKey: groupKeyFn ? undefined : ({ tenantId }) => `${tenantId}/job/${name}`,
+      scoreFn: scoreFn ?? ((payload: P) => occurredAtScore(payload)),
+      process,
+      delay,
+      deduplication: deduplication
+        ? resolveDeduplicationStrategy(
+            deduplication,
+            (payload: P) => `${String(payload.tenantId)}:${name}`,
+          )
+        : undefined,
+      spanAttributes,
+    };
+
+    const facade = this.createFacade("job", name, lane);
+    this.jobQueueClosers.set(this.key("job", name), () => facade.close());
+    return facade;
+  }
+}

@@ -1,0 +1,504 @@
+import {
+  TriggerNotFoundError,
+  type EmailSuppression,
+  type Trigger,
+  type TriggerFire,
+  type TriggerFirePage,
+  type TriggerFireStats,
+  type TriggerSummary,
+} from "@langwatch/automation-contract";
+import { InMemoryProcessStore } from "@langwatch/eventing";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
+import type { WebhookApi } from "@langwatch/webhook-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  createAutomationTestRuntime,
+  createTestSlackConnections,
+} from "../../__tests__/testing.ts";
+import type { AutomationClock } from "../../app/automation.members.ts";
+import { CustomGraphRepository } from "../../repositories/custom-graph.repository.ts";
+import { EmailSuppressionNameRepository } from "../../repositories/email-suppression-name.repository.ts";
+import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
+import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sent.repository.ts";
+import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
+import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
+import { TriggerRepository } from "../../repositories/trigger.repository.ts";
+import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
+import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
+import { AutomationTemplateService } from "../automation-template.service.ts";
+import { AutomationService } from "../automation.service.ts";
+import { AutomationPersistCapService } from "../persist-cap.service.ts";
+import { ReportScheduleService } from "../report-schedule.service.ts";
+import { AutomationGraphService } from "../trigger-graph.service.ts";
+
+class EmptyGraphTriggerSent extends GraphTriggerSentRepository {
+  findProjectsWithGraphTriggers = async () => [];
+  findProjectsWithOpenGraphTriggerSent = async () => new Set<string>();
+  findGraphTriggerSource = async () => undefined;
+  findOpenTriggerIdsForProject = async () => new Set<string>();
+  findOpenForGraphAlert = async () => null;
+  findLatestForGraphAlert = async () => null;
+  claimOpenForGraphAlert = async () => "already-claimed" as const;
+  deleteOpenClaim = async () => undefined;
+  markResolvedById = async () => undefined;
+}
+
+class EmptyCustomGraphs extends CustomGraphRepository {
+  findById(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  existsInProject(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+  findAllByDashboardId(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+  findAllNamesByIds(): Promise<[]> {
+    return Promise.resolve([]);
+  }
+}
+class EmptyWebhookDeliveries {
+  findDeliveriesBySource = vi.fn<WebhookApi["findDeliveriesBySource"]>(async () => []);
+}
+const suppression = (email: string, triggerId: string | null): EmailSuppression => ({
+  id: `${email}-${triggerId ?? "all"}`,
+  projectId: "p",
+  email,
+  triggerId,
+  reason: "unsubscribe",
+  createdAt: new Date(),
+});
+
+const summary = (id: string, overrides: Partial<TriggerSummary> = {}): TriggerSummary => ({
+  id,
+  projectId: "p",
+  name: id,
+  action: "SEND_EMAIL",
+  triggerKind: "AUTOMATION",
+  actionParams: {},
+  filters: {},
+  filterQuery: null,
+  alertType: null,
+  message: null,
+  customGraphId: null,
+  notificationCadence: "immediate",
+  traceDebounceMs: 30_000,
+  templates: {
+    slackTemplateType: null,
+    slackTemplate: null,
+    emailSubjectTemplate: null,
+    emailBodyTemplate: null,
+  },
+  ...overrides,
+});
+class Suppressions extends EmailSuppressionRepository {
+  rows: EmailSuppression[] = [];
+  findAll() {
+    return Promise.resolve(this.rows);
+  }
+  findMatching(input: { triggerId: string }) {
+    return Promise.resolve(
+      this.rows.filter((row) => row.triggerId === null || row.triggerId === input.triggerId),
+    );
+  }
+  create(input: { projectId: string; email: string; triggerId: string | null; reason: string }) {
+    const row = suppression(input.email, input.triggerId);
+    this.rows.push(row);
+    return Promise.resolve(row);
+  }
+  delete() {
+    return Promise.resolve();
+  }
+}
+class Names extends EmailSuppressionNameRepository {
+  findNames() {
+    return Promise.resolve(null);
+  }
+  findTriggerNames() {
+    return Promise.resolve(new Map<string, string>());
+  }
+}
+class Verifier extends UnsubscribeTokenVerifier {
+  findVerifiedPayload() {
+    return null;
+  }
+}
+class Clock implements AutomationClock {
+  now() {
+    return Temporal.Instant.from("2026-01-01T00:00:00Z");
+  }
+}
+class Triggers extends TriggerRepository {
+  reportTargets: ReportScheduleTarget[] = [];
+  rowsByProject = new Map<string, TriggerSummary[]>();
+  findActiveCalls = 0;
+  claimSendCalls: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }[] = [];
+  countUsage(): Promise<{ triggers: number }> {
+    return Promise.resolve({ triggers: 0 });
+  }
+  findActiveForProject(projectId: string): Promise<TriggerSummary[]> {
+    this.findActiveCalls++;
+    return Promise.resolve(this.rowsByProject.get(projectId) ?? []);
+  }
+  findActiveReportTargets(): Promise<ReportScheduleTarget[]> {
+    return Promise.resolve(this.reportTargets);
+  }
+  findAllReportTargets(): Promise<ReportScheduleTarget[]> {
+    return Promise.resolve(this.reportTargets);
+  }
+  claimSend(input: { triggerId: string; traceId: string; projectId: string }) {
+    this.claimSendCalls.push(input);
+    return Promise.resolve(true);
+  }
+  isSendClaimed() {
+    return Promise.resolve(false);
+  }
+  findSlackTriggers(): Promise<Trigger[]> {
+    return Promise.resolve([]);
+  }
+  replaceActionParamsIfUnchanged(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+  findClaimedTraceIds() {
+    return Promise.resolve(new Set<string>());
+  }
+  updateLastRunAt() {
+    return Promise.resolve();
+  }
+  findByIdInputs: { triggerId: string; projectId: string }[] = [];
+  rowsById = new Map<string, Trigger>();
+  findByIdOrThrow(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    this.findByIdInputs.push(input);
+    const row = this.rowsById.get(`${input.projectId}:${input.triggerId}`);
+    if (!row) return Promise.reject(new TriggerNotFoundError());
+    return Promise.resolve(row);
+  }
+  findById() {
+    return Promise.resolve(null);
+  }
+  findAllByProjectId(): Promise<Trigger[]> {
+    return Promise.resolve([]);
+  }
+  findByCustomGraphId() {
+    return Promise.resolve(null);
+  }
+  findByCustomGraphIds() {
+    return Promise.resolve([]);
+  }
+  create() {
+    return Promise.reject(new Error("unused"));
+  }
+  update() {
+    return Promise.reject(new Error("unused"));
+  }
+}
+class Fires extends TriggerFireHistoryRepository {
+  listPageByTriggerId(): Promise<TriggerFirePage> {
+    return Promise.resolve({ fires: [], nextCursor: null });
+  }
+  stats: TriggerFireStats[] = [];
+  fires: TriggerFire[] = [];
+  create = vi.fn(
+    async (input: {
+      projectId: string;
+      triggerId: string;
+      traceId: string | null;
+      customGraphId: string | null;
+      createdAt: Instant;
+      resolvedAt: Instant | null;
+    }) => ({
+      id: "fire-1",
+      triggerId: input.triggerId,
+      customGraphId: input.customGraphId,
+      createdAt: toDate(input.createdAt),
+      resolvedAt: input.resolvedAt === null ? null : toDate(input.resolvedAt),
+    }),
+  );
+  findAllStatsForProject = vi.fn(
+    async (_input: { projectId: string; firesSince: Instant }) => this.stats,
+  );
+  findAllRecentByTriggerId = vi.fn(
+    async (_input: { projectId: string; triggerId: string; limit: number }) => this.fires,
+  );
+  findAllRecentForProject = vi.fn(
+    async (_input: { projectId: string; limit: number }) => this.fires,
+  );
+  findStats(): Promise<TriggerFireStats[]> {
+    return Promise.resolve([]);
+  }
+  findRecent(): Promise<TriggerFire[]> {
+    return Promise.resolve([]);
+  }
+}
+
+const makeService = (
+  triggers = new Triggers(),
+  history = new Fires(),
+  webhookDeliveries = new EmptyWebhookDeliveries(),
+  reportSchedules = ReportScheduleService.create({
+    clock: new Clock(),
+    triggers,
+    instances: InMemoryProcessStore.createForTesting(),
+  }),
+  suppressions = new Suppressions(),
+): AutomationService =>
+  (() => {
+    const runtime = createAutomationTestRuntime();
+    const clock = new Clock();
+    const customGraphs = new EmptyCustomGraphs();
+    const graph = AutomationGraphService.create({
+      triggers,
+      customGraphs,
+      projects: runtime.projects,
+      analytics: runtime.analytics,
+      triggerSent: new EmptyGraphTriggerSent(),
+      notifier: runtime.notifier,
+      logger: runtime.logger,
+      slackDestinations: runtime.slackDestinations,
+      slackConnections: createTestSlackConnections(),
+      dispatchErrors: runtime.dispatchErrors,
+      runaway: runtime.runaway,
+      latestEvaluations: { record: async () => undefined },
+      clock,
+      baseHost: runtime.baseHost,
+    });
+    const templates = AutomationTemplateService.create({
+      baseHost: runtime.baseHost,
+      delivery: runtime.testFire,
+    });
+    const persistCaps = AutomationPersistCapService.create({
+      projects: runtime.projects,
+      planProvider: {
+        getActivePlan: async () => ({
+          planSource: "free",
+          type: "FREE",
+          name: "Free",
+          free: true,
+          maxMembers: 100,
+          maxMembersLite: 0,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+        getUsage: vi.fn(),
+        sendUsageLimitWarning: vi.fn(),
+        listOrganizationSpend: vi.fn(),
+        requestBound: vi.fn(),
+        resolvePlanNextStep: vi.fn(),
+        assertWithinUsageLimit: vi.fn(),
+      },
+      config: { free: 100, paid: 1_000, enterprise: 10_000 },
+      slots: MemoryAutomationPersistCapRepository.create(),
+    });
+    return AutomationService.create({
+      triggers,
+      history,
+      suppressions,
+      names: new Names(),
+      verifier: new Verifier(),
+      reportSchedules,
+      clock,
+      customGraphs,
+      webhookDeliveries,
+      graph,
+      templates,
+      persistCaps,
+      slackConnections: createTestSlackConnections(),
+    });
+  })();
+
+describe("AutomationService trigger and fire-history lifecycle", () => {
+  /** @scenario "Automations are scoped to a project" */
+  it("reads an automation by id only within the project that owns it", async () => {
+    const triggers = new Triggers();
+    triggers.rowsById.set("p:t", { id: "t", projectId: "p" } as Trigger);
+    const service = makeService(triggers);
+
+    await expect(service.getById({ triggerId: "t", projectId: "p" })).resolves.toMatchObject({
+      id: "t",
+      projectId: "p",
+    });
+    await expect(service.getById({ triggerId: "t", projectId: "other" })).rejects.toThrow(
+      TriggerNotFoundError,
+    );
+    expect(triggers.findByIdInputs).toEqual([
+      { triggerId: "t", projectId: "p" },
+      { triggerId: "t", projectId: "other" },
+    ]);
+  });
+
+  /** @scenario "Reports are not dispatched as trace or graph triggers" */
+  it("keeps reports out of trace and graph dispatch projections", async () => {
+    const triggers = new Triggers();
+    triggers.rowsByProject.set("p", [
+      summary("trace"),
+      summary("graph", { customGraphId: "g1" }),
+      summary("report", { triggerKind: "REPORT", customGraphId: "g2" }),
+    ]);
+    const service = makeService(triggers);
+
+    expect(
+      (await service.getActiveTraceTriggersForProject("p")).map((trigger) => trigger.id),
+    ).toEqual(["trace"]);
+    expect(
+      (await service.getActiveGraphTriggersForProject("p")).map((trigger) => trigger.id),
+    ).toEqual(["graph"]);
+  });
+
+  it("caches active projections until the project is invalidated", async () => {
+    const triggers = new Triggers();
+    triggers.rowsByProject.set("p", [summary("trace")]);
+    const service = makeService(triggers);
+
+    await service.getActiveTraceTriggersForProject("p");
+    await service.getActiveGraphTriggersForProject("p");
+    expect(triggers.findActiveCalls).toBe(1);
+
+    await service.invalidate("p");
+    await service.getActiveTraceTriggersForProject("p");
+    expect(triggers.findActiveCalls).toBe(2);
+  });
+
+  /** @scenario "One automation capability owns subordinate lifecycles" */
+  it("forwards send claims through the automation-owned trigger repository", async () => {
+    const triggers = new Triggers();
+    const service = makeService(triggers);
+    const input = { triggerId: "t", traceId: "trace", projectId: "p" };
+
+    expect(await service.claimSend(input)).toBe(true);
+    expect(triggers.claimSendCalls).toEqual([input]);
+  });
+
+  /** @scenario "One automation capability owns subordinate lifecycles" */
+  it("records scheduled fires through the automation-owned history repository", async () => {
+    const history = new Fires();
+    const service = makeService(new Triggers(), history);
+    const firedAt = Temporal.Instant.from("2026-01-01T09:00:00Z");
+
+    await service.recordFire({
+      projectId: "p",
+      triggerId: "report",
+      createdAt: firedAt,
+      resolvedAt: firedAt,
+    });
+
+    expect(history.create).toHaveBeenCalledWith({
+      projectId: "p",
+      triggerId: "report",
+      traceId: null,
+      customGraphId: null,
+      createdAt: firedAt,
+      resolvedAt: firedAt,
+    });
+  });
+
+  it("uses a trailing thirty-day window for fire statistics", async () => {
+    const history = new Fires();
+    history.stats = [
+      {
+        triggerId: "t",
+        lastFiredAt: new Date("2025-12-31T23:00:00Z"),
+        recentFireCount: 2,
+        currentlyFiring: false,
+      },
+    ];
+    const service = makeService(new Triggers(), history);
+
+    expect(await service.getFireStats({ projectId: "p" })).toEqual(history.stats);
+    const input = history.findAllStatsForProject.mock.calls[0]?.[0];
+    expect(input?.projectId).toBe("p");
+    expect(input?.firesSince).toEqual(Temporal.Instant.from("2025-12-02T00:00:00Z"));
+  });
+
+  it("selects trigger-scoped or project fire history based on the query", async () => {
+    const history = new Fires();
+    history.fires = [
+      {
+        id: "fire",
+        triggerId: "t",
+        customGraphId: null,
+        createdAt: new Date("2025-12-31T00:00:00Z"),
+        resolvedAt: null,
+      },
+    ];
+    const service = makeService(new Triggers(), history);
+
+    await service.getRecentFires({ projectId: "p", triggerId: "t", limit: 5 });
+    await service.getRecentFires({ projectId: "p", limit: 10 });
+    expect(history.findAllRecentByTriggerId).toHaveBeenCalledWith({
+      projectId: "p",
+      triggerId: "t",
+      limit: 5,
+    });
+    expect(history.findAllRecentForProject).toHaveBeenCalledWith({
+      projectId: "p",
+      limit: 10,
+    });
+  });
+
+  /** @scenario "One automation capability owns subordinate lifecycles" */
+  it("reads a trigger's webhook attempts from the webhook module's log", async () => {
+    const webhookDeliveries = new EmptyWebhookDeliveries();
+    webhookDeliveries.findDeliveriesBySource.mockResolvedValue([
+      {
+        id: "row-1",
+        ref: "t",
+        dispatchId: "d1",
+        responseStatus: 200,
+        latencyMs: 42,
+        error: null,
+        response: null,
+        outcome: "success",
+        firedAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ]);
+    const service = makeService(new Triggers(), new Fires(), webhookDeliveries);
+    expect(
+      await service.getRecentWebhookDeliveries({
+        projectId: "p",
+        triggerId: "t",
+        limit: 25,
+      }),
+    ).toMatchObject([{ dispatchId: "d1", triggerId: "t" }]);
+    expect(webhookDeliveries.findDeliveriesBySource).toHaveBeenCalledWith({
+      projectId: "p",
+      source: { module: "automation", ref: "t" },
+      limit: 25,
+    });
+  });
+});
+
+describe("AutomationService email suppression", () => {
+  /** @scenario "Project-wide email suppression applies to a trigger" */
+  it("normalizes addresses and applies project-wide rows", async () => {
+    const repo = new Suppressions();
+    const service = makeService(
+      new Triggers(),
+      new Fires(),
+      new EmptyWebhookDeliveries(),
+      ReportScheduleService.create({
+        clock: new Clock(),
+        triggers: new Triggers(),
+        instances: InMemoryProcessStore.createForTesting(),
+      }),
+      repo,
+    );
+    await service.suppressEmail({
+      projectId: "p",
+      email: " Alice@Example.COM ",
+      triggerId: null,
+    });
+    expect(
+      await service.filterSuppressed({
+        projectId: "p",
+        triggerId: "t",
+        emails: ["alice@example.com", "bob@example.com"],
+      }),
+    ).toEqual(["bob@example.com"]);
+  });
+});

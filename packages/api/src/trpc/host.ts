@@ -1,0 +1,557 @@
+/**
+ * Where every tRPC namespace mounts: `/api/trpc`, plus the subscription lane at `/api/sse` over the
+ * SAME router. tRPC is session-authenticated by definition, so the session reader is required.
+ */
+import {
+  LiteMemberRestrictedError,
+  MembershipDisabledError,
+  type AuthzScopeLineageResult,
+  type PermissionDecision,
+} from "@langwatch/authorization";
+import type {
+  FeatureTrpcHost,
+  FeatureTrpcMountOptions,
+  MountableTransport,
+} from "@langwatch/kernel";
+import type { TrpcContract, TrpcContractKind } from "@langwatch/kernel/contract";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { AnyTRPCRouter } from "@trpc/server";
+import { TRPCError } from "@trpc/server";
+
+import type { Authorize, Entitlements } from "../access/access.ts";
+import type { RateLimiter } from "../ports.ts";
+import type { SessionCaller, SessionReader } from "../rest/credential.ts";
+import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
+import {
+  createTrpcRuntimePolicy,
+  type TrpcAuthorizationDenial,
+  type TrpcRequestLike,
+} from "./policy.ts";
+import {
+  bindTrpcFact,
+  browserSessionFact,
+  callerAddressFact,
+  createTrpcErrorFormatter,
+  createTrpcRuntime,
+  TrpcRootDefinition,
+  type TrpcErrorCausePayload,
+  type TrpcFactBinding,
+  type TrpcRoot,
+  type TrpcRuntime,
+  type TrpcRouterDeclaration,
+  type TrpcRuntimeMembers,
+} from "./runtime.ts";
+import {
+  contentEtag,
+  holdsEtag,
+  SESSION_VERSION_HEADER,
+  trpcRequestPaths,
+  type TrpcSessionVersions,
+} from "./session-version.ts";
+import type { TrpcThrottle, TrpcThrottlePolicy } from "./throttle.ts";
+
+/** The signed-in person, as the procedures that render one read it. */
+export type TrpcSessionUser = Readonly<{
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role?: string | null;
+  /** The real administrator when one is acting as this person. */
+  impersonator?: TrpcSessionUser;
+}>;
+
+export type TrpcSession = Readonly<{
+  user: TrpcSessionUser;
+  /** The browser session's own id, where the deployment tracks one. */
+  sessionId?: string;
+}>;
+
+/** The one context every procedure on this root is resolved against. */
+export type TrpcRequestContext = {
+  readonly req?: TrpcRequestLike | undefined;
+  readonly res?: { statusCode?: number } | undefined;
+  /**
+   * Written by the declared authorization check, read by the fail-closed
+   * backstop — starts false on EVERY request, so a carried-over flag cannot
+   * pass a procedure because a different one was checked.
+   */
+  permissionChecked: boolean;
+  organizationRole?: string | null;
+  readonly session: TrpcSession | null;
+  /** Replaced by the real one on the subscription lane; absent elsewhere. */
+  readonly signal?: AbortSignal | undefined;
+  /** Refuses an anonymous caller. The ONE definition of that refusal. */
+  actor(): Readonly<{ id: string }>;
+  /** The same answer, or nothing: the logger has to describe an anonymous caller. */
+  tryActor(): Readonly<{ id: string }> | undefined;
+  clientIp(): string | undefined;
+};
+
+/** Whatever this root made of one declared namespace. */
+export type TrpcNamespace = unknown;
+
+/** One mutation on the deployment's trail, as this transport leaves it. */
+export type TrpcAuditSink = Readonly<{
+  record(entry: {
+    userId: string;
+    organizationId?: string;
+    projectId?: string;
+    action: string;
+    args?: unknown;
+    error?: Error;
+  }): Promise<void> | void;
+}>;
+
+/** This transport's own refusal copy: the two answers the declared check gives. */
+const DENIALS: TrpcAuthorizationDenial = {
+  membershipDisabled: () => new MembershipDisabledError(),
+  liteMemberRestricted: (resource: string) => new LiteMemberRestrictedError(resource),
+};
+
+export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
+  /** The library's own place for tRPC. Not configuration, and not moveable. */
+  static readonly path = "/api/trpc";
+
+  /** The library's own place for the subscription lane over the same router. */
+  static readonly streamPath = "/api/sse";
+
+  static create(options: {
+    /** Structural: this transport IS session-authenticated. */
+    sessions: SessionReader;
+    /** The SAME decisions REST authorizes through, never a second. */
+    authz: Authorize;
+    /** Where every recorded mutation lands. Absent, each one says so once. */
+    audit?: TrpcAuditSink | undefined;
+    /** The module-shaped cause payloads a browser interceptor reads. */
+    errorCausePayload?: TrpcErrorCausePayload | undefined;
+    /**
+     * The counter throttled procedures count against, and the window each one
+     * names by its wire path. A procedure the map does not name passes through.
+     */
+    throttle?:
+      | Readonly<{ limiter: RateLimiter; policies: Readonly<Record<string, TrpcThrottlePolicy>> }>
+      | undefined;
+    /** What the process knows about a caller on every namespace at once. */
+    facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
+    /** The caller's session version (ADR-164). Absent, answers carry no version and no tag. */
+    sessionVersions?: TrpcSessionVersions | undefined;
+    /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
+    entitlements?: Entitlements | undefined;
+    logger?: Pick<Logger, "warn" | "error"> | undefined;
+  }): TrpcHost {
+    return new TrpcHost(options);
+  }
+
+  readonly #logger: Pick<Logger, "warn" | "error">;
+  readonly #root: TrpcRoot<TrpcRequestContext>;
+  readonly #runtime: TrpcRuntime<TrpcRequestContext>;
+  readonly #namespaces: Record<string, TrpcNamespace> = {};
+  /** Each mounted procedure's declared kind, by its dotted path. */
+  readonly #procedureKinds = new Map<string, TrpcContractKind>();
+  /** The session and reference reads, which revalidate by a content ETag (ADR-164). */
+  readonly #revalidatedPaths = new Set<string>();
+  readonly #options: Parameters<typeof TrpcHost.create>[0];
+  /** One request's decisions, by the request itself: never shared with the next one. */
+  readonly #decisions = new WeakMap<TrpcRequestLike, Authorize>();
+  #composed: AnyTRPCRouter | undefined;
+
+  private constructor(options: Parameters<typeof TrpcHost.create>[0]) {
+    this.#options = options;
+    this.#logger = options.logger ?? createLogger("langwatch:api:trpc");
+
+    this.#root = TrpcRootDefinition.forContext<TrpcRequestContext>().create({
+      errorFormatter: createTrpcErrorFormatter({
+        causePayload: options.errorCausePayload ?? { payloadFor: () => null },
+        traceIds: trpcFailureTraceIds,
+      }),
+    });
+
+    const policy = createTrpcRuntimePolicy<TrpcRequestContext, TrpcRequestContext>(this.#root, {
+      identity: {
+        authenticate: (ctx) => {
+          (ctx as TrpcRequestContext).actor();
+
+          return ctx as TrpcRequestContext;
+        },
+        actor: (ctx) => {
+          const context = ctx as TrpcRequestContext;
+          const actor = context.tryActor?.();
+          if (!actor) return void 0;
+
+          const impersonatorId = context.session?.user.impersonator?.id;
+
+          return impersonatorId ? { id: actor.id, impersonatorId } : actor;
+        },
+      },
+      audit: { record: (entry) => this.#record(entry) },
+      errorReporting: {
+        capture: (failure: unknown) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        asError: (failure: unknown): Error =>
+          failure instanceof Error ? failure : new Error(String(failure)),
+      },
+      // This surface re-raises no cause with a code of its own.
+      causes: { translate: () => void 0 },
+    });
+
+    this.#runtime = createTrpcRuntime<TrpcRequestContext>({
+      root: this.#root as Parameters<typeof createTrpcRuntime<TrpcRequestContext>>[0]["root"],
+      procedure: policy.authProtectedProcedure,
+      anonymousProcedure: this.#root.procedure,
+      members: this.#members(options),
+    });
+  }
+
+  /** One declared namespace on this root. The process's own facts come first. */
+  mount(
+    declaration: MountableTransport,
+    app: () => unknown,
+    options?: FeatureTrpcMountOptions,
+  ): TrpcNamespace {
+    if (this.#composed) {
+      throw new Error("The tRPC root was composed; a namespace can no longer be mounted on it.");
+    }
+
+    const trpcDeclaration = asTrpcRouterDeclaration(declaration);
+    const namespace = trpcDeclaration.namespace;
+
+    const mounted = this.#runtime.mount(trpcDeclaration, () => app(), {
+      facts: [
+        ...this.#processFacts(),
+        ...((options?.facts ?? []) as readonly TrpcFactBinding<TrpcRequestContext>[]),
+      ],
+    });
+
+    this.#namespaces[namespace] = mounted;
+    for (const [name, member] of Object.entries(trpcDeclaration.contract.members)) {
+      this.#procedureKinds.set(`${namespace}.${name}`, member.kind);
+      const tier = member.cache?.tier;
+      if (member.kind === "query" && (tier === "session" || tier === "reference")) {
+        this.#revalidatedPaths.add(`${namespace}.${name}`);
+      }
+    }
+
+    return mounted;
+  }
+
+  /**
+   * The root over every namespace, composed on first read. Composing then
+   * rather than at each mount is what makes a batched call spanning two
+   * namespaces work: every namespace has mounted by the time anything asks.
+   */
+  get router(): AnyTRPCRouter {
+    this.#composed ??= this.#runtime.router(this.#namespaces) as AnyTRPCRouter;
+
+    return this.#composed;
+  }
+
+  /**
+   * What kind of procedure this root serves at a dotted path. The stream lane
+   * asks BEFORE it builds a caller, because a path it will not serve should
+   * cost neither a session nor a context.
+   */
+  procedureTypeAt(path: string): TrpcContractKind | undefined {
+    return this.#procedureKinds.get(path);
+  }
+
+  /** The caller's session version header; none for an anonymous caller or an unreadable store. */
+  async sessionVersionHeaders(input: {
+    context: () => Promise<TrpcRequestContext>;
+  }): Promise<Readonly<Record<string, string>>> {
+    const versions = this.#options.sessionVersions;
+    if (!versions) return {};
+    const userId = await this.#userOf(input.context);
+    if (!userId) return {};
+    try {
+      const version = await versions.getSessionVersion({ userId });
+      return { [SESSION_VERSION_HEADER]: String(version) };
+    } catch (error) {
+      this.#logger.warn(
+        { error },
+        "The session version could not be read; this answer carries none",
+      );
+      return {};
+    }
+  }
+
+  /**
+   * Tags a 200 of one unbatched session or reference GET with a hash of its body, and
+   * answers 304 with no body when the browser already holds that body. A 304 hides
+   * nothing by construction: the body it stands for is byte-identical.
+   */
+  async revalidate(input: {
+    request: Request;
+    response: Response;
+    context: () => Promise<TrpcRequestContext>;
+  }): Promise<Response> {
+    const { request, response } = input;
+    if (response.status !== 200 || !this.#isRevalidatedRead(request)) return response;
+    // A streamed answer (application/jsonl) is never buffered to be hashed.
+    const mediaType = response.headers.get("content-type")?.split(";")[0]?.trim();
+    if (mediaType !== "application/json") return response;
+    const userId = await this.#userOf(input.context);
+    if (!userId) return response;
+
+    // ponytail: hashes the computed body, so it saves transfer, not compute; a cheap source
+    // version (the projection's last event, max updatedAt) could skip the heaviest reads first,
+    // such as modelProvider.listAllForProjectForFrontend.
+    const body = new Uint8Array(await response.arrayBuffer());
+    const etag = contentEtag({ userId, body });
+    const headers = new Headers(response.headers);
+    headers.set("ETag", etag);
+    headers.set("Cache-Control", "private, no-cache");
+    headers.set("Vary", "Cookie");
+    if (!holdsEtag({ ifNoneMatch: request.headers.get("if-none-match"), etag })) {
+      return new Response(body, { status: 200, headers });
+    }
+    headers.delete("content-type");
+    headers.delete("content-length");
+    return new Response(null, { status: 304, headers });
+  }
+
+  /** One path, unbatched: a batch's body answers several reads, so one tag would mean several. */
+  #isRevalidatedRead(request: Request): boolean {
+    if (request.method !== "GET") return false;
+    const paths = trpcRequestPaths({ request, endpoint: TrpcHost.path });
+    return paths.length === 1 && paths.every((path) => this.#revalidatedPaths.has(path));
+  }
+
+  /** A context that fails is the procedure's failure to answer, never the stamp's. */
+  async #userOf(context: () => Promise<TrpcRequestContext>): Promise<string | undefined> {
+    const resolved = await context().catch(() => void 0);
+    return resolved?.tryActor()?.id;
+  }
+
+  /** One request, resolved into the context every procedure reads. */
+  async context(input: {
+    request: Request;
+    /** Resolved ONCE at the door, behind this deployment's own proxies. */
+    address?: string | undefined;
+    signal?: AbortSignal | undefined;
+  }): Promise<TrpcRequestContext> {
+    const { request, address, signal } = input;
+    const caller = await this.#options.sessions.read(request);
+    const session = sessionOf(caller);
+    const authenticated = session ? { id: session.user.id } : null;
+
+    const req: TrpcRequestLike = {
+      headers: Object.fromEntries(request.headers),
+      ...(address ? { socket: { remoteAddress: address } } : {}),
+    };
+
+    return {
+      req,
+      permissionChecked: false,
+      session,
+      ...(signal ? { signal } : {}),
+      actor: () => {
+        if (!authenticated) throw new TRPCError({ code: "UNAUTHORIZED" });
+
+        return authenticated;
+      },
+      tryActor: () => authenticated ?? void 0,
+      clientIp: () => address,
+    };
+  }
+
+  /**
+   * What this process knows about a caller that no module can. The two facts
+   * the tRPC toolkit publishes are bound for EVERY namespace, because they
+   * describe the request rather than the feature answering it.
+   */
+  #processFacts(): readonly TrpcFactBinding<TrpcRequestContext>[] {
+    return [
+      bindTrpcFact(browserSessionFact, (ctx: TrpcRequestContext) => ctx.session?.sessionId ?? null),
+      bindTrpcFact(callerAddressFact, (ctx: TrpcRequestContext) => ctx.clientIp() ?? null),
+      ...(this.#options.facts ?? []),
+    ];
+  }
+
+  /**
+   * The decisions a request is authorized through (policy.ts `forRequest`): a batch asking one
+   * question on one scope asks authz once. A caller with no request asks authz directly.
+   */
+  #decisionsFor(ctx: Pick<TrpcRequestContext, "req">): Authorize {
+    if (!ctx.req) return this.#options.authz;
+    const known = this.#decisions.get(ctx.req);
+    if (known) return known;
+    const decisions = decidingOnce(this.#options.authz);
+    this.#decisions.set(ctx.req, decisions);
+
+    return decisions;
+  }
+
+  #members(options: Parameters<typeof TrpcHost.create>[0]): TrpcRuntimeMembers<TrpcRequestContext> {
+    return {
+      identity: {
+        caller: (ctx) => {
+          const actor = ctx.tryActor?.();
+          const impersonatorId = ctx.session?.user.impersonator?.id;
+
+          return {
+            actor: actor
+              ? {
+                  type: "user" as const,
+                  id: actor.id,
+                  ...(impersonatorId ? { impersonatorId } : {}),
+                }
+              : null,
+          };
+        },
+      },
+      authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
+      denials: DENIALS,
+      ...(options.entitlements ? { entitlements: options.entitlements } : {}),
+      ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
+      audit: {
+        record: (entry) => this.#record(entry),
+        redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
+        exempt: (procedure) => isAuditLogExempt(procedure),
+      },
+      errors: {
+        report: (failure) => this.#logger.error({ error: failure }, "tRPC call failed"),
+        asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+        translate: () => void 0,
+      },
+    };
+  }
+
+  /**
+   * One mutation on the deployment's trail. A build that installed no audit
+   * sink says so once per call rather than dropping the row silently.
+   */
+  async #record(entry: {
+    userId: string;
+    organizationId?: string;
+    projectId?: string;
+    action: string;
+    args?: unknown;
+    error?: Error;
+  }): Promise<void> {
+    const audit = this.#options.audit;
+
+    if (!audit) {
+      this.#logger.warn(
+        { trail: "audit-log", action: entry.action },
+        "A mutation went unrecorded: this process installed no audit-log module",
+      );
+
+      return;
+    }
+
+    const scopes = auditScopeIds(entry.args);
+    const organizationId = entry.organizationId ?? scopes.organizationId;
+    const projectId = entry.projectId ?? scopes.projectId;
+
+    await audit.record({
+      userId: entry.userId,
+      action: entry.action,
+      ...(entry.args === void 0 ? {} : { args: entry.args }),
+      ...(organizationId === void 0 ? {} : { organizationId }),
+      ...(projectId === void 0 ? {} : { projectId }),
+      ...(entry.error ? { error: entry.error } : {}),
+    });
+  }
+}
+
+/** The same decisions, each distinct question asked once and its answer shared. */
+function decidingOnce(authz: Authorize): Authorize {
+  const decisions = new Map<string, Promise<PermissionDecision>>();
+  const lineages = new Map<string, Promise<AuthzScopeLineageResult>>();
+
+  return {
+    getDecision: (input) =>
+      askOnce(decisions, `one:${JSON.stringify(input)}`, () => authz.getDecision(input)),
+    getProjectAnyDecision: (input) =>
+      askOnce(decisions, `any:${JSON.stringify(input)}`, () => authz.getProjectAnyDecision(input)),
+    // Lineage reads only the three scope ids, so they alone are the question.
+    checkScopeLineage: (input) =>
+      askOnce(lineages, JSON.stringify([input.organizationId, input.teamId, input.projectId]), () =>
+        authz.checkScopeLineage(input),
+      ),
+  };
+}
+
+function askOnce<T>(
+  asked: Map<string, Promise<T>>,
+  key: string,
+  ask: () => Promise<T>,
+): Promise<T> {
+  const known = asked.get(key);
+  if (known) return known;
+  const answer = ask();
+  asked.set(key, answer);
+
+  return answer;
+}
+
+/** The session a resolved caller stands for, in the shape procedures read. */
+function sessionOf(caller: SessionCaller | null): TrpcSession | null {
+  if (!caller?.userId) return null;
+
+  return {
+    user: {
+      id: caller.userId,
+      name: caller.name ?? null,
+      email: caller.email ?? null,
+      image: caller.image ?? null,
+      ...(caller.impersonator?.id
+        ? {
+            impersonator: {
+              id: caller.impersonator.id,
+              name: caller.impersonator.name ?? null,
+              email: caller.impersonator.email ?? null,
+              image: caller.impersonator.image ?? null,
+            },
+          }
+        : {}),
+    },
+    ...(caller.sessionId ? { sessionId: caller.sessionId } : {}),
+  };
+}
+
+/**
+ * The surface's one throttle: the caller is the actor the check resolved or the
+ * address the request came from, and the counting is the process limiter's.
+ */
+function throttleOf(config: {
+  limiter: RateLimiter;
+  policies: Readonly<Record<string, TrpcThrottlePolicy>>;
+}): TrpcThrottle<TrpcRequestContext> {
+  return {
+    policyFor: ({ procedure }) => Promise.resolve(config.policies[procedure]),
+    principalOf: (ctx) => ctx.tryActor()?.id ?? ctx.clientIp() ?? "anonymous",
+    check: ({ key, policy }) => config.limiter.check(key, policy),
+  };
+}
+
+/** A tRPC declaration as the kernel hands it over, or the wiring bug that it is not one. */
+function asTrpcRouterDeclaration(
+  declaration: MountableTransport,
+): TrpcRouterDeclaration<unknown, TrpcContract> {
+  if (!isTrpcRouterDeclaration(declaration)) {
+    throw new Error("A declaration that is not a tRPC router reached the tRPC surface.");
+  }
+  if (declaration.namespace.length === 0) {
+    throw new Error("A tRPC declaration reached the tRPC surface with no namespace.");
+  }
+  return declaration;
+}
+
+function isTrpcRouterDeclaration(
+  value: MountableTransport,
+): value is TrpcRouterDeclaration<unknown, TrpcContract> {
+  return (
+    "protocol" in value &&
+    value.protocol === "trpc" &&
+    "namespace" in value &&
+    typeof value.namespace === "string" &&
+    "router" in value &&
+    typeof value.router === "function" &&
+    "contract" in value &&
+    typeof value.contract === "object" &&
+    value.contract !== null &&
+    "members" in value.contract &&
+    typeof value.contract.members === "object"
+  );
+}

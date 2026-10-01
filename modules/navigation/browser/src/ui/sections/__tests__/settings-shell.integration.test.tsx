@@ -1,0 +1,415 @@
+/**
+ * @vitest-environment jsdom
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+let opsBadgeCounts: { data?: { blockedCount: number; dlqCount: number; computedAt: Date | null } } =
+  {};
+
+vi.mock("../../../behavior/navigation-api.ts", () => ({
+  navigationApi: {
+    ops: { getBadgeCounts: { useQuery: () => opsBadgeCounts } },
+    limits: { getUsage: { useQuery: () => ({}) } },
+    user: { getSsoStatus: { useQuery: () => ({}) } },
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => ({}) } },
+    personalWorkspaceFeatures: { get: { useQuery: () => ({}) } },
+    annotation: { getPendingItemsCount: { useQuery: () => ({}) } },
+    governance: {
+      resolveHome: { useQuery: () => ({}) },
+      recordWorkspaceView: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
+  },
+}));
+
+import type { NavigationShellReadyState } from "../../../behavior/use-navigation-shell-state.ts";
+import { NavigationHostProvider } from "../../../model/navigation-host.ts";
+import { captureSettingsReturnPath } from "../../../model/resolve-settings-back-target.ts";
+import { SHELL_SIDEBAR_WIDTH_EXPANDED } from "../../../model/shell-layout.ts";
+import { WithStubNavigationHost, StubNavigationHost } from "../../../testing.tsx";
+import { SidebarContent } from "../product-sidebar.tsx";
+import { ShellTopBar } from "../shell-top-bar.tsx";
+
+const ORGANIZATION = { id: "org_1", name: "ACME", teams: [] };
+const commandBarOpenMock = vi.fn();
+
+function renderSettingsSidebar({
+  pathname = "/settings",
+  isLiteMember = false,
+  isEnterprise = true,
+  hasOpsAccess = false,
+  isOpsAdmin = false,
+  isSaaS = false,
+  hasCloudOps = false,
+  permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
+}: {
+  pathname?: string;
+  isLiteMember?: boolean;
+  isEnterprise?: boolean;
+  hasOpsAccess?: boolean;
+  isOpsAdmin?: boolean;
+  isSaaS?: boolean;
+  hasCloudOps?: boolean;
+  permissions?: string[];
+} = {}) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <WithStubNavigationHost
+        readings={{
+          organization: ORGANIZATION,
+          organizations: [ORGANIZATION],
+          pathname,
+          permissions,
+          plan: { isEnterprise, isLoading: false, isLiteMember },
+          opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
+          deployment: { isSaaS, hasCloudOps },
+          commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
+        }}
+      >
+        <SidebarContent surface="settings" showExpanded />
+      </WithStubNavigationHost>
+    </ChakraProvider>,
+  );
+}
+
+function readySettingsShellState(): NavigationShellReadyState {
+  return {
+    status: "ready",
+    user: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+    project: undefined,
+    currentRoute: undefined,
+    activeProductId: null,
+    isSettingsRoute: true,
+    showDevelopmentIndicator: false,
+    isCompactSidebar: false,
+    isMobile: false,
+    menuWidth: SHELL_SIDEBAR_WIDTH_EXPANDED,
+  };
+}
+
+function renderSettingsTopBar() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <NavigationHostProvider
+        value={StubNavigationHost.create({
+          organization: ORGANIZATION,
+          organizations: [ORGANIZATION],
+          currentUser: { id: "user_1", name: "Ada", email: "ada@acme.test", image: null },
+        })}
+      >
+        <ShellTopBar state={readySettingsShellState()} shouldShowProductCluster />
+      </NavigationHostProvider>
+    </ChakraProvider>,
+  );
+}
+
+beforeEach(() => {
+  opsBadgeCounts = {};
+  commandBarOpenMock.mockReset();
+  localStorage.clear();
+  sessionStorage.clear();
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe("the settings shell in a new navigation mode", () => {
+  describe("when Settings was entered from a Gateway page", () => {
+    /** @scenario The Settings sidebar opens with the way back */
+    it("opens with the back entry, then Quick Search", () => {
+      captureSettingsReturnPath({
+        organizationId: ORGANIZATION.id,
+        pathname: "/gateway/budgets",
+      });
+      renderSettingsSidebar();
+
+      const back = screen.getByRole("link", { name: "Back to Gateway" });
+      expect(back).toHaveAttribute("href", "/gateway/budgets");
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the settings menu renders in a v2 mode", () => {
+    /** @scenario The settings menu is grouped with its gates kept */
+    it("shows the groups with the current addresses", () => {
+      renderSettingsSidebar();
+
+      expect(screen.getByText("Organization")).toBeInTheDocument();
+      expect(screen.getByText("People & access")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "General" })).toHaveAttribute("href", "/settings");
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "href",
+        "/settings/directory",
+      );
+    });
+
+    /** @scenario The You section comes first and is about the reader */
+    it("puts the reader's Profile and Security pages first", () => {
+      renderSettingsSidebar();
+
+      const links = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+      const groupButtons = screen
+        .getAllByRole("button", { name: /^Collapse / })
+        .map((button) => button.textContent?.trim());
+
+      expect(groupButtons[0]).toBe("You");
+      expect(links.slice(0, 2)).toEqual(["Profile", "Security"]);
+      expect(groupButtons.indexOf("You")).toBeLessThan(groupButtons.indexOf("Organization"));
+    });
+
+    /** @scenario The personal pages ask for no organization permission */
+    it("keeps Profile and Security when every organization permission is denied", () => {
+      renderSettingsSidebar({ permissions: [] });
+
+      expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute(
+        "href",
+        "/settings/profile",
+      );
+      expect(screen.getByRole("link", { name: "Security" })).toHaveAttribute(
+        "href",
+        "/settings/security",
+      );
+    });
+
+    it("keeps Authentication as one Organization entry, lit on its provider page", () => {
+      renderSettingsSidebar({ pathname: "/settings/authentication/provider" });
+
+      const organizationGroup = screen.getByRole("button", {
+        name: "Collapse Organization",
+      }).parentElement;
+      const authentication = within(organizationGroup!).getByRole("link", {
+        name: /^Authentication/,
+      });
+      expect(authentication).toHaveAttribute("href", "/settings/authentication");
+      expect(authentication).toHaveAttribute("aria-current", "page");
+      expect(screen.queryByRole("link", { name: "Identity Provider" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Connectors" })).not.toBeInTheDocument();
+    });
+
+    /** @scenario The access group is named for people and holds the organization's pages */
+    it("keeps authentication with the organization and consolidates people access", () => {
+      renderSettingsSidebar();
+
+      const organizationGroup = screen.getByRole("button", {
+        name: "Collapse Organization",
+      }).parentElement;
+      const peopleGroup = screen.getByRole("button", {
+        name: "Collapse People & access",
+      }).parentElement;
+
+      expect(
+        within(organizationGroup!).getByRole("link", { name: /^Authentication/ }),
+      ).toHaveAttribute("href", "/settings/authentication");
+      expect(within(peopleGroup!).getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "href",
+        "/settings/directory",
+      );
+      expect(within(peopleGroup!).getByRole("link", { name: /^Roles/ })).toHaveAttribute(
+        "href",
+        "/settings/roles",
+      );
+      for (const name of ["Members", "Groups", "Access", "Role Bindings"]) {
+        expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+      }
+    });
+
+    it("lights Directory and Roles on the old addresses that forward onto them", () => {
+      renderSettingsSidebar({ pathname: "/settings/members" });
+      expect(screen.getByRole("link", { name: "Directory" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      cleanup();
+
+      renderSettingsSidebar({ pathname: "/settings/role-bindings" });
+      expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
+    });
+
+    /** @scenario "Enterprise entries carry a quiet grey pill" */
+    it("marks the enterprise entries with a grey pill in a hairline border", () => {
+      renderSettingsSidebar();
+
+      expect(screen.getByRole("link", { name: /^Roles/ })).toBeInTheDocument();
+      const pills = screen.getAllByText("ENT");
+      expect(pills.length).toBeGreaterThanOrEqual(1);
+      // The hairline border is pinned on the shared chip style itself:
+      // model/__tests__/quiet-chip-style.unit.test.ts.
+      expect(pills[0]).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+    });
+
+    /** @scenario "The settings groups fold, and start open" */
+    it("opens every group, folds one away, and keeps it folded next time", async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderSettingsSidebar();
+
+      // A folded group reads "Expand <name>", so none of them means all open.
+      expect(screen.queryAllByRole("button", { name: /^Expand / })).toEqual([]);
+      expect(screen.getAllByRole("button", { name: /^Collapse / }).length).toBeGreaterThan(1);
+      expect(screen.getByRole("link", { name: "Directory" })).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Collapse People & access" }));
+
+      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Collapse Organization" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+
+      unmount();
+      renderSettingsSidebar();
+
+      expect(screen.getByRole("button", { name: "Expand People & access" })).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      expect(screen.queryByRole("link", { name: "Directory" })).not.toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "General" })).toBeInTheDocument();
+    });
+
+    /** @scenario "A rule separates the way back from the pages below it" */
+    it("draws a rule under the way back entry", () => {
+      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
+      renderSettingsSidebar();
+
+      const backEntry = screen.getByRole("link", { name: /^Back/ });
+      expect(backEntry.parentElement).toHaveStyle({ borderBottomWidth: "1px" });
+    });
+
+    /** @scenario "The way back stays in place while the menu scrolls" */
+    it("keeps the way back out of the region the menu scrolls in", () => {
+      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
+      renderSettingsSidebar();
+
+      const scrollRegion = screen.getByTestId("sidebar-scroll-region");
+      expect(scrollRegion).not.toContainElement(screen.getByRole("link", { name: /^Back/ }));
+      expect(scrollRegion).toContainElement(screen.getByRole("link", { name: "Directory" }));
+    });
+
+    /** @scenario "The pages are cut at the rule as they scroll under the way back" */
+    it("starts the scrolling part at the rule and keeps the gap inside it", () => {
+      captureSettingsReturnPath({ organizationId: ORGANIZATION.id, pathname: "/gateway/budgets" });
+      renderSettingsSidebar();
+
+      const backEntry = screen.getByRole("link", { name: /^Back/ });
+      expect(getComputedStyle(backEntry.parentElement!).marginBottom).toBe("0");
+      expect(getComputedStyle(screen.getByTestId("sidebar-scroll-region")).paddingTop).toBe(
+        "var(--chakra-spacing-1\\.5)",
+      );
+    });
+
+    /** @scenario "API Keys sits under General" */
+    it("puts API Keys under General, above the ACCESS group", () => {
+      renderSettingsSidebar();
+
+      const entries = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+
+      expect(entries.filter((entry) => entry === "API Keys")).toHaveLength(1);
+      expect(entries.indexOf("API Keys")).toBe(entries.indexOf("General") + 1);
+      expect(entries.indexOf("API Keys")).toBeLessThan(entries.indexOf("Directory"));
+    });
+
+    /** @scenario The menu marks the page that is open */
+    it("marks the entry of the page on screen, and only that one", () => {
+      renderSettingsSidebar({ pathname: "/settings/email-suppressions" });
+
+      const marked = within(screen.getByTestId("sidebar-scroll-region"))
+        .getAllByRole("link")
+        .filter((link) => link.getAttribute("aria-current") === "page")
+        .map((link) => link.textContent?.trim());
+
+      expect(marked).toEqual(["Email Suppressions"]);
+    });
+
+    /** @scenario A lite member sees no restricted settings entries */
+    it("hides the restricted entries from a lite member", () => {
+      renderSettingsSidebar({ isLiteMember: true });
+
+      expect(screen.queryByRole("link", { name: "API Keys" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "Secrets" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the settings top bar renders", () => {
+    /** @scenario The top bar shows a static Settings title */
+    it("shows a static Settings title, no product dropdown, and the organization", () => {
+      renderSettingsTopBar();
+
+      expect(screen.queryByRole("button", { name: "Switch product" })).not.toBeInTheDocument();
+      expect(screen.getByText("Settings")).toBeInTheDocument();
+      expect(screen.getByText("ACME")).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has ops access and is an admin", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("puts Ops, Instance and Cloud admin last with cloud ops", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true, hasCloudOps: true });
+
+      const groupLabels = screen
+        .getAllByText(
+          /^(You|Organization|People & access|AI Infrastructure|Data Controls|Project|Ops|Instance|Cloud admin)$/,
+        )
+        .map((node) => node.textContent);
+
+      expect(groupLabels.slice(-3)).toEqual(["Ops", "Instance", "Cloud admin"]);
+    });
+
+    it("hides Cloud admin without cloud ops", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, isOpsAdmin: true });
+
+      expect(screen.getByText("Instance")).toBeInTheDocument();
+      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has ops access", () => {
+    /** @scenario The settings menu holds the ops groups at the bottom */
+    it("shows the Ops group away from an ops page", () => {
+      renderSettingsSidebar({ hasOpsAccess: true });
+
+      expect(screen.getByText("Ops")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "The Foundry" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader has no ops access", () => {
+    /** @scenario A reader without ops access sees no ops groups */
+    it("shows neither the Ops group nor its admin groups", () => {
+      renderSettingsSidebar({ isSaaS: true });
+
+      expect(screen.queryByText("Ops")).not.toBeInTheDocument();
+      expect(screen.queryByText("Instance")).not.toBeInTheDocument();
+      expect(screen.queryByText("Cloud admin")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when an ops page is opened in a new navigation mode", () => {
+    /** @scenario An ops page renders inside the new settings shell */
+    it("marks the matching entry active for an ops page", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/migrations" });
+
+      expect(screen.getByRole("button", { name: "Quick Search" })).toBeInTheDocument();
+      const migrations = screen.getByRole("link", { name: "Migrations" });
+      expect(migrations).toHaveAttribute("aria-current", "page");
+    });
+
+    /** @scenario An ops page renders inside the new settings shell */
+    it("marks the owning entry active on an address that redirects onto it", () => {
+      renderSettingsSidebar({ hasOpsAccess: true, pathname: "/ops/scheduler" });
+
+      expect(screen.getByRole("link", { name: "Event Sourcing" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+    });
+  });
+});

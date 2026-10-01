@@ -3,12 +3,12 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
 
 interface SlackConnection {
   id: string;
@@ -27,7 +27,7 @@ export const listSlackConnectionsCommand = async (): Promise<CommandResult | voi
   const spinner = createSpinner("Fetching Slack connections...").start();
 
   try {
-    const response = await langwatchFetch(`${resolveControlPlaneUrl()}/api/slack-connections`, {
+    const response = await langwatchFetch(`${resolveControlPlaneUrl()}/api/v1/slack-connections`, {
       signal: AbortSignal.timeout(30_000),
       headers: buildAuthHeaders({ apiKey: scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "" }),
     });

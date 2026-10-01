@@ -1,6 +1,6 @@
 """A trailing slash on the endpoint must not reach the URL builders.
 
-Request URLs are built as ``f"{get_endpoint()}/api/experiment/init"``, so an
+Request URLs are built as ``f"{get_endpoint()}/api/v1/experiment/init"``, so an
 endpoint written as ``https://app.langwatch.ai/`` produced a double slash the
 router does not match, and the caller saw an opaque 404.
 """
@@ -140,8 +140,8 @@ class TestClientSetup:
             )
             assert client.endpoint_url == "https://app.langwatch.ai"
             assert langwatch.get_endpoint() == "https://app.langwatch.ai"
-            assert f"{langwatch.get_endpoint()}/api/experiment/init" == (
-                "https://app.langwatch.ai/api/experiment/init"
+            assert f"{langwatch.get_endpoint()}/api/v1/experiment/init" == (
+                "https://app.langwatch.ai/api/v1/experiment/init"
             )
         finally:
             Client.reset_for_testing()

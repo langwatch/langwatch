@@ -1,12 +1,5 @@
 /**
- * `langwatch ingest install claude_code` wires the session context seam the same
- * way a consented wrapper run does: the LangWatch Claude Code plugin when this
- * `claude` can take one, the hook entries in the settings file when it cannot.
- *
- * The report has to say which of the two actually happened. A report claiming
- * hooks were written when the plugin took them sends the next reader looking for
- * entries that are not there.
- *
+ * Install session hooks via Claude Code plugin or settings file.
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
  */
 
@@ -25,15 +18,12 @@ const { mintIngestionKeyMock, spawnSyncMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/cli/utils/governance/cli-api", async () => {
-  const actual = await vi.importActual<typeof CliApiModule>(
-    "@/cli/utils/governance/cli-api",
-  );
+  const actual = await vi.importActual<typeof CliApiModule>("@/cli/utils/governance/cli-api");
   return { ...actual, mintIngestionKey: mintIngestionKeyMock };
 });
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -150,13 +140,8 @@ describe("the claude_code ingestion install", () => {
     it("writes the hook entries into the settings file", async () => {
       await runInstall();
 
-      const settings = JSON.parse(
-        fs.readFileSync(settingsPath, "utf8"),
-      ) as Record<string, unknown>;
-      expect(Object.keys(settings.hooks as object)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      const settings = JSON.parse(fs.readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+      expect(Object.keys(settings.hooks as object)).toEqual(["SessionStart", "Stop"]);
     });
   });
 

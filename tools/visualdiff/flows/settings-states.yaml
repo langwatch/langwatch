@@ -1,0 +1,358 @@
+# Settings screens in the states a prod comparison could not judge: menus, dialogs, drawers and
+# the far end of a long page. Check mode photographs only expects, so every state ends in an expect
+# that reads something the state proves (a menu item, an aria-expanded flag, a saved name).
+# Steps use test ids, aria labels, placeholders and button words that main and the branch share.
+# Unreachable here: the GitHub installed card (no fake GitHub in the check stack; the setup route
+# needs a signed state and a live installation) and the /ops/cloud/* routes (need cloud-ops).
+flows:
+  - id: settings-state-roles-detail-and-new-role-dialog
+    title: Roles opens the built-in detail modal, then the New role dialog with a group and a permission expanded
+    steps:
+      - action: go
+        with:
+          path: /settings/roles
+      - action: expect
+        with:
+          testId: builtin-role-admin
+      - action: click
+        with:
+          selector: '[data-testid="builtin-role-admin"] button'
+          hasText: See what it can do
+      - action: expect
+        with:
+          text: permissions across
+      - action: expect
+        with:
+          count: '[role="dialog"] button'
+          min: "1"
+      - action: go
+        with:
+          path: /settings/roles
+      - action: click
+        with:
+          testId: authz-role-create
+      - action: expect
+        with:
+          testId: permission-area-Building
+      - action: click
+        with:
+          testId: permission-area-Building
+      - action: expect
+        with:
+          count: '[data-testid="permission-area-Building"][aria-expanded="true"]'
+      - action: expect
+        with:
+          testId: access-level-datasets
+      - action: click
+        with:
+          label: Choose actions for Datasets
+      - action: expect
+        with:
+          count: 'button[aria-label="Choose actions for Datasets"][aria-expanded="true"]'
+
+  - id: settings-state-model-providers-add-menu-and-provider-drawer
+    title: Model Providers lists the provider choices in the Add menu and opens Twilio's credential drawer
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: expect
+        with:
+          count: '[role="menuitem"]'
+          min: "8"
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Twilio")'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Twilio\s*$/
+      - action: expect
+        with:
+          text: /TWILIO_ACCOUNT_SID/
+      - action: expect
+        with:
+          text: /TWILIO_FROM_NUMBER/
+      - action: expect
+        with:
+          text: Scope
+
+  - id: settings-state-default-models-section-and-drawer
+    title: With a provider added, the Default Models section sits below the list and its Add drawer opens
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          text: Add Model Provider
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Gemini\s*$/
+      - action: fill
+        with:
+          selector: input[type="password"]
+          value: gem-vd-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Gemini")'
+      - action: expect
+        with:
+          testId: default-models-section
+      - action: hover
+        with:
+          testId: default-models-section
+      - action: expect
+        with:
+          testId: default-models-section
+          hasText: /Default Models/i
+      - action: click
+        with:
+          selector: '[data-testid="add-config-button"], [data-testid="empty-state-add-config"]'
+      - action: expect
+        with:
+          testId: default-model-override-drawer
+      - action: expect
+        with:
+          testId: role-row-default
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: click
+        with:
+          selector: 'tr:has-text("Gemini") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Provider
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/model-providers
+      - action: expect
+        with:
+          count: 'tr:has-text("Gemini")'
+          equals: "0"
+
+  - id: settings-state-model-costs-row-menu
+    title: Model Costs rows open a menu offering Clone for a built-in model
+    steps:
+      - action: go
+        with:
+          path: /settings/model-costs
+      - action: expect
+        with:
+          count: "tbody tr"
+          min: "3"
+      - action: click
+        with:
+          selector: "tbody tr button"
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Clone")'
+
+  - id: settings-state-secrets-row-menu-and-modals
+    title: Secrets shows the Add modal, the row menu and the Update Value modal, never the value
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: click
+        with:
+          text: Add Secret
+      - action: expect
+        with:
+          count: 'input[placeholder="e.g., OPENAI_API_KEY"]'
+      - action: expect
+        with:
+          count: 'input[placeholder="Enter secret value"]'
+      - action: fill
+        with:
+          field: "e.g., OPENAI_API_KEY"
+          value: "vdstate{uid}"
+      - action: fill
+        with:
+          field: Enter secret value
+          value: "sv-state-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          count: 'tr:has-text("vdstate{uid}")'
+      - action: expect
+        with:
+          text: sv-state-{uid}
+          equals: "0"
+      - action: click
+        with:
+          selector: 'tr:has-text("vdstate{uid}") button'
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Update Value")'
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Delete Secret")'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Update Value
+      - action: expect
+        with:
+          text: Update Value for vdstate{uid}
+      - action: expect
+        with:
+          count: 'input[placeholder="Enter new secret value"]'
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: click
+        with:
+          selector: 'tr:has-text("vdstate{uid}") button'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Delete Secret
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: /settings/secrets
+      - action: expect
+        with:
+          count: 'tr:has-text("vdstate{uid}")'
+          equals: "0"
+
+  - id: settings-state-data-retention-menus-and-drawers
+    title: Data Retention shows the scope menu, the Add drawer, a row's menu and the Edit drawer
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/data-retention
+      - action: expect
+        with:
+          text: Retention Policies
+      - action: click
+        with:
+          testId: scope-filter
+      - action: expect
+        with:
+          testId: filter-all
+      - action: expect
+        with:
+          testId: filter-this-project
+      - action: go
+        with:
+          path: /settings/data-retention
+      - action: click
+        with:
+          text: /^\s*Add retention policy\s*$/
+      - action: expect
+        with:
+          count: '[role="dialog"]'
+      - action: select
+        with:
+          field: Retention
+          option: 2 months
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/data-retention
+      - action: expect
+        with:
+          text: 63 days
+      - action: click
+        with:
+          selector: 'button[aria-label^="Actions for "]'
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Edit")'
+      - action: expect
+        with:
+          count: '[role="menuitem"]:has-text("Remove")'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Edit retention policy
+
+  - id: settings-state-data-privacy-add-rule-drawer
+    title: Data Privacy opens the Add privacy rule drawer with its Save button
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/data-privacy
+      - action: expect
+        with:
+          text: Data Privacy
+      - action: click
+        with:
+          text: Add privacy rule
+      - action: expect
+        with:
+          count: '[role="dialog"]'
+      - action: expect
+        with:
+          count: '[role="dialog"] button:has-text("Save")'
+
+  - id: settings-state-api-key-create-drawer
+    title: API Keys opens the Create new secret key drawer with its name field and submit button
+    isolated: true
+    steps:
+      - action: go
+        with:
+          path: /settings/api-keys
+      - action: click
+        with:
+          text: Create new secret key
+      - action: expect
+        with:
+          count: 'input[placeholder="e.g., CI Pipeline, Local Dev"]'
+      - action: expect
+        with:
+          count: 'button:has-text("Create secret key")'
+
+  - id: settings-state-personal-configure-bottom
+    title: Personal Configure scrolls to the OTLP endpoint and the workspace features switch
+    steps:
+      - action: go
+        with:
+          path: /me/configure
+      - action: expect
+        with:
+          text: Personal OTLP Endpoint
+      - action: expect
+        with:
+          text: Workspace features
+      - action: hover
+        with:
+          selector: label
+          hasText: Enable advanced features
+      - action: expect
+        with:
+          text: Enable advanced features (evaluations, datasets, annotations, automations)

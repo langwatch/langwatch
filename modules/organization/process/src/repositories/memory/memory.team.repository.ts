@@ -1,0 +1,249 @@
+import {
+  TeamMembershipChangedError,
+  TeamNotFoundError,
+  TeamSlugConflictError,
+  UserNotInOrganizationError,
+  type OrganizationTeam,
+  type OrganizationTeamPage,
+} from "@langwatch/organization-contract";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
+
+import { TeamRepository } from "../team.repository.ts";
+import type { MemoryOrganizationDatabase, MemoryTeamRow } from "./memory.organization.database.ts";
+
+function toOrganizationTeam(row: MemoryTeamRow): OrganizationTeam {
+  return {
+    ...row,
+    archivedAt: row.archivedAt === null ? null : toDate(row.archivedAt),
+    createdAt: toDate(row.createdAt),
+    updatedAt: toDate(row.updatedAt),
+  };
+}
+
+/** In-memory `TeamRepository`, for tests and a memory-backed boot. */
+export class MemoryTeamRepository extends TeamRepository {
+  private constructor(private readonly memory: MemoryOrganizationDatabase) {
+    super();
+  }
+
+  static create(options: { memory: MemoryOrganizationDatabase }): MemoryTeamRepository {
+    return new MemoryTeamRepository(options.memory);
+  }
+
+  async get(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam> {
+    const team = this.memory.teams.get(input.teamId);
+    if (!team || team.organizationId !== input.organizationId || team.archivedAt) {
+      throw new TeamNotFoundError(input.teamId);
+    }
+    return toOrganizationTeam(team);
+  }
+
+  async getById(teamId: string): Promise<OrganizationTeam> {
+    const team = this.memory.teams.get(teamId);
+    if (!team || team.archivedAt) throw new TeamNotFoundError(teamId);
+    return toOrganizationTeam(team);
+  }
+
+  async findOrganizationId(input: { teamId: string }): Promise<string | null> {
+    return this.memory.teams.get(input.teamId)?.organizationId ?? null;
+  }
+
+  async findPersonalTeamOwners(input: {
+    organizationId: string;
+    teamIds: readonly string[];
+  }): Promise<{ teamId: string; ownerUserId: string | null }[]> {
+    return input.teamIds.flatMap((teamId) => {
+      const team = this.memory.teams.get(teamId);
+      return team?.isPersonal && team.organizationId === input.organizationId
+        ? [{ teamId, ownerUserId: team.ownerUserId }]
+        : [];
+    });
+  }
+
+  async getBySlug(input: { slug: string; organizationId: string }): Promise<OrganizationTeam> {
+    const team = this.activeTeamsOf(input.organizationId).find((row) => row.slug === input.slug);
+    if (!team) throw new TeamNotFoundError(input.slug);
+    return toOrganizationTeam(team);
+  }
+
+  async listPage(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+  }): Promise<OrganizationTeamPage> {
+    const all = this.activeTeamsOf(input.organizationId).toSorted(
+      (a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds,
+    );
+    const start = (input.page - 1) * input.limit;
+    return {
+      data: all.slice(start, start + input.limit).map(toOrganizationTeam),
+      pagination: { page: input.page, limit: input.limit, total: all.length },
+    };
+  }
+
+  async findActive(input: {
+    organizationId: string;
+    visibleToUserId?: string;
+  }): Promise<OrganizationTeam[]> {
+    return this.activeTeamsOf(input.organizationId)
+      .filter(
+        (team) =>
+          !input.visibleToUserId || !team.isPersonal || team.ownerUserId === input.visibleToUserId,
+      )
+      .toSorted((a, b) => a.name.localeCompare(b.name))
+      .map(toOrganizationTeam);
+  }
+
+  async create(input: {
+    teamId: string;
+    name: string;
+    slug: string;
+    organizationId: string;
+  }): Promise<OrganizationTeam> {
+    const duplicate = this.activeTeamsOf(input.organizationId).find(
+      (row) => row.slug === input.slug,
+    );
+    if (duplicate) throw new TeamSlugConflictError();
+    const now = nowInstant();
+    const team: MemoryTeamRow = {
+      id: input.teamId,
+      name: input.name,
+      slug: input.slug,
+      organizationId: input.organizationId,
+      isPersonal: false,
+      ownerUserId: null,
+      archivedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.memory.teams.set(team.id, team);
+    return toOrganizationTeam(team);
+  }
+
+  async update(input: {
+    teamId: string;
+    organizationId: string;
+    name?: string;
+  }): Promise<OrganizationTeam> {
+    const team = await this.get(input);
+    const row = this.memory.teams.get(team.id);
+    if (!row) throw new TeamNotFoundError(input.teamId);
+    if (input.name !== undefined) row.name = input.name;
+    row.updatedAt = nowInstant();
+    return toOrganizationTeam(row);
+  }
+
+  async archive(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam> {
+    const team = await this.get(input);
+    const row = this.memory.teams.get(team.id);
+    if (!row) throw new TeamNotFoundError(input.teamId);
+    row.archivedAt = nowInstant();
+    return toOrganizationTeam(row);
+  }
+
+  // An arrow instance property, matching the base class's property-typed
+  // abstract member (TeamRepository declares it that way for test mocks).
+  getOrganizationMembers = async (input: {
+    userIds: string[];
+    organizationId: string;
+    activeOnly?: boolean;
+  }): Promise<string[]> => {
+    if (input.userIds.length === 0) return [];
+    const found = new Set(
+      this.memory.organizationUsers
+        .filter(
+          (row) =>
+            row.organizationId === input.organizationId &&
+            input.userIds.includes(row.userId) &&
+            (!input.activeOnly || row.disabledAt === null),
+        )
+        .map((row) => row.userId),
+    );
+    const missing = input.userIds.find((userId) => !found.has(userId));
+    if (missing) throw new UserNotInOrganizationError(missing);
+    return input.userIds;
+  };
+
+  async organizationIdsForMember(input: {
+    userId: string;
+    activeOnly?: boolean;
+  }): Promise<string[]> {
+    return this.memory.organizationUsers
+      .filter(
+        (row) =>
+          row.userId === input.userId && (input.activeOnly === false || row.disabledAt === null),
+      )
+      .map((row) => row.organizationId);
+  }
+
+  async memberOrganizationIds(input: {
+    userId: string;
+    organizationIds: string[];
+    activeOnly?: boolean;
+  }): Promise<string[]> {
+    const member = new Set(
+      this.memory.organizationUsers
+        .filter(
+          (row) =>
+            row.userId === input.userId &&
+            input.organizationIds.includes(row.organizationId) &&
+            (input.activeOnly === false || row.disabledAt === null),
+        )
+        .map((row) => row.organizationId),
+    );
+    return input.organizationIds.filter((organizationId) => member.has(organizationId));
+  }
+
+  private readonly membershipLocks = new Map<string, Promise<unknown>>();
+
+  fenceMembershipChange(input: {
+    teamId: string;
+    organizationId: string;
+    expectedUpdatedAt: Instant;
+    name?: string;
+    change: () => Promise<void>;
+  }): Promise<OrganizationTeam> {
+    const previous = this.membershipLocks.get(input.teamId) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.fencedChange(input));
+    this.membershipLocks.set(input.teamId, next);
+    void next
+      .catch(() => undefined)
+      .finally(() => {
+        if (this.membershipLocks.get(input.teamId) === next)
+          this.membershipLocks.delete(input.teamId);
+      });
+    return next;
+  }
+
+  private async fencedChange(input: {
+    teamId: string;
+    organizationId: string;
+    expectedUpdatedAt: Instant;
+    name?: string;
+    change: () => Promise<void>;
+  }): Promise<OrganizationTeam> {
+    const row = this.memory.teams.get(input.teamId);
+    if (!row || row.organizationId !== input.organizationId || row.archivedAt) {
+      throw new TeamNotFoundError(input.teamId);
+    }
+    if (row.updatedAt.epochMilliseconds !== input.expectedUpdatedAt.epochMilliseconds) {
+      throw new TeamMembershipChangedError(input.teamId);
+    }
+    const before = { name: row.name, updatedAt: row.updatedAt };
+    if (input.name !== undefined) row.name = input.name;
+    row.updatedAt = nowInstant();
+    try {
+      await input.change();
+    } catch (error) {
+      Object.assign(row, before);
+      throw error;
+    }
+    return toOrganizationTeam(row);
+  }
+
+  private activeTeamsOf(organizationId: string): MemoryTeamRow[] {
+    return [...this.memory.teams.values()].filter(
+      (team) => team.organizationId === organizationId && team.archivedAt === null,
+    );
+  }
+}

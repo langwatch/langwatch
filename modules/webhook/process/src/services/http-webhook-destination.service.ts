@@ -1,0 +1,79 @@
+import {
+  type WebhookDestination,
+  type WebhookDispatchRequest,
+  type WebhookDispatchResult,
+} from "../app/webhook.app.ts";
+import {
+  classifyWebhookStatus,
+  WEBHOOK_DELIVERY_ID_HEADER,
+} from "../rules/webhook-delivery-classification.rules.ts";
+import type { WebhookEgressService } from "./webhook-egress.service.ts";
+
+/** How much of the receiver's response the delivery log keeps. */
+const RESPONSE_SNIPPET_CHARS = 1000;
+
+export interface HttpWebhookDestinationServiceOptions {
+  url: string;
+  /**
+   * The process's ONE outbound webhook sender: the SSRF fence, the TLS policy
+   * and the hourly dispatch cap all live on it, so a second instance here
+   * would be a second budget and possibly a second fence.
+   */
+  egress: Pick<WebhookEgressService, "send">;
+  /**
+   * Whether this deployment permits a loopback or private destination. A
+   * process-level escape hatch for local development, so the process decides
+   * it rather than a module reading the environment for itself.
+   */
+  allowInsecureLocal: boolean;
+}
+
+/**
+ * The HTTPS destination: the transport every endpoint used before there was more than one.
+ */
+export class HttpWebhookDestinationService implements WebhookDestination {
+  readonly kind = "http" as const;
+
+  private readonly url: string;
+  private readonly egress: Pick<WebhookEgressService, "send">;
+  private readonly allowInsecureLocal: boolean;
+
+  private constructor(options: HttpWebhookDestinationServiceOptions) {
+    this.url = options.url;
+    this.egress = options.egress;
+    this.allowInsecureLocal = options.allowInsecureLocal;
+  }
+
+  static create(options: HttpWebhookDestinationServiceOptions): HttpWebhookDestinationService {
+    return new HttpWebhookDestinationService(options);
+  }
+
+  async send(request: WebhookDispatchRequest): Promise<WebhookDispatchResult> {
+    const result = await this.egress.send({
+      url: this.url,
+      body: request.body,
+      triggerName: request.endpointId,
+      contextLabel: `Webhook endpoint ${request.endpointId}${request.isTestFire ? " (test)" : ""}`,
+      // Endpoints are organization-scoped, so their dispatch cap buckets
+      // per organization rather than per project. A test fire passes no
+      // scope, which is how it stays exempt.
+      ...(request.isTestFire ? { testFire: true } : { projectId: request.organizationId }),
+      eventId: request.batchId,
+      dispatchIdHeader: WEBHOOK_DELIVERY_ID_HEADER,
+      signingSecrets: request.signingSecrets,
+      attempt: request.attempt,
+      allowInsecureLocal: this.allowInsecureLocal,
+    });
+
+    const verdict = classifyWebhookStatus(result.status);
+    return {
+      verdict,
+      status: result.status,
+      body: result.body.slice(0, RESPONSE_SNIPPET_CHARS),
+      ...(result.responseHeaders ? { responseHeaders: result.responseHeaders } : {}),
+      ...(result.retryAfterMs !== undefined ? { retryAfterMs: result.retryAfterMs } : {}),
+      dispatchId: result.eventId,
+      ...(verdict === "success" ? {} : { error: `HTTP ${result.status}` }),
+    };
+  }
+}

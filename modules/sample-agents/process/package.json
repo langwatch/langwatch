@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/sample-agents-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The demo agents behind the sample project: scripted conversations posted as traces to the caller's project.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/sample-agents-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

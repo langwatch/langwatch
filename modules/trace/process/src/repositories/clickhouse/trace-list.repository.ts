@@ -1,0 +1,1435 @@
+import { EventUtils } from "@langwatch/eventing";
+import { nowInstant } from "@langwatch/time";
+import {
+  isStorageAnchoredVersion,
+  type TraceListFacetQuery,
+  type TraceListRepositoryPage,
+  type TraceListQuery,
+  type TraceListRepository,
+  type TraceListSummary,
+  type BatchedFacetResult,
+  type CategoricalFacetResult,
+  type DiscreteFacetResult,
+  type FacetTableName,
+  type EventMetricValues,
+  EVENT_METRIC_SEP,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
+
+import { scopeTraceFilterToTable } from "../../rules/trace-facet-scope.rules.ts";
+import type { TraceFilterWhere } from "../../rules/trace-filter-hidden-origins.rules.ts";
+import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
+import { chBoolean, chNumber, chString } from "./clickhouse.trace-row.mapper.ts";
+
+const TABLE_NAME = "trace_summaries" as const;
+
+const numeric = z.union([z.number(), z.string()]);
+const flag = z.union([z.boolean(), z.number()]);
+
+const totalHitsRowsSchema = z.array(z.looseObject({ totalHits: numeric }));
+
+const countRowsSchema = z.array(z.looseObject({ cnt: numeric }));
+
+const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+
+const distinctValueRowsSchema = z.array(z.looseObject({ val: chString }));
+
+/** Any column can be a discrete facet, so its value is read as whatever ClickHouse wrote. */
+const discreteValueRowsSchema = z.array(
+  z.looseObject({ discrete_value: z.unknown(), cnt: numeric, total_distinct: numeric }),
+);
+
+const rangeRowsSchema = z.array(z.looseObject({ min_val: z.unknown(), max_val: z.unknown() }));
+
+const keyedFacetRowsSchema = z.array(
+  z.looseObject({
+    facet_key: chString,
+    facet_value: chString,
+    cnt: numeric,
+    total_distinct: numeric,
+  }),
+);
+
+const rangeFacetRowsSchema = z.array(z.record(z.string(), z.unknown()));
+
+/**
+ * Buffer for partition-pruning in new-trace-count subquery; matches withPartitionHint.
+ */
+const SINCE_WINDOW_BUFFER_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * One list row. The list mapper only reads a fixed set of keys out of
+ * `Attributes`, so each is projected individually and ClickHouse skips the
+ * full Map column — the dominant cost on traces with large attribute bags.
+ */
+const listSummaryRowSchema = z.looseObject({
+  TraceId: chString,
+  TenantId: chString,
+  AttrSpanName: chString,
+  AttrServiceName: chString,
+  AttrConversationId: chString,
+  AttrUserId: chString,
+  AttrOrigin: chString,
+  AttrNonBillable: chString,
+  AttrCacheReadTokens: chString,
+  AttrCacheCreationTokens: chString,
+  AttrReasoningTokens: chString,
+  AttrContextSizeTokens: chString,
+  AttrLabels: chString,
+  AttrInputMediaRefs: chString,
+  AttrOutputMediaRefs: chString,
+  OccurredAt: chNumber,
+  /** The row's projection stamp; see the OccurredAt decode in `toTraceSummaryData`. */
+  Version: chString.optional(),
+  /** The span timing baseline column added by migration 00072 (ADR-087). */
+  EarliestSpanStartMs: chNumber.optional(),
+  CreatedAt: chNumber,
+  UpdatedAt: chNumber,
+  ComputedIOSchemaVersion: chString,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+  TimeToFirstTokenMs: chNumber.nullable(),
+  TimeToLastTokenMs: chNumber.nullable(),
+  TotalDurationMs: chNumber,
+  TokensPerSecond: chNumber.nullable(),
+  SpanCount: chNumber,
+  ContainsErrorStatus: chBoolean,
+  ContainsOKStatus: chBoolean,
+  ErrorMessage: chString.nullable(),
+  Models: z.array(chString),
+  TotalCost: chNumber.nullable(),
+  NonBilledCost: chNumber.nullable(),
+  TokensEstimated: chBoolean,
+  TotalPromptTokenCount: chNumber.nullable(),
+  TotalCompletionTokenCount: chNumber.nullable(),
+  OutputFromRootSpan: chBoolean,
+  OutputSpanEndTimeMs: chNumber,
+  BlockedByGuardrail: chBoolean,
+  TraceName: chString,
+  RootSpanType: chString.nullable(),
+  ContainsAi: chBoolean,
+  ContainsPrompt: chBoolean,
+  SelectedPromptId: chString.nullable(),
+  SelectedPromptSpanId: chString.nullable(),
+  LastUsedPromptId: chString.nullable(),
+  LastUsedPromptVersionNumber: chNumber.nullable(),
+  LastUsedPromptVersionId: chString.nullable(),
+  LastUsedPromptSpanId: chString.nullable(),
+  TopicId: chString.nullable(),
+  SubTopicId: chString.nullable(),
+  AnnotationIds: z.array(chString),
+  SizeBytes: chNumber.optional(),
+  LastEventOccurredAt: chNumber,
+});
+
+const listSummaryRowsSchema = z.array(listSummaryRowSchema);
+
+type ClickHouseSummaryRow = z.infer<typeof listSummaryRowSchema>;
+
+/**
+ * The active trace filter as an `AND` fragment for a facet read on `table`,
+ * placed after the version dedup so it never decides which version is the
+ * latest. Empty when there is no filter.
+ */
+function facetFilterFragment(
+  table: FacetTableName,
+  filterWhere: TraceFilterWhere | undefined,
+  timeRange: { to: number; live?: boolean },
+): TraceFilterWhere {
+  if (!filterWhere) return { sql: "", params: {} };
+
+  const scoped = scopeTraceFilterToTable({
+    table,
+    filterWhere,
+    isLiveWindow: timeRange.live === true,
+  });
+
+  return { sql: `AND ${scoped.sql}`, params: scoped.params };
+}
+
+export class TraceListClickHouseRepository implements TraceListRepository {
+  private constructor(private readonly resolveClient: TraceClickHouseResolver) {}
+
+  static create(resolveClient: TraceClickHouseResolver): TraceListClickHouseRepository {
+    return new TraceListClickHouseRepository(resolveClient);
+  }
+
+  async listAll(query: TraceListQuery): Promise<TraceListRepositoryPage> {
+    EventUtils.validateTenantId(
+      { tenantId: query.tenantId },
+      "TraceListClickHouseRepository.findAll",
+    );
+
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params,
+    } = TraceListClickHouseRepository.whereClause(
+      query.tenantId,
+      query.timeRange,
+      query.filterWhere,
+    );
+
+    const rawSortExpression =
+      query.sort.column === "TotalTokens"
+        ? "(coalesce(TotalPromptTokenCount, 0) + coalesce(TotalCompletionTokenCount, 0))"
+        : query.sort.column;
+    // Every supported list sort is numeric (OccurredAt is normalized to epoch
+    // milliseconds). Coalescing nullable metrics makes the keyset comparison
+    // use exactly the same value as ORDER BY and as the service-side cursor.
+    const sortExpression =
+      query.sort.column === "OccurredAt"
+        ? "toFloat64(toUnixTimestamp64Milli(OccurredAt))"
+        : `toFloat64(coalesce(${rawSortExpression}, 0))`;
+    const sortDir = query.sort.direction === "asc" ? "ASC" : "DESC";
+    const cursorComparison = query.sort.direction === "asc" ? ">" : "<";
+    const cursorClause = query.cursor
+      ? `AND (
+              ${sortExpression} ${cursorComparison} {cursorSortValue:Float64}
+              OR (
+                ${sortExpression} = {cursorSortValue:Float64}
+                AND TraceId > {cursorTraceId:String}
+              )
+            )`
+      : "";
+
+    const client = await this.resolveClient(query.tenantId);
+
+    // Latest-version dedup, shared by the page's inner stage and the count,
+    // decided on base predicates alone. A whole-window aggregate, so state
+    // it once per read — the outer stage below reuses this result.
+    const dedupFilter = `(TenantId, TraceId, UpdatedAt) IN (
+          SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM ${TABLE_NAME}
+          WHERE ${baseWhereClause}
+          GROUP BY TenantId, TraceId
+        )`;
+
+    // Two-stage: page light columns first, then read heavy payloads for page only.
+    const [result, countResult] = await Promise.all([
+      client.query({
+        query: `
+        SELECT
+          TraceId,
+          TenantId,
+          AttrSpanName,
+          AttrServiceName,
+          AttrConversationId,
+          AttrUserId,
+          AttrOrigin,
+          AttrNonBillable,
+          AttrCacheReadTokens,
+          AttrInputMediaRefs,
+          AttrOutputMediaRefs,
+          AttrCacheCreationTokens,
+          AttrReasoningTokens,
+          AttrContextSizeTokens,
+          AttrLabels,
+          toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+          Version,
+          EarliestSpanStartMs,
+          toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+          toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+          ComputedIOSchemaVersion,
+          ComputedInput,
+          ComputedOutput,
+          TimeToFirstTokenMs,
+          TimeToLastTokenMs,
+          TotalDurationMs,
+          TokensPerSecond,
+          SpanCount,
+          ContainsErrorStatus,
+          ContainsOKStatus,
+          ErrorMessage,
+          Models,
+          TotalCost,
+          NonBilledCost,
+          TokensEstimated,
+          TotalPromptTokenCount,
+          TotalCompletionTokenCount,
+          OutputFromRootSpan,
+          OutputSpanEndTimeMs,
+          BlockedByGuardrail,
+          TraceName,
+          RootSpanType,
+          ContainsAi,
+          ContainsPrompt,
+          SelectedPromptId,
+          SelectedPromptSpanId,
+          LastUsedPromptId,
+          LastUsedPromptVersionNumber,
+          LastUsedPromptVersionId,
+          LastUsedPromptSpanId,
+          TopicId,
+          SubTopicId,
+          AnnotationIds,
+          SizeBytes,
+          toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
+        FROM (
+          SELECT
+            TraceId,
+            TenantId,
+            Attributes['langwatch.span.name'] AS AttrSpanName,
+            Attributes['service.name'] AS AttrServiceName,
+            Attributes['gen_ai.conversation.id'] AS AttrConversationId,
+            Attributes['langwatch.user_id'] AS AttrUserId,
+            Attributes['langwatch.origin'] AS AttrOrigin,
+            Attributes['langwatch.cost.non_billable'] AS AttrNonBillable,
+            Attributes['langwatch.reserved.cache_read_tokens'] AS AttrCacheReadTokens,
+            Attributes['langwatch.reserved.media_refs.input'] AS AttrInputMediaRefs,
+            Attributes['langwatch.reserved.media_refs.output'] AS AttrOutputMediaRefs,
+            Attributes['langwatch.reserved.cache_creation_tokens'] AS AttrCacheCreationTokens,
+            Attributes['langwatch.reserved.reasoning_tokens'] AS AttrReasoningTokens,
+            Attributes['langwatch.reserved.context_size_tokens'] AS AttrContextSizeTokens,
+            Attributes['langwatch.labels'] AS AttrLabels,
+            OccurredAt,
+            Version,
+            EarliestSpanStartMs,
+            CreatedAt,
+            UpdatedAt,
+            ComputedIOSchemaVersion,
+            ComputedInput,
+            ComputedOutput,
+            TimeToFirstTokenMs,
+            TimeToLastTokenMs,
+            TotalDurationMs,
+            TokensPerSecond,
+            SpanCount,
+            ContainsErrorStatus,
+            ContainsOKStatus,
+            ErrorMessage,
+            Models,
+            TotalCost,
+            NonBilledCost,
+            TokensEstimated,
+            TotalPromptTokenCount,
+            TotalCompletionTokenCount,
+            OutputFromRootSpan,
+            OutputSpanEndTimeMs,
+            BlockedByGuardrail,
+            TraceName,
+            RootSpanType,
+            ContainsAi,
+            ContainsPrompt,
+            SelectedPromptId,
+            SelectedPromptSpanId,
+            LastUsedPromptId,
+            LastUsedPromptVersionNumber,
+            LastUsedPromptVersionId,
+            LastUsedPromptSpanId,
+            TopicId,
+            SubTopicId,
+            AnnotationIds,
+            _size_bytes AS SizeBytes,
+            LastEventOccurredAt
+          FROM ${TABLE_NAME}
+          WHERE ${whereClause}
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, UpdatedAt
+              FROM ${TABLE_NAME}
+              WHERE ${whereClause}
+                AND ${dedupFilter}
+                ${cursorClause}
+              -- Offset pagination needs a total order. Many traces legitimately
+              -- share timestamps, costs, token counts, and durations; without
+              -- a unique tie-breaker ClickHouse may return tied rows in a
+              -- different order on adjacent requests, causing duplicates and
+              -- omissions between pages.
+              ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+              LIMIT {limit:UInt32}
+              OFFSET {offset:UInt32}
+            )
+          ORDER BY ${sortExpression} ${sortDir}, TraceId ASC
+          LIMIT {limit:UInt32}
+        )
+      `,
+        query_params: {
+          ...params,
+          limit: query.limit,
+          offset: query.offset ?? 0,
+          ...(query.cursor
+            ? {
+                cursorSortValue: query.cursor.sortValue,
+                cursorTraceId: query.cursor.traceId,
+              }
+            : {}),
+        },
+        format: "JSONEachRow",
+      }),
+      client.query({
+        query: `
+        SELECT count() AS totalHits
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND ${dedupFilter}
+      `,
+        query_params: { ...params },
+        format: "JSONEachRow",
+      }),
+    ]);
+
+    const rows = listSummaryRowsSchema.parse(await result.json());
+    const countRows = totalHitsRowsSchema.parse(await countResult.json());
+    const totalHits = countRows.length > 0 ? Number(countRows[0]!.totalHits) : 0;
+
+    return {
+      rows: rows.map((row) => this.toTraceSummaryData(row)),
+      totalHits,
+    };
+  }
+
+  async findCount(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    since: number;
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+  }): Promise<number> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findCount",
+    );
+
+    // Live "new traces since `since`" poll. Outer count wants OccurredAt >
+    // since, but filterWhere may carry a span-level filter scanning
+    // stored_spans over [from, to] — raising the window's lower bound to
+    // since (minus a buffer) prunes that subquery to recent partitions;
+    // count is unchanged since a matching span's StartTime >= OccurredAt > since.
+    const effectiveFrom = Math.max(params.timeRange.from, params.since - SINCE_WINDOW_BUFFER_MS);
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = TraceListClickHouseRepository.whereClause(
+      params.tenantId,
+      { ...params.timeRange, from: effectiveFrom },
+      params.filterWhere,
+    );
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT count() AS cnt
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${baseWhereClause}
+              AND OccurredAt > fromUnixTimestamp64Milli({since:Int64})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: { ...queryParams, since: params.since },
+      format: "JSONEachRow",
+    });
+
+    const rows = countRowsSchema.parse(await result.json());
+    return Number(rows[0]?.cnt ?? 0);
+  }
+
+  async findTraceIds(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    filterWhere?: { sql: string; params: Record<string, unknown> };
+    limit: number;
+  }): Promise<string[]> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findTraceIds",
+    );
+    const {
+      sql: whereClause,
+      baseSql: baseWhereClause,
+      params: queryParams,
+    } = TraceListClickHouseRepository.whereClause(
+      params.tenantId,
+      params.timeRange,
+      params.filterWhere,
+    );
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT TraceId
+        FROM ${TABLE_NAME}
+        WHERE ${whereClause}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE ${baseWhereClause}
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY OccurredAt DESC, TraceId
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { ...queryParams, limit: params.limit },
+      format: "JSONEachRow",
+    });
+
+    return traceIdRowsSchema.parse(await result.json()).map((row) => row.TraceId);
+  }
+
+  async findDistinctValues(params: {
+    tenantId: string;
+    column: string;
+    prefix: string;
+    limit: number;
+  }): Promise<string[]> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findDistinctValues",
+    );
+
+    // Bound the scan to the last 30 days so prefix-match suggest doesn't
+    // touch cold (S3-tier) partitions. Suggest is interactive, so we trade
+    // completeness on stale historical values for sub-second responses.
+    const SUGGEST_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+    const fromMs = nowInstant().epochMilliseconds - SUGGEST_WINDOW_MS;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT DISTINCT ${params.column} AS val
+        FROM ${TABLE_NAME}
+        WHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+          AND ${params.column} LIKE {prefix:String}
+          AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${TABLE_NAME}
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+            GROUP BY TenantId, TraceId
+          )
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        tenantId: params.tenantId,
+        fromMs,
+        prefix: `${params.prefix}%`,
+        limit: params.limit,
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = distinctValueRowsSchema.parse(await result.json());
+    return rows.map((r) => r.val);
+  }
+
+  async findCategoricalFacet(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    table: FacetTableName;
+    timeColumn: string;
+    facetExpression: string;
+    limit: number;
+    offset: number;
+    prefix?: string;
+    filterWhere?: TraceFilterWhere;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findCategoricalFacet",
+    );
+
+    const { sql: whereClause, params: queryParams } =
+      TraceListClickHouseRepository.whereClauseForTable(
+        params.tenantId,
+        params.timeRange,
+        params.timeColumn,
+      );
+
+    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
+
+    const prefixFilter = params.prefix
+      ? `AND ${params.facetExpression} ILIKE concat({prefix:String}, '%')`
+      : "";
+
+    // `trace_summaries` is a ReplacingMergeTree-style projection — the same
+    // logical trace can have multiple rows (different `UpdatedAt` versions)
+    // until the merge runs. Without dedup, facet counts double-count any
+    // re-projected trace. Other tables (evaluation_runs, stored_spans) keep
+    // their own row identity per evaluation/span, so we don't dedup there.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          ${params.facetExpression} AS facet_value,
+          count() AS cnt,
+          count() OVER () AS total_distinct
+        FROM ${params.table}
+        WHERE ${whereClause}
+          ${dedupFilter}
+          ${filter.sql}
+          AND ${params.facetExpression} != ''
+          ${prefixFilter}
+        GROUP BY facet_value
+        ORDER BY cnt DESC
+        LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+      `,
+      query_params: {
+        ...filter.params,
+        ...queryParams,
+        limit: params.limit,
+        offset: params.offset,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = facetRowsSchema.parse(await result.json());
+    return TraceListClickHouseRepository.mapFacetRows(rows);
+  }
+
+  async findDiscreteValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    table: FacetTableName;
+    timeColumn: string;
+    column: string;
+    limit: number;
+    filterWhere?: TraceFilterWhere;
+  }): Promise<DiscreteFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findDiscreteValues",
+    );
+
+    const { sql: whereClause, params: queryParams } =
+      TraceListClickHouseRepository.whereClauseForTable(
+        params.tenantId,
+        params.timeRange,
+        params.timeColumn,
+      );
+
+    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
+
+    // Same ReplacingMergeTree dedup as findCategoricalFacet — only
+    // trace_summaries re-projects a logical trace across versions.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          ${params.column} AS discrete_value,
+          count() AS cnt,
+          count() OVER () AS total_distinct
+        FROM ${params.table}
+        WHERE ${whereClause}
+          ${dedupFilter}
+          ${filter.sql}
+          AND ${params.column} IS NOT NULL
+        GROUP BY discrete_value
+        ORDER BY discrete_value ASC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { ...filter.params, ...queryParams, limit: params.limit },
+      format: "JSONEachRow",
+    });
+
+    const rows = discreteValueRowsSchema.parse(await result.json());
+    return {
+      values: rows.map((r) => ({
+        value: Number(r.discrete_value),
+        count: Number(r.cnt),
+      })),
+      // `count() OVER ()` is evaluated over the full grouped set before LIMIT,
+      // so this is the true distinct count even when values are capped.
+      distinctCount: Number(rows[0]?.total_distinct ?? 0),
+    };
+  }
+
+  async findCategoricalFacetRaw(params: {
+    tenantId: string;
+    query: TraceListFacetQuery;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findCategoricalFacetRaw",
+    );
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: params.query.sql,
+      query_params: params.query.params,
+      // Per-query guard (e.g. the key-discovery facets' memory ceiling); absent
+      // for facets that don't set one.
+      ...(params.query.settings ? { clickhouse_settings: params.query.settings } : {}),
+      format: "JSONEachRow",
+    });
+
+    const rows = facetRowsSchema.parse(await result.json());
+    return TraceListClickHouseRepository.mapFacetRows(rows);
+  }
+
+  async findRangeStatsForTable(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    table: FacetTableName;
+    timeColumn: string;
+    column: string;
+    filterWhere?: TraceFilterWhere;
+  }): Promise<{ min: number; max: number }> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findRangeStatsForTable",
+    );
+
+    const { sql: whereClause, params: queryParams } =
+      TraceListClickHouseRepository.whereClauseForTable(
+        params.tenantId,
+        params.timeRange,
+        params.timeColumn,
+      );
+
+    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
+
+    // Match the dedup behaviour of findCategoricalFacet/findBatchedFacets:
+    // trace_summaries is a ReplacingMergeTree projection, so without the
+    // IN-tuple dedup older versions of a trace widen the discovered
+    // min/max envelope until merges run. Other facet tables keep one row
+    // per logical entity (eval/span) and don't need it.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          min(${params.column}) AS min_val,
+          max(${params.column}) AS max_val
+        FROM ${params.table}
+        WHERE ${whereClause}
+          ${dedupFilter}
+          ${filter.sql}
+      `,
+      query_params: { ...filter.params, ...queryParams },
+      format: "JSONEachRow",
+    });
+
+    const rows = rangeRowsSchema.parse(await result.json());
+    const row = rows[0];
+    return { min: Number(row?.min_val ?? 0), max: Number(row?.max_val ?? 0) };
+  }
+
+  /**
+   * Tuple-typed arrayJoin packs every facet into a single row stream. Each (key, expression)
+   * pair becomes one (key, value) tuple per row.
+   */
+  private async fetchCategoricalFacets({
+    client,
+    specs,
+    table,
+    whereClause,
+    dedupFilter,
+    filterClause,
+    queryParams,
+    topN,
+  }: {
+    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    specs: { key: string; expression: string }[];
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    filterClause: string;
+    queryParams: Record<string, unknown>;
+    topN: number;
+  }): Promise<Record<string, CategoricalFacetResult>> {
+    const tupleArray = specs
+      .map((s) => `(${this.quoteIdentifier(s.key)}, toString(${s.expression}))`)
+      .join(", ");
+
+    const query = `
+              SELECT facet_key, facet_value, cnt, total_distinct FROM (
+                SELECT
+                  facet_key,
+                  facet_value,
+                  cnt,
+                  count() OVER (PARTITION BY facet_key) AS total_distinct
+                FROM (
+                  SELECT facet_key, facet_value, count() AS cnt FROM (
+                    SELECT
+                      arrayJoin([${tupleArray}]) AS kv,
+                      kv.1 AS facet_key,
+                      kv.2 AS facet_value
+                    FROM ${table}
+                    WHERE ${whereClause}
+                      ${dedupFilter}
+                      ${filterClause}
+                  )
+                  WHERE facet_value != ''
+                  GROUP BY facet_key, facet_value
+                )
+              )
+              ORDER BY facet_key, cnt DESC
+              LIMIT {topN:UInt32} BY facet_key
+            `;
+
+    const result = await client.query({
+      query,
+      query_params: { ...queryParams, topN },
+      format: "JSONEachRow",
+    });
+
+    const rows = keyedFacetRowsSchema.parse(await result.json());
+
+    const out: Record<string, CategoricalFacetResult> = {};
+    for (const spec of specs) {
+      out[spec.key] = { values: [], totalDistinct: 0 };
+    }
+    for (const row of rows) {
+      const bucket = out[row.facet_key];
+      if (!bucket) continue;
+      bucket.values.push({ value: row.facet_value, count: Number(row.cnt) });
+      bucket.totalDistinct = Number(row.total_distinct);
+    }
+
+    return out;
+  }
+
+  /**
+   * Indexed aliases, so arbitrary registry keys cannot collide with reserved SQL words or with
+   * each other after sanitisation.
+   */
+  private async fetchRangeFacets({
+    client,
+    specs,
+    table,
+    whereClause,
+    dedupFilter,
+    filterClause,
+    queryParams,
+  }: {
+    client: Awaited<ReturnType<TraceListClickHouseRepository["resolveClient"]>>;
+    specs: { key: string; expression: string }[];
+    table: FacetTableName;
+    whereClause: string;
+    dedupFilter: string;
+    filterClause: string;
+    queryParams: Record<string, unknown>;
+  }): Promise<Record<string, { min: number; max: number }>> {
+    const aggClauses = specs
+      .flatMap((s, i) => [
+        `min(${s.expression}) AS r_${i}_min`,
+        `max(${s.expression}) AS r_${i}_max`,
+      ])
+      .join(", ");
+
+    const query = `
+              SELECT ${aggClauses}
+              FROM ${table}
+              WHERE ${whereClause}
+                ${dedupFilter}
+                ${filterClause}
+            `;
+
+    const result = await client.query({
+      query,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+
+    const rows = rangeFacetRowsSchema.parse(await result.json());
+    const row = rows[0] ?? {};
+    const out: Record<string, { min: number; max: number }> = {};
+    for (let i = 0; i < specs.length; i += 1) {
+      const spec = specs[i]!;
+      out[spec.key] = {
+        min: Number(row[`r_${i}_min`] ?? 0),
+        max: Number(row[`r_${i}_max`] ?? 0),
+      };
+    }
+
+    return out;
+  }
+
+  async findBatchedFacets(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number; live?: boolean };
+    table: FacetTableName;
+    timeColumn: string;
+    categoricalSpecs: { key: string; expression: string }[];
+    rangeSpecs: { key: string; expression: string }[];
+    topN: number;
+    filterWhere?: TraceFilterWhere;
+  }): Promise<BatchedFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findBatchedFacets",
+    );
+
+    const { sql: whereClause, params: baseParams } =
+      TraceListClickHouseRepository.whereClauseForTable(
+        params.tenantId,
+        params.timeRange,
+        params.timeColumn,
+      );
+    const filter = facetFilterFragment(params.table, params.filterWhere, params.timeRange);
+    const queryParams = { ...filter.params, ...baseParams };
+
+    // `trace_summaries` is a ReplacingMergeTree-style projection — same trace
+    // can have multiple `UpdatedAt` versions until merge runs. The other facet
+    // tables (`evaluation_runs`, `stored_spans`) keep row identity per record.
+    const needsDedup = params.table === "trace_summaries";
+    const dedupFilter = needsDedup
+      ? `AND (TenantId, TraceId, UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM ${params.table}
+            WHERE ${whereClause}
+            GROUP BY TenantId, TraceId
+          )`
+      : "";
+
+    const client = await this.resolveClient(params.tenantId);
+    const shared = {
+      client,
+      table: params.table,
+      whereClause,
+      dedupFilter,
+      filterClause: filter.sql,
+      queryParams,
+    };
+
+    const categoricalsPromise =
+      params.categoricalSpecs.length === 0
+        ? Promise.resolve({})
+        : this.fetchCategoricalFacets({
+            ...shared,
+            specs: params.categoricalSpecs,
+            topN: params.topN,
+          });
+
+    const rangesPromise =
+      params.rangeSpecs.length === 0
+        ? Promise.resolve({})
+        : this.fetchRangeFacets({ ...shared, specs: params.rangeSpecs });
+
+    const [categoricals, ranges] = await Promise.all([categoricalsPromise, rangesPromise]);
+
+    return { categoricals, ranges };
+  }
+
+  /**
+   * Quote a registry key for safe use as a ClickHouse string literal. The
+   * registry only ships ASCII identifiers, but we still defend in depth.
+   */
+  private quoteIdentifier(key: string): string {
+    if (!/^[a-zA-Z0-9_]+$/.test(key)) {
+      throw new Error(`Invalid facet key: ${key}`);
+    }
+    return `'${key}'`;
+  }
+
+  async findAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findAttributeValues",
+    );
+
+    // Attribute values are typically low-cardinality; the picker needs only
+    // distinct values, fast, not exact counts. Strategy: scan a bounded
+    // prefix of rows with the key set and pull distinct values from that
+    // sample — surfaces every value in ms for low cardinality; high-
+    // cardinality keys re-query with a search prefix; counts return 0.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    const innerPrefix = params.prefix
+      ? "AND lower(Attributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
+      : "";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT Attributes[{attrKey:String}] AS facet_value
+        FROM ${TABLE_NAME}
+        PREWHERE TenantId = {tenantId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND mapContains(Attributes, {attrKey:String})
+        WHERE Attributes[{attrKey:String}] != ''
+          ${innerPrefix}
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = facetRowsSchema.parse(await result.json());
+    return TraceListClickHouseRepository.mapFacetRows(rows);
+  }
+
+  async findEventAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findEventAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against the store
+    // the `event.attribute.` filter actually queries: `Events.Attributes` is
+    // an Array(Map) parallel to `Events.Name`, so a span contributes one
+    // candidate value per event that carries the key.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    // The prefix filter lives INSIDE arrayFilter (not a WHERE on the
+    // arrayJoin alias) so the sample keeps its one-pass shape.
+    const valuePredicate = params.prefix
+      ? "v -> v != '' AND lower(v) LIKE concat({prefix:String}, '%')"
+      : "v -> v != ''";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT arrayJoin(
+          arrayFilter(
+            ${valuePredicate},
+            arrayMap(m -> m[{attrKey:String}], \`Events.Attributes\`)
+          )
+        ) AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND arrayExists(m -> mapContains(m, {attrKey:String}), \`Events.Attributes\`)
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = facetRowsSchema.parse(await result.json());
+    return TraceListClickHouseRepository.mapFacetRows(rows);
+  }
+
+  async findSpanAttributeValues(params: {
+    tenantId: string;
+    timeRange: { from: number; to: number };
+    attributeKey: string;
+    prefix?: string;
+    limit: number;
+    offset: number;
+  }): Promise<CategoricalFacetResult> {
+    EventUtils.validateTenantId(
+      { tenantId: params.tenantId },
+      "TraceListClickHouseRepository.findSpanAttributeValues",
+    );
+
+    // Same bounded-sample strategy as findAttributeValues, against
+    // `stored_spans.SpanAttributes` — the store the `span.attribute.` filter
+    // actually queries.
+    const ATTR_VALUE_SAMPLE_ROWS = 50_000;
+
+    const innerPrefix = params.prefix
+      ? "AND lower(SpanAttributes[{attrKey:String}]) LIKE concat({prefix:String}, '%')"
+      : "";
+
+    const sql = `
+      SELECT
+        facet_value,
+        0 AS cnt,
+        0 AS total_distinct
+      FROM (
+        SELECT DISTINCT SpanAttributes[{attrKey:String}] AS facet_value
+        FROM stored_spans
+        PREWHERE TenantId = {tenantId:String}
+          AND StartTime >= fromUnixTimestamp64Milli({timeFrom:Int64})
+          AND StartTime <= fromUnixTimestamp64Milli({timeTo:Int64})
+          AND mapContains(SpanAttributes, {attrKey:String})
+        WHERE SpanAttributes[{attrKey:String}] != ''
+          ${innerPrefix}
+        LIMIT {sampleRows:UInt32}
+        SETTINGS
+          max_execution_time = 3,
+          timeout_overflow_mode = 'break',
+          max_threads = 8
+      )
+      ORDER BY facet_value
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `;
+
+    const client = await this.resolveClient(params.tenantId);
+    const result = await client.query({
+      query: sql,
+      query_params: {
+        tenantId: params.tenantId,
+        timeFrom: params.timeRange.from,
+        timeTo: params.timeRange.to,
+        attrKey: params.attributeKey,
+        limit: params.limit,
+        offset: params.offset,
+        sampleRows: ATTR_VALUE_SAMPLE_ROWS,
+        ...(params.prefix ? { prefix: params.prefix } : {}),
+      },
+      format: "JSONEachRow",
+    });
+
+    const rows = facetRowsSchema.parse(await result.json());
+    return TraceListClickHouseRepository.mapFacetRows(rows);
+  }
+
+  private toTraceSummaryData(row: ClickHouseSummaryRow): TraceListSummary {
+    return {
+      traceId: row.TraceId,
+      spanCount: row.SpanCount,
+      totalDurationMs: Number(row.TotalDurationMs),
+      computedIOSchemaVersion: row.ComputedIOSchemaVersion,
+      computedInput: row.ComputedInput,
+      computedOutput: row.ComputedOutput,
+      timeToFirstTokenMs: row.TimeToFirstTokenMs,
+      timeToLastTokenMs: row.TimeToLastTokenMs,
+      tokensPerSecond: row.TokensPerSecond,
+      containsErrorStatus: !!row.ContainsErrorStatus,
+      containsOKStatus: !!row.ContainsOKStatus,
+      errorMessage: row.ErrorMessage,
+      models: row.Models,
+      totalCost: row.TotalCost,
+      nonBilledCost: row.NonBilledCost ?? null,
+      tokensEstimated: !!row.TokensEstimated,
+      totalPromptTokenCount: row.TotalPromptTokenCount,
+      totalCompletionTokenCount: row.TotalCompletionTokenCount,
+      outputFromRootSpan: !!row.OutputFromRootSpan,
+      outputSpanEndTimeMs: Number(row.OutputSpanEndTimeMs),
+      blockedByGuardrail: !!row.BlockedByGuardrail,
+      traceName: row.TraceName ?? "",
+      rootSpanType: row.RootSpanType,
+      containsAi: !!row.ContainsAi,
+      containsPrompt: !!row.ContainsPrompt,
+      selectedPromptId: row.SelectedPromptId,
+      selectedPromptSpanId: row.SelectedPromptSpanId,
+      selectedPromptStartTimeMs: null,
+      lastUsedPromptId: row.LastUsedPromptId,
+      lastUsedPromptVersionNumber: row.LastUsedPromptVersionNumber,
+      lastUsedPromptVersionId: row.LastUsedPromptVersionId,
+      lastUsedPromptSpanId: row.LastUsedPromptSpanId,
+      lastUsedPromptStartTimeMs: null,
+      topicId: row.TopicId,
+      subTopicId: row.SubTopicId,
+      annotationIds: row.AnnotationIds ?? [],
+      sizeBytes: Number(row.SizeBytes ?? 0),
+      attributes: TraceListClickHouseRepository.listAttributes(row),
+      // `OccurredAt` is the frozen storage anchor since ADR-087 and
+      // `EarliestSpanStartMs` is the span timing baseline it used to double as.
+      // A row at an older stamp predates the split and carries both in the one
+      // column, which is why this is version-gated rather than a bare read.
+      storageAnchorMs: Number(row.OccurredAt),
+      occurredAt: isStorageAnchoredVersion(row.Version)
+        ? Number(row.EarliestSpanStartMs ?? 0)
+        : Number(row.OccurredAt),
+      createdAt: Number(row.CreatedAt),
+      updatedAt: Number(row.UpdatedAt),
+      LastEventOccurredAt: Number(row.LastEventOccurredAt ?? 0),
+    };
+  }
+
+  /**
+   * When the client signals `live: true` (relative preset like "Last 24h"),
+   * `to` is rolling — skip the upper bound so new traces always appear.
+   * For absolute ranges we keep the exact bound.
+   */
+  private static isLiveUpperBound(timeRange: { to: number; live?: boolean }): boolean {
+    return timeRange.live === true;
+  }
+
+  /**
+   * WHERE split: baseSql for dedup, sql for filter; dedup must ignore user filter.
+   */
+  private static whereClause(
+    tenantId: string,
+    timeRange: { from: number; to: number; live?: boolean },
+    filterWhere?: { sql: string; params: Record<string, unknown> },
+  ): { sql: string; baseSql: string; params: Record<string, unknown> } {
+    const parts = [
+      "TenantId = {tenantId:String}",
+      "OccurredAt >= fromUnixTimestamp64Milli({timeFrom:Int64})",
+    ];
+    const params: Record<string, unknown> = {
+      tenantId,
+      timeFrom: timeRange.from,
+    };
+
+    if (!TraceListClickHouseRepository.isLiveUpperBound(timeRange)) {
+      parts.push("OccurredAt <= fromUnixTimestamp64Milli({timeTo:Int64})");
+      params.timeTo = timeRange.to;
+    }
+
+    const baseSql = parts.join(" AND ");
+
+    if (filterWhere) {
+      parts.push(filterWhere.sql);
+      Object.assign(params, filterWhere.params);
+    }
+
+    return { sql: parts.join(" AND "), baseSql, params };
+  }
+
+  private static whereClauseForTable(
+    tenantId: string,
+    timeRange: { from: number; to: number; live?: boolean },
+    timeColumn: string,
+  ): { sql: string; params: Record<string, unknown> } {
+    const parts = [
+      "TenantId = {tenantId:String}",
+      `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
+    ];
+    const params: Record<string, unknown> = {
+      tenantId,
+      timeFrom: timeRange.from,
+    };
+
+    if (!TraceListClickHouseRepository.isLiveUpperBound(timeRange)) {
+      parts.push(`${timeColumn} <= fromUnixTimestamp64Milli({timeTo:Int64})`);
+      params.timeTo = timeRange.to;
+    }
+
+    return { sql: parts.join(" AND "), params };
+  }
+
+  private static mapFacetRows(rows: FacetRow[]): CategoricalFacetResult {
+    return {
+      values: rows.map((r) => ({
+        value: r.facet_value,
+        ...(r.facet_label ? { label: r.facet_label } : {}),
+        count: Number(r.cnt),
+        ...TraceListClickHouseRepository.extractFacetAggregates(r),
+        ...TraceListClickHouseRepository.extractEventMetrics(r),
+      })),
+      totalDistinct: rows.length > 0 ? Number(rows[0]!.total_distinct) : 0,
+    };
+  }
+
+  /**
+   * Reshape the event facet's composite-key buckets into per-metric-key value
+   * lists. Values pass through as stored — verbatim strings — so a drilldown
+   * click round-trips exactly into `event.attribute.<key>:<value>`.
+   */
+  private static extractEventMetrics(r: FacetRow): {
+    eventMetrics?: EventMetricValues[];
+  } {
+    if (!r.metric_values?.length) return {};
+    const byKey = new Map<string, { value: string; count: number }[]>();
+    for (const [composite, count] of r.metric_values) {
+      const sep = composite.indexOf(EVENT_METRIC_SEP);
+      if (sep <= 0) continue;
+      const key = composite.slice(0, sep);
+      const value = composite.slice(sep + EVENT_METRIC_SEP.length);
+      // A second separator means the metric key itself carried one, so the
+      // split point is a guess. Drop the bucket rather than render a row
+      // whose key and value are both wrong.
+      if (value === "" || value.includes(EVENT_METRIC_SEP)) continue;
+      let list = byKey.get(key);
+      if (!list) {
+        list = [];
+        byKey.set(key, list);
+      }
+      list.push({ value, count: Number(count) });
+    }
+    if (byKey.size === 0) return {};
+    return {
+      eventMetrics: [...byKey.entries()].map(([key, values]) => ({ key, values })),
+    };
+  }
+
+  private static extractFacetAggregates(r: FacetRow): {
+    aggregates?: {
+      passedCount: number;
+      failedCount: number;
+      erroredCount: number;
+      scoreMin: number | null;
+      scoreMax: number | null;
+      hasScore: boolean;
+      distinctScores: number;
+      hasLabel: boolean;
+      labelValues?: { value: string; count: number }[];
+    };
+  } {
+    // Only the evaluator facet's queryBuilder emits these columns. Other
+    // facets (status, model, …) return undefined for all of them, so the
+    // discriminator below avoids attaching an empty aggregates object to
+    // every facet value.
+    const hasNoAggregates =
+      r.passed_count === undefined &&
+      r.failed_count === undefined &&
+      r.errored_count === undefined &&
+      r.has_score === undefined &&
+      r.has_label === undefined;
+    if (hasNoAggregates) {
+      return {};
+    }
+    // Reshape the `[[value, count], …]` tuples into `{ value, count }`. Drop any
+    // residual empty/blank values defensively — the SQL already filters them.
+    const labelValues = (r.label_values ?? [])
+      .filter(([value]) => value !== "")
+      .map(([value, count]) => ({ value, count: Number(count) }));
+    return {
+      aggregates: {
+        passedCount: Number(r.passed_count ?? 0),
+        failedCount: Number(r.failed_count ?? 0),
+        erroredCount: Number(r.errored_count ?? 0),
+        scoreMin: r.score_min == null ? null : Number(r.score_min),
+        scoreMax: r.score_max == null ? null : Number(r.score_max),
+        hasScore: Boolean(r.has_score),
+        distinctScores: Number(r.distinct_scores ?? 0),
+        hasLabel: Boolean(r.has_label),
+        ...(labelValues.length > 0 ? { labelValues } : {}),
+      },
+    };
+  }
+
+  private static listAttributes(row: ClickHouseSummaryRow): Record<string, string> {
+    const attributes: Record<string, string> = {};
+    if (row.AttrSpanName) attributes["langwatch.span.name"] = row.AttrSpanName;
+    if (row.AttrServiceName) attributes["service.name"] = row.AttrServiceName;
+    if (row.AttrConversationId) {
+      attributes["gen_ai.conversation.id"] = row.AttrConversationId;
+    }
+    if (row.AttrUserId) attributes["langwatch.user_id"] = row.AttrUserId;
+    if (row.AttrOrigin) attributes["langwatch.origin"] = row.AttrOrigin;
+    if (row.AttrNonBillable) {
+      attributes["langwatch.cost.non_billable"] = row.AttrNonBillable;
+    }
+    // Fold-summed cache / reasoning token counts the drawer header reads to show
+    // the "Cache read" / "Cache write" / reasoning rows (the raw per-span
+    // gen_ai.usage.cache_* values never reach the trace attribute map).
+    if (row.AttrCacheReadTokens) {
+      attributes["langwatch.reserved.cache_read_tokens"] = row.AttrCacheReadTokens;
+    }
+    if (row.AttrInputMediaRefs) {
+      attributes["langwatch.reserved.media_refs.input"] = row.AttrInputMediaRefs;
+    }
+    if (row.AttrOutputMediaRefs) {
+      attributes["langwatch.reserved.media_refs.output"] = row.AttrOutputMediaRefs;
+    }
+    if (row.AttrCacheCreationTokens) {
+      attributes["langwatch.reserved.cache_creation_tokens"] = row.AttrCacheCreationTokens;
+    }
+    if (row.AttrReasoningTokens) {
+      attributes["langwatch.reserved.reasoning_tokens"] = row.AttrReasoningTokens;
+    }
+    if (row.AttrContextSizeTokens) {
+      attributes["langwatch.reserved.context_size_tokens"] = row.AttrContextSizeTokens;
+    }
+    // JSON-encoded array of trace labels (e.g. '["prod","beta"]'). Preserve the
+    // raw string here because TraceSummaryData.attributes is string-valued; the
+    // list mapper decodes it into a string[] for the Labels column.
+    if (row.AttrLabels) attributes["langwatch.labels"] = row.AttrLabels;
+    return attributes;
+  }
+}
+
+const facetRowSchema = z.looseObject({
+  facet_value: chString,
+  facet_label: chString.optional(),
+  cnt: numeric,
+  total_distinct: numeric,
+  // Optional per-value aggregates carried by the evaluator facet's
+  // custom queryBuilder so the sidebar can render the inline drilldown
+  // without firing a second query per evaluator.
+  passed_count: numeric.optional(),
+  failed_count: numeric.optional(),
+  errored_count: numeric.optional(),
+  score_min: numeric.nullable().optional(),
+  score_max: numeric.nullable().optional(),
+  has_score: flag.optional(),
+  distinct_scores: numeric.optional(),
+  has_label: flag.optional(),
+  // Top-N `Array(Tuple(String, UInt64))` as `[[value, count], …]`; for the
+  // event facet the value is `<metric key>\x1F<stored value>` (EVENT_METRIC_SEP).
+  label_values: z.array(z.tuple([chString, numeric])).optional(),
+  metric_values: z.array(z.tuple([chString, numeric])).optional(),
+});
+
+const facetRowsSchema = z.array(facetRowSchema);
+
+type FacetRow = z.infer<typeof facetRowSchema>;
+
+// CH returns empty strings for missing Map keys; the list mapper expects
+// keys absent so its ?? null / ?? "" fallbacks fire, not present-but-empty.
+// Keys below match listAll's explicit Attributes[...] projections — add a
+// new one in both places. If user-pinned attribute columns ship, prefer an
+// extraAttributeKeys: string[] input over reintroducing the full Map projection.

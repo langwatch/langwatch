@@ -1,31 +1,31 @@
 {
   "name": "langgraph-sdk-example",
   "description": "",
+  "keywords": [],
+  "license": "MIT",
+  "author": "LangWatch",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "start": "tsc && dotenv -- node dist/index.js",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "LangWatch",
-  "type": "module",
-  "license": "MIT",
   "dependencies": {
-    "@langchain/openai": "^0.6.3",
-    "@langchain/core": "^0.3.80",
     "@langchain/community": "^1.1.18",
-    "langchain": "^0.3.37",
+    "@langchain/core": "^0.3.80",
     "@langchain/langgraph": "^0.4.3",
+    "@langchain/openai": "^0.6.3",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.217.0",
     "cli-markdown": "^3.5.1",
-    "zod": "^3.22.4",
-    "langwatch": "file:../../"
+    "langchain": "^0.3.37",
+    "langwatch": "file:../../",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
-    "typescript": "^5.9.2",
-    "dotenv-cli": "^10.0.0"
+    "dotenv-cli": "^10.0.0",
+    "typescript": "^5.9.2"
   },
   "overrides": {
     "@grpc/grpc-js": ">=1.14.4",

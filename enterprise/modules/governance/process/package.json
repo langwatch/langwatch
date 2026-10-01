@@ -1,0 +1,88 @@
+{
+  "name": "@langwatch/enterprise-governance-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side LangWatch Enterprise governance services.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/aws-client": "workspace:*",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/enterprise-gateway-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-scim-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@opentelemetry/otlp-transformer": "catalog:",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "jsonpath-plus": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/gateway-process": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/trace-process": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "nanoid": "^6.0.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

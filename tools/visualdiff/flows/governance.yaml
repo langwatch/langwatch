@@ -1,0 +1,471 @@
+# Governance and Connect flows (lane green-governance-ui). Labels, placeholders and test ids are
+# the ones main draws (ee/governance/dashboard and src/components/governance on origin/main).
+# Enterprise edition only: the seeded licence unlocks the ingestion source cap and the tool
+# catalog. Costs, Insights, Analytics and Signals also sit behind the billed-cost release flag
+# (release_ui_governance_billed_cost_enabled), which the stack must force on (FeatureFlagsOn).
+# Not scripted, and why: the AI tool icon on main is a data URL read in the browser and sent in
+# the create call (no presigned upload exists on either ref); routing policies are the gateway
+# module's screen (gateway.yaml). Archiving a source asks through window.confirm, so that flow
+# needs the runner to accept native dialogs. Unrun: first run proves the selectors.
+flows:
+  - id: governance-overview-hero-and-chips
+    title: The governance overview draws its greeting, the ways in and the Preview badge
+    steps:
+      - action: go
+        with:
+          path: /governance
+      - action: expect
+        with:
+          text: AI Governance
+      - action: expect
+        with:
+          text: Every AI tool, agent, licence and dollar across the organization.
+      - action: expect
+        with:
+          text: Add department
+      - action: expect
+        with:
+          text: Add agent
+      - action: expect
+        with:
+          text: Add tool
+
+  - id: governance-overview-add-tool-chip-opens-drawer
+    title: The Add tool chip on the overview lands on the inventory catalog with the tool drawer open
+    steps:
+      - action: go
+        with:
+          path: /governance
+      - action: click
+        with:
+          selector: a
+          hasText: Add tool
+      - action: expect
+        with:
+          url: /governance/inventory
+      - action: expect
+        with:
+          text: Save tool
+          timeout: "15000"
+
+  - id: governance-overview-add-department-chip-opens-drawer
+    title: The Add department chip on the overview lands on People with the department drawer open
+    steps:
+      - action: go
+        with:
+          path: /governance
+      - action: click
+        with:
+          selector: a
+          hasText: Add department
+      - action: expect
+        with:
+          url: /governance/people
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+
+  - id: governance-department-create-reads-back
+    title: Create a department from the deep link and see it on the Departments tab after a reload
+    steps:
+      - action: go
+        with:
+          path: /governance/people?tab=departments&add=1
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+      - action: type
+        with:
+          placeholder: Engineering
+          text: VD Dept {uid}
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: Department created
+      - action: go
+        with:
+          path: /governance/people?tab=departments
+      - action: expect
+        with:
+          text: VD Dept {uid}
+          timeout: "15000"
+
+  - id: governance-department-create-refuses-empty-name
+    title: Creating a department with no name says so beside the field and creates nothing
+    steps:
+      - action: go
+        with:
+          path: /governance/people?tab=departments&add=1
+      - action: expect
+        with:
+          text: Department name
+          timeout: "15000"
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: Give the department a name.
+
+  - id: governance-costs-breakdown-panels
+    title: The costs page draws its department, model, agent and person panels, with no read error
+    steps:
+      - action: go
+        with:
+          path: /governance/costs
+      - action: expect
+        with:
+          text: Cost by department
+          timeout: "25000"
+      - action: expect
+        with:
+          text: Cost by model
+      - action: expect
+        with:
+          text: Cost by agent
+      - action: expect
+        with:
+          text: Metered spend by person
+      - action: expect
+        with:
+          testId: cost-spenders-error
+          equals: "0"
+
+  - id: governance-teams-and-people-cost-views
+    title: The teams ranking and the people table both render, and the old users address lands on People
+    steps:
+      - action: go
+        with:
+          path: /governance/teams
+      - action: expect
+        with:
+          text: /All teams by/
+          timeout: "20000"
+      - action: go
+        with:
+          path: /governance/people
+      - action: expect
+        with:
+          testId: people-summary-strip
+          timeout: "20000"
+      - action: go
+        with:
+          path: /governance/users
+      - action: expect
+        with:
+          url: /governance/people
+
+  - id: governance-activity-signals-and-insights-previews
+    title: Signals and Insights render their Preview pages, empty, with the copy main draws
+    steps:
+      - action: go
+        with:
+          path: /governance/signals
+      - action: expect
+        with:
+          text: Signals & Alerts
+      - action: expect
+        with:
+          testId: signals-empty-registry
+      - action: expect
+        with:
+          text: No rules here yet. Creating one is coming.
+      - action: go
+        with:
+          path: /governance/insights
+      - action: expect
+        with:
+          text: Insights
+      - action: expect
+        with:
+          testId: insights-empty-brief
+
+  - id: governance-agents-register-drawer-deep-link
+    title: The agents page opens the register drawer from its add deep link
+    steps:
+      - action: go
+        with:
+          path: /governance/agents?add=1
+      - action: expect
+        with:
+          text: Register an agent
+          timeout: "15000"
+
+  - id: governance-source-add-status-and-detail
+    title: Add a Generic OpenTelemetry source, see it awaiting its first event, reload and open its page
+    steps:
+      - action: go
+        with:
+          path: /governance/inventory?tab=sources
+      - action: expect
+        with:
+          text: Inventory
+      - action: click
+        with:
+          text: /^\s*Add source\s*$/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Generic OpenTelemetry
+      - action: expect
+        with:
+          text: Add Generic OpenTelemetry
+      - action: type
+        with:
+          placeholder: Display name for this source
+          text: VD Source {uid}
+      - action: click
+        with:
+          text: /^\s*Create source\s*$/
+      - action: expect
+        with:
+          text: Source created - paste this secret upstream
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /only time we.ll show this secret/
+      - action: click
+        with:
+          text: /I.ve saved it/
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Source {uid}")'
+          min: "1"
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Source {uid}"):has-text("Awaiting first event")'
+          min: "1"
+      - action: go
+        with:
+          path: /governance/inventory?tab=sources
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Source {uid}")'
+          min: "1"
+          timeout: "15000"
+      - action: click
+        with:
+          selector: 'a[href^="/governance/inventory/"]'
+          hasText: VD Source {uid}
+      - action: expect
+        with:
+          url: /governance/inventory/
+      - action: expect
+        with:
+          text: VD Source {uid}
+
+  - id: governance-source-archive-removes-row
+    title: Archive a source from its row menu and see it gone, also after a reload
+    steps:
+      - action: go
+        with:
+          path: /governance/inventory?tab=sources
+      - action: click
+        with:
+          text: /^\s*Add source\s*$/
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Generic OpenTelemetry
+      - action: type
+        with:
+          placeholder: Display name for this source
+          text: VD Archive {uid}
+      - action: click
+        with:
+          text: /^\s*Create source\s*$/
+      - action: click
+        with:
+          text: /I.ve saved it/
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Archive {uid}")'
+          min: "1"
+      - action: click
+        with:
+          label: Actions for VD Archive {uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Archive
+      - action: expect
+        with:
+          text: Source archived
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Archive {uid}")'
+          equals: "0"
+      - action: go
+        with:
+          path: /governance/inventory?tab=sources
+      - action: expect
+        with:
+          count: 'tbody tr:has-text("VD Archive {uid}")'
+          equals: "0"
+
+  - id: governance-tool-register-with-uploaded-icon
+    title: Register an internal tool with an uploaded icon, see it in the catalog and on the personal portal
+    steps:
+      - action: go
+        with:
+          path: /governance/inventory?tab=catalog&add=1
+      - action: expect
+        with:
+          text: Save tool
+          timeout: "15000"
+      - action: click
+        with:
+          text: Internal tool
+      - action: fill
+        with:
+          field: e.g. Claude Code
+          value: VD Tool {uid}
+      - action: fill
+        with:
+          selector: textarea
+          value: VD tool description {uid}
+      - action: fill
+        with:
+          field: https://copilotstudio.microsoft.com
+          value: https://example.com/vd-{uid}
+      - action: upload
+        with:
+          fixture: avatar.png
+      - action: expect
+        with:
+          text: Replace uploaded icon
+      - action: click
+        with:
+          text: /^\s*Save tool\s*$/
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool {uid}")'
+          min: "1"
+          timeout: "20000"
+      - action: go
+        with:
+          path: /governance/inventory?tab=catalog
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool {uid}") img[src^="data:image"]'
+          min: "1"
+          timeout: "20000"
+      - action: go
+        with:
+          path: /me
+      - action: expect
+        with:
+          text: Internal tools
+          timeout: "20000"
+      - action: expect
+        with:
+          text: VD Tool {uid}
+
+  - id: governance-tool-edit-icon-then-remove
+    title: Change a tool's icon from its row menu, read it back after a reload, then remove the tool
+    steps:
+      - action: go
+        with:
+          path: /governance/inventory?tab=catalog&add=1
+      - action: expect
+        with:
+          text: Save tool
+          timeout: "15000"
+      - action: click
+        with:
+          text: Internal tool
+      - action: fill
+        with:
+          field: e.g. Claude Code
+          value: VD Tool E {uid}
+      - action: fill
+        with:
+          selector: textarea
+          value: VD tool description {uid}
+      - action: fill
+        with:
+          field: https://copilotstudio.microsoft.com
+          value: https://example.com/vd-e-{uid}
+      - action: click
+        with:
+          text: /^\s*Save tool\s*$/
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool E {uid}")'
+          min: "1"
+          timeout: "20000"
+      - action: click
+        with:
+          label: Actions for VD Tool E {uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Edit
+      - action: expect
+        with:
+          text: Edit tool
+      - action: expect
+        with:
+          text: Upload custom icon
+      - action: upload
+        with:
+          fixture: avatar.png
+      - action: expect
+        with:
+          text: Replace uploaded icon
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: go
+        with:
+          path: /governance/inventory?tab=catalog
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool E {uid}") img[src^="data:image"]'
+          min: "1"
+          timeout: "20000"
+      - action: click
+        with:
+          label: Actions for VD Tool E {uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Remove
+      - action: expect
+        with:
+          text: Remove VD Tool E {uid}?
+      - action: click
+        with:
+          text: /^\s*Remove tool\s*$/
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool E {uid}")'
+          equals: "0"
+      - action: go
+        with:
+          path: /governance/inventory?tab=catalog
+      - action: expect
+        with:
+          count: '[data-testid^="tool-card-"]:has-text("VD Tool E {uid}")'
+          equals: "0"
+
+  - id: connect-settings-services-render
+    title: The Connect settings page lists the hosted services, spend cap and licence sync
+    steps:
+      - action: go
+        with:
+          path: /settings/connect
+      - action: expect
+        with:
+          text: Connect
+      - action: expect
+        with:
+          text: The LangWatch-hosted services this install may call, what each one sends, and what they cost.
+      - action: expect
+        with:
+          testId: connect-services
+          timeout: "20000"

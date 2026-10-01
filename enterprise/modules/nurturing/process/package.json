@@ -1,0 +1,55 @@
+{
+  "name": "@langwatch/enterprise-nurturing-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Customer.io nurturing and server-side PostHog product milestones: owners record signals, nurturing names no peer.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-nurturing-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "posthog-node": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

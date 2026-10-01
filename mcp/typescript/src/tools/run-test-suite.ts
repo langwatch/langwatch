@@ -1,10 +1,7 @@
-import type {
-  RunParameters,
-  RunPlanTarget,
-} from "../langwatch-api-run-plans.js";
-import { toWireTargets } from "../schemas/run-plan.js";
-import { runTestSuite as apiRunTestSuite } from "../langwatch-api-test-suites.js";
-import { formatRunPlanRun } from "./format-run-plan.js";
+import type { RunParameters, RunPlanTarget } from "../langwatch-api-run-plans.ts";
+import { runTestSuite as apiRunTestSuite } from "../langwatch-api-test-suites.ts";
+import { toWireTargets } from "../schemas/run-plan.ts";
+import { formatRunPlanRun } from "./format-run-plan.ts";
 
 /**
  * Handles the platform_run_test_suite MCP tool invocation.

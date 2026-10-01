@@ -1,13 +1,13 @@
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
-import { parseJsonFlags } from "./parseJsonObject";
-import { slackShorthands } from "./slackShorthands";
-import type { TriggerRecord } from "./summary";
-import { triggerRequest } from "./triggerRequest";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { parseJsonFlags } from "./parseJsonObject.ts";
+import { slackShorthands } from "./slackShorthands.ts";
+import type { TriggerRecord } from "./summary.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Returns the updated trigger rather than printing it: the output port renders

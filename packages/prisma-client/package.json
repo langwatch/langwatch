@@ -1,0 +1,57 @@
+{
+  "name": "@langwatch/prisma-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
+  "license": "MIT",
+  "files": [
+    "prisma",
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./generated": {
+      "types": "./dist/generated/client.d.ts",
+      "default": "./src/generated/client.ts"
+    },
+    "./errors": {
+      "types": "./dist/prisma-error-codes.d.ts",
+      "default": "./src/prisma-error-codes.ts"
+    },
+    "./ownership": {
+      "types": "./dist/ownership.d.ts",
+      "default": "./src/ownership.ts"
+    }
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate --config ./prisma.config.ts && node scripts/generate-table-catalogue.mjs",
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:seed": "pnpm --filter @langwatch/tasks task storage-seed"
+  },
+  "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "catalog:",
+    "lodash-es": "catalog:",
+    "pg": "^8.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/lodash-es": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.20.3",
+    "prisma": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

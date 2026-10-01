@@ -1,0 +1,294 @@
+/**
+ * `/api/dataset`, pinned: every method, path, operation id and
+ * permission the family publishes. Operation ids are what the published
+ * document already carries, so a rename here renames an integrator's client.
+ */
+
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
+import type { DatasetApi } from "@langwatch/dataset-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { completeDatasetApi } from "../../app/__tests__/dataset-api.fake.ts";
+import { createDatasetRest } from "../dataset.rest.ts";
+
+const declaration = createDatasetRest().router();
+
+const scope: AuthzDeclaredScopeId = { tier: "project", id: "project-1" };
+const project = { projectSlug: "my-project", viewerUserId: null, actorId: "user-1" };
+
+function answer(
+  operation: string,
+  app: DatasetApi,
+  input: unknown,
+  files?: Record<string, File>,
+): Promise<unknown> {
+  const route = declaration.routes.find((candidate) => candidate.operation === operation);
+  if (!route) throw new Error(`no route declares the operation "${operation}"`);
+
+  return Promise.resolve(
+    route.handler({ app, input, files, scope, actor: null, signal: undefined } as never, project),
+  );
+}
+
+describe("the dataset REST declaration", () => {
+  describe("given the family the process mounts", () => {
+    it("keeps every published address, operation id and permission", () => {
+      expect(
+        declaration.routes.map((route) => ({
+          method: route.method,
+          path: route.path,
+          operation: route.operation,
+          permission: route.permission,
+        })),
+      ).toEqual([
+        { method: "get", path: "/", operation: "getApiDataset", permission: "datasets:view" },
+        { method: "post", path: "/", operation: "postApiDataset", permission: "datasets:create" },
+        {
+          method: "post",
+          path: "/:slugOrId/records",
+          operation: "postApiDatasetBySlugOrIdRecords",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/:datasetSlug/entries",
+          operation: "postApiDatasetBySlugEntries",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/imports",
+          operation: "postApiDatasetImports",
+          permission: "datasets:create",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/imports",
+          operation: "postApiDatasetBySlugOrIdImports",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/upload",
+          operation: "postApiDatasetUpload",
+          permission: "datasets:create",
+        },
+        {
+          method: "post",
+          path: "/:slugOrId/upload",
+          operation: "postApiDatasetBySlugOrIdUpload",
+          permission: "datasets:update",
+        },
+        {
+          method: "post",
+          path: "/attachments",
+          operation: "postApiDatasetAttachments",
+          permission: "datasets:manage",
+        },
+        {
+          method: "get",
+          path: "/:slugOrId",
+          operation: "getApiDatasetBySlugOrId",
+          permission: "datasets:view",
+        },
+        {
+          method: "patch",
+          path: "/:slugOrId",
+          operation: "patchApiDatasetBySlugOrId",
+          permission: "datasets:manage",
+        },
+        {
+          method: "delete",
+          path: "/:slugOrId",
+          operation: "deleteApiDatasetBySlugOrId",
+          permission: "datasets:manage",
+        },
+        {
+          method: "get",
+          path: "/:slugOrId/records",
+          operation: "getApiDatasetBySlugOrIdRecords",
+          permission: "datasets:view",
+        },
+        {
+          method: "get",
+          path: "/:datasetSlug/entries",
+          operation: "getApiDatasetBySlugEntries",
+          permission: "datasets:view",
+        },
+        {
+          method: "patch",
+          path: "/:slugOrId/records/:recordId",
+          operation: "patchApiDatasetBySlugOrIdRecordsByRecordId",
+          permission: "datasets:update",
+        },
+        {
+          method: "delete",
+          path: "/:slugOrId/records",
+          operation: "deleteApiDatasetBySlugOrIdRecords",
+          permission: "datasets:manage",
+        },
+      ]);
+    });
+
+    it("serves `/api/dataset` at the management vintage, dated addresses included", () => {
+      expect(declaration.namespace).toBe("dataset");
+      expect(declaration.version).toBe("2026-08-07");
+      expect(declaration.addressing).toBe("dated");
+      expect(declaration.credential).toBe("project");
+    });
+
+    it("answers a create with 201 and everything else with 200", () => {
+      const created = declaration.routes
+        .filter((route) => route.status === 201)
+        .map((route) => route.operation);
+
+      expect(created).toEqual([
+        "postApiDataset",
+        "postApiDatasetBySlugOrIdRecords",
+        "postApiDatasetImports",
+        "postApiDatasetUpload",
+      ]);
+    });
+
+    it("marks the multipart upload pair deprecated, naming the imports successor", () => {
+      const pair = declaration.routes.filter((route) => route.path.endsWith("/upload"));
+
+      expect(pair.map((route) => route.operation)).toEqual([
+        "postApiDatasetUpload",
+        "postApiDatasetBySlugOrIdUpload",
+      ]);
+      for (const route of pair) {
+        expect(route.deprecated?.successor).toBeTruthy();
+      }
+    });
+  });
+
+  describe("given the web-only direct-upload addresses main served", () => {
+    /** @scenario "The web-only direct-upload addresses are gone" */
+    it("declares none of them", () => {
+      expect(declaration.routes.filter((route) => route.path.startsWith("/direct-upload"))).toEqual(
+        [],
+      );
+    });
+  });
+
+  describe("when the project's datasets are listed", () => {
+    it("passes the page window through and links each row into the platform", async () => {
+      const listDatasets = vi.fn(async () => ({
+        data: [{ id: "dataset-1" }],
+        pagination: { page: 2, limit: 10, total: 1, totalPages: 1 },
+      }));
+
+      const body = (await answer(
+        "getApiDataset",
+        completeDatasetApi({ listDatasets: listDatasets as never }),
+        { page: 2, limit: 10 },
+      )) as { data: { platformUrl: string }[] };
+
+      expect(listDatasets).toHaveBeenCalledWith({ projectId: "project-1", page: 2, limit: 10 });
+      expect(body.data[0]?.platformUrl).toBe(
+        "https://app.example.com/my-project/datasets/dataset-1",
+      );
+    });
+  });
+
+  describe("when one dataset is read whole", () => {
+    it("asks for it under the family's own read ceiling", async () => {
+      const getDatasetWithinLimit = vi.fn(async () => ({
+        dataset: { id: "dataset-1", name: "One", slug: "one", columnTypes: [] },
+        records: [],
+        truncated: false,
+      }));
+
+      await answer(
+        "getApiDatasetBySlugOrId",
+        completeDatasetApi({ getDatasetWithinLimit: getDatasetWithinLimit as never }),
+        { slugOrId: "one" },
+      );
+
+      expect(getDatasetWithinLimit).toHaveBeenCalledWith({
+        slugOrId: "one",
+        projectId: "project-1",
+        limitMb: 25,
+      });
+    });
+  });
+
+  describe("when a file is posted to the deprecated attachments address", () => {
+    /** @scenario "Posting a file to the dataset attachments address still works and is marked deprecated" */
+    it("stores the file for the key's project and names file upload as the successor", async () => {
+      const stored = {
+        url: "/api/files/project-1/object-1/receipt.png",
+        name: "receipt.png",
+        mediaType: "image/png",
+        sizeBytes: 3,
+      };
+      const storeAttachmentUpload = vi.fn(async () => stored);
+      const route = declaration.routes.find(
+        (candidate) => candidate.operation === "postApiDatasetAttachments",
+      );
+      const file = new File(["png"], "receipt.png", { type: "image/png" });
+
+      expect(route?.deprecated?.successor).toBe("/api/v1/stored-objects");
+      expect(route?.rateLimit).toEqual({ requests: 30, seconds: 60 });
+      await expect(
+        answer(
+          "postApiDatasetAttachments",
+          completeDatasetApi({ storeAttachmentUpload }),
+          { projectId: "project-1", datasetId: "dataset-1" },
+          { file },
+        ),
+      ).resolves.toEqual(stored);
+      expect(storeAttachmentUpload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: "project-1",
+          datasetId: "dataset-1",
+          filename: "receipt.png",
+          mediaType: "image/png",
+          fileSize: 3,
+        }),
+      );
+    });
+  });
+
+  describe("when one record is patched", () => {
+    const stored = {
+      id: "record-1",
+      datasetId: "dataset-1",
+      projectId: "project-1",
+      entry: { input: "hi" },
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      updatedAt: new Date("2026-01-01T00:00:00Z"),
+    };
+
+    it("answers 200 with the record when it already existed", async () => {
+      const upsertRecord = vi.fn(async () => ({ record: stored, created: false }));
+
+      await expect(
+        answer("patchApiDatasetBySlugOrIdRecordsByRecordId", completeDatasetApi({ upsertRecord }), {
+          slugOrId: "my-dataset",
+          recordId: "record-1",
+          entry: { input: "hi" },
+        }),
+      ).resolves.toEqual({ status: 200, body: stored });
+      expect(upsertRecord).toHaveBeenCalledWith({
+        slugOrId: "my-dataset",
+        projectId: "project-1",
+        recordId: "record-1",
+        updatedRecord: { input: "hi" },
+      });
+    });
+
+    it("answers 201 with the record when it was created", async () => {
+      const upsertRecord = vi.fn(async () => ({ record: stored, created: true }));
+
+      await expect(
+        answer("patchApiDatasetBySlugOrIdRecordsByRecordId", completeDatasetApi({ upsertRecord }), {
+          slugOrId: "my-dataset",
+          recordId: "record-1",
+          entry: { input: "hi" },
+        }),
+      ).resolves.toEqual({ status: 201, body: stored });
+    });
+  });
+});

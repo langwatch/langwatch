@@ -6,15 +6,12 @@ import (
 )
 
 // Selection is a worktree's sticky service choice (ADR-064): which optional
-// services `haven up` runs here. app always runs and is not selectable.
-// Expressed as deltas on up (`haven up +langy`, `haven up -nlp`), persisted
-// per worktree, shown by status. The zero value is NOT a fresh worktree's
-// default — that is DefaultSelection.
+// services `haven up` runs here. The two Node lanes — ui and api — always
+// run and are not selectable. Gateway and NLP still select individually; both
+// are hosted by the one `go` lane. Expressed as deltas on up (`haven up
+// +langy`, `haven up -nlp`), persisted per worktree, shown by status. The zero
+// value is NOT a fresh worktree's default — that is DefaultSelection.
 type Selection struct {
-	// Workers true runs the background workers as their own standalone lane;
-	// false (the default) hosts them inside the app process, saving the RAM
-	// of a second Node process.
-	Workers bool `json:"workers"`
 	Gateway bool `json:"gateway"`
 	NLP     bool `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
@@ -27,36 +24,153 @@ type Selection struct {
 	// setup step. Worktrees that don't want it say `haven up -idp` once.
 	// `haven idp` runs the simulator alone, with no stack at all.
 	IDP bool `json:"idp"`
+	// Mail is the local mail sink (mailsim), on by default for the same reason
+	// as IDP: it is one small Go process, and having it always routed means an
+	// email the app sends — a signup verification, an invite — can always be
+	// caught and read without a setup step. Worktrees that don't want it say
+	// `haven up -mail` once.
+	Mail bool `json:"mail"`
+	// DesignSystem is the design system's component workshop, off by default:
+	// it is a developer's tool rather than a part of the product, and the
+	// worktrees that never open it should not pay for the build. A worktree
+	// doing design work says `haven up +design-system` once. With the lane on,
+	// the ui lane frames THIS Storybook at /design-system instead of starting
+	// a second one (see Stack.OverlayEnv's LANGWATCH_STORYBOOK_PORT).
+	DesignSystem bool `json:"design-system"`
+	// MailRoom is the studio that renders every transactional message the
+	// product sends. Off by default for the same reason as DesignSystem: it is
+	// a tool for the person writing an email template, not a service the
+	// application talks to, so nothing else in the stack degrades without it.
+	MailRoom bool `json:"mail-room"`
+	// Langevals is the evaluator service monitors and evaluations call. Off by
+	// default like Langy: it is a Python process whose imports alone hold a
+	// few GiB, and most worktrees never run an evaluator. `haven up
+	// +langevals` once, and the overlay points LANGEVALS_ENDPOINT at it.
+	Langevals bool `json:"langevals"`
+	// Storage is the local S3 stand-in (storagesim), on by default like Mail:
+	// one small Go process, and the presigned upload flow works with no S3.
+	// The overlay points the product's S3 config at it unless .env chose one.
+	Storage bool `json:"storage"`
+	// Voice is the voice provider stand-in (voicesim). Off by default: it
+	// replaces ElevenLabs for the stack, which a developer testing a real
+	// agent must never get by surprise. `haven up +voice` once.
+	Voice bool `json:"voice"`
+	// LLM is the LLM provider stand-in (llmsim). Off by default: it answers
+	// in place of OpenAI and Anthropic, which a developer judging real model
+	// output must never get by surprise. `haven up +llm` once.
+	LLM bool `json:"llm"`
+	// Analytics is the PostHog and Customer.io stand-in (analyticssim). Off by
+	// default: it takes product analytics away from the real vendors, which
+	// nobody should get by surprise. `haven up +analytics` once.
+	Analytics bool `json:"analytics"`
 }
 
-// DefaultSelection is a fresh worktree's lean default: app (workers
-// in-process), gateway, nlp and the idp simulator — no langy.
-func DefaultSelection() Selection { return Selection{Gateway: true, NLP: true, IDP: true} }
+// DefaultSelection is a fresh worktree's lean default: the two Node lanes,
+// gateway, nlp, the idp simulator and the mail sink — no langy, no langevals,
+// and neither of the two developer tools (design-system, mail-room).
+func DefaultSelection() Selection {
+	return Selection{Gateway: true, NLP: true, IDP: true, Mail: true, Storage: true}
+}
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"workers", "gateway", "nlp", "langy", "idp"}
+var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "design-system", "mail-room", "langevals"}
+
+// RetiredSelectionServices are ±names that no longer pick what they used to,
+// with the full sentence to say instead. `workers` was the choice between a
+// standalone worker lane and hosting the queue stack inside the app process;
+// the worker is its own application now, so the lane always runs and there is
+// nothing left to select. `storybook` is the pre-rename spelling of the
+// design-system lane — refused the same way, naming the flag that replaced it
+// rather than pretending it still works. `mail` used to be the pre-rename
+// spelling of the mail-room studio too, but that rename freed the name for the
+// actual mail lane (the sink) — `±mail` is a real selector now, not a retired
+// one; see MailService. Refused by name rather than falling into the generic
+// "unknown service" error, which would read as a typo.
+var RetiredSelectionServices = map[string]string{
+	"workers":   "no longer selects anything — the worker runs in the api lane locally and as its own deployment in production — every stack runs the ui and api lanes, so there is nothing to select",
+	"worker":    "no longer selects anything — the worker runs in the api lane, which every stack runs",
+	"api":       "is not selectable — every stack runs the api lane, or it would serve pages and process no jobs",
+	"backend":   "was renamed — the lane is called api now, and it is not selectable: every stack runs it",
+	"storybook": "was renamed — use +design-system / -design-system",
+}
+
+// MonolithRetiredSelectionServices are the ±names refused on a monolith
+// checkout, on top of the ones refused everywhere: it has neither application
+// package, so `ui` and `api` name nothing there. Refused by name rather than as
+// a typo, because it is the layout that decides.
+var MonolithRetiredSelectionServices = map[string]string{
+	"ui":      "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+	"api":     "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+	"backend": "is not a lane of this checkout - it runs one app lane, which serves the browser application and its API together",
+}
 
 // ApplySelectionDeltas folds `+svc` / `-svc` arguments into a selection.
 func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
+	return ApplySelectionDeltasForLayout(sel, deltas, LayoutModular)
+}
+
+// ApplySelectionDeltasForLayout is ApplySelectionDeltas against a known
+// layout, so a lane name that does not exist in this checkout is refused by
+// name rather than accepted and then silently not planned.
+func ApplySelectionDeltasForLayout(sel Selection, deltas []string, layout Layout) (Selection, error) {
 	for _, d := range deltas {
 		if len(d) < 2 || (d[0] != '+' && d[0] != '-') {
 			return sel, fmt.Errorf("unrecognised argument %q — services are picked with +service or -service (services: %s)", d, strings.Join(SelectableServices, ", "))
 		}
-		on := d[0] == '+'
-		switch d[1:] {
-		case "workers":
-			sel.Workers = on
-		case "gateway":
-			sel.Gateway = on
-		case "nlp":
-			sel.NLP = on
-		case "langy":
-			sel.Langy = on
-		case "idp":
-			sel.IDP = on
-		default:
-			return sel, fmt.Errorf("unknown service %q — services: %s", d[1:], strings.Join(SelectableServices, ", "))
+		name := d[1:]
+		if note := refusedSelectionName(name, layout); note != "" {
+			return sel, fmt.Errorf("%q %s", name, note)
 		}
+		next, err := applySelectionDelta(sel, name, d[0] == '+')
+		if err != nil {
+			return sel, err
+		}
+		sel = next
+	}
+	return sel, nil
+}
+
+// refusedSelectionName is why a ±name is refused by name rather than applied,
+// or "" when it names something this checkout can actually select. The
+// layout's own refusals come first: they are the more specific answer.
+func refusedSelectionName(name string, layout Layout) string {
+	if layout.IsMonolith() {
+		if note, refused := MonolithRetiredSelectionServices[name]; refused {
+			return note
+		}
+	}
+	return RetiredSelectionServices[name]
+}
+
+// applySelectionDelta turns one accepted ±name into the selection it makes.
+func applySelectionDelta(sel Selection, name string, on bool) (Selection, error) {
+	switch name {
+	case "gateway":
+		sel.Gateway = on
+	case "nlp":
+		sel.NLP = on
+	case "langy":
+		sel.Langy = on
+	case "idp":
+		sel.IDP = on
+	case "mail":
+		sel.Mail = on
+	case "design-system":
+		sel.DesignSystem = on
+	case "mail-room":
+		sel.MailRoom = on
+	case LangevalsService:
+		sel.Langevals = on
+	case StorageService:
+		sel.Storage = on
+	case VoiceService:
+		sel.Voice = on
+	case LLMService:
+		sel.LLM = on
+	case AnalyticsService:
+		sel.Analytics = on
+	default:
+		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
 	return sel, nil
 }
@@ -64,7 +178,7 @@ func ApplySelectionDeltas(sel Selection, deltas []string) (Selection, error) {
 // SelectionFromStack derives what a running stack actually runs, so a plain
 // `up` can tell "already matches the selection" from "needs a restart".
 func SelectionFromStack(st Stack) Selection {
-	sel := Selection{Workers: st.HasStandaloneWorkers}
+	var sel Selection
 	for _, svc := range st.Services {
 		local := svc.Port != 0 && !svc.IsFallback
 		switch svc.Name {
@@ -76,28 +190,67 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Langy = local
 		case "idp":
 			sel.IDP = local
+		case MailService:
+			sel.Mail = local
+		case DesignSystemService:
+			sel.DesignSystem = local
+		case MailRoomService:
+			sel.MailRoom = local
+		case LangevalsService:
+			sel.Langevals = local
+		case StorageService:
+			sel.Storage = local
+		case VoiceService:
+			sel.Voice = local
+		case LLMService:
+			sel.LLM = local
+		case AnalyticsService:
+			sel.Analytics = local
 		}
 	}
 	return sel
 }
 
 // CLIServiceName maps an internal service name to its CLI spelling — the CLI
-// says langy, never langyagent (ADR-064: one name).
+// says langy, never langyagent (ADR-064: one name), and it says ui for the
+// routed `app` hostname, which is the browser application's lane. The hostname
+// keeps the name app.<slug> because the API is served under it at /api; the
+// LANE is the Vite process alone, and `haven logs ui` / `haven restart ui`
+// must name the same thing the supervisor labels. The two developer tools need
+// no entry here: their hostnames (design-system, mail-room) are already their
+// CLI spelling.
 func CLIServiceName(internal string) string {
-	if internal == "langyagent" {
+	return CLIServiceNameForLayout(internal, LayoutModular)
+}
+
+// CLIServiceNameForLayout is CLIServiceName against a known layout. Only the
+// routed `app` hostname differs: a monolith checkout runs ONE process behind
+// it, and that lane is called app, so calling it ui would name a lane this
+// stack does not have.
+func CLIServiceNameForLayout(internal string, layout Layout) string {
+	switch internal {
+	case "langyagent":
 		return "langy"
+	case "app":
+		if layout.IsMonolith() {
+			return MonolithAppLane
+		}
+		return "ui"
+	default:
+		return internal
 	}
-	return internal
 }
 
 // Describe renders the selection for humans: what runs, what is off, and the
 // exact delta that adds it.
-func (s Selection) Describe() string {
-	on := []string{"app"}
-	if s.Workers {
-		on = append(on, "workers (own lane)")
-	} else {
-		on = append(on, "workers (in-process)")
+func (s Selection) Describe() string { return s.DescribeForLayout(LayoutModular) }
+
+// DescribeForLayout is Describe for a known layout: a monolith checkout runs
+// one Node lane, so naming two would describe a stack that is not there.
+func (s Selection) DescribeForLayout(layout Layout) string {
+	on := []string{"ui", "api"}
+	if layout.IsMonolith() {
+		on = []string{MonolithAppLane}
 	}
 	var off []string
 	add := func(enabled bool, name string) {
@@ -111,6 +264,14 @@ func (s Selection) Describe() string {
 	add(s.NLP, "nlp")
 	add(s.Langy, "langy")
 	add(s.IDP, "idp")
+	add(s.Mail, "mail")
+	add(s.Storage, StorageService)
+	add(s.Voice, VoiceService)
+	add(s.LLM, LLMService)
+	add(s.Analytics, AnalyticsService)
+	add(s.DesignSystem, "design-system")
+	add(s.MailRoom, "mail-room")
+	add(s.Langevals, LangevalsService)
 	out := "services: " + strings.Join(on, " · ")
 	if len(off) > 0 {
 		out += "   off: " + strings.Join(off, " · ")

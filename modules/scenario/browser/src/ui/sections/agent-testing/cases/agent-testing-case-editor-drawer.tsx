@@ -1,0 +1,100 @@
+/**
+ * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agent-testing/run-plan-editor.feature
+ * @see dev/docs/best_practices/drawers.md
+ */
+
+import {
+  getFlowCallbacks,
+  type UiAgentTestingCaseEditorDrawerProps,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { toaster } from "@langwatch/design-system/toaster";
+import {
+  parseEvaluatorAttachments,
+  parseSuiteFieldDefinitions,
+} from "@langwatch/scenario-contract";
+import { useCallback, useMemo } from "react";
+
+import { api, type Scenario } from "../../../../behavior/scenario-api.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
+import { CaseModal } from "./case-modal.tsx";
+// The key lives in a component-free module so a static importer never pulls
+// this drawer's React and Chakra dependencies into its own chunk. The drawer
+// re-exports the key so existing importers stay unaffected.
+import { CASE_EDITOR_DRAWER } from "./drawer-keys.ts";
+import { useCaseEditor } from "./use-case-editor.ts";
+
+export { CASE_EDITOR_DRAWER };
+
+function useEditorSuites(projectId: string): TestSuiteEntry[] {
+  const { data: testSuites } = api.suites.testSuites.getAll.useQuery(
+    { projectId },
+    { enabled: !!projectId },
+  );
+
+  return useMemo<TestSuiteEntry[]>(
+    () =>
+      (testSuites ?? []).map((testSuite) => ({
+        id: testSuite.id,
+        name: testSuite.name,
+        slug: testSuite.slug,
+        caseCount: 0,
+        fields: parseSuiteFieldDefinitions(testSuite.fields),
+        evaluators: parseEvaluatorAttachments(testSuite.evaluators),
+      })),
+    [testSuites],
+  );
+}
+
+export function AgentTestingCaseEditorDrawer(_props: UiAgentTestingCaseEditorDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
+  const { closeDrawer, drawerOpen } = useDrawer();
+  const params = useDrawerParams();
+
+  const isOpen = drawerOpen(CASE_EDITOR_DRAWER);
+  const scenarioId = params.scenarioId ?? null;
+  const testSuiteId = params.testSuiteId ?? null;
+  const showHistory = params.showHistory === "true";
+
+  const suites = useEditorSuites(projectId);
+
+  const callbacks = getFlowCallbacks(CASE_EDITOR_DRAWER);
+
+  const onSaved = useCallback(
+    (saved: Scenario, options: { shouldRunAfterSave: boolean }) => {
+      toaster.create({
+        title: scenarioId ? "Scenario updated" : "Scenario created",
+        type: "success",
+      });
+      closeDrawer();
+      callbacks?.onSaved?.(saved, options);
+    },
+    [callbacks, closeDrawer, scenarioId],
+  );
+
+  const editor = useCaseEditor({
+    open: isOpen,
+    projectId,
+    scenarioId,
+    testSuiteId,
+    suites,
+    onSaved,
+  });
+
+  return (
+    <CaseModal
+      open={isOpen}
+      scenarioId={scenarioId}
+      suites={suites}
+      editor={editor}
+      onClose={closeDrawer}
+      openHistoryOnOpen={showHistory}
+    />
+  );
+}
+
+export default AgentTestingCaseEditorDrawer;

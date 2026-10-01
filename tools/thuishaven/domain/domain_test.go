@@ -205,7 +205,7 @@ func TestOverlayExportsClickHouseConcurrencyCapWhenManaged(t *testing.T) {
 	if got := valueOf(managed.OverlayEnv(), "CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES"); got != want {
 		t.Errorf("CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES = %q, want %q (the cap haven renders)", got, want)
 	}
-	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits()), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
+	if !strings.Contains(RenderClickHouseConfig(DefaultClickHouseLimits(0)), "<max_concurrent_queries>"+want+"</max_concurrent_queries>") {
 		t.Errorf("the exported cap must be the one rendered into the server's config")
 	}
 }
@@ -345,6 +345,14 @@ func TestOverlayPinsTheSevenDayRetentionDefault(t *testing.T) {
 	}
 }
 
+// @scenario "haven names the development badge after its stack"
+func TestOverlayLabelsTheDevelopmentBadgeWithTheSlug(t *testing.T) {
+	st := Stack{Slug: "feat-strict-feature-layout-v0", APIPort: 1, Services: []Service{{Name: "app"}}}
+	if got := valueOf(st.OverlayEnv(), "DEV_INDICATOR_LABEL"); got != st.Slug {
+		t.Errorf("DEV_INDICATOR_LABEL = %q, want the stack slug %q", got, st.Slug)
+	}
+}
+
 // TestOverlayNeverEmitsLangwatchApiKey is the watertight guard: haven must NEVER put
 // LANGWATCH_API_KEY (the langwatch SDK's own key contract) into a platform child's env.
 // A platform process that saw it would self-instrument into its own trace ingest — a
@@ -371,6 +379,40 @@ func TestOverlayNeverEmitsLangwatchApiKey(t *testing.T) {
 	}
 	if !hasKey(st.OverlayEnv(), "LANGWATCH_ENDPOINT") {
 		t.Errorf("overlay must still emit LANGWATCH_ENDPOINT (a benign address, unchanged)")
+	}
+}
+
+// TestOverlayLeavesNxCacheLocationToNx pins ADR-150's shared cache: Nx 23 already
+// shares one cache and its index across every checkout (~/.nx/<id>), and any of
+// these variables makes it fall back to a per-checkout index over that cache.
+// @scenario "A trusted worktree leaves the Nx cache location to Nx"
+func TestOverlayLeavesNxCacheLocationToNx(t *testing.T) {
+	st := Stack{
+		Slug: "portless", APIPort: 1, LocalAPIKey: DefaultLocalAPIKey,
+		Services: []Service{{Name: "app"}, {Name: "gateway"}, {Name: "nlp"}, {Name: "langyagent"}},
+	}
+	for _, key := range []string{"NX_CACHE_DIRECTORY", "NX_WORKSPACE_DATA_DIRECTORY", "NX_PROJECT_GRAPH_CACHE_DIRECTORY"} {
+		if hasKey(st.OverlayEnv(), key) {
+			t.Errorf("overlay emitted %s, which turns off Nx's cross-checkout cache", key)
+		}
+	}
+}
+
+// TestOverlayGivesUntrustedCheckoutAPrivateNxCache is the other direction: Nx
+// must never store a fork's task results in the cache trusted worktrees replay.
+// @scenario "An untrusted checkout gets a private Nx cache and no daemon"
+func TestOverlayGivesUntrustedCheckoutAPrivateNxCache(t *testing.T) {
+	st := Stack{Slug: "haven-pr-7", NxPrivateDir: "/home/.haven/nx-untrusted/haven-pr-7"}
+	env := EnvMap(st.OverlayEnv())
+	want := map[string]string{
+		"NX_CACHE_DIRECTORY":          "/home/.haven/nx-untrusted/haven-pr-7/cache",
+		"NX_WORKSPACE_DATA_DIRECTORY": "/home/.haven/nx-untrusted/haven-pr-7/workspace-data",
+		"NX_DAEMON":                   "false",
+	}
+	for k, v := range want {
+		if env[k] != v {
+			t.Errorf("%s = %q, want %q", k, env[k], v)
+		}
 	}
 }
 

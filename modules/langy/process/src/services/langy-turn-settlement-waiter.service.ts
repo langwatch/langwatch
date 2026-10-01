@@ -1,0 +1,295 @@
+import { clearTimeout, setTimeout } from "node:timers";
+
+import {
+  extractLangyTextFromParts,
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LangyConversationNotFoundError,
+  type LangyConversationTurnWireEvent,
+  type LangyEventCursor,
+  type LangyTurnSettlement,
+  type LangyTurnSettlementWait,
+} from "@langwatch/langy-contract";
+
+import type { LangyTokenBufferRepository } from "../repositories/langy-token-buffer.repository.ts";
+
+export type LangyTurnSettlementReader = {
+  getEventsAfter(input: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    after: LangyEventCursor;
+  }): Promise<{
+    events: LangyConversationTurnWireEvent[];
+    cursor: LangyEventCursor;
+    truncated: boolean;
+  }>;
+};
+
+/** One turn's live edge over a borrowed blocking connection; `release` gives it back. */
+export type LangyTurnBufferWatch = { buffer: LangyTokenBufferRepository; release: () => void };
+export type OpenLangyTurnBuffer = () => LangyTurnBufferWatch | null;
+
+const bufferedPollMs = 5_000;
+const fallbackPollMs = 750;
+const confirmPollMs = 250;
+
+/** Holding a request open until one turn settles, from the fold and the live edge. */
+export class LangyTurnSettlementWaiterService {
+  static create(): LangyTurnSettlementWaiterService {
+    return new LangyTurnSettlementWaiterService();
+  }
+
+  private constructor() {}
+
+  abortableDelay(ms: number, signal: AbortSignal): Promise<boolean> {
+    if (signal.aborted) {
+      return Promise.resolve(false);
+    }
+
+    return new Promise<boolean>((resolve) => {
+      const onAbort = () => {
+        clearTimeout(timer);
+        resolve(false);
+      };
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(true);
+      }, ms);
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
+  deriveSettlementFromEvents(
+    events: LangyConversationTurnWireEvent[],
+    turnId: string,
+  ): LangyTurnSettlement | null {
+    for (const event of events) {
+      const settlement = this.settlementFromEvent(event, turnId);
+      if (settlement) {
+        return settlement;
+      }
+    }
+
+    return null;
+  }
+
+  private settlementFromEvent(
+    event: LangyConversationTurnWireEvent,
+    turnId: string,
+  ): LangyTurnSettlement | null {
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
+      event.data.turnId === turnId
+    ) {
+      if (event.data.outcome === "failed") {
+        return {
+          succeeded: false,
+          outcome: "failed",
+          text: null,
+          error: event.data.error ?? "Turn failed",
+        };
+      }
+
+      return {
+        succeeded: true,
+        outcome: event.data.outcome,
+        text: extractLangyTextFromParts(event.data.parts),
+        error: null,
+      };
+    }
+
+    if (
+      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
+      event.data.turnId === turnId
+    ) {
+      return {
+        succeeded: false,
+        outcome: "failed",
+        text: null,
+        error: event.data.error,
+      };
+    }
+
+    return null;
+  }
+
+  private userWaitFromEvents(
+    events: LangyConversationTurnWireEvent[],
+    turnId: string,
+  ): LangyTurnSettlementWait | null {
+    for (const event of events) {
+      if (
+        event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED &&
+        event.data.turnId === turnId
+      ) {
+        const questions = event.data.questions ?? [];
+        return {
+          kind: "awaiting_user",
+          question: questions.map((question) => question.question).join("\n"),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /** A user wait is answered only after the whole pass found no reply, so a reply always wins. */
+  private async readSettlementFromFold(input: {
+    langy: LangyTurnSettlementReader;
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+    signal: AbortSignal;
+    shouldSettleOnUserWait?: boolean;
+  }): Promise<LangyTurnSettlementWait | null> {
+    let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
+    let userWait: LangyTurnSettlementWait | null = null;
+
+    while (!input.signal.aborted) {
+      const page = await input.langy
+        .getEventsAfter({
+          projectId: input.projectId,
+          conversationId: input.conversationId,
+          userId: input.userId,
+          after: cursor,
+        })
+        .catch((error: unknown) => {
+          if (error instanceof LangyConversationNotFoundError) {
+            return null;
+          }
+
+          throw error;
+        });
+      if (!page) {
+        return null;
+      }
+
+      const settlement = this.deriveSettlementFromEvents(page.events, input.turnId);
+      if (settlement) {
+        return { kind: "settled", settlement };
+      }
+
+      if (input.shouldSettleOnUserWait) {
+        userWait ??= this.userWaitFromEvents(page.events, input.turnId);
+      }
+
+      if (!page.truncated) {
+        return userWait;
+      }
+
+      cursor = page.cursor;
+    }
+
+    return null;
+  }
+
+  private neverSettles(): Promise<never> {
+    return new Promise<never>(() => {});
+  }
+
+  private isTerminalFrame(entry: { type: string }): boolean {
+    return entry.type === "end" || entry.type === "error";
+  }
+
+  private async watchBufferForTerminal(
+    buffer: LangyTokenBufferRepository,
+    input: { conversationId: string; turnId: string; signal: AbortSignal },
+  ): Promise<void> {
+    const { reads, lastId } = await buffer.readTail({
+      conversationId: input.conversationId,
+      turnId: input.turnId,
+    });
+    if (reads.some(({ entry }) => this.isTerminalFrame(entry))) {
+      return;
+    }
+
+    for await (const { entry } of buffer.follow({
+      conversationId: input.conversationId,
+      turnId: input.turnId,
+      fromId: lastId,
+      signal: input.signal,
+    })) {
+      if (this.isTerminalFrame(entry)) {
+        return;
+      }
+    }
+
+    await this.neverSettles();
+  }
+
+  private armBufferWatch(input: {
+    openBuffer: OpenLangyTurnBuffer | null;
+    conversationId: string;
+    turnId: string;
+    signal: AbortSignal;
+  }): { terminalSeen: Promise<void> | null; release: () => void } {
+    const opened = input.openBuffer?.();
+    if (!opened) {
+      return { terminalSeen: null, release: () => {} };
+    }
+
+    const { buffer, release } = opened;
+
+    return {
+      terminalSeen: this.watchBufferForTerminal(buffer, input).catch(() => this.neverSettles()),
+      release,
+    };
+  }
+
+  private async waitForNextPoll(
+    terminalSeen: Promise<void> | null,
+    pollMs: number,
+    signal: AbortSignal,
+  ): Promise<"tick" | "terminal" | "abort"> {
+    const delay: Promise<"tick" | "abort"> = this.abortableDelay(pollMs, signal).then(
+      (completed): "tick" | "abort" => (completed ? "tick" : "abort"),
+    );
+    if (!terminalSeen) {
+      return delay;
+    }
+
+    const terminal: Promise<"terminal"> = terminalSeen.then((): "terminal" => "terminal");
+
+    return Promise.race([terminal, delay]);
+  }
+
+  async awaitTurnSettlement(input: {
+    langy: LangyTurnSettlementReader;
+    openBuffer: OpenLangyTurnBuffer | null;
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+    signal: AbortSignal;
+    pollIntervalMs?: number;
+    shouldSettleOnUserWait?: boolean;
+  }): Promise<LangyTurnSettlementWait> {
+    const armed = this.armBufferWatch(input);
+    let terminalSeen = armed.terminalSeen;
+    let pollMs = terminalSeen ? bufferedPollMs : (input.pollIntervalMs ?? fallbackPollMs);
+
+    try {
+      while (!input.signal.aborted) {
+        const settlement = await this.readSettlementFromFold(input);
+        if (settlement) {
+          return settlement;
+        }
+
+        const outcome = await this.waitForNextPoll(terminalSeen, pollMs, input.signal);
+        if (outcome === "abort") {
+          return { kind: "stopped" };
+        }
+
+        if (outcome === "terminal") {
+          terminalSeen = null;
+          pollMs = confirmPollMs;
+        }
+      }
+
+      return { kind: "stopped" };
+    } finally {
+      armed.release();
+    }
+  }
+}

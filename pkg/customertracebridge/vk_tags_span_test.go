@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // VK tags must land on the customer span as the langwatch.labels attribute:
@@ -28,11 +28,11 @@ func findSliceAttr(span sdktrace.ReadOnlySpan, key string) ([]string, bool) {
 
 // @scenario "Virtual-key tags are stamped on the customer span as labels"
 func TestEmitter_VKTags_StampedAsLabels(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID: domain.ProviderAnthropic,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "qwen3-14b",
 		VKTags:     []string{"app=nexttrace", "team=offsecops"},
-		Usage:      domain.Usage{CompletionTokens: 5},
+		Usage:      aitrace.Usage{CompletionTokens: 5},
 	})
 
 	labels, ok := findSliceAttr(span, "langwatch.labels")
@@ -42,10 +42,10 @@ func TestEmitter_VKTags_StampedAsLabels(t *testing.T) {
 
 // @scenario "A VK without tags stamps no labels attribute"
 func TestEmitter_NoVKTags_NoLabelsAttribute(t *testing.T) {
-	span := recordSpanForParams(t, domain.AITraceParams{
-		ProviderID: domain.ProviderAnthropic,
+	span := recordSpanForParams(t, aitrace.AITraceParams{
+		ProviderID: aitrace.ProviderAnthropic,
 		Model:      "qwen3-14b",
-		Usage:      domain.Usage{CompletionTokens: 5},
+		Usage:      aitrace.Usage{CompletionTokens: 5},
 	})
 
 	_, ok := findSliceAttr(span, "langwatch.labels")

@@ -1,0 +1,85 @@
+{
+  "name": "@langwatch/evaluator-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe reusable Evaluator UI and presentation helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/evaluator.web.ts",
+      "types": "./dist/evaluator.web.d.ts",
+      "default": "./src/evaluator.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/analytics-browser": "workspace:*",
+    "@langwatch/analytics-browser-kit": "workspace:*",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-browser-kit": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/model-provider-browser": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/prompt-browser-kit": "workspace:*",
+    "@langwatch/secret-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@xyflow/react": "catalog:",
+    "langwatch": "workspace:*",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "numeral": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "safe-regex2": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

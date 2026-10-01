@@ -95,6 +95,6 @@ class AnalyticsFacade:
             Dictionary containing the timeseries result data.
         """
         body = params or {}
-        response = self._http().post("/api/analytics/timeseries", json=body)
+        response = self._http().post("/api/v1/analytics/timeseries", json=body)
         _raise_for_status(response, operation="timeseries")
         return response.json()

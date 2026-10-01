@@ -3,13 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
+
 import { TurnEventMapper, contentText, settledToolOutput } from "./events.js";
 import { MAX_FIELD_BYTES, TRUNCATION_MARKER } from "./protocol.js";
 
 describe("contentText", () => {
   it("joins the text blocks of a result", () => {
     expect(
-      contentText({ content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }] }),
+      contentText({
+        content: [{ type: "text", text: "a" }, { type: "image" }, { type: "text", text: "b" }],
+      }),
     ).toBe("a\nb");
     expect(contentText(undefined)).toBe("");
     expect(contentText({ content: "nope" })).toBe("");
@@ -56,7 +59,10 @@ describe("TurnEventMapper", () => {
     it("maps text deltas to delta and thinking deltas to reasoning", () => {
       const mapper = new TurnEventMapper("t1");
       expect(
-        mapper.map({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: "Hi" } }),
+        mapper.map({
+          type: "message_update",
+          assistantMessageEvent: { type: "text_delta", delta: "Hi" },
+        }),
       ).toEqual([{ type: "delta", turnId: "t1", text: "Hi" }]);
       expect(
         mapper.map({

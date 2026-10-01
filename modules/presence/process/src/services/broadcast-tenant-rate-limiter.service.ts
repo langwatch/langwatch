@@ -1,0 +1,107 @@
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
+const logger = createLogger("langwatch:presence:broadcast-rate-limit");
+
+export interface BucketConfig {
+  /** Maximum tokens (burst size). */
+  capacity: number;
+  /** Tokens added per second. */
+  refillRate: number;
+}
+
+export interface TierConfig {
+  /** START, END, RUN_FINISHED, RUN_STARTED */
+  structural: BucketConfig;
+  /** CONTENT, TOOL_CALL_ARGS */
+  delta: BucketConfig;
+}
+
+const DEFAULT_TIERS: TierConfig = {
+  structural: { capacity: 200, refillRate: 200 },
+  delta: { capacity: 500, refillRate: 200 },
+};
+
+interface Bucket {
+  tokens: number;
+  lastAccessMs: number;
+}
+
+const CLEANUP_INTERVAL_MS = 60_000;
+const STALE_THRESHOLD_MS = 60_000;
+
+export class BroadcastTenantRateLimiterService {
+  static create(config?: TierConfig): BroadcastTenantRateLimiterService {
+    return new BroadcastTenantRateLimiterService(config);
+  }
+
+  private readonly config: TierConfig;
+  private readonly buckets = new Map<string, Bucket>();
+  private readonly warnedTenants = new Set<string>();
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  private constructor(config?: TierConfig) {
+    this.config = config ?? DEFAULT_TIERS;
+  }
+
+  start(): void {
+    if (this.cleanupTimer) return;
+    this.cleanupTimer = setInterval(() => this.cleanupStaleBuckets(), CLEANUP_INTERVAL_MS);
+  }
+
+  /**
+   * Attempt to consume one token from the bucket for the given tenant and tier.
+   *
+   * @returns `true` if the event is allowed, `false` if rate-limited.
+   */
+  consume(tenantId: string, tier: "structural" | "delta"): boolean {
+    const bucketConfig = this.config[tier];
+    const key = `${tenantId}:${tier}`;
+    const now = nowInstant().epochMilliseconds;
+
+    let bucket = this.buckets.get(key);
+    if (!bucket) {
+      bucket = { tokens: bucketConfig.capacity, lastAccessMs: now };
+      this.buckets.set(key, bucket);
+    }
+
+    // Refill tokens based on elapsed time
+    const elapsedSec = (now - bucket.lastAccessMs) / 1000;
+    bucket.tokens = Math.min(
+      bucketConfig.capacity,
+      bucket.tokens + elapsedSec * bucketConfig.refillRate,
+    );
+    bucket.lastAccessMs = now;
+
+    if (bucket.tokens >= 1) {
+      bucket.tokens -= 1;
+      return true;
+    }
+
+    // Rate-limited — emit a single warning per tenant
+    if (!this.warnedTenants.has(tenantId)) {
+      this.warnedTenants.add(tenantId);
+      logger.warn({ tenantId, tier }, "broadcast rate limit hit for tenant");
+    }
+
+    return false;
+  }
+
+  /** Stop the internal cleanup timer. Call on shutdown. */
+  destroy(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = null;
+    }
+  }
+
+  private cleanupStaleBuckets(): void {
+    const now = nowInstant().epochMilliseconds;
+
+    for (const [key, bucket] of this.buckets.entries()) {
+      if (now - bucket.lastAccessMs >= STALE_THRESHOLD_MS) {
+        this.buckets.delete(key);
+      }
+    }
+  }
+}

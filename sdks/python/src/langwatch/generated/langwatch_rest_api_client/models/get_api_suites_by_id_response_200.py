@@ -10,10 +10,18 @@ from ..models.get_api_suites_by_id_response_200_kind import GetApiSuitesByIdResp
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
-    from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
-    from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
-    from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+        GetApiSuitesByIdResponse200ScopeType0Type0,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+        GetApiSuitesByIdResponse200ScopeType0Type1,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+        GetApiSuitesByIdResponse200ScopeType0Type2,
+    )
+    from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+        GetApiSuitesByIdResponse200ScopeType0Type3,
+    )
     from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
 
@@ -37,11 +45,8 @@ class GetApiSuitesByIdResponse200:
         platform_url (str):
         kind (GetApiSuitesByIdResponse200Kind | Unset): custom is a hand-assembled run plan; folder is a test suite that
             groups scenarios filed into it. Absent on servers that predate test suites.
-        scope (GetApiSuitesByIdResponse200ScopeType0 | GetApiSuitesByIdResponse200ScopeType1 |
-            GetApiSuitesByIdResponse200ScopeType2 | GetApiSuitesByIdResponse200ScopeType3 | None | Unset): What the run plan
-            covers: all (every active scenario), folders (the scenarios filed in the named test suites), labels (the
-            scenarios carrying any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at
-            every run, so a scenario written later runs without editing the plan.
+        scope (GetApiSuitesByIdResponse200ScopeType0Type0 | GetApiSuitesByIdResponse200ScopeType0Type1 |
+            GetApiSuitesByIdResponse200ScopeType0Type2 | GetApiSuitesByIdResponse200ScopeType0Type3 | None | Unset):
     """
 
     id: str
@@ -57,20 +62,28 @@ class GetApiSuitesByIdResponse200:
     platform_url: str
     kind: GetApiSuitesByIdResponse200Kind | Unset = UNSET
     scope: (
-        GetApiSuitesByIdResponse200ScopeType0
-        | GetApiSuitesByIdResponse200ScopeType1
-        | GetApiSuitesByIdResponse200ScopeType2
-        | GetApiSuitesByIdResponse200ScopeType3
+        GetApiSuitesByIdResponse200ScopeType0Type0
+        | GetApiSuitesByIdResponse200ScopeType0Type1
+        | GetApiSuitesByIdResponse200ScopeType0Type2
+        | GetApiSuitesByIdResponse200ScopeType0Type3
         | None
         | Unset
     ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
-        from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
-        from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
-        from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+            GetApiSuitesByIdResponse200ScopeType0Type0,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+            GetApiSuitesByIdResponse200ScopeType0Type1,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+            GetApiSuitesByIdResponse200ScopeType0Type2,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+            GetApiSuitesByIdResponse200ScopeType0Type3,
+        )
 
         id = self.id
 
@@ -105,13 +118,13 @@ class GetApiSuitesByIdResponse200:
         scope: dict[str, Any] | None | Unset
         if isinstance(self.scope, Unset):
             scope = UNSET
-        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0):
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type0):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType1):
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type1):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType2):
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type2):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType3):
+        elif isinstance(self.scope, GetApiSuitesByIdResponse200ScopeType0Type3):
             scope = self.scope.to_dict()
         else:
             scope = self.scope
@@ -142,10 +155,18 @@ class GetApiSuitesByIdResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_suites_by_id_response_200_scope_type_0 import GetApiSuitesByIdResponse200ScopeType0
-        from ..models.get_api_suites_by_id_response_200_scope_type_1 import GetApiSuitesByIdResponse200ScopeType1
-        from ..models.get_api_suites_by_id_response_200_scope_type_2 import GetApiSuitesByIdResponse200ScopeType2
-        from ..models.get_api_suites_by_id_response_200_scope_type_3 import GetApiSuitesByIdResponse200ScopeType3
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_0 import (
+            GetApiSuitesByIdResponse200ScopeType0Type0,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_1 import (
+            GetApiSuitesByIdResponse200ScopeType0Type1,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_2 import (
+            GetApiSuitesByIdResponse200ScopeType0Type2,
+        )
+        from ..models.get_api_suites_by_id_response_200_scope_type_0_type_3 import (
+            GetApiSuitesByIdResponse200ScopeType0Type3,
+        )
         from ..models.get_api_suites_by_id_response_200_targets_item import GetApiSuitesByIdResponse200TargetsItem
 
         d = dict(src_dict)
@@ -191,10 +212,10 @@ class GetApiSuitesByIdResponse200:
         def _parse_scope(
             data: object,
         ) -> (
-            GetApiSuitesByIdResponse200ScopeType0
-            | GetApiSuitesByIdResponse200ScopeType1
-            | GetApiSuitesByIdResponse200ScopeType2
-            | GetApiSuitesByIdResponse200ScopeType3
+            GetApiSuitesByIdResponse200ScopeType0Type0
+            | GetApiSuitesByIdResponse200ScopeType0Type1
+            | GetApiSuitesByIdResponse200ScopeType0Type2
+            | GetApiSuitesByIdResponse200ScopeType0Type3
             | None
             | Unset
         ):
@@ -205,40 +226,40 @@ class GetApiSuitesByIdResponse200:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_0 = GetApiSuitesByIdResponse200ScopeType0.from_dict(data)
+                scope_type_0_type_0 = GetApiSuitesByIdResponse200ScopeType0Type0.from_dict(data)
 
-                return scope_type_0
+                return scope_type_0_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_1 = GetApiSuitesByIdResponse200ScopeType1.from_dict(data)
+                scope_type_0_type_1 = GetApiSuitesByIdResponse200ScopeType0Type1.from_dict(data)
 
-                return scope_type_1
+                return scope_type_0_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_2 = GetApiSuitesByIdResponse200ScopeType2.from_dict(data)
+                scope_type_0_type_2 = GetApiSuitesByIdResponse200ScopeType0Type2.from_dict(data)
 
-                return scope_type_2
+                return scope_type_0_type_2
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_3 = GetApiSuitesByIdResponse200ScopeType3.from_dict(data)
+                scope_type_0_type_3 = GetApiSuitesByIdResponse200ScopeType0Type3.from_dict(data)
 
-                return scope_type_3
+                return scope_type_0_type_3
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             return cast(
-                GetApiSuitesByIdResponse200ScopeType0
-                | GetApiSuitesByIdResponse200ScopeType1
-                | GetApiSuitesByIdResponse200ScopeType2
-                | GetApiSuitesByIdResponse200ScopeType3
+                GetApiSuitesByIdResponse200ScopeType0Type0
+                | GetApiSuitesByIdResponse200ScopeType0Type1
+                | GetApiSuitesByIdResponse200ScopeType0Type2
+                | GetApiSuitesByIdResponse200ScopeType0Type3
                 | None
                 | Unset,
                 data,

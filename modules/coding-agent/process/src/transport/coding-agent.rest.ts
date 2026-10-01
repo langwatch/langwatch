@@ -1,0 +1,152 @@
+/**
+ * The coding-agent reads over the project-scoped `/api/coding-agent` prefix.
+ * `coding-agent` is dated with an `/api/v1` twin; `coding-agent-rollup` answers
+ * at the bare path alone, the v1 address being another family's.
+ */
+import {
+  baseResponses,
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  resolvePersonalCaller,
+} from "@langwatch/api/rest";
+import {
+  CodingAgentApi,
+  codingAgentSessionEventsRestParamsSchema,
+  codingAgentSessionEventsRestQuerySchema,
+  codingAgentSessionEventsRestResponseSchema,
+  type CodingAgentCallerScope,
+} from "@langwatch/coding-agent-contract";
+import { z } from "zod";
+
+import {
+  pullRequestUsageQuerySchema,
+  pullRequestUsageResponseSchema,
+} from "../rules/pull-request-usage-wire.rules.ts";
+
+/**
+ * What the project door resolved: the workspace the personal-workspace guard is
+ * applied to, and the credential itself, which reads with its own bindings.
+ */
+export const codingAgentRestCaller = defineRestMiddleware(
+  "codingAgentRestCaller",
+  z.object({
+    project: z.object({
+      isPersonal: z.boolean().nullable(),
+      ownerUserId: z.string().nullable(),
+    }),
+    credential: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("legacyProjectKey") }),
+      z.object({
+        kind: z.literal("apiKey"),
+        apiKeyId: z.string(),
+        userId: z.string().nullable(),
+        organizationId: z.string(),
+        projectId: z.string(),
+        teamId: z.string(),
+      }),
+    ]),
+  }),
+);
+
+/**
+ * One session's event sequence, in time order: every model call with its
+ * context and cost, every compaction with its before/after tokens, rate limits,
+ * tool runs, prompts. Scalar facts only; content stays on the trace/log reads.
+ */
+export const codingAgentRest = defineRestRouter(CodingAgentApi)
+  .withNamespace("coding-agent")
+  .withVersion(MANAGEMENT_API_VERSION)
+
+  .get("/sessions/:sessionId/events", "getApiCodingAgentSessionsBySessionIdEvents")
+  .withParams(codingAgentSessionEventsRestParamsSchema)
+  .withQuery(codingAgentSessionEventsRestQuerySchema)
+  .withPermission("traces:view")
+  .withOutput(codingAgentSessionEventsRestResponseSchema)
+  .withDocs({
+    summary: "List coding agent session events",
+    description:
+      "List a coding-agent session's events (model calls, compactions, rate limits, " +
+      "tool runs, prompts) in time order, keyset-paginated. Pass the previous " +
+      "response's nextCursor to continue; filter with kinds (comma-separated).",
+    responses: baseResponses,
+  })
+  .handle(({ app, input, scope }) => app.readSessionEventsPage({ ...input, projectId: scope.id }))
+  .build();
+
+/**
+ * What one pull request cost in assistant usage, across every project of the
+ * organization the CALLING CREDENTIAL may read. Numbers and names only: no
+ * session title, no prompt, no file list.
+ */
+export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
+  .withNamespace("coding-agent-rollup")
+  .withVersion(MANAGEMENT_API_VERSION)
+  // The bare path alone, at exactly the address it has always answered.
+  .withAddressing("literal", { v1Twin: false })
+
+  .get("/api/coding-agent/pull-request-usage", "getApiCodingAgentPullRequestUsage")
+  .withQuery(pullRequestUsageQuerySchema)
+  .withPermission("traces:view")
+  .withOutput(pullRequestUsageResponseSchema)
+  .withMiddleware(codingAgentRestCaller)
+  .withDocs({
+    summary: "Get pull request coding agent usage",
+    description:
+      "Assistant usage for one pull request: sessions, tokens and cost, " +
+      "grouped by contributor and agent, plus per-model totals, " +
+      "over the pull request's whole lifetime rather than a time window. " +
+      "Every row and the totals split cost three ways: the part priced per " +
+      "token, the part a bundled subscription already covers, and the " +
+      "list-price total of both. Per-model totals carry the list price only. " +
+      "Cost is calculated from the tokens the agent reported and LangWatch's " +
+      "model prices, so it estimates spend rather than restating a provider " +
+      "invoice. " +
+      "Requires a personal-project API key; rows appear only for projects the " +
+      "calling user may view, and cost only for those they may price.",
+    responses: baseResponses,
+  })
+  .handle(async ({ app, input, scope }, caller) => {
+    // Whose data this is stays the personal-workspace question it always was.
+    // What the read REACHES is the credential's, the same way the v1 door
+    // reads it.
+    const ownerUserId = resolvePersonalCaller({
+      project: caller.project,
+      credential: caller.credential,
+    });
+    const by: CodingAgentCallerScope =
+      caller.credential.kind === "legacyProjectKey"
+        ? { kind: "user", userId: ownerUserId }
+        : {
+            kind: "apiKey",
+            apiKeyId: caller.credential.apiKeyId,
+            userId: caller.credential.userId,
+          };
+    const host = input.host ?? new URL(app.githubWebBase()).hostname;
+
+    // The application resolves the organization behind the project, refuses an
+    // orphan as "not mapped", and applies the same permission cut the in-app
+    // surfaces resolve — names included.
+    const { usage, organizationId } = await app.getPullRequestUsage(
+      {
+        projectId: scope.id,
+        repositoryHost: host,
+        repositoryFullName: input.repository,
+        prNumber: input.pullRequest,
+      },
+      by,
+    );
+
+    // Awaited before the answer leaves, so a read is never served unrecorded.
+    await app.recordPullRequestUsageRead({
+      readerUserId: ownerUserId,
+      organizationId,
+      repositoryHost: host,
+      repositoryFullName: input.repository,
+      prNumber: input.pullRequest,
+      contributingProjectCount: new Set(usage.rows.map((row) => row.projectId)).size,
+    });
+
+    return usage;
+  })
+  .build();

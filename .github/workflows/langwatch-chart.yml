@@ -13,12 +13,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process-server/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -42,12 +48,18 @@ on:
       - "charts/langyagent/**"
       - "charts/lib/**"
       - ".github/workflows/langwatch-chart.yml"
-      # The shutdown budget is the one place where a code constant and a
-      # chart value must agree: the pod's terminationGracePeriodSeconds is
-      # sized from the same numbers budget.ts derives. Without this path a
-      # change to those constants never runs the workers-shutdown job, and
-      # the chart would keep asserting a margin the code no longer uses.
-      - "platform/app/src/server/shutdown/**"
+      # Where the processes declare what they read. The shutdown deadline must
+      # agree with the pod's grace period (workers-shutdown.sh), and every
+      # variable the chart sets must still be declared somewhere
+      # (env-contract.mjs); without these paths a code change breaks either
+      # while the chart CI never runs.
+      - "packages/process-server/src/**"
+      - "packages/process-stores/src/config-owner.ts"
+      - "packages/secrets/src/shared-secrets.ts"
+      - "packages/config/src/**"
+      - "modules/*/contract/src/*.config.ts"
+      - "enterprise/modules/*/contract/src/*.config.ts"
+      - "apps/tasks/src/config.ts"
       # This job is the only thing in CI that builds the app image and runs a
       # stack against it — publish-docker-app fires on `release: published`, so
       # on a pull request nothing else touches the Dockerfile at all. Without
@@ -100,9 +112,17 @@ jobs:
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
-      - run: helm dependency build .
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: "@langwatch/workspace"
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      # Adds the repositories, builds the dependencies, then lints and renders
+      # the smoke preset for every chart; each is cached by chart content.
+      - name: "helm deps, lint and smoke render"
+        working-directory: .
+        run: pnpm exec nx run-many -t helm:deps helm:lint helm:template --projects "tag:helm" --outputStyle=static
 
       # `set +e` is deliberate and load-bearing. Actions runs `run:` steps with
       # `-e` already on, and `set -uo pipefail` does not clear it — so without
@@ -195,6 +215,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/workers-shutdown.sh
 
+      - name: "assert ClickHouse pool sizing follows fleet capacity"
+        if: "!cancelled()"
+        run: ./tests/clickhouse-pool-sizing.sh
+
       # In local-filesystem mode the app and the workers mount one ReadWriteOnce
       # PVC, and a helm upgrade rolls both Deployments at once. The pre-upgrade
       # hook that orders them is a template over several values, so which
@@ -218,6 +242,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-internal-url.sh
 
+      - name: "assert the app knows the control plane address its gateway dials"
+        if: "!cancelled()"
+        run: ./tests/gateway-control-plane-url.sh
+
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
       # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the
@@ -226,6 +254,13 @@ jobs:
       - name: "assert Connect emits nothing by default and reaches both workloads when on"
         if: "!cancelled()"
         run: ./tests/connect-env.sh
+
+      # apps/api and apps/worker parse one config at each owner (ADR-132), so a
+      # variable nothing declares is dead and a missing store URL refuses the
+      # boot. Both are only visible by setting the render beside the source.
+      - name: "assert every process env var is read, and the required ones are set"
+        if: "!cancelled()"
+        run: node tests/env-contract.mjs
 
       # release-please bumps the gateway and langyagent subchart versions on
       # every release, and clickhouse-serverless on its own releases. The
@@ -248,25 +283,24 @@ jobs:
     # `changes` gate to read `heavy` from, so the draft check is inline.
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: platform/app
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
-      - run: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-      - run: helm repo add langwatch https://langwatch.github.io/langwatch
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "@langwatch/web..."
+          install: "@langwatch/platform-api... @langwatch/langy-browser..."
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: chart
+      - name: Build chart dependencies
+        run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
       - name: Generate required files
-        run: pnpm start:prepare:files
+        run: pnpm start:prepare:files && pnpm ensure:built
       # The integration config's globalSetup runs ClickHouse migrations via
       # goose before any test file executes, helm-backed or not.
       - name: Install Goose migration tool
-        working-directory: .
         run: bash .github/scripts/install-goose.sh
       - name: Run helm behavioral suites
         env:
@@ -274,8 +308,13 @@ jobs:
           # job exists precisely so these suites cannot quietly not run.
           REQUIRE_HELM_TESTS: "1"
         run: |
-          pnpm test:unit run src/server/stored-objects/__tests__/helm-and-docs-shape.unit.test.ts
-          pnpm test:integration run src/server/stored-objects/__tests__/helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/stored-object-process exec vitest run \
+            src/__tests__/stored-object-helm-and-docs-shape.unit.test.ts \
+            src/__tests__/stored-object-helm-azure-identity.integration.test.ts
+          pnpm --filter @langwatch/evaluation-process exec vitest run \
+            src/__tests__/helm-langevals-memory.unit.test.ts
+          pnpm --filter @langwatch/auth-process exec vitest run \
+            src/transport/__tests__/helm-auth-base-url.unit.test.ts
 
   e2e:
     name: "e2e: ${{ matrix.name }}"

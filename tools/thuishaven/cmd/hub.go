@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/0xdeafcafe/moron/tui"
 
@@ -21,7 +22,7 @@ import (
 // list; a TUI is useless to them.
 func runHub(ctx context.Context, d deps) error {
 	if d.isAgent {
-		return d.orch.Status(false, d.worktree)
+		return d.orch.Status(false, d.worktree, false)
 	}
 	// The TUI owns the terminal: a stray zap line would scribble over the
 	// interface, so the orchestrator's logs go to a file for this command.
@@ -32,8 +33,12 @@ func runHub(ctx context.Context, d deps) error {
 			return err
 		}
 		switch {
+		case out.OpenStack != "":
+			if err := runUpViewer(ctx, out.OpenStack, "", d.orch.LogPath(out.OpenStack), d.orch.LogDir(out.OpenStack), d.sessionActions(out.OpenStack)); err != nil {
+				fmt.Fprintf(os.Stderr, "haven: viewer for %s failed: %v\n", out.OpenStack, err)
+			}
 		case out.RunCleanup:
-			if err := runInteractiveClean(ctx, d, pruneStaleThreshold(invocation{})); err != nil {
+			if err := runInteractiveClean(ctx, newCleanRun(d, invocation{})); err != nil {
 				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
 			}
 		case out.OpenGitDir != "":
@@ -68,6 +73,7 @@ func (d deps) hubActions() hubtui.Actions {
 		},
 		WebURL:     d.orch.DashboardURL(),
 		HasCleanup: true,
+		HasViewer:  true,
 	}
 }
 
@@ -135,10 +141,12 @@ func dashboardExtras(v app.HubView) dashboard.Extras {
 			OtherRSS:   v.Footprint.OtherRSS,
 			Pressure:   v.Footprint.Pressure.String(),
 		},
-		StackRSS: map[int]uint64{},
+		StackRSS:    map[int]uint64{},
+		StackUptime: map[int]time.Duration{},
 	}
 	for i := range v.Stacks {
 		out.StackRSS[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].RSS
+		out.StackUptime[v.Stacks[i].Stack.LauncherPID] = v.Stacks[i].Uptime
 	}
 	for _, wt := range v.Worktrees {
 		out.Worktrees = append(out.Worktrees, dashboard.WorktreeView{

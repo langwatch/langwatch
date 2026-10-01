@@ -1,16 +1,12 @@
 /**
- * The `langwatch query` family, with the API mocked.
- *
- * What these pin is the CONTRACT between the flags and the request: a statement
- * sent as written, parameters bound as given, a keyset walk that rebinds the
- * cursor instead of rewriting the statement, and a refusal before any request
- * for every flag combination that cannot mean anything.
- *
- * @see specs/analytics/lwql-cli-query.feature
+ * The `langwatch query` family: a statement sent as written, parameters bound
+ * as given, a keyset walk that rebinds the cursor, and a refusal before any
+ * request. @see specs/analytics/lwql-cli-query.feature
  */
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -20,8 +16,7 @@ const mockQuery = vi.fn();
 let stdoutWrite: MockInstance<(chunk: unknown) => boolean>;
 
 vi.mock("@/client-sdk/services/query/query-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual: Record<string, unknown> = await importOriginal();
   return { ...actual, QueryApiService: vi.fn() };
 });
 
@@ -49,6 +44,7 @@ class ProcessExitError extends Error {
 }
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
+
 import { runQueryCommand } from "../run";
 
 const RESULT = {
@@ -88,9 +84,7 @@ let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
 
   mockQuery.mockResolvedValue(RESULT);
@@ -104,9 +98,9 @@ beforeEach(async () => {
 
   vi.spyOn(console, "log").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
-  stdoutWrite = vi.spyOn(process.stdout, "write").mockImplementation(
-    () => true,
-  ) as unknown as MockInstance<(chunk: unknown) => boolean>;
+  stdoutWrite = vi
+    .spyOn(process.stdout, "write")
+    .mockImplementation(() => true) as unknown as MockInstance<(chunk: unknown) => boolean>;
   vi.spyOn(process, "exit").mockImplementation((code) => {
     throw new ProcessExitError(code as number);
   });
@@ -143,9 +137,9 @@ describe("runQueryCommand", () => {
   describe("when both a statement and a file are given", () => {
     /** @scenario "A statement and a statement file together are refused" */
     it("refuses before making a request", async () => {
-      await expect(
-        runQueryCommand("SELECT 1", { sqlFile: "/nowhere.sql" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runQueryCommand("SELECT 1", { sqlFile: "/nowhere.sql" })).rejects.toThrow(
+        ProcessExitError,
+      );
       expect(mockQuery).not.toHaveBeenCalled();
     });
   });
@@ -203,9 +197,7 @@ describe("runQueryCommand", () => {
     });
 
     it("refuses a limit that is not a whole number", async () => {
-      await expect(runQueryCommand("SELECT 1", { limit: "0" })).rejects.toThrow(
-        ProcessExitError,
-      );
+      await expect(runQueryCommand("SELECT 1", { limit: "0" })).rejects.toThrow(ProcessExitError);
     });
   });
 
@@ -296,20 +288,16 @@ describe("runQueryCommand", () => {
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
-      const statements = new Set(
-        mockQuery.mock.calls.map((call) => call[0].sql as string),
-      );
+      const statements = new Set(mockQuery.mock.calls.map((call) => call[0].sql as string));
       expect([...statements]).toEqual([KEYSET_SQL]);
     });
 
     /** @scenario "Keyset paging stops when a page comes back short" */
     it("stops after a page shorter than the one before it", async () => {
-      mockQuery
-        .mockResolvedValueOnce(KEYSET_RESULT)
-        .mockResolvedValueOnce({
-          ...KEYSET_RESULT,
-          rows: [KEYSET_RESULT.rows[0]],
-        });
+      mockQuery.mockResolvedValueOnce(KEYSET_RESULT).mockResolvedValueOnce({
+        ...KEYSET_RESULT,
+        rows: [KEYSET_RESULT.rows[0]],
+      });
 
       await runQueryCommand(KEYSET_SQL, { pageBy: "keyset", format: "jsonl" });
 
@@ -331,12 +319,8 @@ describe("runQueryCommand", () => {
         limit: "3",
       });
 
-      const written = stdoutWrite.mock.calls
-        .map((call) => String(call[0]))
-        .join("");
-      const lines = written
-        .split("\n")
-        .filter((line) => line.trim().length > 0);
+      const written = stdoutWrite.mock.calls.map((call) => String(call[0])).join("");
+      const lines = written.split("\n").filter((line) => line.trim().length > 0);
       expect(lines).toHaveLength(3);
     });
 

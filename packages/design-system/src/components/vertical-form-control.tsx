@@ -1,0 +1,41 @@
+import type { PropsWithChildren, ReactNode } from "react";
+import type { FieldErrors, FieldValues } from "react-hook-form";
+
+import {
+  HorizontalFormControl,
+  type HorizontalFormControlProps,
+} from "./horizontal-form-control.tsx";
+
+export interface VerticalFormControlProps extends HorizontalFormControlProps {
+  helper?: string | ReactNode;
+  invalid?: boolean;
+  inputWidth?: string;
+  error?: FieldErrors<FieldValues>[0] | ReactNode;
+  size?: "sm" | "md";
+}
+
+export function VerticalFormControl({
+  label,
+  helper,
+  invalid,
+  children,
+  inputWidth,
+  error,
+  size = "md",
+  ...props
+}: PropsWithChildren<VerticalFormControlProps>) {
+  return (
+    <HorizontalFormControl
+      label={label}
+      helper={helper}
+      invalid={invalid}
+      inputWidth={inputWidth}
+      size={size}
+      error={error}
+      {...props}
+      direction="vertical"
+    >
+      {children}
+    </HorizontalFormControl>
+  );
+}

@@ -1,0 +1,102 @@
+/**
+ * The rules every automation door shares, over the collaborators they
+ * need: the application's own methods, moved here so the authoring
+ * service can ask without reaching back through the application.
+ */
+import {
+  AutomationNotInProjectError,
+  GraphNotInProjectError,
+  hasActionableTriggerFilters,
+  ProjectNotFoundError,
+  TriggerFiltersRequiredError,
+  type Trigger,
+} from "@langwatch/automation-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+
+import type { AutomationService } from "./automation.service.ts";
+
+/** The project an automation names, as a test fire renders it. */
+export interface AutomationProjectIdentity {
+  readonly name: string;
+  readonly slug: string;
+}
+
+/** What the shared rules read the world through. */
+export interface AutomationRulesCollaborators {
+  automation: AutomationService;
+  projects: ProjectApi;
+}
+
+export class AutomationRulesService {
+  static create(collaborators: AutomationRulesCollaborators): AutomationRulesService {
+    return new AutomationRulesService(collaborators);
+  }
+
+  private constructor(private readonly collaborators: AutomationRulesCollaborators) {}
+
+  /**
+   * One LIVE automation, or null when there isn't one. The store answers
+   * soft-deleted rows too, so every caller tested `deleted` -- and the
+   * two doors disagreed on the same id's answer.
+   */
+  async findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null> {
+    const trigger = await this.collaborators.automation.findById(input);
+
+    return !trigger || trigger.deleted ? null : trigger;
+  }
+
+  /** One live automation, refusing when the project does not have it. */
+  async getById(input: { triggerId: string; projectId: string }): Promise<Trigger> {
+    const trigger = await this.findLiveById(input);
+
+    if (!trigger) throw new AutomationNotInProjectError(input.triggerId, input.projectId);
+
+    return trigger;
+  }
+
+  /**
+   * Refuses a graph alert whose graph is not this project's. Without it a
+   * hostile client could attach an alert to another tenant's graph.
+   */
+  async assertCustomGraphInProject(input: {
+    customGraphId: string;
+    projectId: string;
+  }): Promise<void> {
+    const exists = await this.collaborators.automation.customGraphExistsInProject(input);
+
+    if (!exists) throw new GraphNotInProjectError(input.customGraphId, input.projectId);
+  }
+
+  /** Refuses a trace automation with no condition. */
+  assertTraceConditionPresent(filters: Record<string, unknown> | undefined): void {
+    if (!hasActionableTriggerFilters(filters ?? {})) {
+      throw new TriggerFiltersRequiredError();
+    }
+  }
+
+  /**
+   * Refuses an edit that would leave a trace automation matching everything: an
+   * automation whose condition lives in its query keeps a legitimately empty
+   * structured set, and alerts and reports have no trace condition at all.
+   */
+  assertConditionSurvivesEdit(input: {
+    existing: Trigger;
+    filters: Record<string, unknown> | undefined;
+  }): void {
+    if (input.filters === undefined) return;
+    if (hasActionableTriggerFilters(input.filters)) return;
+    if (input.existing.triggerKind !== "AUTOMATION") return;
+    if ((input.existing.filterQuery ?? "").trim() !== "") return;
+
+    throw new TriggerFiltersRequiredError();
+  }
+
+  /** The project's name and slug, as a rendered notification quotes them. */
+  async getProjectIdentity(projectId: string): Promise<AutomationProjectIdentity> {
+    const project = await this.collaborators.projects.findSummaryById(projectId);
+
+    if (!project) throw new ProjectNotFoundError(projectId);
+
+    return { name: project.name, slug: project.slug };
+  }
+}

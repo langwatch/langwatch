@@ -1,28 +1,10 @@
 /**
- * Bounded concurrency, with shedding.
- *
- * Pool sizing bounds how many sockets a process may open. It does not bound how
- * many statements the process will try to run: work arrives from a queue whose
- * concurrency is set somewhere else entirely, and on a bad day every lane wants
- * the server at once. That is the shape of the 2026-07-31 incident - the server
- * hit `max_concurrent_queries`, rejected, the rejections were classified as
- * transient, and the retries went back into the same wall.
- *
- * Two rules follow, and they are the reason this exists as a separate layer
- * rather than a flag on the retry policy:
- *
- *  - A slot is held across retries, not taken per attempt. Compose this
- *    *outside* retry. Inside, a retrying statement releases its slot, joins the
- *    back of the queue, and competes with fresh work, which is how a queue
- *    turns a small overload into a persistent one.
- *
- *  - The waiting queue is bounded and sheds when full. An unbounded wait queue
- *    does not prevent overload, it hides it: the server stays inside its limit
- *    while memory grows and latency climbs until something upstream times out.
- *    Refusing immediately is worse for one caller and much better for the rest.
+ * Bounded concurrency, with shedding. A slot is held across retries, not
+ * per attempt — else a retrying statement escapes the bound. The wait
+ * queue sheds when full, since unbounded hides overload instead of preventing it.
  */
 
-import type { AbortSignalLike } from "./query";
+import type { AbortSignalLike } from "./query.ts";
 
 /** Raised when the wait queue is full. Shed load rather than grow it. */
 export class QueueFullError extends Error {
@@ -57,12 +39,9 @@ export interface LimiterStats {
 const DEFAULT_MAX_QUEUED = 1_000;
 
 /**
- * Bounded concurrency with a bounded wait queue.
- *
- * A class rather than a closure because it is the one thing in this package
- * that holds mutable state — how many statements are in flight, and who is
- * waiting — and that state is worth naming. It also makes the state readable
- * from a test through {@link stats} without the test having to run a statement.
+ * Bounded concurrency with a bounded wait queue. A class rather than a
+ * closure since it holds this package's one piece of mutable state —
+ * in-flight count and waiters — readable from a test via {@link stats}.
  */
 export class ConcurrencyLimiter {
   private readonly maxConcurrent: number;
@@ -73,10 +52,7 @@ export class ConcurrencyLimiter {
     abort: (error: Error) => void;
   }[] = [];
 
-  constructor({
-    maxConcurrent,
-    maxQueued = DEFAULT_MAX_QUEUED,
-  }: ConcurrencyLimiterOptions) {
+  constructor({ maxConcurrent, maxQueued = DEFAULT_MAX_QUEUED }: ConcurrencyLimiterOptions) {
     if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
       throw new RangeError("maxConcurrent must be a positive integer");
     }

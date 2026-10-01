@@ -1,0 +1,523 @@
+# The runner freezes Date.now(), so the list's default window ends before a note made mid-run;
+# the address names an absolute range, which main's period selector reads too.
+# Annotations beyond the trace drawer flows in observability.yaml: an annotation posted over REST shows in
+# the annotations list, score metrics in settings, and editing a queue. Every step uses selectors main and
+# the branch share (form labels, button words, aria labels, a table row's text). Unrun.
+flows:
+  - id: annotation-list-shows-annotation
+    title: An annotation posted on a trace shows in the annotations list with its comment and thumb
+    setup:
+      - post: /api/annotations/trace/trace_visualdiff_1
+        body:
+          comment: vd rest note {uid}
+          isThumbsUp: true
+        as:
+          noteText: data.comment
+          noteId: data.id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: expect
+        with:
+          text: "{noteText}"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/annotations/{noteId}
+          contains: '"isThumbsUp":true'
+      - action: go
+        with:
+          path: /{slug}/annotations/all?startDate=2020-01-01T00:00:00.000Z&endDate=2099-01-01T00:00:00.000Z
+      - action: expect
+        with:
+          text: "{noteText}"
+
+  - id: annotation-score-create
+    title: Add a score metric in settings and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score made by the visual diff flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-score-{uid}
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-score-{uid}
+
+  - id: annotation-score-edit-and-delete
+    title: Rename a score metric, then delete it, each read back after a reload
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-scoreed-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score made by the visual diff flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-scoreed-{uid}
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-scoreed-{uid}
+      - action: click
+        with:
+          selector: tr:has-text("vd-scoreed-{uid}") button
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-scoreed-{uid}-renamed
+      - action: click
+        with:
+          text: Update Score Metric
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-scoreed-{uid}-renamed
+      - action: click
+        with:
+          selector: tr:has-text("vd-scoreed-{uid}-renamed") button
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          text: vd-scoreed-{uid}-renamed
+          equals: "0"
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-scoreed-{uid}-renamed
+          equals: "0"
+
+  - id: annotation-queue-edit-rename
+    title: Rename an annotation queue from its sidebar menu and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qedit-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qedit-score-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: vd-qedit-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Created by the visual diff flow {uid}
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: Add Score Type
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          label: Actions for queue vd-qedit-{uid}
+      - action: click
+        with:
+          label: Actions for queue vd-qedit-{uid}
+      - action: click
+        with:
+          text: Edit queue
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: vd-qedit-{uid}-renamed
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          label: Actions for queue vd-qedit-{uid}-renamed
+
+  - id: annotation-score-type-checkbox
+    title: Add a Checkboxes score with two options and read the type back from its edit form
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-sct-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Checkbox score made by the visual diff flow {uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Checkboxes
+      - action: expect
+        with:
+          text: Allow multiple selections with checkboxes
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: vd-alpha-{uid}
+      - action: click
+        with:
+          text: Add Option
+      - action: fill
+        with:
+          selector: xpath=(//input[@placeholder="value"])[2]
+          value: vd-beta-{uid}
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-sct-{uid}
+      - action: expect
+        with:
+          text: vd-alpha-{uid}
+      - action: expect
+        with:
+          text: vd-beta-{uid}
+      - action: click
+        with:
+          selector: tr:has-text("vd-sct-{uid}") button
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Allow multiple selections with checkboxes
+
+  - id: annotation-score-type-option
+    title: Add a Multiple choice score with two options and read the type back from its edit form
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-sco-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Multiple choice score made by the visual diff flow {uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: expect
+        with:
+          text: Single selection from multiple options
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: vd-good-{uid}
+      - action: click
+        with:
+          text: Add Option
+      - action: fill
+        with:
+          selector: xpath=(//input[@placeholder="value"])[2]
+          value: vd-bad-{uid}
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: expect
+        with:
+          text: vd-sco-{uid}
+      - action: expect
+        with:
+          text: vd-good-{uid}
+      - action: expect
+        with:
+          text: vd-bad-{uid}
+      - action: click
+        with:
+          selector: tr:has-text("vd-sco-{uid}") button
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          text: Single selection from multiple options
+
+  - id: annotation-queue-members-on-its-page
+    title: Create a queue with a member and a score, open it from the sidebar and see its header and empty list
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qm-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qm-score-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: vd-qm-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Members shown by the visual diff flow {uid}
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: Add Score Type
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          label: Actions for queue vd-qm-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          text: vd-qm-{uid}
+      - action: expect
+        with:
+          url: /annotations\/vd-qm-/i
+      - action: expect
+        with:
+          text: "Members:"
+      - action: expect
+        with:
+          text: No queued annotations for this queue
+
+  - id: annotation-queue-reserved-name
+    title: A queue named after a reserved address is refused and never appears in the sidebar
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-qres-score-{uid}
+      - action: select
+        with:
+          field: Score Type
+          option: Multiple choice
+      - action: fill
+        with:
+          label: /^Description/
+          value: Score for the queue flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-qres-score-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: My Queue
+      - action: fill
+        with:
+          label: /^Description/
+          value: Refused by the visual diff flow {uid}
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: Add Score Type
+      - action: click
+        with:
+          selector: xpath=//*[@data-scope="popover"][@data-part="content"]//button[@aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: wait
+        with:
+          millis: "2500"
+      - action: expect
+        with:
+          label: /^Name Annotation Queue/
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          label: Actions for queue My Queue
+          equals: "0"

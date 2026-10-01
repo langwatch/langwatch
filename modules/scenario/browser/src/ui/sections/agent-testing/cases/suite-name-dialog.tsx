@@ -1,0 +1,99 @@
+/**
+ * Asks only for the name of a new test suite; what it declares next is the suite editor's job.
+ * @see specs/features/agent-testing/suites-rail.feature
+ * @see specs/suites/test-suites.feature
+ */
+
+import { Button, Input, Text } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { useEffect, useState } from "react";
+
+/** What the dialog says when the name is empty. */
+export const SUITE_NAME_REQUIRED = "A test suite needs a name.";
+
+export type SuiteNameDialogProps = {
+  open: boolean;
+  /** True while the suite is being created, so a second submit cannot send it twice. */
+  isCreating?: boolean;
+  onClose: () => void;
+  onConfirm: (name: string) => void;
+};
+
+export function SuiteNameDialog({
+  open,
+  isCreating = false,
+  onClose,
+  onConfirm,
+}: SuiteNameDialogProps) {
+  const [name, setName] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setName("");
+    setProblem(null);
+  }, [open]);
+
+  const submit = () => {
+    if (isCreating) return;
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setProblem(SUITE_NAME_REQUIRED);
+      return;
+    }
+    setProblem(null);
+    onConfirm(trimmed);
+  };
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
+      placement="center"
+    >
+      <Dialog.Content bg="bg" maxWidth="420px" data-testid="agent-testing-suite-name-dialog">
+        <Dialog.CloseTrigger />
+        <Dialog.Header>
+          <Dialog.Title fontSize="md" fontWeight="500">
+            New test suite
+          </Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <Input
+            size="sm"
+            placeholder="e.g. Refunds"
+            aria-label="Test suite name"
+            data-testid="suite-name-input"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                submit();
+              }
+            }}
+          />
+          {problem && (
+            <Text paddingTop={2} fontSize="12px" color="red.600" data-testid="suite-name-problem">
+              {problem}
+            </Text>
+          )}
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="outline" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="blue"
+            size="sm"
+            loading={isCreating}
+            onClick={submit}
+            data-testid="suite-name-confirm"
+          >
+            Create
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}

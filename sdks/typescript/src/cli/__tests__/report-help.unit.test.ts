@@ -8,18 +8,15 @@ import { buildProgram } from "../program";
 
 /**
  * The help text IS the product for `langwatch report`: agents discover the
- * command, the consent rule, their own transcript location, and the redaction
- * guarantees from `--help` alone. These tests pin that rendered output.
- * Corresponds to specs/typescript-sdk/cli-report.feature.
+ * command, consent rule, transcript location and redaction guarantees from
+ * `--help` alone. Pins that rendered output. See specs/typescript-sdk/cli-report.feature.
  */
 const renderHelp = (args: string[]): string => {
   let out = "";
-  const writeSpy = vi
-    .spyOn(process.stdout, "write")
-    .mockImplementation((chunk) => {
-      out += String(chunk);
-      return true;
-    });
+  const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+    out += String(chunk);
+    return true;
+  });
   const program = buildProgram();
   program.exitOverride();
   for (const command of program.commands) command.exitOverride();

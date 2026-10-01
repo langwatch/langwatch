@@ -1,23 +1,29 @@
-import type {
-  LocalPromptConfig,
-  MaterializedPrompt,
-  RuntimeParameters,
-} from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
+
+import type { LocalPromptConfig, MaterializedPrompt, RuntimeParameters } from "../types";
 import {
   type CliOutput,
   type LocalResponseFormat,
   outputsToResponseFormat,
 } from "./responseFormat";
 
+type PromptYamlContent = {
+  model: string;
+  modelParameters?: {
+    temperature?: number;
+    maxTokens?: number;
+  };
+  messages: {
+    role: "system" | "user" | "assistant";
+    content: string;
+  }[];
+  response_format?: LocalResponseFormat;
+  parameters?: RuntimeParameters;
+};
+
 /**
- * Converter utility for transforming between YAML prompt format and API service format.
- *
- * The YAML format follows the GitHub .prompt.yaml file format standard,
- * while the API format is our internal prompt service schema tied to the database.
- *
- * This separation allows us to maintain and evolve both formats independently
- * while keeping the conversion logic centralized and well-tested.
+ * Converts between the YAML `.prompt.yaml` format (GitHub's standard) and
+ * this service's internal API schema, keeping the two evolvable independently.
  */
 export class PromptConverter {
   /**
@@ -46,20 +52,8 @@ export class PromptConverter {
    * Converts a MaterializedPrompt to the YAML content structure
    * for saving to .prompt.yaml files.
    */
-  static fromMaterializedToYaml(prompt: MaterializedPrompt): {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      maxTokens?: number;
-    };
-    messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }>;
-    response_format?: LocalResponseFormat;
-    parameters?: RuntimeParameters;
-  } {
-    const result: any = {
+  static fromMaterializedToYaml(prompt: MaterializedPrompt): PromptYamlContent {
+    const result: PromptYamlContent = {
       model: prompt.model,
       messages: prompt.messages,
     };
@@ -102,8 +96,7 @@ export class PromptConverter {
    */
   static fromLocalToApiFormat(
     config: LocalPromptConfig,
-  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
-  {
+  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters } {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,
@@ -117,9 +110,7 @@ export class PromptConverter {
    * Extracts the system prompt from messages array.
    * Used when converting to API format that separates system prompt from messages.
    */
-  static extractSystemPrompt(
-    messages: Array<{ role: string; content: string }>,
-  ): string {
+  static extractSystemPrompt(messages: { role: string; content: string }[]): string {
     return messages.find((m) => m.role === "system")?.content ?? "";
   }
 
@@ -128,14 +119,14 @@ export class PromptConverter {
    * Used when converting to API format that handles system prompt separately.
    */
   static filterNonSystemMessages(
-    messages: Array<{
+    messages: {
       role: "system" | "user" | "assistant";
       content: string;
-    }>,
-  ): Array<{ role: "user" | "assistant"; content: string }> {
-    return messages.filter((m) => m.role !== "system") as Array<{
+    }[],
+  ): { role: "user" | "assistant"; content: string }[] {
+    return messages.filter((m) => m.role !== "system") as {
       role: "user" | "assistant";
       content: string;
-    }>;
+    }[];
   }
 }

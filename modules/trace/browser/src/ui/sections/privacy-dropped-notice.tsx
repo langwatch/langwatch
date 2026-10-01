@@ -1,0 +1,52 @@
+import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Alert, Button } from "@langwatch/design-system/primitives";
+
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+
+/**
+ * Banner shown when a trace is missing content because a `drop` privacy policy stripped
+ * it before storage.
+ */
+const CATEGORY_LABELS: Record<string, string> = {
+  input: "input",
+  output: "output",
+  system: "system instructions",
+  tools: "tool calls",
+};
+
+function describeCategories(categories: string[]): string {
+  const labels = categories.map((category) => CATEGORY_LABELS[category] ?? category);
+  if (labels.length === 1) return labels[0]!;
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+}
+
+export function PrivacyDroppedNotice({ categories }: { categories?: string[] | null }) {
+  const { hasPermission } = useOrganizationTeamProject();
+  if (!categories || categories.length === 0) return null;
+
+  const single = categories.length === 1;
+  const list = describeCategories(categories);
+  const wasWere = single ? "was" : "were";
+  const itThey = single ? "it is" : "they are";
+  const itTheyWere = single ? "it was" : "they were";
+
+  return (
+    <Alert.Root status="info" size="sm" width="full">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>
+          The {list} {wasWere} dropped by this project's privacy settings before {itTheyWere}{" "}
+          stored, so {itThey} not shown here and cannot be recovered.
+        </Alert.Description>
+        {hasPermission("project:view") && (
+          <Button asChild size="xs" variant="outline" marginTop={1} alignSelf="start">
+            <RoutedLink href="/settings/data-privacy" target="_blank" rel="noopener noreferrer">
+              Privacy settings
+            </RoutedLink>
+          </Button>
+        )}
+      </Alert.Content>
+    </Alert.Root>
+  );
+}

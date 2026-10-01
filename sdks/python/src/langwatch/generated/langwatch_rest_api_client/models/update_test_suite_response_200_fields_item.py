@@ -13,10 +13,13 @@ T = TypeVar("T", bound="UpdateTestSuiteResponse200FieldsItem")
 
 @_attrs_define
 class UpdateTestSuiteResponse200FieldsItem:
-    """
-    Attributes:
-        identifier (str):
-        type_ (UpdateTestSuiteResponse200FieldsItemType):
+    """One field the test suite declares beyond situation and criteria. Every scenario filed in the suite carries a value
+    for it.
+
+        Attributes:
+            identifier (str): The field name, as scenarios and evaluator mappings address it. Lowercase letters, digits and
+                underscores, starting with a letter.
+            type_ (UpdateTestSuiteResponse200FieldsItemType): The value type every scenario carries for this field.
     """
 
     identifier: str

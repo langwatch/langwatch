@@ -3,7 +3,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # The public REST surface for the AI Gateway control plane: virtual key
   # CRUD + spend, budget CRUD across every scope dimension, cache rules.
   # Bound scenarios run in
-  # platform/app/src/app/api/gateway-platform/__tests__/ against the real
+  # [gone] src/app/api/gateway-platform/__tests__/ against the real
   # Hono app, real Postgres, and real ClickHouse.
 
   As a LangWatch customer integrating with the AI Gateway programmatically
@@ -93,6 +93,72 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 201
     And the key is reachable org-wide
 
+  # Budgets and cache rules are organization-owned, so every write to one is
+  # authorized at the organization, whichever project the credential names.
+
+  @integration @rest @rbac
+  Scenario: A scoped API key with the budget grant at the organization creates a budget
+    Given a scoped API key whose bindings grant `gatewayBudgets:create` at the organization
+    When it creates a budget
+    Then the response status is 201
+    And the budget is attributed to the key's owning user
+
+  @integration @rest @rbac
+  Scenario: A key without the budget grant at the organization is refused by code
+    Given a scoped API key that may create budgets only in its own project
+    When it creates a budget
+    Then the response status is 403 with the code `permission_denied`
+    And no budget is created
+
+  @unit @rbac
+  Scenario: The organization-wide gate asks the key and its owner at the organization
+    Given a scoped API key
+    When it asks to write an organization-wide gateway row
+    Then the grant is checked for that key and its owner at the organization
+    And a key without it is refused with the code `permission_denied`
+
+  @unit @rbac
+  Scenario: A legacy project key writes organization-wide budgets and cache rules
+    # As on main: the legacy key carries full access by its class alone for
+    # these seven writes. Nothing else widens; its keys stay project-bound.
+    When a legacy project key asks to write an organization-wide gateway row
+    Then it is admitted without any grant being asked
+    And the write is attributed to the synthetic actor `svc_<projectId>`
+
+  @unit @rbac
+  Scenario: A refused virtual-key create is a 403 naming the missing grant
+    When a legacy project key requests an organization-scoped key
+    Then it is refused with the code `permission_denied`
+    And the refusal names the missing `virtualKeys:manage` grant
+
+  @integration @rest @audit
+  Scenario: A legacy project key's own-project key is attributed to the machine principal
+    When a legacy project key creates a key for its own project
+    Then the response status is 201
+    And the write is attributed to the synthetic actor `svc_<projectId>`
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot aim a budget at another organization
+    Given a legacy project key for a project in organization A
+    When it creates a budget whose scope, anchor or model provider names a resource of organization B
+    Then it is refused with the code `gateway_scope_org_mismatch`, or `virtual_key_not_found` for a key
+    And no budget is created
+
+  @integration @rest @rbac
+  Scenario: A legacy project key cannot change another organization's budget or cache rule
+    Given a legacy project key for a project in organization A
+    When it updates, archives or resets a budget or cache rule of organization B by id
+    Then the response status is 404
+    And nothing is written
+
+  @integration @rest @rbac
+  Scenario: A legacy project key's writes land in its own project's organization
+    # As on main: inside its own organization the key may budget any team or
+    # project, and change any budget or cache rule.
+    Given a legacy project key for a project in organization A
+    When it creates a budget or a cache rule, whatever organization the body names
+    Then the row is filed under organization A
+
   @integration @rest @rbac
   Scenario: A key that can create but not manage mints a key for its own project
     # MEMBER holds virtualKeys:create but not virtualKeys:manage. Issuing a
@@ -162,14 +228,15 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.code is "missing_credentials"
 
   @integration @rest
-  Scenario: A request-validation failure answers the canonical error envelope at 400
+  Scenario: A request-validation failure answers the canonical error envelope at 422
     When a request fails its schema
-    Then the response status is 400
+    Then the response status is 422
     And the body is the canonical error envelope with code "validation_error"
     And error.meta names the target and the offending fields
     And error.meta.reasons carries one entry per violation
-    # One status for one code: the surface used to answer 422 here while the
-    # platform routes answered 400 for the same refusal.
+    # One status for one code, and the code is 422: the request arrived intact
+    # and was rejected on its values. A body that could not be read as a
+    # request at all is the other class, and answers 400 malformed_request.
 
   @integration @rest
   Scenario: An unexpected server failure answers the canonical error envelope naming nothing internal
@@ -204,7 +271,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # A product-managed key is hidden from reads and refuses mutations —
     # nothing a customer can ever want to mint against themselves.
     When I create a key with purpose "langy"
-    Then the response status is 400 with error.code "validation_error"
+    Then the response status is 422 with error.code "validation_error"
 
   @integration @rest @budgets
   Scenario: A key and its cap are created atomically over REST
@@ -217,7 +284,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # The budget wire parses through the SAME zod schema the tRPC create
     # uses, so a cap tRPC would refuse cannot arrive via REST.
     When I create a key with `budget: { "limit_usd": "10abs", "window": "month" }`
-    Then the response status is 400
+    Then the response status is 422
     And the message names `limit_usd`
 
   # ============================================================================
@@ -291,7 +358,7 @@ Feature: Public REST API — /api/gateway/v1/*
     # same spelling. One casing, both directions.
     When I send the stored casing on `?scope_type`, on a budget `kind`, or on a
     virtual key `scope_type`
-    Then each answers 400 with code "validation_error"
+    Then each answers 422 with code "validation_error"
 
   @integration @rest @budgets
   Scenario: Every enum a budget read returns is lowercase
@@ -331,7 +398,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest
   Scenario: The page size is capped
     When I send `?limit=500`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest
   Scenario: The spend window is epoch milliseconds, like every spend endpoint
@@ -342,7 +409,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 200
     And the echoed `window` is in the same unit, so it can be sent straight back
     When I send the ISO-8601 form this route used to take
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @budgets
   Scenario: One budget can be read on its own
@@ -357,6 +424,12 @@ Feature: Public REST API — /api/gateway/v1/*
     When I send `GET /api/gateway/v1/budgets/{unknown}`
     Then the response status is 404
     And the body is the canonical error envelope with code "budget_not_found"
+
+  @integration @rest @budgets
+  Scenario: A cycle anchor on a window that never rolls is refused
+    When I create a budget with window "manual" or "total" and a cycle_anchor_at
+    Then the response status is 400
+    And error.code is "gateway_budget_cycle_anchor_invalid" and meta.window names the window
 
   @unit @budgets
   Scenario: A budget amount converts to nano-USD without float drift
@@ -409,7 +482,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest @budgets
   Scenario: An invalid scope_type filter is refused
     When I send `GET /api/gateway/v1/budgets?scope_type=BANANA`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @budgets
   Scenario: A PRINCIPAL budget must target a member of the org
@@ -498,7 +571,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest @spend
   Scenario: The spend read validates its window
     When I send `from` after `to`
-    Then the response status is 400
+    Then the response status is 422
 
   @integration @rest @spend
   Scenario: Spend for an unknown key is a 404, not a zero
@@ -651,7 +724,7 @@ Feature: Public REST API — /api/gateway/v1/*
   @integration @rest
   Scenario: Metadata beyond the documented caps is refused, naming the key
     When I send a `metadata` value longer than 500 characters
-    Then the response status is 400 with error.code = "validation_error"
+    Then the response status is 422 with error.code = "validation_error"
     And error.meta.fields names the offending key
     And a map of more than 40 keys is refused the same way
 

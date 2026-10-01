@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 // Gateway-level canonicalization test for the session/thread id element.
@@ -28,21 +28,21 @@ func TestClientSessionID_perTool(t *testing.T) {
 	cases := []struct {
 		name     string
 		headerID string // what the middleware lifted from headers (empty = header stripped)
-		reqType  domain.RequestType
+		reqType  aitrace.RequestType
 		body     string
 		want     string
 	}{
-		{"claude header", claudeSID, domain.RequestTypeMessages, `{}`, claudeSID},
+		{"claude header", claudeSID, aitrace.RequestTypeMessages, `{}`, claudeSID},
 		{
 			"claude body fallback when header absent",
-			"", domain.RequestTypeMessages,
+			"", aitrace.RequestTypeMessages,
 			`{"metadata":{"user_id":"{\"device_id\":\"abc\",\"account_uuid\":\"\",\"session_id\":\"` + claudeSID + `\"}"}}`,
 			claudeSID,
 		},
-		{"codex header", codexSID, domain.RequestTypeResponses, `{}`, codexSID},
-		{"codex body fallback (prompt_cache_key)", "", domain.RequestTypeResponses, `{"prompt_cache_key":"` + codexSID + `"}`, codexSID},
-		{"opencode header only", opencodeSID, domain.RequestTypeMessages, `{}`, opencodeSID},
-		{"gemini sends no session id on the gateway wire", "", domain.RequestTypePassthrough, `{"contents":[]}`, ""},
+		{"codex header", codexSID, aitrace.RequestTypeResponses, `{}`, codexSID},
+		{"codex body fallback (prompt_cache_key)", "", aitrace.RequestTypeResponses, `{"prompt_cache_key":"` + codexSID + `"}`, codexSID},
+		{"opencode header only", opencodeSID, aitrace.RequestTypeMessages, `{}`, opencodeSID},
+		{"gemini sends no session id on the gateway wire", "", aitrace.RequestTypePassthrough, `{"contents":[]}`, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestClientSessionID_perTool(t *testing.T) {
 			if tc.headerID != "" {
 				ctx = WithClientSessionID(ctx, tc.headerID)
 			}
-			got := clientSessionID(ctx, domain.AITraceParams{
+			got := clientSessionID(ctx, aitrace.AITraceParams{
 				RequestType: tc.reqType,
 				RequestBody: []byte(tc.body),
 			})

@@ -1,0 +1,202 @@
+import {
+  AgentAlreadyExistsError,
+  AgentRegisterOnlyError,
+  voiceAgentIdentityKey,
+  type VoiceAgentConfig,
+  type VoiceTransport,
+  type AgentWorkflowInput,
+  type AgentWorkflowConfig,
+  type UpdateAgentWorkflowConfigInput,
+  InvalidAgentConfigError,
+  createAgentCommandSchema,
+  agentConfigSchema,
+  updateAgentCommandSchema,
+  type GetAgentInput,
+  type AgentProjectInput,
+  type AgentIdsInput,
+  type AgentCreationWindowInput,
+  type ListAgentsInput,
+  type CreateAgentCommand,
+  type UpdateAgentCommand,
+  type ConnectedAgentsInput,
+  type ConnectedAgentsEnvironmentInput,
+  type RegisterConnectedAgentInput,
+  type Agent,
+  type AgentReferenceState,
+  type AgentName,
+  type AgentPage,
+} from "@langwatch/agent-contract";
+
+import type { AgentRepository, AgentPresenceInput } from "../repositories/agent.repository.ts";
+import { nextAgentId } from "../rules/agent-id.rules.ts";
+
+export class AgentService {
+  #repository: AgentRepository;
+
+  private constructor(repository: AgentRepository) {
+    this.#repository = repository;
+  }
+
+  static create(repository: AgentRepository): AgentService {
+    return new AgentService(repository);
+  }
+
+  getById(input: GetAgentInput): Promise<Agent> {
+    return this.#repository.getById(input);
+  }
+
+  listWorkflowConfigs(input: AgentWorkflowInput): Promise<AgentWorkflowConfig[]> {
+    return this.#repository.findWorkflowConfigs(input);
+  }
+
+  updateWorkflowConfig(input: UpdateAgentWorkflowConfigInput): Promise<void> {
+    return this.#repository.updateWorkflowConfig(input);
+  }
+
+  getAll(input: AgentProjectInput): Promise<Agent[]> {
+    return this.#repository.findAll(input);
+  }
+
+  getReferenceStates(input: AgentIdsInput): Promise<AgentReferenceState[]> {
+    return this.#repository.findReferenceStates(input);
+  }
+
+  getNamesByIds(input: AgentIdsInput): Promise<AgentName[]> {
+    return this.#repository.findNamesByIds(input);
+  }
+
+  exists(input: GetAgentInput): Promise<boolean> {
+    return this.#repository.exists(input);
+  }
+
+  async list(input: ListAgentsInput): Promise<AgentPage> {
+    const { data, total } = await this.#repository.listPage(input);
+
+    return {
+      data,
+      pagination: {
+        page: input.page,
+        limit: input.limit,
+        total,
+        totalPages: Math.ceil(total / input.limit),
+      },
+    };
+  }
+
+  create(input: CreateAgentCommand): Promise<Agent> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
+
+    const result = createAgentCommandSchema.safeParse(input);
+    if (!result.success) throw new InvalidAgentConfigError(input.type, result.error.issues);
+
+    const command = result.data;
+    return this.#repository.create({ ...command, id: command.id ?? nextAgentId() });
+  }
+
+  async update(input: UpdateAgentCommand): Promise<Agent> {
+    if (input.type === "connected") throw new AgentRegisterOnlyError();
+
+    const existing = await this.#repository.getByIdIncludingArchived({
+      id: input.id,
+      projectId: input.projectId,
+    });
+    if (existing.type === "connected") throw new AgentRegisterOnlyError();
+
+    const parsed = updateAgentCommandSchema.safeParse(input);
+    if (!parsed.success)
+      throw new InvalidAgentConfigError(input.type ?? "signature", parsed.error.issues);
+
+    await this.#repository.getById({ id: input.id, projectId: input.projectId });
+    const type = parsed.data.type ?? existing.type;
+    const checked = agentConfigSchema.safeParse({
+      type,
+      config: parsed.data.config ?? existing.config,
+    });
+    if (!checked.success) throw new InvalidAgentConfigError(type, checked.error.issues);
+    const config = checked.data.config;
+
+    return this.#repository.update({ ...parsed.data, type, config });
+  }
+
+  archive(input: GetAgentInput): Promise<Agent> {
+    return this.#repository.archive(input);
+  }
+
+  registerConnected(input: RegisterConnectedAgentInput): Promise<Agent> {
+    return this.#repository.registerConnected({ ...input, type: "connected" });
+  }
+
+  /** Deduped by identity key; the create race re-reads and reuses the winner (#8020). */
+  async createVoiceAgent(input: {
+    id: string;
+    projectId: string;
+    name: string;
+    transport: VoiceTransport;
+    agentId: string;
+  }): Promise<Agent> {
+    const identityKey = voiceAgentIdentityKey({
+      transport: input.transport,
+      agentExternalId: input.agentId,
+    });
+    const [existing] = await this.#repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey,
+    });
+    if (existing) return existing;
+
+    const config: VoiceAgentConfig =
+      input.transport === "phone"
+        ? { transport: "phone", phoneNumber: input.agentId, callDirection: "outbound" }
+        : { transport: input.transport, agentId: input.agentId };
+    try {
+      return await this.#repository.create({
+        id: input.id,
+        projectId: input.projectId,
+        name: input.name,
+        type: "voice",
+        config,
+        identityKey,
+      });
+    } catch (error) {
+      if (!(error instanceof AgentAlreadyExistsError)) throw error;
+      const [raced] = await this.#repository.findByIdentityKey({
+        projectId: input.projectId,
+        identityKey,
+      });
+      if (!raced) throw error;
+      return raced;
+    }
+  }
+
+  async hasVoiceAgentForExternalId(input: {
+    projectId: string;
+    transport: VoiceTransport;
+    agentExternalId: string;
+  }): Promise<boolean> {
+    const agents = await this.#repository.findByIdentityKey({
+      projectId: input.projectId,
+      identityKey: voiceAgentIdentityKey(input),
+    });
+    return agents.some((agent) => agent.type === "voice");
+  }
+
+  getConnectedByNameAndEnvironment(input: ConnectedAgentsEnvironmentInput): Promise<Agent[]> {
+    return this.#repository.findConnectedByNameAndEnvironment(input);
+  }
+
+  getConnectedByName(input: ConnectedAgentsInput): Promise<Agent[]> {
+    return this.#repository.findConnectedByName(input);
+  }
+
+  findConnectedInProjects(input: { projectIds: string[] }): Promise<Agent[]> {
+    return this.#repository.findConnectedInProjects(input);
+  }
+
+  touchLastSeenAt(input: AgentPresenceInput): Promise<void> {
+    return this.#repository.touchLastSeenAt(input);
+  }
+
+  findIdsCreatedInWindow(input: AgentCreationWindowInput): Promise<string[]> {
+    return this.#repository.findIdsCreatedInWindow(input);
+  }
+}

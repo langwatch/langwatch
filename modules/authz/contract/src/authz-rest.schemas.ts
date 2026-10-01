@@ -1,0 +1,73 @@
+/**
+ * The wire shapes of the `role-bindings` management REST family. A write's
+ * answer is the row the list reports; only the create adds the
+ * legacy-access notice, and only when it switches legacy team access off.
+ */
+import { z } from "zod";
+
+import { grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
+
+export const roleBindingPrincipalSchema = z.object({
+  type: z.enum(["user", "group", "apiKey"]),
+  id: z.string(),
+  name: z.string().nullable(),
+});
+export type RoleBindingPrincipal = z.infer<typeof roleBindingPrincipalSchema>;
+
+export const roleBindingRestSchema = z.object({
+  id: z.string(),
+  principal: roleBindingPrincipalSchema,
+  role: teamUserRoleSchema,
+  customRoleId: z.string().nullable(),
+  customRoleName: z.string().nullable(),
+  scopeType: grantScopeTierSchema,
+  scopeId: z.string(),
+  scopeName: z.string().nullable(),
+  createdAt: z.date(),
+  /** When this binding stops granting, or null when it never does; listed past its date too. */
+  expiresAt: z.date().nullable(),
+});
+export type RoleBindingRest = z.infer<typeof roleBindingRestSchema>;
+
+export const roleBindingRestListQuerySchema = z.object({
+  userId: z.string().min(1).optional(),
+  groupId: z.string().min(1).optional(),
+  apiKeyId: z.string().min(1).optional(),
+  scopeType: grantScopeTierSchema.optional(),
+  scopeId: z.string().min(1).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+});
+export type RoleBindingRestListQuery = z.infer<typeof roleBindingRestListQuerySchema>;
+
+export const roleBindingRestListSchema = z.object({
+  bindings: z.array(roleBindingRestSchema),
+  totalCount: z.number(),
+});
+export type RoleBindingRestList = z.infer<typeof roleBindingRestListSchema>;
+
+export const roleBindingRestCreateSchema = z.object({
+  /** Exactly one of userId, groupId or apiKeyId; the service enforces it. */
+  userId: z.string().min(1).optional(),
+  groupId: z.string().min(1).optional(),
+  apiKeyId: z.string().min(1).optional(),
+  role: teamUserRoleSchema,
+  customRoleId: z.string().min(1).optional(),
+  scopeType: grantScopeTierSchema,
+  scopeId: z.string().min(1),
+  /** Optional ISO-8601 end date, strictly in the future (`grant_expiry_in_past`, 422 otherwise). */
+  expiresAt: z.coerce.date().optional(),
+});
+export type RoleBindingRestCreate = z.infer<typeof roleBindingRestCreateSchema>;
+
+export const roleBindingRestUpdateSchema = z.object({
+  role: teamUserRoleSchema,
+  customRoleId: z.string().min(1).optional(),
+});
+export type RoleBindingRestUpdate = z.infer<typeof roleBindingRestUpdateSchema>;
+
+export const roleBindingRestParamsSchema = z.object({ id: z.string().min(1) });
+export type RoleBindingRestParams = z.infer<typeof roleBindingRestParamsSchema>;
+
+export const roleBindingRestDeletedSchema = z.object({ success: z.literal(true) });
+export type RoleBindingRestDeleted = z.infer<typeof roleBindingRestDeletedSchema>;

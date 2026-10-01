@@ -1,17 +1,11 @@
 /**
- * The connection the client speaks over, behind one small interface so the
- * client never depends on how the frames travel.
- *
- * Two transports carry the same frames. The WebSocket is the default and it
- * needs the `ws` package: the platform authenticates from the request
- * headers of the upgrade, and no global `WebSocket` constructor can send
- * them. HTTP long polling is for a network that blocks WebSockets: one POST
- * registers, a GET waits for the next frames, a POST carries the answers. It
- * speaks through the global `fetch` (Node 20+).
+ * Connection abstraction for frame transport (WebSocket default, HTTP fallback).
  */
 
 import { createRequire } from "node:module";
+
 import type { WebSocket as WsWebSocket } from "ws";
+
 import { langwatchFetch } from "../internal/http/langwatchFetch";
 
 export const AGENT_TRANSPORTS = ["websocket", "http"] as const;
@@ -25,9 +19,8 @@ const isSet = (value: string | undefined): value is string =>
 
 /**
  * The transport to start with: the explicit option, then
- * `LANGWATCH_AGENT_TRANSPORT`, else the WebSocket. Anything that is not
- * `http` is the WebSocket, which falls back to HTTP on its own when the
- * upgrade is refused.
+ * `LANGWATCH_AGENT_TRANSPORT`, else the WebSocket, which falls back to HTTP
+ * on its own when the upgrade is refused.
  */
 export function resolveTransport({
   explicit,
@@ -37,7 +30,11 @@ export function resolveTransport({
   env?: NodeJS.ProcessEnv;
 }): AgentTransport {
   const candidate = isSet(explicit) ? explicit : env.LANGWATCH_AGENT_TRANSPORT;
-  return isSet(candidate) && candidate.trim().toLowerCase() === "http" ? "http" : "websocket";
+  if (!isSet(candidate)) return "websocket";
+  const normalized = candidate.trim().toLowerCase();
+  if (normalized === "http") return "http";
+
+  return "websocket";
 }
 
 export interface SocketLike {
@@ -77,7 +74,7 @@ const textOf = (data: unknown): string => {
 };
 
 const wrapWs = (socket: WsWebSocket): SocketLike => {
-  const closeListeners: Array<(code: number) => void> = [];
+  const closeListeners: ((code: number) => void)[] = [];
   let closed = false;
   const emitClose = (code: number) => {
     if (closed) return;
@@ -106,16 +103,12 @@ const wrapWs = (socket: WsWebSocket): SocketLike => {
   };
 };
 
-type WsConstructor = new (
-  url: string,
-  options: { headers: Record<string, string> },
-) => WsWebSocket;
+type WsConstructor = new (url: string, options: { headers: Record<string, string> }) => WsWebSocket;
 
 /**
- * The `ws` constructor, or null when the package cannot be loaded. It is
- * required rather than imported: a runtime or a bundle without `ws` must
- * reach the factory below and get one clear message, never fail while this
- * module loads.
+ * The `ws` constructor, or null when the package cannot be loaded. Required
+ * rather than imported so a runtime without `ws` reaches the factory below
+ * for one clear message, never fails while this module loads.
  */
 const wsConstructor = (): WsConstructor | null => {
   try {
@@ -155,15 +148,14 @@ const POST_RETRY_DELAYS_MS = [250, 500, 1000];
 const EMPTY_POLL_FLOOR_MS = 250;
 
 /**
- * How long a close waits for the queued frames to go out before it drops them.
- * A frames request has no deadline of its own, so a proxy that accepts the
- * request and never answers would otherwise keep the socket from ever
- * reporting its close, and the client that is waiting to open a replacement
- * would wait with it.
+ * How long a close waits for queued frames before dropping them: a frames
+ * request has no deadline of its own, so an unanswering proxy would
+ * otherwise keep the socket from ever reporting close.
  */
 const CLOSE_DEADLINE_MS = 500;
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
@@ -175,21 +167,18 @@ export interface HttpLongPollOptions {
 }
 
 /**
- * The same frames over three requests. `send` of a register frame posts it
- * and starts the poll loop on the registered answer; `send` of any other
- * frame posts it in order; every frame a poll answers with is a message.
- * A poll that is refused, that fails or that names an unknown session ends
- * the connection the way a dropped socket would, and the client reconnects
- * with its own backoff, registering again.
+ * The same frames over three requests: `send` of a register frame starts
+ * the poll loop; a refused/failed/unknown-session poll ends the connection
+ * like a dropped socket, and the client reconnects with its own backoff.
  */
 export class HttpLongPollSocket implements SocketLike {
   private readonly url: string;
   private readonly headers: Record<string, string>;
   private readonly fetchImpl: typeof fetch;
-  private readonly messageListeners: Array<(data: string) => void> = [];
-  private readonly closeListeners: Array<(code: number) => void> = [];
-  private readonly errorListeners: Array<(error: unknown) => void> = [];
-  private readonly pingListeners: Array<() => void> = [];
+  private readonly messageListeners: ((data: string) => void)[] = [];
+  private readonly closeListeners: ((code: number) => void)[] = [];
+  private readonly errorListeners: ((error: unknown) => void)[] = [];
+  private readonly pingListeners: (() => void)[] = [];
   private readonly inFlight = new Set<string>();
   private readonly polls = new AbortController();
   private readonly frames = new AbortController();
@@ -204,7 +193,8 @@ export class HttpLongPollSocket implements SocketLike {
   constructor(options: HttpLongPollOptions) {
     this.url = options.url;
     this.headers = options.headers;
-    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? langwatchFetch : undefined);
+    const fetchImpl =
+      options.fetch ?? (typeof globalThis.fetch === "function" ? langwatchFetch : undefined);
     if (typeof fetchImpl !== "function") {
       throw new Error("the HTTP transport needs a global fetch; run on Node 20 or later");
     }
@@ -226,7 +216,8 @@ export class HttpLongPollSocket implements SocketLike {
       return;
     }
     if (frame.type === "ack" && typeof frame.callId === "string") this.inFlight.add(frame.callId);
-    if (frame.type === "result" && typeof frame.callId === "string") this.inFlight.delete(frame.callId);
+    if (frame.type === "result" && typeof frame.callId === "string")
+      this.inFlight.delete(frame.callId);
     this.outbox = this.outbox
       .then(() => this.registered)
       .then(() => this.post(data))
@@ -234,10 +225,9 @@ export class HttpLongPollSocket implements SocketLike {
   }
 
   /**
-   * Stops polling, lets the frames already queued go out, then reports the
-   * close. The wait is bounded: on the deadline the frame requests are aborted
-   * and the close is reported anyway, so a request that never answers cannot
-   * hold the connection open.
+   * Stops polling, lets queued frames go out, then reports close. Bounded: on
+   * the deadline the frame requests are aborted and close is reported anyway,
+   * so an unanswering request cannot hold the connection open.
    */
   close(code = 1000): void {
     this.closed = true;
@@ -301,7 +291,8 @@ export class HttpLongPollSocket implements SocketLike {
         signal: this.polls.signal,
       });
     } catch (error) {
-      if (!this.closed) this.fail(`could not reach ${this.url}/register (${describe(error)})`, 1006);
+      if (!this.closed)
+        this.fail(`could not reach ${this.url}/register (${describe(error)})`, 1006);
       return;
     }
     const body = await this.jsonOf(response);
@@ -325,48 +316,76 @@ export class HttpLongPollSocket implements SocketLike {
 
   private async pollLoop(): Promise<void> {
     while (!this.closed && this.token) {
-      const query = this.inFlight.size > 0 ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}` : "";
-      const startedAt = Date.now();
-      let response: Response;
-      try {
-        response = await this.fetchImpl(`${this.url}/poll${query}`, {
-          method: "GET",
-          headers: this.requestHeaders(),
-          signal: this.polls.signal,
-        });
-      } catch (error) {
-        if (!this.closed) this.fail(`the poll failed (${describe(error)})`, 1006);
-        return;
-      }
-      if (this.closed) return;
-      if (response.status === 410) {
-        this.fail("the platform no longer knows this instance, registering again", SESSION_LOST_CLOSE_CODE);
-        return;
-      }
-      const body = await this.jsonOf(response);
-      if (!response.ok) {
-        const answered = body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
-        if (answered) this.emitMessage(JSON.stringify(answered));
-        if ((answered as { type?: unknown } | null)?.type === "refused") {
-          // The platform refused the credential: the client prints and gives
-          // up, and closes the connection itself.
-          return;
-        }
-        this.fail(`the poll was answered with HTTP ${response.status}`, 1006);
-        return;
-      }
-      const frames = Array.isArray(body?.frames) ? (body.frames as unknown[]) : [];
-      for (const frame of frames) {
-        const entry = frame as { type?: unknown; callId?: unknown };
-        if (entry.type === "cancel" && typeof entry.callId === "string") this.inFlight.delete(entry.callId);
-        this.emitMessage(JSON.stringify(frame));
-      }
-      for (const listener of this.pingListeners) listener();
-      if (frames.length === 0) {
-        const elapsedMs = Date.now() - startedAt;
-        if (elapsedMs < EMPTY_POLL_FLOOR_MS) await wait(EMPTY_POLL_FLOOR_MS - elapsedMs);
-      }
+      if (!(await this.pollOnce())) return;
     }
+  }
+
+  /** One long poll: delivers what it answered, and says whether polling goes on. */
+  private async pollOnce(): Promise<boolean> {
+    const query =
+      this.inFlight.size > 0 ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}` : "";
+    const startedAt = Date.now();
+    let response: Response;
+    try {
+      response = await this.fetchImpl(`${this.url}/poll${query}`, {
+        method: "GET",
+        headers: this.requestHeaders(),
+        signal: this.polls.signal,
+      });
+    } catch (error) {
+      if (!this.closed) this.fail(`the poll failed (${describe(error)})`, 1006);
+      return false;
+    }
+    if (this.closed) return false;
+    if (response.status === 410) {
+      this.fail(
+        "the platform no longer knows this instance, registering again",
+        SESSION_LOST_CLOSE_CODE,
+      );
+      return false;
+    }
+    const body = await this.jsonOf(response);
+    if (!response.ok) {
+      this.refusePoll({ status: response.status, body });
+      return false;
+    }
+    const delivered = this.deliverFrames(body);
+    for (const listener of this.pingListeners) listener();
+    if (delivered === 0) {
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs < EMPTY_POLL_FLOOR_MS) await wait(EMPTY_POLL_FLOOR_MS - elapsedMs);
+    }
+    return true;
+  }
+
+  private refusePoll({
+    status,
+    body,
+  }: {
+    status: number;
+    body: Record<string, unknown> | null;
+  }): void {
+    const answered =
+      body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
+    if (answered) this.emitMessage(JSON.stringify(answered));
+    if ((answered as { type?: unknown } | null)?.type === "refused") {
+      // The platform refused the credential: the client prints and gives
+      // up, and closes the connection itself.
+      return;
+    }
+    this.fail(`the poll was answered with HTTP ${status}`, 1006);
+  }
+
+  /** Emits every frame a poll answered and returns how many there were. */
+  private deliverFrames(body: Record<string, unknown> | null): number {
+    const frames = Array.isArray(body?.frames) ? (body.frames as unknown[]) : [];
+    for (const frame of frames) {
+      const entry = frame as { type?: unknown; callId?: unknown };
+      if (entry.type === "cancel" && typeof entry.callId === "string")
+        this.inFlight.delete(entry.callId);
+      this.emitMessage(JSON.stringify(frame));
+    }
+    return frames.length;
   }
 
   private async post(data: string): Promise<void> {
@@ -385,12 +404,7 @@ export class HttpLongPollSocket implements SocketLike {
         if (this.frames.signal.aborted) return;
         response = null;
       }
-      if (response?.ok) return;
-      if (response?.status === 410) {
-        this.fail("the platform no longer knows this instance, registering again", SESSION_LOST_CLOSE_CODE);
-        return;
-      }
-      if (response && response.status < 500) return;
+      if (this.postSettled(response)) return;
       const delay = POST_RETRY_DELAYS_MS[attempt];
       if (delay === undefined) {
         this.fail(`a frame could not be posted after ${attempt} retries`, 1006);
@@ -400,10 +414,25 @@ export class HttpLongPollSocket implements SocketLike {
     }
   }
 
+  /** Whether a post's response ends its retries: delivered, refused, or the session lost. */
+  private postSettled(response: Response | null): boolean {
+    if (response?.ok) return true;
+    if (response?.status === 410) {
+      this.fail(
+        "the platform no longer knows this instance, registering again",
+        SESSION_LOST_CLOSE_CODE,
+      );
+      return true;
+    }
+    return response !== null && response.status < 500;
+  }
+
   private async jsonOf(response: Response): Promise<Record<string, unknown> | null> {
     try {
       const parsed = (await response.json()) as unknown;
-      return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : null;
     } catch {
       return null;
     }

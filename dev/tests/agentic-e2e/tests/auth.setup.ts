@@ -1,0 +1,167 @@
+import fs from "fs";
+import path from "path";
+
+import { closeDb, findUserIdByEmail } from "./front-door/db";
+import { registerConfirmedAccount } from "./front-door/steps";
+import { test as setup, expect } from "./test.ts";
+
+const AUTH_DIR = path.join(__dirname, "..", ".auth");
+const AUTH_FILE = path.join(AUTH_DIR, "user.json");
+
+// Ensure .auth directory exists
+if (!fs.existsSync(AUTH_DIR)) {
+  fs.mkdirSync(AUTH_DIR, { recursive: true });
+}
+
+/**
+ * Auth setup for E2E tests: creates/authenticates a test user, saving
+ * session state to .auth/user.json for reuse by all test projects.
+ * Credentials (shared with /browser-test): browser-test@langwatch.ai.
+ */
+
+const TEST_USER = {
+  name: "Browser Test Agent",
+  email: "browser-test@langwatch.ai",
+  password: "BrowserTest123!",
+};
+
+setup("authenticate", async ({ page, request }) => {
+  // Step 1: Register the test user when it does not already exist. Credential
+  // enrollment requires the same mailbox proof the sign-up UI consumes.
+  try {
+    const existingUserId = await findUserIdByEmail(TEST_USER.email);
+    if (existingUserId === null) {
+      await registerConfirmedAccount(request, TEST_USER);
+      console.log("Test user created successfully");
+    } else {
+      console.log("Test user already exists, proceeding with log in");
+    }
+  } finally {
+    await closeDb();
+  }
+
+  // Step 2: Log in through the identifier-first UI. callbackUrl ensures the
+  // successful credential ceremony redirects to the app root.
+  await page.goto("/auth/signin?callbackUrl=%2F");
+
+  await expect(
+    page.getByRole("heading", { name: "Log in to LangWatch", exact: true }),
+  ).toBeVisible();
+
+  await page.getByLabel("Email", { exact: true }).fill(TEST_USER.email);
+  await page.getByRole("button", { name: "Continue", exact: true }).click();
+
+  // A registered password account routes to its credential step. Waiting for
+  // that step also proves the router resolved the seeded user before auth.
+  const passwordField = page.getByLabel("Password", { exact: true });
+  await expect(passwordField).toBeVisible();
+  await expect(page.getByTestId("routed-identifier")).toContainText(TEST_USER.email);
+  await passwordField.fill(TEST_USER.password);
+  await page.getByRole("button", { name: "Log in", exact: true }).click();
+
+  // Wait for successful authentication - should redirect away from signin
+  await expect(page).not.toHaveURL(/\/auth\/signin/);
+  console.log("Signed in successfully. Current URL:", page.url());
+
+  // The security offer is product behaviour, but leaving its modal open would
+  // obstruct every unrelated authenticated browser test that reuses this state.
+  const dismissNudgeResponse = await page.request.post(
+    "/api/trpc/user.dismissSecureAccountNudge?batch=1",
+    { data: { "0": {} } },
+  );
+  const dismissNudgeData = await dismissNudgeResponse.json().catch(() => null);
+
+  if (!dismissNudgeResponse.ok() || dismissNudgeData?.["0"]?.error) {
+    throw new Error(
+      `dismissSecureAccountNudge failed: ${JSON.stringify(dismissNudgeData).slice(0, 500)}`,
+    );
+  }
+
+  // Same as the nudge: `JoinYourTeamTakeover` always has an offer for `@langwatch.ai` accounts, and
+  // its `aria-modal` hides the page from `getByRole` in every later suite.
+  const dismissJoinOfferResponse = await page.request.post(
+    "/api/trpc/joinRequests.dismissOffer?batch=1",
+    { data: { "0": {} } },
+  );
+  const dismissJoinOfferData = await dismissJoinOfferResponse.json().catch(() => null);
+
+  if (!dismissJoinOfferResponse.ok() || dismissJoinOfferData?.["0"]?.error) {
+    throw new Error(
+      `joinRequests.dismissOffer failed: ${JSON.stringify(dismissJoinOfferData).slice(0, 500)}`,
+    );
+  }
+
+  // Step 3: Create org + project via API if not already set up.
+  // page.request inherits the browser session cookies from the sign-in above,
+  // so this call is fully authenticated. This is more reliable than clicking
+  // through the onboarding UI (which has timing/button-label issues in self-hosted mode).
+  console.log("Checking if org/project setup is needed...");
+
+  const getAllResponse = await page.request.get(
+    "/api/trpc/organization.getAll?batch=1&input=" +
+      encodeURIComponent(JSON.stringify({ "0": {} })),
+  );
+  console.log("getAll status:", getAllResponse.status());
+  const getAllData = await getAllResponse.json().catch(() => null);
+  const orgs: { teams: { projects: unknown[] }[] }[] = getAllData?.["0"]?.result?.data ?? [];
+  console.log(
+    "Orgs found:",
+    orgs.length,
+    "| Projects:",
+    orgs.flatMap((o) => o.teams).flatMap((t) => t.projects).length,
+  );
+  const hasProject = orgs.some((o) => o.teams.some((t) => t.projects.length > 0));
+
+  if (!hasProject) {
+    console.log("No project found — creating org + project via API...");
+    const initResponse = await page.request.post(
+      "/api/trpc/onboarding.initializeOrganization?batch=1",
+      {
+        data: {
+          "0": {
+            orgName: "Browser Test Org",
+            projectName: "Browser Test Project",
+            language: "other",
+            framework: "other",
+          },
+        },
+      },
+    );
+    console.log("initializeOrganization status:", initResponse.status());
+    const initData = await initResponse.json().catch(() => null);
+    if (!initResponse.ok() || initData?.["0"]?.error) {
+      throw new Error(`initializeOrganization failed: ${JSON.stringify(initData).slice(0, 500)}`);
+    }
+    console.log("Org + project created successfully.");
+  } else {
+    console.log("Org/project already exists, skipping setup.");
+  }
+
+  // Uses /settings, not the app root: root redirects to the trace-backed
+  // personal landing, whose data fetch can disturb layout. /settings
+  // renders the same sidebar from Postgres alone.
+  console.log("Navigating to settings to confirm setup...");
+  await page.goto("/settings");
+
+  try {
+    await page.waitForURL((url) => !url.pathname.startsWith("/auth/"), {
+      timeout: 30000,
+    });
+    // href is stable regardless of sidebar expand state (collapsed links
+    // drop their text label), so match the Settings nav link by href.
+    await expect(page.locator('a[href="/settings"]').first()).toBeVisible({
+      timeout: 30000,
+    });
+  } catch (err) {
+    console.log("Authenticated shell not confirmed. URL:", page.url());
+    await page.screenshot({
+      path: path.join(__dirname, "..", "debug-post-setup.png"),
+    });
+    throw err;
+  }
+
+  // Step 5: Save authentication state
+  await page.context().storageState({ path: AUTH_FILE });
+
+  console.log("Authentication state saved to:", AUTH_FILE);
+});

@@ -17,6 +17,20 @@ Feature: Running system migrations across organizations
     Given a registered system migration
     And an organization "org_acme"
 
+  Scenario: A project-rooted migration keeps enrollment and execution axes distinct
+    Given an explicitly configured project-rooted migration
+    And project "project_one" belongs to enrolled organization "org_acme"
+    When the migration pass reaches that project
+    Then organization enrollment decides admission
+    And the migration receives "project_one" as its tenant identifier
+    And its persisted checkpoint is keyed by "project_one"
+
+  Scenario: Project-rooted startup migrations prove completion for projects
+    Given an explicitly configured project-rooted startup migration
+    When startup drives and verifies the migration
+    Then both execution and completion verification enumerate project identifiers
+    And an organization identifier is never substituted for a project identifier
+
   # ═══ Passes and claims ════════════════════════════════════════════════
 
   @unit
@@ -137,6 +151,17 @@ Feature: Running system migrations across organizations
     When those events and application events are queued concurrently
     Then the preflight uses the canonical queue and its aggregate locks
     And it dispatches only groups registered by that preflight
+    And blocked or failed work in those groups prevents startup
+    And worker-scoped durable subscribers run for the preflight events
+    And schedulers, process-manager consumers, and general workers do not start
+
+  # The barrier's deadline is the one refusal a booting fleet cannot answer:
+  # every replica runs this preflight before it starts consuming, so work it
+  # queues drains only if some other process already serves that queue, and a
+  # fleet booting together has none. Held work is not unsafe — a held tenant
+  # already starts on the legacy path with its migration gate closed — so
+  # giving up on the wait costs a later pass, never correctness; a failure is
+  # a fault a later pass will not clear, and that half still refuses.
     And blocked or failed work the preflight itself caused in those groups prevents startup
     And worker-scoped durable subscribers run for the preflight events
     And schedulers, process-manager consumers, and general workers do not start
@@ -212,6 +237,9 @@ Feature: Running system migrations across organizations
     Then no further pass starts
     And runtime processes do not start
 
+  # A pass now enumerates only the tenants with work left, so it may ask that
+  # question of the whole installation — a walk no single tenant owns, which
+  # the multitenancy guard has to admit or no process serves.
   # `lease.acquire` fails safe to false on contention AND on any Redis error,
   # and a tenant that cannot be claimed does no work — so a pass shut out of
   # the whole fleet reports exactly what a converged one reports. Reading that
@@ -224,6 +252,12 @@ Feature: Running system migrations across organizations
     Then the run continues rather than stopping
     But an installation with no organizations at all is converged
 
+  # Enumerating only the tenants with work left makes a handful the whole of a
+  # settled fleet, and a few replicas booting together can genuinely hold every
+  # one of them. "Shut out of everything" is therefore no longer proof of a
+  # broken lease store, so the proof is named instead: a tenant this process
+  # claimed is one the lease store answered for, because a claim fails safe to
+  # "held" on every error.
   # Every replica runs this preflight, so a rolling deploy has a dozen of them
   # sweeping the same tenants at once and each reads the others' leases as
   # claims. If a claim a peer holds prevented convergence, none of them could
@@ -252,12 +286,14 @@ Feature: Running system migrations across organizations
   Scenario: A shut-out from the last remaining tenants settles once a claim has been granted
     Given an earlier pass claimed a tenant of its own
     When every later pass finds the few remaining tenants held by a peer
+    Then the loop stops rather than running to the cap
     Then the run ends and runtime processes start
 
   @unit
   Scenario: A process never granted a claim keeps trying rather than settling
     Given no pass has ever been granted a claim
     When every pass finds every tenant held
+    Then the loop keeps running to the cap
     Then the preflight fails rather than starting
 
   @unit
@@ -273,6 +309,16 @@ Feature: Running system migrations across organizations
     Then the preflight fails
     And it says how many passes it gave up after
     And runtime processes do not start
+
+  # Main drove this loop in the background of every worker boot, so how fast a
+  # fleet converged was a function of the deploy cadence. It is an ordered step
+  # of the boot chain now — a task the image runs before the process starts.
+  @unit
+  Scenario: The boot chain drives the migrations to convergence before the process starts
+    Given the boot chain runs the system-migrations pass task
+    When the fleet stops advancing
+    Then the task returns and the boot chain continues to the process it was going to start
+    And a pass that fails outright ends the task without failing the boot chain
 
   @unit
   Scenario: A failed pass prevents startup
@@ -323,6 +369,13 @@ Feature: Running system migrations across organizations
     Given a pass that fails outright after startup
     When the cadence comes round again
     Then another pass is attempted
+
+  @unit
+  Scenario: The hourly re-drive runs as a scheduled process once across the fleet
+    Given several workers are running
+    When an hour passes
+    Then one scheduled process wakes on one of them
+    And it asks for exactly one re-drive pass for that wake
 
   # D04 records the configured legacy route WITHOUT treating the old domain
   # string as ownership evidence, which is what let it join the shared
@@ -685,3 +738,72 @@ Feature: Running system migrations across organizations
     When the run reports
     Then it says it waited
     And it does not report "org_acme" as held
+
+  @unit
+  Scenario: The migrations page lists every registered migration when served by the api role
+    Given the api role serves the migrations page
+    And identity registers an organization-rooted and a user-rooted migration
+    When an operator opens the migrations page
+    Then both migrations are listed, organization-rooted first, with their rollups
+
+  @unit
+  Scenario: A migration registered by a peer module appears on the page with its title and description
+    Given a peer module registers a migration with its own title and description
+    When an operator opens the migrations page
+    Then the migration is listed with that title and description
+
+  # Authz answers its grant import through AuthzApi, as identity answers D04; ops composes both in
+  # main's registry order and never imports either process package (Alex, 2026-09-28).
+  @unit
+  Scenario: The authorization engine answers the migration it registers
+    Given a process that installed authz
+    When the migrations runner asks authz for its registered migrations
+    Then the grant import is answered under its existing name
+
+  @unit
+  Scenario: An authorization app composed without its migration refuses to answer one
+    Given an authz app composed from already-built services
+    When the migrations runner asks it for its registered migrations
+    Then it refuses by name rather than answering an empty registry
+
+  @unit
+  Scenario: The authorization engine's migration runs ahead of identity's, as on main
+    Given authz registers the grant import and identity registers D04
+    When an operator opens the migrations page
+    Then the grant import is listed first and D04 second
+
+  # The exclusion list is the ClickHouse member's own routing table, parsed once at boot from the
+  # CLICKHOUSE_URL__* family (ARCHITECTURE §7), never a second declaration of it.
+  @unit
+  Scenario: A cohort's private-dataplane exclusion is the ClickHouse member's routing table
+    Given the ClickHouse member routes "org_private" to a private endpoint
+    When a cohort is sampled without dedicated-data-plane organizations
+    Then the pool is asked to leave "org_private" out
+
+  @unit
+  Scenario: A cohort on a deployment with no private data planes excludes nobody
+    Given the ClickHouse member routes no organization privately
+    When a cohort is sampled
+    Then the whole pool is sampled rather than the request being refused
+
+  @unit
+  Scenario: Kicking a pass from the page runs one pass on a worker
+    When an operator asks for a pass now
+    Then the request is recorded under the operator
+    And a worker runs one pass for it without first asking whether anything could move
+
+  # Main's kick was fire-and-forget and never failed the page: a kick that cannot be sent is
+  # logged, and the hourly re-drive still runs the pass (Alex, 2026-09-28).
+  @unit
+  Scenario: A kick in a process that never connected the pass command still answers started
+    Given a process that never connected the system migration pass command
+    When an operator asks for a pass now
+    Then the page is told the pass started
+    And nothing is sent
+
+  @unit
+  Scenario: A kick whose send fails still answers started
+    Given the system migration pass command refuses the send
+    When an operator asks for a pass now
+    Then the page is told the pass started
+    And the failure is logged rather than answered

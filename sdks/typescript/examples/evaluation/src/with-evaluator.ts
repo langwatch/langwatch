@@ -1,10 +1,6 @@
 /**
- * Evaluation with Built-in Evaluators Example
- *
- * This example shows how to use LangWatch's built-in evaluators
- * (like exact_match) alongside custom metrics.
- *
- * Run with: npm run start:with-evaluator
+ * Evaluation with built-in evaluators (e.g. exact_match) alongside custom
+ * metrics. Run with: npm run start:with-evaluator
  */
 
 import "dotenv/config";
@@ -80,7 +76,7 @@ const main = async () => {
           },
         });
       } catch (error) {
-        console.log(`  ⚠️ Evaluator error: ${error}`);
+        console.log("  ⚠️ Evaluator error:", error);
       }
 
       // Also log response length as a custom metric
@@ -90,7 +86,7 @@ const main = async () => {
         data: { response },
       });
     },
-    { concurrency: 2 }
+    { concurrency: 2 },
   );
 
   console.log("\n✅ Evaluation complete!");

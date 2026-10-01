@@ -1,10 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import type { CommandResult } from "../../utils/output";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const experimentRestoreCommand = async (
   slug: string,
@@ -12,16 +14,12 @@ export const experimentRestoreCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const spinner = createSpinner(
-    `Restoring "${slug}" to version ${version}...`,
-  ).start();
+  const spinner = createSpinner(`Restoring "${slug}" to version ${version}...`).start();
 
   try {
     const parsedVersion = parsePositiveIntOrNull(version);
     if (parsedVersion === null) {
-      throw new Error(
-        `The version to restore is a version number, like 3. Got "${version}".`,
-      );
+      throw new Error(`The version to restore is a version number, like 3. Got "${version}".`);
     }
 
     const service = new ExperimentsApiService();

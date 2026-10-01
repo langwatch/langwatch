@@ -1,0 +1,488 @@
+import type { GrantScopeTier } from "@langwatch/authz-contract";
+import { InviteNotFoundError, OrganizationNotFoundError } from "@langwatch/organization-contract";
+import type {
+  Organization,
+  OrganizationInvite,
+  OrganizationUser,
+  OrganizationUserRole,
+} from "@langwatch/organization-contract";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
+
+import {
+  OrganizationInviteRepository,
+  type InviteWithOrganization,
+  type InviteWithRequester,
+  type WriteInviteInput,
+} from "../organization-invite.repository.ts";
+import {
+  inviteFromRecord,
+  organizationFromRecord,
+  organizationUserFromRecord,
+} from "./prisma.organization.mapper.ts";
+import { PrismaPersonalTeamScopeRepository } from "./prisma.personal-team-scope.repository.ts";
+
+/** A root client, or the transaction-scoped client `$transaction` hands back. */
+type InviteClient = PrismaClient | Prisma.TransactionClient;
+
+function toInviteJson(value: unknown): Prisma.InputJsonValue | undefined {
+  return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+}
+
+/** Private Prisma owner for an organization's invitations and what settles them. */
+export class PrismaOrganizationInviteRepository extends OrganizationInviteRepository {
+  static create(options: { database: PrismaClient }): PrismaOrganizationInviteRepository {
+    return new PrismaOrganizationInviteRepository(options.database, options.database);
+  }
+
+  private constructor(
+    private readonly prisma: InviteClient,
+    /** Absent on a transaction-scoped instance — only the root can open one. */
+    private readonly root: PrismaClient | null,
+  ) {
+    super();
+  }
+
+  async withTransaction<T>(
+    write: (transaction: OrganizationInviteRepository) => Promise<T>,
+    options?: { timeoutMs: number; maxWaitMs: number },
+  ): Promise<T> {
+    if (!this.root) {
+      throw new Error("This orchestration requires a root Prisma client, not a transaction client");
+    }
+
+    return this.root.$transaction(
+      (client) => write(new PrismaOrganizationInviteRepository(client, null)),
+      options ? { timeout: options.timeoutMs, maxWait: options.maxWaitMs } : undefined,
+    );
+  }
+
+  async hasOpenInviteForEmail({
+    email,
+    organizationId,
+  }: {
+    email: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: "insensitive" },
+        organizationId,
+        status: { in: ["PENDING", "PAYMENT_PENDING"] },
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+      select: { id: true },
+    });
+
+    return invite !== null;
+  }
+
+  async findMemberEmails({
+    organizationId,
+    emails,
+  }: {
+    organizationId: string;
+    emails: string[];
+  }): Promise<string[]> {
+    const members = await this.prisma.organizationUser.findMany({
+      where: { organizationId, user: { email: { in: emails, mode: "insensitive" } } },
+      select: { user: { select: { email: true } } },
+    });
+
+    return members.map((member) => member.user.email ?? "");
+  }
+
+  async findTeamIdsInOrganization({
+    teamIds,
+    organizationId,
+  }: {
+    teamIds: string[];
+    organizationId: string;
+  }): Promise<string[]> {
+    const teams = await this.prisma.team.findMany({
+      where: { id: { in: teamIds }, organizationId },
+      select: { id: true },
+    });
+
+    return teams.map((team) => team.id);
+  }
+
+  findCustomRolePermissions({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; permissions: unknown }[]> {
+    return this.prisma.customRole.findMany({
+      where: { organizationId },
+      select: { id: true, permissions: true },
+    });
+  }
+
+  async getOrganization({ organizationId }: { organizationId: string }): Promise<Organization> {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
+    });
+    if (organization === null) throw new OrganizationNotFoundError();
+
+    return organizationFromRecord(organization);
+  }
+
+  async getOrganizationWithMembers({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<Organization & { members: OrganizationUser[] }> {
+    const organization = await this.prisma.organization.findFirst({
+      where: { id: organizationId },
+      include: { members: true },
+    });
+    if (organization === null) throw new OrganizationNotFoundError();
+
+    return {
+      ...organizationFromRecord(organization),
+      members: organization.members.map(organizationUserFromRecord),
+    };
+  }
+
+  findPersonalTeamsInScopes({
+    scopes,
+  }: {
+    scopes: { scopeType: GrantScopeTier; scopeId: string }[];
+  }): Promise<{ name: string }[]> {
+    return PrismaPersonalTeamScopeRepository.create().findPersonalTeamsInScopes({
+      client: this.prisma,
+      scopes,
+    });
+  }
+
+  async createPendingInvite(input: WriteInviteInput): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.create({
+      data: {
+        email: input.email,
+        inviteCode: input.inviteCode,
+        expiration: input.expiration && toDate(input.expiration),
+        organizationId: input.organizationId,
+        teamIds: input.teamIds,
+        teamAssignments: toInviteJson(input.teamAssignments),
+        role: input.role,
+        status: "PENDING",
+      },
+    });
+
+    return inviteFromRecord(invite);
+  }
+
+  async createPaymentPendingInvite(
+    input: WriteInviteInput & { subscriptionId: string },
+  ): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.create({
+      data: {
+        email: input.email,
+        inviteCode: input.inviteCode,
+        expiration: input.expiration && toDate(input.expiration),
+        organizationId: input.organizationId,
+        teamIds: input.teamIds,
+        teamAssignments: toInviteJson(input.teamAssignments),
+        role: input.role,
+        status: "PAYMENT_PENDING",
+        subscriptionId: input.subscriptionId,
+      },
+    });
+
+    return inviteFromRecord(invite);
+  }
+
+  async findListableInvites({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<InviteWithRequester[]> {
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: { organizationId, status: { in: ["PENDING", "REVOKED"] } },
+      include: { requestedByUser: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return invites.map(({ requestedByUser, ...invite }) => ({
+      ...inviteFromRecord(invite),
+      requestedByUser,
+    }));
+  }
+
+  /**
+   * The revoke and the acceptance claim meet on one row, so both are SQL with
+   * their conditions against the table: through `updateMany` a write parked on
+   * the row lock re-checks only the id, and would land over the other.
+   */
+  async revokeOpenInvite({
+    inviteId,
+    organizationId,
+  }: {
+    inviteId: string;
+    organizationId: string;
+  }): Promise<number> {
+    return this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'REVOKED',
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "status" IN ('PENDING', 'PAYMENT_PENDING')
+    `;
+  }
+
+  async getInviteWithOrganization({
+    inviteId,
+    organizationId,
+  }: {
+    inviteId: string;
+    organizationId: string;
+  }): Promise<InviteWithOrganization> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: { id: inviteId, organizationId },
+      include: { organization: true },
+    });
+    if (invite === null) throw new InviteNotFoundError("Invitation not found");
+
+    return inviteWithOrganizationFromRecord(invite);
+  }
+
+  async rotateInviteCode({
+    inviteId,
+    organizationId,
+    expectedInviteCode,
+    inviteCode,
+    expiration,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    expectedInviteCode: string;
+    inviteCode: string;
+    expiration: Instant;
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.updateMany({
+      where: {
+        id: inviteId,
+        organizationId,
+        status: "PENDING",
+        inviteCode: expectedInviteCode,
+      },
+      data: { inviteCode, expiration: toDate(expiration) },
+    });
+
+    return count;
+  }
+
+  async extendInviteExpiration({
+    inviteId,
+    organizationId,
+    expiration,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    expiration: Instant;
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.updateMany({
+      where: { id: inviteId, organizationId, status: "PENDING" },
+      data: { expiration: toDate(expiration) },
+    });
+
+    return count;
+  }
+
+  async getInviteByCodeWithOrganization({
+    inviteCode,
+  }: {
+    inviteCode: string;
+  }): Promise<InviteWithOrganization> {
+    const invite = await this.prisma.organizationInvite.findUnique({
+      where: { inviteCode },
+      include: { organization: true },
+    });
+    if (invite === null) throw new InviteNotFoundError("Invitation not found");
+
+    return inviteWithOrganizationFromRecord(invite);
+  }
+
+  async findAdminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
+    const admins = await this.prisma.organizationUser.findMany({
+      where: { organizationId, role: "ADMIN" },
+      select: { user: { select: { email: true } } },
+    });
+
+    return admins
+      .map((admin) => admin.user.email)
+      .filter((email): email is string => Boolean(email));
+  }
+
+  async findProjectSlugsForTeams({ teamIds }: { teamIds: string[] }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { teamId: { in: teamIds }, archivedAt: null },
+      select: { slug: true },
+    });
+
+    return projects.map((project) => project.slug);
+  }
+
+  async findProjectSlugsInOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId, archivedAt: null }, archivedAt: null },
+      select: { slug: true },
+    });
+
+    return projects.map((project) => project.slug);
+  }
+
+  async getPendingInviteForEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.findFirst({
+      where: {
+        organizationId,
+        email: { equals: email, mode: "insensitive" },
+        status: "PENDING",
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+    });
+    if (invite === null) throw new InviteNotFoundError();
+
+    return inviteFromRecord(invite);
+  }
+
+  async claimInviteForAcceptance({
+    inviteId,
+    organizationId,
+    inviteCode,
+    acceptedByUserId,
+    acceptedViaIdentifierId,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    inviteCode: string;
+    acceptedByUserId: string;
+    acceptedViaIdentifierId: string | null;
+  }): Promise<number> {
+    // SQL for the reason given on `revokeOpenInvite`.
+    return this.prisma.$executeRaw`
+      UPDATE "OrganizationInvite"
+         SET "status" = 'ACCEPTED',
+             "acceptedByUserId" = ${acceptedByUserId},
+             "acceptedViaIdentifierId" = ${acceptedViaIdentifierId},
+             "updatedAt" = now()
+       WHERE "id" = ${inviteId}
+         AND "organizationId" = ${organizationId}
+         AND "inviteCode" = ${inviteCode}
+         AND "status" = 'PENDING'
+         AND ("expiration" IS NULL OR "expiration" > now())
+    `;
+  }
+
+  async addMembership({
+    userId,
+    organizationId,
+    role,
+  }: {
+    userId: string;
+    organizationId: string;
+    role: OrganizationUserRole;
+  }): Promise<void> {
+    await this.prisma.organizationUser.createMany({
+      data: [{ userId, organizationId, role }],
+      skipDuplicates: true,
+    });
+  }
+
+  async getInviteStatus({ inviteId }: { inviteId: string }): Promise<{ status: string }> {
+    const invite = await this.prisma.organizationInvite.findUnique({
+      where: { id: inviteId },
+      select: { status: true },
+    });
+    if (invite === null) throw new InviteNotFoundError();
+
+    return invite;
+  }
+
+  async hasMembership({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<boolean> {
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { userId: true },
+    });
+
+    return membership != null;
+  }
+
+  async deletePaymentPendingInvites({
+    organizationId,
+    subscriptionIds,
+  }: {
+    organizationId: string;
+    subscriptionIds: readonly string[];
+  }): Promise<number> {
+    const { count } = await this.prisma.organizationInvite.deleteMany({
+      where: {
+        organizationId,
+        status: "PAYMENT_PENDING",
+        subscriptionId: { in: [...subscriptionIds] },
+      },
+    });
+    return count;
+  }
+
+  async findPaymentPendingInvites({
+    subscriptionId,
+    organizationId,
+  }: {
+    subscriptionId: string;
+    organizationId: string;
+  }): Promise<InviteWithOrganization[]> {
+    const invites = await this.prisma.organizationInvite.findMany({
+      where: { subscriptionId, organizationId, status: "PAYMENT_PENDING" },
+      include: { organization: true },
+    });
+
+    return invites.map(inviteWithOrganizationFromRecord);
+  }
+
+  async approvePaymentPendingInvite({
+    inviteId,
+    organizationId,
+    expiration,
+  }: {
+    inviteId: string;
+    organizationId: string;
+    expiration: Instant;
+  }): Promise<OrganizationInvite> {
+    const invite = await this.prisma.organizationInvite.update({
+      where: { id: inviteId, organizationId },
+      data: { status: "PENDING", expiration: toDate(expiration) },
+    });
+
+    return inviteFromRecord(invite);
+  }
+}
+
+function inviteWithOrganizationFromRecord({
+  organization,
+  ...invite
+}: Prisma.OrganizationInviteGetPayload<{
+  include: { organization: true };
+}>): InviteWithOrganization {
+  return {
+    ...inviteFromRecord(invite),
+    organization: organization === null ? null : organizationFromRecord(organization),
+  };
+}

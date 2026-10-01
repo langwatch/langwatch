@@ -1,15 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type {
-  PromptDetailResponse,
-  PromptMutationResponse,
-} from "../langwatch-api.js";
+
+import type { PromptDetailResponse, PromptMutationResponse } from "../langwatch-api.ts";
 
 describe("Prompt response type interfaces", () => {
   describe("given fully-populated PromptDetailResponse and PromptMutationResponse fixtures", () => {
     /** @scenario Declaring every rendered field on the typed response interfaces */
     it("declares every field the prompt tools render, with no `as` cast needed", () => {
       // Mirrors apiResponsePromptWithVersionDataSchema (the real GET
-      // /api/prompts/:id contract): version data flattened to the top level,
+      // /api/v1/prompts/:id contract): version data flattened to the top level,
       // parameters as an object map, tags as { name, versionId } objects,
       // and no nested versions array.
       const detail: PromptDetailResponse = {
@@ -19,7 +17,7 @@ describe("Prompt response type interfaces", () => {
         version: 3,
         versionId: "ver_abc123",
         commitMessage: "Updated tone",
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         messages: [{ role: "system", content: "You are a friendly bot." }],
         prompt: "You are a friendly bot.",
         temperature: 0.7,

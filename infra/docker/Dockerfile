@@ -1,7 +1,30 @@
+# ── Stage 0: the dev-script binary ──────────────────────────────────
+# generate:modules, sync:references and ensure:built are Go (cmd/devscripts,
+# stdlib only). Built here so the builder carries the binary and no Go
+# toolchain, and so this layer caches until those two directories change.
+# `go mod download` is skipped on purpose: the binary imports no module.
+FROM golang:1.27.1-alpine AS devscripts
+WORKDIR /src
+COPY go.work go.work.sum ./
+COPY cmd/go.* cmd/
+COPY pkg/go.* pkg/
+COPY services/go.* services/
+COPY tools/go.* tools/
+COPY sdks/go/go.* sdks/go/
+COPY infra/clickhouse-serverless/go.* infra/clickhouse-serverless/
+COPY cmd/devscripts ./cmd/devscripts
+COPY tools/devscripts ./tools/devscripts
+# devscripts imports these two stdlib-only packages.
+COPY tools/cliprof ./tools/cliprof
+COPY tools/internal ./tools/internal
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 go build -o /out/devscripts ./cmd/devscripts
+
 # ── Stage 1: build ──────────────────────────────────────────────────
 FROM node:24-alpine AS builder
 RUN apk --no-cache add curl python3 make gcc g++ openssl bash
-RUN npm install -g pnpm@10.24.0
+RUN npm install -g pnpm@12.6.0
 
 # Install Goose migration tool (copied to runtime stage later)
 ARG GOOSE_SHA256_ARM64=dfafe0254b0058cabf016234a500df5ada1623ed034e9473cee9fe4ed07ca090
@@ -23,47 +46,54 @@ RUN ARCH=$(uname -m) && \
 
 WORKDIR /app
 
-# mcp/typescript is a workspace member — copy it early so pnpm install can link
-# it. Its build runs automatically as part of the app's `pnpm run build`
-# (via start:prepare:files → build:mcp-server).
+# mcp/typescript is a workspace member — copy it early so pnpm install can
+# link it. `@langwatch/hosted-mcp-process` depends on it, so its build runs as
+# part of the API's dependency build below.
 COPY mcp/typescript ./mcp/typescript
 COPY services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY packages ./packages
+COPY modules ./modules
+COPY enterprise ./enterprise
 COPY skills ./skills
 COPY infra/docker/Dockerfile.langyagent ./infra/docker/Dockerfile.langyagent
 COPY feature-map.json ./feature-map.json
 
 # Since ADR-076 the repo is a SINGLE pnpm workspace: the lockfile, the
-# workspace definition and the hoist settings all live at the root, and
-# platform/app/ is one member of it. The install therefore runs from /app rather
-# than /app/platform/app, and is narrowed with a filter so the TypeScript SDK,
-# the skills compiler and the e2e suites never enter the image.
+# workspace definition and the hoist settings all live at the root, and the
+# three deployable applications — apps/api, apps/worker and apps/ui — are three
+# of its members. The install runs from /app and is narrowed with a filter so
+# the TypeScript SDK's e2e suites, the skills compiler and apps/server (the npx
+# self-host CLI, which is published separately) never enter the image.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json .npmrc ./
-COPY platform/app/package.json ./platform/app/
+# The lockfile resolves @langwatch/scenario to a vendored tarball.
+# Every package tsconfig extends the root ones, and build:types builds tsconfig.build.json.
+COPY tsconfig.base.json tsconfig.shared.json tsconfig.build.json tsconfig.emit.json ./
+COPY vendor ./vendor
 # Every workspace member's manifest must be present or `--frozen-lockfile`
 # has nothing to check the lockfile against. This one carries no source into
 # the image — only the manifest the workspace needs to stay coherent.
-COPY tests/agentic-e2e/package.json ./tests/agentic-e2e/
+COPY dev/tests/agentic-e2e/package.json ./dev/tests/agentic-e2e/
+# agentic-e2e depends on @langwatch/e2e-stack (workspace:*), so `pnpm prune`
+# needs that manifest too.
+COPY dev/tests/e2e-stack/package.json ./dev/tests/e2e-stack/
 # The SDK, in full, because the app declares `langwatch: workspace:*` and so
 # imports THIS copy rather than a published release. Manifest-only was enough
 # while the app resolved the registry tarball; now the app's bundle cannot be
 # built without the SDK's own build output.
 COPY sdks/typescript ./sdks/typescript
-# The SDK's `prepare` runs copy-types.sh, which GENERATES the SDK's types from
-# the application's source — so the SDK's install needs app files, while the app
-# needs the SDK. That cycle is why manifest-only worked before: a published
-# tarball ships the generated types already. Bring in exactly the inputs the
-# generators read, ahead of the install, rather than copying the whole app here
-# and losing the dependency layer's cache on every source edit. Same shape as
-# Dockerfile.langyagent, which has to solve this too.
-COPY platform/app/src/server/tracer/types.ts              ./platform/app/src/server/tracer/types.ts
-COPY platform/app/src/server/filters/types.ts             ./platform/app/src/server/filters/types.ts
-COPY platform/app/src/server/evaluations/types.ts         ./platform/app/src/server/evaluations/types.ts
-COPY platform/app/src/server/evaluations/evaluators.native.ts ./platform/app/src/server/evaluations/evaluators.native.ts
-COPY platform/app/src/server/scenarios/suite-fields.ts     ./platform/app/src/server/scenarios/suite-fields.ts
-COPY platform/app/src/server/scenarios/evaluator-attachments.ts ./platform/app/src/server/scenarios/evaluator-attachments.ts
-COPY platform/app/src/server/modelProviders/llmModels.json ./platform/app/src/server/modelProviders/llmModels.json
-COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app/api/openapiLangWatch.json
+# The SDK's `pnpm run generate` (its `prebuild`) runs copy-types.sh, which
+# GENERATES the SDK's types from first-party source. Every input it still reads
+# is already in the image at this point: the trace, evaluator and
+# model-provider contracts and packages/redaction arrive with `COPY packages`
+# above, the langevals catalogue and feature-map.json with their own lines, and
+# the skills bundle with `COPY skills`. Its one remaining application input —
+# apps/api/src/features/discovery/openapi-document.json, from which
+# `generate:openapi-types` derives the REST client — arrives with `COPY apps/api`
+# below, ahead of the build that runs the generator.
+#
+# The four monolith source files that used to be copied here are gone from the
+# tree, and so are the two generators that read them — their output was imported
+# by nothing in the SDK. See copy-types.sh.
 # The `packages/*` workspace members (e.g. @langwatch/observability, @langwatch/api)
 # are consumed as source, so pnpm install must see their package.json to link them
 # and install their own dependencies (pino, pino-pretty, ...) into
@@ -72,35 +102,85 @@ COPY platform/app/src/app/api/openapiLangWatch.json       ./platform/app/src/app
 # is copied early above — and why `COPY packages` above brings the whole tree, now
 # that all nine members live there. node_modules is dockerignored, so only source
 # is copied here.
-COPY platform/app/vendor ./platform/app/vendor
-# https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci
-RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/web..."
-COPY platform/app ./platform/app
-# `--filter "@langwatch/web..."` rather than a bare `pnpm run build` in the app
-# directory: the trailing `...` makes pnpm build the app's workspace
-# DEPENDENCIES first, in topological order. The app imports `langwatch` from the
-# SDK working copy, so the SDK's dist has to exist before vite resolves it —
-# and pnpm already knows that order from the dependency graph.
-RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/web..." run build
+#
+# The three applications are copied manifest-first for the same reason
+# (https://stackoverflow.com/questions/70154568/pnpm-equivalent-command-for-npm-ci):
+# the install layer must not be invalidated by a source edit.
+COPY apps/worker/package.json ./apps/worker/package.json
+# The interactive API process. It also owns the two openapi document tasks
+# that still live in apps/api; the goose runner and TTL reconciler moved to
+# packages/clickhouse-migrations, and the rest (Prisma, LangWatchQL) moved to
+# apps/tasks.
+COPY apps/api/package.json ./apps/api/package.json
+# The browser bundle. `@langwatch/ui` is a Vite build rather than a process:
+# it emits dist/client, which the API process serves.
+COPY apps/ui/package.json ./apps/ui/package.json
+# The boot-chain task runner: prisma-migrate, clickhouse-migrate,
+# lwql-provision, and every other feature-owned task.
+COPY apps/tasks/package.json ./apps/tasks/package.json
+# The scenario child program, a workspace dependency of the api and the worker.
+COPY apps/scenario-child/package.json ./apps/scenario-child/package.json
+# Four filters, because the four applications are four dependency subtrees
+# and none is a subset of the others.
+RUN CI=true pnpm install --frozen-lockfile --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
+COPY apps/worker ./apps/worker
+COPY apps/api ./apps/api
+COPY apps/ui ./apps/ui
+COPY apps/tasks ./apps/tasks
+COPY apps/scenario-child ./apps/scenario-child
+# What `start:prepare:files` and `ensure:built` read: the generator scripts (and
+# their Go binary, below), the
+# OpenAPI document the SDK derives its REST client from, and the web declarations
+# project the browser packages reference.
+COPY dev/scripts ./dev/scripts
+# dev/scripts/devscripts.sh runs this binary when Go is not on PATH.
+COPY --from=devscripts /out/devscripts /app/.bin/devscripts/devscripts
+COPY dev/tsconfig.web-declarations.json ./dev/tsconfig.web-declarations.json
+COPY specs/api-reference/openapi-document.json ./specs/api-reference/openapi-document.json
+# The trailing `...` on each filter makes pnpm build each application's
+# workspace DEPENDENCIES first, in topological order, and pnpm skips the
+# members that declare no `build`. That order is load-bearing twice over: the
+# packages import `langwatch` from the SDK working copy, so the SDK's dist has
+# to exist before vite resolves it, and `@langwatch/hosted-mcp-process` imports
+# `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
+# through the api/worker filters, not the ui one. apps/api declares no `build`
+# of its own and runs from source through node; apps/worker declares none either
+# now — the pre-compiled scenario child is its own app, @langwatch/scenario-child,
+# reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
+# process per simulation, so it is spawned as `node` on that bundle rather than
+# `pnpm exec` on a TypeScript tree (the --prod
+# install below drops it, so the bundle is the only supported path in an image).
+# @see specs/scenarios/pre-compiled-child-process.feature
+# `build:types` first: the module contracts' declarations now come from one
+# `tsc -b` over the generated root solution rather than a compiler process per
+# package, so the filtered application builds below find their dependencies'
+# .d.ts already on disk instead of emitting them 38 processes at a time.
+# The same preparation the CI build runs: generated files (modules, Prisma client,
+# langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
+# before the declaration build, which reads their declarations. The root
+# `build:types` script goes through nx, whose workspace project is registered by
+# dev/nx plugins this stage does not copy, so run its tsc command directly.
+RUN pnpm start:prepare:files && pnpm ensure:built \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 tsconfig.build.json \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
-# gigabyte of vite, vitest, playwright and biome. A filtered re-install with
+# gigabyte of vite, vitest and playwright. A filtered re-install with
 # --prod rather than `pnpm prune --prod`: prune takes no --filter, so in a
 # workspace it reasons about every project instead of the one subtree we
 # installed.
 #
 # CI=true is load-bearing. --prod purges the modules directory, and pnpm
 # refuses to do that without a TTY unless told it is non-interactive
-# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). The root .npmrc also carries
-# confirm-modules-purge=false, so either alone suffices; both are kept because
-# losing this silently would leave a dev-dependency-laden production image,
-# and losing it loudly fails the build here where the cause is obvious.
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Losing this silently would
+# leave a dev-dependency-laden production image; losing it loudly fails the
+# build here where the cause is obvious.
 # --ignore-scripts: this pass exists only to drop devDependencies. Without it
 # the SDK's `prepare` re-runs here and dies — it regenerates types with
 # openapi-typescript, a devDependency this very command is removing. Nothing
 # needs regenerating at this point; the dist was built in the step above, and
 # the Prisma client is regenerated explicitly after the prune below.
-RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/web..."
+RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/ui..." --filter "@langwatch/tasks..."
 
 # ...and then actually reclaim the disk. The step above rewrites each member's
 # node_modules — the devDependency symlinks go — but it does NOT touch the
@@ -108,52 +188,53 @@ RUN CI=true pnpm install --frozen-lockfile --prod --ignore-scripts --filter "@la
 # /app/node_modules. Measured on a scratch workspace: after
 # `pnpm install --prod`, `node_modules/.pnpm/<devdep>@<ver>` is still present;
 # after `pnpm prune --prod` it is gone. Without this line vite, vitest,
-# playwright, biome and esbuild all ship in the production image, merely
+# playwright and esbuild all ship in the production image, merely
 # unreferenced — roughly the gigabyte this step is supposed to remove.
 #
 # `prune` takes no --filter, which is why the install above is filtered and
 # this is not. That is fine here: the members outside the app's closure have
 # no node_modules in this image at all, so there is nothing for prune to get
-# wrong. No post-prune `prisma generate` anymore: Prisma 7's generator emits
-# into platform/app/src/generated/prisma (first-party source, inlined into the
-# dist bundles by the build above), not into node_modules, so prune cannot
-# drop it. The runtime stage still needs the `prisma` CLI (a prod dep) for
-# `migrate deploy` at boot.
+# wrong. No post-prune `prisma generate` anymore: @langwatch/prisma-client owns
+# generated first-party source that the build above inlines into the dist
+# bundles, so prune cannot drop it. The runtime stage still needs the `prisma`
+# CLI (a prod dep) for `migrate deploy` at boot.
 RUN CI=true pnpm prune --prod
 
 # ── Stage 2: runtime ───────────────────────────────────────────────
 FROM node:24-alpine
 RUN apk --no-cache add curl openssl bash
-RUN npm install -g pnpm@10.24.0
+RUN npm install -g pnpm@12.6.0
 
 COPY --from=builder /usr/local/bin/goose /usr/local/bin/goose
+# The scenario SDK opens a voice worker's quick tunnel with a bare `cloudflared` spawn, so the
+# binary is on the image's PATH; the worker never writes its own environment (Alex, 2026-09-28).
+# Pinned to a release and its multi-arch index digest; bump both together.
+COPY --from=cloudflare/cloudflared:2026.9.3@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 WORKDIR /app
 
 # Copy built artifacts from builder.
 #
 # /app/node_modules FIRST, and it is not optional. Since ADR-076 the install
-# root is /app, not /app/platform/app, so pnpm's virtual store lives at
-# /app/node_modules/.pnpm and every entry in platform/app/node_modules is a
-# symlink into it:
+# root is /app, so pnpm's virtual store lives at /app/node_modules/.pnpm and
+# every entry in an application's node_modules is a symlink into it:
 #
-#   platform/app/node_modules/react -> ../../../node_modules/.pnpm/react@…/node_modules/react
+#   apps/api/node_modules/hono -> ../../../node_modules/.pnpm/hono@…/node_modules/hono
 #
-# Copying platform/app/ without it leaves every one of those links dangling. The
-# image builds clean and dies at boot on the first import — there is no build
-# error to catch it, which is exactly why it is spelled out here.
+# Copying apps/ without it leaves every one of those links dangling. The image
+# builds clean and dies at boot on the first import — there is no build error to
+# catch it, which is exactly why it is spelled out here.
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/platform/app ./platform/app
-# mcp/typescript must be copied alongside the app because pnpm workspace
-# symlinks platform/app/node_modules/@langwatch/mcp-server -> ../../../../mcp/typescript.
-# langy and handled-error are other root workspace packages linked the same
-# way. Both are loaded by migration tasks as well as the running server —
-# handled-error is imported for side effects by the server and worker entry
-# points, so omitting it fails the boot outright.
+# mcp/typescript must be copied alongside the applications because pnpm
+# workspace-symlinks @langwatch/mcp-server into
+# modules/hosted-mcp/process/node_modules, which apps/api mounts. langy
+# and handled-error are other root workspace packages linked the same way —
+# handled-error is imported for side effects by the API and worker entry points,
+# so omitting it fails the boot outright.
 COPY --from=builder /app/mcp/typescript ./mcp/typescript
-# Same reasoning for the SDK: `langwatch: workspace:*` means
-# platform/app/node_modules/langwatch is a symlink to ../../../sdks/typescript,
-# and a symlink whose target this stage never copies dangles at first import.
+# Same reasoning for the SDK: `langwatch: workspace:*` in a dozen packages means
+# their node_modules/langwatch is a symlink to ../../../sdks/typescript, and a
+# symlink whose target this stage never copies dangles at first import.
 COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # The whole packages/ tree, not a cherry-picked list.
 #
@@ -168,17 +249,60 @@ COPY --from=builder /app/sdks/typescript ./sdks/typescript
 # as an app dependency and forgetting to add a COPY line here leaves a
 # dangling symlink and a boot-time "Cannot find module" — which is exactly how
 # @langwatch/handled-error broke the workers entry point once already. Copying
-# the tree cannot be forgotten. It costs about 1.3MB (packages/server, the npx
-# CLI, is the only member the app does not import) against an image measured
+# the tree cannot be forgotten. It costs about 1.3MB; apps/server, the npx CLI,
+# is separate and is the only workspace application the app does not import
 # in hundreds.
 COPY --from=builder /app/packages ./packages
+# The module trees, for the same reason: modules/ and enterprise/ are workspace
+# members outside packages/ since the tree rename.
+COPY --from=builder /app/modules ./modules
+COPY --from=builder /app/enterprise ./enterprise
+# The worker executable runs from source through node, the way apps/api does. The
+# child it spawns is its own app, built into apps/scenario-child/dist.
+COPY --from=builder /app/apps/worker ./apps/worker
+COPY --from=builder /app/apps/scenario-child ./apps/scenario-child
+# The task runner. Runs from source through node, like apps/api and apps/worker.
+COPY --from=builder /app/apps/tasks ./apps/tasks
+# Same: run from source through node. The boot command below runs both schema
+# migrations from here before anything serves.
+COPY --from=builder /app/apps/api ./apps/api
+# The browser half. Whole, not just dist/client: apps/api imports
+# `@langwatch/ui/public-config` as SOURCE to build the boot configuration it
+# injects into the HTML shell, so the package has to resolve at runtime as well
+# as its build output being on disk.
+COPY --from=builder /app/apps/ui ./apps/ui
 COPY --from=builder /app/services/langevals/ts-integration/evaluators.generated.ts ./services/langevals/ts-integration/evaluators.generated.ts
 COPY --from=builder /app/feature-map.json ./feature-map.json
 
 ENV NODE_ENV=production
+# pnpm 11+ checks dependencies before every `pnpm run` and installs when they
+# look stale. This stage carries no pnpm-workspace.yaml or lockfile, so the
+# check fails to resolve `catalog:` specs (ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC)
+# and would write into /app, which is read-only under the chart. The dependencies
+# were installed by the builder; every boot and task command is `pnpm run`.
+ENV pnpm_config_verify_deps_before_run=false
+# The api process listens on API_PORT (6560 unset); the image serves on 5560.
+ENV API_PORT=5560
 EXPOSE 5560
 
 # Set bash as the default shell
 SHELL ["/bin/bash", "-c"]
 
-CMD cd platform/app && pnpm start
+# The boot chain lives in apps/api, not here: `pnpm --silent run start` is
+# `start:prepare:db && node src/main.ts`, and start:prepare:db runs
+# the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
+# client's history), clickhouse-migrate (the goose runner, TTL reconciler and
+# ClickHouse SQL, now packages/clickhouse-migrations'), and lwql-provision. Written
+# once so a container, a laptop and the api lane haven supervises boot the same
+# way; a copy here would migrate twice and drift.
+#
+# The order is load-bearing: LangWatchQL provisioning reads both the Postgres
+# schema and the ClickHouse one, so it cannot run before either. Sequenced with
+# `&&` so a failed migration stops the boot rather than serving against a schema
+# that was never applied.
+#
+# The API process serves the REST, tRPC and SSE families AND the browser bundle
+# it finds at /app/apps/ui/dist/client, so this one container is the whole
+# interactive tier. The worker deployment runs the same image from
+# /app/apps/worker, whose start script runs the same start:prepare:db chain.
+CMD cd /app/apps/api && pnpm --silent run start

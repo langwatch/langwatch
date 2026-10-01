@@ -1,0 +1,1197 @@
+# Simulations and agent testing: agents, test suites, scenarios and their runs.
+#
+# Every name carries {uid}, so any number of flows share one stack. The agent
+# points at an address that need not answer: creating and listing an agent
+# never calls it. A run does call it, then the simulator and judge models with
+# the seeded provider key, and the flow waits for the verdict the run panel
+# prints. The /agent-testing page renders only with
+# release_ui_agent_testing_v2_enabled, which the seed turns on.
+# Skipped on purpose: share-simulation-run (no UI: sharing is wired into the
+# trace explorer alone) and the empty-state "Setup agent" button (present only
+# while the project has no agent, which parallel flows cannot promise).
+flows:
+  - id: sim-connect-agent
+    title: Connect an HTTP agent and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-agent-{uid}
+
+  - id: sim-create-suite
+    title: Name a test suite and find it in the rail after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+
+  - id: sim-rename-suite
+    title: Rename a test suite in its editor and find the new name after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: click
+        with:
+          testId: edit-suite-button
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}-edited
+      - action: click
+        with:
+          testId: suite-editor-save
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}-edited
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}-edited
+
+  - id: sim-create-scenario
+    title: Write a scenario into a new test suite and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: "|-"
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: expect
+        with:
+          api: /api/scenarios
+          contains: vd-scenario-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+
+  - id: sim-run-scenario
+    title: Run one scenario against an agent and read its verdict
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-run
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: expect
+        with:
+          testId: run-verdict-panel
+          timeout: "240000"
+      - action: expect
+        with:
+          count: '[data-testid="run-verdict-status-passed"], [data-testid="run-verdict-status-failed"]'
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-{uid}
+
+  - id: sim-run-suite
+    title: Run a whole test suite and open a run from its results
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-suite-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-suite-run-{uid}
+      - action: expect
+        with:
+          testId: agent-testing-run-plan-detail
+      - action: click
+        with:
+          testIdPrefix: run-result-row-
+      - action: expect
+        with:
+          testId: run-verdict-panel
+          timeout: "240000"
+      - action: expect
+        with:
+          count: '[data-testid="run-verdict-status-passed"], [data-testid="run-verdict-status-failed"]'
+
+  - id: sim-edit-agent
+    title: Rename an agent and offer it as a run target for a scenario
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          text: vd-agent-{uid}
+      - action: click
+        with:
+          text: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}-renamed
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-{uid}-renamed
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: expect
+        with:
+          text: vd-agent-{uid}-renamed
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-run
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-{uid}-renamed
+
+  # Appended by the coverage builder: scenario and run journeys main has beyond the first seven flows.
+  # Handles are main's own (text, labels, test ids main draws).
+
+  - id: sim-edit-scenario
+    title: Edit a scenario from its row menu and find the new title after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}-edited
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          api: /api/scenarios
+          contains: vd-scenario-{uid}-edited
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}-edited
+
+  - id: sim-duplicate-scenario
+    title: Duplicate a scenario and find its copy after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Duplicate\s*$/
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid} (copy)
+      - action: expect
+        with:
+          api: /api/scenarios
+          contains: vd-scenario-{uid} (copy)
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid} (copy)
+
+  - id: sim-archive-scenario
+    title: Archive a scenario behind its confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Archive\s*$/
+      - action: click
+        with:
+          text: /^\s*Archive\s*$/
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          equals: "0"
+
+  - id: sim-archive-suite
+    title: Archive a test suite behind its confirmation and see it gone from the rail after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: click
+        with:
+          label: Actions for vd-suite-{uid}
+      - action: click
+        with:
+          text: /^\s*Archive suite\s*$/
+      - action: click
+        with:
+          text: /^\s*Archive\s*$/
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+          equals: "0"
+
+  - id: sim-move-scenario-to-suite
+    title: Move a scenario to another test suite and find it there after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-b-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: expect
+        with:
+          testId: suite-rail-item-vd-suite-b-{uid}
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-checkbox
+      - action: click
+        with:
+          testId: cases-selection-move-to-suite
+      - action: select
+        with:
+          testId: cases-move-to-suite-select
+          option: vd-suite-b-{uid}
+      - action: click
+        with:
+          testId: cases-move-to-suite-confirm
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-b-{uid}
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+
+  - id: sim-scenario-version-history
+    title: Edit a scenario twice and read its version history from the editor
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}-v2
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          api: /api/scenarios
+          contains: vd-scenario-{uid}-v2
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: click
+        with:
+          label: Actions for vd-scenario-{uid}-v2
+      - action: click
+        with:
+          text: /^\s*Edit\s*$/
+      - action: click
+        with:
+          testId: case-modal-history
+      - action: expect
+        with:
+          testId: scenario-version-history
+
+  - id: sim-run-compare-agents-dialog
+    title: Open a scenario's run dialog and switch it to comparing agents
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-a-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-a-{uid}
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-b-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-b-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-b-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-run
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-a-{uid}
+      - action: click
+        with:
+          text: Compare agents
+      - action: expect
+        with:
+          testId: run-dialog-compare
+      - action: expect
+        with:
+          testId: run-dialog-compare-row-0
+      - action: expect
+        with:
+          testId: run-dialog-compare-add
+
+  - id: sim-run-suite-with-note
+    title: Run a suite with a note and read the note on the run's summary
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-a-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-a-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-note-{uid}
+      - action: click
+        with:
+          text: Add a note
+      - action: fill
+        with:
+          label: Note for the run
+          value: vd note {uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-note-{uid}
+      - action: expect
+        with:
+          testId: agent-testing-run-plan-detail
+      - action: expect
+        with:
+          testId: run-summary-note
+          hasText: vd note {uid}
+
+  - id: sim-run-suite-again
+    title: Open a run's plan and offer its run again, with its edit-plan control beside it
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-a-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-a-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-again-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-again-{uid}
+      - action: expect
+        with:
+          testId: edit-run-plan-button
+      - action: click
+        with:
+          testId: run-plan-button
+      - action: expect
+        with:
+          testId: run-dialog
+
+  - id: sim-stop-running-suite
+    title: Stop a suite run in flight from its plan and see the control go away
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-a-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-a-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-a-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-stop-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-stop-{uid}
+      - action: expect
+        with:
+          testId: stop-all-button
+          timeout: "20000"
+      - action: click
+        with:
+          testId: stop-all-button
+      - action: expect
+        with:
+          testId: stop-all-button
+          equals: "0"
+          timeout: "60000"

@@ -1,0 +1,118 @@
+/**
+ * The engine-CPU percent an operator reads is derived across two collection
+ * cycles, not one INFO reading: the collector diffs main-thread CPU
+ * counters against the previous sample. Spec: specs/ops/redis-pressure.feature
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MemoryAnomalyRateTrackerRepository } from "../repositories/memory/memory.anomaly-rate-tracker.repository.ts";
+import { MemoryOpsStore } from "../repositories/memory/memory.ops.store.ts";
+import type {
+  OpsLatencyHistograms,
+  OpsPersistedStateRead,
+  OpsQueueTotals,
+} from "../repositories/ops-metrics.repository.ts";
+import { OpsMetricsRepository } from "../repositories/ops-metrics.repository.ts";
+import { OpsMetricsTestAdapter } from "../services/__tests__/ops-metrics.fixture.ts";
+import { OpsMetricsCollectorService } from "../services/ops-metrics-collector.service.ts";
+
+/** Answers every read the collect cycle makes, with one INFO text per cycle. */
+class ScriptedMetricsRepository extends OpsMetricsRepository {
+  private infoTexts: string[];
+
+  constructor(infoTexts: string[]) {
+    super();
+    this.infoTexts = [...infoTexts];
+  }
+
+  readServerInfo(): Promise<string> {
+    return Promise.resolve(this.infoTexts.shift() ?? "");
+  }
+
+  readLatencyHistograms(): Promise<OpsLatencyHistograms> {
+    return Promise.resolve({ minute: [], hourByQueue: [], allTime: [] });
+  }
+
+  readQueueTotals(): Promise<OpsQueueTotals[]> {
+    return Promise.resolve([]);
+  }
+
+  readLatencySamplesMs(): Promise<number[]> {
+    return Promise.resolve([]);
+  }
+
+  readJobNameTotals(): Promise<Map<string, OpsQueueTotals>> {
+    return Promise.resolve(new Map());
+  }
+
+  readPausedJobKeys(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+
+  readPersistedState(): Promise<OpsPersistedStateRead> {
+    return Promise.resolve({ kind: "miss" });
+  }
+
+  writePersistedState(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  recordKnownPipelinePaths(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  readKnownPipelinePaths(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
+}
+
+const infoText = (args: { userSec: number; sysSec: number }): string =>
+  [
+    "used_memory:3200000000",
+    "used_memory_human:2.98G",
+    "used_memory_peak:10500000000",
+    "used_memory_peak_human:9.78G",
+    "maxmemory:10400000000",
+    "connected_clients:24",
+    `used_cpu_user_main_thread:${args.userSec}`,
+    `used_cpu_sys_main_thread:${args.sysSec}`,
+  ].join("\r\n");
+
+const collectorOver = (infoTexts: string[]): OpsMetricsCollectorService =>
+  OpsMetricsCollectorService.create({
+    metrics: new ScriptedMetricsRepository(infoTexts),
+    ops: OpsMetricsTestAdapter.create(),
+    rateTracker: MemoryAnomalyRateTrackerRepository.create({ store: MemoryOpsStore.create() }),
+    snapshots: null,
+    writerId: "test-writer",
+  });
+
+describe("Redis engine CPU on the dashboard", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("given the collector has sampled Redis INFO cpu twice, 1000ms apart", () => {
+    describe("when the dashboard data is built", () => {
+      /** @scenario Engine CPU percent is derived from two successive INFO snapshots */
+      it("reports the main-thread percent the two snapshots imply", async () => {
+        const collector = collectorOver([
+          infoText({ userSec: 10, sysSec: 5 }),
+          infoText({ userSec: 10.3, sysSec: 5.1 }),
+        ]);
+
+        await collector.collect();
+        expect(collector.getDashboardData().redisEngineCpuPercent).toBeNull();
+
+        vi.advanceTimersByTime(1_000);
+        await collector.collect();
+
+        expect(collector.getDashboardData().redisEngineCpuPercent).toBe(40);
+      });
+    });
+  });
+});

@@ -29,8 +29,7 @@ describe("navigateOpenCommand()", () => {
       expect(resolveCredentials).toHaveBeenCalledTimes(1);
       // Ordering, not just presence: the credential check must run BEFORE any
       // output, so a regression that prints first would fail here.
-      const checkOrder = vi.mocked(resolveCredentials).mock
-        .invocationCallOrder[0]!;
+      const checkOrder = vi.mocked(resolveCredentials).mock.invocationCallOrder[0]!;
       const logOrder = log.mock.invocationCallOrder[0]!;
       expect(checkOrder).toBeLessThan(logOrder);
     });

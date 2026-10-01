@@ -1,0 +1,751 @@
+import type { FrameworkKey, PlatformKey } from "../../../../model/observability/types.ts";
+import type { Docs, IconData } from "../../../../model/shared/types.ts";
+import { iconWithLabel, singleIcon, themedIcon } from "../../../../model/shared/types.ts";
+import { FlowiseSetup } from "../../../elements/observability/flowise-setup.tsx";
+import { LangflowSetup } from "../langflow-setup.tsx";
+import { OpenTelemetrySetup } from "../open-telemetry-setup.tsx";
+import goAnthropicSource from "./snippets/go/anthropic.snippet.go?raw";
+import goAzureSource from "./snippets/go/azure.snippet.go?raw";
+import goBedrockSource from "./snippets/go/bedrock.snippet.go?raw";
+import goGeminiSource from "./snippets/go/gemini.snippet.go?raw";
+import goGenkitSource from "./snippets/go/genkit.snippet.go?raw";
+import goGrokSource from "./snippets/go/grok.snippet.go?raw";
+import goGroqSource from "./snippets/go/groq.snippet.go?raw";
+import goMistralSource from "./snippets/go/mistral.snippet.go?raw";
+import goOllamaSource from "./snippets/go/ollama.snippet.go?raw";
+import goOpenaiSource from "./snippets/go/openai.snippet.go?raw";
+import springAiYamlSource from "./snippets/java/springai.snippet.yaml?raw";
+import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh?raw";
+import agnoPySource from "./snippets/python/agno.snippet.py?raw";
+import anthropicPySource from "./snippets/python/anthropic.snippet.py?raw";
+import dspyPySource from "./snippets/python/dspy.snippet.py?raw";
+import haystackPySource from "./snippets/python/haystack.snippet.py?raw";
+import langchainPySource from "./snippets/python/langchain.snippet.py?raw";
+import langgraphPySource from "./snippets/python/langgraph.snippet.py?raw";
+import litellmPySource from "./snippets/python/litellm.snippet.py?raw";
+import openaiPySource from "./snippets/python/openai.snippet.py?raw";
+import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py?raw";
+import pydanticPySource from "./snippets/python/pydanticai.snippet.py?raw";
+import strandsPySource from "./snippets/python/strandsagents.snippet.py?raw";
+import langchainTsSource from "./snippets/typescript/langchain.snippet.sts?raw";
+import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts?raw";
+import mastraTsSource from "./snippets/typescript/mastra.snippet.sts?raw";
+import openaiTsSource from "./snippets/typescript/openai.snippet.sts?raw";
+import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts?raw";
+
+export interface InstallMatrix {
+  js?: { npm: string; pnpm: string; yarn: string; bun: string };
+  python?: { pip: string; uv: string };
+  go?: { "go get": string };
+}
+
+export interface SnippetRef {
+  file: string;
+  language: string;
+  filename: string;
+}
+
+/**
+ * UI grouping for integration discovery: agents (frameworks like LangChain) vs
+ * traditional (direct LLM clients).
+ */
+export type IntegrationCategory = "agents" | "traditional";
+
+export interface IntegrationSpec {
+  platform: PlatformKey;
+  framework?: FrameworkKey;
+  label: string;
+  category: IntegrationCategory;
+  icon?: IconData;
+  docs: Docs;
+  install?: InstallMatrix;
+  snippet?: SnippetRef;
+  customComponent?: React.ComponentType;
+}
+
+export type IntegrationRegistry = IntegrationSpec[];
+
+// Helpers to build snippet refs
+const tsRef = (file: string): SnippetRef => ({
+  file,
+  language: "typescript",
+  filename: "app.ts",
+});
+const goRef = (file: string): SnippetRef => ({
+  file,
+  language: "go",
+  filename: "main.go",
+});
+const pyRef = (file: string): SnippetRef => ({
+  file,
+  language: "python",
+  filename: "app.py",
+});
+const yamlRef = (file: string): SnippetRef => ({
+  file,
+  language: "yaml",
+  filename: "application.yaml",
+});
+const bashRef = (file: string): SnippetRef => ({
+  file,
+  language: "bash",
+  filename: "run.sh",
+});
+
+export const registry: IntegrationRegistry = [
+  // TypeScript
+  {
+    platform: "typescript",
+    framework: "vercel_ai",
+    label: "Vercel AI SDK",
+    category: "agents",
+    docs: {
+      internal: "/integration/typescript/integrations/vercel-ai-sdk",
+      external: "https://sdk.vercel.ai/docs",
+    },
+    icon: themedIcon(
+      "/images/external-icons/vercel-lighttheme.svg",
+      "/images/external-icons/vercel-darktheme.svg",
+      "Vercel AI SDK",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch ai @ai-sdk/openai",
+        pnpm: "pnpm add langwatch ai @ai-sdk/openai",
+        yarn: "yarn add langwatch ai @ai-sdk/openai",
+        bun: "bun add langwatch ai @ai-sdk/openai",
+      },
+    },
+    snippet: tsRef(vercelAiTsSource),
+  },
+  {
+    platform: "typescript",
+    framework: "mastra",
+    label: "Mastra",
+    category: "agents",
+    docs: {
+      internal: "/integration/typescript/integrations/mastra",
+      external: "https://docs.mastra.ai/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/mastra-lighttheme.svg",
+      "/images/external-icons/mastra-darktheme.svg",
+      "Mastra",
+    ),
+    install: {
+      js: {
+        npm: "npm i @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        pnpm: "pnpm add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        yarn: "yarn add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+        bun: "bun add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
+      },
+    },
+    snippet: tsRef(mastraTsSource),
+  },
+  {
+    platform: "typescript",
+    framework: "langchain",
+    label: "LangChain",
+    category: "agents",
+    docs: {
+      internal: "/integration/typescript/integrations/langchain",
+      external: "https://langchain-ai.github.io/langchain/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/langchain-lighttheme.svg",
+      "/images/external-icons/langchain-darktheme.svg",
+      "LangChain",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @langchain/openai @langchain/core",
+        pnpm: "pnpm add langwatch @langchain/openai @langchain/core",
+        yarn: "yarn add langwatch @langchain/openai @langchain/core",
+        bun: "bun add langwatch @langchain/openai @langchain/core",
+      },
+    },
+    snippet: tsRef(langchainTsSource),
+  },
+  {
+    platform: "typescript",
+    framework: "langgraph",
+    label: "LangGraph",
+    category: "agents",
+    docs: {
+      internal: "/integration/typescript/integrations/langgraph",
+      external: "https://langchain-ai.github.io/langgraph/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/langgraph-lighttheme.svg",
+      "/images/external-icons/langgraph-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        pnpm: "pnpm add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        yarn: "yarn add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        bun: "bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+      },
+    },
+    snippet: tsRef(langgraphTsSource),
+  },
+  {
+    platform: "typescript",
+    framework: "openai",
+    label: "OpenAI (Manual Instrumentation)",
+    category: "traditional",
+    docs: { internal: "/integration/typescript/integrations/open-ai" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch openai",
+        pnpm: "pnpm add langwatch openai",
+        yarn: "yarn add langwatch openai",
+        bun: "bun add langwatch openai",
+      },
+    },
+    snippet: tsRef(openaiTsSource),
+  },
+
+  // Python
+  {
+    platform: "python",
+    framework: "openai",
+    label: "OpenAI",
+    category: "traditional",
+    docs: {
+      internal: "/integration/python/integrations/open-ai",
+      external: "https://platform.openai.com/docs/overview",
+    },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openai",
+        uv: "uv add langwatch openai",
+      },
+    },
+    snippet: pyRef(openaiPySource),
+  },
+  {
+    platform: "python",
+    framework: "openai_agents",
+    label: "OpenAI Agents",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/openai-agents",
+      external: "https://platform.openai.com/docs/guides/agents",
+    },
+    icon: iconWithLabel(
+      themedIcon(
+        "/images/external-icons/openai-lighttheme.svg",
+        "/images/external-icons/openai-darktheme.svg",
+        "OpenAI Agents",
+      ),
+      "Agents",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openai-agents openinference-instrumentation-openai-agents",
+        uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
+      },
+    },
+    snippet: pyRef(openaiAgentsPySource),
+  },
+  {
+    platform: "python",
+    framework: "langchain",
+    label: "LangChain",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/langchain",
+      external: "https://docs.langchain.com/oss/python/langchain/quickstart/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/langchain-lighttheme.svg",
+      "/images/external-icons/langchain-darktheme.svg",
+      "LangChain",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch langchain langchain-openai",
+        uv: "uv add langwatch langchain langchain-openai",
+      },
+    },
+    snippet: pyRef(langchainPySource),
+  },
+  {
+    platform: "python",
+    framework: "langgraph",
+    label: "LangGraph",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/langgraph",
+      external: "https://docs.langchain.com/oss/python/langgraph/quickstart",
+    },
+    icon: themedIcon(
+      "/images/external-icons/langgraph-lighttheme.svg",
+      "/images/external-icons/langgraph-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch langgraph langchain-openai",
+        uv: "uv add langwatch langgraph langchain-openai",
+      },
+    },
+    snippet: pyRef(langgraphPySource),
+  },
+  {
+    platform: "python",
+    framework: "litellm",
+    label: "LiteLLM",
+    category: "traditional",
+    docs: {
+      internal: "/integration/python/integrations/lite-llm",
+      external: "https://docs.litellm.ai/docs/",
+    },
+    icon: singleIcon("/images/external-icons/litellm.avif", "LiteLLM"),
+    install: {
+      python: {
+        pip: "pip install langwatch litellm",
+        uv: "uv add langwatch litellm",
+      },
+    },
+    snippet: pyRef(litellmPySource),
+  },
+  {
+    platform: "python",
+    framework: "dspy",
+    label: "DSPy",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/dspy",
+      external: "https://dspy.ai/",
+    },
+    icon: singleIcon("/images/external-icons/dspy.webp", "DSPy"),
+    install: {
+      python: {
+        pip: "pip install langwatch dspy",
+        uv: "uv add langwatch dspy",
+      },
+    },
+    snippet: pyRef(dspyPySource),
+  },
+  {
+    platform: "python",
+    framework: "strands",
+    label: "Strand Agents",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/strand-agents",
+      external: "https://strandsagents.com/latest/",
+    },
+    icon: singleIcon("/images/external-icons/strands.svg", "Strands Agents"),
+    install: {
+      python: {
+        pip: "pip install langwatch strands-agents strands-agents-tools",
+        uv: "uv add langwatch strands-agents strands-agents-tools",
+      },
+    },
+    snippet: pyRef(strandsPySource),
+  },
+  {
+    platform: "python",
+    framework: "agno",
+    label: "Agno",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/agno",
+      external: "https://docs.agno.com/introduction",
+    },
+    icon: singleIcon("/images/external-icons/agno.png", "Agno"),
+    install: {
+      python: {
+        pip: "pip install langwatch agno openai openinference-instrumentation-agno",
+        uv: "uv add langwatch agno openai openinference-instrumentation-agno",
+      },
+    },
+    snippet: pyRef(agnoPySource),
+  },
+  {
+    platform: "python",
+    framework: "anthropic",
+    label: "Anthropic",
+    category: "traditional",
+    docs: {
+      internal: "/integration/python/integrations/anthropic",
+      external: "https://docs.claude.com/en/home",
+    },
+    icon: themedIcon(
+      "/images/external-icons/anthropic-lighttheme.svg",
+      "/images/external-icons/anthropic-darktheme.svg",
+      "Anthropic",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch anthropic openinference-instrumentation-anthropic",
+        uv: "uv add langwatch anthropic openinference-instrumentation-anthropic",
+      },
+    },
+    snippet: pyRef(anthropicPySource),
+  },
+  {
+    platform: "python",
+    framework: "pydantic",
+    label: "Pydantic AI",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/pydantic-ai",
+      external: "https://ai.pydantic.dev/",
+    },
+    icon: singleIcon("/images/external-icons/pydanticai.svg", "Pydantic AI"),
+    install: {
+      python: {
+        pip: "pip install langwatch pydantic-ai",
+        uv: "uv add langwatch pydantic-ai",
+      },
+    },
+    snippet: pyRef(pydanticPySource),
+  },
+  {
+    platform: "python",
+    framework: "haystack",
+    label: "Haystack",
+    category: "agents",
+    docs: {
+      internal: "/integration/python/integrations/haystack",
+      external: "https://docs.haystack.deepset.ai/docs/intro",
+    },
+    icon: singleIcon("/images/external-icons/haystack.png", "Haystack"),
+    install: {
+      python: {
+        pip: "pip install langwatch openinference-instrumentation-haystack haystack-ai",
+        uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
+      },
+    },
+    snippet: pyRef(haystackPySource),
+  },
+
+  // Go
+  {
+    platform: "go",
+    framework: "openai",
+    label: "OpenAI",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/open-ai",
+      external: "https://github.com/openai/openai-go",
+    },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
+      },
+    },
+    snippet: goRef(goOpenaiSource),
+  },
+  {
+    platform: "go",
+    framework: "azure",
+    label: "Azure OpenAI",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/azure-openai",
+      external: "https://learn.microsoft.com/azure/ai-services/openai/",
+    },
+    icon: singleIcon("/images/external-icons/azure.svg", "Azure OpenAI"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/azureopenai github.com/openai/openai-go/v3",
+      },
+    },
+    snippet: goRef(goAzureSource),
+  },
+  {
+    platform: "go",
+    framework: "anthropic",
+    label: "Anthropic",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/anthropic",
+      external: "https://docs.claude.com/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/anthropic-lighttheme.svg",
+      "/images/external-icons/anthropic-darktheme.svg",
+      "Anthropic",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/anthropic github.com/anthropics/anthropic-sdk-go",
+      },
+    },
+    snippet: goRef(goAnthropicSource),
+  },
+  {
+    platform: "go",
+    framework: "gemini",
+    label: "Gemini",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/google-gemini",
+      external: "https://ai.google.dev/",
+    },
+    icon: singleIcon("/images/external-icons/google.svg", "Gemini"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/googlegenai google.golang.org/genai",
+      },
+    },
+    snippet: goRef(goGeminiSource),
+  },
+  {
+    platform: "go",
+    framework: "groq",
+    label: "Groq",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/groq",
+      external: "https://console.groq.com/docs",
+    },
+    icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
+      },
+    },
+    snippet: goRef(goGroqSource),
+  },
+  {
+    platform: "go",
+    framework: "grok",
+    label: "Grok (xAI)",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/grok",
+      external: "https://x.ai/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/grok-lighttheme.svg",
+      "/images/external-icons/grok-darktheme.svg",
+      "Grok",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
+      },
+    },
+    snippet: goRef(goGrokSource),
+  },
+  {
+    platform: "go",
+    framework: "mistral",
+    label: "Mistral",
+    category: "traditional",
+    docs: { external: "https://docs.mistral.ai/" },
+    icon: singleIcon("/images/external-icons/mistral.svg", "Mistral"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
+      },
+    },
+    snippet: goRef(goMistralSource),
+  },
+  {
+    platform: "go",
+    framework: "ollama",
+    label: "Ollama",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/ollama",
+      external: "https://github.com/ollama/ollama",
+    },
+    icon: themedIcon(
+      "/images/external-icons/ollama-lighttheme.svg",
+      "/images/external-icons/ollama-darktheme.svg",
+      "Ollama",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/ollama github.com/ollama/ollama/api",
+      },
+    },
+    snippet: goRef(goOllamaSource),
+  },
+  {
+    platform: "go",
+    framework: "bedrock",
+    label: "AWS Bedrock",
+    category: "traditional",
+    docs: {
+      internal: "/integration/go/integrations/amazon-bedrock",
+      external: "https://docs.aws.amazon.com/bedrock/",
+    },
+    icon: themedIcon(
+      "/images/external-icons/aws-lighttheme.svg",
+      "/images/external-icons/aws-darktheme.svg",
+      "AWS Bedrock",
+    ),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/bedrock github.com/aws/aws-sdk-go-v2/config github.com/aws/aws-sdk-go-v2/service/bedrockruntime",
+      },
+    },
+    snippet: goRef(goBedrockSource),
+  },
+  {
+    platform: "go",
+    framework: "genkit",
+    label: "Genkit",
+    category: "agents",
+    docs: {
+      internal: "/integration/go/integrations/genkit",
+      external: "https://genkit.dev/go/docs/get-started-go/",
+    },
+    icon: singleIcon("/images/external-icons/custom.svg", "Genkit"),
+    install: {
+      go: {
+        "go get":
+          "go get github.com/langwatch/langwatch/sdks/go/instrumentation/genkit github.com/firebase/genkit/go",
+      },
+    },
+    snippet: goRef(goGenkitSource),
+  },
+
+  // Java
+  {
+    platform: "java",
+    framework: "spring",
+    label: "Spring Boot AI",
+    category: "traditional",
+    docs: {
+      internal: "/integration/java/integrations/spring-ai",
+      external: "https://spring.io/projects/spring-ai",
+    },
+    icon: singleIcon("/images/external-icons/spring-boot.svg", "Spring Boot AI"),
+    snippet: yamlRef(springAiYamlSource),
+  },
+
+  // OpenTelemetry
+  {
+    platform: "opentelemetry",
+    docs: {
+      internal: "/integration/opentelemetry/guide",
+      external: "https://opentelemetry.io/docs/getting-started/dev/",
+    },
+    icon: singleIcon("/images/external-icons/opentelemetry.svg", "OpenTelemetry"),
+    label: "OpenTelemetry",
+    category: "traditional",
+    customComponent: OpenTelemetrySetup,
+  },
+
+  // No/Lo
+  {
+    platform: "no_and_lo",
+    framework: "n8n",
+    label: "n8n",
+    category: "agents",
+    docs: { internal: "/integration/n8n", external: "https://docs.n8n.io/" },
+    icon: singleIcon("/images/external-icons/n8n.svg", "n8n"),
+    install: {
+      js: {
+        npm: "npm i @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
+        pnpm: "pnpm add @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
+        yarn: "yarn add @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
+        bun: "bun add @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
+      },
+    },
+    snippet: bashRef(n8nBashSource),
+  },
+  {
+    platform: "no_and_lo",
+    framework: "flowise",
+    label: "Flowise",
+    category: "agents",
+    docs: {
+      internal: "/integration/flowise",
+      external: "https://docs.flowiseai.com/",
+    },
+    icon: singleIcon("/images/external-icons/flowise.svg", "Flowise"),
+    customComponent: FlowiseSetup,
+  },
+  {
+    platform: "no_and_lo",
+    framework: "langflow",
+    label: "Langflow",
+    category: "agents",
+    docs: {
+      internal: "/integration/langflow",
+      external: "https://docs.langflow.org/",
+    },
+    icon: singleIcon("/images/external-icons/langflow.svg", "Langflow"),
+    customComponent: LangflowSetup,
+  },
+];
+
+export function getRegistryEntry(
+  platform: PlatformKey,
+  framework?: FrameworkKey,
+): IntegrationSpec | undefined {
+  // If no framework is provided, return the first entry for the platform (platform-only items)
+  if (!framework) {
+    return registry.find((r) => r.platform === platform);
+  }
+  return registry.find((r) => r.platform === platform && r.framework === framework);
+}
+
+export function deriveFrameworksByPlatform(
+  category?: IntegrationCategory,
+): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
+  const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> = {
+    typescript: [],
+    python: [],
+    go: [],
+    java: [],
+    opentelemetry: [],
+    no_and_lo: [],
+  };
+  for (const r of registry) {
+    if (category && r.category !== category) continue;
+    // Skip entries without a framework (platform-only items)
+    if (r.framework) {
+      out[r.platform].push({ key: r.framework, label: r.label, icon: r.icon });
+    }
+  }
+  return out;
+}
+
+/**
+ * Returns the set of platforms that have at least one framework — or one
+ * platform-only entry — in the given category. Used to hide platform tabs
+ * that would render an empty FrameworkGrid.
+ */
+export function derivePlatformsForCategory(category: IntegrationCategory): Set<PlatformKey> {
+  const out = new Set<PlatformKey>();
+  for (const r of registry) {
+    if (r.category === category) out.add(r.platform);
+  }
+  return out;
+}

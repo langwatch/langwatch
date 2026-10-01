@@ -7,27 +7,27 @@ Feature: Remove dead cost-checking code from worker paths
   # The remaining are tracked under #3458:
   #   - 2 NO_TEST: behavior shipped + correct, no integration test yet exists
   # NO_TEST gaps:
-  #   - "getCurrentMonthCost remains available in the repository"
+  #   - "findCurrentMonthCost remains available in the repository"
   #   - "UsageStatsService still reports current month cost on the dashboard"
 
   Background:
     Since Nov 2025 maxMonthlyUsageLimit() returns Infinity unconditionally.
     The cost-check blocks in the four worker call sites always evaluate
     `currentCost >= Infinity` which is always false, making the code dead.
-    The repository method getCurrentMonthCost() is still used by
+    The repository method findCurrentMonthCost() is still used by
     UsageStatsService for the usage dashboard and must be preserved.
 
   # ── Preserve repository method for dashboard ───────────────────────────
 
   @integration
-  Scenario: getCurrentMonthCost remains available in the repository
+  Scenario: findCurrentMonthCost remains available in the repository
     Given a LicenseEnforcementRepository instance
-    When getCurrentMonthCost is called with an organization ID
+    When findCurrentMonthCost is called with an organization ID
     Then it returns the summed cost for the current calendar month
 
   @integration @unimplemented
   Scenario: UsageStatsService still reports current month cost on the dashboard
     Given a UsageStatsService backed by a repository that returns cost data
     When usage stats are fetched for an organization
-    Then the response includes the current month cost from getCurrentMonthCost
+    Then the response includes the current month cost from findCurrentMonthCost
 

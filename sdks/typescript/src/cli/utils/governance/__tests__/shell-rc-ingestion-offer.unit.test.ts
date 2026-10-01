@@ -1,24 +1,7 @@
 /**
- * Tests for the Path B (ingestion) persist OFFER driven from the
- * `langwatch <tool>` wrapper. Two target paths are covered:
- *
- *   - `claude` writes to `~/.claude/settings.json`'s top-level `env`
- *     block (native Claude Code env loader; doesn't leak vars into
- *     unrelated shell children)
- *   - `codex` never prompts here: wrapper-mode's per-run [otel] write
- *     already persists the Authorization header inline, so the offer
- *     only asserts the turn harvest
- *   - any other tool without an app-scoped target (cursor, gemini,
- *     opencode) falls back to appending a marker-bracketed export block
- *     to the detected shell rc file
- *
- * Drives the Y / n / never branches by mocking readline (the stdin
- * prompt) and saveConfig (the persistence).
- *
- * `claude` here is one without plugin support, which is what keeps these
- * scenarios about the file each tool's exports land in. What consent does for a
- * `claude` that CAN take the LangWatch plugin lives in
- * claude-plugin-persist.unit.test.ts.
+ * Tests for the Path B (ingestion) persist OFFER: `claude` writes to
+ * settings.json's `env` block, `codex` never prompts (its per-run write
+ * already persists inline), others fall back to a shell rc export block.
  */
 import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";
@@ -50,8 +33,7 @@ const { spawnSyncMock } = vi.hoisted(() => ({
   spawnSyncMock: vi.fn(() => ({ status: 1, stdout: "", stderr: "unknown" })),
 }));
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -66,10 +48,7 @@ let logSpy: ReturnType<typeof vi.spyOn>;
 const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origShell = process.env.SHELL;
-const origTtyDescriptor = Object.getOwnPropertyDescriptor(
-  process.stdin,
-  "isTTY",
-);
+const origTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const origEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
 const otelVars: Record<string, string> = {
@@ -137,9 +116,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     describe("and the user answers 'y'", () => {
       it("merges OTEL vars into ~/.claude/settings.json's `env` block", async () => {
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
@@ -154,9 +131,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
       it("names ~/.claude/settings.json in the prompt, not the shell rc", async () => {
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
@@ -182,9 +157,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           ),
         );
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
@@ -200,9 +173,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     describe("and the user answers 'never'", () => {
       it("persists shell_rc_preference='skip' and leaves settings.json untouched", async () => {
         answers.push("never");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         const c = cfg();
         await maybeOfferIngestionShellRcPersist({
           cfg: c,
@@ -218,9 +189,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     describe("and the user answers 'n'", () => {
       it("persists nothing and leaves settings.json untouched", async () => {
         answers.push("n");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         const c = cfg();
         await maybeOfferIngestionShellRcPersist({
           cfg: c,
@@ -236,17 +205,12 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     describe("and settings.json already carries every OTEL key", () => {
       beforeEach(() => {
         fs.mkdirSync(path.dirname(claudeSettingsPath()), { recursive: true });
-        fs.writeFileSync(
-          claudeSettingsPath(),
-          JSON.stringify({ env: otelVars }, null, 2),
-        );
+        fs.writeFileSync(claudeSettingsPath(), JSON.stringify({ env: otelVars }, null, 2));
       });
 
       it("does not prompt again or rewrite the exports", async () => {
         // No answer queued: a fired prompt would read "" → "yes".
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
@@ -260,9 +224,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
       /** @scenario "A device whose exports are already current still gets the hooks" */
       it("installs the session hooks those exports were persisted without", async () => {
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
@@ -287,18 +249,14 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           ),
         );
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "claude",
           vars: otelVars,
         });
         const written = JSON.parse(fs.readFileSync(claudeSettingsPath(), "utf8"));
-        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-          "http://app.example.com/api/otel",
-        );
+        expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
         expect(written.env.OTEL_TRACES_EXPORTER).toBe("otlp");
       });
     });
@@ -312,9 +270,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     /** @scenario "The wrapper's [otel] write carries the Authorization header, so codex needs no persist prompt" */
     it("never prompts and never writes the exports here", async () => {
       // No answer queued: a fired prompt would read "" and rewrite files.
-      const { maybeOfferIngestionShellRcPersist } = await import(
-        "../shell-rc.js"
-      );
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
         cfg: cfg(),
         tool: "codex",
@@ -332,24 +288,18 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
 
     it("asks codex to record each turn's conversation as it completes", async () => {
-      const { maybeOfferIngestionShellRcPersist } = await import(
-        "../shell-rc.js"
-      );
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
         cfg: cfg(),
         tool: "codex",
         vars: otelVars,
       });
-      expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
-        NOTIFY_MARKER,
-      );
+      expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(NOTIFY_MARKER);
     });
 
     describe("when the offer runs twice", () => {
       it("leaves exactly one harvest hook behind", async () => {
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         const run = () =>
           maybeOfferIngestionShellRcPersist({
             cfg: cfg(),
@@ -359,9 +309,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         await run();
         await run();
         const toml = fs.readFileSync(codexConfigPath(), "utf8");
-        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(
-          1,
-        );
+        expect((toml.match(/langwatch codex notify begin/g) ?? []).length).toBe(1);
       });
     });
 
@@ -373,9 +321,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         // Two top-level assignments: moving one aside still leaves the other,
         // and a duplicate key stops codex from starting at all.
         fs.writeFileSync(configFile, 'notify = ["/one"]\nnotify = ["/two"]\n');
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
 
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
@@ -409,9 +355,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
       it("does not prompt again or rewrite the exports", async () => {
         // No answer queued: a fired prompt would read "" → "yes" → rewrite.
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "codex",
@@ -424,58 +368,43 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
       /** @scenario "A device that already persisted its capture settings still gets the turn harvest" */
       it("installs the turn harvest those settings were persisted without", async () => {
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "codex",
           vars: otelVars,
         });
-        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(
-          NOTIFY_MARKER,
-        );
+        expect(fs.readFileSync(codexConfigPath(), "utf8")).toContain(NOTIFY_MARKER);
         expect(lastPrompts).toHaveLength(0);
       });
     });
-
   });
 
   describe("when the tool is `opencode` (scoped shell function, no global export)", () => {
     describe("and the user answers 'y'", () => {
-      it("writes a scoped opencode() wrapper, not bare exports", async () => {
+      beforeEach(async () => {
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "opencode",
           vars: otelVars,
         });
+      });
+
+      it("writes a scoped opencode() wrapper, not bare exports", () => {
         const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
         expect(rc).toContain("# >>> langwatch opencode begin >>>");
         expect(rc).toContain("opencode() {");
         expect(rc).toContain('command opencode "$@"');
-        expect(rc).toContain(
-          "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
-        );
+        expect(rc).toContain("OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel");
         // NOT a bare global export — that's the leak we're avoiding.
         expect(rc).not.toContain("export OTEL_TRACES_EXPORTER");
         // Claude Code settings file untouched.
         expect(fs.existsSync(claudeSettingsPath())).toBe(false);
       });
 
-      it("names the shell rc in the prompt", async () => {
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "opencode",
-          vars: otelVars,
-        });
+      it("names the shell rc in the prompt", () => {
         expect(lastPrompts).toHaveLength(1);
         expect(lastPrompts[0]).toContain(".zshrc");
       });
@@ -488,9 +417,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           "# >>> langwatch begin >>>\nexport OTEL_EXPORTER_OTLP_ENDPOINT=http://gemini\n# <<< langwatch end <<<\n";
         fs.writeFileSync(rcFile, priorExport);
         answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "opencode",
@@ -509,12 +436,10 @@ describe("maybeOfferIngestionShellRcPersist", () => {
       it("stays quiet — no prompt, no rewrite", async () => {
         const rcFile = path.join(tmpHome, ".zshrc");
         const installed =
-          "# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode \"$@\"\n}\n# <<< langwatch opencode end <<<\n";
+          '# >>> langwatch opencode begin >>>\nopencode() {\n    OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel \\\n    command opencode "$@"\n}\n# <<< langwatch opencode end <<<\n';
         fs.writeFileSync(rcFile, installed);
         // No answer queued: a fired prompt would read "" → "yes" → rewrite.
-        const { maybeOfferIngestionShellRcPersist } = await import(
-          "../shell-rc.js"
-        );
+        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
           cfg: cfg(),
           tool: "opencode",
@@ -530,9 +455,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
   describe("when the tool is `gemini` (same scoped-function pattern)", () => {
     it("writes a scoped gemini() wrapper under its own markers, no global export", async () => {
       answers.push("y");
-      const { maybeOfferIngestionShellRcPersist } = await import(
-        "../shell-rc.js"
-      );
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
         cfg: cfg(),
         tool: "gemini",
@@ -548,9 +471,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
   describe("when shell_rc_preference is 'skip' (any tool)", () => {
     it("does not prompt or write for claude", async () => {
-      const { maybeOfferIngestionShellRcPersist } = await import(
-        "../shell-rc.js"
-      );
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
         cfg: cfg({ shell_rc_preference: "skip" }),
         tool: "claude",
@@ -562,9 +483,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
     });
 
     it("does not prompt or write for codex", async () => {
-      const { maybeOfferIngestionShellRcPersist } = await import(
-        "../shell-rc.js"
-      );
+      const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
       await maybeOfferIngestionShellRcPersist({
         cfg: cfg({ shell_rc_preference: "skip" }),
         tool: "codex",

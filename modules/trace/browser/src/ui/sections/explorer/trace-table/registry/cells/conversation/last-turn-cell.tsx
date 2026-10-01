@@ -1,0 +1,19 @@
+import { Text } from "@langwatch/design-system/primitives";
+import { formatRelativeTime } from "@langwatch/trace-browser-kit";
+
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { ConversationGroup } from "../../../conversation-groups.ts";
+import type { CellDef } from "../../types.ts";
+
+export const LastTurnCell: CellDef<ConversationGroup> = {
+  id: "lastTurn",
+  label: "Last Activity",
+  render: ({ row }) => (
+    <MonoCell color="fg.muted">{formatRelativeTime(row.latestTimestamp)}</MonoCell>
+  ),
+  renderComfortable: ({ row }) => (
+    <Text textStyle="xs" color="fg">
+      {formatRelativeTime(row.latestTimestamp)}
+    </Text>
+  ),
+};

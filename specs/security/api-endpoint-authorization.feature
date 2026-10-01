@@ -38,12 +38,36 @@ Feature: Hono API endpoint authorization and tenant isolation
       When a developer tries to register a verb route without calling access(policy) first
       Then the verb method does not exist on the bare app and the code fails to compile
 
+    @unit
+    Scenario: A versioned endpoint without an access policy fails the build
+      Given a versioned route family built through the same REST service
+      When an endpoint is registered without declaring a permission policy
+      Then building the family raises rather than mounting an unclassified route
+
     @integration
     Scenario: The composed router has no route without a registered policy
       Given the fully composed API router from createApiRouter
       When every mounted concrete-method endpoint is enumerated
       Then each one is registered through SecuredApp with a declared policy
       And any route that bypassed the builder fails this assertion
+
+    @unit
+    Scenario: A mounted route with no declared policy stops the boot
+      Given the composed REST router of the API process
+      When a route is mounted that the route registry does not carry
+      Then the process refuses to finish booting
+      And the refusal names the method and path of every such route
+      # The CI cross-check only sees the composition the description task can
+      # build. This is the same check on the router the process actually
+      # serves, so a path CI never composed cannot answer unguarded.
+
+    @unit
+    Scenario: A tRPC procedure with no access declaration fails the sweep
+      Given every procedure the process mounts
+      When one carries no access declaration at all
+      Then the declaration sweep fails and names that procedure
+      # The sweep used to skip an undeclared procedure, so the one shape it
+      # could say nothing about was the one it reported as fine.
 
     @integration
     Scenario: A public or internal route declares a documented reason
@@ -154,6 +178,15 @@ Feature: Hono API endpoint authorization and tenant isolation
       When I call a mutating endpoint that requires a write permission
       Then the response status is 403
 
+    @unit
+    Scenario: A narrow API key cannot write model defaults with its owner's grants
+      Given a read-only project API key whose owner administers the organization
+      When it creates, updates or deletes a model-defaults config
+      Then the request is refused with the API-key permission-denied code
+      And the write never reaches the service
+      # The service gates each named scope against the key's OWNING USER, so
+      # without a ceiling on the route the key's scope capped nothing.
+
     @integration
     Scenario: An authorized key passes the permission gate
       Given a project API key whose role grants the required permission
@@ -206,6 +239,27 @@ Feature: Hono API endpoint authorization and tenant isolation
 
   # ============================================================================
   Rule: A credential for one tenant cannot reach another tenant's data
+
+    @unit
+    Scenario: A scoped key cannot be re-pointed at a project its grants do not reach
+      Given a project API key bound to project A only
+      When it names a sibling project B of the same organization in X-Project-Id
+      Then the credential resolves to nothing and the request is unauthenticated
+      # The organization was the only fence, and a project-scoped key that
+      # named a sibling passed it. The key's own bindings are the fence now.
+
+    @unit
+    Scenario: A key reading stored bytes is pinned to the project it authenticated as
+      Given a project API key authenticated on the stored-object byte route
+      When it reads an object owned by another project
+      Then it is refused and no bytes are read
+      # Main's rule (Alex, 2026-09-30): the pin is the whole gate; no permission ceiling is asked.
+
+    @unit
+    Scenario: An organization or team key still selects a project it covers
+      Given a project API key bound to an organization, or to a project's team
+      When it names a project inside that scope in X-Project-Id
+      Then the credential resolves to that project
 
     @integration
     Scenario: A key for one organization cannot resolve another organization's project

@@ -4,21 +4,19 @@ import { type DocumentInterface } from "@langchain/core/documents";
 import type { Serialized } from "@langchain/core/load/serializable";
 import { type BaseMessage } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
+import type { ChainValues } from "@langchain/core/utils/types";
+import { context, trace, SpanStatusCode, type Attributes } from "@opentelemetry/api";
+import { isAttributeValue } from "@opentelemetry/core";
+
 import {
   chatMessageSchema,
   type ChatMessage,
   type ChatRichContent,
 } from "../../../internal/generated/types/tracer";
-import type { ChainValues } from "@langchain/core/utils/types";
-import { getLangWatchTracer } from "../../tracer";
-import type { LangWatchSpan } from "../../span";
-import {
-  context,
-  trace,
-  SpanStatusCode,
-  type Attributes,
-} from "@opentelemetry/api";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
+import { ATTR_LANGWATCH_INPUT } from "../../semconv/attributes";
+import { processSpanInputOutput, type LangWatchSpan } from "../../span";
+import { getLangWatchTracer } from "../../tracer";
 
 type RunKind = "llm" | "chat" | "chain" | "tool" | "retriever";
 
@@ -66,15 +64,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     if (this.seenStarts.has(runId)) return;
     this.seenStarts.add(runId);
 
-    const parentCtx = getResolvedParentContext(
-      parentRunId,
-      this.spans,
-      this.parentOf
-    );
+    const parentCtx = getResolvedParentContext(parentRunId, this.spans, this.parentOf);
     const parentSpan = parentRunId ? this.spans[parentRunId] : void 0;
-    const links = parentSpan
-      ? [{ context: parentSpan.spanContext() }]
-      : void 0;
+    const links = parentSpan ? [{ context: parentSpan.spanContext() }] : void 0;
 
     const { name, type } = deriveNameAndType({
       runType: args.kind,
@@ -92,12 +84,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setAttribute("langwatch.langchain.run.tags", args.tags.slice(0, 50));
 
     if (shouldCaptureInput() && args.input !== void 0) {
-      const i: any = args.input as any;
-      if (i && typeof i === "object" && "type" in i && "value" in i) {
-        span.setInput(i.type, i.value);
-      } else {
-        span.setInput(i);
-      }
+      setRunInput(span, args.input);
     }
 
     if (args.extraParams) {
@@ -106,8 +93,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
           Object.entries(args.extraParams).map(([k, v]) => [
             `langwatch.langchain.run.extra_params.${k}`,
             wrapNonScalarValues(v),
-          ])
-        )
+          ]),
+        ),
       );
     }
 
@@ -130,26 +117,18 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       extra?: Attributes;
       tags?: string[];
       md?: Record<string, unknown>;
-    }
+    },
   ) {
     const span = this.spans[runId];
     if (!span) return;
 
-    addLangChainEvent(
-      span,
-      end.event,
-      runId,
-      end.parentRunId,
-      end.tags,
-      end.md,
-      end.extra
-    );
+    addLangChainEvent(span, end.event, runId, end.parentRunId, end.tags, end.md, end.extra);
 
     if (end.err) {
       span.recordException(end.err);
       span.setStatus({ code: SpanStatusCode.ERROR, message: end.err.message });
     } else if (shouldCaptureOutput() && end.output !== undefined) {
-      span.setOutput(end.output as any);
+      span.setOutput(end.output);
     }
 
     span.end();
@@ -168,14 +147,15 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     extraParams?: Record<string, unknown>,
     tags?: string[],
     metadata?: Record<string, unknown>,
-    name?: string
+    name?: string,
   ): Promise<void> {
-    const input = shouldCaptureInput() && prompts
-      ? {
-          type: "list",
-          value: prompts.map((p) => ({ type: "text", value: p })),
-        }
-      : void 0;
+    const input =
+      shouldCaptureInput() && prompts
+        ? {
+            type: "list",
+            value: prompts.map((p) => ({ type: "text", value: p })),
+          }
+        : void 0;
 
     this.startRunSpan({
       kind: "llm",
@@ -198,7 +178,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     extraParams?: Record<string, unknown>,
     tags?: string[],
     metadata?: Record<string, unknown>,
-    name?: string
+    name?: string,
   ): Promise<void> {
     const input = shouldCaptureInput()
       ? {
@@ -220,13 +200,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     });
   }
 
-  async handleLLMEnd(
-    response: LLMResult,
-    runId: string,
-    parentRunId?: string
-  ): Promise<void> {
+  async handleLLMEnd(response: LLMResult, runId: string, parentRunId?: string): Promise<void> {
     const span = this.spans[runId];
-    const tu = (response.llmOutput as any)?.tokenUsage as
+    const tu = response.llmOutput?.tokenUsage as
       | {
           promptTokens?: number;
           completionTokens?: number;
@@ -244,9 +220,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     const outputs = shouldCaptureOutput()
       ? response.generations.flat().map((g) => {
           if ("message" in g && g.message) {
-            return convertFromLangChainMessages([
-              (g as ChatGeneration).message,
-            ]);
+            return convertFromLangChainMessages([(g as ChatGeneration).message]);
           } else if ("text" in g && g.text) {
             return g.text;
           }
@@ -261,11 +235,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     });
   }
 
-  async handleLLMError(
-    err: Error,
-    runId: string,
-    parentRunId?: string
-  ): Promise<void> {
+  async handleLLMError(err: Error, runId: string, parentRunId?: string): Promise<void> {
     this.finishRun(runId, { err, event: "handleLLMError", parentRunId });
   }
 
@@ -277,7 +247,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     tags?: string[],
     metadata?: Record<string, unknown>,
     _runType?: string,
-    name?: string
+    name?: string,
   ): Promise<void> {
     this.startRunSpan({
       kind: "chain",
@@ -296,11 +266,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
   }
 
-  async handleChainEnd(
-    output: ChainValues,
-    runId: string,
-    parentRunId?: string
-  ): Promise<void> {
+  async handleChainEnd(output: ChainValues, runId: string, parentRunId?: string): Promise<void> {
     this.finishRun(runId, { output, event: "handleChainEnd", parentRunId });
   }
 
@@ -309,7 +275,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     runId: string,
     parentRunId?: string,
     tags?: string[],
-    kwargs?: { inputs?: Record<string, unknown> | undefined }
+    kwargs?: { inputs?: Record<string, unknown> | undefined },
   ): Promise<void> {
     this.finishRun(runId, {
       err,
@@ -327,7 +293,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     parentRunId?: string,
     tags?: string[],
     metadata?: Record<string, unknown>,
-    name?: string
+    name?: string,
   ): Promise<void> {
     this.startRunSpan({
       kind: "tool",
@@ -349,15 +315,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
   }
 
-  async handleToolEnd(
-    output: string,
-    runId: string,
-    parentRunId?: string
-  ): Promise<void> {
+  async handleToolEnd(output: string, runId: string, parentRunId?: string): Promise<void> {
     this.finishRun(runId, {
-      output: shouldCaptureOutput()
-        ? { type: "text", value: output }
-        : void 0,
+      output: shouldCaptureOutput() ? { type: "text", value: output } : void 0,
       event: "handleToolEnd",
       parentRunId,
     });
@@ -367,7 +327,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     err: Error,
     runId: string,
     parentRunId?: string,
-    tags?: string[]
+    tags?: string[],
   ): Promise<void> {
     this.finishRun(runId, { err, event: "handleToolError", parentRunId, tags });
   }
@@ -379,7 +339,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     parentRunId?: string,
     tags?: string[],
     metadata?: Record<string, unknown>,
-    name?: string
+    name?: string,
   ) {
     this.startRunSpan({
       kind: "retriever",
@@ -402,10 +362,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   }
 
   async handleRetrieverEnd(
-    documents: DocumentInterface<Record<string, any>>[],
+    documents: DocumentInterface[],
     runId: string,
     parentRunId?: string,
-    tags?: string[]
+    tags?: string[],
   ) {
     const span = this.spans[runId];
 
@@ -419,19 +379,14 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
           document_id: document.metadata.id,
           chunk_id: document.metadata.chunk_id,
           content: document.pageContent,
-        }))
+        })),
       );
     }
 
     this.finishRun(runId, { event: "handleRetrieverEnd", parentRunId, tags });
   }
 
-  async handleRetrieverError(
-    err: Error,
-    runId: string,
-    parentRunId?: string,
-    tags?: string[]
-  ) {
+  async handleRetrieverError(err: Error, runId: string, parentRunId?: string, tags?: string[]) {
     this.finishRun(runId, {
       err,
       event: "handleRetrieverError",
@@ -444,7 +399,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _action: AgentAction,
     runId: string,
     parentRunId?: string,
-    tags?: string[]
+    tags?: string[],
   ): Promise<void> {
     const span = this.spans[runId];
     if (span) {
@@ -457,12 +412,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     action: AgentFinish,
     runId: string,
     parentRunId?: string,
-    tags?: string[]
+    tags?: string[],
   ): Promise<void> {
     this.finishRun(runId, {
-      output: shouldCaptureOutput()
-        ? { type: "json", value: action.returnValues }
-        : void 0,
+      output: shouldCaptureOutput() ? { type: "json", value: action.returnValues } : void 0,
       event: "handleAgentEnd",
       parentRunId,
       tags,
@@ -470,100 +423,112 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   }
 }
 
-export function convertFromLangChainMessages(
-  messages: BaseMessage[]
-): ChatMessage[] {
+export function convertFromLangChainMessages(messages: BaseMessage[]): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const message of messages) {
-    out.push(
-      convertFromLangChainMessage(message as BaseMessage & { id?: string[] })
-    );
+    out.push(convertFromLangChainMessage(message as BaseMessage & { id?: string[] }));
   }
   return out;
 }
 
-function convertFromLangChainMessage(
-  message: BaseMessage & { id?: string[] }
-): ChatMessage {
-  let role: ChatMessage["role"] = "user";
+function messageRoleOf(message: BaseMessage & { id?: string[] }): ChatMessage["role"] {
+  const msgType = "type" in message ? message.type : undefined;
+  if (msgType === "human") return "user";
+  if (msgType === "ai") return "assistant";
+  if (msgType === "system") return "system";
+  if (msgType === "function") return "function";
+  if (msgType === "tool") return "tool";
+  return legacyMessageRoleOf(message);
+}
 
-  const msgType = (message as any).type as string | undefined;
-  if (msgType === "human") role = "user";
-  else if (msgType === "ai") role = "assistant";
-  else if (msgType === "system") role = "system";
-  else if (msgType === "function") role = "function";
-  else if (msgType === "tool") role = "tool";
-  else {
-    if (
-      (message as any)?._getType?.() === "human" ||
-      message.id?.[message.id.length - 1] === "HumanMessage"
-    ) {
-      role = "user";
-    } else if (
-      (message as any)?._getType?.() === "ai" ||
-      message.id?.[message.id.length - 1] === "AIMessage"
-    ) {
-      role = "assistant";
-    } else if (
-      (message as any)?._getType?.() === "system" ||
-      message.id?.[message.id.length - 1] === "SystemMessage"
-    ) {
-      role = "system";
-    } else if (
-      (message as any)?._getType?.() === "function" ||
-      message.id?.[message.id.length - 1] === "FunctionMessage"
-    ) {
-      role = "function";
-    } else if (
-      (message as any)?._getType?.() === "tool" ||
-      message.id?.[message.id.length - 1] === "ToolMessage"
-    ) {
-      role = "tool";
-    }
+function legacyMessageRoleOf(message: BaseMessage & { id?: string[] }): ChatMessage["role"] {
+  const legacyType = message._getType?.();
+  const lastId = message.id?.[message.id.length - 1];
+  if (legacyType === "human" || lastId === "HumanMessage") return "user";
+  if (legacyType === "ai" || lastId === "AIMessage") return "assistant";
+  if (legacyType === "system" || lastId === "SystemMessage") return "system";
+  if (legacyType === "function" || lastId === "FunctionMessage") return "function";
+  if (legacyType === "tool" || lastId === "ToolMessage") return "tool";
+  return "user";
+}
+
+function convertFromLangChainMessage(message: BaseMessage & { id?: string[] }): ChatMessage {
+  const role = messageRoleOf(message);
+
+  let content: ChatMessage["content"];
+  if (typeof message.content === "string") {
+    content = message.content;
+  } else if (message.content == null) {
+    content = null;
+  } else if (Array.isArray(message.content)) {
+    content = message.content.map((c): ChatRichContent => {
+      if (c?.type === "text") {
+        return { type: "text", text: c.text };
+      }
+      if (c?.type === "image_url") {
+        return { type: "image_url", image_url: c.image_url };
+      }
+      return { type: "text", text: JSON.stringify(c) };
+    });
+  } else {
+    content = JSON.stringify(message.content);
   }
 
-  const content: ChatMessage["content"] =
-    typeof (message as any).content === "string"
-      ? ((message as any).content as string)
-      : (message as any).content == null
-      ? null
-      : Array.isArray((message as any).content)
-      ? (message as any).content.map(
-          (c: any): ChatRichContent =>
-            c?.type === "text"
-              ? { type: "text", text: c.text }
-              : c?.type === "image_url"
-              ? { type: "image_url", image_url: c.image_url }
-              : { type: "text", text: JSON.stringify(c) }
-        )
-      : JSON.stringify((message as any).content);
-
-  const functionCall = (message as any).additional_kwargs;
+  const functionCall = message.additional_kwargs;
 
   return {
     role,
     content,
     ...(functionCall &&
     typeof functionCall === "object" &&
-    Object.keys(functionCall).length > 0
+    Object.keys(functionCall).length > 0 &&
+    isFunctionCallShaped(functionCall)
       ? { function_call: functionCall }
       : {}),
   };
 }
 
+/** All of `additional_kwargs` travels as `function_call`; its name/arguments must be strings. */
+function isFunctionCallShaped<T extends object>(
+  kwargs: T,
+): kwargs is T & { name?: string; arguments?: string } {
+  const isOptionalString = (value: unknown) => value === undefined || typeof value === "string";
+  return (
+    isOptionalString(Reflect.get(kwargs, "name")) &&
+    isOptionalString(Reflect.get(kwargs, "arguments"))
+  );
+}
+
+/** A `{ type, value }` input keeps its declared type, as `span.setInput(type, value)` would. */
+function setRunInput(span: LangWatchSpan, input: unknown) {
+  if (input && typeof input === "object" && "type" in input && "value" in input) {
+    span.setAttribute(
+      ATTR_LANGWATCH_INPUT,
+      JSON.stringify(processSpanInputOutput(input.type, input.value)),
+    );
+    return;
+  }
+  span.setInput(input);
+}
+
 function className(serialized?: Serialized): string {
-  const id = (serialized as any)?.id;
+  const id = serialized?.id;
   if (Array.isArray(id) && id.length) return String(id[id.length - 1]);
-  const ns = (serialized as any)?.lc_namespace;
+  const ns = serialized && "lc_namespace" in serialized ? serialized.lc_namespace : undefined;
   if (Array.isArray(ns) && ns.length) return String(ns[ns.length - 1]);
 
   return "";
 }
 
+function displayOf(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+    return String(value);
+  return JSON.stringify(value) ?? String(value);
+}
+
 function shorten(str: string, max = 120): string {
-  return typeof str === "string" && str.length > max
-    ? str.slice(0, max - 1) + "…"
-    : str;
+  return typeof str === "string" && str.length > max ? str.slice(0, max - 1) + "…" : str;
 }
 
 function previewInput(v: unknown): string | undefined {
@@ -576,33 +541,24 @@ function previewInput(v: unknown): string | undefined {
 
 function ctxSkip(serialized?: Serialized, tags?: string[]) {
   const cls = className(serialized);
-  return (
-    cls.startsWith("ChannelWrite") ||
-    (tags?.includes("langsmith:hidden") ?? false)
-  );
+  return cls.startsWith("ChannelWrite") || (tags?.includes("langsmith:hidden") ?? false);
 }
 
-function wrapNonScalarValues(
-  value: unknown
-): string | number | boolean | undefined {
+function wrapNonScalarValues(value: unknown): string | number | boolean | undefined {
   if (value === void 0) return void 0;
   if (value === null) return JSON.stringify(null);
-  if (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  )
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
     return value;
 
   // Special-case: ChatMessage[] detection via zod schema the project already has
-  const chatMessages = chatMessageSchema.array().safeParse(value as any);
+  const chatMessages = chatMessageSchema.array().safeParse(value);
   if (Array.isArray(value) && chatMessages.success) {
     return JSON.stringify({ type: "chat_messages", value: chatMessages.data });
   }
 
   try {
     const seen = new WeakSet();
-    const json = JSON.stringify(value as any, (k, val) => {
+    const json = JSON.stringify(value, (k, val) => {
       if (typeof val === "object" && val !== null) {
         if (seen.has(val)) return "[Circular]";
         seen.add(val);
@@ -622,7 +578,7 @@ function addLangChainEvent(
   parentRunId: string | undefined,
   tags?: string[],
   metadata?: Record<string, unknown>,
-  attributes?: Attributes
+  attributes?: Attributes,
 ) {
   const attrs: Attributes = {
     "langwatch.langchain.run.id": runId,
@@ -641,21 +597,15 @@ function addLangChainEvent(
   span.addEvent("langwatch.langchain.callback", attrs);
 }
 
-function setLangGraphAttributes(
-  span: LangWatchSpan,
-  metadata?: Record<string, unknown>
-) {
+function setLangGraphAttributes(span: LangWatchSpan, metadata?: Record<string, unknown>) {
   if (!metadata) return;
   const keys = Object.keys(metadata);
   for (const key of keys) {
-    const value = (metadata as any)[key];
+    const value = metadata[key];
     if (value !== undefined) {
       const wrapped = wrapNonScalarValues(value);
       if (wrapped !== undefined) {
-        span.setAttribute(
-          `langwatch.langgraph.${key}` as const,
-          wrapped as any
-        );
+        span.setAttribute(`langwatch.langgraph.${key}` as const, wrapped);
       }
     }
   }
@@ -669,35 +619,43 @@ function buildLangChainMetadataAttributes(metadata: Record<string, unknown>) {
       .map(([key, value]) => [
         `langwatch.langchain.run.metadata.${key}`,
         wrapNonScalarValues(value),
-      ])
+      ]),
   );
 }
 
 function applyGenAIAttrs(
   span: LangWatchSpan,
   metadata?: Record<string, unknown>,
-  extraParams?: Record<string, unknown>
+  extraParams?: Record<string, unknown>,
 ) {
-  const md = (metadata ?? {}) as any;
-  const ex = (extraParams ?? {}) as any;
+  const md = metadata ?? {};
 
-  const provider = md.ls_provider as string | undefined;
-  const requestModel = md.ls_model_name ?? md.kwargs?.model ?? ex.kwargs?.model;
+  const provider = md.ls_provider;
+  const requestModel =
+    md.ls_model_name ?? propertyOf(md.kwargs, "model") ?? propertyOf(extraParams?.kwargs, "model");
   const temperature =
-    md.ls_temperature ?? md.kwargs?.temperature ?? ex.kwargs?.temperature;
-  const responseModel = md.response_metadata?.model_name as string | undefined;
+    md.ls_temperature ??
+    propertyOf(md.kwargs, "temperature") ??
+    propertyOf(extraParams?.kwargs, "temperature");
+  const responseModel = propertyOf(md.response_metadata, "model_name");
 
-  if (provider) span.setAttribute("gen_ai.system", provider);
-  if (requestModel) span.setAttribute("gen_ai.request.model", requestModel);
-  if (typeof temperature === "number")
-    span.setAttribute("gen_ai.request.temperature", temperature);
-  if (responseModel) span.setAttribute("gen_ai.response.model", responseModel);
+  if (provider && isAttributeValue(provider)) span.setAttribute("gen_ai.system", provider);
+  if (requestModel && isAttributeValue(requestModel))
+    span.setAttribute("gen_ai.request.model", requestModel);
+  if (typeof temperature === "number") span.setAttribute("gen_ai.request.temperature", temperature);
+  if (responseModel && isAttributeValue(responseModel))
+    span.setAttribute("gen_ai.response.model", responseModel);
+}
+
+function propertyOf(value: unknown, key: string): unknown {
+  if (value === null || value === undefined) return undefined;
+  return Reflect.get(Object(value), key);
 }
 
 function getResolvedParentContext(
   runId: string | undefined,
   spans: Record<string, LangWatchSpan | undefined>,
-  parentOf: Record<string, string | undefined>
+  parentOf: Record<string, string | undefined>,
 ) {
   let cur = runId;
   while (cur) {
@@ -706,6 +664,64 @@ function getResolvedParentContext(
     cur = parentOf[cur];
   }
   return context.active();
+}
+
+function typeFromRunKind(runType: RunKind): "llm" | "chain" | "tool" | "rag" | "component" {
+  if (runType === "tool") {
+    return "tool";
+  }
+  if (runType === "retriever") {
+    return "rag";
+  }
+  if (runType === "llm" || runType === "chat") {
+    return "llm";
+  }
+  return "chain";
+}
+
+function llmRunName({ md, cls }: { md: Record<string, unknown>; cls: string }): string {
+  const prov = (md?.ls_provider as string) ?? "LLM";
+  const model = (md?.ls_model_name as string) ?? (cls || "call");
+  const temp = md?.ls_temperature;
+  let tempStr: string | null = null;
+  if (typeof temp === "number") {
+    tempStr = temp.toString();
+  } else if (temp != null) {
+    tempStr = JSON.stringify(temp);
+  }
+  return tempStr != null ? `${prov} ${model} (temp ${tempStr})` : `${prov} ${model}`;
+}
+
+function routerRunName(md: Record<string, unknown>): string {
+  const pathArr = md?.langgraph_path as string[] | undefined;
+  const fromNode =
+    Array.isArray(pathArr) && pathArr.length ? pathArr[pathArr.length - 1] : undefined;
+  const triggers = md?.langgraph_triggers;
+  const decision = Array.isArray(triggers)
+    ? String(triggers.find((t) => String(t).startsWith("branch:")) ?? "").replace(
+        /^branch:(to:)?/,
+        "",
+      )
+    : undefined;
+  return `Route: ${fromNode ?? "unknown"} → ${decision ?? "unknown"}`;
+}
+
+function toolRunName({
+  metadata,
+  cls,
+  inputs,
+  serialized,
+}: {
+  metadata?: Record<string, unknown>;
+  cls: string;
+  inputs?: unknown;
+  serialized?: Serialized;
+}): string {
+  const tool = displayOf(metadata?.name ?? (cls || "tool"));
+  const prev =
+    previewInput(inputs) ??
+    previewInput(serialized && "input" in serialized ? serialized.input : undefined);
+  return prev ? `Tool: ${tool} — ${prev}` : `Tool: ${tool}`;
 }
 
 function deriveNameAndType(opts: {
@@ -719,74 +735,36 @@ function deriveNameAndType(opts: {
   const { runType, name, serialized, metadata, inputs } = opts;
 
   // user-specified name / metadata override
-  const hardName = (name?.trim() ?? (metadata as any)?.operation_name) as
-    | string
-    | undefined;
+  const hardName = (name?.trim() ?? metadata?.operation_name) as string | undefined;
   if (hardName) {
     return {
       name: hardName,
-      type:
-        runType === "tool"
-          ? "tool"
-          : runType === "retriever"
-          ? "rag"
-          : runType === "llm" || runType === "chat"
-          ? "llm"
-          : "chain",
+      type: typeFromRunKind(runType),
     };
   }
 
   const cls = className(serialized);
-  const md = (metadata ?? {}) as any;
+  const md = metadata ?? {};
 
   // LangGraph node / router - prioritize routers over nodes
   const hasNode = md?.langgraph_node != null;
   const hasTriggers = Array.isArray(md?.langgraph_triggers) && md.langgraph_triggers.length > 0;
-  const isRouter =
-    cls.startsWith("Branch<") || hasTriggers;
+  const isRouter = cls.startsWith("Branch<") || hasTriggers;
   const isGraphRunner = md?.langgraph_path && !md?.langgraph_node;
 
   // LLM / Chat - always prioritize runType over metadata
   if (runType === "llm" || runType === "chat") {
-    const prov = (md?.ls_provider as string) ?? "LLM";
-    const model = (md?.ls_model_name as string) ?? (cls || "call");
-    const temp = md?.ls_temperature;
-    const tempStr =
-      temp != null
-        ? typeof temp === "number"
-          ? temp.toString()
-          : JSON.stringify(temp)
-        : null;
-    const nm =
-      tempStr != null
-        ? `${prov} ${model} (temp ${tempStr})`
-        : `${prov} ${model}`;
-    return { name: nm, type: "llm" };
+    return { name: llmRunName({ md, cls }), type: "llm" };
   }
 
   // Prioritize LangGraph routers over nodes (but after LLM/Chat)
   if (isRouter) {
-    const pathArr = md?.langgraph_path as string[] | undefined;
-    const fromNode =
-      Array.isArray(pathArr) && pathArr.length
-        ? pathArr[pathArr.length - 1]
-        : undefined;
-    const decision = Array.isArray(md?.langgraph_triggers)
-      ? String(
-          md.langgraph_triggers.find((t: any) =>
-            String(t).startsWith("branch:")
-          ) ?? ""
-        ).replace(/^branch:(to:)?/, "")
-      : undefined;
-    const nm = `Route: ${fromNode ?? "unknown"} → ${decision ?? "unknown"}`;
-    return { name: nm, type: "component" };
+    return { name: routerRunName(md), type: "component" };
   }
 
   if (hasNode) {
     const step = md?.langgraph_step;
-    const nm = `Node: ${md.langgraph_node}${
-      step != null ? ` (step ${String(step)})` : ""
-    }`;
+    const nm = `Node: ${displayOf(md.langgraph_node)}${step != null ? ` (step ${displayOf(step)})` : ""}`;
     return { name: nm, type: "component" };
   }
   if (isGraphRunner && runType === "chain") {
@@ -795,21 +773,19 @@ function deriveNameAndType(opts: {
 
   // Tool
   if (runType === "tool") {
-    const tool = (metadata as any)?.name ?? (cls || "tool");
-    const prev =
-      previewInput(inputs) ?? previewInput((serialized as any)?.input);
-    return {
-      name: prev ? `Tool: ${tool} — ${prev}` : `Tool: ${tool}`,
-      type: "tool",
-    };
+    return { name: toolRunName({ metadata, cls, inputs, serialized }), type: "tool" };
   }
 
-  // Retriever
+  return fallbackNameAndType({ runType, cls });
+}
+
+function fallbackNameAndType({ runType, cls }: { runType: RunKind; cls: string }): {
+  name: string;
+  type: "llm" | "chain" | "tool" | "rag" | "component";
+} {
   if (runType === "retriever") return { name: "Retriever", type: "rag" };
 
-  // Fallbacks
-  if (cls.includes("Agent"))
-    return { name: `Agent: ${cls}`, type: "component" };
+  if (cls.includes("Agent")) return { name: `Agent: ${cls}`, type: "component" };
   if (cls.startsWith("Runnable"))
     return { name: `Runnable: ${cls.replace(/^Runnable/, "")}`, type: "chain" };
   return { name: cls || "LangChain operation", type: "chain" };

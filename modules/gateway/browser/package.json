@@ -1,0 +1,72 @@
+{
+  "name": "@langwatch/gateway-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe AI Gateway presentation helpers and surfaces.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/gateway.web.ts",
+      "types": "./dist/gateway.web.d.ts",
+      "default": "./src/gateway.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-gateway-contract": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-browser-kit": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-browser-kit": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "lucide-react": "catalog:",
+    "papaparse": "catalog:",
+    "react-hook-form": "catalog:",
+    "recharts": "catalog:",
+    "shiki": "^3.15.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/trace-process": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/papaparse": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

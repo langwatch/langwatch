@@ -4,7 +4,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { parseServerFrame, serializeFrame, traceIdFromTraceparent, PROTOCOL_VERSION } from "../protocol";
+import {
+  parseServerFrame,
+  serializeFrame,
+  traceIdFromTraceparent,
+  PROTOCOL_VERSION,
+} from "../protocol";
 
 describe("parseServerFrame()", () => {
   describe("when given a registered frame", () => {
@@ -13,7 +18,15 @@ describe("parseServerFrame()", () => {
         JSON.stringify({
           type: "registered",
           protocol: 1,
-          agents: [{ name: "a", environment: "development", id: "agent_1", url: "https://x/y", parameterNotes: ["n"] }],
+          agents: [
+            {
+              name: "a",
+              environment: "development",
+              id: "agent_1",
+              url: "https://x/y",
+              parameterNotes: ["n"],
+            },
+          ],
           heartbeatIntervalMs: 5000,
           instanceId: "inst_1",
         }),
@@ -23,7 +36,16 @@ describe("parseServerFrame()", () => {
         protocol: 1,
         // A frame with no scope is a platform that predates the field, and
         // everything it registers is shared.
-        agents: [{ name: "a", environment: "development", id: "agent_1", url: "https://x/y", parameterNotes: ["n"], scope: { kind: "shared" } }],
+        agents: [
+          {
+            name: "a",
+            environment: "development",
+            id: "agent_1",
+            url: "https://x/y",
+            parameterNotes: ["n"],
+            scope: { kind: "shared" },
+          },
+        ],
         heartbeatIntervalMs: 5000,
         instanceId: "inst_1",
       });
@@ -68,7 +90,15 @@ describe("parseServerFrame()", () => {
         JSON.stringify({
           type: "registered",
           protocol: 1,
-          agents: [{ name: "a", environment: "development", agentId: "agent_1", url: "", parameterNotes: [] }],
+          agents: [
+            {
+              name: "a",
+              environment: "development",
+              agentId: "agent_1",
+              url: "",
+              parameterNotes: [],
+            },
+          ],
           heartbeatIntervalMs: 5000,
           instanceId: "inst_1",
         }),
@@ -81,8 +111,12 @@ describe("parseServerFrame()", () => {
     it("reads it as epoch milliseconds, and an ISO string too", () => {
       const at = 1_700_000_000_000;
       const base = { type: "call", protocol: 1, callId: "c", agentId: "a", messages: [] };
-      expect(parseServerFrame(JSON.stringify({ ...base, deadlineAt: at }))).toMatchObject({ deadlineAt: at });
-      expect(parseServerFrame(JSON.stringify({ ...base, deadlineAt: new Date(at).toISOString() }))).toMatchObject({
+      expect(parseServerFrame(JSON.stringify({ ...base, deadlineAt: at }))).toMatchObject({
+        deadlineAt: at,
+      });
+      expect(
+        parseServerFrame(JSON.stringify({ ...base, deadlineAt: new Date(at).toISOString() })),
+      ).toMatchObject({
         deadlineAt: at,
       });
     });
@@ -92,7 +126,12 @@ describe("parseServerFrame()", () => {
     it("carries the code, the message and the meta", () => {
       expect(
         parseServerFrame(
-          JSON.stringify({ type: "refused", code: "project_required", message: "pick one", meta: { projects: [] } }),
+          JSON.stringify({
+            type: "refused",
+            code: "project_required",
+            message: "pick one",
+            meta: { projects: [] },
+          }),
         ),
       ).toEqual({
         type: "refused",
@@ -116,7 +155,9 @@ describe("parseServerFrame()", () => {
 
 describe("serializeFrame()", () => {
   it("writes the frame as one JSON text", () => {
-    expect(JSON.parse(serializeFrame({ type: "ack", protocol: PROTOCOL_VERSION, callId: "c" }))).toEqual({
+    expect(
+      JSON.parse(serializeFrame({ type: "ack", protocol: PROTOCOL_VERSION, callId: "c" })),
+    ).toEqual({
       type: "ack",
       protocol: 1,
       callId: "c",

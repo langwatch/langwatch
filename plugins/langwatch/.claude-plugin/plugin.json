@@ -9,11 +9,5 @@
   "homepage": "https://docs.langwatch.ai",
   "repository": "https://github.com/langwatch/agent-plugin",
   "license": "MIT",
-  "keywords": [
-    "langwatch",
-    "observability",
-    "telemetry",
-    "traces",
-    "coding-agent"
-  ]
+  "keywords": ["langwatch", "observability", "telemetry", "traces", "coding-agent"]
 }

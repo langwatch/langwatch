@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/** The server half of `governanceAgents.*`: `governance:view` reads, `governance:manage` asks, as on main. */
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import { GovernanceRestApi, governanceAgentsTrpc } from "@langwatch/enterprise-governance-contract";
+
+export const governanceAgentsTrpcTransport: TrpcRouterDeclaration<
+  GovernanceRestApi,
+  typeof governanceAgentsTrpc
+> = defineTrpcRouter(GovernanceRestApi, governanceAgentsTrpc)
+  .procedure("list")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceAgentsList(input))
+
+  .procedure("syncSources")
+  .withPermission("governance:view")
+  .handle(({ app, input }) => app.governanceAgentsSyncSources(input))
+
+  .procedure("requestListing")
+  .withPermission("governance:manage")
+  .handle(({ app, input }) => app.governanceAgentsRequestListing(input))
+  .build();

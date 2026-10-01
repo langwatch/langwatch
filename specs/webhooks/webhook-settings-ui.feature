@@ -132,10 +132,18 @@ Feature: Webhook settings and the billing events ledger
       Then the response maps virtual key ids to their names
 
     @unit
+    Scenario: Unknown project tenants do not resolve virtual-key names
+      Given the project resolves to no organization
+      Then the response carries no virtual key names
+      And no name resolution is attempted
+
+    @unit
     Scenario: The ledger requires the gateway usage view scope
       Given a member without gateway usage view
       Then the list query is rejected before any read
 
     @unit
-    Scenario: The ledger degrades to an empty page without ClickHouse
-      Then the query returns an empty page flagged clickHouseDisabled
+    Scenario: Spend history is served with no ClickHouse-absent degrade path
+      Given ClickHouse is a mandatory boot member of the gateway module
+      Then the ledger query always returns the repository's page
+      And a deployment with no ClickHouse does not boot this module at all

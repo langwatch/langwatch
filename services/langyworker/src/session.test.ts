@@ -1,9 +1,11 @@
 import { mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import type { AssistantMessage, UserMessage } from "@earendil-works/pi-ai";
 import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
+
 import { ENABLED_TOOLS, openSessionManager } from "./session.js";
 
 function tempHome(): { home: string; sessionDir: string } {

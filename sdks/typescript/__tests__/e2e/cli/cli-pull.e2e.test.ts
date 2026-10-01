@@ -1,19 +1,13 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
 import { config } from "dotenv";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
+
+import { LangWatch } from "../../../dist";
 import {
   expectations,
   CliRunner,
@@ -21,7 +15,6 @@ import {
   PROMPT_NAME_PREFIX,
   PromptFileManager,
 } from "./helpers";
-import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -74,7 +67,7 @@ describe("CLI E2E", () => {
     await apiHelpers.cleanUpTestPrompts([...createdHandles]);
   });
 
-  describe("pull", () => {
+  describe("when running pull", () => {
     describe("when remote prompt exists", () => {
       let promptHandle: string;
 
@@ -82,7 +75,7 @@ describe("CLI E2E", () => {
         promptHandle = createUniquePromptName();
         await langwatch.prompts.create({
           handle: promptHandle,
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           temperature: 0.9,
           prompt: "You are a helpful assistant.",
         });
@@ -102,9 +95,9 @@ describe("CLI E2E", () => {
         const pullResult = cli.run("prompt pull");
         expectCliResultSuccess(pullResult);
 
-        expect(
-          materializedPromptFileManagement.getPromptFileContent(promptHandle),
-        ).toContain("gpt-4-turbo");
+        expect(materializedPromptFileManagement.getPromptFileContent(promptHandle)).toContain(
+          "gpt-5-mini",
+        );
 
         const lock = lockFileManager.readLockFile();
         expect(lock).not.toBeNull();
@@ -119,18 +112,16 @@ describe("CLI E2E", () => {
           await langwatch.prompts.update(promptHandle, {
             commitMessage: "Updated for pull test",
             temperature: 0.5,
-            model: "gpt-4-turbo",
-            messages: [
-              { role: "system", content: "Updated system message." },
-            ],
+            model: "gpt-5-mini",
+            messages: [{ role: "system", content: "Updated system message." }],
           });
 
           const pull2 = cli.run("prompt pull");
           expectCliResultSuccess(pull2);
 
-          expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toContain("Updated system message.");
+          expect(materializedPromptFileManagement.getPromptFileContent(promptHandle)).toContain(
+            "Updated system message.",
+          );
         });
       });
     });
@@ -139,7 +130,7 @@ describe("CLI E2E", () => {
       const promptHandle = createUniquePromptName();
       await langwatch.prompts.create({
         handle: promptHandle,
-        model: "gpt-4-turbo",
+        model: "gpt-5-mini",
         temperature: 0.7,
         prompt: "Test prompt.",
       });

@@ -1,0 +1,65 @@
+import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import { ProjectNotFoundError } from "@langwatch/project-contract";
+import { fromDate, type Instant } from "@langwatch/time";
+
+import type { ModelCostProject } from "../app/model-provider.members.ts";
+
+export type ModelProviderProjectSystemContext = {
+  scopes: ModelDefaultScope[];
+  referenceCreatedAt: Instant;
+};
+
+/**
+ * The scope facts that come off a project row and nothing else.
+ */
+export class ModelProviderProjectScopeService {
+  private constructor(private readonly projects: ModelCostProject) {}
+
+  static create(options: { projects: ModelCostProject }): ModelProviderProjectScopeService {
+    return new ModelProviderProjectScopeService(options.projects);
+  }
+
+  async getProjectScopes(projectId: string): Promise<ModelDefaultScope[]> {
+    const project = await this.projects.getWithTeam(projectId);
+
+    return projectScopes(project.id, project.teamId, project.team.organizationId);
+  }
+
+  async getProjectSystemContext(projectId: string): Promise<ModelProviderProjectSystemContext> {
+    const project = await this.projects.getWithTeam(projectId);
+
+    return {
+      scopes: projectScopes(project.id, project.teamId, project.team.organizationId),
+      referenceCreatedAt: fromDate(project.createdAt),
+    };
+  }
+
+  async getAnchorOrganizationId(input: {
+    projectId?: string;
+    organizationId?: string;
+  }): Promise<string> {
+    if (input.organizationId) {
+      return input.organizationId;
+    }
+
+    if (!input.projectId) {
+      throw new ProjectNotFoundError();
+    }
+
+    const project = await this.projects.getWithTeam(input.projectId);
+
+    return project.team.organizationId;
+  }
+}
+
+function projectScopes(
+  projectId: string,
+  teamId: string,
+  organizationId: string,
+): ModelDefaultScope[] {
+  return [
+    { scopeType: "PROJECT", scopeId: projectId },
+    { scopeType: "TEAM", scopeId: teamId },
+    { scopeType: "ORGANIZATION", scopeId: organizationId },
+  ];
+}

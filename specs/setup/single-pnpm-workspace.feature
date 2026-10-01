@@ -5,10 +5,14 @@ Feature: One workspace for every JavaScript project in the repo
     between two projects can actually be shared
 
   See dev/docs/adr/076-single-pnpm-workspace.md.
+  See dev/docs/adr/111-physical-application-workspaces.md for the planned
+  physical application packages and amended npm staging workspace closure.
 
   # These scenarios describe how the repository installs, resolves and packages
-  # itself. The @unit ones bind to packages/server/test/workspace-invariants.test.ts
-  # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go),
+  # itself. The @unit ones bind to apps/server/test/workspace-invariants.test.ts
+  # (and, for the fresh-clone scenario, tools/thuishaven/app/deps_test.go, and
+  # for the entry-point scenario apps/server/test/pack-npm-filters.test.ts,
+  # which runs the real packaging script against a fixture repository),
   # which assert the shape directly against the repo — one lockfile, one
   # workspace definition, no member holding install rules pnpm would ignore,
   # the app and the SDK on different names, the install argv pinned to
@@ -193,6 +197,26 @@ Feature: One workspace for every JavaScript project in the repo
     # install exactly that way.
 
   @unit
+  Scenario: The published package carries every input its install reads
+    Given a dependency the workspace patches before anything uses it
+    When the published package installs the application
+    Then the patch file the workspace names is present in the package
+    # Not a weaker install — no install. The patch declaration travels with the
+    # workspace definition, so it always reaches the end user; the file it
+    # names does not unless the packaging step is told to ship it, and pnpm
+    # answers a missing one by stopping the whole install.
+
+  @unit
+  Scenario: Every entry point the published package advertises resolves inside it
+    Given the published package is assembled one directory above the workspace
+    When its manifest is rewritten for that layout
+    Then every path it advertises as an entry point names a file the package ships
+    # The executable and the file list were relocated for the staged layout and
+    # the module map was not, so the package advertised the repository's paths.
+    # Nothing failed at publish time: the files shipped correctly one directory
+    # down, and only someone importing the package by name found nothing there.
+
+  @unit
   Scenario: Every project the lockfile mentions is resolvable
     Given the published package
     When its dependencies are installed
@@ -203,6 +227,29 @@ Feature: One workspace for every JavaScript project in the repo
   # ===========================================================================
   # Building
   # ===========================================================================
+
+  @unit
+  Scenario: A fresh clone starts the applications without a manual build step
+    Given someone has cloned the repo and installed once from the root
+    And two workspace packages are consumed as a bundle rather than as source
+    When they start any of the three Node applications
+    Then those two bundles are produced first, without being asked for
+    And the repository's file-generation step no longer builds them
+    # They used to be built by the same `&&` chain that generates the Prisma
+    # client and the evaluator types, so a contributor who did not know that
+    # chain existed got a dependency-scan failure from the browser build tool
+    # and an unresolvable import in the API — neither of which names a build.
+
+  @unit
+  Scenario: A stale SDK build is rebuilt before the browser application starts
+    Given the TypeScript SDK's source has changed since its bundle was built
+    When the browser application is started
+    Then the SDK is rebuilt before the application starts
+    And an application whose bundles are already current starts without
+      rebuilding anything
+    # The check is a modification-time comparison, not a build system: the
+    # point is that a lane never serves a bundle older than the source it was
+    # built from, and never pays for a build it does not need.
 
   @unimplemented
   Scenario: Building a project builds what it depends on first

@@ -18,13 +18,6 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataUsageType0:
         cache_read_input_tokens (int):
         cache_creation_input_tokens (int):
         reasoning_tokens (int):
-        input_image_tokens (int): Image tokens billed on the input side, 0 when the request carried no image. Priced at
-            its own rate and disjoint from input_tokens, which never includes it.
-        output_image_tokens (int): Image tokens the answer was billed for, 0 when the answer held no image. Priced at
-            its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render
-            here, so a reconciler reading output_tokens alone sees none of the image traffic.
-        image_count (int): Images the request carried, 0 when it carried none. Display only: no rate prices it, so it
-            never belongs in a cost sum.
     """
 
     input_tokens: int
@@ -32,9 +25,6 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataUsageType0:
     cache_read_input_tokens: int
     cache_creation_input_tokens: int
     reasoning_tokens: int
-    input_image_tokens: int
-    output_image_tokens: int
-    image_count: int
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -48,12 +38,6 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataUsageType0:
 
         reasoning_tokens = self.reasoning_tokens
 
-        input_image_tokens = self.input_image_tokens
-
-        output_image_tokens = self.output_image_tokens
-
-        image_count = self.image_count
-
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -63,9 +47,6 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataUsageType0:
                 "cache_read_input_tokens": cache_read_input_tokens,
                 "cache_creation_input_tokens": cache_creation_input_tokens,
                 "reasoning_tokens": reasoning_tokens,
-                "input_image_tokens": input_image_tokens,
-                "output_image_tokens": output_image_tokens,
-                "image_count": image_count,
             }
         )
 
@@ -84,21 +65,12 @@ class GetApiGatewayV1SpendEventsResponse200DataItemDataUsageType0:
 
         reasoning_tokens = d.pop("reasoning_tokens")
 
-        input_image_tokens = d.pop("input_image_tokens")
-
-        output_image_tokens = d.pop("output_image_tokens")
-
-        image_count = d.pop("image_count")
-
         get_api_gateway_v1_spend_events_response_200_data_item_data_usage_type_0 = cls(
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cache_read_input_tokens=cache_read_input_tokens,
             cache_creation_input_tokens=cache_creation_input_tokens,
             reasoning_tokens=reasoning_tokens,
-            input_image_tokens=input_image_tokens,
-            output_image_tokens=output_image_tokens,
-            image_count=image_count,
         )
 
         get_api_gateway_v1_spend_events_response_200_data_item_data_usage_type_0.additional_properties = d

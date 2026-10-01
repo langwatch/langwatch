@@ -1,0 +1,108 @@
+import {
+  ScimConnectionNotFoundError,
+  ScimConnectionRequiredError,
+} from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * Minting a SCIM provisioning token, and the two refusals a mint can hit
+ * before it ever writes a row: no connection named at all, and a connection
+ * that belongs to a different organization.
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import { GrantsFake } from "../../__tests__/support/grants-fake.ts";
+import { OrganizationAdministrationFake } from "../../__tests__/support/organization-administration-fake.ts";
+import { scimRepositoryFixture } from "../../__tests__/support/scim-repository-fixture.ts";
+import type { ScimRepository } from "../../repositories/scim.repository.ts";
+import type { ScimUserProvisioning } from "../scim-provisioning.service.ts";
+import { ScimService } from "../scim.service.ts";
+import { QuietScimSyncLifecycle } from "./support/quiet-scim-sync-lifecycle.ts";
+
+class FixedEntitlementService implements Pick<EntitlementApi, "getActivePlan"> {
+  async getActivePlan() {
+    return {
+      planSource: "free" as const,
+      type: "ENTERPRISE",
+      name: "Test",
+      free: false,
+      maxMembers: 1,
+      maxMembersLite: 1,
+      maxMessagesPerMonth: 1,
+      canPublish: false,
+      prices: { USD: 0, EUR: 0 },
+    };
+  }
+}
+
+function service(repo: ScimRepository): ScimService {
+  return ScimService.create({
+    prisma: repo,
+    writer: new GrantsFake(),
+    users: {
+      findByEmail: vi.fn(async () => null),
+      findById: vi.fn(async () => null),
+      create: vi.fn(),
+    } satisfies ScimUserProvisioning,
+    governance: {
+      departmentResolveByNameOrCreate: vi.fn(),
+      departmentAssignUser: vi.fn(async () => undefined),
+    },
+    organization: new OrganizationAdministrationFake(),
+    entitlements: new FixedEntitlementService(),
+    lifecycle: new QuietScimSyncLifecycle(),
+    provenOffboarding: false,
+    tokenPepper: "scim-test-pepper",
+  });
+}
+
+describe("ScimService.generateToken", () => {
+  describe("when generating a token", () => {
+    describe("given no connection", () => {
+      /** @scenario A token cannot exist without a connection to belong to */
+      /** @scenario "Issuing a token without naming a connection is refused" */
+      it("refuses with scim_connection_required and writes nothing", async () => {
+        const repo = scimRepositoryFixture();
+        const scim = service(repo);
+
+        await expect(
+          scim.generateToken({ organizationId: "org-1", connectionId: null }),
+        ).rejects.toBeInstanceOf(ScimConnectionRequiredError);
+        expect(repo.createToken).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given a connection belonging to another organization", () => {
+      /** @scenario A token cannot be issued against another organization's connection */
+      it("refuses as not found, revealing nothing about the other organization", async () => {
+        const repo = scimRepositoryFixture({
+          scimConnectionExists: vi.fn(async () => false),
+        });
+        const scim = service(repo);
+
+        await expect(
+          scim.generateToken({ organizationId: "org-1", connectionId: "conn-other-org" }),
+        ).rejects.toBeInstanceOf(ScimConnectionNotFoundError);
+        expect(repo.createToken).not.toHaveBeenCalled();
+      });
+    });
+  });
+});
+
+describe("ScimService.revokeToken", () => {
+  describe("given a token owned by another organization", () => {
+    /** @scenario "Revocation is organization scoped" */
+    it("reports scim_token_not_found rather than revoking it", async () => {
+      const repo = scimRepositoryFixture({ revokeToken: vi.fn(async () => false) });
+      const scim = service(repo);
+
+      await expect(
+        scim.revokeToken({ organizationId: "org-1", tokenId: "token-of-org-2" }),
+      ).rejects.toMatchObject({ code: "scim_token_not_found" });
+      expect(repo.revokeToken).toHaveBeenCalledWith({
+        organizationId: "org-1",
+        tokenId: "token-of-org-2",
+      });
+    });
+  });
+});

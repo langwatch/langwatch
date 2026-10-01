@@ -1,28 +1,12 @@
 /**
- * Where the session context hook posts, and what authenticates the record.
- *
- * The environment comes first, per the OTel exporter spec, and cannot be the
- * only source: Claude Code strips every `OTEL_*` variable from the processes it
- * spawns, so a session exporting perfectly well hands its hooks an environment
- * with no endpoint in it at all. The CLI's own device config is the fallback,
- * and a CLI signed in with no key for this agent is a no-op rather than a guess.
- *
- * The config holds two credentials for one agent, and they are read in the
- * order `langwatch instrument` chooses between them: a tool pinned with
- * `--key` or `--project` reports with that key, to the endpoint the pin
- * carries, and the personal key is what an unpinned tool falls back on.
- *
- * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * Where the session context hook posts, and what authenticates it: env
+ * first (OTel exporter spec), then the CLI's device config -- Claude Code
+ * strips `OTEL_*` from spawned processes, so a pinned tool uses its pin.
  */
 
 import { describe, expect, it } from "vitest";
 
-import {
-  attributesOf,
-  ENDPOINT,
-  installHookHarness,
-  SESSION_ID,
-} from "./hook-harness";
+import { attributesOf, ENDPOINT, installHookHarness, SESSION_ID } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;

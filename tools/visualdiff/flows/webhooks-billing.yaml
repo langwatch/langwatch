@@ -1,0 +1,557 @@
+# Webhook endpoints, usage, plans, licence and governance cost flows (builder D, 2026-09-30).
+# Names carry {uid}. Not scripted, and why, is in .claude/handoffs/diff-builder-d.md: delivery to a
+# sink (private and loopback hosts are always fenced, and no public receiver is wired), licence
+# upload and remove (org-wide on the shared stack), free-edition gates, usage-limit mail.
+flows:
+  - id: webhook-endpoint-create-secret-shown-once
+    title: Create a webhook endpoint, read its signing secret once and not again after a reload
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: capture
+        with:
+          testId: webhook-secret-value
+          as: secretOne
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+          equals: "0"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: expect
+        with:
+          testId: webhook-secret-value
+          equals: "0"
+
+  - id: webhook-endpoint-edit-url
+    title: Edit an endpoint's URL and see the new address after a reload
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}-edited"
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          text: "vd-{uid}-edited"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: "vd-{uid}-edited"
+
+  - id: webhook-endpoint-disable-enable
+    title: Disable an endpoint, see it marked disabled after a reload, enable it again
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Disable\s*$/
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Enable\s*$/
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
+          equals: "0"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-{uid}") [data-testid^="webhook-disabled-"]'
+          equals: "0"
+
+  - id: webhook-endpoint-roll-secret
+    title: Roll an endpoint's signing secret and read the new one once
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: capture
+        with:
+          testId: webhook-secret-value
+          as: secretOne
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Roll secret
+      - action: click
+        with:
+          text: Roll secret
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: capture
+        with:
+          testId: webhook-secret-value
+          as: secretTwo
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+          equals: "0"
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+
+  - id: webhook-endpoint-delete
+    title: Delete an endpoint and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: Delete endpoint
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+          equals: "0"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          testId: webhook-new
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+          equals: "0"
+
+  - id: webhook-endpoint-deliveries-drawer
+    title: Open a new endpoint's delivery log and health strip
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "https://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+      - action: expect
+        with:
+          testId: webhook-secret-value
+      - action: click
+        with:
+          selector: '[data-testid="webhook-secret-dialog"] button[aria-label="Close"]'
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+      # A virtual key made now is a gateway event; the endpoint listens to that family, so the
+      # delivery worker records an attempt against it for the drawer to list.
+      - action: request
+        with:
+          path: /api/gateway/v1/virtual-keys
+          auth: "{orgKey}"
+          body: '{"name":"vd-whk-{uid}"}'
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          selector: 'tr:has-text("vd-{uid}") button[aria-label="Actions"]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: Deliveries
+      - action: expect
+        with:
+          testId: webhook-health-strip
+      - action: expect
+        with:
+          testId: webhook-health-lag
+      - action: expect
+        with:
+          text: not failing
+      - action: expect
+        with:
+          text: Attempt
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: webhook-dlq-badge
+          equals: "0"
+
+  - id: webhook-endpoint-refuses-insecure-url
+    title: An http URL is refused and no endpoint is created
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: fill
+        with:
+          testId: webhook-url-input
+          value: "http://example.com/vd-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: wait
+        with:
+          millis: "2500"
+      - action: expect
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+          equals: "0"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          testId: webhook-new
+      - action: expect
+        with:
+          text: "example.com/vd-{uid}"
+          equals: "0"
+
+  - id: webhook-endpoint-sqs-refuses-bad-queue-url
+    title: An SQS endpoint with a queue URL that is not a queue is refused
+    steps:
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: click
+        with:
+          testId: webhook-new
+      - action: click
+        with:
+          text: Amazon SQS queue
+      - action: fill
+        with:
+          testId: webhook-sqs-queue-url
+          value: "not-a-queue-{uid}"
+      - action: click
+        with:
+          testId: webhook-family-toggle-gateway
+      - action: click
+        with:
+          testId: webhook-save
+      - action: wait
+        with:
+          millis: "2500"
+      - action: expect
+        with:
+          testId: webhook-save
+      - action: expect
+        with:
+          testId: webhook-secret-dialog
+          equals: "0"
+      - action: go
+        with:
+          path: /gateway/webhooks
+      - action: expect
+        with:
+          testId: webhook-new
+      - action: expect
+        with:
+          text: "not-a-queue-{uid}"
+          equals: "0"
+
+  - id: license-page-shows-licence-and-seats
+    title: The licence page names the plan, the licensed organisation, the seats and the end date, with no upload form
+    steps:
+      - action: go
+        with:
+          path: /settings/license
+      - action: expect
+        with:
+          text: Licensed to
+      - action: expect
+        with:
+          text: Seats
+      - action: expect
+        with:
+          text: Expires
+      - action: expect
+        with:
+          text: Remove License
+      - action: expect
+        with:
+          text: "Activate a license:"
+          equals: "0"
+
+  - id: usage-page-shows-plan-limits
+    title: The usage page shows the organisation's resource limits beside current usage, on Cloud and self-hosted alike
+    steps:
+      - action: go
+        with:
+          path: /settings/usage
+      - action: expect
+        with:
+          text: /Resource (Usage|Limits)/
+      - action: expect
+        with:
+          text: /Members/
+      - action: expect
+        with:
+          text: /(Events|Traces) \/ Month/
+      - action: expect
+        with:
+          text: Unable to load resource limits
+          equals: "0"
+
+  - id: subscription-page-renders
+    title: The subscription page shows the billing page on Cloud and the self-hosted note otherwise, never a blank
+    steps:
+      - action: go
+        with:
+          path: /settings/subscription
+      - action: expect
+        with:
+          text: /Billing|Change Subscription/
+          timeout: "20000"
+      - action: expect
+        with:
+          text: Something went wrong
+          equals: "0"
+
+  - id: plans-page-lists-plans
+    title: The plans page lists the plans with what each includes
+    steps:
+      - action: go
+        with:
+          path: /settings/plans
+      - action: expect
+        with:
+          testIdPrefix: plan-column-
+          min: "2"
+      - action: expect
+        with:
+          text: Enterprise
+
+  - id: governance-costs-lanes-answer
+    title: The governance costs page draws its lanes, or says why it cannot, and never shows a read error
+    steps:
+      - action: go
+        with:
+          path: /governance/costs
+      - action: expect
+        with:
+          text: Costs
+      - action: expect
+        with:
+          count: '[data-testid="cost-lane-gateway"], [data-testid="cost-lanes-unavailable"]'
+          timeout: "25000"
+      - action: expect
+        with:
+          testId: cost-lanes-error
+          equals: "0"
+      - action: expect
+        with:
+          testId: cost-spenders-error
+          equals: "0"
+
+  - id: governance-analytics-spend-renders
+    title: The governance analytics page renders its spend views
+    steps:
+      - action: go
+        with:
+          path: /governance/analytics
+      - action: expect
+        with:
+          text: Analytics
+      - action: expect
+        with:
+          text: /spend/i
+          timeout: "20000"

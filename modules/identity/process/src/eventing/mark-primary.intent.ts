@@ -1,0 +1,36 @@
+import { type Command, type CommandHandler, defineCommandSchema } from "@langwatch/eventing";
+import {
+  MARK_PRIMARY_COMMAND_TYPE,
+  type MarkPrimaryCommandData,
+  markPrimaryCommandDataSchema,
+} from "@langwatch/identity-contract";
+
+import type { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { identityEventsFor } from "./identity-events.intent.ts";
+import type { IdentityEvent } from "./identity-state.projection.ts";
+
+/** The staged re-run: the calling path's guard, the calling path's envelope. */
+export class MarkPrimaryCommand implements CommandHandler<
+  Command<MarkPrimaryCommandData>,
+  IdentityEvent
+> {
+  static readonly schema = defineCommandSchema(
+    MARK_PRIMARY_COMMAND_TYPE,
+    markPrimaryCommandDataSchema,
+    "Make one VERIFIED identifier the user's PRIMARY",
+  );
+
+  static getAggregateId(payload: MarkPrimaryCommandData): string {
+    return payload.userId;
+  }
+
+  constructor(private readonly guards: IdentityGuardsService) {}
+
+  async handle(command: Command<MarkPrimaryCommandData>): Promise<IdentityEvent[]> {
+    const facts = await this.guards.markPrimary(command.data);
+    return identityEventsFor({
+      command: { type: MARK_PRIMARY_COMMAND_TYPE, data: command.data },
+      facts,
+    });
+  }
+}

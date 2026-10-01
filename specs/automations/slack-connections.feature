@@ -85,12 +85,18 @@ Feature: Slack connections
       Then the stored secret is kept
 
     @integration
-    Scenario: Deleting a connection in use says what stops delivering
-      Given a connection three active automations deliver through
+    Scenario: Deleting a connection in use is refused and names its automations
+      Given a connection the automations "Errors to ops" and "Daily digest" deliver through
       When the user deletes it
-      Then it is refused with the machine-readable in-use code carrying the count of three
-      And the drawer asks to confirm that three automations stop delivering
-      When the user confirms
+      Then it is refused with the machine-readable in-use code naming both automations
+      And the drawer says "Used by 2 automations: Errors to ops, Daily digest"
+      And the connection is kept
+
+    @integration
+    Scenario: A connection deletes once no automation uses it
+      Given a connection one automation delivered through
+      And that automation now delivers through another connection
+      When the user deletes the first connection and confirms
       Then the connection is removed
 
     @unit
@@ -176,6 +182,27 @@ Feature: Slack connections
       When the user picks a webhook connection
       Then no channel is asked for
 
+  Rule: An automation claims the connection it delivers through
+
+    @integration
+    Scenario: Saving an automation on a connection claims it
+      Given a connection no automation delivers through
+      When the user saves an automation that delivers through it
+      Then the connection is used by that automation
+
+    @integration
+    Scenario: Moving an automation to another connection releases the first
+      Given an automation that delivers through connection A
+      When the user changes it to deliver through connection B
+      Then connection B is used by the automation
+      And connection A is no longer used by it
+
+    @integration
+    Scenario: Pausing or deleting an automation releases its connection
+      Given two automations that deliver through one connection
+      When the user pauses one and deletes the other
+      Then no automation uses the connection
+
   Rule: Delivery resolves through the automation's connection
 
     @unit
@@ -247,20 +274,20 @@ Feature: Slack connections
       And no token, webhook URL, ciphertext or token-set flag appears
       And the rule a graph alert or report fires by is returned as stored
 
-  Rule: One migration moves every automation's secret into connections
+  Rule: One system migration moves every automation's secret into connections and claims them
 
     @integration
     Scenario: Automations sharing a secret share one connection
       Given three automations in one project with the same bot token
       And two automations in that project with the same webhook URL
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then two project connections exist
       And each automation points at the connection holding its secret
 
     @integration
     Scenario: A secret shared across projects becomes one connection per project
       Given automations in two projects with the same webhook URL
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then each project has its own project connection holding that URL
       And no organization connection is created
       And each automation points at its own project's connection
@@ -270,28 +297,29 @@ Feature: Slack connections
       Given a project whose Slack integration was set up before this change
       And an automation in it with the same token
       And a bot automation in it with no token of its own
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then both automations point at the existing connection
       And no second connection was created
 
     @integration
-    Scenario: The migration changes nothing unless applied, and nothing twice
-      When the Slack connection migration runs without apply
-      Then it reports what it would create and link, and writes nothing
-      When it runs with apply twice
-      Then the second run creates and links nothing
+    Scenario: A pass that moved anything runs again, and a pass with nothing left finishes
+      Given automations in an organization that still store their own secrets
+      When the Slack connection migration runs for the organization
+      Then the organization is reported migrated, not finished
+      When it runs again
+      Then it creates and links nothing and the organization is reported finished
 
     @integration
     Scenario: A secret that cannot be decrypted is skipped, not guessed
       Given an automation whose stored token cannot be decrypted
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then that automation is reported as skipped and left unchanged
 
     @integration
     Scenario: Another project's connection is never widened or borrowed
       Given a project whose Slack integration was set up before this change
       And an automation in another project with the same token
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then that connection keeps its project scope
       And the other project's automation points at a new connection of its own project
 
@@ -299,42 +327,39 @@ Feature: Slack connections
     Scenario: The migration clears the secret each automation stored
       Given automations that still store their own bot token or webhook URL
       And an automation an earlier run pointed at a connection that still stores its own token
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then every one of them points at a connection
       And none stores a bot token, webhook URL or token-set flag
-      When it runs with apply again
+      When it runs again
       Then nothing changes
 
     @integration
     Scenario: An organization connection holding the secret is reused as it is
       Given an organization connection holding a webhook URL
       And automations in two projects with that URL
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then both automations point at that connection
       And the connection is unchanged and no other is created
 
     @integration
     Scenario: Automations the migration must not touch are left unchanged
       Given a deleted automation, an automation in an archived project and an automation already pointing at a connection with no secret of its own
-      When the Slack connection migration runs with apply
+      When the Slack connection migration runs for the organization
       Then none of them changes
       And no connection is created for them
 
-    @integration
-    Scenario: The migration runs dry unless told to apply, and refuses any other option
-      When the Slack connection migration task runs with no option
-      Then it says it is a dry run, reports what it would do and writes nothing
-      When it runs with apply
-      Then it writes the connections and links
-      When it runs with any other option
-      Then it refuses before printing or writing anything
+    @unit
+    Scenario: The migration runs by itself, on cloud and self-hosted
+      Then automation registers the Slack connection migration as "automations-slack-connections"
+      And every organization is enrolled without an operator's confirmation, on cloud and on self-hosted
+      And there is no manual Slack connection migration task
 
     @unit
     Scenario: The migration report never prints a secret
       Given automations whose tokens and webhook URLs the migration creates, reuses or skips
-      When the Slack connection migration reports a dry run or an apply
+      When the Slack connection migration reports an organization's pass
       Then each new connection is named by the last four characters of its secret
-      And no token, webhook URL or stored ciphertext appears anywhere in the output
+      And no token, webhook URL or stored ciphertext appears anywhere in the report
 
     @integration
     Scenario: A concurrent run that stored the secret first is reused, not duplicated
@@ -352,8 +377,21 @@ Feature: Slack connections
     @integration
     Scenario: One organization's failure does not stop the others
       Given two organizations with Slack automations to migrate
-      And writing the first organization's connections fails partway
-      When the Slack connection migration runs with apply
-      Then the first organization keeps no connection and no link
-      And the second organization is migrated
-      And the failure is reported by its error code, never its message, and the run exits with an error
+      And storing the first organization's connections fails partway
+      When the system migrations runner makes a pass
+      Then the first organization is parked and the second is migrated
+      And a later pass retries the parked organization until it finishes
+      And the retry reuses every connection the failed pass stored, creating no second
+
+    @unit
+    Scenario: A pass aborted at shutdown writes nothing
+      Given the Slack connection migration has planned an organization
+      When the pass is aborted before it writes
+      Then no connection, link or claim is written
+
+    @integration
+    Scenario: The migration claims the connection of every Slack automation
+      Given automations that delivered through connections before claims existed
+      When the Slack connection migration runs for the organization
+      Then each connection is used by the automations that deliver through it
+      And running it again changes nothing

@@ -1,23 +1,33 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2020",
-    "module": "preserve",
-    "moduleResolution": "bundler",
-    "lib": ["es2020"],
-    "strict": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["es2023"],
+    // Node-only (a startup convergence loop): AbortSignal/AbortController and
+    // setTimeout are Node's globals here, not DOM's, and nothing else in this
+    // package's `lib` array declares them.
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/system-migrations.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // Consumers import the TypeScript sources directly (see the package's
     // `exports`), so this project only ever type-checks - nothing is built.
-    "noEmit": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true
   },
   "include": ["src/**/*.ts"],
   // Tests are checked by tsconfig.test.json, which adds the vitest globals
   // this project does not need.
-  "exclude": ["src/__tests__/**"]
+  "exclude": ["src/__tests__/**"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    }
+  ]
 }

@@ -1,7 +1,8 @@
-import { resolveCredentials } from "../../utils/apiKey";
-import type { CommandResult } from "../../utils/output";
-import { asCommandResult } from "./call";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { asCommandResult } from "./call.ts";
 
 /**
  * Bound the request so a quiet socket cannot hold the CLI open forever. This
@@ -11,10 +12,9 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
 const REQUEST_TIMEOUT_MS = 60_000;
 
 /**
- * List every UI action the platform can dispatch to an open page, with each
- * action's JSON schema and required permission
- * (specs/langy/langy-ui-actions.feature). The companion to `ui call`: read
- * the schema here, then dispatch with a payload that matches it.
+ * List every UI action the platform can dispatch to an open page, with each action's JSON
+ * schema and required permission (specs/langy/langy-ui-actions.feature). The companion to
+ * `ui call`: read the schema here, then dispatch with a payload that matches it.
  */
 export const uiActionsCommand = async (): Promise<CommandResult | void> => {
   const { apiKey, endpoint } = await resolveCredentials();
@@ -22,7 +22,7 @@ export const uiActionsCommand = async (): Promise<CommandResult | void> => {
   let response: Response;
   let text: string;
   try {
-    response = await langwatchFetch(`${endpoint}/api/langy/ui/actions`, {
+    response = await langwatchFetch(`${endpoint}/api/v1/langy/ui/actions`, {
       method: "GET",
       headers: { "X-Auth-Token": apiKey },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

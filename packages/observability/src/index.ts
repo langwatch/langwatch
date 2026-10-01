@@ -1,9 +1,7 @@
 /**
- * Browser-safe public API for @langwatch/observability.
- *
- * Node context and OpenTelemetry helpers intentionally live behind the
- * `@langwatch/observability/context` and `@langwatch/observability/tracing` subpaths so
- * importing the logger in client code never evaluates those dependencies.
+ * Browser-safe public API for @langwatch/observability. Node context and
+ * OpenTelemetry helpers deliberately live behind the `/context` and
+ * `/tracing` subpaths, so importing the logger in client code never evaluates them.
  */
 
 export {
@@ -12,28 +10,49 @@ export {
   OTEL_ATTR,
   REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
-} from "./constants";
-export type {
-  JobContextMetadata,
-  JobDataWithContext,
-  RequestContext,
-} from "./context/core";
+} from "./constants.ts";
+export type { JobContextMetadata, JobDataWithContext, RequestContext } from "./context/core.ts";
 export {
+  configureLogger,
+  createLoggerFactory,
   type CreateLoggerOptions,
   consoleIgnoreFields,
   createLogger,
+  type LoggerConfiguration,
+  type LoggerFactory,
+  type LoggerFormat,
+  loggerConfigurationFrom,
   type Logger,
-} from "./logger";
+  type ProcessLoggerInputs,
+  type ResolvedLoggerConfiguration,
+} from "./logger.ts";
 export {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
   type RequestLogData,
-} from "./request/requestLogging";
+} from "./request/requestLogging.ts";
+export {
+  type ClientAttribution,
+  type ClientSource,
+  classifyClient,
+  type EndpointClass,
+  endpointClassOf,
+  type RequestAttribution,
+} from "./request/trafficAttribution.ts";
 export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
   type ValidationIssueMeta,
   type ValidationMeta,
-} from "./validation/validationMeta";
+} from "./validation/validationMeta.ts";
+export {
+  processFailureLine,
+  runScript,
+  scriptFailureRecord,
+  writeScriptWarning,
+} from "./run-script.ts";
+export { bootNodeExecutable, installBootGuard } from "./boot-guard.ts";
+export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";
+export { canonicalOtlpPath } from "./request/otlp-path.ts";

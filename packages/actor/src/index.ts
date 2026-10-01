@@ -1,21 +1,8 @@
+import { z } from "zod";
+
 /**
- * The actor vocabulary: one closed answer to "who caused this action",
- * minted at the boundary that authenticated it and carried to every durable
- * record. The shape follows mojo's actor model — one union, boundary-minted,
- * with platform-initiated work attributed to the code that did it — with the
- * typing this package already applies to scopes and principals: a
- * discriminated union, not a bag of parameters.
- *
- * Two layers, on purpose:
- *
- * - {@link Actor} is the rich, in-process identity. It can say things the
- *   stored record does not need every consumer to parse — which person an
- *   impersonator was acting as, which code path an internal action ran from.
- * - {@link LedgerActor} is the durable record stamped onto ledger facts. Its
- *   shape (`{ type: "user" | "system", id }`) is frozen by every event
- *   already written; {@link toLedgerActor} is the ONE place the rich actor
- *   serializes down to it. No call site builds a `"system:..."` or
- *   `"apikey:..."` string by hand.
+ * Actor is the boundary-minted in-process identity; LedgerActor is its durable
+ * event shape. Use toLedgerActor for the single rich-to-durable conversion.
  */
 
 /**
@@ -43,6 +30,22 @@ export const SYSTEM_ACTORS = {
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;
 
+/** A CLI device session: the token key that severs it, its login key and the device it named. */
+export type CliSession = Readonly<{
+  tokenKey: string;
+  cliApiKeyId?: string | undefined;
+  clientInfo?:
+    | Readonly<{ deviceLabel?: string | undefined; hostname?: string | undefined }>
+    | undefined;
+}>;
+
+/**
+ * The pino `redact` paths for the actor's secret fields: the CLI token key, logged bare or one
+ * level down (`{ actor }`). The audit trail never writes it: it keeps the actor id, and its
+ * argument rule already masks a `tokenKey` by name.
+ */
+export const ACTOR_SECRET_LOG_PATHS = ["cliSession.tokenKey", "*.cliSession.tokenKey"] as const;
+
 /** Who caused an action, as the boundary that authenticated it knows them. */
 export type Actor =
   | {
@@ -50,6 +53,8 @@ export type Actor =
       id: string;
       /** Set when a platform operator is acting as this user. */
       impersonatorId?: string;
+      /** Set by the CLI token door: the device session the bearer resolved to. */
+      cliSession?: CliSession;
     }
   | { type: "api_key"; id: string }
   | { type: "system"; name: SystemActorName }
@@ -65,11 +70,44 @@ export type Actor =
       revision?: string;
     };
 
+const systemActorNameSchema = z.custom<SystemActorName>(
+  (value) =>
+    typeof value === "string" && Object.prototype.hasOwnProperty.call(SYSTEM_ACTORS, value),
+);
+
+/** The canonical runtime schema for actors crossing a typed boundary. */
+export const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("user"),
+      id: z.string().min(1),
+      impersonatorId: z.string().min(1).optional(),
+      cliSession: z
+        .object({
+          tokenKey: z.string().min(1),
+          cliApiKeyId: z.string().optional(),
+          clientInfo: z
+            .object({ deviceLabel: z.string().optional(), hostname: z.string().optional() })
+            .strict()
+            .optional(),
+        })
+        .strict()
+        .optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("system"), name: systemActorNameSchema }).strict(),
+  z
+    .object({
+      type: z.literal("internal"),
+      codePath: z.string().min(1),
+      revision: z.string().min(1).optional(),
+    })
+    .strict(),
+]);
+
 /** Mint the actor for platform-initiated work, named by its code path. */
-export function internalActor(
-  codePath: string,
-  options?: { revision?: string },
-): Actor {
+export function internalActor(codePath: string, options?: { revision?: string }): Actor {
   return { type: "internal", codePath, revision: options?.revision };
 }
 
@@ -95,12 +133,8 @@ export function toLedgerActor(actor: Actor): LedgerActor {
 }
 
 /**
- * A user id if the write is attributable to a person; an API key id if it
- * is attributable to a credential acting for nobody; otherwise `fallback`,
- * the system principal named for the surface making the write.
- *
- * The composition helper for boundaries that hold raw ids rather than a
- * minted {@link Actor}.
+ * For boundaries holding raw ids rather than a minted {@link Actor}; `fallback`
+ * names the system principal when neither a user nor API key is attributable.
  */
 export function ledgerActorFor({
   userId,

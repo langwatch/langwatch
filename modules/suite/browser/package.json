@@ -1,0 +1,27 @@
+{
+  "name": "@langwatch/suite-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Suite run presentation primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/suite.web.ts",
+      "types": "./dist/suite.web.d.ts",
+      "default": "./src/suite.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@langwatch/suite-browser-kit": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

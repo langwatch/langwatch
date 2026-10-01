@@ -29,7 +29,7 @@ class GetApiScenariosByIdVersionsByVersionResponse200:
         is_synthesized (bool): True on the Created entry a scenario saved before versions were recorded shows. It has no
             stored snapshot, so it cannot be read back.
         schema_version (int): The shape the snapshot was written in.
-        snapshot (GetApiScenariosByIdVersionsByVersionResponse200Snapshot): The editable content of the scenario as this
+        snapshot (GetApiScenariosByIdVersionsByVersionResponse200Snapshot): The editable content of the case as this
             version saved it.
     """
 

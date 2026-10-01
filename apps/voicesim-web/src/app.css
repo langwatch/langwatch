@@ -1,0 +1,24 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.voice-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.voice-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.voice-turns,
+.voice-events {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+}
+
+.voice-muted {
+  color: var(--ink-500);
+}

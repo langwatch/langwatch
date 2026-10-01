@@ -1,14 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   ExperimentsApiService,
   type ExperimentVersionSummary,
 } from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { parsePositiveIntOrNull } from "../../utils/positiveInt";
 import type { CommandResult } from "../../utils/output";
+import { parsePositiveIntOrNull } from "../../utils/positiveInt";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface ExperimentVersionsOptions {
   limit?: string;
@@ -26,14 +28,24 @@ const authorOf = (version: ExperimentVersionSummary): string => {
 };
 
 /**
- * What the version cell holds.
- *
- * Numbered versions run 1, 2, 3 with no gaps. Typing rewrites one autosave
- * row, whose number changes with every save, so the table names it for what it
- * is. The number is still in the JSON output for a script that restores it.
+ * What the version cell holds: numbered versions run 1, 2, 3 with no gaps.
+ * The one autosave row's number changes with every save, so the table names
+ * it "autosave" -- the number stays in JSON output for a script to restore it.
  */
 const versionOf = (version: ExperimentVersionSummary): string =>
   version.autoSaved ? "autosave" : `v${version.version}`;
+
+const readLimit = (raw: string | undefined): number => {
+  if (raw === undefined) return DEFAULT_LIMIT;
+  const parsed = parsePositiveIntOrNull(raw);
+  if (parsed === null) {
+    // Falling back to the default would serve a page size nobody asked for,
+    // and the caller would read the short page as the whole history.
+    console.error(`--limit takes a whole number of versions, 1 to ${MAX_PAGE_SIZE}. Got "${raw}".`);
+    process.exit(1);
+  }
+  return Math.min(parsed, MAX_PAGE_SIZE);
+};
 
 export const experimentVersionsCommand = async (
   slug: string,
@@ -41,19 +53,7 @@ export const experimentVersionsCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const limit = (() => {
-    if (options.limit === undefined) return DEFAULT_LIMIT;
-    const parsed = parsePositiveIntOrNull(options.limit);
-    if (parsed === null) {
-      // Falling back to the default would serve a page size nobody asked for,
-      // and the caller would read the short page as the whole history.
-      console.error(
-        `--limit takes a whole number of versions, 1 to ${MAX_PAGE_SIZE}. Got "${options.limit}".`,
-      );
-      process.exit(1);
-    }
-    return Math.min(parsed, MAX_PAGE_SIZE);
-  })();
+  const limit = readLimit(options.limit);
 
   const cursor = (() => {
     if (options.cursor === undefined) return undefined;
@@ -130,9 +130,7 @@ export const experimentVersionsCommand = async (
         const autosave = result.versions.find((version) => version.autoSaved);
         if (autosave) {
           console.log(
-            chalk.gray(
-              `The autosave restores as version ${chalk.cyan(autosave.version)}.`,
-            ),
+            chalk.gray(`The autosave restores as version ${chalk.cyan(autosave.version)}.`),
           );
         }
       },

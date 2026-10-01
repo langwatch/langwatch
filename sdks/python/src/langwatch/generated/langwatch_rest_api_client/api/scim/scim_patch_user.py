@@ -1,21 +1,21 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_patch_user_body import ScimPatchUserBody
 from ...models.scim_patch_user_response_200 import ScimPatchUserResponse200
-from ...models.scim_patch_user_response_400 import ScimPatchUserResponse400
-from ...models.scim_patch_user_response_401 import ScimPatchUserResponse401
-from ...models.scim_patch_user_response_403 import ScimPatchUserResponse403
-from ...models.scim_patch_user_response_404 import ScimPatchUserResponse404
 from ...types import Response, safe_http_status
 
 
 def _get_kwargs(
     id: str,
+    *,
+    body: ScimPatchUserBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
@@ -24,42 +24,36 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-    | None
-):
+) -> Any | ScimPatchUserResponse200 | None:
     if response.status_code == 200:
         response_200 = ScimPatchUserResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = ScimPatchUserResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = ScimPatchUserResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = ScimPatchUserResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
     if response.status_code == 404:
-        response_404 = ScimPatchUserResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -70,13 +64,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-]:
+) -> Response[Any | ScimPatchUserResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -92,13 +80,8 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-]:
+    body: ScimPatchUserBody,
+) -> Response[Any | ScimPatchUserResponse200]:
     """Update a provisioned user
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active`
@@ -112,17 +95,19 @@ def sync_detailed(
 
     Args:
         id (str):
+        body (ScimPatchUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimPatchUserResponse200 | ScimPatchUserResponse400 | ScimPatchUserResponse401 | ScimPatchUserResponse403 | ScimPatchUserResponse404]
+        Response[Any | ScimPatchUserResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -136,14 +121,8 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-    | None
-):
+    body: ScimPatchUserBody,
+) -> Any | ScimPatchUserResponse200 | None:
     """Update a provisioned user
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active`
@@ -157,18 +136,20 @@ def sync(
 
     Args:
         id (str):
+        body (ScimPatchUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimPatchUserResponse200 | ScimPatchUserResponse400 | ScimPatchUserResponse401 | ScimPatchUserResponse403 | ScimPatchUserResponse404
+        Any | ScimPatchUserResponse200
     """
 
     return sync_detailed(
         id=id,
         client=client,
+        body=body,
     ).parsed
 
 
@@ -176,13 +157,8 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-]:
+    body: ScimPatchUserBody,
+) -> Response[Any | ScimPatchUserResponse200]:
     """Update a provisioned user
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active`
@@ -196,17 +172,19 @@ async def asyncio_detailed(
 
     Args:
         id (str):
+        body (ScimPatchUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimPatchUserResponse200 | ScimPatchUserResponse400 | ScimPatchUserResponse401 | ScimPatchUserResponse403 | ScimPatchUserResponse404]
+        Response[Any | ScimPatchUserResponse200]
     """
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -218,14 +196,8 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimPatchUserResponse200
-    | ScimPatchUserResponse400
-    | ScimPatchUserResponse401
-    | ScimPatchUserResponse403
-    | ScimPatchUserResponse404
-    | None
-):
+    body: ScimPatchUserBody,
+) -> Any | ScimPatchUserResponse200 | None:
     """Update a provisioned user
 
      Applies RFC 7644 section 3.5.2 patch operations. What is implemented: `replace` of `active`
@@ -239,18 +211,20 @@ async def asyncio(
 
     Args:
         id (str):
+        body (ScimPatchUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimPatchUserResponse200 | ScimPatchUserResponse400 | ScimPatchUserResponse401 | ScimPatchUserResponse403 | ScimPatchUserResponse404
+        Any | ScimPatchUserResponse200
     """
 
     return (
         await asyncio_detailed(
             id=id,
             client=client,
+            body=body,
         )
     ).parsed

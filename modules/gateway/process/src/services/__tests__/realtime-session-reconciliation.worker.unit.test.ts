@@ -1,0 +1,159 @@
+import { GatewayVoiceKeyMissingError } from "@langwatch/gateway-contract";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import type { ElevenLabsConversationChannel } from "../../channels/elevenlabs-conversation.channel.ts";
+import {
+  GatewayRealtimeSessionReconciliationService,
+  realtimeSessionReconciliationConfig,
+  type ElevenLabsCredentialReader,
+  type RealtimeSessionReconciliationRepository,
+} from "../../services/gateway-realtime-session-reconciliation.service.ts";
+
+const session = {
+  id: "session-1",
+  projectId: "project-1",
+  organizationId: "organization-1",
+  virtualKeyId: "key-1",
+  modelProviderId: "provider-1",
+  vendor: "elevenlabs",
+  model: "eleven_multilingual_v2",
+  traceId: null,
+  requestedModel: null,
+  mintedAt: new Date("2026-08-25T11:55:00.000Z"),
+  vendorConversationId: "conversation-1",
+};
+
+/** A session as the sweep lists it, which may carry no recorded conversation. */
+type ListedSession = Omit<typeof session, "vendorConversationId"> & {
+  vendorConversationId: string | null;
+};
+
+function buildWorker(options?: {
+  conversation?: ElevenLabsConversationChannel;
+  sessions?: ListedSession[];
+  credentials?: ElevenLabsCredentialReader;
+}) {
+  const repository = {
+    expireStaleSessions: vi.fn().mockResolvedValue(2),
+    listOpenElevenLabsSessions: vi.fn().mockResolvedValue(options?.sessions ?? [session]),
+    releaseMissingVendorConversation: vi.fn().mockResolvedValue(void 0),
+    confirmSession: vi.fn().mockResolvedValue(void 0),
+  } satisfies RealtimeSessionReconciliationRepository;
+  const readConversation = vi.fn().mockResolvedValue({
+    report: { status: "done", metadata: { call_duration_secs: 4.2 } },
+    notFound: false,
+  });
+  const conversations: ElevenLabsConversationChannel = options?.conversation ?? {
+    readConversation,
+  };
+  const worker = GatewayRealtimeSessionReconciliationService.create({
+    repository,
+    credentials: options?.credentials ?? {
+      getApiCredential: vi.fn().mockResolvedValue({
+        apiKey: "key",
+        baseUrl: "https://api.elevenlabs.io",
+      }),
+    },
+    conversations,
+    logger: { warn: vi.fn(), info: vi.fn(), error: vi.fn() },
+    config: realtimeSessionReconciliationConfig,
+    clock: { now: () => nowInstant() },
+  });
+
+  return { worker, repository, readConversation };
+}
+
+describe("GatewayRealtimeSessionReconciliationService", () => {
+  /** @scenario Reconciliation confirms a completed ElevenLabs conversation */
+  it("expires stale sessions, reads eligible sessions exactly, and confirms rounded duration", async () => {
+    const { worker, repository, readConversation } = buildWorker();
+    const now = Temporal.Instant.from("2026-08-25T12:00:00.000Z");
+
+    await expect(worker.poll(now)).resolves.toEqual({
+      examined: 1,
+      confirmed: 1,
+      expired: 2,
+    });
+    expect(repository.listOpenElevenLabsSessions).toHaveBeenCalledWith({
+      mintedBefore: Temporal.Instant.from("2026-08-25T11:58:00.000Z"),
+      limit: 25,
+    });
+    expect(readConversation).toHaveBeenCalledWith({
+      apiKey: "key",
+      baseUrl: "https://api.elevenlabs.io",
+      conversationId: "conversation-1",
+      timeoutMs: 10_000,
+    });
+    expect(repository.confirmSession).toHaveBeenCalledWith({
+      session,
+      audioMs: 4_000,
+      vendorCostRaw: { call_duration_secs: 4.2 },
+      durationMs: 4_000,
+      reason: "reconciled by poll",
+    });
+  });
+
+  /** @scenario A minted credential was never used */
+  it("releases a minted but unused credential when the vendor reports no conversation", async () => {
+    const { worker, repository } = buildWorker({
+      conversation: { readConversation: vi.fn().mockResolvedValue({ notFound: true }) },
+    });
+
+    await expect(worker.poll()).resolves.toMatchObject({ confirmed: 0 });
+    expect(repository.releaseMissingVendorConversation).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      projectId: "project-1",
+      reason: "the vendor has no conversation for this session, so the credential was never used",
+    });
+  });
+
+  /** @scenario A vendor report is incomplete */
+  it("leaves a terminal conversation open when its duration is unusable", async () => {
+    const { worker, repository } = buildWorker({
+      conversation: {
+        readConversation: vi.fn().mockResolvedValue({
+          report: { status: "done", metadata: { call_duration_secs: 0 } },
+          notFound: false,
+        }),
+      },
+    });
+
+    await expect(worker.poll()).resolves.toMatchObject({ confirmed: 0 });
+    expect(repository.confirmSession).not.toHaveBeenCalled();
+    expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
+  });
+
+  it("counts each outcome of one tick and keeps a failed session open for the next", async () => {
+    const unrecorded = { ...session, id: "session-2", vendorConversationId: null };
+    const failing = { ...session, id: "session-3", vendorConversationId: "conversation-3" };
+    const { worker, repository } = buildWorker({
+      sessions: [session, unrecorded, failing],
+      conversation: {
+        readConversation: vi.fn(async ({ conversationId }: { conversationId: string }) => {
+          if (conversationId === "conversation-3") throw new Error("vendor timed out");
+          return {
+            report: { status: "done", metadata: { call_duration_secs: 3 } },
+            notFound: false,
+          };
+        }),
+      },
+    });
+
+    await expect(worker.poll()).resolves.toEqual({ examined: 3, confirmed: 1, expired: 2 });
+    expect(repository.confirmSession).toHaveBeenCalledTimes(1);
+    expect(repository.releaseMissingVendorConversation).not.toHaveBeenCalled();
+  });
+
+  it("leaves a session open when its voice provider has no API key", async () => {
+    const { worker, repository, readConversation } = buildWorker({
+      credentials: {
+        getApiCredential: vi.fn().mockRejectedValue(new GatewayVoiceKeyMissingError()),
+      },
+    });
+
+    await expect(worker.poll()).resolves.toMatchObject({ examined: 1, confirmed: 0 });
+    expect(readConversation).not.toHaveBeenCalled();
+    expect(repository.confirmSession).not.toHaveBeenCalled();
+  });
+});

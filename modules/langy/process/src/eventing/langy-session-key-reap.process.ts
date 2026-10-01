@@ -1,0 +1,37 @@
+import type { IntentSpec, WakeHandler } from "@langwatch/eventing";
+import { z } from "zod";
+
+export const LANGY_SESSION_KEY_REAP_PROCESS_NAME = "langySessionKeyReap";
+
+/**
+ * Hourly. Keys carry their own `expiresAt` and `ApiKeyApi.verify` already
+ * refuses an elapsed one, so a reaped key was inert before this ran - the
+ * sweep is about not leaving a dead manager's rows behind, not an auth hole.
+ */
+export const LANGY_SESSION_KEY_REAP_INTERVAL_MS = 60 * 60 * 1000;
+
+export const langySessionKeyReapSchema = z.object({
+  scheduledFor: z.number().int(),
+});
+
+export const langySessionKeyReapStateSchema = z.object({
+  lastReapAt: z.number().nullable(),
+});
+export type LangySessionKeyReapState = z.infer<typeof langySessionKeyReapStateSchema>;
+
+type LangySessionKeyReapIntents = {
+  reap: IntentSpec<typeof langySessionKeyReapSchema>;
+};
+
+/**
+ * Wake handlers must be pure and synchronous — no I/O, no clock reads — because
+ * the commit that persists this evolution is what fences racing workers. The
+ * revoke itself is an intent, so it runs behind the outbox lease instead.
+ */
+export const langySessionKeyReapWake: WakeHandler<
+  LangySessionKeyReapState,
+  LangySessionKeyReapIntents
+> = (_state, ctx) => ({
+  state: { lastReapAt: ctx.at },
+  intents: [ctx.intent("reap", `reap:${ctx.at}`, { scheduledFor: ctx.at })],
+});

@@ -1,0 +1,62 @@
+import type { StoredObjectStorageDestination } from "@langwatch/stored-object-contract";
+
+import { StoredObjectProjectDestinationResolver } from "./stored-object-storage-runtime.service.ts";
+
+export type StoredObjectStorageSelection = Readonly<{
+  backend: "azure" | "s3" | "file";
+  globalS3Bucket?: string;
+  localFilesystemRoot: string;
+  azure?: StoredObjectAzureDestination;
+}>;
+
+export abstract class StoredObjectAzureDestination {
+  abstract resolve(): Readonly<{ accountName: string; container: string }>;
+}
+
+/**
+ * A project's own (BYOC) bucket when its organization routes one, the platform's destination
+ * otherwise.
+ */
+export type StoredObjectProjectBucket =
+  | Readonly<{ kind: "byoc"; bucket: string }>
+  | Readonly<{ kind: "platform" }>;
+
+export abstract class StoredObjectProjectS3Config {
+  abstract resolveBucket(projectId: string): Promise<StoredObjectProjectBucket>;
+}
+
+/** Pure BYOC-first destination policy; environment parsing stays at roots. */
+export class StoredObjectDestinationPolicyService extends StoredObjectProjectDestinationResolver {
+  static create(options: {
+    selection: StoredObjectStorageSelection;
+    projects: StoredObjectProjectS3Config;
+  }): StoredObjectDestinationPolicyService {
+    return new StoredObjectDestinationPolicyService(options.selection, options.projects);
+  }
+
+  private constructor(
+    private readonly selection: StoredObjectStorageSelection,
+    private readonly projects: StoredObjectProjectS3Config,
+  ) {
+    super();
+  }
+
+  async resolve(projectId: string): Promise<StoredObjectStorageDestination> {
+    const projectBucket = await this.projects.resolveBucket(projectId);
+    if (projectBucket.kind === "byoc") return { kind: "s3", bucket: projectBucket.bucket };
+
+    if (this.selection.backend === "azure") {
+      const azure = this.selection.azure?.resolve();
+      if (!azure) {
+        throw new Error("Azure storage destination is missing its validated configuration");
+      }
+      return { kind: "azure", ...azure };
+    }
+
+    const globalS3Bucket = this.selection.globalS3Bucket?.trim();
+    if (globalS3Bucket) {
+      return { kind: "s3", bucket: globalS3Bucket };
+    }
+    return { kind: "file", root: this.selection.localFilesystemRoot };
+  }
+}

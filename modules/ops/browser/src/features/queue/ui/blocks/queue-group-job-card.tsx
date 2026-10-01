@@ -1,0 +1,181 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  HStack,
+  Spacer,
+  Text,
+} from "@langwatch/design-system/primitives";
+import type { OpsQueueJob as JobEntry } from "@langwatch/ops-contract";
+import { useState } from "react";
+
+import { formatBytes, formatTimeAgo } from "../../../../model/ops-formatters.ts";
+import { middleEllipsis } from "../../../../model/queue-cluster-groups.ts";
+import { JsonViewer } from "../../../../ui/elements/ops-json-viewer.tsx";
+import { type JobContextInfo, readJobContext, readJobKind } from "../../model/queue-job-context.ts";
+
+function ContextRow({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: string;
+  href?: string | null;
+}) {
+  return (
+    <HStack gap={2} align="baseline">
+      <Text textStyle="xs" color="fg.muted" width="90px" flexShrink={0}>
+        {label}
+      </Text>
+      {href ? (
+        <Text
+          asChild
+          textStyle="xs"
+          fontFamily="mono"
+          color="blue.fg"
+          title={value}
+          _hover={{ textDecoration: "underline" }}
+        >
+          <a href={href} target="_blank" rel="noreferrer">
+            {middleEllipsis(value, 40)} ↗
+          </a>
+        </Text>
+      ) : (
+        <Text textStyle="xs" fontFamily="mono" title={value}>
+          {middleEllipsis(value, 40)}
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+function JobHeaderRow({
+  job,
+  now,
+  showJson,
+  onToggleJson,
+}: {
+  job: JobEntry;
+  now: number;
+  showJson: boolean;
+  onToggleJson: () => void;
+}) {
+  return (
+    <HStack gap={2}>
+      <Text textStyle="xs" fontFamily="mono" truncate title={job.jobId} flexShrink={1}>
+        {job.jobId}
+      </Text>
+      <Spacer />
+      {job.payloadBytes !== null && (
+        <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+          {formatBytes(job.payloadBytes)}
+        </Text>
+      )}
+      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+        runs {formatTimeAgo(job.score, now)}
+      </Text>
+      <Button
+        size="2xs"
+        variant={showJson ? "solid" : "ghost"}
+        onClick={onToggleJson}
+        disabled={!job.data}
+        flexShrink={0}
+      >
+        JSON
+      </Button>
+    </HStack>
+  );
+}
+
+function JobChipsRow({ job }: { job: JobEntry }) {
+  const kind = readJobKind(job.data);
+  return (
+    <HStack gap={1.5} flexWrap="wrap">
+      {kind.jobType && (
+        <Badge size="xs" colorPalette="teal" variant="subtle">
+          {kind.jobType}
+        </Badge>
+      )}
+      {kind.jobName && (
+        <Badge size="xs" variant="subtle" fontFamily="mono">
+          {kind.jobName}
+        </Badge>
+      )}
+      {job.envelope?.blobId && (
+        <Badge
+          size="xs"
+          colorPalette="purple"
+          variant="subtle"
+          fontFamily="mono"
+          title={`Body offloaded to the payload store (${job.envelope.format ?? "?"}): ${job.envelope.blobId}`}
+        >
+          {job.envelope.format} blob {middleEllipsis(job.envelope.blobId, 14)}
+        </Badge>
+      )}
+      {!job.data && (
+        <Badge size="xs" colorPalette="orange" variant="subtle">
+          body unavailable
+        </Badge>
+      )}
+    </HStack>
+  );
+}
+
+function JobContextRows({
+  context,
+  traceHref,
+}: {
+  context: JobContextInfo;
+  traceHref: string | null;
+}) {
+  return (
+    <Box>
+      {context.traceId && <ContextRow label="Trace" value={context.traceId} href={traceHref} />}
+      {context.projectId && <ContextRow label="Project" value={context.projectId} />}
+      {context.userId && <ContextRow label="User" value={context.userId} />}
+      {context.organizationId && <ContextRow label="Organization" value={context.organizationId} />}
+    </Box>
+  );
+}
+
+/**
+ * One staged job, structurally: what it is, whose request staged it
+ * (`__context`), where its body lives, and when it runs. Full payload is
+ * one click away behind the JSON toggle, sparing a wall of JSON per job.
+ */
+export function GroupJobCard({
+  job,
+  now,
+  traceUrlForTraceId,
+}: {
+  job: JobEntry;
+  now: number;
+  traceUrlForTraceId?: (traceId: string) => string | null;
+}) {
+  const [showJson, setShowJson] = useState(false);
+  const context = readJobContext(job.data);
+  const traceHref =
+    context?.traceId && traceUrlForTraceId ? traceUrlForTraceId(context.traceId) : null;
+
+  return (
+    <Card.Root variant="outline">
+      <Card.Body padding={2.5} gap={2}>
+        <JobHeaderRow
+          job={job}
+          now={now}
+          showJson={showJson}
+          onToggleJson={() => setShowJson((v) => !v)}
+        />
+        <JobChipsRow job={job} />
+        {context && <JobContextRows context={context} traceHref={traceHref} />}
+        {showJson && job.data && (
+          <Box bg="bg.subtle" borderRadius="sm" padding={2} maxHeight="280px" overflow="auto">
+            <JsonViewer data={job.data} maxHeight="280px" />
+          </Box>
+        )}
+      </Card.Body>
+    </Card.Root>
+  );
+}

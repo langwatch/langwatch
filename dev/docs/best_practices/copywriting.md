@@ -27,11 +27,11 @@ built. Keep out of user-facing strings:
 If a term only makes sense to someone who has read our code, it does not
 belong in the UI.
 
-| Wrong | Right |
-|-------|-------|
-| `Essential (fast, in-process: emails, phones, cards, IDs)` | `Essential (emails, phones, cards, IPs, national IDs)` |
-| `Strict (adds names and locations, uses the analysis service)` | `Strict (adds names, locations, and more)` |
-| `Saved. Cache invalidated.` | `Saved.` |
+| Wrong                                                          | Right                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------ |
+| `Essential (fast, in-process: emails, phones, cards, IDs)`     | `Essential (emails, phones, cards, IPs, national IDs)` |
+| `Strict (adds names and locations, uses the analysis service)` | `Strict (adds names, locations, and more)`             |
+| `Saved. Cache invalidated.`                                    | `Saved.`                                               |
 
 One exception: naming a recognized third-party standard or model can build
 trust ("Uses the Microsoft Presidio PII model"). Keep that in a tooltip, not
@@ -53,10 +53,10 @@ History lives in git and release notes, never in the product.
 ```tsx
 // Bad: "no workflow needed" compares against an option a new user has not
 // seen yet, and leaks that a workflow is otherwise involved.
-description="Write a Python evaluator right here, no workflow needed"
+description = "Write a Python evaluator right here, no workflow needed";
 
 // Good: says what they get, stands on its own.
-description="Write a custom Python evaluator"
+description = "Write a custom Python evaluator";
 ```
 
 ## Short and concise

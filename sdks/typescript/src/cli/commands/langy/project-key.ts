@@ -1,11 +1,7 @@
 /**
- * The project's LangWatch key for the credentials call, fetched with the
- * developer's own device session. The project routes never reveal a base key
- * to an API key, the organization key this command also holds included, so
- * the key comes from POST /api/auth/cli/project-key, which answers a signed-in
- * person with project administration on that project. That route names a
- * project by slug and the Langy request names it by id, so the id is looked up
- * first.
+ * The project's key, fetched with the developer's own device session from
+ * POST /api/auth/cli/project-key (project administration required). The route
+ * takes a slug and the Langy request an id, so the id is looked up first.
  */
 
 import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
@@ -36,6 +32,10 @@ export class ProjectKeyError extends Error {
   }
 }
 
+function pickNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
 function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyError {
   const { status, httpStatus, code, message } = (error ?? {}) as {
     status?: unknown;
@@ -45,7 +45,7 @@ function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyE
   };
   return new ProjectKeyError(
     stage,
-    typeof status === "number" ? status : typeof httpStatus === "number" ? httpStatus : undefined,
+    pickNumber(status) ?? pickNumber(httpStatus),
     typeof code === "string" ? code : undefined,
     typeof message === "string" ? message : "the project's key could not be read",
   );
@@ -70,7 +70,7 @@ export function createProjectKeyReader(
   };
 }
 
-/** The reader over the platform: the signed-in credentials for the lookup, the device session for the key. */
+/** The reader over the platform: signed-in credentials look up, the device session fetches. */
 export function platformProjectKeyReader({
   endpoint,
   apiKey,

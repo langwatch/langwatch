@@ -1,11 +1,11 @@
 /**
- * The command catalog builder: the one structure behind `langwatch commands`,
- * `langwatch help-tree`, and the `status` cheat-sheet. The tree comes from
- * the live commander program, the hints/skills from the embedded feature map
- * — these tests pin both directions of that join so the catalog can never
- * silently drift from what the CLI registers or the map declares.
+ * The command catalog builder behind `commands`, `help-tree`, and `status`.
+ * Tree from the live commander program, hints/skills from the feature map --
+ * these tests pin both directions so the catalog can't silently drift.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { buildProgram } from "../../program";
 import {
   buildCatalog,
@@ -15,7 +15,6 @@ import {
   renderStatusSummary,
   type CatalogEntry,
 } from "../commandCatalog";
-import { FEATURE_MAP } from "../../../internal/generated/cli/feature-map.generated";
 import { AGENT_MODE_ENV_VARS } from "../output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
@@ -60,13 +59,10 @@ describe("buildCatalog", () => {
 
   it("covers every registered non-hidden top-level command", () => {
     const registered = buildProgram()
-      .commands.filter(
-        (command) =>
-          (command as unknown as { _hidden?: boolean })._hidden !== true,
-      )
+      .commands.filter((command) => (command as unknown as { _hidden?: boolean })._hidden !== true)
       .map((command) => command.name());
     const cataloged = catalog.map((entry) => entry.path);
-    expect(cataloged.sort()).toEqual(registered.sort());
+    expect(cataloged.toSorted()).toEqual(registered.toSorted());
   });
 
   it("excludes the hidden gateway wrappers and hidden primitives", () => {
@@ -136,9 +132,7 @@ describe("buildCatalog", () => {
     // Exact formula check on one entry: rebuild the synthetic help by hand.
     const traceGet = flat.find((entry) => entry.path === "trace get")!;
     const usage = `langwatch trace get <traceId> — ${traceGet.description}`;
-    const flags = traceGet.flags
-      .map((flag) => `\n  ${flag.name}  ${flag.description}`)
-      .join("");
+    const flags = traceGet.flags.map((flag) => `\n  ${flag.name}  ${flag.description}`).join("");
     expect(traceGet.tokenCost).toBe(Math.ceil((usage + flags).length / 4));
   });
 });

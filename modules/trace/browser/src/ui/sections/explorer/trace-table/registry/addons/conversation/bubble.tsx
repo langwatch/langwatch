@@ -1,0 +1,254 @@
+import { Box, Circle, Flex, HStack, Icon, Spacer, Text } from "@langwatch/design-system/primitives";
+import { BUBBLE_TONES, type BubbleTone, useConversationExpand } from "@langwatch/trace-browser-kit";
+import { Lightbulb, MessageSquare } from "lucide-react";
+import type React from "react";
+import { useState } from "react";
+
+import { MessageExpandToggle } from "../../../../../../elements/explorer/trace-drawer/conversation-view/message-expand-toggle.tsx";
+import { Markdown } from "../../../../../markdown.tsx";
+import {
+  MessageAnnotateCluster,
+  type MessageAnnotateTarget,
+  type MessageTranslation,
+} from "../../../../trace-drawer/conversation-view/message-annotate-cluster.tsx";
+import { ReasoningBlock } from "../../../../trace-drawer/transcript/index.ts";
+
+export type BubbleSide = "left" | "right";
+export type BubbleSize = "compact" | "regular";
+
+interface BubbleProps {
+  side: BubbleSide;
+  tone: BubbleTone;
+  label: string;
+  icon: React.ReactNode;
+  text: string;
+  reasoning?: string;
+  isSelected?: boolean;
+  onClick?: () => void;
+  size?: BubbleSize;
+  /** Truncate the text body to N characters. 0 disables. */
+  maxChars?: number;
+  /**
+   * When set, marks the bubble as carrying annotations. The amber accent stripe lights
+   * up so a long thread is scannable for noted turns; `hasCorrection` upgrades the
+   * inline badge to the lightbulb tone used elsewhere for "suggested output".
+   */
+  annotation?: { count: number; hasCorrection: boolean };
+  /**
+   * When set, the bubble offers to have a comment left on the message it is
+   * showing. Left unset by the surfaces that render a bubble as a preview of
+   * somebody else's conversation, where there is nothing to annotate.
+   */
+  annotate?: MessageAnnotateTarget;
+  /**
+   * When set, the bubble offers to flip the message it is showing to English.
+   * Owned by the host, which holds the text and swaps it.
+   */
+  translate?: MessageTranslation;
+}
+
+const DEFAULT_MAX_CHARS = 320;
+const TRUNCATE_BREAK_PREFER_RATIO = 0.5;
+
+// Cuts on a paragraph/sentence boundary above maxChars*ratio so we don't slice
+// mid-token and produce broken markdown (unclosed code fences, dangling lists).
+export function truncateMarkdown({ text, maxChars }: { text: string; maxChars: number }): string {
+  if (maxChars <= 0 || text.length <= maxChars) return text;
+  const truncated = text.slice(0, maxChars);
+  const lastBreak = Math.max(
+    truncated.lastIndexOf("\n\n"),
+    truncated.lastIndexOf("\n"),
+    truncated.lastIndexOf(". "),
+  );
+  const cut = lastBreak > maxChars * TRUNCATE_BREAK_PREFER_RATIO ? lastBreak : maxChars;
+  return `${text.slice(0, cut).trimEnd()}\n\n…`;
+}
+
+function bubbleDisplayText({
+  text,
+  truncated,
+  isExpandable,
+  isTruncated,
+  expanded,
+}: {
+  text: string;
+  truncated: string;
+  isExpandable: boolean;
+  isTruncated: boolean;
+  expanded: boolean;
+}): string {
+  if (!isExpandable || !isTruncated) return truncated;
+  if (expanded) return text;
+  return truncated.replace(/\n+…\s*$/, "");
+}
+
+/** The amber edge on the bubble's inner side that marks an annotated message. */
+function annotatedEdge(side: "left" | "right"): string {
+  return `inset ${side === "right" ? "-3px" : "3px"} 0 0 var(--chakra-colors-amber-solid)`;
+}
+
+function AnnotationBadge({ annotation }: { annotation: NonNullable<BubbleProps["annotation"]> }) {
+  const { count, hasCorrection } = annotation;
+  return (
+    <HStack
+      gap={0.5}
+      paddingX={1.5}
+      paddingY={0.5}
+      borderRadius="sm"
+      bg="amber.subtle"
+      color="amber.fg"
+      aria-label={`${count} annotation${count === 1 ? "" : "s"}${
+        hasCorrection ? ", includes correction" : ""
+      }`}
+    >
+      <Icon as={MessageSquare} boxSize="10px" />
+      <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+        {count}
+      </Text>
+      {hasCorrection && <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />}
+    </HStack>
+  );
+}
+
+function ReasoningPanel({ reasoning, hasText }: { reasoning: string; hasText: boolean }) {
+  return (
+    <Box
+      mb={hasText ? "3" : "0"}
+      borderBottomWidth={hasText ? "1px" : "0"}
+      borderBottomColor="border.subtle"
+      bg="bg.muted/60"
+      px="3"
+      py="2"
+      borderRadius="md"
+      mx="-1"
+    >
+      <ReasoningBlock text={reasoning} />
+    </Box>
+  );
+}
+
+/**
+ * The message as markdown, with Prose's headings tamed so chat reads as
+ * conversation, and its outer block margins dropped so they do not stack on
+ * the bubble's own padding.
+ */
+function BubbleMarkdown({ compact, text }: { compact: boolean; text: string }) {
+  return (
+    <Box
+      css={{
+        "& > div": { fontSize: compact ? "13.5px" : "14px", lineHeight: "1.55" },
+        "& > div > *:first-child": { marginTop: "0 !important" },
+        "& > div > *:last-child": { marginBottom: "0 !important" },
+        "& h1": { fontSize: "1.15em !important" },
+        "& h2": { fontSize: "1.1em !important" },
+        "& h3": { fontSize: "1.05em !important" },
+        "& h4, & h5, & h6": { fontSize: "1em !important" },
+      }}
+    >
+      <Markdown>{text}</Markdown>
+    </Box>
+  );
+}
+
+export const Bubble: React.FC<BubbleProps> = ({
+  side,
+  tone,
+  label,
+  icon,
+  text,
+  reasoning,
+  isSelected = false,
+  onClick,
+  size = "regular",
+  maxChars = DEFAULT_MAX_CHARS,
+  annotation,
+  annotate,
+  translate,
+}) => {
+  const palette = BUBBLE_TONES[tone];
+  const compact = size === "compact";
+  const hasAnnotation = !!annotation && annotation.count > 0;
+
+  // In the conversation view (provider sets `isExpandable`), a truncated
+  // message offers a per-message Show more / Show less toggle instead of a
+  // bare "…". Elsewhere (the table's compact preview) `isExpandable` is false
+  // and the original ellipsis truncation is kept. See
+  // specs/traces-v2/conversation-message-expand.feature
+  const { isExpandable, shouldExpandAll } = useConversationExpand();
+  const [expanded, setExpanded] = useState(shouldExpandAll);
+  const [expandAllFrom, setExpandAllFrom] = useState(shouldExpandAll);
+  if (expandAllFrom !== shouldExpandAll) {
+    setExpandAllFrom(shouldExpandAll);
+    setExpanded(shouldExpandAll);
+  }
+  const isTruncated = maxChars > 0 && text.length > maxChars;
+  const canExpand = isExpandable && isTruncated;
+  const truncated = truncateMarkdown({ text, maxChars });
+  const display = bubbleDisplayText({ text, truncated, isExpandable, isTruncated, expanded });
+
+  return (
+    <Flex
+      // Anchored to the top, not centred: a long message would otherwise float
+      // its avatar down beside the middle of the text, away from the label
+      // that says whose message it is.
+      align="flex-start"
+      gap={2}
+      flexDirection={side === "right" ? "row-reverse" : "row"}
+      width="full"
+      // `className="group"` is what the comment cluster's `_groupHover`
+      // resolves against; the fieldset is what tells a reader the message and its
+      // actions are one thing. The turn separator's own group sits on a
+      // sibling, so the two scopes never nest.
+      className="group"
+      as="fieldset"
+    >
+      <Circle
+        size={compact ? "22px" : "26px"}
+        bg={palette.avatarBg}
+        color={palette.avatarFg}
+        flexShrink={0}
+      >
+        <Icon boxSize={compact ? "12px" : "14px"}>{icon}</Icon>
+      </Circle>
+
+      <Box
+        maxWidth={compact ? "calc(100% - 36px)" : "calc(85% - 36px)"}
+        bg={isSelected ? palette.selectedBg : palette.bg}
+        color={palette.fg}
+        paddingX={compact ? 3.5 : 4}
+        paddingY={compact ? 2.5 : 3}
+        borderRadius="2xl"
+        borderTopLeftRadius={side === "left" ? "sm" : "2xl"}
+        borderTopRightRadius={side === "right" ? "sm" : "2xl"}
+        cursor={onClick ? "pointer" : "default"}
+        transition="background 0.15s ease, transform 0.15s ease"
+        position="relative"
+        boxShadow={hasAnnotation ? annotatedEdge(side) : undefined}
+        _hover={onClick ? { bg: palette.selectedBg, transform: "translateY(-1px)" } : undefined}
+        onClick={(e: React.MouseEvent) => {
+          if (!onClick) return;
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        <HStack gap={1.5} marginBottom={1} align="center">
+          <Text textStyle="2xs" fontWeight="600" color={palette.accent} letterSpacing="0.02em">
+            {label}
+          </Text>
+          {annotation && hasAnnotation && <AnnotationBadge annotation={annotation} />}
+          {annotate && (
+            <>
+              <Spacer />
+              <MessageAnnotateCluster target={annotate} translation={translate} />
+            </>
+          )}
+        </HStack>
+        {reasoning && <ReasoningPanel reasoning={reasoning} hasText={!!text} />}
+        <BubbleMarkdown compact={compact} text={display} />
+        {canExpand && (
+          <MessageExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+        )}
+      </Box>
+    </Flex>
+  );
+};

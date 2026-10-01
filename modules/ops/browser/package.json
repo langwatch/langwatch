@@ -1,0 +1,66 @@
+{
+  "name": "@langwatch/ops-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe platform operations, instance admin and Cloud admin UI.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/ops.web.ts",
+      "types": "./dist/ops.web.d.ts",
+      "default": "./src/ops.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-web": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "@xyflow/react": "catalog:",
+    "langwatch": "workspace:*",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-router": "catalog:",
+    "recharts": "catalog:",
+    "use-debounce": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

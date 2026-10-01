@@ -1,0 +1,391 @@
+/**
+ * Integration test for ScenarioMessageRenderer's content coercion.
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SimulationMessage } from "@langwatch/scenario-contract";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
+
+vi.mock("@langwatch/stored-object-browser-kit", () => ({
+  useStoredObjectUrl: ({ reference }: { reference: string }) => ({
+    status: "ready",
+    url: reference,
+  }),
+}));
+
+// Trace lends the thread; a synchronous stand-in keeps this suite on what this module wires.
+vi.mock("../../../../behavior/lent-trace.tsx", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  ConversationThread: (await import("./stub-conversation-thread.tsx")).StubConversationThread,
+}));
+
+// RunTurnSeparator internally calls useOrganizationTeamProject() and
+// api.traces.getById.useQuery, neither of which is available in this jsdom
+// harness — mock the module so the renderer's grouping contract (one
+// separator per traced turn) is what these tests exercise.
+vi.mock("../run-turn-separator.tsx", () => ({
+  RunTurnSeparator: ({ index, traceId }: { index: number; traceId: string }) => (
+    <div data-testid="run-turn-separator" data-trace-id={traceId}>
+      Turn {index}
+    </div>
+  ),
+}));
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+const PROJECT_ID = "proj_test";
+
+const renderWith = (messages: SimulationMessage[]): void => {
+  render(
+    <Wrapper>
+      <ScenarioMessageRenderer messages={messages} variant="drawer" projectId={PROJECT_ID} />
+    </Wrapper>,
+  );
+};
+
+const renderWithGrid = (messages: SimulationMessage[]): void => {
+  render(
+    <Wrapper>
+      <ScenarioMessageRenderer messages={messages} variant="grid" projectId={PROJECT_ID} />
+    </Wrapper>,
+  );
+};
+
+describe("<ScenarioMessageRenderer/>", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => cleanup());
+
+  describe("when a message arrives with content as a python-repr string", () => {
+    it("renders an <audio> element instead of the raw repr blob", () => {
+      const pythonReprContent =
+        "[{'type': 'input_audio', 'input_audio': {'data': 'UklGRg==', 'format': 'wav'}}]";
+
+      renderWith([
+        {
+          id: "msg_audio_repr",
+          role: "user",
+          content: pythonReprContent,
+        } as SimulationMessage,
+      ]);
+
+      const audio = document.querySelector("audio");
+      expect(audio).not.toBeNull();
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+  });
+
+  describe("when a message arrives with content as a JSON-encoded array string", () => {
+    it("renders the same way as the python-repr equivalent", () => {
+      const jsonContent =
+        '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]';
+
+      renderWith([
+        {
+          id: "msg_audio_json",
+          role: "user",
+          content: jsonContent,
+        } as SimulationMessage,
+      ]);
+
+      const audio = document.querySelector("audio");
+      expect(audio).not.toBeNull();
+    });
+  });
+
+  describe("when a message arrives with a sibling text part as a transcript", () => {
+    it("renders audio + italic transcript and not the raw blob", () => {
+      const pythonReprContent =
+        "[{'type': 'input_audio', 'input_audio': {'data': 'UklGRg==', 'format': 'wav'}}, {'type': 'text', 'text': 'hello world'}]";
+
+      renderWith([
+        {
+          id: "msg_audio_with_transcript",
+          role: "assistant",
+          content: pythonReprContent,
+        } as SimulationMessage,
+      ]);
+
+      expect(document.querySelector("audio")).not.toBeNull();
+      expect(screen.getByText("hello world")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a message has plain string content (not array-shaped)", () => {
+    it("renders as a text bubble unchanged", () => {
+      renderWith([
+        {
+          id: "msg_plain",
+          role: "assistant",
+          content: "hello there",
+        } as SimulationMessage,
+      ]);
+
+      expect(screen.getByText("hello there")).toBeInTheDocument();
+      expect(document.querySelector("audio")).toBeNull();
+    });
+  });
+
+  // The trace binding below is partial: RunTurnSeparator owns the fetch +
+  // click handler (useTraceDetailsDrawer().openTraceDetailsDrawer), so these
+  // jsdom tests only assert the renderer's responsibility — mounting one
+  // separator per traced turn with the correct traceId. The drawer-open
+  // behavior on click is browser-verified.
+  describe("when an assistant audio message has a trace id in drawer variant", () => {
+    /** @scenario "Assistant audio turn with a trace id shows a turn separator in drawer variant" */
+    it("renders a turn separator above the traced turn", () => {
+      renderWith([
+        {
+          id: "msg_audio_trace",
+          role: "assistant",
+          trace_id: "trace_abc123",
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+        } as SimulationMessage,
+      ]);
+
+      const separator = screen.getByTestId("run-turn-separator");
+      expect(separator).toBeInTheDocument();
+      expect(separator).toHaveAttribute("data-trace-id", "trace_abc123");
+      // Confirms it's the media branch rendering (not a text branch)
+      expect(document.querySelector("audio")).not.toBeNull();
+    });
+  });
+
+  describe("when an assistant audio message has no trace id", () => {
+    /** @scenario "Assistant audio turn without a trace id renders no separator" */
+    it("does not render a turn separator", () => {
+      renderWith([
+        {
+          id: "msg_audio_no_trace",
+          role: "assistant",
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+        } as SimulationMessage,
+      ]);
+
+      expect(screen.queryByTestId("run-turn-separator")).toBeNull();
+      expect(document.querySelector("audio")).not.toBeNull();
+    });
+  });
+
+  describe("when a user-role audio message has a trace id", () => {
+    /** @scenario "A traced turn gets one separator regardless of message role" */
+    it("renders a turn separator above the traced user turn", () => {
+      renderWith([
+        {
+          id: "msg_audio_user_trace",
+          role: "user",
+          trace_id: "trace_xyz",
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+        } as SimulationMessage,
+      ]);
+
+      const separator = screen.getByTestId("run-turn-separator");
+      expect(separator).toHaveAttribute("data-trace-id", "trace_xyz");
+      expect(document.querySelector("audio")).not.toBeNull();
+    });
+  });
+
+  describe("when the renderer is mounted in grid variant", () => {
+    /** @scenario "Grid variant suppresses turn separators on audio turns" */
+    it("does not render a turn separator on assistant audio messages", () => {
+      renderWithGrid([
+        {
+          id: "msg_audio_grid",
+          role: "assistant",
+          trace_id: "trace_grid",
+          content: '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}}]',
+        } as SimulationMessage,
+      ]);
+
+      expect(screen.queryByTestId("run-turn-separator")).toBeNull();
+    });
+  });
+
+  describe("when an assistant message has both audio and a sibling text transcript with one trace id", () => {
+    /** @scenario "Transcript-collapse case renders one bubble with one turn separator" */
+    it("renders exactly one bubble with exactly one turn separator", () => {
+      renderWith([
+        {
+          id: "msg_audio_transcript",
+          role: "assistant",
+          trace_id: "trace_collapse",
+          content:
+            '[{"type":"input_audio","input_audio":{"data":"UklGRg==","format":"wav"}},{"type":"text","text":"hello"}]',
+        } as SimulationMessage,
+      ]);
+
+      expect(document.querySelectorAll("audio")).toHaveLength(1);
+      expect(screen.getAllByTestId("run-turn-separator")).toHaveLength(1);
+    });
+  });
+
+  describe("when assistant text, tool_call, and tool_result turns have distinct trace ids", () => {
+    /** @scenario "Each distinct consecutive trace id group gets its own separator" */
+    it("renders one turn separator per distinct consecutive trace id group", () => {
+      renderWith([
+        {
+          id: "msg_text_turn",
+          role: "assistant",
+          trace_id: "trace_text",
+          content: "Here is the result",
+        } as SimulationMessage,
+        {
+          id: "msg_tool_call_turn",
+          role: "assistant",
+          trace_id: "trace_tool_call",
+          content: "",
+          tool_calls: [{ function: { name: "search", arguments: "{}" } }],
+        } as SimulationMessage,
+        {
+          id: "msg_tool_result_turn",
+          role: "tool",
+          trace_id: "trace_tool_result",
+          content: "ok",
+        } as SimulationMessage,
+      ]);
+
+      const separators = screen.getAllByTestId("run-turn-separator");
+      expect(separators).toHaveLength(3);
+
+      const traceIds = separators.map((separator) => separator.getAttribute("data-trace-id"));
+      expect(traceIds).toContain("trace_text");
+      expect(traceIds).toContain("trace_tool_call");
+      expect(traceIds).toContain("trace_tool_result");
+    });
+  });
+
+  // ------------------------------------------------------------------------- #4138 —
+  // post-extraction `input_audio` URL shape.
+  describe("when an assistant audio message arrives in the post-extraction url shape (#4138)", () => {
+    const urlShapeMessage = {
+      id: "msg_audio_url_shape",
+      role: "assistant",
+      content: [
+        {
+          type: "input_audio",
+          input_audio: { url: "/api/files/test-id", mimeType: "audio/mpeg" },
+        },
+      ],
+    };
+
+    it("renders a media-part-audio element whose src is the file url (drawer variant)", () => {
+      renderWith([urlShapeMessage]);
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio.tagName.toLowerCase()).toBe("audio");
+      expect(audio).toHaveAttribute("src", "/api/files/test-id");
+      expect(audio).toHaveAttribute("controls");
+      // The raw part shape must never leak into the bubble as text.
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+
+    it("renders a media-part-audio element whose src is the file url (grid variant)", () => {
+      renderWithGrid([urlShapeMessage]);
+
+      const audio = screen.getByTestId("media-part-audio") as HTMLAudioElement;
+      expect(audio).toBeInTheDocument();
+      expect(audio).toHaveAttribute("src", "/api/files/test-id");
+      expect(audio).toHaveAttribute("controls");
+    });
+  });
+
+  describe("when a media part has an unsupported mimeType (#4138 graceful fallback)", () => {
+    /**
+     * A media part whose mimeType is not an `audio/`/`image/`/`video/` type resolves to
+     * the binary category in MediaPart, which renders a download-link fallback
+     * (media-part-binary) rather than a broken <audio> element.
+     */
+    it("renders a graceful binary fallback, not a broken audio element", () => {
+      renderWith([
+        {
+          id: "msg_audio_bad_mime",
+          role: "assistant",
+          content: [
+            {
+              // Non-media mimeType → MediaPart resolves the binary category and
+              // renders the download-link fallback instead of an <audio>.
+              type: "binary",
+              mimeType: "application/octet-stream",
+              url: "/api/files/unsupported-id",
+              filename: "voice-turn.bin",
+            },
+          ],
+        },
+      ]);
+
+      // Graceful fallback present; no broken <audio> element rendered.
+      expect(screen.getByTestId("media-part-binary")).toBeInTheDocument();
+      expect(document.querySelector("audio")).toBeNull();
+      expect(screen.queryByText(/input_audio/)).toBeNull();
+    });
+  });
+
+  describe("when a message carries a stored document attachment (binary part)", () => {
+    /** @scenario "A document attachment renders as a labeled chip that opens the file in a new tab" */
+    it("renders a chip with a file icon and filename that opens the stored file in a new tab", () => {
+      renderWith([
+        {
+          id: "msg_pdf_attachment",
+          role: "user",
+          content: [
+            { type: "text", text: "Please summarize this document." },
+            {
+              type: "binary",
+              mimeType: "application/pdf",
+              id: "so_123",
+              url: "/api/files/proj_test/so_123",
+              filename: "document.pdf",
+            },
+          ],
+        },
+      ]);
+
+      const chip = screen.getByTestId("media-part-binary");
+      // The filename query gives downloads from the opened viewer the
+      // original name (stored objects are content-addressed, no name of
+      // their own).
+      expect(chip).toHaveAttribute("href", "/api/files/proj_test/so_123");
+      expect(chip).toHaveAttribute("target", "_blank");
+      expect(chip).toHaveAttribute("rel", "noopener noreferrer");
+      expect(chip).not.toHaveAttribute("download");
+      expect(screen.getByText("document.pdf")).toBeInTheDocument();
+      // File icon plus the open-in-new-tab affordance.
+      expect(chip.querySelector("svg")).not.toBeNull();
+      expect(screen.getByTestId("media-part-binary-open")).toBeInTheDocument();
+    });
+
+    it("falls back to a download link for legacy inline base64 attachments", () => {
+      renderWith([
+        {
+          id: "msg_pdf_legacy",
+          role: "user",
+          content: [
+            {
+              type: "binary",
+              mimeType: "application/pdf",
+              data: "JVBERi0xLjQ=",
+              filename: "legacy.pdf",
+            },
+          ],
+        },
+      ]);
+
+      const chip = screen.getByTestId("media-part-binary");
+      expect(chip).toHaveAttribute("download", "legacy.pdf");
+      expect(chip).not.toHaveAttribute("target");
+      expect(screen.getByText("legacy.pdf")).toBeInTheDocument();
+      expect(screen.queryByTestId("media-part-binary-open")).toBeNull();
+    });
+  });
+
+  // Voice-turn layout (#4698, scenario#994) is the lent thread's and is
+  // covered in trace's conversation-thread suite.
+});

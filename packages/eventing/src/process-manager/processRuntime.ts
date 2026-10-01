@@ -1,0 +1,514 @@
+import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
+import type { Event } from "../domain/types.ts";
+import {
+  buildIntentAccessor,
+  type ProcessManagerDefinition,
+} from "../pipeline/processManagerDefinition.ts";
+import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
+import { ProcessStateUnreadableError } from "./failureDiagnostic.ts";
+import {
+  DEFAULT_LEASE_DURATION_MS,
+  type IntentHandler,
+  OutboxDispatcherService,
+} from "./outbox/outboxDispatcherService.ts";
+import { ProcessOutboxWorker } from "./outbox/processOutboxWorker.ts";
+import type {
+  ProcessDefinition,
+  ProcessEventEnvelope,
+  ProcessSignalEnvelope,
+} from "./processManager.types.ts";
+import { ProcessManagerService, type SignalHandleResult } from "./processManagerService.ts";
+import type { ProcessStore } from "./stores/processStore.types.ts";
+import { ProcessWakeWorker, type ProcessWakeHandler } from "./wake/processWakeWorker.ts";
+
+const defaultLogger = createLogger("langwatch:event-sourcing:process-runtime");
+
+const STUCK_DRAIN_LEASE_MULTIPLE = 5;
+const STUCK_DRAIN_FLOOR_MS = 300_000;
+
+/**
+ * Far above any legitimate drain (a full batch of slow deliveries fits in one
+ * lease), so only a never-settling delivery trips it.
+ */
+function stuckDrainTimeoutMs(leaseDurationMs: number | undefined): number {
+  return Math.max(
+    STUCK_DRAIN_LEASE_MULTIPLE * (leaseDurationMs ?? DEFAULT_LEASE_DURATION_MS),
+    STUCK_DRAIN_FLOOR_MS,
+  );
+}
+
+export const SCHEDULED_SINGLETON_PROJECT_ID = "__global__" as const;
+/** The synthetic event that arms a scheduled process's first wake. Exported
+ *  so a test drives the same value the runtime does, rather than copying the
+ *  literal and drifting from it. */
+export const SCHEDULE_ARM_EVENT_TYPE = "__schedule_arm" as const;
+
+interface RegisteredProcessManager {
+  definition: ProcessManagerDefinition;
+  manager: ProcessManagerService<unknown>;
+  outboxWorker: ProcessOutboxWorker;
+}
+
+export interface GeneratedProcessArtifacts<E extends Event> {
+  subscribers: EventSubscriberDefinition<E>[];
+}
+
+/**
+ * The outbox intent handlers a builder config generates: schema-validate the
+ * leased payload, then hand it to the declared executor with the dispatch
+ * context. Exported for the same reason as {@link buildProcessDefinition}.
+ */
+export function buildIntentHandlers(
+  config: ProcessManagerDefinition["config"],
+): Record<string, IntentHandler> {
+  const handlers: Record<string, IntentHandler> = {};
+  for (const [intentType, spec] of Object.entries(config.intents)) {
+    handlers[intentType] = async ({ message }) => {
+      await spec.run(spec.schema.parse(message.payload), {
+        processName: message.processName,
+        projectId: message.projectId,
+        processKey: message.processKey,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        attempt: message.attempt,
+        leaseExpiresAt: message.leaseExpiresAt,
+      });
+    };
+  }
+  return handlers;
+}
+
+/** Parses the state the store handed back; an unreadable one refuses by path, never by value. */
+function readStoredState({
+  config,
+  previousState,
+  processKey,
+}: {
+  config: ProcessManagerDefinition["config"];
+  previousState: unknown;
+  processKey: string;
+}): unknown {
+  const parsed = config.stateSchema.safeParse(previousState);
+  if (parsed.success) return parsed.data;
+  throw new ProcessStateUnreadableError({
+    processName: config.name,
+    processKey,
+    issuePaths: parsed.error.issues.map((issue) => issue.path.join(".") || "(root)"),
+  });
+}
+
+/**
+ * `evolve` for a config-built ProcessDefinition: clamping, schedule arming,
+ * and the undeclared-event guard. Module-level so its branching counts on its
+ * own rather than folding into `buildProcessDefinition`'s complexity.
+ */
+function evolveProcessInstance(
+  config: ProcessManagerDefinition["config"],
+  { previousState, input, ref }: Parameters<ProcessDefinition<unknown>["evolve"]>[0],
+): ReturnType<ProcessDefinition<unknown>["evolve"]> {
+  const intent = buildIntentAccessor(config.intents, {
+    processKey: ref.processKey,
+  });
+  const state = readStoredState({ config, previousState, processKey: ref.processKey });
+  if (input.kind === "wake") {
+    if (!config.onWake) {
+      return { state: previousState, nextWakeAt: null, intents: [] };
+    }
+    const evolution = config.onWake(state, {
+      at: input.scheduledFor,
+      now: input.now,
+      key: ref.processKey,
+      projectId: ref.projectId,
+      intent,
+    });
+    return {
+      state: evolution.state,
+      // Rearm from the present, not from the slot we missed. A wake
+      // that fires days late must schedule the NEXT slot from now, or
+      // every skipped interval is replayed back-to-back on recovery.
+      nextWakeAt: config.schedule
+        ? Math.max(input.scheduledFor, input.now) + config.schedule.everyMs
+        : (evolution.nextWakeAt ?? null),
+      intents: evolution.intents ?? [],
+    };
+  }
+
+  const envelope = input.event;
+  if (envelope.eventType === SCHEDULE_ARM_EVENT_TYPE) {
+    return {
+      state: previousState,
+      nextWakeAt: Math.max(envelope.occurredAt, input.now) + (config.schedule?.everyMs ?? 0),
+      intents: [],
+    };
+  }
+
+  const handler = config.handlers[envelope.eventType];
+  if (!handler) {
+    throw new Error(
+      `Process manager "${config.name}" received undeclared event "${envelope.eventType}"`,
+    );
+  }
+  const evolution = handler(state, envelope.payload, {
+    at: envelope.occurredAt,
+    now: input.now,
+    key: envelope.processKey,
+    projectId: envelope.projectId,
+    intent,
+  });
+  return {
+    state: evolution.state,
+    nextWakeAt: evolution.nextWakeAt ?? null,
+    intents: evolution.intents ?? [],
+  };
+}
+
+/**
+ * `evolveSignal` for a config-built ProcessDefinition. Extracted for the
+ * same reason as `evolveProcessInstance`.
+ */
+function evolveProcessSignal(
+  config: ProcessManagerDefinition["config"],
+  signalSpecs: NonNullable<ProcessManagerDefinition["config"]["signals"]>,
+  {
+    previousState,
+    signal,
+    now,
+    ref,
+  }: Parameters<NonNullable<ProcessDefinition<unknown>["evolveSignal"]>>[0],
+): ReturnType<NonNullable<ProcessDefinition<unknown>["evolveSignal"]>> {
+  const spec = signalSpecs[signal.signalType];
+  if (!spec) {
+    throw new Error(
+      `Process manager "${config.name}" received undeclared signal "${signal.signalType}"`,
+    );
+  }
+  const intent = buildIntentAccessor(config.intents, {
+    processKey: ref.processKey,
+  });
+  const evolution = spec.handle(
+    readStoredState({ config, previousState, processKey: ref.processKey }),
+    spec.schema.parse(signal.payload),
+    {
+      at: signal.occurredAt,
+      now,
+      key: signal.processKey,
+      projectId: signal.projectId,
+      intent,
+    },
+  );
+  return {
+    state: evolution.state,
+    nextWakeAt: evolution.nextWakeAt ?? null,
+    intents: evolution.intents ?? [],
+  };
+}
+
+/**
+ * The runtime-facing ProcessDefinition a builder config generates. Exported
+ * so tests can drive the EXACT evolve the runtime runs, instead of
+ * re-implementing it around the raw handlers.
+ */
+export function buildProcessDefinition(
+  config: ProcessManagerDefinition["config"],
+): ProcessDefinition<unknown> {
+  const signalSpecs = config.signals ?? {};
+  return {
+    name: config.name,
+    initialState: config.state,
+    ...(config.transient ? { transient: true } : {}),
+    evolve: (params) => evolveProcessInstance(config, params),
+    ...(Object.keys(signalSpecs).length > 0
+      ? {
+          evolveSignal: (params) => evolveProcessSignal(config, signalSpecs, params),
+        }
+      : {}),
+  };
+}
+
+/**
+ * The envelope a process manager consumes for one event. The inbox keys on the
+ * command's deterministic key, since the event log can briefly hold two rows.
+ */
+function processEnvelopeFor<E extends Event>({
+  definition,
+  event,
+  context,
+}: {
+  definition: ProcessManagerDefinition;
+  event: E;
+  context: Parameters<EventSubscriberDefinition<E>["handle"]>[1];
+}): ProcessEventEnvelope {
+  const processKey = definition.config.keyBy?.(event) ?? context.aggregateId;
+  if (processKey.trim().length === 0) {
+    throw new Error(
+      `Process manager "${definition.config.name}" derived an empty process key for event ${event.id}`,
+    );
+  }
+  return {
+    eventId: event.idempotencyKey ?? event.id,
+    eventType: event.type,
+    occurredAt: event.occurredAt,
+    tenantId: context.tenantId,
+    projectId: context.tenantId,
+    processKey,
+    // `toPayload` is the content boundary. Without one the raw event
+    // data is persisted into process state and outbox rows verbatim.
+    payload: definition.config.toPayload
+      ? definition.config.toPayload(event)
+      : (event.data as ProcessEventEnvelope["payload"]),
+  };
+}
+
+/**
+ * Owns process managers mounted on event-sourced pipelines. A generated live
+ * subscriber hands committed events straight to the transactional inbox; no
+ * feed, fact port, or second delivery mechanism exists between them.
+ */
+export class ProcessRuntime {
+  private readonly store: ProcessStore;
+  private readonly logger: Logger;
+  private readonly consumersEnabled: boolean;
+  /** Whether workers start as they register; a held runtime starts them in `start()`. */
+  private running: boolean;
+  private readonly managers = new Map<string, RegisteredProcessManager>();
+  private readonly wakeManagers: Record<string, ProcessWakeHandler> = {};
+  private readonly hostedOutboxes: ProcessOutboxWorker[] = [];
+  private wakeWorker: ProcessWakeWorker | null = null;
+
+  constructor(options: {
+    store: ProcessStore;
+    consumersEnabled: boolean;
+    /** Registers without starting anything until `start()`, so none runs before boot ends. */
+    held?: boolean;
+    logger?: Logger;
+  }) {
+    this.store = options.store;
+    this.consumersEnabled = options.consumersEnabled;
+    this.running = options.consumersEnabled && options.held !== true;
+    this.logger = options.logger ?? defaultLogger;
+  }
+
+  /** Starts what a held runtime registered: every outbox, the wake worker and each schedule. */
+  start(): void {
+    if (this.running || !this.consumersEnabled) return;
+    this.running = true;
+    this.wakeWorker?.start();
+    for (const registered of this.managers.values()) this.startManager(registered);
+    for (const outboxWorker of this.hostedOutboxes) outboxWorker.start();
+  }
+
+  registerPipeline<E extends Event>(params: {
+    pipelineName: string;
+    processManagers: Map<string, ProcessManagerDefinition>;
+  }): GeneratedProcessArtifacts<E> {
+    const subscribers: EventSubscriberDefinition<E>[] = [];
+    for (const definition of params.processManagers.values()) {
+      const registered = this.registerProcessManager(definition);
+      const hasNoEventTypes = definition.config.eventTypes.length === 0;
+      if (hasNoEventTypes) continue;
+      const keyBy = definition.config.keyBy;
+      subscribers.push({
+        name: `pm:${definition.config.name}`,
+        eventTypes: definition.config.eventTypes,
+        // A keyed process gathers several aggregates into one instance, so its
+        // deliveries must serialize into one lane per key — concurrent ones
+        // would fight over the instance revision.
+        ...(keyBy ? { options: { groupKeyFn: keyBy } } : {}),
+        handle: async (event, context) => {
+          const envelope = processEnvelopeFor({ definition, event, context });
+          const result = await this.handleEventReportingUnreadableState({ registered, envelope });
+          if (result.outcome === "revisionConflict") {
+            throw new Error(
+              `Process manager "${definition.config.name}" revision conflict on event ${event.id}`,
+            );
+          }
+          if (result.outcome === "committed") {
+            registered.outboxWorker.notify();
+          }
+        },
+      });
+    }
+    return { subscribers };
+  }
+
+  /** Names an unreadable stored state by instance and issue paths, then lets the queue retry. */
+  private async handleEventReportingUnreadableState({
+    registered,
+    envelope,
+  }: {
+    registered: RegisteredProcessManager;
+    envelope: ProcessEventEnvelope;
+  }) {
+    try {
+      return await registered.manager.handleEvent({
+        envelope,
+        now: nowInstant().epochMilliseconds,
+      });
+    } catch (error) {
+      if (error instanceof ProcessStateUnreadableError) {
+        this.logger.error(
+          {
+            processName: error.processName,
+            projectId: envelope.projectId,
+            processKey: error.processKey,
+            issuePaths: error.issuePaths,
+          },
+          "Stored process state does not match its schema; the delivery retries until it does",
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Routes a synchronous signal to a process manager already mounted on this
+   * runtime. The returned state is committed (or the state observed for an
+   * idempotent retry); callers never need direct access to the process store.
+   */
+  async signal<State = unknown>(params: {
+    processName: string;
+    signal: ProcessSignalEnvelope;
+    now?: number;
+    /** Establish revision 1 from the process's initial state when absent. */
+    createIfMissing?: boolean;
+  }): Promise<SignalHandleResult<State>> {
+    const registered = this.managers.get(params.processName);
+    if (!registered) {
+      throw new Error(`Process manager "${params.processName}" is not registered`);
+    }
+
+    const result = await registered.manager.handleSignal({
+      signal: params.signal,
+      now: params.now ?? nowInstant().epochMilliseconds,
+      createIfMissing: params.createIfMissing,
+    });
+    if (result.outcome === "committed" || result.outcome === "duplicateSignal") {
+      // The duplicate path may be recovery after the first response was lost;
+      // nudging again is cheap and closes the analogous notification-loss
+      // window. Periodic polling remains the crash-recovery guarantee.
+      registered.outboxWorker.notify();
+    }
+    return result as SignalHandleResult<State>;
+  }
+
+  /**
+   * Hosts an outbox the runtime's own machinery writes (failed hand-offs),
+   * with the lease, backoff and dead letters a process manager's intents get.
+   */
+  hostOutbox({
+    processName,
+    handlers,
+  }: {
+    processName: string;
+    handlers: Record<string, IntentHandler>;
+  }): void {
+    const dispatcher = new OutboxDispatcherService({
+      store: this.store,
+      handlers,
+      processNames: [processName],
+    });
+    const outboxWorker = new ProcessOutboxWorker({
+      dispatcher,
+      logger: this.logger,
+      name: processName,
+      stuckDrainTimeoutMs: stuckDrainTimeoutMs(undefined),
+    });
+    this.hostedOutboxes.push(outboxWorker);
+    if (this.running) outboxWorker.start();
+  }
+
+  async stop(): Promise<void> {
+    await Promise.all([
+      this.wakeWorker?.stop(),
+      ...Array.from(this.managers.values(), (manager) => manager.outboxWorker.stop()),
+      ...this.hostedOutboxes.map((outboxWorker) => outboxWorker.stop()),
+    ]);
+  }
+
+  private registerProcessManager(definition: ProcessManagerDefinition): RegisteredProcessManager {
+    const config = definition.config;
+    if (this.managers.has(config.name)) {
+      throw new Error(`Process manager "${config.name}" is mounted by more than one pipeline`);
+    }
+
+    const manager = new ProcessManagerService<unknown>({
+      definition: buildProcessDefinition(config),
+      store: this.store,
+    });
+
+    const dispatcher = new OutboxDispatcherService({
+      store: this.store,
+      handlers: buildIntentHandlers(config),
+      maxAttempts: config.outbox?.maxAttempts,
+      leaseDurationMs: config.outbox?.leaseDurationMs,
+      retryDelayMs: config.outbox?.retryDelayMs,
+      concurrency: config.outbox?.concurrency,
+      processNames: [config.name],
+    });
+    const outboxWorker = new ProcessOutboxWorker({
+      dispatcher,
+      logger: this.logger,
+      name: config.name,
+      batchSize: config.outbox?.batchSize,
+      stuckDrainTimeoutMs: stuckDrainTimeoutMs(config.outbox?.leaseDurationMs),
+    });
+    const registered = { definition, manager, outboxWorker };
+    this.managers.set(config.name, registered);
+
+    if (config.onWake) {
+      this.wakeManagers[config.name] = manager;
+      if (!this.wakeWorker) {
+        this.wakeWorker = new ProcessWakeWorker({
+          store: this.store,
+          managers: this.wakeManagers,
+          logger: this.logger,
+          notifyOutbox: () => {
+            for (const item of this.managers.values()) {
+              item.outboxWorker.notify();
+            }
+          },
+        });
+        if (this.running) this.wakeWorker.start();
+      }
+    }
+
+    if (this.running) this.startManager(registered);
+    return registered;
+  }
+
+  private startManager(registered: RegisteredProcessManager): void {
+    registered.outboxWorker.start();
+    if (registered.definition.config.schedule) this.armSchedule({ registered });
+  }
+
+  private armSchedule({ registered }: { registered: RegisteredProcessManager }): void {
+    const instant = nowInstant();
+    const now = instant.epochMilliseconds;
+    const day = instant.toString({ fractionalSecondDigits: 3 }).slice(0, 10);
+    const processName = registered.definition.config.name;
+    void registered.manager
+      .handleEvent({
+        envelope: {
+          eventId: `schedule-arm:${day}`,
+          eventType: SCHEDULE_ARM_EVENT_TYPE,
+          occurredAt: now,
+          tenantId: SCHEDULED_SINGLETON_PROJECT_ID,
+          projectId: SCHEDULED_SINGLETON_PROJECT_ID,
+          processKey: processName,
+          payload: {},
+        },
+        now,
+      })
+      .catch((error: unknown) => {
+        this.logger.error(
+          {
+            processName,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Schedule arming failed; the next worker boot will retry",
+        );
+      });
+  }
+}

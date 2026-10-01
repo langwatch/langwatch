@@ -1,0 +1,83 @@
+import {
+  DECLARED_SCOPE_TIERS,
+  type AuthzScopeLineageEntry,
+  type AuthzScopeLineageInput,
+  type AuthzScopeLineageResult,
+  SCOPE_TIER_FIELDS,
+  type DeclaredScopeTier,
+} from "@langwatch/authorization";
+import { createLogger, type Logger } from "@langwatch/observability";
+
+import type { ScopeLineageRepository } from "../repositories/authz-read.repository.ts";
+
+type PresentScope = Readonly<{ tier: DeclaredScopeTier; id: string }>;
+
+/** Resolves every scope id in one request and enforces one tenant lineage. */
+export class AuthzScopeLineageService {
+  private constructor(
+    private readonly repository: ScopeLineageRepository,
+    private readonly logger: Logger,
+  ) {}
+
+  static create(options: {
+    repository: ScopeLineageRepository;
+    logger?: Logger;
+  }): AuthzScopeLineageService {
+    return new AuthzScopeLineageService(
+      options.repository,
+      options.logger ?? createLogger("langwatch:authz:scope-lineage"),
+    );
+  }
+
+  async check(input: AuthzScopeLineageInput): Promise<AuthzScopeLineageResult> {
+    const scopes = presentScopes(input);
+    if (scopes.length < 2) {
+      return { kind: "consistent" };
+    }
+
+    const entries = await Promise.all(scopes.map((scope) => this.resolve(scope)));
+    const organizations = new Set(entries.map((entry) => entry.organizationId));
+    if (organizations.size === 1 && !organizations.has(null)) {
+      return { kind: "consistent" };
+    }
+
+    this.logger.warn(
+      { scopes: entries },
+      "refused: one request carries scope ids that do not resolve to one organization",
+    );
+
+    return { kind: "mismatch", widest: widestScope(scopes), entries };
+  }
+
+  private async resolve(scope: PresentScope): Promise<AuthzScopeLineageEntry> {
+    switch (scope.tier) {
+      case "organization":
+        return { ...scope, organizationId: scope.id };
+      case "team": {
+        const team = await this.repository.findTeamOrganization({ teamId: scope.id });
+
+        return { ...scope, organizationId: team?.organizationId ?? null };
+      }
+      case "project": {
+        const project = await this.repository.findProjectLineage({ projectId: scope.id });
+
+        return { ...scope, organizationId: project?.organizationId ?? null };
+      }
+    }
+  }
+}
+
+function presentScopes(input: AuthzScopeLineageInput): PresentScope[] {
+  return DECLARED_SCOPE_TIERS.flatMap((tier) => {
+    const id = input[SCOPE_TIER_FIELDS[tier]];
+
+    return typeof id === "string" && id.length > 0 ? [{ tier, id }] : [];
+  });
+}
+
+function widestScope(scopes: readonly PresentScope[]): PresentScope {
+  return [...scopes].toSorted(
+    (left, right) =>
+      DECLARED_SCOPE_TIERS.indexOf(right.tier) - DECLARED_SCOPE_TIERS.indexOf(left.tier),
+  )[0]!;
+}

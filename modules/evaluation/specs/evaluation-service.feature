@@ -1,0 +1,350 @@
+Feature: Evaluation service boundary
+
+  @unit
+  Scenario: Evaluation execution is delegated through one capability
+    Given a valid trace evaluation command
+    When the Evaluation service executes it
+    Then it validates workflow scope through the Workflow service when needed
+    And delegates trace and evaluator execution to the injected execution port
+
+  @unit
+  Scenario: Evaluation runs use private ClickHouse persistence
+    Given an evaluation run value
+    When the Evaluation service upserts it
+    Then it validates the Zod 4 run contract
+    And writes through its private repository
+
+  @unit
+  Scenario: Per-trace evaluation reads use the same capability
+    Given trace evaluation cards need evaluation state or deferred inputs
+    When the Evaluation service reads them
+    Then it uses its private repository
+    And a memory-limited trace read retries without the heavy Inputs column
+    And durable input markers are resolved before the value leaves the service
+
+  @unit
+  Scenario: Monitor performance uses the same capability
+    Given monitors need current and previous evaluation performance
+    When the Evaluation service reads their performance
+    Then it uses its private performance read model
+    And it chooses score or pass-rate based on each monitor's guardrail mode
+
+  @unit
+  Scenario: Missing evaluation runs throw a domain error
+    Given no run exists for an evaluation id
+    When a caller requests that run
+    Then EvaluationNotFoundError is thrown
+
+  @unit
+  Scenario: An installed evaluation module runs an evaluator over data it is handed
+    Given a process that installs the evaluation feature
+    When a caller runs an evaluator over data it holds, with no trace behind it
+    Then the evaluator runtime answers with the evaluator's result
+    And the call is never refused for want of a composed runtime
+
+  @unit
+  Scenario: An installed evaluation module warms the evaluator runtime through the studio engine
+    Given a process that installs the evaluation feature
+    When the experiment workbench asks it to warm up 3 evaluator runtime instances
+    Then the workflow module is posted 3 "is_alive" studio events for that project
+    And the answer reports success for 3 instances
+
+  @unit
+  Scenario: An installed evaluation module re-scores a stored trace through the caller's protections
+    Given a process that installs the evaluation feature
+    When a signed-in user re-runs an evaluator on one stored trace
+    Then the trace is read through that user's own read-time protections
+    And the call is never refused for want of a composed trace evaluation runtime
+
+  Scenario: API and workers share the same service
+    Given the process has composed one Evaluation service
+    When an API handler or worker reads a run
+    Then both use the same service capability
+    And neither constructs ClickHouse or execution dependencies per request
+
+  @unit
+  Scenario: The evaluation transport moves without changing who may call it
+    Given the evaluation procedures are owned by the Evaluation package
+    When the process mounts them on its own tRPC root
+    Then the browser calls the same procedure names as before
+    And every procedure declares the same access decision it declared before
+
+  @unit
+  Scenario: An evaluator run reports its duration and its outcome
+    Given a process composed the evaluator runtime's telemetry
+    When an evaluation finishes
+    Then its duration is recorded against the evaluator that produced it
+    And its outcome is counted apart from the other outcomes
+
+  @unit
+  Scenario: The evaluator inventory names what this install and this project lack
+    Given an evaluator this install left out and a project with no Azure Safety provider
+    When a caller lists the evaluators
+    Then each Azure evaluator names both Azure credentials as missing
+    And the evaluator left out says so, apart from being unconfigured
+    And every other evaluator's missing variables come from this install's environment
+
+  @unit
+  Scenario: A re-scored trace is reported onto the pipeline every other verdict travels on
+    Given a caller re-scores one stored trace with one evaluator
+    When the evaluator answers
+    Then the result reaches the caller
+    And the run is attributed to the caller
+    And the verdict is reported against the project's tenant
+    And a pipeline that refuses the report still lets the caller have the result
+
+  @unit
+  Scenario: A warm-up is a nudge rather than a health check
+    Given a caller warms the evaluator runtime for a project
+    When every probe fails
+    Then the caller is still told how many were sent
+
+  @unit
+  Scenario: The memory and Postgres evaluation cost ledgers answer alike
+    Given one evaluation run's cost written under its own idempotency key
+    When the same run is recorded again
+    Then the second write is refused rather than billing the project twice
+    And a row belonging to another project is never read back for this one
+
+  @unit
+  Scenario: A public evaluate call writes its cost to the ledger
+    Given an evaluate call whose evaluator reported a cost
+    When the cost is recorded
+    Then the ledger holds one entry under the id the call chose, inside its project only
+
+  @unit
+  Scenario: An evaluate call reads the monitor it names by slug from the monitor module
+    Given a process that installs the evaluation feature beside a monitor owner
+    When an evaluate call names a monitor slug the project holds
+    Then the monitor's id, name, check type, settings and enabled flag come back
+    And a slug the project does not hold answers no monitor rather than an error
+
+  @unit
+  Scenario: An evaluate call resolves a saved evaluator through the evaluator module
+    Given a process that installs the evaluation feature beside an evaluator owner
+    When an evaluate call names a saved evaluator by slug or id
+    Then the evaluator's check type, settings, name, id and required fields come back
+    And an evaluator the project does not hold is refused with the owner's own code
+
+  @unit
+  Scenario: An evaluate call reads the project's custom evaluators from the workflow module
+    Given a process that installs the evaluation feature beside a workflow owner
+    When an evaluate call names a custom/<workflowId> evaluator
+    Then the project's evaluator workflows come back, each carrying only its published version
+
+  @unit
+  Scenario: A dataset evaluation reads its dataset and writes its rows through the dataset module
+    Given a process that installs the evaluation feature beside a dataset owner
+    When a dataset evaluation names a dataset slug and scores an entry
+    Then the dataset's id comes back, and a slug the project does not hold answers no dataset
+    And the scored entry is written as a batch-evaluation row by the dataset owner
+
+  @unit
+  Scenario: An SDK batch is written into its experiment's run history through the experiment module
+    Given a process that installs the evaluation feature beside an experiment owner
+    When an SDK logs a batch of evaluation results
+    Then the experiment is found or created, and its run is started, filled and completed in that order
+    And an evaluator result carries the status the batch reported
+    And a dataset evaluation's experiment slug resolves through the same owner
+
+  @unit
+  Scenario: An evaluate call reads the project's default models from the cascade
+    Given a process that installs the evaluation feature beside a model provider owner
+    When an evaluate call asks for the model a feature resolves to
+    Then the cascade's model comes back, and nothing when the cascade sets none
+
+  @unit
+  Scenario: An installed evaluation module reads back the runs it wrote
+    Given a process that installs the evaluation module over its repositories
+    When a run is upserted for a trace
+    Then the run reads back by its id, by its trace and among the trace's evaluations
+    And a run the tenant never wrote is refused as not found
+
+  @unit
+  Scenario: The live tier reads run history through the process's routing ClickHouse
+    Given the live evaluation repositories over the process's ClickHouse member
+    When a run is looked up for a tenant
+    Then every statement names that tenant and carries only settings the member accepts
+
+  # The ClickHouse run read owns the floor: the tenant's retention plus two days' margin, as on main.
+  # The memory tier has no partitions to prune and no TTL, so it does not floor.
+  @unit
+  Scenario: A run lookup without a scheduled time stops at the tenant's retention horizon
+    Given the live run read over a tenant's retention from data retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the tenant's retention plus two days' margin, not the platform default
+
+  @unit
+  Scenario: A run lookup whose tenant retention cannot be read stops at the platform default
+    Given data retention refuses to answer a tenant's retention
+    When a run is looked up without its scheduled time
+    Then the fallback scan starts at the platform default plus the margin, bounded rather than unbounded
+
+  @unit
+  Scenario: An evaluation report travels on the pipeline's own sender
+    Given an installed evaluation module whose evaluation_processing senders are connected
+    When an evaluation is reported
+    Then the report is sent once through the reportEvaluation sender
+
+  @unit
+  Scenario: An evaluation report refuses by name before the pipeline is connected
+    Given an installed evaluation module whose evaluation_processing senders are not connected
+    When an evaluation is reported
+    Then the report is refused naming the missing reportEvaluation sender
+
+  @unit
+  Scenario: Evaluation's fold stores stamp the platform default retention read at write time
+    Given evaluation's fold stores built over the platform default retention
+    When a run and its analytics fold are written for a tenant with no override
+    Then each row carries the default read at that write, and building the stores reads nothing
+
+  @unit
+  Scenario: A trigger's evaluation filter matches a processed verdict of the named evaluator
+    Given a trace whose evaluator run passed
+    When a trigger filtering on that evaluator passing is matched against the trace's runs
+    Then the filter matches
+
+  @unit
+  Scenario: A verdict on an errored run never satisfies a trigger's evaluation filter
+    Given a trace whose evaluator run errored with a failing verdict
+    When a trigger filtering on that evaluator failing is matched against the trace's runs
+    Then the filter does not match
+
+  @unit
+  Scenario: A keyed evaluation filter fails when its evaluator has no run on the trace
+    Given a trace with a run for one of two evaluators a trigger names
+    When the trigger's evaluation filters are matched against the trace's runs
+    Then the filter does not match
+
+  @unit
+  Scenario: Topic clustering sends nothing when the deployment names no langevals endpoint
+    Given a deployment with no langevals endpoint configured
+    When topic clustering asks evaluation for a batch clustering
+    Then the answer is not configured
+    And nothing is posted to langevals
+
+  @unit
+  Scenario: Topic clustering posts a batch to langevals and returns its checked answer
+    Given a deployment with a langevals endpoint
+    When topic clustering asks evaluation for a batch clustering
+    Then the params are posted to the batch clustering route as a topic clustering batch call
+    And the answer carries the topics langevals returned
+
+  @unit
+  Scenario: A langevals clustering failure is refused with its status and body
+    Given langevals answers a clustering call with a server error
+    When topic clustering asks evaluation for an incremental clustering
+    Then it is refused naming the incremental clustering, the status text and the body
+
+  @unit
+  Scenario: A clustering call aborted by its caller does not reach langevals
+    Given topic clustering's deadline has already fired
+    When it asks evaluation for a batch clustering
+    Then the call rejects with the abort and nothing is posted
+
+  @unit
+  Scenario: PII detection sends nothing when the deployment names no langevals endpoint
+    Given a deployment with no langevals endpoint configured
+    When data privacy asks evaluation to detect PII in a batch of texts
+    Then the answer is not configured
+    And nothing is posted to langevals
+
+  @unit
+  Scenario: PII detection posts a batch to langevals' Presidio evaluator and returns one result per text
+    Given a deployment with a langevals endpoint
+    When data privacy asks evaluation to detect PII in two texts for a set of entities
+    Then the texts are posted to the Presidio PII detection route with each entity lowercased and switched on
+    And the answer carries one result per text
+
+  @unit
+  Scenario: An empty PII batch reaches no langevals
+    Given a deployment with a langevals endpoint
+    When data privacy asks evaluation to detect PII in no texts
+    Then the answer carries no results and nothing is posted
+
+  @unit
+  Scenario: A langevals PII detection failure is refused with the answer's body
+    Given langevals answers a PII batch with a server error
+    When data privacy asks evaluation to detect PII
+    Then it is refused carrying the body langevals answered
+
+  @unit
+  Scenario: A PII answer that is not one result per text is refused
+    Given langevals answers a PII batch of two texts with one result
+    When data privacy asks evaluation to detect PII
+    Then it is refused naming the expected and received result counts
+
+  @unit
+  Scenario: A PII answer whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers a PII batch with label, details and cost set to null
+    When data privacy asks evaluation to detect PII
+    Then the answer carries each result with its unset fields still null
+
+  @unit
+  Scenario: An evaluator result whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers an evaluation with a processed result whose label and cost are null
+    When an evaluator is run over the data
+    Then the result carries its score, passed and details
+    And its label and cost are null
+
+  @unit
+  Scenario: A skipped evaluator result whose unset fields langevals sends as null is accepted as sent
+    Given langevals answers an evaluation with a skipped result whose cost is null
+    When an evaluator is run over the data
+    Then the result is skipped with its details and a null cost
+
+  @unit
+  Scenario: A langevals answer that is not an evaluation result fails the run naming the evaluator
+    Given langevals answers an evaluation with a result whose score is not a number
+    When an evaluator is run over the data
+    Then the run fails with an evaluator execution error for an unexpected response
+    And the failure names the evaluator and carries the validation issues as its reason
+
+  @unit
+  Scenario: A tenantless PII batch over the staging threshold posts inline
+    Given a deployment that stages langevals payloads over a threshold
+    When a PII batch that names no project and is over the threshold is posted
+    Then it is posted inline and nothing is staged
+
+  @unit
+  Scenario: A trace's online evaluation is queued with the trace trigger's dedup
+    Given evaluation_processing's senders are connected
+    When trace queues an evaluation for a trace-level monitor
+    Then executeEvaluation is sent keeping the command's delay, deduplicated per trace and evaluator for six minutes past dispatch
+
+  @unit
+  Scenario: A thread-level online evaluation waits out the thread's idle window
+    Given evaluation_processing's senders are connected
+    When trace queues an evaluation for a monitor with a thread idle timeout on a threaded trace
+    Then executeEvaluation is delayed and deduplicated per thread and evaluator for that idle window
+
+  @unit
+  Scenario: A trace evaluation queued before the pipeline is connected is refused by name
+    Given an installed evaluation module whose evaluation_processing senders are not connected
+    When trace queues an evaluation
+    Then the call is refused naming the missing executeEvaluation sender
+
+  @unit
+  Scenario: RAG contexts reach langevals as the chunks' text
+    Given a monitor whose contexts mapping carries RAG chunk objects, JSON-encoded or not
+    When the evaluator request is built for langevals
+    Then each context is the chunk's content, not the JSON envelope around it
+    And an unmapped or empty contexts field is sent as no contexts rather than one empty string
+
+  @unit
+  Scenario: Invalid evaluator settings are refused even when generation parameters ride along
+    Given an evaluator whose settings carry a temperature
+    And the evaluator's own settings fail its settings schema
+    When the settings are parsed for dispatch on the API route
+    Then the parse fails with the schema's error
+    And the route answers 400 rather than dispatching the generation parameters alone
+
+  # Replaces "An evaluation's organization count is read once" (Alex, 2026-09-30, option D1a):
+  # nurturing names the admin and counts evaluations from its own side, so evaluation needs no
+  # ProjectApi. See enterprise/modules/nurturing/specs/nurturing.feature.
+  @unit
+  Scenario: A settled evaluation is recorded with no organization lookup
+    Given an evaluation in a project settles
+    When its lifecycle fact is recorded
+    Then the fact carries the project, the evaluation, its evaluator type, score and verdict
+    And it names no admin and no organization count

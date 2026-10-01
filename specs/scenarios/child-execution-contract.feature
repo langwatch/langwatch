@@ -1,21 +1,9 @@
 Feature: Scenario child execution contract stays private to the child
 
-  `server/scenarios/execution/types.ts` describes the wire contract between the
-  scenario worker and the child process it spawns: the job data written to the
-  child's stdin, the adapter payloads inside it, and the execution context it
-  runs under. It is meant to move to the child's own package, so that the app
-  can stop depending on the scenario runner and the production image can stop
-  shipping it.
-
-  One thing stopped that move. `FieldMappingSchema` — how a single agent input
-  is filled, from a scenario source or from a literal — lived in that same file,
-  and two callers outside the child needed it: the suite target schema, and the
-  optimization-studio DSL. The DSL is frontend-reachable, so the browser bundle
-  reached into the child's execution contract to read one small schema.
-
-  Splitting the schema into `server/scenarios/field-mapping.ts` gives each side
-  what it actually needs: a zod-only module both can import, and an execution
-  contract with no importers outside the child's own tree.
+  `modules/scenario/contract/src/scenario-execution-data.ts` defines
+  the validated stdin contract between the worker and its isolated child.
+  Portable field mappings live separately in `field-mapping.ts`, so Suite and
+  browser authoring do not import the child execution payload.
 
   # ---------------------------------------------------------------------------
   # The boundary
@@ -45,3 +33,25 @@ Feature: Scenario child execution contract stays private to the child
     Given a suite target carrying a source mapping and a literal mapping
     When the child's job data schema parses the same mappings
     Then both schemas accept them
+
+  # ---------------------------------------------------------------------------
+  # The fence the child dials a target through
+  # ---------------------------------------------------------------------------
+
+  # A child inherits an allowlisted handful of the operator's environment and
+  # runs under SKIP_ENV_VALIDATION, so a fence it resolved for itself would be
+  # the library default rather than the deployment's: an install that blocks
+  # local addresses everywhere else would stop blocking them the moment the
+  # call moved into a child.
+
+  @unit
+  Scenario: The child is handed the deployment's own egress policy
+    Given a deployment that blocks local addresses and allowlists one host
+    When the parent builds a child's environment
+    Then the child is handed that exact policy
+
+  @unit
+  Scenario: A child handed no egress policy refuses rather than assuming one
+    Given a child process started without a stated egress policy
+    When it reads the policy an HTTP target would be dialled through
+    Then it fails by naming the variable instead of defaulting the fence open

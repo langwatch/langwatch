@@ -1,0 +1,142 @@
+Feature: Data Privacy service
+
+  @unit
+  Scenario: The service resolves the platform default
+    Given a project with no data privacy rules
+    When the data privacy service resolves the project policy
+    Then content is captured
+    And essential PII redaction is enabled
+    And secrets redaction is enabled
+
+  Scenario: The nearest scope wins while patterns accumulate
+    Given an organization rule and a narrower team rule
+    When the data privacy service resolves a project in that team
+    Then the team rule supplies fields it sets
+    And custom patterns from both rules are applied
+
+  @unit
+  Scenario: Unsafe customer patterns are rejected before persistence
+    Given a data privacy rule with an invalid or unsafe regular expression
+    When the rule is saved
+    Then the service rejects the rule
+    And no policy row is written
+
+  Rule: A refusal a reader can act on says what happened
+
+    A privacy rule is saved from a settings page whose scope picker can go
+    stale under the reader: a team is renamed, a department archived, a project
+    moved to another organization. Every one of those refusals names itself, so
+    the page can tell the reader what to do instead of showing an unexplained
+    failure.
+
+    @integration
+    Scenario: A rule aimed at a scope that no longer exists is refused by name
+      Given the organization, department, team or project a rule was aimed at has been removed
+      When the reader saves the rule
+      Then the save is refused as a missing scope
+      And the reader is told to reload the page and pick a scope that is still there
+
+    @unit
+    Scenario: A rule aimed outside the project's organization is refused by name
+      Given the scope a rule was aimed at belongs to a different organization than the project
+      When the reader saves the rule
+      Then the save is refused as an out-of-organization scope
+      And the reader is told to pick a scope in this organization
+
+    @unit
+    Scenario: A rule written from a project that is gone is refused by name
+      Given the project the privacy settings were opened from has been removed
+      When the reader saves the rule
+      Then the save is refused as a missing project
+
+    @unit
+    Scenario: A caller without standing at a tier is told which permission it needs
+      Given a reader who may change their own project but not the organization
+      When they save a rule at the organization
+      Then the save is refused
+      And the refusal names the permission that tier asks for
+
+    @integration
+    Scenario: A rule whose pattern is refused says which pattern and why
+      Given a rule carrying a custom pattern that also matches ordinary text
+      When the reader saves the rule
+      Then the save is refused as an invalid rule
+      And the reader is told which pattern was rejected and why
+
+    @unit
+    Scenario: A rule aimed at a department is refused by name
+      Given a reader who picked a department in the scope picker
+      When they save the rule
+      Then the save is refused as a tier that cannot carry a rule
+      And the reader is told to set the rule on the organization, a team or a project instead
+      And the reader is told to check their custom patterns and exceptions
+      And no policy row is written
+
+  Rule: Every backend the feature stores rules in answers the same way
+
+    @unit
+    Scenario: The memory and Postgres privacy rule repositories answer alike
+      Given the same privacy rules written to each backend
+      When the same reads and writes run against every backend
+      Then each answers the same rules, the same absences, and never a rule another organization wrote
+
+  Rule: The Google service-account credential has one owner
+
+    @unit
+    Scenario: A peer borrows the Google credential without the value leaving data privacy
+      Given a deployment configured with a Google service-account credential
+      When a peer asks data privacy to build something from it
+      Then the peer receives what it built from the credential
+      And a deployment with no credential lends undefined instead of refusing
+
+  Rule: A project's PII redaction level reads and writes by its public name
+
+    The management API and the MCP and CLI tools name one level per project:
+    STRICT, ESSENTIAL or DISABLED. The level is the project's own scoped rule,
+    the nearest scope, so it is what the project's traces are redacted at.
+
+    @unit
+    Scenario: A project with no rule reads the platform default level
+      Given a project with no data privacy rules
+      When its PII redaction level is read
+      Then the level is ESSENTIAL
+
+    @unit
+    Scenario: A custom entity list reads as STRICT
+      Given a project whose own rule redacts a custom list of PII entities
+      When its PII redaction level is read
+      Then the level is STRICT
+
+    @unit
+    Scenario: Writing the level keeps every other field of the project's rule
+      Given a project whose own rule drops input and carries a PII exception pattern
+      When its PII redaction level is set to STRICT
+      Then the project's rule redacts PII at the strict level
+      And the rule still drops input and keeps the exception pattern
+      And reading the level answers STRICT
+
+    @unit
+    Scenario: Writing the level for a project with no rule creates its rule
+      Given a project with no data privacy rules
+      When its PII redaction level is set to DISABLED
+      Then the project has one rule, redacting no PII
+
+    @unit
+    Scenario: Leaving the custom level drops the entity list
+      Given a project whose own rule redacts a custom list of PII entities
+      When its PII redaction level is set to ESSENTIAL
+      Then the project's rule redacts PII at the essential level with no entity list
+
+    @unit
+    Scenario: Disabling PII redaction drops the exception patterns
+      Given a project whose own rule drops input and carries a PII exception pattern
+      When its PII redaction level is set to DISABLED
+      Then the project's rule redacts no PII and carries no exception pattern
+      And the rule still drops input
+
+    @unit
+    Scenario: A level written for a project that is gone is refused by name
+      Given the project has been removed
+      When its PII redaction level is set
+      Then the write is refused as a missing project
+      And no policy row is written

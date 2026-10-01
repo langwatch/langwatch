@@ -1,0 +1,186 @@
+import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
+import {
+  OrganizationNotFoundError,
+  UNLIMITED_PLAN,
+} from "@langwatch/enterprise-licensing-contract";
+import { describe, expect, it } from "vitest";
+
+import type { OrganizationLicense } from "../app/licensing.members.ts";
+import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
+import { LicensingEntitlementSourceService } from "../services/licensing-entitlement-source.service.ts";
+import {
+  ENTERPRISE_LICENSE_KEY,
+  EXPIRED_ENTERPRISE_LICENSE_KEY,
+  TAMPERED_LICENSE_KEY,
+  TEST_PUBLIC_KEY,
+} from "./testing.ts";
+
+/**
+ * Spec: enterprise/modules/licensing/specs/licensing.feature
+ */
+
+/** The one read the licence leg makes; nothing else is exercised. */
+class StoredLicense implements OrganizationLicense {
+  static of(licenseKey: string | null): StoredLicense {
+    return new StoredLicense(licenseKey);
+  }
+
+  private constructor(private readonly licenseKey: string | null) {}
+
+  async getOrganizationLicense(): Promise<{ licenseKey: string | null }> {
+    return { licenseKey: this.licenseKey };
+  }
+}
+
+const cryptography = NodeLicenseCryptographyService.create({ publicKey: TEST_PUBLIC_KEY });
+
+function planSourceFor(licenseKey: string | null): LicensePlanSourceService {
+  return LicensePlanSourceService.create({
+    licenses: StoredLicense.of(licenseKey),
+    cryptography,
+  });
+}
+
+describe("given the plan a signed licence entitles an organization to", () => {
+  describe("when the organization activated no licence", () => {
+    /** @scenario "A deployment that never had a license stays uncapped" */
+    /** @scenario "An unlicensed deployment runs on the Open Source plan" */
+    it("answers the unlimited baseline on both readings, so nothing narrows an unlicensed deployment", async () => {
+      const plans = planSourceFor(null);
+
+      await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(plans.getSelfHostedPlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+    });
+  });
+
+  describe("when the organization no longer exists", () => {
+    it("answers the unlimited baseline and lets any other failure through", async () => {
+      const missing = LicensePlanSourceService.create({
+        licenses: { getOrganizationLicense: () => Promise.reject(new OrganizationNotFoundError()) },
+        cryptography,
+      });
+      const broken = LicensePlanSourceService.create({
+        licenses: { getOrganizationLicense: () => Promise.reject(new Error("connection reset")) },
+        cryptography,
+      });
+
+      await expect(missing.getActivePlan("org-gone")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(missing.getSelfHostedPlan("org-gone")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(broken.getActivePlan("org-1")).rejects.toThrow("connection reset");
+    });
+  });
+
+  describe("when the stored licence was tampered with", () => {
+    /** @scenario "A license we did not sign is still not a license" */
+    /** @scenario "An unreadable license leaves the deployment on the Open Source plan" */
+    it("answers the unlimited baseline rather than the plan the payload claims", async () => {
+      const plans = planSourceFor(TAMPERED_LICENSE_KEY);
+
+      await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(plans.getSelfHostedPlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+    });
+  });
+
+  describe("when the organization holds a genuine Enterprise licence", () => {
+    it("answers the plan the licence names", async () => {
+      const plans = planSourceFor(ENTERPRISE_LICENSE_KEY);
+
+      await expect(plans.getActivePlan("org-1")).resolves.toMatchObject({
+        type: "ENTERPRISE",
+        free: false,
+        maxMembers: 100,
+        planSource: "license",
+      });
+    });
+  });
+
+  describe("when a genuine licence's term has ended", () => {
+    /**
+     * The two readings deliberately disagree, and ADR-027 is why. On Cloud the
+     */
+    it("steps aside on the hosted reading and still holds on the self-hosted one", async () => {
+      const plans = planSourceFor(EXPIRED_ENTERPRISE_LICENSE_KEY);
+
+      await expect(plans.getActivePlan("org-1")).resolves.toBe(UNLIMITED_PLAN);
+      await expect(plans.getSelfHostedPlan("org-1")).resolves.toMatchObject({
+        type: "ENTERPRISE",
+        free: false,
+        maxMembers: 100,
+      });
+    });
+  });
+});
+
+describe("given the licence leg a deployment composes", () => {
+  describe("when the deployment is the hosted one", () => {
+    /** @scenario "On Cloud a lapsed license steps aside for the subscription" */
+    it("reads the licence on the hosted terms, so a lapsed contract stops answering", async () => {
+      const source = LicensingEntitlementSourceService.forDeployment({
+        licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
+        cryptography,
+        isSaas: true,
+      });
+
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toEqual({
+        granted: true,
+        plan: UNLIMITED_PLAN,
+      });
+    });
+  });
+
+  describe("when the deployment is self-hosted", () => {
+    /**
+     * The mode is derived HERE rather than at each root, which is what this
+     * pins: the interactive and background processes both call this, so a
+     * lapsed self-hosted licence cannot keep its seats in one process and lose
+     * them in the other.
+     */
+    /** @scenario "A lapsed license keeps metering the seats it sold" */
+    /** @scenario "An expired license keeps the seats it sold" */
+    it("reads the licence on the self-hosted terms and floors it at the open-source baseline", async () => {
+      const source = LicensingEntitlementSourceService.forDeployment({
+        licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
+        cryptography,
+        isSaas: false,
+      });
+
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
+        granted: true,
+        plan: {
+          type: "ENTERPRISE",
+          // The seats the customer bought bind; the licence's message ceiling
+          // does not, because self-hosted volume is never metered.
+          maxMembers: 100,
+          maxMessagesPerMonth: UNLIMITED_PLAN.maxMessagesPerMonth,
+        },
+      });
+    });
+
+    /** @scenario "A lapsed license keeps the capabilities it bought" */
+    it("keeps the Enterprise identity on the self-hosted reading of a lapsed licence", async () => {
+      const source = LicensingEntitlementSourceService.forDeployment({
+        licenses: StoredLicense.of(EXPIRED_ENTERPRISE_LICENSE_KEY),
+        cryptography,
+        isSaas: false,
+      });
+
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toMatchObject({
+        granted: true,
+        plan: { type: "ENTERPRISE" },
+      });
+    });
+
+    it("answers the unlimited baseline where no licence was activated", async () => {
+      const source = LicensingEntitlementSourceService.forDeployment({
+        licenses: StoredLicense.of(null),
+        cryptography,
+        isSaas: false,
+      });
+
+      await expect(source.resolve({ organizationId: "org-1" })).resolves.toEqual({
+        granted: true,
+        plan: UNLIMITED_PLAN,
+      });
+    });
+  });
+});

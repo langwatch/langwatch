@@ -1,11 +1,12 @@
 import { createServer, type Server } from "node:http";
+
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   headersForRedirect,
   requestPublicJson,
   resolvePublicDestination,
-} from "../public-http-request.js";
+} from "../public-http-request.ts";
 
 describe("public HTTP request security", () => {
   afterEach(() => {
@@ -22,7 +23,9 @@ describe("public HTTP request security", () => {
     "file:///etc/passwd",
     "http://user:password@example.com/",
   ])("rejects unsafe destination %s", async (url) => {
-    await expect(resolvePublicDestination(url)).rejects.toThrow(/globally routable public addresses/);
+    await expect(resolvePublicDestination(url)).rejects.toThrow(
+      /globally routable public addresses/,
+    );
   });
 
   it("fails closed when any resolved address is not public", async () => {
@@ -30,13 +33,15 @@ describe("public HTTP request security", () => {
       resolvePublicDestination("https://agent.example/run", async () => [
         { address: "93.184.216.34", family: 4 },
         { address: "10.0.0.4", family: 4 },
-      ])
+      ]),
     ).rejects.toThrow(/globally routable public addresses/);
   });
 
   it("pins a validated public destination", async () => {
     await expect(
-      resolvePublicDestination("https://agent.example/run", async () => [{ address: "93.184.216.34", family: 4 }])
+      resolvePublicDestination("https://agent.example/run", async () => [
+        { address: "93.184.216.34", family: 4 },
+      ]),
     ).resolves.toMatchObject({
       address: "93.184.216.34",
       family: 4,
@@ -47,22 +52,19 @@ describe("public HTTP request security", () => {
     vi.useFakeTimers();
     const resolution = resolvePublicDestination(
       "https://agent.example/run",
-      () => new Promise(() => undefined)
+      () => new Promise(() => undefined),
     );
-    const rejection = expect(resolution).rejects.toThrow(
-      /destination could not be resolved/
-    );
-
-    await vi.advanceTimersByTimeAsync(30_000);
-
-    await rejection;
+    await Promise.all([
+      expect(resolution).rejects.toThrow(/destination could not be resolved/),
+      vi.advanceTimersByTimeAsync(30_000),
+    ]);
   });
 
   /** @scenario HTTP agent redirects are revalidated */
   it("rejects private redirect targets and strips cross-origin secrets", async () => {
-    await expect(
-      resolvePublicDestination("http://127.0.0.1/redirect-target")
-    ).rejects.toThrow(/globally routable public addresses/);
+    await expect(resolvePublicDestination("http://127.0.0.1/redirect-target")).rejects.toThrow(
+      /globally routable public addresses/,
+    );
 
     expect(
       headersForRedirect(
@@ -73,15 +75,15 @@ describe("public HTTP request security", () => {
           "X-Api-Key": "secret",
           "X-Request-Id": "request-1",
         },
-        true
-      )
+        true,
+      ),
     ).toEqual({
       "Content-Type": "application/json",
       "X-Request-Id": "request-1",
     });
   });
 
-  describe("real HTTP request", () => {
+  describe("when making a real HTTP request", () => {
     let server: Server;
     let port: number;
     let hits = 0;
@@ -110,7 +112,7 @@ describe("public HTTP request security", () => {
         requestPublicJson(`http://127.0.0.1:${port}/secrets`, {
           method: "POST",
           body: "{}",
-        })
+        }),
       ).rejects.toThrow(/globally routable public addresses/);
       expect(hits).toBe(0);
     });

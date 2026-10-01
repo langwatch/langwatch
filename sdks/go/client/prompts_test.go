@@ -52,7 +52,7 @@ func TestPromptsGet(t *testing.T) {
 			p, err := c.Prompts.Get(context.Background(), "support-greeting", nil)
 			require.NoError(t, err)
 
-			assert.Equal(t, "/api/prompts/support-greeting", gotPath)
+			assert.Equal(t, "/api/v1/prompts/support-greeting", gotPath)
 			assert.Empty(t, gotQuery)
 			assert.Equal(t, "prompt_abc", p.ID)
 			require.NotNil(t, p.Handle)
@@ -192,7 +192,7 @@ func TestPromptsCreate(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/prompts", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts", r.URL.Path)
 				assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
 				raw, _ := io.ReadAll(r.Body)
 				require.NoError(t, json.Unmarshal(raw, &gotBody))
@@ -231,7 +231,7 @@ func TestPromptsListAndVersions(t *testing.T) {
 	t.Run("given prompts exist", func(t *testing.T) {
 		t.Run("when listing", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/prompts", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts", r.URL.Path)
 				_, _ = w.Write([]byte("[" + samplePromptJSON + "]"))
 			})
 			prompts, err := c.Prompts.List(context.Background())
@@ -244,7 +244,7 @@ func TestPromptsListAndVersions(t *testing.T) {
 	t.Run("given a prompt with versions", func(t *testing.T) {
 		t.Run("when listing versions", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/prompts/support-greeting/versions", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts/support-greeting/versions", r.URL.Path)
 				_, _ = w.Write([]byte("[" + samplePromptJSON + "]"))
 			})
 			versions, err := c.Prompts.Versions(context.Background(), "support-greeting")
@@ -260,7 +260,7 @@ func TestPromptsTags(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/prompts/tags", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts/tags", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(raw, &gotBody)
 				w.WriteHeader(http.StatusCreated)
@@ -276,7 +276,7 @@ func TestPromptsTags(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPut, r.Method)
-				assert.Equal(t, "/api/prompts/support-greeting/tags/production", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts/support-greeting/tags/production", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(raw, &gotBody)
 				_, _ = w.Write([]byte(`{"configId":"prompt_abc","versionId":"prompt_version_xyz","tag":"production","updatedAt":"2024-01-01T00:00:00Z"}`))
@@ -290,7 +290,7 @@ func TestPromptsTags(t *testing.T) {
 		t.Run("when deleting a tag", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodDelete, r.Method)
-				assert.Equal(t, "/api/prompts/tags/staging", r.URL.Path)
+				assert.Equal(t, "/api/v1/prompts/tags/staging", r.URL.Path)
 				w.WriteHeader(http.StatusNoContent)
 			})
 			err := c.Prompts.DeleteTag(context.Background(), "staging")

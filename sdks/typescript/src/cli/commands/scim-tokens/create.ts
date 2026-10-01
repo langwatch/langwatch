@@ -1,15 +1,14 @@
 import chalk from "chalk";
+
 import { ScimTokensApiService } from "@/client-sdk/services/scim-tokens/scim-tokens-api.service";
+
 import type { CommandResult } from "../../utils/output";
 import { runManagement } from "../management/_shared";
 
 /**
- * Mint a SCIM bearer token for the identity provider.
- *
- * `data` deliberately includes the token: this is the ONE moment it exists,
- * the platform never returns it again, and a provisioning script reading
- * `-o json` needs it. The human rendering says so in as many words, the same
- * warning `api-keys create` prints for the same reason.
+ * Mints a SCIM bearer token. `data` deliberately includes it -- this is the
+ * ONE moment it exists, the platform never returns it again, and a
+ * provisioning script reading `-o json` needs it (same as `api-keys create`).
  */
 export const createScimTokenCommand = async (
   options: { description?: string } = {},
@@ -19,18 +18,12 @@ export const createScimTokenCommand = async (
     pending: "Creating SCIM token...",
     run: () =>
       new ScimTokensApiService().create(
-        options.description !== undefined
-          ? { description: options.description }
-          : {},
+        options.description !== undefined ? { description: options.description } : {},
       ),
     succeed: () => "Created SCIM token",
     table: (token) => {
       console.log();
-      console.log(
-        chalk.bold.yellow(
-          "⚠  Save the token below NOW. It will not be shown again.",
-        ),
-      );
+      console.log(chalk.bold.yellow("⚠  Save the token below NOW. It will not be shown again."));
       console.log();
       console.log(`  ${chalk.green(token.token)}`);
       console.log();
@@ -38,9 +31,7 @@ export const createScimTokenCommand = async (
       console.log(chalk.gray("Description: ") + (token.description ?? "—"));
       console.log();
       console.log(
-        chalk.gray(
-          "Give this to your identity provider as the bearer token for /api/scim/v2.",
-        ),
+        chalk.gray("Give this to your identity provider as the bearer token for /api/scim/v2."),
       );
       console.log();
     },

@@ -14,29 +14,29 @@ class PostApiAgentCacheByNameClaimResponse200:
     """
     Attributes:
         name (str):
-        claimed (bool):
         ttl_seconds (float):
+        claimed (bool):
     """
 
     name: str
-    claimed: bool
     ttl_seconds: float
+    claimed: bool
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
 
-        claimed = self.claimed
-
         ttl_seconds = self.ttl_seconds
+
+        claimed = self.claimed
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "name": name,
-                "claimed": claimed,
                 "ttl_seconds": ttl_seconds,
+                "claimed": claimed,
             }
         )
 
@@ -47,14 +47,14 @@ class PostApiAgentCacheByNameClaimResponse200:
         d = dict(src_dict)
         name = d.pop("name")
 
-        claimed = d.pop("claimed")
-
         ttl_seconds = d.pop("ttl_seconds")
+
+        claimed = d.pop("claimed")
 
         post_api_agent_cache_by_name_claim_response_200 = cls(
             name=name,
-            claimed=claimed,
             ttl_seconds=ttl_seconds,
+            claimed=claimed,
         )
 
         post_api_agent_cache_by_name_claim_response_200.additional_properties = d

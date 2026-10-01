@@ -321,6 +321,27 @@ Feature: Proving a domain by publishing a record
     And she is told how long is left before she may claim again
     And the domains she already claimed are untouched
 
+  # ── The surface the administrator runs it from ─────────────────────────
+
+  @unit
+  Scenario: Running the ceremony takes managing single sign-on, not only seeing it
+    Given a reader who may see single sign-on but not manage it
+    When they claim, prove, re-check or remove a domain
+    Then every one of those is refused
+    And nothing about the connection is read or changed
+
+  @unit
+  Scenario: The ceremony names the administrator the surface authenticated
+    Given "ana" is signed in and manages single sign-on for "acme"
+    When she claims "acme.com" on the connection
+    Then the fact names her, and no identifier from the request decides who acted
+
+  @unit
+  Scenario: The attempt is on the trail even when the ceremony refuses
+    Given "ana" re-checks a record that is not published yet
+    When the check refuses
+    Then the attempt is already recorded against her and the connection
+
   # ── The record is read again, and again ────────────────────────────────
 
   @integration
@@ -380,6 +401,42 @@ Feature: Proving a domain by publishing a record
     Then she is emailed what to publish, where it goes, and the deadline
     And the mail carries no token value, because we keep only its fingerprint
     And a second mail at the deadline says what stopped and says existing members are unaffected
+
+  # The two halves of that notice, each on its own: what decides how many
+  # mails one absence earns, and who receives the one it earns. A sweep that
+  # re-reads a domain every eight hours would otherwise mail an
+  # administrator every eight hours about the same missing record.
+
+  @unit
+  Scenario: The same absence is one notice however many times it arrives
+    Given the record for "acme.com" went missing at a known moment
+    When that same absence reaches the notifier again
+    Then one notice is asked for, keyed on the absence rather than on the delivery
+    And the record going missing again later asks for another
+    And the deadline notice is keyed apart from the first, so it is never collapsed into it
+
+  @unit
+  Scenario: Every administrator who can still sign in is told, and one bad address stops nobody
+    Given "acme" has three administrators and one of their addresses bounces
+    When the notice is sent
+    Then the other administrators are still told what to publish, where it goes, and by when
+    And an organization with no administrator left to tell is sent nothing at all
+    And an organization whose row no longer names it is still named something a reader recognises
+
+  @unit
+  Scenario: The wavering and lapsed mails leave through notification with the record and the settings link
+    Given an administrator of "acme" is to be told the record for "acme.com" is missing
+    When the wavering mail and later the lapsed mail are sent
+    Then notification sends each one to that address, naming the record to publish
+    And each carries the link to the deployment's access settings and no token value
+    And the wavering mail names the deadline
+
+  @unit
+  Scenario: Each domain-proof mail carries a delivery key naming its notice and its administrator
+    Given a domain-proof notice that reaches two administrators of "acme"
+    When the notice is sent
+    Then each administrator's mail carries the notice's key followed by that administrator's user id
+    And the two keys differ, so a retry of one administrator's mail is not a second mail to the other
 
   @integration
   Scenario: A domain the file proved is re-read at its file, not at DNS

@@ -1,0 +1,47 @@
+{
+  "name": "@langwatch/log-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical Log service and private persistence adapters.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/otlp-transformer": "catalog:",
+    "hono": "catalog:",
+    "langwatch": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

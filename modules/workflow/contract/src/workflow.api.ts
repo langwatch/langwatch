@@ -1,0 +1,409 @@
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { Evaluator } from "@langwatch/evaluator-contract";
+import { moduleApi } from "@langwatch/kernel/module-api";
+
+import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
+import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
+import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
+import type {
+  WorkflowCodeCompletionResponse,
+  WorkflowRestEnvelope,
+} from "./workflow-rest.schemas.ts";
+import type {
+  ArchiveWorkflowCommand,
+  CopyWorkflowCommand,
+  CreateWorkflowCommand,
+  PublishWorkflowCommand,
+  RunWorkflowCommand,
+  UpdateWorkflowCommand,
+} from "./workflow.commands.ts";
+import type {
+  WorkflowCascadeArchive,
+  WorkflowCopyRow,
+  WorkflowListRow,
+  WorkflowProjectPath,
+  WorkflowPushToCopies,
+  WorkflowRelatedEntities,
+} from "./workflow.trpc-schemas.ts";
+import type {
+  Workflow,
+  WorkflowEvaluatorFields,
+  WorkflowRunAnswer,
+  WorkflowRunOrigin,
+  WorkflowVersion,
+  WorkflowVersionHistoryEntry,
+  WorkflowVersionHistoryMode,
+  WorkflowWithVersion,
+} from "./workflow.ts";
+
+export type WorkflowMappingFields = {
+  inputFields: Field[];
+  outputFields: Field[];
+  fieldsResolved: boolean;
+};
+
+export type WorkflowReference = { workflowId: string; projectId: string };
+
+/** Who a write is attributed to. */
+export type WorkflowCaller = Readonly<{ id: string }>;
+
+/** The workflow being copied, as the row its caller already read carries it. */
+export type WorkflowStudioCopySource = {
+  id: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  isEvaluator?: boolean;
+  isComponent?: boolean;
+  latestVersion: { dsl: unknown } | null;
+};
+
+/** Copying a Studio graph into another project, without its first version. */
+export type CopyStudioWorkflowCommand = {
+  workflow: WorkflowStudioCopySource;
+  sourceProjectId: string;
+  targetProjectId: string;
+  copyDatasets?: boolean;
+  copiedFromWorkflowId?: string;
+};
+
+/**
+ * One stored version, as the copy-lineage reads carry it. `dsl` is `unknown`:
+ * it comes out of a JSON column and is re-parsed before it is touched, so
+ * typing it as a graph here would assert a shape nothing has checked.
+ */
+export type WorkflowVersionRow = Readonly<{ version: string; dsl: unknown }>;
+
+/** A workflow row plus the latest-version pointer the copy flows read off it. */
+export type WorkflowRowWithLatestVersion = Workflow & {
+  latestVersion: WorkflowVersionRow | null;
+};
+
+/** The row a sync reads: the copy, and the workflow it was copied from. */
+export type WorkflowSourceRow = WorkflowRowWithLatestVersion & {
+  copiedFrom: WorkflowRowWithLatestVersion | null;
+};
+
+/** The row a push reads: the source, and every non-archived copy of it. */
+export type WorkflowCopiesRow = WorkflowRowWithLatestVersion & {
+  copiedWorkflows: readonly (Workflow & { latestVersion: WorkflowVersionRow | null })[];
+};
+
+/** One copy of a workflow, with enough lineage to render where it lives. */
+export type WorkflowCopyWithPath = Readonly<{
+  id: string;
+  name: string;
+  projectId: string;
+  project: WorkflowProjectPath;
+}>;
+
+/** A listed workflow with its copy lineage in both directions, unredacted. */
+export type WorkflowLineageRow = Readonly<{
+  id: string;
+  projectId: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  createdAt: Workflow["createdAt"];
+  updatedAt: Workflow["updatedAt"];
+  latestVersionId: string | null;
+  currentVersionId: string | null;
+  publishedId: string | null;
+  publishedById: string | null;
+  archivedAt: Workflow["archivedAt"];
+  isEvaluator: boolean;
+  isComponent: boolean;
+  copiedFromWorkflowId: string | null;
+  copiedFrom: WorkflowCopyWithPath | null;
+  copiedWorkflows: readonly Readonly<{ projectId: string }>[];
+}>;
+
+/** The publication flags the Optimization Studio reads and writes. */
+export type WorkflowPublicationFlags = Readonly<{
+  id: string;
+  name: string;
+  publishedId: string | null;
+  isComponent: boolean;
+  isEvaluator: boolean;
+}>;
+
+/** A workflow's published version with its flags, or that nothing is published yet (ADR-146). */
+export type PublishedWorkflowAnswer =
+  | Readonly<{
+      published: true;
+      workflow: Readonly<Record<string, unknown>> &
+        Readonly<{ isComponent: boolean | undefined; isEvaluator: boolean | undefined }>;
+    }>
+  | Readonly<{ published: false }>;
+
+/** What one started evaluation run answers with. */
+export type WorkflowEvaluationStarted = Readonly<{
+  runId: string;
+  runUrl: string;
+  workflowVersionId: string;
+  version: string;
+}>;
+
+/** What starting one evaluation run of a committed version is asked for. */
+export type WorkflowEvaluationRequest = Readonly<{
+  projectId: string;
+  projectSlug: string;
+  workflowId: string;
+  versionId?: string | undefined;
+  data?: Record<string, unknown>[] | undefined;
+  datasetId?: string | undefined;
+  parameters?: Record<string, string | number | boolean> | undefined;
+  rowIndices?: number[] | undefined;
+}>;
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many workflows were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface WorkflowUsageCount {
+  readonly workflows: number;
+  readonly firstWorkflowAt?: number;
+}
+
+/** Callable capability exposed by the composed Workflow application. */
+export interface WorkflowApi {
+  // -- the workflow itself ---------------------------------------------------
+
+  executeComponent(input: ExecuteWorkflowComponentInput): Promise<ExecutionState>;
+  list(input: { projectId: string }): Promise<Workflow[]>;
+  /** Every evaluator workflow, archived or not, each carrying only its published version. */
+  findEvaluatorWorkflows(input: {
+    projectId: string;
+  }): Promise<(Workflow & { versions: WorkflowVersion[] })[]>;
+  getById(input: {
+    id: string;
+    projectId: string;
+    includeVersion?: boolean;
+  }): Promise<WorkflowWithVersion>;
+  /** One workflow with its current version, the graph upgraded to the current DSL. */
+  getWithMigratedDsl(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowWithVersion>;
+  assertInProject(input: { workflowId: string; projectId: string }): Promise<void>;
+  listFields(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<Record<string, WorkflowMappingFields>>;
+  listSummaries(input: {
+    projectId: string;
+    workflowIds: string[];
+  }): Promise<{ id: string; name: string }[]>;
+  archiveLinked(input: WorkflowReference): Promise<{ id: string }>;
+  deleteUncommitted(input: WorkflowReference): Promise<void>;
+  create(
+    input: Omit<CreateWorkflowCommand, "authorId">,
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
+  copy(
+    input: Omit<CopyWorkflowCommand, "authorId">,
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
+  /** Copies a workflow once the caller may create workflows in its source project too. */
+  copyFromPermittedSource(
+    input: Omit<CopyWorkflowCommand, "authorId">,
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }>;
+  update(input: UpdateWorkflowCommand): Promise<Workflow>;
+  getVersionHistory(input: {
+    workflowId: string;
+    projectId: string;
+    mode: WorkflowVersionHistoryMode;
+  }): Promise<WorkflowVersionHistoryEntry[]>;
+  restoreVersion(input: { versionId: string; projectId: string }): Promise<WorkflowVersion>;
+  publish(input: Omit<PublishWorkflowCommand, "actorId">, by: WorkflowCaller): Promise<Workflow>;
+  unpublish(input: { id: string; projectId: string }): Promise<Workflow>;
+  archive(input: ArchiveWorkflowCommand): Promise<Workflow>;
+  /** Runs a workflow synchronously, on the published version unless one is named. */
+  run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
+  /** Runs one public synchronous REST door with its named refusals. */
+  runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
+  /** Starts one evaluation run of a committed version, unless the caller may not read runs. */
+  triggerEvaluation(
+    input: WorkflowEvaluationRequest & { callerMayReadRuns: boolean },
+  ): Promise<WorkflowEvaluationStarted>;
+
+  // -- the Studio's own graph ------------------------------------------------
+
+  prepareStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent>;
+  /** A peer's inbound Studio event, prepared the same way before it re-enters the graph. */
+  enrichStudioEvent(input: {
+    event: StudioClientEvent;
+    projectId: string;
+  }): Promise<StudioClientEvent>;
+  /** The evaluator-fields shape a peer's guard and run read off this workflow. */
+  getFields(input: { workflowId: string; projectId: string }): Promise<WorkflowEvaluatorFields>;
+  prepareStudioDsl(input: { projectId: string; dsl: StudioWorkflow }): Promise<StudioWorkflow>;
+  saveStudioVersion(
+    input: {
+      projectId: string;
+      workflowId: string;
+      dsl: StudioWorkflow;
+      autoSaved: boolean;
+      commitMessage: string;
+      setAsLatestVersion?: boolean;
+    },
+    by: WorkflowCaller,
+  ): Promise<WorkflowVersion>;
+  copyStudioWorkflow(
+    input: CopyStudioWorkflowCommand,
+  ): Promise<{ workflowId: string; dsl: StudioWorkflow }>;
+  /** One Monaco completion for the editor, over whichever model answers it. */
+  completeCode(input: {
+    projectId: string;
+    /** Absent when no one is signed in, which is refused. */
+    userId: string | undefined;
+    body: WorkflowRestEnvelope;
+  }): Promise<WorkflowCodeCompletionResponse>;
+  /**
+   * The Studio editor's posted event, checked and prepared, answered as the engine's events. A
+   * `done` keeps the stream open one more second so a trailing frame still reaches the editor.
+   */
+  streamStudioEvent(input: {
+    body: string;
+    /** Absent when no one is signed in, which is refused. */
+    userId: string | undefined;
+  }): Promise<AsyncIterable<StudioServerEvent>>;
+  /** Opens one studio run and streams the engine's events back through `onEvent`. */
+  postStudioEvent(input: {
+    projectId: string;
+    event: StudioClientEvent;
+    onEvent: (event: StudioServerEvent) => void;
+    /** Asked before and during every read; absent means the run cannot be stopped. */
+    isAborted?: () => Promise<boolean>;
+    /** Who started the run, as the engine attributes it; `workflow` when absent. */
+    origin?: WorkflowRunOrigin;
+  }): Promise<void>;
+  /** Where an unexpected studio failure is reported. Best effort. */
+  reportStudioFailure(error: unknown, context: { projectId: string }): void;
+  /** A short commit message for the change between two graphs. */
+  generateCommitMessage(input: {
+    projectId: string;
+    prevDsl: StudioWorkflow;
+    newDsl: StudioWorkflow;
+  }): Promise<string>;
+
+  // -- the evaluator a published workflow is wrapped in ----------------------
+
+  listEvaluators(input: { projectId: string }): Promise<Evaluator[]>;
+  linkEvaluatorToWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+    name: string;
+  }): Promise<Evaluator>;
+  unlinkEvaluatorFromWorkflow(input: { workflowId: string; projectId: string }): Promise<void>;
+
+  // -- what the caller may see in a project other than the scoped one -------
+
+  hasProjectPermission(input: {
+    userId: string;
+    projectId: string;
+    permission: AuthzPermission;
+  }): Promise<boolean>;
+
+  // -- copy lineage, related entities and the archive cascade ---------------
+
+  /** The project's workflows, lineage redacted to what this caller may see. */
+  listWithCopyLineage(input: {
+    projectId: string;
+    viewerUserId: string;
+  }): Promise<WorkflowListRow[]>;
+  findWorkflowOwner(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Readonly<{ projectId: string }> | null>;
+  findCopiesWithPath(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<readonly WorkflowCopyWithPath[] | null>;
+  findWorkflowWithSource(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowSourceRow | null>;
+  findWorkflowWithCopies(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowCopiesRow | null>;
+  findLatestVersionNumber(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<Readonly<{ version: string | null }> | null>;
+  /** The copies of a workflow the caller may push to. */
+  listPermittedCopies(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<WorkflowCopyRow[]>;
+  /** Pulls the source's latest graph into this copy as its next major version. */
+  syncFromSource(
+    input: { workflowId: string; projectId: string },
+    by: WorkflowCaller,
+  ): Promise<{ workflow: WorkflowSourceRow; version: WorkflowVersion }>;
+  /** Pushes this workflow's latest graph to the copies the caller may update. */
+  pushToCopies(
+    input: { workflowId: string; projectId: string; copyIds?: string[] },
+    by: WorkflowCaller,
+  ): Promise<WorkflowPushToCopies>;
+  /** What archiving this workflow would take with it. */
+  getRelatedEntities(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowRelatedEntities>;
+  cascadeArchive(input: {
+    projectId: string;
+    workflowId: string;
+    unarchive?: boolean;
+  }): Promise<WorkflowCascadeArchive>;
+
+  // -- the Optimization Studio's publication flags --------------------------
+
+  runPublished(input: {
+    workflowId: string;
+    projectId: string;
+    body: Readonly<Record<string, unknown>>;
+  }): Promise<WorkflowRunAnswer>;
+  toggleSaveAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    isEvaluator: boolean;
+  }): Promise<void>;
+  findWorkflowFlags(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<WorkflowPublicationFlags | null>;
+  getPublishedWorkflow(input: {
+    workflowId: string;
+    projectId: string;
+  }): Promise<PublishedWorkflowAnswer>;
+  /** One stored version by id, as the process's own read carries it. */
+  findWorkflowVersionById(input: {
+    versionId: string;
+    projectId: string;
+  }): Promise<Readonly<Record<string, unknown>> | null>;
+  setWorkflowFlags(input: {
+    workflowId: string;
+    projectId: string;
+    isComponent?: boolean;
+    isEvaluator?: boolean;
+  }): Promise<void>;
+  listPublishedComponents(input: { projectId: string }): Promise<unknown>;
+
+  /**
+   * The platform's own address for one workflow resource, from the
+   * project's slug and an already-resolved path. Built by the app itself
+   * since the REST declaration is static, with no request-scoped builder.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<WorkflowUsageCount>;
+}
+
+export const WorkflowApi = moduleApi<WorkflowApi>()("workflow");

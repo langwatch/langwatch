@@ -1,0 +1,252 @@
+/**
+ * The `simulation_processing` pipeline as a PRODUCER registers it. One definition, two
+ * registrations.
+ */
+import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
+import type {
+  ScenarioExecutionPrefetchResult,
+  SimulationService,
+} from "@langwatch/scenario-contract";
+import { ScenarioExecutionService } from "@langwatch/scenario-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
+
+import { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
+import { NullSimulationRepository } from "../repositories/simulation.repository.ts";
+import { SimulationService as SimulationServiceClass } from "../services/simulation.service.ts";
+import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
+import { FinishRunCommand } from "./finish-run.commands.ts";
+import { QueueRunCommand } from "./queue-run.commands.ts";
+import { RecordEvaluationsCommand } from "./record-evaluations.commands.ts";
+import {
+  SCENARIO_EVALUATIONS_PROCESS_NAME,
+  scenarioEvaluationsPM,
+} from "./scenario-evaluations.process.ts";
+import {
+  SimulationProcessingPipelineAdapter,
+  type SimulationProcessingPipelineDefinition,
+} from "./simulation-processing.pipeline.ts";
+import {
+  SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+  simulationRunExecutionPM,
+} from "./simulation-run-execution.process.ts";
+import type { SimulationRunMetricsProjectionRecord } from "./simulation-run-metrics.projection.ts";
+import type { SimulationRunStateData } from "./simulation-run-state.projection.ts";
+
+/** Why every stand-in below refuses, in the process's own words. */
+function producerOnly(processName: string, capability: string): Error {
+  return new Error(
+    `${processName} registered the simulation_processing pipeline as a producer only, so it cannot ${capability}. This work belongs to the worker that drains the pipeline.`,
+  );
+}
+
+/** A fold store that cannot fold, because this process consumes nothing. */
+class ProducerOnlyFoldStore<TState> implements FoldProjectionStore<TState> {
+  constructor(
+    private readonly processName: string,
+    private readonly name: string,
+  ) {}
+
+  store(): Promise<void> {
+    return Promise.reject(producerOnly(this.processName, `write the ${this.name} projection`));
+  }
+
+  get(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, `read the ${this.name} projection`));
+  }
+}
+
+/** An append store that cannot append, for the same reason. */
+class ProducerOnlyAppendStore<TRow> implements AppendStore<TRow> {
+  constructor(
+    private readonly processName: string,
+    private readonly name: string,
+  ) {}
+
+  append(): Promise<void> {
+    return Promise.reject(producerOnly(this.processName, `append to the ${this.name} projection`));
+  }
+}
+
+/**
+ * The run executor the `execute` and `cancel` intents reach.
+ */
+class ProducerOnlyScenarioExecution extends ScenarioExecutionService {
+  constructor(private readonly processName: string) {
+    super();
+  }
+
+  submit(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "submit a scenario run for execution"));
+  }
+
+  cancel(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "cancel a running scenario"));
+  }
+
+  prefetch(): Promise<ScenarioExecutionPrefetchResult> {
+    return Promise.reject(producerOnly(this.processName, "resolve a scenario run's target"));
+  }
+
+  prepare(): never {
+    throw producerOnly(this.processName, "prepare a scenario run");
+  }
+
+  finishUnsuccessfulRun(): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, "finish an unsuccessful scenario run"));
+  }
+
+  recordAgentInstance(): Promise<never> {
+    return Promise.reject(
+      producerOnly(this.processName, "record the agent instance that served a scenario run"),
+    );
+  }
+
+  recordCutAtLimit(): Promise<never> {
+    return Promise.reject(
+      producerOnly(this.processName, "record a scenario run cut at the call limit"),
+    );
+  }
+}
+
+/**
+ * The eight writes, as the process manager's `finish` intent would reach them. This is the seat a
+ * REAL dispatcher takes in a producer — the commands the registration itself hands back.
+ */
+class ProducerOnlySimulationExecution extends SimulationExecutionRepository {
+  constructor(private readonly processName: string) {
+    super();
+  }
+
+  queueRun(): Promise<never> {
+    return this.refuse("queue a simulation run");
+  }
+  startRun(): Promise<never> {
+    return this.refuse("start a simulation run");
+  }
+  messageSnapshot(): Promise<never> {
+    return this.refuse("record a message snapshot");
+  }
+  textMessageStart(): Promise<never> {
+    return this.refuse("record a message start");
+  }
+  textMessageEnd(): Promise<never> {
+    return this.refuse("record a message end");
+  }
+  finishRun(): Promise<never> {
+    return this.refuse("finish a simulation run");
+  }
+  recordEvaluations(): Promise<never> {
+    return this.refuse("record a simulation run's evaluator results");
+  }
+  cancelRun(): Promise<never> {
+    return this.refuse("cancel a simulation run");
+  }
+  deleteRun(): Promise<never> {
+    return this.refuse("delete a simulation run");
+  }
+  recordAgentInstance(): Promise<never> {
+    return this.refuse("record the agent instance that served a simulation run");
+  }
+  recordCutAtLimit(): Promise<never> {
+    return this.refuse("record a simulation run cut at the call limit");
+  }
+
+  private refuse(capability: string): Promise<never> {
+    return Promise.reject(producerOnly(this.processName, capability));
+  }
+}
+
+/**
+ * Builds the simulation-processing definition for a process that only sends commands on it.
+ * `processName` names the refusal, so a stand-in reached by accident says which process reached it
+ * rather than reporting an anonymous failure.
+ */
+function buildSimulationProcessingProducerPipeline(input: {
+  processName: string;
+}): SimulationProcessingPipelineDefinition {
+  const { processName } = input;
+  const execution = new ProducerOnlySimulationExecution(processName);
+  const simulations: SimulationService = SimulationServiceClass.create(
+    new NullSimulationRepository(),
+    execution,
+  );
+
+  const refuseGrading = () =>
+    Promise.reject(producerOnly(processName, "grade a finished scenario run"));
+
+  return SimulationProcessingPipelineAdapter.create({
+    simulationRunStore: new ProducerOnlyFoldStore<SimulationRunStateData>(
+      processName,
+      "simulation run state",
+    ),
+    simulationRunMetricsStore: new ProducerOnlyAppendStore<SimulationRunMetricsProjectionRecord>(
+      processName,
+      "simulation run metrics",
+    ),
+    queueRunCommand: new QueueRunCommand(),
+    finishRunCommand: new FinishRunCommand({
+      loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
+    }),
+    recordEvaluationsCommand: new RecordEvaluationsCommand({
+      loadPriorEvents: () => Promise.reject(producerOnly(processName, "read a run's prior events")),
+    }),
+    computeRunMetricsCommand: new ComputeRunMetricsCommand({
+      traceSummaryStore: new ProducerOnlyFoldStore<TraceSummaryData>(processName, "trace summary"),
+      scheduleRetry: () => Promise.reject(producerOnly(processName, "schedule a metrics retry")),
+      deriveScenarioRoleMetrics: () =>
+        Promise.reject(producerOnly(processName, "derive per-role scenario metrics")),
+    }),
+    scenarioRunExecution: {
+      name: SIMULATION_RUN_EXECUTION_PROCESS_NAME,
+      process: simulationRunExecutionPM(
+        new ProducerOnlyScenarioExecution(processName),
+        simulations,
+      ),
+    },
+    scenarioEvaluations: {
+      name: SCENARIO_EVALUATIONS_PROCESS_NAME,
+      process: scenarioEvaluationsPM({
+        loadPriorEvents: refuseGrading,
+        evaluations: {
+          scenarios: { getById: refuseGrading },
+          suites: { getRunAttachments: refuseGrading, getAttachedEvaluators: refuseGrading },
+          runs: { getRunState: refuseGrading },
+          spans: { getSpansByTraceId: refuseGrading },
+          runEvaluation: refuseGrading,
+          reportEvaluation: refuseGrading,
+          recordEvaluations: refuseGrading,
+        },
+      }),
+    },
+    simulations,
+    snapshotUpdateBroadcast: {
+      broadcastUpdate: () =>
+        Promise.reject(producerOnly(processName, "broadcast a simulation update")),
+    },
+    suiteRunSync: {
+      recordSuiteRunItemStarted: () =>
+        Promise.reject(producerOnly(processName, "record a suite run item start")),
+      completeSuiteRunItem: () =>
+        Promise.reject(producerOnly(processName, "complete a suite run item")),
+      regradeSuiteRunItem: () =>
+        Promise.reject(producerOnly(processName, "regrade a suite run item")),
+    },
+    traceMetricsSync: {
+      computeRunMetrics: () =>
+        Promise.reject(producerOnly(processName, "compute a run's trace metrics")),
+    },
+  });
+}
+
+/** The simulation-processing definition as a command-only producer sees it. */
+export class SimulationProcessingProducerPipeline {
+  static create(options: { processName: string }): SimulationProcessingProducerPipeline {
+    return new SimulationProcessingProducerPipeline(options);
+  }
+
+  private constructor(private readonly options: { processName: string }) {}
+
+  build(): SimulationProcessingPipelineDefinition {
+    return buildSimulationProcessingProducerPipeline(this.options);
+  }
+}

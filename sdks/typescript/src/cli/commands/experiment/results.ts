@@ -1,19 +1,18 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   ExperimentsApiService,
   type ExperimentRunResultsResponse,
   type ExperimentRunDatasetEntry,
   type ExperimentRunEvaluation,
 } from "@/client-sdk/services/experiments/experiments-api.service";
-import {
-  deriveRunStatus,
-  isTerminalStatus,
-} from "@/client-sdk/services/experiments/run-status";
+import { deriveRunStatus, isTerminalStatus } from "@/client-sdk/services/experiments/run-status";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { resolveRunId } from "./resolve-run";
 
 export type ExperimentResultsFilter = "failed" | "all";
@@ -27,8 +26,7 @@ export interface ExperimentResultsOptions {
 
 const DEFAULT_LIMIT = 20;
 
-const rowKey = (index: number, targetId?: string | null): string =>
-  `${index}:${targetId ?? ""}`;
+const rowKey = (index: number, targetId?: string | null): string => `${index}:${targetId ?? ""}`;
 
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   // Pick something meaningful: input, question, query, prompt, or first string field
@@ -39,9 +37,7 @@ const summarizeEntry = (entry: Record<string, unknown>): string => {
       return value.length > 60 ? `${value.slice(0, 57)}...` : value;
     }
   }
-  const firstString = Object.entries(entry).find(
-    ([, v]) => typeof v === "string" && v.length > 0,
-  );
+  const firstString = Object.entries(entry).find(([, v]) => typeof v === "string" && v.length > 0);
   if (firstString) {
     const v = firstString[1] as string;
     return v.length > 60 ? `${v.slice(0, 57)}...` : v;
@@ -66,6 +62,124 @@ const isFailedRow = ({
   return evaluations.some((e) => isFailedEvaluation(e));
 };
 
+type RunStatus = ReturnType<typeof deriveRunStatus>;
+type ResultRow = {
+  entry: ExperimentRunResultsResponse["dataset"][number];
+  evaluations: ExperimentRunEvaluation[];
+};
+
+/** Evaluations grouped by target-scoped row key. */
+const groupByRow = ({
+  evaluations,
+  evaluatorFilter,
+}: {
+  evaluations: ExperimentRunEvaluation[];
+  evaluatorFilter: string | undefined;
+}): Map<string, ExperimentRunEvaluation[]> => {
+  const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
+  for (const evaluation of evaluations) {
+    if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
+    const key = rowKey(evaluation.index, evaluation.targetId);
+    const list = evaluationsByRow.get(key) ?? [];
+    list.push(evaluation);
+    evaluationsByRow.set(key, list);
+  }
+  return evaluationsByRow;
+};
+
+const passedSuffix = (passed: boolean | null | undefined): string => {
+  if (passed === false) return chalk.red(" ✗");
+  if (passed === true) return chalk.green(" ✓");
+  return "";
+};
+
+const evaluatorCell = (e: ExperimentRunEvaluation | undefined): string => {
+  if (!e) return chalk.gray("—");
+  if (e.status === "error") return chalk.red("error");
+  if (typeof e.score === "number") return `${e.score.toFixed(2)}${passedSuffix(e.passed)}`;
+  if (e.label) return e.label;
+  if (typeof e.passed === "boolean") return e.passed ? chalk.green("pass") : chalk.red("fail");
+  return chalk.gray("—");
+};
+
+const rowStatus = ({ entry, evaluations }: ResultRow): string => {
+  if (entry.error) {
+    const error = entry.error.length > 40 ? `${entry.error.slice(0, 37)}...` : entry.error;
+    return chalk.red(error);
+  }
+  return evaluations.some(isFailedEvaluation) ? chalk.red("failed") : chalk.green("ok");
+};
+
+const emptyResultsNotice = ({
+  filter,
+  runStatus,
+}: {
+  filter: ExperimentResultsFilter;
+  runStatus: RunStatus;
+}): string => {
+  if (filter === "failed") return "No rows matched the filter.";
+  if (runStatus === "running") {
+    return "No rows recorded yet. The run is still in progress; run this again shortly.";
+  }
+  if (runStatus === "interrupted") return "No rows were recorded before the run was interrupted.";
+  return "No rows recorded for this run.";
+};
+
+const printResultsTable = ({
+  runStatus,
+  shownRows,
+  filter,
+  evaluatorNames,
+  tableTruncated,
+  totalMatching,
+}: {
+  runStatus: RunStatus;
+  shownRows: ResultRow[];
+  filter: ExperimentResultsFilter;
+  evaluatorNames: string[];
+  tableTruncated: boolean;
+  totalMatching: number;
+}): void => {
+  if (!isTerminalStatus(runStatus)) {
+    console.log(
+      chalk.yellow(
+        runStatus === "interrupted"
+          ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
+          : `Run status: running. These are partial results; more rows may appear later.`,
+      ),
+    );
+  }
+
+  if (shownRows.length === 0) {
+    console.log(chalk.gray(emptyResultsNotice({ filter, runStatus })));
+    return;
+  }
+
+  const headers = ["#", "Target", ...evaluatorNames, "Status"];
+  const tableData = shownRows.map((row) => ({
+    "#": String(row.entry.index),
+    Target: summarizeEntry(row.entry.entry),
+    ...Object.fromEntries(
+      evaluatorNames.map((name) => [
+        name,
+        evaluatorCell(row.evaluations.find((x) => x.evaluator === name)),
+      ]),
+    ),
+    Status: rowStatus(row),
+  }));
+
+  formatTable({ data: tableData, headers });
+
+  if (tableTruncated) {
+    console.log();
+    console.log(
+      chalk.gray(
+        `Showing ${shownRows.length} of ${totalMatching} rows. Use --limit <n> to print more. The JSON answer already carries every row.`,
+      ),
+    );
+  }
+};
+
 export const experimentResultsCommand = async ({
   experimentSlug,
   options = {},
@@ -75,8 +189,7 @@ export const experimentResultsCommand = async ({
 }): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const filter: ExperimentResultsFilter =
-    options.filter === "failed" ? "failed" : "all";
+  const filter: ExperimentResultsFilter = options.filter === "failed" ? "failed" : "all";
   const limit = (() => {
     const parsed = options.limit ? parseInt(options.limit, 10) : DEFAULT_LIMIT;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_LIMIT;
@@ -101,64 +214,32 @@ export const experimentResultsCommand = async ({
       `Loaded results for ${chalk.cyan(runId)} (${results.dataset.length} rows, ${results.evaluations.length} evaluations)`,
     );
 
-    // Group evaluations by target-scoped row key.
-    const evaluationsByRow = new Map<string, ExperimentRunEvaluation[]>();
-    for (const evaluation of results.evaluations) {
-      if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) continue;
-      const key = rowKey(evaluation.index, evaluation.targetId);
-      const list = evaluationsByRow.get(key) ?? [];
-      list.push(evaluation);
-      evaluationsByRow.set(key, list);
-    }
+    const evaluationsByRow = groupByRow({ evaluations: results.evaluations, evaluatorFilter });
 
-    // Evaluations that belong to no dataset entry.
-    //
-    // The dataset is one entry per (row, target), and the join below walks it.
-    // A Comparison evaluator judges the whole field of targets in a single
-    // verdict, so its result is recorded against the comparison itself rather
-    // than any one target — leaving it with no (row, target) pair to attach
-    // to. Walking the dataset alone therefore drops it without a word, which
-    // is how a real four-way run reported 240 of its 300 evaluations while the
-    // run summary still advertised the comparison.
-    //
-    // These are keyed by row instead, and follow whichever rows survive the
-    // filter and limit below.
+    // Comparison evaluator verdicts: keyed to row, not (row, target).
+    // They follow rows that survive filter and limit.
     const datasetKeys = new Set(
       results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
     );
-    const rowIndependentEvaluations = results.evaluations.filter(
-      (evaluation) => {
-        if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
-          return false;
-        }
-        return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
-      },
-    );
+    const rowIndependentEvaluations = results.evaluations.filter((evaluation) => {
+      if (evaluatorFilter && evaluation.evaluator !== evaluatorFilter) {
+        return false;
+      }
+      return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
+    });
 
-    // Determine evaluator columns to show
+    // Determine evaluator columns to show, capped at 3 to keep table readable
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
-      : Array.from(
-          new Set(results.evaluations.map((e) => e.evaluator)),
-        ).slice(0, 3); // cap visible columns to keep table readable
+      : Array.from(new Set(results.evaluations.map((e) => e.evaluator))).slice(0, 3);
 
     let rows = results.dataset.map((entry) => ({
       entry,
       evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
     }));
 
-    // A row's failures are not all reachable through the dataset join.
-    //
-    // `isFailedRow` was handed only the evaluations keyed to that (row,
-    // target), so a row whose ONLY failure was the comparison — every target
-    // produced output, every per-target evaluation passed, and the judge
-    // errored — looked clean and was filtered out. That is the evaluator this
-    // command was just taught to display, so `--filter failed` could hide
-    // exactly the failure a caller came to find.
-    //
-    // Grouped by row index because that is all a row-independent evaluation
-    // has. Every target-row of that index carries it, which is right: the
-    // comparison covers the whole field on that row, so the row failed.
+    // Comparison failures aren't visible through dataset join.
+    // Grouped by row index. The comparison covers the whole field on that row.
     const rowIndependentByIndex = new Map<number, ExperimentRunEvaluation[]>();
     for (const evaluation of rowIndependentEvaluations) {
       const list = rowIndependentByIndex.get(evaluation.index) ?? [];
@@ -170,41 +251,30 @@ export const experimentResultsCommand = async ({
       rows = rows.filter((r) =>
         isFailedRow({
           entry: r.entry,
-          evaluations: [
-            ...r.evaluations,
-            ...(rowIndependentByIndex.get(r.entry.index) ?? []),
-          ],
+          evaluations: [...r.evaluations, ...(rowIndependentByIndex.get(r.entry.index) ?? [])],
         }),
       );
     }
 
     const totalMatching = rows.length;
 
-    // `--limit` shortens what a person reads. It never shortens the answer.
-    //
-    // A caller that asks for JSON is usually an agent, and it does arithmetic
-    // on what it receives. While the limit sliced the payload too, such a
-    // caller got the first 20 rows with nothing in them saying rows were
-    // missing, and any rate it worked out was quietly wrong: one report of
-    // "70%" was 14 of 20 rows of a run whose real figure was 30 of 40.
+    // `--limit` shortens table only, never the answer.
+    // Agents computing rates from the payload need every row.
     const shownRows = rows.slice(0, limit);
     const tableTruncated = rows.length > limit;
 
     // Carry a row-independent evaluation only when its row is in the answer,
     // so a verdict never describes a row the caller cannot see.
     const returnedIndices = new Set(rows.map((row) => row.entry.index));
-    const returnedRowIndependent = rowIndependentEvaluations.filter(
-      (evaluation) => returnedIndices.has(evaluation.index),
+    const returnedRowIndependent = rowIndependentEvaluations.filter((evaluation) =>
+      returnedIndices.has(evaluation.index),
     );
 
     return {
       data: {
         ...results,
         dataset: rows.map((row) => row.entry),
-        evaluations: [
-          ...rows.flatMap((row) => row.evaluations),
-          ...returnedRowIndependent,
-        ],
+        evaluations: [...rows.flatMap((row) => row.evaluations), ...returnedRowIndependent],
         meta: {
           totalMatching,
           /** Rows in `dataset`. Equal to `totalMatching`: the answer is whole. */
@@ -213,107 +283,23 @@ export const experimentResultsCommand = async ({
           tableLimit: limit,
           tableTruncated,
           /**
-           * Which run these rows came from, and whether the caller chose it.
-           *
-           * Without `--run-id` this resolves to whichever run is newest at the
-           * moment of the call. Every scoped execution mints its own run, so
-           * two calls made either side of one produce numbers from two
-           * different runs. A caller comparing a before against an after has
-           * to pin the run, and cannot know to unless it is told.
+           * "explicit" if --run-id was passed, "latest-at-call-time" otherwise.
+           * Two calls either side of a new run give different numbers.
            */
-          runSelection: options.runId?.trim()
-            ? "explicit"
-            : "latest-at-call-time",
+          runSelection: options.runId?.trim() ? "explicit" : "latest-at-call-time",
           filter,
           evaluator: evaluatorFilter ?? null,
         },
       },
-      table: () => {
-        if (!isTerminalStatus(runStatus)) {
-          console.log(
-            chalk.yellow(
-              runStatus === "interrupted"
-                ? `Run status: interrupted. These are partial results (the run never sent a finished/stopped marker and has had no recent updates).`
-                : `Run status: running. These are partial results; more rows may appear later.`,
-            ),
-          );
-        }
-
-        if (shownRows.length === 0) {
-          if (filter === "failed") {
-            console.log(chalk.gray("No rows matched the filter."));
-          } else if (runStatus === "running") {
-            console.log(
-              chalk.gray(
-                "No rows recorded yet. The run is still in progress; run this again shortly.",
-              ),
-            );
-          } else if (runStatus === "interrupted") {
-            console.log(
-              chalk.gray("No rows were recorded before the run was interrupted."),
-            );
-          } else {
-            console.log(chalk.gray("No rows recorded for this run."));
-          }
-          return;
-        }
-
-        const headers = ["#", "Target", ...evaluatorNames, "Status"];
-        const tableData = shownRows.map(({ entry, evaluations }) => {
-          const evaluatorCols: Record<string, string> = {};
-          for (const name of evaluatorNames) {
-            const e = evaluations.find((x) => x.evaluator === name);
-            if (!e) {
-              evaluatorCols[name] = chalk.gray("—");
-            } else if (e.status === "error") {
-              evaluatorCols[name] = chalk.red("error");
-            } else if (typeof e.score === "number") {
-              const passedSuffix =
-                e.passed === false
-                  ? chalk.red(" ✗")
-                  : e.passed === true
-                    ? chalk.green(" ✓")
-                    : "";
-              evaluatorCols[name] = `${e.score.toFixed(2)}${passedSuffix}`;
-            } else if (e.label) {
-              evaluatorCols[name] = e.label;
-            } else if (typeof e.passed === "boolean") {
-              evaluatorCols[name] = e.passed
-                ? chalk.green("pass")
-                : chalk.red("fail");
-            } else {
-              evaluatorCols[name] = chalk.gray("—");
-            }
-          }
-          const status = entry.error
-            ? chalk.red(
-                entry.error.length > 40
-                  ? `${entry.error.slice(0, 37)}...`
-                  : entry.error,
-              )
-            : evaluations.some(isFailedEvaluation)
-              ? chalk.red("failed")
-              : chalk.green("ok");
-
-          return {
-            "#": String(entry.index),
-            Target: summarizeEntry(entry.entry),
-            ...evaluatorCols,
-            Status: status,
-          };
-        });
-
-        formatTable({ data: tableData, headers });
-
-        if (tableTruncated) {
-          console.log();
-          console.log(
-            chalk.gray(
-              `Showing ${shownRows.length} of ${totalMatching} rows. Use --limit <n> to print more. The JSON answer already carries every row.`,
-            ),
-          );
-        }
-      },
+      table: () =>
+        printResultsTable({
+          runStatus,
+          shownRows,
+          filter,
+          evaluatorNames,
+          tableTruncated,
+          totalMatching,
+        }),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch experiment results" });

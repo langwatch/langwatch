@@ -1,4 +1,5 @@
 import chalk from "chalk";
+
 import { langwatchFetch } from "../../internal/http/langwatchFetch";
 
 const LANGWATCH_DOCS_BASE = "https://langwatch.ai/docs";
@@ -64,9 +65,7 @@ async function fetchAndPrint(url: string): Promise<void> {
 
   if (!response.ok) {
     console.error(
-      chalk.red(
-        `Error fetching ${url}: HTTP ${response.status} ${response.statusText}`,
-      ),
+      chalk.red(`Error fetching ${url}: HTTP ${response.status} ${response.statusText}`),
     );
     process.exit(1);
   }

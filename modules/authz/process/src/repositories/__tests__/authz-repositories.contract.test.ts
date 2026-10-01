@@ -1,0 +1,250 @@
+/**
+ * @vitest-environment node
+ * The contract every authz backend answers the same way, run against each
+ * backend the package can reach. The memory tier always runs; Postgres
+ * joins as a second row when this package declares that datastore.
+ */
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import type { AuthzRepositories } from "../authz.repositories.ts";
+import { AuthzMemoryStore } from "../memory/authz-memory.store.ts";
+import { MemoryAuthzAdmissionRepository } from "../memory/memory.authz-admission.repository.ts";
+import { MemoryAuthzCutoverRepository } from "../memory/memory.authz-cutover.repository.ts";
+import { MemoryAuthzEpochRepository } from "../memory/memory.authz-epoch.repository.ts";
+import { MemoryAuthzManagedGrantRepository } from "../memory/memory.authz-managed-grant.repository.ts";
+
+const ORGANIZATION_ID = "org_contract";
+const USER_ID = "user_contract";
+
+type Backend = Readonly<{
+  name: string;
+  create: () => AuthzRepositories & { store: AuthzMemoryStore };
+}>;
+
+const backends: readonly Backend[] = [
+  {
+    name: "memory",
+    create: () => {
+      const memory = AuthzMemoryStore.create();
+
+      return {
+        store: memory,
+        bindings: MemoryAuthzManagedGrantRepository.create({ memory }),
+        cutover: MemoryAuthzCutoverRepository.create({ memory }),
+        admissions: MemoryAuthzAdmissionRepository.create({ memory }),
+      };
+    },
+  },
+];
+
+describe.each(backends)("given the $name authz backend", (backend) => {
+  describe("when no row has been written", () => {
+    it("reads no cutover for an organization", async () => {
+      const { cutover } = backend.create();
+
+      await expect(cutover.findCutover({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+    });
+
+    it("reads no admission marker for a membership", async () => {
+      const { admissions } = backend.create();
+
+      await expect(
+        admissions.readAdmissionMarker({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+      ).resolves.toEqual({ found: false });
+    });
+
+    it("reads no bindings for a user", async () => {
+      const { bindings } = backend.create();
+
+      await expect(
+        bindings.hasBindingsForUser({ organizationId: ORGANIZATION_ID, userId: USER_ID }),
+      ).resolves.toBe(false);
+    });
+
+    it("finds no binding by id", async () => {
+      const { bindings } = backend.create();
+
+      await expect(
+        bindings.findBinding({ organizationId: ORGANIZATION_ID, bindingId: "rb_missing" }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when a finalized cutover has been written", () => {
+    it("reads the status and the business time back", async () => {
+      const repositories = backend.create();
+      const occurredAt = Temporal.Instant.from("2026-08-18T09:00:00.000Z");
+      repositories.store.cutovers.set(ORGANIZATION_ID, {
+        organizationId: ORGANIZATION_ID,
+        status: "finalized",
+        occurredAt,
+      });
+
+      await expect(
+        repositories.cutover.findCutover({ organizationId: ORGANIZATION_ID }),
+      ).resolves.toEqual({ status: "finalized", occurredAt });
+    });
+
+    it("keeps another organization's cutover absent", async () => {
+      const repositories = backend.create();
+      repositories.store.cutovers.set(ORGANIZATION_ID, {
+        organizationId: ORGANIZATION_ID,
+        status: "finalized",
+        occurredAt: null,
+      });
+
+      await expect(
+        repositories.cutover.findCutover({ organizationId: "org_other" }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when a binding has been written", () => {
+    it("reads it back by id and by user", async () => {
+      const repositories = backend.create();
+      const binding = {
+        id: "rb_1",
+        organizationId: ORGANIZATION_ID,
+        userId: USER_ID,
+        groupId: null,
+        apiKeyId: null,
+        role: "MEMBER" as const,
+        customRoleId: null,
+        scopeType: "ORGANIZATION" as const,
+        scopeId: ORGANIZATION_ID,
+      };
+      repositories.store.bindings.push(binding);
+
+      await expect(
+        repositories.bindings.findBinding({
+          organizationId: ORGANIZATION_ID,
+          bindingId: "rb_1",
+        }),
+      ).resolves.toEqual(binding);
+      await expect(
+        repositories.bindings.hasBindingsForUser({
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        repositories.bindings.findDirectUserBindings({
+          organizationId: ORGANIZATION_ID,
+          userId: USER_ID,
+          bindingIds: ["rb_1"],
+        }),
+      ).resolves.toEqual([binding]);
+    });
+  });
+
+  describe("when a membership carries an unfinished admission", () => {
+    it("reads the marker back, and the grant only once the ledger holds one", async () => {
+      const repositories = backend.create();
+      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
+      repositories.store.admissions.push({
+        ...scope,
+        grantId: "rb_admission",
+        occurredAtMs: 1_700_000_000_000,
+        disabled: false,
+        deactivated: false,
+      });
+
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: true,
+        grantId: "rb_admission",
+        occurredAtMs: 1_700_000_000_000,
+      });
+      await expect(
+        repositories.admissions.readAdmissionGrant({ ...scope, grantId: "rb_admission" }),
+      ).resolves.toEqual({ found: false });
+    });
+
+    it("refuses to complete while no live grant answers the marker", async () => {
+      const repositories = backend.create();
+      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
+      repositories.store.admissions.push({
+        ...scope,
+        grantId: "rb_admission",
+        occurredAtMs: 1,
+        disabled: false,
+        deactivated: false,
+      });
+      repositories.store.admissionGrants.push({
+        ...scope,
+        grantId: "rb_admission",
+        revoked: true,
+      });
+
+      await expect(
+        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
+      ).resolves.toBe(false);
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: true,
+        grantId: "rb_admission",
+        occurredAtMs: 1,
+      });
+    });
+
+    it("clears the marker once a live grant answers it, and again on a revoked one", async () => {
+      const repositories = backend.create();
+      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
+      const marker = {
+        ...scope,
+        grantId: "rb_admission",
+        occurredAtMs: 1,
+        disabled: false,
+        deactivated: false,
+      };
+      repositories.store.admissions.push(marker);
+      repositories.store.admissionGrants.push({
+        ...scope,
+        grantId: "rb_admission",
+        revoked: false,
+      });
+
+      await expect(
+        repositories.admissions.completeAdmission({ ...scope, grantId: "rb_admission" }),
+      ).resolves.toBe(true);
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: false,
+      });
+
+      repositories.store.admissions.push(marker);
+      await expect(
+        repositories.admissions.clearPendingAdmission({ ...scope, grantId: "rb_admission" }),
+      ).resolves.toBe(true);
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: false,
+      });
+    });
+
+    it("keeps a disabled membership's marker out of the read", async () => {
+      const repositories = backend.create();
+      const scope = { organizationId: ORGANIZATION_ID, userId: USER_ID };
+      repositories.store.admissions.push({
+        ...scope,
+        grantId: "rb_admission",
+        occurredAtMs: 1,
+        disabled: true,
+        deactivated: false,
+      });
+
+      await expect(repositories.admissions.readAdmissionMarker(scope)).resolves.toEqual({
+        found: false,
+      });
+    });
+  });
+
+  describe("when the epoch is bumped", () => {
+    it("counts up from absent", async () => {
+      const repositories = backend.create();
+      const epoch = MemoryAuthzEpochRepository.create({ memory: repositories.store });
+
+      await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBeNull();
+      await epoch.bump({ organizationId: ORGANIZATION_ID });
+      await epoch.bump({ organizationId: ORGANIZATION_ID });
+      await expect(epoch.findEpoch({ organizationId: ORGANIZATION_ID })).resolves.toBe(2);
+    });
+  });
+});

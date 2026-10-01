@@ -1,28 +1,22 @@
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   HandledError,
   isZodLikeError,
+  remediation,
+  serializedHandledErrorSchema,
   ValidationError,
   type ZodLikeError,
 } from "@langwatch/handled-error";
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
-import { httpStatusText } from "./types.js";
-
 // ---------------------------------------------------------------------------
 // Zod error mapping
 // ---------------------------------------------------------------------------
 
 /**
- * One Zod issue, as a reason on the surrounding `ValidationError`.
- *
- * `ValidationError.fromZodError` in the shared package flattens to
- * `meta.fieldErrors` / `meta.formErrors`, which loses the per-issue `type`.
- * This package's documented wire contract is a `reasons` array of
- * `schema_failure` entries (see the README), so we build the reasons
- * ourselves and keep that shape. Because `serializeReason` renders any
- * `HandledError` child, the emitted entry gains `kind` and `fault` on top of
- * the `code` + `meta` clients already read — additive, not breaking.
+ * One Zod issue as a reason on the surrounding `ValidationError`. Flattening loses the per-issue
+ * `type`, so we build reasons ourselves to preserve the schema_failure shape in the wire contract.
  */
 class SchemaFailure extends HandledError {
   constructor(meta: { field: string; type: string; message: string }) {
@@ -31,20 +25,119 @@ class SchemaFailure extends HandledError {
   }
 }
 
+export class ProjectInputMismatchError extends HandledError {
+  constructor() {
+    super(
+      "project_input_mismatch",
+      "The requested project is not the project authorized for this request",
+      { httpStatus: 403 },
+    );
+
+    this.name = "ProjectInputMismatchError";
+  }
+}
+
 /**
- * Converts a `ZodError` into a `ValidationError` — a real `HandledError`, so
- * it carries `httpStatus: 422` and `fault: "customer"`.
- *
- * That matters beyond tidiness: request logging derives both its status code
- * and its level from the error itself (`getStatusCodeFromError` /
- * `getLogLevelForRequest`). A bare `ZodError` has neither `httpStatus` nor
- * `fault`, so it was logged as a 500 `error` while the response went out 422 —
- * validation noise landing in the 5xx error budget.
- *
- * Typed `ZodLikeError`, not `ZodError`: routes mounted on this app validate
- * with whichever zod their schema was authored against, and the repo now runs
- * both majors. `issue.code`, `issue.path` and `issue.message` are identical
- * across them, so the reasons this builds are too.
+ * The request named a scope its credential did not resolve to. `meta` carries the field name
+ * so a client can mark the offending input; which organization or team the credential covers
+ * is the question the refusal exists to withhold.
+ */
+export class ScopeInputMismatchError extends HandledError {
+  constructor(scope: string) {
+    super(
+      "scope_input_mismatch",
+      "The requested scope is not the scope authorized for this request",
+      { httpStatus: 403, meta: { field: scope } },
+    );
+
+    this.name = "ScopeInputMismatchError";
+  }
+}
+
+export class AuthenticatedActorRequiredError extends HandledError {
+  constructor() {
+    super("authenticated_actor_required", "This operation requires a credential bound to a user", {
+      httpStatus: 403,
+    });
+
+    this.name = "AuthenticatedActorRequiredError";
+  }
+}
+
+export class ApiVersionConflictError extends HandledError {
+  constructor() {
+    super("api_version_conflict", "The API version in the URL and header must match", {
+      httpStatus: 400,
+    });
+
+    this.name = "ApiVersionConflictError";
+  }
+}
+
+export class InvalidApiVersionError extends HandledError {
+  constructor(expected = "latest or a real date in YYYY-MM-DD form") {
+    super("invalid_api_version", `The API version must be ${expected}`, { httpStatus: 400 });
+    this.name = "InvalidApiVersionError";
+  }
+}
+
+export class ApiVersionUnavailableError extends HandledError {
+  constructor() {
+    super("api_version_unavailable", "The requested API version is not available", {
+      httpStatus: 404,
+    });
+
+    this.name = "ApiVersionUnavailableError";
+  }
+}
+
+export class EndpointWithdrawnError extends HandledError {
+  constructor() {
+    super("endpoint_withdrawn", "This endpoint has been removed", { httpStatus: 410 });
+    this.name = "EndpointWithdrawnError";
+  }
+}
+
+/**
+ * The body passed the cap the route declared. The caller can act on it — send
+ * less — and the cap itself is documented on the operation, so nothing about
+ * the limit belongs on the wire.
+ */
+export class PayloadTooLargeError extends HandledError {
+  constructor() {
+    super("payload_too_large", "The request body is larger than this endpoint accepts", {
+      httpStatus: 413,
+    });
+
+    this.name = "PayloadTooLargeError";
+  }
+}
+
+export class RateLimitedError extends HandledError {
+  constructor() {
+    super("rate_limited", "Too many requests", { httpStatus: 429, retryable: true });
+    this.name = "RateLimitedError";
+  }
+}
+
+export class EnterprisePlanRequiredError extends HandledError {
+  /** `feature` is the capability main names on `meta.feature`. */
+  constructor(feature?: string) {
+    super("enterprise_plan_required", "This operation requires an Enterprise plan", {
+      httpStatus: 402,
+      ...(feature ? { meta: { feature } } : {}),
+      fault: "customer",
+      ...remediation("enterprise_plan_required"),
+    });
+
+    this.name = "EnterprisePlanRequiredError";
+  }
+}
+
+/**
+ * Converts a `ZodError` into a `ValidationError` (a `HandledError` with `httpStatus: 422`
+ * and `fault: "customer"`). Needed for logging: a bare `ZodError` was logged as 500 error
+ * while the response went out 422, landing validation noise in the 5xx error budget.
  */
 function validationErrorFromZod(err: ZodLikeError): ValidationError {
   return new ValidationError("Validation error", {
@@ -64,24 +157,16 @@ function validationErrorFromZod(err: ZodLikeError): ValidationError {
 // ---------------------------------------------------------------------------
 
 interface ErrorResponseBody {
-  /** Present only for unversioned (backwards-compat) responses. */
-  error?: string;
   code: string;
-  /**
-   * Always equal to `code`. The Go envelope calls the discriminant `type`
-   * (OpenAI-compatible — see pkg/herr/http.go), so both names are emitted here
-   * too: a consumer can read whichever its transport taught it and get the
-   * same answer either way.
-   */
+  /** Always equal to `code`; retained for the OpenAI-compatible Go envelope. */
   type?: string;
   /**
    * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; removed once no
-   * consumer reads `kind`.
+   * DomainError → HandledError transition; read `code` in new code.
    */
   kind?: string;
   message: string;
+  retryable: boolean;
   meta?: Record<string, unknown>;
   reasons?: unknown[];
   traceId?: string;
@@ -95,40 +180,61 @@ interface ErrorResponseBody {
 function finalizeErrorResponse({
   status,
   body,
-  isVersioned,
 }: {
   status: ContentfulStatusCode;
   body: ErrorResponseBody;
-  isVersioned: boolean;
 }): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  if (!isVersioned) body.error = httpStatusText(status);
   // Emit the deprecated `kind` alias alongside `code` so clients still reading
   // the old discriminant keep working through the transition. See
   // ErrorResponseBody.kind. `type` mirrors the Go envelope's name for the same
   // value — see ErrorResponseBody.type.
   body.kind = body.code;
   body.type = body.code;
+
   return { status, body };
 }
 
-function handledErrorToResponse({
-  err,
-  isVersioned,
-}: {
-  err: HandledError;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
-  const serialized = err.serialize();
+function handledErrorToResponse({ err }: { err: HandledError }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
+  let serialized: ReturnType<typeof HandledError.serializeTrusted>;
+
+  try {
+    const candidate = HandledError.serializeTrusted(err);
+    const json = JSON.stringify(candidate);
+
+    if (json === void 0) {
+      return internalErrorResponse();
+    }
+
+    const wire: unknown = JSON.parse(json);
+    const parsed = serializedHandledErrorSchema.safeParse(wire);
+
+    if (!parsed.success) {
+      return internalErrorResponse();
+    }
+
+    serialized = parsed.data;
+  } catch {
+    return internalErrorResponse();
+  }
+
+  const status = serialized.httpStatus;
+
+  if (!validHttpStatus(status)) {
+    return internalErrorResponse();
+  }
+
   return finalizeErrorResponse({
-    status: serialized.httpStatus as ContentfulStatusCode,
-    isVersioned,
+    status,
     body: {
       code: serialized.code,
       // The code, never `err.message`. A HandledError's message is server copy
-      // — it can name env vars, hostnames or internal services (ADR-045) — and
-      // this body goes to external API callers. Consumers that need prose read
-      // `tips` / `docsUrl`, which are authored for exactly that.
+      // and the body is externally visible. Trusted handled metadata remains
+      // lossless; untrusted exceptions never reach this branch.
       message: serialized.code,
+      retryable: serialized.retryable,
       meta: serialized.meta,
       reasons: serialized.reasons,
       traceId: serialized.traceId,
@@ -141,57 +247,68 @@ function handledErrorToResponse({
   });
 }
 
-/**
- * Formats an error into a JSON response body + status code.
- *
- * @param isVersioned - Whether the request was made through a versioned path.
- *   Versioned requests get the new format only; unversioned get a union
- *   format that includes the legacy `error` field.
- */
-function formatError({
-  err,
-  isVersioned,
-}: {
-  err: unknown;
-  isVersioned: boolean;
-}): { status: ContentfulStatusCode; body: ErrorResponseBody } {
+/** Formats an error using the single version-gated envelope (ADR 002 §5). */
+function formatError({ err }: { err: unknown }): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   // 1. Handled errors -- the domain's own vocabulary, safe to show a caller.
-  if (HandledError.isHandled(err)) {
-    return handledErrorToResponse({ err, isVersioned });
+  if (isTrustedHandledError(err)) {
+    return handledErrorToResponse({ err });
   }
 
   // 2. ZodError -- promoted to a ValidationError so it travels the same path.
-  //    Matched by shape, so a route whose schema is on `zod/v4` is promoted
-  //    the same as one still on v3; an `instanceof` would see only one major
-  //    and drop the other's rejections through to the unknown-error 500 below.
+  //    Matched by shape so portable contracts do not depend on the identity of
+  //    the particular Zod runtime instance that created the error.
   if (isZodLikeError(err)) {
     return handledErrorToResponse({
       err: validationErrorFromZod(err),
-      isVersioned,
     });
   }
 
-  // 3. Error with `status` property (e.g. Hono HTTPException)
+  // 3. Error with `status` property (e.g. Hono HTTPException). Its message is
+  // untrusted: an adapter may put a downstream response body in it.
   const errObj = err as Record<string, unknown>;
+
   if (err instanceof Error && typeof errObj.status === "number") {
-    const status = errObj.status as ContentfulStatusCode;
+    const status = validHttpStatus(errObj.status) ? errObj.status : 500;
+
     return finalizeErrorResponse({
       status,
-      isVersioned,
       body: {
         code: status >= 500 ? "internal_error" : "http_error",
-        message: status >= 500 ? "An unknown error occurred" : err.message,
+        message: status >= 500 ? "internal_error" : "http_error",
+        retryable: false,
       },
     });
   }
 
   // 4. Unknown errors -- 500
+  return internalErrorResponse();
+}
+
+function internalErrorResponse(): {
+  status: ContentfulStatusCode;
+  body: ErrorResponseBody;
+} {
   const status: ContentfulStatusCode = 500;
+
   return finalizeErrorResponse({
     status,
-    isVersioned,
-    body: { code: "internal_error", message: "An unknown error occurred" },
+    body: {
+      code: "internal_error",
+      message: "An unknown error occurred",
+      retryable: false,
+    },
   });
+}
+
+function isTrustedHandledError(error: unknown): error is HandledError {
+  return HandledError.isHandled(error);
+}
+
+function validHttpStatus(value: number): value is ContentfulStatusCode {
+  return Number.isInteger(value) && value >= 400 && value <= 599;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,24 +316,15 @@ function formatError({
 // ---------------------------------------------------------------------------
 
 /**
- * The Hono context key holding what the error handler actually resolved: the
- * status it sent, and the error it sent it for.
- *
- * The request logger owns the single error record for a failed request, but on
- * its own it can only see the raw thrown value and has to re-derive a status
- * from it. Both guesses are wrong whenever the handler promoted the error: a
- * `ZodError` has no `httpStatus`, so the logger would report a 500 the caller
- * never received, against an error the response no longer describes. Writing
- * the resolved pair down once removes the guesswork — and keeps the handler
- * from logging a second, competing copy.
+ * The Hono context key holding what the error handler resolved: status and error.
+ * The request logger must not re-derive the status from the raw value (both guesses
+ * are wrong when the handler promoted the error). Writing the resolved pair removes guesswork.
  */
 export const RESOLVED_ERROR = "resolvedError";
 
 /**
  * What {@link createErrorHandler} publishes for the request logger to consume.
- *
- * Request bodies are deliberately absent: automation `actionParams` carry
- * encrypted webhook headers and Slack tokens.
+ * Request bodies are deliberately absent: automation `actionParams` carry encrypted secrets.
  */
 export interface ResolvedError {
   status: ContentfulStatusCode;
@@ -224,44 +332,299 @@ export interface ResolvedError {
   traceId?: string;
 }
 
+/** Prisma's codes for a pool with no connection to lend (P2024) or no transaction slot (P2028). */
+const DATABASE_BUSY_CODES: readonly unknown[] = ["P2024", "P2028"];
+
+/** Whether the failure is Prisma running out of Postgres connections. */
+export function isDatabaseBusy(error: unknown): boolean {
+  return error instanceof Error && "code" in error && DATABASE_BUSY_CODES.includes(error.code);
+}
+
+/** Postgres had no connection to give in time. The request did nothing wrong; retry shortly. */
+export class DatabaseBusyError extends HandledError {
+  declare readonly code: "database_busy";
+
+  constructor() {
+    super("database_busy", "The service is busy. Retry shortly.", {
+      httpStatus: 503,
+      fault: "platform",
+      retryable: true,
+      meta: { retryAfterMs: 1000 },
+    });
+
+    this.name = "DatabaseBusyError";
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Hono onError handler
 // ---------------------------------------------------------------------------
 
 /**
- * Creates the `app.onError(...)` handler for the service framework.
- *
- * Reads `c.get("isVersionedRequest")` to decide the response format, and
- * records the error it sent plus the status it sent it as on the context, so
- * the request logger reports what the caller actually received.
- *
- * This handler does not log. `loggerMiddleware` writes exactly one error
- * record per failed request, from the resolved pair published here — a second
- * record from this side would double every error-log-derived alert and count.
+ * Creates the `app.onError(...)` handler for the service framework. Records the error and
+ * status on the context so the request logger reports what the caller received. Does not log
+ * itself; `loggerMiddleware` writes exactly one error record per failed request.
  */
-export function createErrorHandler(): (
-  err: Error,
-  c: Context,
-) => Response | Promise<Response> {
+export function createErrorHandler(): (err: Error, c: Context) => Response | Promise<Response> {
   return (err: Error, c: Context) => {
-    const isVersioned = c.get("isVersionedRequest") === true;
     // Promote first so the response and the log agree on one error. Reporting
     // the raw ZodError would log it as unhandled, at `error`, against the 500
     // it no longer is.
-    const effective = isZodLikeError(err) ? validationErrorFromZod(err) : err;
-    const { status, body } = formatError({ err: effective, isVersioned });
+    const promoted = isDatabaseBusy(err) ? new DatabaseBusyError() : err;
+    const effective = isZodLikeError(promoted) ? validationErrorFromZod(promoted) : promoted;
+    const { status, body } = formatError({ err: effective });
 
     const resolved: ResolvedError = {
       status,
       error: effective,
-      ...(HandledError.isHandled(effective) && effective.traceId
+      ...(isTrustedHandledError(effective) && effective.traceId
         ? { traceId: effective.traceId }
         : {}),
     };
+
     c.set(RESOLVED_ERROR, resolved);
 
     return c.json(body, status);
   };
 }
 
-export { formatError, SchemaFailure, validationErrorFromZod };
+export { formatError, isTrustedHandledError, SchemaFailure, validationErrorFromZod };
+
+// What a surface answers a credential it will not accept: one class per code, and the sentences are
+// wire (SDK error copy quotes them).
+
+/**
+ * The sentence an unauthenticated caller of a project family receives. It names all three accepted
+ * credential shapes because that is what it has always named.
+ */
+export const MISSING_PROJECT_CREDENTIAL_MESSAGE =
+  "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).";
+
+export const INVALID_PROJECT_CREDENTIAL_MESSAGE = "Invalid auth token.";
+
+/** No credential at all reached a project surface. */
+export class ProjectMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+
+  constructor() {
+    super("missing_credentials", MISSING_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+
+    this.name = "ProjectMissingCredentialsError";
+  }
+}
+
+/** The token reached a project surface and stands for nothing this deployment knows. */
+export class ProjectInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+
+  constructor() {
+    super("invalid_credentials", INVALID_PROJECT_CREDENTIAL_MESSAGE, {
+      httpStatus: 401,
+      fault: "customer",
+    });
+
+    this.name = "ProjectInvalidCredentialsError";
+  }
+}
+
+/** No credential at all reached an organization surface. */
+export class OrganizationMissingCredentialsError extends HandledError {
+  declare readonly code: "missing_credentials";
+
+  constructor() {
+    super("missing_credentials", "Authentication required. Use Authorization: Bearer <api-key>.", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+
+    this.name = "OrganizationMissingCredentialsError";
+  }
+}
+
+/** A PROJECT key was presented at an organization surface: a different mistake. */
+export class OrganizationCredentialClassMismatchError extends HandledError {
+  declare readonly code: "credential_class_mismatch";
+
+  constructor() {
+    super(
+      "credential_class_mismatch",
+      "This endpoint requires an organization API key, and a project key was presented.",
+      { httpStatus: 401, fault: "customer" },
+    );
+
+    this.name = "OrganizationCredentialClassMismatchError";
+  }
+}
+
+/** The token reached the surface and stands for nothing this deployment knows. */
+export class OrganizationInvalidCredentialsError extends HandledError {
+  declare readonly code: "invalid_credentials";
+
+  constructor() {
+    super("invalid_credentials", "Invalid credentials.", { httpStatus: 401, fault: "customer" });
+    this.name = "OrganizationInvalidCredentialsError";
+  }
+}
+
+/**
+ * The credential resolved, and the tenant behind it is gone. Answered as a 401
+ * rather than a 404: which organizations exist is not something an unaccepted
+ * credential gets to learn.
+ */
+export class OrganizationNotFoundForCredentialError extends HandledError {
+  declare readonly code: "organization_not_found";
+
+  constructor() {
+    super("organization_not_found", "Organization not found", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+
+    this.name = "OrganizationNotFoundForCredentialError";
+  }
+}
+
+/** The lookup behind the surface broke. The caller learns nothing of the cause. */
+export class OrganizationAuthenticationUnavailableError extends HandledError {
+  declare readonly code: "internal_error";
+
+  constructor() {
+    super("internal_error", "Authentication service error", {
+      httpStatus: 500,
+      fault: "platform",
+    });
+
+    this.name = "OrganizationAuthenticationUnavailableError";
+  }
+}
+
+/** The credential is accepted and does not hold what the route asked for. */
+export class OrganizationPermissionError extends HandledError {
+  constructor(permission: AuthzPermission) {
+    super("insufficient_permissions", `Insufficient permissions. Required: ${permission}`, {
+      httpStatus: 403,
+      fault: "customer",
+      // Read by the CLI, which names the re-login that grants it when the
+      // refused credential is its own login key.
+      meta: { permission },
+    });
+
+    this.name = "OrganizationPermissionError";
+  }
+}
+
+/**
+ * A surface this deployment opened with no verifier behind it, or a credential
+ * it refused. It fails CLOSED: the request is refused, and the refusal names
+ * the surface rather than letting an unverified caller through.
+ */
+export class SurfaceUnverifiedError extends HandledError {
+  constructor(surface: string) {
+    super("unauthorized", "Authentication required", {
+      httpStatus: 401,
+      fault: "customer",
+      meta: { surface },
+    });
+
+    this.name = "SurfaceUnverifiedError";
+  }
+}
+
+/** The route is served and this deployment composed nothing behind it. */
+export class SurfaceCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+
+    this.name = "SurfaceCapabilityUnavailableError";
+  }
+}
+
+/**
+ * A bearer whose secret this deployment did not configure. 404 rather than 401:
+ * whether this deployment holds a given secret is not something a caller
+ * presenting the wrong one gets to learn.
+ */
+export class SurfaceUnconfiguredError extends HandledError {
+  constructor(surface: string) {
+    super("not_found", "Not found", { httpStatus: 404, fault: "customer", meta: { surface } });
+    this.name = "SurfaceUnconfiguredError";
+  }
+}
+
+/**
+ * A bearer whose secret this deployment named and left blank: not an absent
+ * one, which the 404 above is for, but a mis-set key, said out loud.
+ */
+export class SurfaceBlankSecretError extends HandledError {
+  declare readonly code: "internal_error";
+
+  constructor(surface: string) {
+    super("internal_error", "This deployment is misconfigured.", {
+      httpStatus: 500,
+      fault: "platform",
+      meta: { surface },
+    });
+
+    this.name = "SurfaceBlankSecretError";
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The subscription lane's own refusals. All three are the same claim from three
+// angles: the lane streams SUBSCRIPTIONS opened by this application's own
+// pages, and nothing else.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The composed router carries no procedure at the requested path. */
+export class LiveStreamNotFoundError extends HandledError {
+  declare readonly code: "live_stream_not_found";
+
+  constructor() {
+    super("live_stream_not_found", "No live update channel is served at that path.", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+
+    this.name = "LiveStreamNotFoundError";
+  }
+}
+
+/**
+ * The path names a real procedure, but a query or a mutation.
+ */
+export class LiveStreamUnsupportedProcedureError extends HandledError {
+  declare readonly code: "live_stream_unsupported_procedure";
+
+  constructor() {
+    super(
+      "live_stream_unsupported_procedure",
+      "Only subscriptions are served on the live update channel; call this procedure over the tRPC endpoint instead.",
+      { httpStatus: 405, fault: "customer" },
+    );
+
+    this.name = "LiveStreamUnsupportedProcedureError";
+  }
+}
+
+/** The request did not originate from this application's own origin. */
+export class LiveStreamCrossSiteBlockedError extends HandledError {
+  declare readonly code: "live_stream_cross_site_blocked";
+
+  constructor() {
+    super(
+      "live_stream_cross_site_blocked",
+      "A live update channel can only be opened from this application's own pages.",
+      { httpStatus: 403, fault: "customer" },
+    );
+
+    this.name = "LiveStreamCrossSiteBlockedError";
+  }
+}

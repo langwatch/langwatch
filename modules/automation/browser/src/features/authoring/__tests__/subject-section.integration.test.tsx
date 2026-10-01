@@ -1,0 +1,497 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { TriggerAction } from "@langwatch/automation-contract";
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useAutomationStore } from "../ui/sections/automation-store.ts";
+import { INITIAL_DRAFT } from "../ui/sections/draft-model.ts";
+import { SubjectSection } from "../ui/sections/subject-section.tsx";
+
+vi.mock("../../../behavior/automation-session.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", name: "Proj", slug: "proj" },
+  }),
+}));
+
+vi.mock("../../../behavior/automation-feedback.ts", () => ({
+  useDescribeError:
+    () =>
+    ({ fallbackTitle }: { fallbackTitle?: string }) =>
+      fallbackTitle ?? "Something went wrong",
+}));
+
+/** Shared with the failed-load retry test; hoisted because the api mock reads it. */
+const { mockGraphsRefetch } = vi.hoisted(() => ({ mockGraphsRefetch: vi.fn() }));
+
+/** What the subject's mocked queries return for the test at hand. `graphs` and
+ *  `isGraphsError` are independent: a background refetch failure keeps the last
+ *  good `data`, and a test needs to represent that state. */
+const server = vi.hoisted(() => ({
+  preview: {
+    data: null as { totalHits: number; items: unknown[] } | null,
+    isFetching: false,
+    error: null as unknown,
+  },
+  cap: { data: null as { cap: number } | null },
+  graphs: [{ id: "graph-1", name: "Latency", trigger: null }] as
+    | { id: string; name: string; trigger: unknown }[]
+    | undefined,
+  isGraphsLoading: false,
+  isGraphsError: false,
+  /** What the query would carry in `error` when `isGraphsError` is set. */
+  graphsErrorValue: null as unknown,
+}));
+
+vi.mock("../../../behavior/automation-api.ts", () => ({
+  api: {
+    graphs: {
+      getAll: {
+        useQuery: () => ({
+          data: server.graphs,
+          isLoading: server.isGraphsLoading,
+          isError: server.isGraphsError,
+          error: server.graphsErrorValue,
+          refetch: mockGraphsRefetch,
+        }),
+      },
+      getById: {
+        useQuery: () => ({
+          data: {
+            id: "graph-1",
+            name: "Latency",
+            graph: {
+              series: [{ name: "p95 latency", key: "latency", aggregation: "p95" }],
+            },
+          },
+          isLoading: false,
+        }),
+      },
+    },
+    dashboards: {
+      getAll: { useQuery: () => ({ data: [], isLoading: false }) },
+    },
+    traces: { list: { useQuery: () => server.preview } },
+    automation: { getDailyCap: { useQuery: () => server.cap } },
+    useUtils: () => ({}),
+  },
+}));
+
+// The query editors carry the traces-view suggestion engine, which is not what
+// the preview and its advice are about.
+vi.mock("../ui/blocks/condition-builder.tsx", () => ({
+  ConditionBuilder: () => <div data-testid="condition-builder" />,
+}));
+vi.mock("../ui/elements/query-filter-input.tsx", () => ({
+  QueryFilterInput: () => <div data-testid="query-filter-input" />,
+}));
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+function selectContainingOption(optionName: RegExp): HTMLSelectElement {
+  const selects = screen.getAllByRole("combobox") as HTMLSelectElement[];
+  const match = selects.find((select) =>
+    within(select)
+      .queryAllByRole("option")
+      .some((option) => optionName.test(option.textContent ?? "")),
+  );
+  if (!match) throw new Error(`No select with option ${String(optionName)}`);
+  return match;
+}
+
+const seedGraphDraft = () =>
+  useAutomationStore.getState().hydrate({
+    ...INITIAL_DRAFT,
+    source: "customGraph",
+    customGraphId: "graph-1",
+  });
+
+/** A brand-new graph-watching draft: no graph chosen yet. */
+const seedFreshAlertDraft = () =>
+  useAutomationStore.getState().hydrate({ ...INITIAL_DRAFT, source: "customGraph" });
+
+const seedTraceDraft = (action: TriggerAction) =>
+  useAutomationStore.getState().hydrate({
+    ...INITIAL_DRAFT,
+    source: "trace",
+    action,
+    filterQuery: "status:error",
+  });
+
+/** 7-day totals the preview reports, at a plan ceiling of 100 a day. */
+const OVER_CAP_HITS = 7000; // 1,000 a day
+const WITHIN_CAP_HITS = 70; // 10 a day
+const PLAN_CAP = 100;
+
+const previewReturns = (totalHits: number) => {
+  server.preview = {
+    data: { totalHits, items: [] },
+    isFetching: false,
+    error: null,
+  };
+};
+
+/** The graph list request itself failed, with nothing ever cached. */
+const graphListFails = () => {
+  server.isGraphsError = true;
+  server.graphs = undefined;
+  seedFreshAlertDraft();
+};
+
+describe("SubjectSection", () => {
+  beforeEach(() => {
+    useAutomationStore.getState().reset();
+    previewReturns(0);
+    server.cap = { data: { cap: PLAN_CAP } };
+    server.graphs = [{ id: "graph-1", name: "Latency", trigger: null }];
+    server.isGraphsLoading = false;
+    server.isGraphsError = false;
+    server.graphsErrorValue = null;
+    mockGraphsRefetch.mockClear();
+  });
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("given an alert draft", () => {
+    it("renders the graph and series pickers", () => {
+      seedGraphDraft();
+      render(<SubjectSection />, { wrapper: Wrapper });
+
+      expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+      expect(selectContainingOption(/select a series/i)).toBeInTheDocument();
+    });
+
+    describe("when opened prefilled from a graph card", () => {
+      it("locks the graph select to the launching graph", () => {
+        seedGraphDraft();
+        render(<SubjectSection prefilledGraphId="graph-1" />, {
+          wrapper: Wrapper,
+        });
+
+        expect(selectContainingOption(/select a graph/i)).toBeDisabled();
+      });
+
+      it("keeps the series select enabled", () => {
+        seedGraphDraft();
+        render(<SubjectSection prefilledGraphId="graph-1" />, {
+          wrapper: Wrapper,
+        });
+
+        expect(selectContainingOption(/select a series/i)).toBeEnabled();
+      });
+    });
+
+    describe("when a series is chosen", () => {
+      it("records it on the draft", async () => {
+        const user = userEvent.setup();
+        seedGraphDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        await user.selectOptions(selectContainingOption(/select a series/i), "p95 latency");
+
+        expect(useAutomationStore.getState().draft.graphAlert.seriesName.length).toBeGreaterThan(0);
+      });
+    });
+
+    describe("when the project has no custom graphs yet", () => {
+      beforeEach(() => {
+        server.graphs = [];
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+      });
+
+      /** @scenario "A project with no custom graphs offers to create one" */
+      it("explains there is nothing to watch yet and offers to create one", () => {
+        expect(screen.getByText(/doesn.t have a custom graph yet/i)).toBeInTheDocument();
+        const link = screen.getByRole("link", { name: /create a custom graph/i });
+        expect(link).toHaveAttribute("href", "/proj/analytics/custom");
+        // Opens in a new tab so the in-progress draft is not lost.
+        expect(link).toHaveAttribute("target", "_blank");
+      });
+
+      it("does not show a graph or series picker", () => {
+        expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+      });
+    });
+
+    describe("when an existing automation's graph is gone from the project", () => {
+      it("keeps the picker with the selection, not the empty state", () => {
+        server.graphs = [];
+        seedGraphDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+        expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when opened prefilled even though the project has no other graphs", () => {
+      it("still shows the locked graph picker, not the empty state", () => {
+        server.graphs = [];
+        seedGraphDraft();
+        render(<SubjectSection prefilledGraphId="graph-1" />, { wrapper: Wrapper });
+
+        expect(selectContainingOption(/select a graph/i)).toBeInTheDocument();
+      });
+    });
+
+    describe("when the graph list fails to load with no data ever cached", () => {
+      /** @scenario "A failed graph list shows a retry, not the empty-project state" */
+      it("shows a load failure, not the no-graphs-yet empty state", () => {
+        graphListFails();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByText(/couldn.t be loaded right now/i)).toBeInTheDocument();
+        expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
+      });
+
+      it("does not name the underlying error", () => {
+        graphListFails();
+        server.graphsErrorValue = new Error(
+          "upstream exploded: connect ECONNREFUSED 10.0.0.7:8123",
+        );
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByText(/upstream exploded/i)).toBeNull();
+        expect(screen.queryByText(/ECONNREFUSED/i)).toBeNull();
+      });
+
+      it("does not offer to create a graph the project may already have", () => {
+        graphListFails();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.queryByRole("link", { name: /create a custom graph/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      describe("when the user retries", () => {
+        it("re-runs the graph list query", async () => {
+          const user = userEvent.setup();
+          graphListFails();
+          render(<SubjectSection />, { wrapper: Wrapper });
+
+          await user.click(screen.getByRole("button", { name: /try again/i }));
+
+          expect(mockGraphsRefetch).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
+    describe("when a background refetch fails but a good graph list is still cached", () => {
+      it("keeps showing the working picker with the selection intact, not the failure screen", () => {
+        server.isGraphsError = true;
+        seedGraphDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByText(/couldn.t be loaded right now/i)).not.toBeInTheDocument();
+        expect(selectContainingOption(/select a graph/i)).toHaveValue("graph-1");
+      });
+    });
+
+    describe("given the graph list is still loading", () => {
+      it("shows neither the empty state nor the picker's missing-graph error", () => {
+        server.isGraphsLoading = true;
+        seedFreshAlertDraft();
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByText(/doesn.t have a custom graph yet/i)).not.toBeInTheDocument();
+        expect(screen.queryByText("Pick a custom graph to continue.")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a trace draft whose condition matches more than the plan allows", () => {
+    describe("when the action writes a record per match", () => {
+      /** @scenario "An over-ceiling condition on a persist action shows the advice" */
+      it("warns that the condition is over the daily limit", () => {
+        seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+        previewReturns(OVER_CAP_HITS);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByTestId("daily-cap-advice")).toHaveTextContent(
+          "About 1,000 matches a day is over your plan's daily automation " +
+            "limit of 100. Matches past the limit are skipped for the rest " +
+            "of the day. Narrow the condition so it selects fewer traces.",
+        );
+      });
+
+      it("warns for the annotation-queue action too", () => {
+        seedTraceDraft(TriggerAction.ADD_TO_ANNOTATION_QUEUE);
+        previewReturns(OVER_CAP_HITS);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByTestId("daily-cap-advice")).toBeInTheDocument();
+      });
+
+      /** @scenario "The advice offers a way out that is not narrowing" */
+      it("links to the plans page, since a bigger plan is the other way out", () => {
+        seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+        previewReturns(OVER_CAP_HITS);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByTestId("daily-cap-advice-upgrade")).toHaveAttribute(
+          "href",
+          "/settings/plans",
+        );
+      });
+    });
+
+    describe("when the action only notifies", () => {
+      /** @scenario "A notify action shows nothing even over the ceiling" */
+      it("says nothing about the daily limit", () => {
+        seedTraceDraft(TriggerAction.SEND_SLACK_MESSAGE);
+        previewReturns(OVER_CAP_HITS);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
+      });
+    });
+
+    describe("when the plan ceiling cannot be read", () => {
+      /** @scenario "A failed ceiling read shows nothing and never blocks saving" */
+      it("says nothing and leaves the draft alone", () => {
+        seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+        previewReturns(OVER_CAP_HITS);
+        server.cap = { data: null };
+        const before = useAutomationStore.getState().draft;
+
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
+        expect(useAutomationStore.getState().draft).toBe(before);
+      });
+    });
+  });
+
+  describe("given a trace draft whose condition matches less than the plan allows", () => {
+    /** @scenario "A condition within the ceiling renders no warning in the drawer" */
+    it("says nothing about the daily limit", () => {
+      seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+      previewReturns(WITHIN_CAP_HITS);
+      render(<SubjectSection />, { wrapper: Wrapper });
+
+      // The preview itself rendered, so the absent advice is a decision.
+      expect(screen.getByText(String(WITHIN_CAP_HITS))).toBeInTheDocument();
+      expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
+    });
+  });
+
+  describe("given a trace draft with no condition yet", () => {
+    const seedEmptyConditionDraft = (annotators: { id: string; name: string }[]) =>
+      useAutomationStore.getState().hydrate({
+        ...INITIAL_DRAFT,
+        source: "trace",
+        action: TriggerAction.ADD_TO_ANNOTATION_QUEUE,
+        filterQuery: "",
+        slices: {
+          ...INITIAL_DRAFT.slices,
+          [TriggerAction.ADD_TO_ANNOTATION_QUEUE]: { annotators },
+        },
+      });
+
+    describe("when the delivery is not set up yet", () => {
+      /** @scenario "The missing condition is only flagged once the delivery is set up" */
+      it("offers the empty condition as guidance, not as an error", () => {
+        seedEmptyConditionDraft([]);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(
+          screen.getByText("Add a condition to see which traces would match."),
+        ).toBeInTheDocument();
+        expect(screen.queryByText("Add at least one condition.")).toBeNull();
+      });
+    });
+
+    describe("when the delivery is set up", () => {
+      /** @scenario "The missing condition is only flagged once the delivery is set up" */
+      it("flags the missing condition", () => {
+        seedEmptyConditionDraft([{ id: "u_1", name: "Ada" }]);
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Add at least one condition.")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("given a trace query typed in the Code tab", () => {
+    const seedQuery = (filterQuery: string) =>
+      useAutomationStore.getState().hydrate({
+        ...INITIAL_DRAFT,
+        source: "trace",
+        action: TriggerAction.SEND_SLACK_MESSAGE,
+        filterQuery,
+      });
+
+    describe("when the query cannot parse", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("shows the parse error inline and no answered check", () => {
+        seedQuery("status:error AND (model:gpt");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("alert")).toHaveTextContent(/./);
+        expect(screen.queryByText("Answered")).toBeNull();
+      });
+    });
+
+    describe("when a clause names a value its field never has", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("warns that it never matches and shows no answered check", () => {
+        seedQuery("status:error#simplified");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("status")).toHaveTextContent(
+          "`status` is never `error#simplified`: expected one of error, warning, ok.",
+        );
+        expect(screen.queryByText("Answered")).toBeNull();
+      });
+    });
+
+    describe("when a clause names an unknown field", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("warns that the field is unknown and shows no answered check", () => {
+        seedQuery("stauts:error");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByRole("status")).toHaveTextContent("Unknown field `stauts`");
+        expect(screen.queryByText("Answered")).toBeNull();
+      });
+    });
+
+    describe("when the query parses and names real fields", () => {
+      /** @scenario "The Code tab only marks a query answered when it parses" */
+      it("marks the section answered and says nothing more", () => {
+        seedQuery("status:error AND trace.attribute.plan:pro");
+        render(<SubjectSection />, { wrapper: Wrapper });
+
+        expect(screen.getByText("Answered")).toBeInTheDocument();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(screen.queryByRole("status")).toBeNull();
+      });
+    });
+  });
+
+  describe("given the condition preview failed", () => {
+    /** @scenario "A failed preview shows nothing and never blocks saving" */
+    it("says nothing and leaves the draft alone", () => {
+      seedTraceDraft(TriggerAction.ADD_TO_DATASET);
+      server.preview = {
+        data: null,
+        isFetching: false,
+        error: new Error("upstream unavailable"),
+      };
+      const before = useAutomationStore.getState().draft;
+
+      render(<SubjectSection />, { wrapper: Wrapper });
+
+      expect(screen.queryByTestId("daily-cap-advice")).toBeNull();
+      expect(useAutomationStore.getState().draft).toBe(before);
+    });
+  });
+});

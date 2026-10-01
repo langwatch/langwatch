@@ -1,0 +1,263 @@
+{
+  "name": "@langwatch/browser-host",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The framework-shaped adapters a feature-web package asks its composing application for, instead of reaching the router, a toast singleton or session storage directly.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./navigation": {
+      "types": "./dist/navigation.d.ts",
+      "default": "./src/navigation.ts"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./compat/next-dynamic": {
+      "types": "./dist/compat/next-dynamic.d.ts",
+      "default": "./src/compat/next-dynamic.ts"
+    },
+    "./slots": {
+      "types": "./dist/slots.d.ts",
+      "default": "./src/slots.tsx"
+    },
+    "./declarations": {
+      "types": "./dist/declarations.d.ts",
+      "default": "./src/declarations.ts"
+    },
+    "./capabilities": {
+      "types": "./dist/capabilities.d.ts",
+      "default": "./src/capabilities.ts"
+    },
+    "./query-client": {
+      "types": "./dist/query-client.d.ts",
+      "default": "./src/query-client.ts"
+    },
+    "./analytics": {
+      "types": "./dist/analytics.d.ts",
+      "default": "./src/analytics.ts"
+    },
+    "./use-router": {
+      "types": "./dist/use-router.d.ts",
+      "default": "./src/use-router.ts"
+    },
+    "./toaster": {
+      "types": "./dist/toaster.d.ts",
+      "default": "./src/toaster.ts"
+    },
+    "./storage": {
+      "types": "./dist/storage.d.ts",
+      "default": "./src/storage.ts"
+    },
+    "./facilities": {
+      "types": "./dist/facilities.d.ts",
+      "default": "./src/facilities.ts"
+    },
+    "./deployment": {
+      "types": "./dist/deployment.d.ts",
+      "default": "./src/deployment.ts"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "default": "./src/errors.ts"
+    },
+    "./fetch-sse": {
+      "types": "./dist/fetch-sse.d.ts",
+      "default": "./src/fetch-sse.ts"
+    },
+    "./cache-tiers": {
+      "types": "./dist/cache-tiers.d.ts",
+      "default": "./src/cache-tiers.ts"
+    },
+    "./session-version": {
+      "types": "./dist/session-version.d.ts",
+      "default": "./src/session-version.ts"
+    },
+    "./query-persistence": {
+      "types": "./dist/query-persistence.d.ts",
+      "default": "./src/query-persistence.ts"
+    },
+    "./query-retry": {
+      "types": "./dist/query-retry.d.ts",
+      "default": "./src/query-retry.ts"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.ts"
+    },
+    "./link": {
+      "types": "./dist/link.d.ts",
+      "default": "./src/link.tsx"
+    },
+    "./use-drawer": {
+      "types": "./dist/use-drawer.d.ts",
+      "default": "./src/use-drawer.ts"
+    },
+    "./upgrade-modal-store": {
+      "types": "./dist/upgrade-modal-store.d.ts",
+      "default": "./src/upgrade-modal-store.ts"
+    },
+    "./use-organization-team-project": {
+      "types": "./dist/use-organization-team-project.d.ts",
+      "default": "./src/use-organization-team-project.ts"
+    },
+    "./session": {
+      "types": "./dist/session.d.ts",
+      "default": "./src/session.ts"
+    },
+    "./format-time-ago": {
+      "types": "./dist/format-time-ago.d.ts",
+      "default": "./src/format-time-ago.ts"
+    },
+    "./feature-flag": {
+      "types": "./dist/feature-flag.d.ts",
+      "default": "./src/feature-flag.ts"
+    },
+    "./period-selector": {
+      "types": "./dist/period-selector.d.ts",
+      "default": "./src/period-selector.tsx"
+    },
+    "./markdown": {
+      "types": "./dist/markdown/index.d.ts",
+      "default": "./src/markdown/index.tsx"
+    },
+    "./isolated-error-boundary": {
+      "types": "./dist/isolated-error-boundary.d.ts",
+      "default": "./src/isolated-error-boundary.tsx"
+    },
+    "./copy-button": {
+      "types": "./dist/copy-button.d.ts",
+      "default": "./src/copy-button.tsx"
+    },
+    "./drawer": {
+      "types": "./dist/drawer/index.d.ts",
+      "default": "./src/drawer/index.ts"
+    },
+    "./transport": {
+      "types": "./dist/transport.d.ts",
+      "default": "./src/transport.ts"
+    },
+    "./sse-subscription-link": {
+      "types": "./dist/sse-subscription-link.d.ts",
+      "default": "./src/sse-subscription-link.ts"
+    },
+    "./browser-rpc": {
+      "types": "./dist/browser-rpc.d.ts",
+      "default": "./src/browser-rpc.ts"
+    },
+    "./address": {
+      "types": "./dist/address.d.ts",
+      "default": "./src/address.ts"
+    },
+    "./browser-analytics": {
+      "types": "./dist/browser-analytics.d.ts",
+      "default": "./src/browser-analytics.ts"
+    },
+    "./posthog": {
+      "types": "./dist/posthog.d.ts",
+      "default": "./src/posthog.ts"
+    },
+    "./gtag-readiness": {
+      "types": "./dist/gtag-readiness.d.ts",
+      "default": "./src/gtag-readiness.ts"
+    },
+    "./poll-for-global": {
+      "types": "./dist/poll-for-global.d.ts",
+      "default": "./src/poll-for-global.ts"
+    },
+    "./browser-tracing": {
+      "types": "./dist/browser-tracing.d.ts",
+      "default": "./src/browser-tracing.ts"
+    },
+    "./navigation-tracing": {
+      "types": "./dist/navigation-tracing.d.ts",
+      "default": "./src/navigation-tracing.ts"
+    },
+    "./feedback": {
+      "types": "./dist/ui-feedback.d.ts",
+      "default": "./src/ui-feedback.ts"
+    },
+    "./lent": {
+      "types": "./dist/lent.d.ts",
+      "default": "./src/lent.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/annotation-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/browser-trpc": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "@tanstack/query-async-storage-persister": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-persist-client": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "idb-keyval": "catalog:",
+    "lucide-react": "catalog:",
+    "posthog-js": "catalog:",
+    "qs": "catalog:",
+    "react-error-boundary": "catalog:",
+    "react-feather": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/qs": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router": "^8.0.1"
+  }
+}

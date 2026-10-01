@@ -1,29 +1,20 @@
 /**
  * The data a statement is described by, and the port the driver implements.
- *
- * These types used to live in `pipeline.ts` alongside a middleware `compose()`.
- * The composition is now a class — see `client.ts` — and what remains here is
- * only the vocabulary every layer shares, which is why the module is named for
- * the query rather than for the mechanism that runs it.
+ * These types used to share `pipeline.ts` with a middleware `compose()`, now
+ * a class in `client.ts` — this module keeps only the shared vocabulary.
  */
 
 /** Whether a statement reads or writes, which several policies branch on. */
 export type QueryKind = "read" | "write";
 
 /**
- * The part of `AbortSignal` this package uses, declared structurally.
- *
- * A real `AbortSignal` satisfies it. Declaring it here rather than reaching for
- * the DOM or Node lib is what keeps the package buildable without `@types/node`
- * and usable from any host.
+ * The part of `AbortSignal` this package uses, declared structurally so a
+ * real `AbortSignal` satisfies it without reaching for the DOM or Node lib —
+ * keeps the package buildable without `@types/node`, usable from any host.
  */
 export interface AbortSignalLike {
   readonly aborted: boolean;
-  addEventListener(
-    type: "abort",
-    listener: () => void,
-    options?: { once?: boolean },
-  ): void;
+  addEventListener(type: "abort", listener: () => void, options?: { once?: boolean }): void;
   removeEventListener(type: "abort", listener: () => void): void;
 }
 
@@ -34,26 +25,57 @@ export interface QueryRequest {
    * a request that cannot name its tenant cannot be routed or audited safely.
    */
   tenantId: string;
+  /** Route an organisation-wide operation directly; tenant scope checks still apply. */
+  organizationId?: string;
+  /**
+   * A declared tenant set, one organisation's projects: the statement's `TenantId IN (...)`
+   * must bind exactly these, `tenantId` among them, and the router refuses a set that spans
+   * organisations.
+   */
+  tenantIds?: readonly string[] | undefined;
   sql: string;
   params?: Record<string, unknown> | undefined;
   /** The primary table, used for metrics and span attributes. */
   table?: string | undefined;
   kind?: QueryKind | undefined;
   /** Per-query ClickHouse settings, e.g. a `max_memory_usage` cap. */
-  settings?: Record<string, string> | undefined;
+  settings?: Record<string, string | number> | undefined;
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
-   * Declares a statement that genuinely has no tenant predicate - DDL, a
-   * `system.*` read, a migration, a cross-tenant maintenance sweep.
-   *
-   * The tenant guard refuses anything untenanted unless this is set, and it is
-   * a written reason rather than a boolean on purpose: it has to be typed out
-   * by a person, it shows up in review as an added string, and it is recorded
-   * on the span so an audit can list every unscoped statement the system ran
-   * and why. A boolean would be set to `true` and forgotten.
+   * Declares a statement with no tenant predicate (DDL, `system.*`, a
+   * migration, a cross-tenant sweep). A written reason, not a boolean: it's
+   * recorded on the span so an audit can list every unscoped statement and why.
    */
   unscoped?: { reason: string } | undefined;
+}
+
+/**
+ * One batch of rows, written to the server their tenant is on. A batch that
+ * mixes tenants is refused rather than routed by whichever row came first,
+ * so "every statement scopes to one tenant" holds without a reader remembering.
+ */
+export interface InsertRequest {
+  /**
+   * The tenant these rows belong to. Required for the same reason a read's is:
+   * no other identifier in this schema is unique across tenants, so a batch
+   * that cannot name its tenant cannot be routed.
+   */
+  tenantId: string;
+  /** Route to the known billing organisation without changing the rows' tenant. */
+  organizationId?: string;
+  /** The table the rows are written to. */
+  table: string;
+  /**
+   * Read-only on purpose: nothing here mutates the batch it is handed, and
+   * saying so lets a caller holding a `readonly` row array write without
+   * copying every row.
+   */
+  rows: readonly Readonly<Record<string, unknown>>[];
+  /** Per-insert ClickHouse settings, e.g. `async_insert`. */
+  settings?: Record<string, string | number> | undefined;
+  /** Cooperative cancellation. Policies should stop retrying when aborted. */
+  signal?: AbortSignalLike | undefined;
 }
 
 export interface QueryResult<Row> {
@@ -69,12 +91,28 @@ export interface QueryResult<Row> {
 }
 
 /**
- * The port a real ClickHouse connection implements.
- *
- * One method, so a test double is an object literal and the class under test
- * needs no network. This is the only thing in the package that actually talks
- * to a server; everything else decides whether, when, and how loudly.
+ * The port a real ClickHouse connection implements — one method, so a test
+ * double is an object literal and the class under test needs no network.
+ * The only thing in the package that actually talks to a server.
  */
 export interface QueryDriver {
   execute<Row>(request: QueryRequest): Promise<QueryResult<Row>>;
+  /**
+   * Writes one batch. Separate from {@link execute} because an insert carries
+   * rows rather than text, and because the tenant guard checks a batch by
+   * reading its rows rather than by reading a predicate out of SQL.
+   */
+  insert(request: InsertRequest): Promise<void>;
+  /**
+   * Runs a statement with no rows back (`ALTER ... UPDATE`, `KILL MUTATION`,
+   * `TRUNCATE`). Separate from {@link execute}: appending a result format to
+   * one is a syntax error, not an empty answer.
+   */
+  command(request: QueryRequest): Promise<void>;
+  /**
+   * Reads one statement's rows batch by batch as the server sends them, so a large read holds one
+   * batch in memory rather than the whole result. Optional: a driver without it answers the whole
+   * result as one batch through {@link execute}.
+   */
+  stream?<Row>(request: QueryRequest): AsyncIterable<Row[]>;
 }

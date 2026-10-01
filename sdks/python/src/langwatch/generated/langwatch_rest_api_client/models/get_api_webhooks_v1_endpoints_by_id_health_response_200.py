@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-if TYPE_CHECKING:
-    from ..models.get_api_webhooks_v1_endpoints_by_id_health_response_200_data import (
-        GetApiWebhooksV1EndpointsByIdHealthResponse200Data,
-    )
-
+from ..models.get_api_webhooks_v1_endpoints_by_id_health_response_200_status import (
+    GetApiWebhooksV1EndpointsByIdHealthResponse200Status,
+)
 
 T = TypeVar("T", bound="GetApiWebhooksV1EndpointsByIdHealthResponse200")
 
@@ -19,20 +17,72 @@ T = TypeVar("T", bound="GetApiWebhooksV1EndpointsByIdHealthResponse200")
 class GetApiWebhooksV1EndpointsByIdHealthResponse200:
     """
     Attributes:
-        data (GetApiWebhooksV1EndpointsByIdHealthResponse200Data):
+        status (GetApiWebhooksV1EndpointsByIdHealthResponse200Status):
+        disabled_reason (None | str):
+        failing_since (None | str):
+        last_success_at (None | str):
+        last_failure_at (None | str):
+        oldest_undelivered_age_ms (int | None):
+        dlq_depth (int):
+        sends_per_minute (float):
+        success_rate (float | None):
+        p95_latency_ms (int | None):
     """
 
-    data: GetApiWebhooksV1EndpointsByIdHealthResponse200Data
+    status: GetApiWebhooksV1EndpointsByIdHealthResponse200Status
+    disabled_reason: None | str
+    failing_since: None | str
+    last_success_at: None | str
+    last_failure_at: None | str
+    oldest_undelivered_age_ms: int | None
+    dlq_depth: int
+    sends_per_minute: float
+    success_rate: float | None
+    p95_latency_ms: int | None
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data = self.data.to_dict()
+        status = self.status.value
+
+        disabled_reason: None | str
+        disabled_reason = self.disabled_reason
+
+        failing_since: None | str
+        failing_since = self.failing_since
+
+        last_success_at: None | str
+        last_success_at = self.last_success_at
+
+        last_failure_at: None | str
+        last_failure_at = self.last_failure_at
+
+        oldest_undelivered_age_ms: int | None
+        oldest_undelivered_age_ms = self.oldest_undelivered_age_ms
+
+        dlq_depth = self.dlq_depth
+
+        sends_per_minute = self.sends_per_minute
+
+        success_rate: float | None
+        success_rate = self.success_rate
+
+        p95_latency_ms: int | None
+        p95_latency_ms = self.p95_latency_ms
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "data": data,
+                "status": status,
+                "disabled_reason": disabled_reason,
+                "failing_since": failing_since,
+                "last_success_at": last_success_at,
+                "last_failure_at": last_failure_at,
+                "oldest_undelivered_age_ms": oldest_undelivered_age_ms,
+                "dlq_depth": dlq_depth,
+                "sends_per_minute": sends_per_minute,
+                "success_rate": success_rate,
+                "p95_latency_ms": p95_latency_ms,
             }
         )
 
@@ -40,15 +90,73 @@ class GetApiWebhooksV1EndpointsByIdHealthResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_webhooks_v1_endpoints_by_id_health_response_200_data import (
-            GetApiWebhooksV1EndpointsByIdHealthResponse200Data,
-        )
-
         d = dict(src_dict)
-        data = GetApiWebhooksV1EndpointsByIdHealthResponse200Data.from_dict(d.pop("data"))
+        status = GetApiWebhooksV1EndpointsByIdHealthResponse200Status(d.pop("status"))
+
+        def _parse_disabled_reason(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        disabled_reason = _parse_disabled_reason(d.pop("disabled_reason"))
+
+        def _parse_failing_since(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        failing_since = _parse_failing_since(d.pop("failing_since"))
+
+        def _parse_last_success_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        last_success_at = _parse_last_success_at(d.pop("last_success_at"))
+
+        def _parse_last_failure_at(data: object) -> None | str:
+            if data is None:
+                return data
+            return cast(None | str, data)
+
+        last_failure_at = _parse_last_failure_at(d.pop("last_failure_at"))
+
+        def _parse_oldest_undelivered_age_ms(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        oldest_undelivered_age_ms = _parse_oldest_undelivered_age_ms(d.pop("oldest_undelivered_age_ms"))
+
+        dlq_depth = d.pop("dlq_depth")
+
+        sends_per_minute = d.pop("sends_per_minute")
+
+        def _parse_success_rate(data: object) -> float | None:
+            if data is None:
+                return data
+            return cast(float | None, data)
+
+        success_rate = _parse_success_rate(d.pop("success_rate"))
+
+        def _parse_p95_latency_ms(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        p95_latency_ms = _parse_p95_latency_ms(d.pop("p95_latency_ms"))
 
         get_api_webhooks_v1_endpoints_by_id_health_response_200 = cls(
-            data=data,
+            status=status,
+            disabled_reason=disabled_reason,
+            failing_since=failing_since,
+            last_success_at=last_success_at,
+            last_failure_at=last_failure_at,
+            oldest_undelivered_age_ms=oldest_undelivered_age_ms,
+            dlq_depth=dlq_depth,
+            sends_per_minute=sends_per_minute,
+            success_rate=success_rate,
+            p95_latency_ms=p95_latency_ms,
         )
 
         get_api_webhooks_v1_endpoints_by_id_health_response_200.additional_properties = d

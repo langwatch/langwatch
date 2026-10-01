@@ -89,7 +89,7 @@ class AnnotationsFacade:
         Returns:
             Dictionary with annotation data.
         """
-        response = self._http().get("/api/annotations")
+        response = self._http().get("/api/v1/annotations")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -103,7 +103,7 @@ class AnnotationsFacade:
         Returns:
             Dictionary containing the annotation data.
         """
-        response = self._http().get(f"/api/annotations/{_quote(annotation_id)}")
+        response = self._http().get(f"/api/v1/annotations/{_quote(annotation_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -118,7 +118,7 @@ class AnnotationsFacade:
             Dictionary containing the annotation data for the trace.
         """
         response = self._http().get(
-            f"/api/annotations/trace/{_quote(trace_id)}"
+            f"/api/v1/annotations/trace/{_quote(trace_id)}"
         )
         _raise_for_status(response, operation="get_by_trace")
         return response.json()
@@ -141,7 +141,7 @@ class AnnotationsFacade:
         """
         body = params or {}
         response = self._http().post(
-            f"/api/annotations/trace/{_quote(trace_id)}", json=body
+            f"/api/v1/annotations/trace/{_quote(trace_id)}", json=body
         )
         _raise_for_status(response, operation="create")
         return response.json()
@@ -157,7 +157,7 @@ class AnnotationsFacade:
             Dictionary with deletion result.
         """
         response = self._http().delete(
-            f"/api/annotations/{_quote(annotation_id)}"
+            f"/api/v1/annotations/{_quote(annotation_id)}"
         )
         _raise_for_status(response, operation="delete")
         return response.json()

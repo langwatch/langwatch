@@ -17,22 +17,22 @@ export type ExperimentRunSummary = {
     finishedAt?: number;
     stoppedAt?: number;
   };
-  targets?: Array<{
+  targets?: {
     targetId: string;
     name: string;
     passed: number;
     failed: number;
     avgLatency: number;
     totalCost: number;
-  }>;
-  evaluators?: Array<{
+  }[];
+  evaluators?: {
     evaluatorId: string;
     name: string;
     passed: number;
     failed: number;
     passRate: number;
     avgScore?: number;
-  }>;
+  }[];
   totalPassed?: number;
   totalFailed?: number;
   passRate?: number;
@@ -59,16 +59,14 @@ export type RunExperimentOptions = {
 
 /**
  * Inputs that override a platform experiment or workflow run on the server.
- *
- * `data` and `datasetId` are mutually exclusive (the backend rejects passing
- * both). `parameters` overrides target parameters (e.g. prompt variables) and
- * `rowIndices` restricts execution to a subset of the configured dataset.
+ * `data`/`datasetId` are mutually exclusive (backend rejects both).
+ * `parameters` overrides target params; `rowIndices` subsets the dataset.
  */
 export type RunWithResultsOptions = {
   /**
    * Inline rows to evaluate. Mutually exclusive with `datasetId`.
    */
-  data?: Array<Record<string, unknown>>;
+  data?: Record<string, unknown>[];
   /**
    * Id of a saved dataset to evaluate. Mutually exclusive with `data`.
    */

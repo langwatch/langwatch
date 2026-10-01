@@ -281,8 +281,8 @@ spec:
                 # Render the two files from the same env the app reads for LWQL.
                 # The renderer is offline (no ClickHouse connection), so it is
                 # safe to run before the ClickHouse StatefulSet exists.
-                cd /app/platform/app
-                pnpm run task renderLwqlAccessConfig --out /render
+                cd /app/apps/tasks
+                LWQL_RENDER_OUT_DIR=/render pnpm run task lwql-render-access-config
               else
                 # Feature off: write empty, valid YAML so the pods' mount is
                 # always satisfiable and ClickHouse merges a no-op. The mount

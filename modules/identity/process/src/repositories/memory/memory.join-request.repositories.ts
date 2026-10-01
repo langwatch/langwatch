@@ -1,0 +1,131 @@
+import type {
+  JoinCandidateOrganization,
+  JoinRequestAggregateState,
+} from "@langwatch/identity-contract";
+import { JoinNotAvailableError, JoinRequestNotFoundError } from "@langwatch/identity-contract";
+import type { Instant } from "@langwatch/time";
+
+import type {
+  JoinCandidateRepository,
+  JoinRequestListReadRepository,
+} from "../join-request.repository.ts";
+import { MemoryIdentityStore } from "./memory.identity.store.ts";
+
+const PENDING = "PENDING";
+
+/** The join-request read twin: the guards' two reads plus the three list reads. */
+export class MemoryJoinRequestReadRepository implements JoinRequestListReadRepository {
+  static create(store: MemoryIdentityStore): MemoryJoinRequestReadRepository {
+    return new MemoryJoinRequestReadRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async getRequest(args: { joinRequestId: string }): Promise<JoinRequestAggregateState> {
+    const request = this.store.joinRequests.get(args.joinRequestId);
+    if (!request)
+      throw new JoinRequestNotFoundError(`join request ${args.joinRequestId} does not exist`);
+    return request;
+  }
+
+  async getPendingRequest(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState> {
+    const match = [...this.store.joinRequests.values()].find(
+      (request) =>
+        request.userId === args.userId &&
+        request.organizationId === args.organizationId &&
+        request.state === PENDING,
+    );
+
+    if (!match) {
+      throw new JoinRequestNotFoundError(
+        `${args.userId} has no pending request to ${args.organizationId}`,
+      );
+    }
+    return match;
+  }
+
+  async getLastRejectionAt(args: { userId: string; organizationId: string }): Promise<Instant> {
+    const rejectedAt = this.store.joinRejections.get(MemoryIdentityStore.rejectionKey(args));
+    if (!rejectedAt) {
+      throw new JoinRequestNotFoundError(`${args.organizationId} never rejected ${args.userId}`);
+    }
+    return rejectedAt;
+  }
+
+  async findPendingForOrganization(args: {
+    organizationId: string;
+  }): Promise<JoinRequestAggregateState[]> {
+    return this.pending((request) => request.organizationId === args.organizationId);
+  }
+
+  async findAutomaticJoinsForOrganization(args: {
+    organizationId: string;
+    resolvedAfterMs: number;
+  }): Promise<JoinRequestAggregateState[]> {
+    return [...this.store.joinRequests.values()]
+      .filter(
+        (request) =>
+          request.state === "APPROVED" &&
+          request.resolvedByType === "policy" &&
+          request.organizationId === args.organizationId &&
+          (request.resolvedAtMs ?? 0) >= args.resolvedAfterMs,
+      )
+      .toSorted((left, right) => (right.resolvedAtMs ?? 0) - (left.resolvedAtMs ?? 0));
+  }
+
+  async findPendingForUser(args: { userId: string }): Promise<JoinRequestAggregateState[]> {
+    return this.pending((request) => request.userId === args.userId);
+  }
+
+  async findApprovedForMembers(args: {
+    organizationId: string;
+    userIds: readonly string[];
+  }): Promise<JoinRequestAggregateState[]> {
+    return [...this.store.joinRequests.values()]
+      .filter(
+        (request) =>
+          request.state === "APPROVED" &&
+          request.organizationId === args.organizationId &&
+          args.userIds.includes(request.userId),
+      )
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
+  }
+
+  private pending(
+    matches: (request: JoinRequestAggregateState) => boolean,
+  ): JoinRequestAggregateState[] {
+    return [...this.store.joinRequests.values()]
+      .filter((request) => request.state === PENDING && matches(request))
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
+  }
+}
+
+/** The candidate twin: the organizations a domain could reach. */
+export class MemoryJoinCandidateRepository implements JoinCandidateRepository {
+  static create(store: MemoryIdentityStore): MemoryJoinCandidateRepository {
+    return new MemoryJoinCandidateRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async findCandidateOrganizations(args: { domain: string }): Promise<JoinCandidateOrganization[]> {
+    return this.store.joinCandidates.get(args.domain) ?? [];
+  }
+
+  async getCandidateOrganization(args: {
+    organizationId: string;
+    domain: string;
+  }): Promise<JoinCandidateOrganization> {
+    const candidates = this.store.joinCandidates.get(args.domain) ?? [];
+    const candidate = candidates.find((row) => row.organizationId === args.organizationId);
+    if (!candidate) {
+      throw new JoinNotAvailableError(
+        `${args.organizationId} is not a candidate for ${args.domain}`,
+      );
+    }
+    return candidate;
+  }
+}

@@ -15,6 +15,17 @@ Feature: Langy panel theme per color mode
   # Langy's own namespace (`langy.*`, the identity gradient stops, the data
   # bar colours, the signal grid line) keeps values in BOTH modes: those tokens
   # have no app-level fallback and feed the mark, shimmer and fold.
+  #
+  # Dark mode is lifted from the marketing site's own dark sections
+  # (SectionLangy, SectionEnterprise), not invented, and keeps their rules:
+  # text is paper at alpha, never a lighter grey; one hairline (white/10) for
+  # both card edges and dividers; elevation is white-alpha layers on the ink
+  # ground, never a lighter grey surface; no shadows anywhere; one lit accent
+  # (brand-300 at alpha), plus moss/rust for pass/fail. A warm paper palette
+  # was tried for light mode and read as a beige island next to the app's
+  # white surfaces — hence "no overrides" above. The condition selectors win
+  # by specificity alone: `.dark .langy-root { … }` (0,2,0) beats Chakra's own
+  # `.dark` (0,1,0), verified against `system.getTokenCss()`.
   # ---------------------------------------------------------------------------
 
   @unit

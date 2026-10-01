@@ -37,13 +37,13 @@ imports no parser.
 `LangWatchQLQueryBlock` therefore carries, per `SELECT` block, the facts no
 consumer could recover afterwards:
 
-| field | what it answers |
-| --- | --- |
-| `tables` | which LangWatchQL datasets this block reads, and under which alias |
-| `joins` | which column equalities the join was written on |
-| `filteredColumns` | which columns appear in `WHERE` / `PREWHERE` / `QUALIFY` |
-| `groupByColumns` | which *names* the block groups by |
-| `groupBy`, `aggregated` | whether the block collapses rows |
+| field                   | what it answers                                                    |
+| ----------------------- | ------------------------------------------------------------------ |
+| `tables`                | which LangWatchQL datasets this block reads, and under which alias |
+| `joins`                 | which column equalities the join was written on                    |
+| `filteredColumns`       | which columns appear in `WHERE` / `PREWHERE` / `QUALIFY`           |
+| `groupByColumns`        | which _names_ the block groups by                                  |
+| `groupBy`, `aggregated` | whether the block collapses rows                                   |
 
 Grain comes from the catalog, not from the SQL: a dataset's `dedup.keyColumns`
 **is** its grain, so "the join did not match every one of the finer dataset's
@@ -58,9 +58,9 @@ Three consequences are deliberate:
    column behind it. Both are misses. An advisory that fires on healthy queries
    is one people learn to ignore, and then it is not an advisory at all.
 2. **`groupByColumns` is what keeps the result rules honest.** The time-bucket
-   rules only treat a temporal result column as a *series* when the query
+   rules only treat a temporal result column as a _series_ when the query
    grouped by that column's name. Without it, "first failure per trace" — which
-   groups by trace and returns a timestamp *aggregate* — reads as a series, and
+   groups by trace and returns a timestamp _aggregate_ — reads as a series, and
    the ordinary spacing between two unrelated traces gets reported as missing
    buckets.
 3. **The clock is a dependency.** "Has this period finished yet" is asked
@@ -80,7 +80,7 @@ That is the trade taken, and the alternative is worse — see below.
 Every diagnostic is data in the response with a stable machine-readable `code`,
 enumerated in the published OpenAPI spec. An empty list is documented, in one
 place reused by the endpoint's own description
-(`LWQL_CLEAN_DIAGNOSTICS_MEANING`), as *no known issue was detected* and
+(`LWQL_CLEAN_DIAGNOSTICS_MEANING`), as _no known issue was detected_ and
 explicitly not as proof the answer is the one the caller meant.
 
 ## Alternatives considered
@@ -97,7 +97,7 @@ knowing the grain each side was matched on, which is a fact about the statement.
 
 **Record column references per block so "affected columns" means "columns this
 query referenced".** Not taken in this slice. `meta.affectedColumns` names the
-repeated dataset's *measures* (the catalog columns declaring a `unit`) — the
+repeated dataset's _measures_ (the catalog columns declaring a `unit`) — the
 ones where repetition changes the number rather than only the row count. That is
 true whether or not the query selects them, and it needs no further accept-shape
 growth. Revisit if a consumer needs the intersection.

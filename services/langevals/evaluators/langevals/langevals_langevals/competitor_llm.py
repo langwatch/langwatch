@@ -1,14 +1,13 @@
 import litellm
 from litellm.utils import get_max_tokens
 from litellm.cost_calculator import completion_cost
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.utils import trim_messages
 
 from pydantic import Field
 from typing import List, Optional, cast
-import json
 
+from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
     BaseEvaluator,
@@ -119,7 +118,7 @@ class CompetitorLLMEvaluator(
                             "properties": {
                                 "reasoning": {
                                     "type": "string",
-                                    "description": "Use this field to ponder and write the reasoning behind the decision written before a result is actually given",
+                                    "description": "A short reasoning for the decision, written before the result",
                                 },
                                 "competitor_mentioned": {
                                     "type": "boolean",
@@ -142,9 +141,11 @@ class CompetitorLLMEvaluator(
             tool_choice={"type": "function", "function": {"name": "competitor_check"}},  # type: ignore
         )
         response = cast(ModelResponse, response)
-        choice = cast(Choices, response.choices[0])
-        arguments = json.loads(
-            cast(Message, choice.message).tool_calls[0].function.arguments
+        arguments = read_tool_call_arguments(
+            response,
+            "competitor_check",
+            required=["competitor_mentioned"],
+            model=self.settings.model,
         )
         passed = not arguments["competitor_mentioned"] if "competitor_mentioned" in arguments else True
         confidence = arguments["confidence"] if "confidence" in arguments else 1

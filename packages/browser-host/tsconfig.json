@@ -1,0 +1,97 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node"],
+
+    "rootDir": ".",
+
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../browser-trpc/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../react-rum/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    }
+  ]
+}

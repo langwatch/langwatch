@@ -13,9 +13,9 @@
 
 clickhouse:
   objectStorage:
-    bucket: ""       # required — set via --set
-    region: ""       # required — set via --set
-    useEnvironmentCredentials: true  # IRSA / workload identity
+    bucket: "" # required — set via --set
+    region: "" # required — set via --set
+    useEnvironmentCredentials: true # IRSA / workload identity
   cold:
     enabled: true
     defaultTtlDays: 49

@@ -1,0 +1,230 @@
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Monitor } from "@langwatch/monitor-contract";
+import type { SystemMigration } from "@langwatch/system-migrations";
+import type { Instant } from "@langwatch/time";
+
+import type {
+  AutomationRestCreateInput,
+  AutomationRestUpdateInput,
+} from "./automation-rest.schemas.ts";
+import type {
+  AutomationListRow,
+  AutomationPersistCapStatus,
+  SlackChannelListing,
+} from "./automation.responses.ts";
+import type {
+  AutomationApiCreateInput,
+  AutomationApiFireHistoryInput,
+  AutomationApiListSlackChannelsInput,
+  AutomationApiTestFireInput,
+  AutomationApiToggleTriggerInput,
+  AutomationApiUpdateTriggerFiltersInput,
+  AutomationApiTriggerScope,
+  AutomationApiUpsertInput,
+  NextFiring,
+  TriggerFirePage,
+  TriggerLatestEvaluation,
+} from "./automation.trpc-schemas.ts";
+import type { EmailSuppression, EmailSuppressionRow, UnsubscribeView } from "./automation.ts";
+import type { CustomGraphNameRef } from "./custom-graph.ts";
+import type { AutomationPersistCapCount } from "./persist-cap.ts";
+import type { TestFireInput, TestFireResult, TestFireTemplateDraft } from "./test-fire.ts";
+import type { CreateTriggerCommand, UpdateTriggerCommand } from "./trigger.commands.ts";
+import type {
+  OperatorReportSchedule,
+  ReportSchedule,
+  TriggerFire,
+  TriggerFireStats,
+} from "./trigger.queries.ts";
+import type { Trigger } from "./trigger.ts";
+import type { WebhookDeliveryRow } from "./webhook-delivery.ts";
+
+/**
+ * The caller a write is attributed to, as the door resolved them. It travels as
+ * an argument so one operation serves a browser session, an API key and a
+ * background job without knowing which it is serving.
+ */
+export interface AutomationAuthor {
+  readonly id: string;
+}
+
+/** The same caller, plus the address a test fire is delivered to (ADR-031). */
+export interface AutomationTestFireAuthor extends AutomationAuthor {
+  /** Null for a caller whose account carries no address. */
+  readonly email: string | null;
+}
+
+/** Which unsubscribe affordance a confirmation arrived through. */
+export type UnsubscribeChannel = "link" | "one-click";
+
+/**
+ * What the install-wide usage report counts here (ADR-156, section 10): how
+ * many triggers were made, since `since` where one is given, and when the
+ * first was. Times are epoch milliseconds.
+ */
+export interface AutomationUsageCount {
+  readonly triggers: number;
+  readonly firstTriggerAt?: number;
+}
+
+/** Callable automation capability shared by transports and process peers. */
+export interface AutomationApi {
+  getAllForProject(input: { projectId: string }): Promise<Trigger[]>;
+  /** Every automation the list renders: redacted, with its monitors and graph. */
+  listAutomations(input: { projectId: string }): Promise<AutomationListRow[]>;
+  findById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  /** One automation with every secret stripped, for a browser to read. */
+  findRedactedById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  findLiveById(input: { triggerId: string; projectId: string }): Promise<Trigger | null>;
+  getById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
+  findByCustomGraphId(input: { projectId: string; customGraphId: string }): Promise<Trigger | null>;
+  getByCustomGraphIds(input: { projectId: string; customGraphIds: string[] }): Promise<Trigger[]>;
+  assertCustomGraphInProject(input: { customGraphId: string; projectId: string }): Promise<void>;
+  customGraphExistsInProject(input: { customGraphId: string; projectId: string }): Promise<boolean>;
+  getCustomGraphNamesByIds(input: {
+    customGraphIds: string[];
+    projectId: string;
+  }): Promise<CustomGraphNameRef[]>;
+  getMonitorsByIds(input: { monitorIds: string[]; projectId: string }): Promise<Monitor[]>;
+  resolvePersistDailyCap(projectId: string): Promise<number>;
+  readPersistCapCounts(input: {
+    projectId: string;
+    triggerIds: readonly string[];
+    now: Instant;
+    cap: number;
+  }): Promise<Record<string, AutomationPersistCapCount>>;
+  /** The ceiling and what each automation has spent of it today. */
+  readDailyCapStatus(input: { projectId: string }): Promise<AutomationPersistCapStatus>;
+  getFireStats(input: { projectId: string }): Promise<TriggerFireStats[]>;
+  getRecentFires(input: {
+    projectId: string;
+    triggerId?: string;
+    limit: number;
+  }): Promise<TriggerFire[]>;
+  getRecentWebhookDeliveries(input: {
+    projectId: string;
+    triggerId: string;
+    limit: number;
+  }): Promise<WebhookDeliveryRow[]>;
+  getReportSchedules(input: { projectId: string }): Promise<ReportSchedule[]>;
+  /** The ORGANIZATION-rooted migrations automation registers (the Slack connection move). */
+  registeredMigrations(): readonly SystemMigration[];
+  /** The Slack conversations a connection's bot can see, for the channel picker. */
+  listSlackChannels(input: AutomationApiListSlackChannelsInput): Promise<SlackChannelListing>;
+  create(input: CreateTriggerCommand): Promise<Trigger>;
+  createTraceAutomation(input: CreateTriggerCommand): Promise<Trigger>;
+  /** The authoring surface's legacy create, with its per-action refusals. */
+  createAutomation(input: AutomationApiCreateInput, author: AutomationAuthor): Promise<Trigger>;
+  /** The authoring drawer's save: one row, whichever of the three kinds it is. */
+  saveAutomation(input: AutomationApiUpsertInput, author: AutomationAuthor): Promise<Trigger>;
+  /** Pausing and resuming, including the report's calendar entry. */
+  setAutomationActive(input: AutomationApiToggleTriggerInput): Promise<Trigger>;
+  /** Replaces one automation's condition, keeping it from matching everything. */
+  replaceAutomationFilters(input: AutomationApiUpdateTriggerFiltersInput): Promise<Trigger>;
+  update(input: UpdateTriggerCommand): Promise<Trigger>;
+  /** Main's public-API read: one live automation, redacted; `trigger_not_found` on a miss. */
+  getPublicTrigger(input: { projectId: string; triggerId: string }): Promise<Trigger>;
+  /** Main's public-API create: held to the dashboard's rules, credentials never read back. */
+  createPublicTrigger(input: {
+    projectId: string;
+    actorId: string;
+    input: AutomationRestCreateInput;
+  }): Promise<Trigger>;
+  /** Main's public-API update: channel and kind fixed, a sent-back placeholder keeps the secret. */
+  updatePublicTrigger(input: {
+    projectId: string;
+    triggerId: string;
+    actorId: string;
+    input: AutomationRestUpdateInput;
+  }): Promise<Trigger>;
+  /** Main's public-API pause/resume: `trigger_not_found` on a miss; a resumed report re-syncs. */
+  setPublicTriggerActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<Trigger>;
+  /** Main's public-API delete: `trigger_not_found` on a miss; a report's schedule retires too. */
+  deletePublicTrigger(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** One keyset page of an automation's fires, newest first; `trigger_not_found` on a miss. */
+  getFireHistory(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
+  /** Main's tRPC view read: the same page, but empty rather than refused on a miss. */
+  listFireHistoryPage(input: AutomationApiFireHistoryInput): Promise<TriggerFirePage>;
+  /** The alert's latest recorded check: zero rows when it has never been evaluated. */
+  findLatestEvaluation(input: AutomationApiTriggerScope): Promise<TriggerLatestEvaluation[]>;
+  /** When the automation acts next; `trigger_not_found` on a miss. */
+  getNextFiring(input: AutomationApiTriggerScope): Promise<NextFiring>;
+  /** Sends a stored automation's message to its own saved destination, capped per project. */
+  testFireStoredTrigger(input: { projectId: string; triggerId: string }): Promise<TestFireResult>;
+  delete(input: { triggerId: string; projectId: string }): Promise<void>;
+  /** Deactivates and soft-deletes one automation in a single write. */
+  softDeleteById(input: { triggerId: string; projectId: string }): Promise<Trigger>;
+  syncReportSchedule(input: {
+    projectId: string;
+    triggerId: string;
+    cron: string;
+    timezone: string;
+  }): Promise<void>;
+  removeReportSchedule(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** Every live report's schedule across projects, for the operator scheduler. */
+  findAllReportSchedules(): Promise<OperatorReportSchedule[]>;
+  /** An operator's pause or resume of one report's schedule; the automation stays as saved. */
+  setReportScheduleActive(input: {
+    projectId: string;
+    triggerId: string;
+    active: boolean;
+  }): Promise<void>;
+  /** An operator's run-now: one extra send, the cadence unchanged. */
+  requestReportRun(input: { projectId: string; triggerId: string }): Promise<void>;
+  /** An operator's release of a run held past staleness; only the run it names is released. */
+  clearReportRun(input: { projectId: string; triggerId: string; requestId: string }): Promise<void>;
+  invalidate(projectId: string): Promise<void>;
+  assertTraceConditionPresent(filters: Record<string, unknown> | undefined): void;
+  assertConditionSurvivesEdit(input: {
+    existing: Trigger;
+    filters: Record<string, unknown> | undefined;
+  }): void;
+  validateTemplateDraft(input: TestFireTemplateDraft): void;
+  getProjectIdentity(projectId: string): Promise<{ name: string; slug: string }>;
+  testFire(input: TestFireInput): Promise<TestFireResult>;
+  /** The authoring drawer's test-fire button, throttled and self-addressed. */
+  sendTestFire(
+    input: AutomationApiTestFireInput,
+    author: AutomationTestFireAuthor,
+  ): Promise<TestFireResult>;
+  findUnsubscribeView(input: {
+    token: string;
+  }): Promise<{ projectName: string; triggerName: string | null; email: string } | null>;
+  /** The unsubscribe page's own read, throttled per caller (ADR-031). */
+  resolveUnsubscribeView(input: {
+    token: string;
+    callerAddress: string | null;
+  }): Promise<UnsubscribeView>;
+  confirmUnsubscribe(input: { token: string; scope: "trigger" | "project" }): Promise<void>;
+  /** The same confirmation from either affordance, throttled per caller. */
+  acceptUnsubscribe(input: {
+    token: string;
+    scope: "trigger" | "project";
+    callerAddress: string | null;
+    via: UnsubscribeChannel;
+  }): Promise<void>;
+  /** The operator-facing suppression list, audited because it reads addresses. */
+  listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
+  removeSuppression(input: { id: string; projectId: string }): Promise<void>;
+  /** Every suppression for a project, each carrying the trigger name it names. */
+  getAllEnriched(input: {
+    projectId: string;
+  }): Promise<(EmailSuppression & { triggerName: string | null })[]>;
+  /**
+   * The platform's own address for one automation resource, built from
+   * the project's slug and the path the caller resolved. The REST
+   * declaration has no request-scoped builder, so the app composes it.
+   */
+  platformUrl(input: { projectSlug: string; path: string }): string;
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<AutomationUsageCount>;
+}
+
+export const AutomationApi = moduleApi<AutomationApi>()("automation");

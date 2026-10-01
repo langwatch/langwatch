@@ -1,0 +1,49 @@
+{
+  "name": "@langwatch/trace-browser-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Peer-importable browser helpers owned by the Trace module.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "liqe": "catalog:",
+    "lucide-react": "catalog:",
+    "react-icons": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7"
+  }
+}

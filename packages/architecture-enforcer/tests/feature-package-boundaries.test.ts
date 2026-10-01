@@ -1,0 +1,1128 @@
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+import { lintWorkspace } from "../src/index.ts";
+import { writePolicyAnchors } from "./workspace.ts";
+
+let root = "";
+
+beforeEach(() => {
+  root = mkdtempSync(join(tmpdir(), "langwatch-architecture-enforcer-"));
+  writePolicyAnchors(root);
+});
+
+afterEach(() => {
+  rmSync(root, { recursive: true, force: true });
+});
+
+function write(path: string, content: string): void {
+  const absolute = join(root, path);
+  mkdirSync(dirname(absolute), { recursive: true });
+  writeFileSync(absolute, content, "utf8");
+}
+
+function className(value: string): string {
+  return value
+    .split("-")
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1)}`)
+    .join("");
+}
+
+function featurePackage({
+  feature,
+  role,
+  name = `@langwatch/${feature}-${role}`,
+  dependencies = {},
+  devDependencies = {},
+  exports = { ".": "./src/index.ts" },
+  source = "export const value = true;",
+  enterprise = false,
+  subjects,
+  capability = "service",
+}: {
+  feature: string;
+  /** `query-language` stands for any module library folder. */
+  role: "contract" | "process" | "browser" | "query-language";
+  name?: string;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  exports?: Record<string, unknown>;
+  source?: string;
+  enterprise?: boolean;
+  subjects?: string[];
+  /** The contract capability: the legacy abstract service, or the reference moduleApi token. */
+  capability?: "service" | "api";
+}): void {
+  const prefix = enterprise
+    ? `enterprise/modules/${feature}/${role}`
+    : `modules/${feature}/${role}`;
+  const featureRoot = enterprise ? `enterprise/modules/${feature}` : `modules/${feature}`;
+  const decisionMarker = feature.split("").reverse().join("");
+  const adrName = "001-package-boundary.md";
+  const cataloguePath = join(root, "modules/catalogue.json");
+  const catalogue = existsSync(cataloguePath)
+    ? (JSON.parse(readFileSync(cataloguePath, "utf8")) as {
+        version: 0;
+        features: {
+          id: string;
+          root: string;
+          classification: "core" | "enterprise";
+          subjects: string[];
+        }[];
+      })
+    : { version: 0 as const, features: [] };
+  const entry = {
+    id: feature,
+    root: featureRoot,
+    classification: enterprise ? ("enterprise" as const) : ("core" as const),
+    subjects: subjects ?? [feature],
+  };
+  catalogue.features = catalogue.features
+    .filter(({ id }) => id !== feature)
+    .concat(entry)
+    .toSorted((left, right) => {
+      const classificationOrder =
+        Number(left.classification === "enterprise") -
+        Number(right.classification === "enterprise");
+      return classificationOrder || left.id.localeCompare(right.id);
+    });
+  write("modules/catalogue.json", JSON.stringify(catalogue));
+  write(
+    `${featureRoot}/adrs/${adrName}`,
+    `# ADR-001: ${feature} package boundary
+
+**Status:** Proposed
+
+**Behavioural contract:** [Package boundary](../specs/package-boundary.feature)
+
+## Context
+
+The ${feature} feature currently has caller-owned behaviour that can diverge. Its test decision marker is ${decisionMarker}.
+
+## Decision
+
+The ${feature} contract owns its portable vocabulary and service capability. Its test decision marker is ${decisionMarker}.
+
+### Public surfaces and transports
+
+The ${feature} transport delegates to its process-owned contract service. Its test decision marker is ${decisionMarker}.
+
+### Dependencies
+
+The ${feature} server depends on portable contracts and injected host ports. Its test decision marker is ${decisionMarker}.
+
+### Persistence
+
+The ${feature} repository maps private records into its portable contract values. Its test decision marker is ${decisionMarker}.
+
+### Runtime and registration
+
+Runtime composition constructs one ${feature} service without import-time registration. Its test decision marker is ${decisionMarker}.
+
+### Environment and configuration
+
+The boot root validates ${feature} configuration before constructing its service. Its test decision marker is ${decisionMarker}.
+
+### Errors
+
+The ${feature} contract names its domain errors and transports map them once. Its test decision marker is ${decisionMarker}.
+
+### Contracts and validation
+
+Zod 4 schemas validate ${feature} inputs without importing server implementation code. Its test decision marker is ${decisionMarker}.
+
+## Consequences
+
+The ${feature} implementation becomes singular at the cost of explicit composition. Its test decision marker is ${decisionMarker}.
+`,
+  );
+  write(`${featureRoot}/adrs/README.md`, `- [Boundary](./${adrName})\n`);
+  write(`${featureRoot}/specs/package-boundary.feature`, `Feature: ${feature}\n`);
+  write(
+    `${prefix}/package.json`,
+    JSON.stringify({
+      name,
+      type: "module",
+      exports,
+      dependencies: role === "contract" ? { zod: "^4.4.3", ...dependencies } : dependencies,
+      devDependencies,
+    }),
+  );
+  write(
+    `${prefix}/tsconfig.json`,
+    JSON.stringify({
+      compilerOptions: {
+        target: "es2022",
+        module: "preserve",
+        moduleResolution: "bundler",
+        strict: true,
+      },
+      include: ["src/**/*.ts"],
+    }),
+  );
+  write(`${prefix}/src/index.ts`, source);
+  const serviceName = `${className(feature)}Service`;
+  if (role === "contract" && capability === "service") {
+    write(`${prefix}/src/${feature}.service.ts`, `export abstract class ${serviceName} {}`);
+  }
+  if (role === "contract" && capability === "api") {
+    write(
+      `${prefix}/src/${feature}.api.ts`,
+      `import { moduleApi } from "@langwatch/kernel"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
+    );
+  }
+  if (role === "process") {
+    write(
+      `${prefix}/src/services/${feature}.service.ts`,
+      `export class ${serviceName} { static create(): ${serviceName} { return new ${serviceName}(); } }`,
+    );
+  }
+}
+
+/**
+ * A package the build has produced: the configuration naming its sources, and
+ * the `.d.ts` files `tsc -b` wrote for them. A fixture that omits one is a
+ * package whose build has not run.
+ */
+function buildsDeclarations({
+  directory,
+  sources,
+  emitted,
+}: {
+  directory: string;
+  sources: string[];
+  emitted: Record<string, string>;
+}): void {
+  write(
+    `${directory}/tsconfig.build.json`,
+    JSON.stringify({
+      compilerOptions: {
+        declaration: true,
+        emitDeclarationOnly: true,
+        noEmit: false,
+        rootDir: "src",
+        outDir: "dist",
+      },
+      files: sources,
+    }),
+  );
+
+  for (const [path, declaration] of Object.entries(emitted)) {
+    write(`${directory}/${path}`, declaration);
+  }
+}
+
+function policies(options?: { declarations?: boolean }): string[] {
+  return lintWorkspace({
+    root,
+    declarations: options?.declarations ?? false,
+  }).map((violation) => violation.policy);
+}
+
+describe("feature package boundary lint", () => {
+  /** @scenario A valid feature graph passes */
+  it("accepts portable contracts and role-correct dependencies", () => {
+    featurePackage({ feature: "workflow", role: "contract", capability: "api" });
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      capability: "api",
+      dependencies: { "@langwatch/workflow-contract": "workspace:*" },
+      source:
+        'import type { value } from "@langwatch/workflow-contract"; export type Agent = typeof value;',
+    });
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { "@langwatch/agent-contract": "workspace:*" },
+      source:
+        'import type { Agent } from "@langwatch/agent-contract"; export const create = (agent: Agent) => agent;',
+    });
+    featurePackage({
+      feature: "agent",
+      role: "browser",
+      dependencies: { "@langwatch/agent-contract": "workspace:*" },
+      source:
+        'import type { Agent } from "@langwatch/agent-contract"; export type AgentView = Agent;',
+    });
+
+    const minimalFixturePolicies = new Set([
+      "feature-shape",
+      "browser-package-exports",
+      "unused-module-export",
+    ]);
+    const violations = lintWorkspace({ root, declarations: false });
+    expect(violations.filter((item) => !minimalFixturePolicies.has(item.policy))).toEqual([]);
+  });
+
+  /** @scenario Physical package names match their feature roles */
+  it("rejects a name that does not match its physical role", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      name: "@langwatch/agents",
+    });
+    expect(policies()).toContain("feature-layout");
+  });
+
+  /** @scenario "Retired schema runtimes cannot re-enter feature packages" */
+  it("rejects the retired Zod runtime in a feature contract", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { zod: "^3.25.76" },
+    });
+
+    expect(policies()).toContain("retired-package-runtime");
+  });
+
+  it("rejects the retired Zod runtime in any governed feature surface", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { zod: "^3.25.76" },
+    });
+
+    expect(policies()).toContain("retired-package-runtime");
+  });
+
+  /**
+   * @scenario "pnpm's catalog protocol resolves against the workspace
+   * catalogue before the retired-runtime check reads it"
+   */
+  it("accepts the repository Zod 4 range declared through pnpm's catalog protocol", () => {
+    write("pnpm-workspace.yaml", "catalog:\n  zod: ^4.4.3\n");
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { zod: "catalog:" },
+    });
+
+    expect(policies()).not.toContain("retired-package-runtime");
+  });
+
+  it("still rejects a catalog range that itself pins the retired Zod runtime", () => {
+    write("pnpm-workspace.yaml", "catalog:\n  zod: ^3.25.76\n");
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { zod: "catalog:" },
+    });
+
+    expect(policies()).toContain("retired-package-runtime");
+  });
+
+  /** @scenario Every feature package owns a complete architecture record */
+  /** @scenario "A new durable domain changes its architecture records" */
+  it("rejects an incomplete feature boundary ADR", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    write(
+      "modules/agent/adrs/001-package-boundary.md",
+      "# ADR-001: Agents\n\n**Status:** Proposed\n\n## Context\n\nToo little.\n",
+    );
+
+    expect(policies()).toContain("architecture-record");
+
+    // The Gherkin half of the record is required too: a catalogued feature
+    // whose root carries an ADR but no executable specification is the same
+    // undocumented expansion, and must fail the same gate.
+    rmSync(join(root, "modules/agent/specs"), { recursive: true });
+    expect(
+      lintWorkspace({ root, declarations: false }).map((violation) => violation.message),
+    ).toContain("Every documented feature boundary must own at least one Gherkin spec.");
+  });
+
+  /** @scenario Web production code cannot acquire backend dependencies */
+  it("rejects backend dependencies from web source", () => {
+    featurePackage({ feature: "agent", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "browser",
+      dependencies: { "@langwatch/agent-process": "workspace:*" },
+      source:
+        'import type { value } from "@langwatch/agent-process"; export type View = typeof value;',
+    });
+    expect(policies()).toContain("package-role");
+  });
+
+  /** @scenario A contract manifest cannot declare a server runtime */
+  it("rejects a server runtime a contract declares even when nothing imports it", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/eventing": "workspace:*" },
+    });
+
+    const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    expect(messages).toContain(
+      "A contract package cannot declare the server runtime @langwatch/eventing.",
+    );
+  });
+
+  it("accepts canonical dotted artifact roles with kebab-case subjects", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/contract/src/this-this.service.ts",
+      "export abstract class ThisThisService {}",
+    );
+    write(
+      "modules/agent/process/src/repositories/prisma/prisma.ingestion-source.repository.ts",
+      "export abstract class PrismaIngestionSourceRepository {}",
+    );
+    write(
+      "modules/agent/process/src/adapters/clickhouse.trace.adapter.ts",
+      "export class ClickhouseTraceAdapter { static create() { return new ClickhouseTraceAdapter(); } }",
+    );
+    write(
+      "modules/agent/process/src/ports/simulation-execution.port.ts",
+      "export abstract class SimulationExecution {}",
+    );
+
+    expect(
+      lintWorkspace({ root, declarations: false }).filter(
+        ({ policy }) => policy === "feature-source-filename",
+      ),
+    ).toEqual([]);
+  });
+
+  /** @scenario A module library is portable and any module may depend on it */
+  it("accepts a library on its own contract and another library, depended on by any module", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "workflow", role: "query-language" });
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-contract": "workspace:*",
+        "@langwatch/workflow-query-language": "workspace:*",
+        zod: "^4.4.3",
+      },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "process",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "browser",
+      dependencies: { "@langwatch/agent-query-language": "workspace:*" },
+    });
+
+    const boundaryPolicies = new Set(["package-role", "cross-feature", "feature-layout"]);
+    expect(policies().filter((policy) => boundaryPolicies.has(policy))).toEqual([]);
+  });
+
+  /** @scenario A module library depends on nothing but its contract, libraries and framework-free packages */
+  it("rejects a library on an implementation, a peer's contract or a runtime", () => {
+    featurePackage({ feature: "workflow", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "query-language",
+      dependencies: {
+        "@langwatch/agent-process": "workspace:*",
+        "@langwatch/workflow-contract": "workspace:*",
+        react: "^19.0.0",
+      },
+    });
+
+    const refused = lintWorkspace({ root, declarations: false })
+      .filter(({ policy, file }) => policy === "package-role" && file.includes("query-language"))
+      .flatMap(({ specifier }) => (specifier === undefined ? [] : [specifier]))
+      .toSorted((a, b) => a.localeCompare(b));
+    expect(refused).toEqual(["@langwatch/agent-process", "@langwatch/workflow-contract", "react"]);
+  });
+
+  /** @scenario Cross-feature collaboration uses only contracts */
+  it("rejects another feature server even through a type-only import", () => {
+    featurePackage({ feature: "workflow", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      dependencies: { "@langwatch/workflow-process": "workspace:*" },
+      source:
+        'import type { value } from "@langwatch/workflow-process"; export type Value = typeof value;',
+    });
+    expect(policies()).toContain("cross-feature");
+  });
+
+  /** @scenario Core packages cannot import enterprise implementations */
+  it("rejects enterprise dependencies from core", () => {
+    featurePackage({
+      feature: "billing",
+      role: "contract",
+      name: "@langwatch/enterprise-billing-contract",
+      enterprise: true,
+    });
+    featurePackage({
+      feature: "entitlement",
+      role: "process",
+      dependencies: { "@langwatch/enterprise-billing-contract": "workspace:*" },
+      source:
+        'import type { value } from "@langwatch/enterprise-billing-contract"; export type Value = typeof value;',
+    });
+    expect(policies()).toContain("enterprise-direction");
+  });
+
+  /** @scenario Wildcard exports are forbidden for feature packages */
+  it("rejects wildcard exports", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: { ".": "./src/index.ts", "./*": "./src/*.ts" },
+    });
+    expect(policies()).toContain("public-exports");
+  });
+
+  /** @scenario "A root barrel cannot disguise private persistence" */
+  it("rejects private persistence exported through a server root barrel", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export { AgentRepository } from "./repositories/agent.repository";',
+    });
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A repository reached through a star-exported adapter is still private */
+  it("rejects a repository reached through a star-exported adapter chain", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export * from "./adapters/agent.adapter";',
+    });
+    write(
+      "modules/agent/process/src/adapters/agent.adapter.ts",
+      'export * from "../repositories/agent.repository";',
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A repository reached through a named re-export chain is still private */
+  it("rejects a repository reached through a named re-export chain", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export { AgentRepository } from "./adapters/agent.adapter";',
+    });
+    write(
+      "modules/agent/process/src/adapters/agent.adapter.ts",
+      'import { AgentRepository } from "../repositories/agent.repository";\nexport { AgentRepository };',
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A repository reached through a #app/ self-import alias is still private */
+  it("rejects a repository reached through a #app/ import alias", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export { AgentRepository } from "#app/repositories/agent.repository";',
+    });
+    write(
+      "modules/agent/process/package.json",
+      JSON.stringify({
+        name: "@langwatch/agent-process",
+        type: "module",
+        imports: { "#*": "./src/*.ts" },
+        exports: { ".": "./src/index.ts" },
+        dependencies: {},
+      }),
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario Every declared package entrypoint is checked, not only src/index.ts */
+  it("rejects a repository reached through a secondary package entrypoint", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "modules/agent/process/src/testing.ts",
+      'export { AgentRepository } from "./repositories/agent.repository";',
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts may export a memory repository double */
+  it("allows testing.ts to export a repository under repositories/memory", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "modules/agent/process/src/testing.ts",
+      'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
+    );
+    write(
+      "modules/agent/process/src/repositories/memory/memory.agent.repository.ts",
+      "export class MemoryAgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts may export a fake/stub/null-named repository double */
+  it("allows testing.ts to export a fake-named repository double", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "modules/agent/process/src/testing.ts",
+      'export { FakeAgentRepository } from "./repositories/fake.agent.repository";',
+    );
+    write(
+      "modules/agent/process/src/repositories/fake.agent.repository.ts",
+      "export class FakeAgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts may export test fakes from a *.test-fakes.ts module */
+  it("allows testing.ts to export from a *.test-fakes.ts module", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "modules/agent/process/src/testing.ts",
+      'export { agentFixture } from "./stores/agent.test-fakes";',
+    );
+    write(
+      "modules/agent/process/src/stores/agent.test-fakes.ts",
+      "export const agentFixture = {};",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario testing.ts still rejects a real repository, store, or projection */
+  it("still rejects testing.ts exporting a real repository", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      exports: {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+      },
+    });
+    write(
+      "modules/agent/process/src/testing.ts",
+      'export { AgentRepository } from "./repositories/prisma/prisma.agent.repository";',
+    );
+    write(
+      "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A memory repository double still cannot escape through index.ts */
+  it("still rejects index.ts exporting a memory repository double", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source:
+        'export { MemoryAgentRepository } from "./repositories/memory/memory.agent.repository";',
+    });
+    write(
+      "modules/agent/process/src/repositories/memory/memory.agent.repository.ts",
+      "export class MemoryAgentRepository {}",
+    );
+
+    expect(policies()).toContain("private-runtime-export");
+  });
+
+  /** @scenario A type-only export of a repository's database type is allowed */
+  it("allows a type-only export of a repository's database type", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export type { AgentDatabase } from "./repositories/agent.repository";',
+    });
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export type AgentDatabase = { agentId: string };\nexport class AgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario An adapter that merely uses a repository is not itself private */
+  it("allows an adapter export that only uses a repository internally", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export { AgentAdapter } from "./adapters/agent.adapter";',
+    });
+    write(
+      "modules/agent/process/src/adapters/agent.adapter.ts",
+      'import { AgentRepository } from "../repositories/agent.repository";\nexport class AgentAdapter { constructor(private repo: AgentRepository) {} static create() { return new AgentAdapter(new AgentRepository()); } }',
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export class AgentRepository {}",
+    );
+
+    expect(policies()).not.toContain("private-runtime-export");
+  });
+
+  /** @scenario Prisma cannot leak through public declarations */
+  it("rejects Prisma in emitted declarations", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export type Leaked = import("@prisma/client").PrismaClient;',
+    });
+    buildsDeclarations({
+      directory: "modules/agent/process",
+      sources: ["src/index.ts"],
+      emitted: {
+        "dist/index.d.ts": 'export type Leaked = import("@prisma/client").PrismaClient;\n',
+      },
+    });
+
+    expect(policies({ declarations: true })).toContain("public-declarations");
+  });
+
+  /** @scenario Repository lint includes package architecture */
+  it("returns violations for the CLI to turn into a non-zero exit", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      name: "@langwatch/not-agents-contract",
+    });
+    expect(lintWorkspace({ root, declarations: false }).length).toBeGreaterThan(0);
+  });
+});
+
+describe("strict feature source layout", () => {
+  /** @scenario A strict feature declares the initial layout version */
+  /** @scenario "Test fixtures have a named non-production home" */
+  it("accepts canonical version-0 contract and server source", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    write("modules/agent/contract/src/agent.service.ts", "export abstract class AgentService {}");
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/services/agent.service.ts",
+      "export class AgentService { static create() { return new AgentService(); } }",
+    );
+    write(
+      "modules/agent/process/src/repositories/agent.repository.ts",
+      "export abstract class AgentRepository {}",
+    );
+    write(
+      "modules/agent/process/src/repositories/prisma/prisma.agent.repository.ts",
+      "export class PrismaAgentRepository { static create() { return new PrismaAgentRepository(); } }",
+    );
+    write(
+      "modules/agent/process/src/transport/api-rest/agent.api.ts",
+      "export class AgentApi { static create() { return new AgentApi(); } }",
+    );
+    write("modules/agent/process/src/transport/agent.rest.ts", "export const agentRest = {};");
+    write("modules/agent/process/src/transport/agent.trpc.ts", "export const agentTrpc = {};");
+    write(
+      "modules/agent/process/src/fixtures/agent.fixture.ts",
+      "export const agentFixture = { id: 'agent_1' };",
+    );
+    write(
+      "modules/agent/process/src/subscribers/agent.subscriber.ts",
+      "export class AgentSubscriber { static create() { return new AgentSubscriber(); } }",
+    );
+    write(
+      "modules/agent/process/src/tasks/agent-backfill.task.ts",
+      "export class AgentBackfillTask { static create() { return new AgentBackfillTask(); } }",
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  it("accepts a canonical API contract as the portable capability module", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/kernel": "workspace:*" },
+    });
+    rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
+    write(
+      "modules/widget/contract/src/widget.api.ts",
+      'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  it("rejects process wiring bound from the composition root by a portable API contract", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/kernel": "workspace:*" },
+    });
+    rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
+    write(
+      "modules/widget/contract/src/widget.api.ts",
+      'import { createApp, moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget"); export const app = createApp;',
+    );
+
+    expect(policies()).toContain("feature-layout");
+  });
+
+  it("accepts the feature-API vocabulary bound from the composition root", () => {
+    featurePackage({
+      feature: "widget",
+      role: "contract",
+      dependencies: { "@langwatch/kernel": "workspace:*" },
+    });
+    rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
+    write(
+      "modules/widget/contract/src/widget.api.ts",
+      'import { moduleApi } from "@langwatch/kernel"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  /**
+   * A test is named for the behaviour it pins, never for an artifact, so the source grammar has
+   * nothing useful to say about it.
+   */
+  it("accepts tests and their helpers anywhere under a __tests__ directory", () => {
+    featurePackage({ feature: "agent", role: "process" });
+    write("modules/agent/process/src/services/agent.service.ts", "export class AgentService {}");
+    write(
+      "modules/agent/process/src/services/__tests__/agent.service.unit.test.ts",
+      "export const covered = true;",
+    );
+    // A name the production grammar would reject on every count: no artifact
+    // suffix, four dotted parts, and a level that is not one of the three.
+    write(
+      "modules/agent/process/src/services/__tests__/agent.retries.redelivery.test.ts",
+      "export const covered = true;",
+    );
+    // Helpers and fixtures travel with the tests that use them, at any depth.
+    write(
+      "modules/agent/process/src/services/__tests__/support/testAgentService.ts",
+      "export const stub = true;",
+    );
+    write(
+      "modules/agent/process/src/__tests__/fixtures/agent.fixtures.ts",
+      "export const fixture = true;",
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+    expect(policies()).not.toContain("feature-source-filename");
+  });
+
+  /**
+   * The exemption is for the DIRECTORY, not for the word. A test parked beside
+   * production source is still a source path, and the grammar still applies.
+   */
+
+  it("treats the last qualifier as the subject of a technology adapter", () => {
+    featurePackage({ feature: "licensing", role: "contract" });
+    featurePackage({ feature: "sso", role: "process" });
+    write(
+      "modules/sso/process/src/adapters/licensing.sso.adapter.ts",
+      "export class LicensingSsoAdapter {}",
+    );
+
+    const subjectViolations = lintWorkspace({
+      root,
+      declarations: false,
+    }).filter((violation) => violation.policy === "feature-source-subject");
+    expect(subjectViolations).toEqual([]);
+  });
+
+  it("rejects malformed central subject declarations", () => {
+    featurePackage({
+      feature: "governance",
+      role: "contract",
+      subjects: ["pulled-usage", "ingestion-pull", "ingestion-pull"],
+    });
+
+    expect(policies()).toContain("feature-catalogue");
+  });
+
+  /** @scenario "A rules/ module is a pure package of functions" */
+  it("accepts a rules module exporting pure functions and constants", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/rules/agent-support.rules.ts",
+      "export function isSiblingRule(value: number): boolean {\n  return value % 2 === 0;\n}\n",
+    );
+    write(
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { createHash } from "node:crypto";',
+        'import { value } from "@langwatch/agent-contract";',
+        'import { isSiblingRule } from "./agent-support.rules";',
+        "",
+        "export function isEligible(input: string): boolean {",
+        '  return Boolean(value) && isSiblingRule(input.length) && createHash("sha256").update(input).digest("hex").length > 0;',
+        "}",
+        "",
+        "export const ELIGIBILITY_THRESHOLD = 1;",
+        "",
+      ].join("\n"),
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  it("accepts a rules module constructing a pure value", () => {
+    featurePackage({ feature: "agent", role: "contract" });
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
+      'export function names(): Set<string> {\n  return new Set(["a"]);\n}\n',
+    );
+
+    expect(policies()).not.toContain("feature-layout");
+  });
+
+  it("rejects a rules module importing a service", () => {
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { AgentService } from "../services/agent.service";',
+        "",
+        "export function noop(): boolean {",
+        "  return Boolean(AgentService);",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("../services/agent.service") &&
+          violation.message.includes("a service"),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a rules module importing Prisma", () => {
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/rules/agent-eligibility.rules.ts",
+      [
+        'import { Prisma } from "@prisma/client";',
+        "",
+        "export function noop(): boolean {",
+        "  return Boolean(Prisma);",
+        "}",
+        "",
+      ].join("\n"),
+    );
+
+    const violations = lintWorkspace({ root, declarations: false }).filter(
+      (violation) => violation.policy === "feature-layout",
+    );
+    expect(
+      violations.some(
+        (violation) =>
+          violation.file.includes("agent-eligibility.rules.ts") &&
+          violation.message.includes("@prisma/client") &&
+          violation.message.includes("Prisma"),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("Prisma client containment", () => {
+  /** @scenario Prisma imports stay in concrete adapters */
+  it("allows generated Prisma only in strict feature Prisma adapters", () => {
+    featurePackage({ feature: "agent", role: "process" });
+    write(
+      "modules/agent/process/src/repositories/prisma/prisma.agents.repository.ts",
+      'import type { Prisma } from "@langwatch/prisma-client/generated"; export class PrismaAgentsRepository { static create(_query: Prisma.AgentWhereInput) { return new PrismaAgentsRepository(); } }',
+    );
+
+    expect(policies()).not.toContain("prisma-containment");
+  });
+
+  /** @scenario "Architecture lint stays on structural facts" */
+  it("reports each structural family and stays silent about formatting", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { zod: "^3.25.76" },
+    });
+    featurePackage({ feature: "agent", role: "process" });
+    featurePackage({
+      feature: "agent",
+      role: "browser",
+      dependencies: { "@langwatch/agent-process": "workspace:*" },
+      subjects: ["agent", "shared", "shared"],
+      source:
+        'import type { value } from "@langwatch/agent-process"; export type View = typeof value;',
+    });
+    write(
+      "modules/agent/contract/src/agent.service.ts",
+      "export abstract class AgentService { abstract findById(): Promise<string | null>; }",
+    );
+    write(
+      "modules/agent/process/src/services/agent.service.ts",
+      'import type { PrismaClient } from "@langwatch/prisma-client/generated"; export class AgentService { static create(_client: PrismaClient) { return new AgentService(); } }',
+    );
+
+    const reported = new Set(policies());
+    for (const family of ["feature-catalogue", "package-role", "retired-package-runtime"]) {
+      expect(reported).toContain(family);
+    }
+  });
+
+  it("reports nothing about a source file whose only defect is its formatting", () => {
+    featurePackage({ feature: "agent", role: "contract", capability: "api" });
+    write(
+      "modules/agent/contract/src/agent.command.ts",
+      "export    const   createAgent=(name:string)=>({name})\n\n\n",
+    );
+
+    const violations = lintWorkspace({ root, declarations: false });
+    expect(violations.map((item) => item.policy)).toEqual([]);
+  });
+
+  /** @scenario Prisma cannot leak through public declarations */
+  it("rejects generated Prisma reached through a public server re-export", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source:
+        'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";',
+    });
+    write(
+      "modules/agent/process/src/repositories/prisma/prisma.agents.repository.ts",
+      'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";',
+    );
+    buildsDeclarations({
+      directory: "modules/agent/process",
+      sources: ["src/index.ts", "src/repositories/prisma/prisma.agents.repository.ts"],
+      emitted: {
+        "dist/index.d.ts":
+          'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";\n',
+        "dist/repositories/prisma/prisma.agents.repository.d.ts":
+          'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";\n',
+      },
+    });
+
+    expect(policies({ declarations: true })).toContain("public-declarations");
+  });
+
+  /**
+   * The policy reads what `tsc -b` wrote. A package whose declarations are
+   * missing is an unread input, not a clean one: reporting nothing would turn
+   * the gate off without anyone noticing.
+   */
+  /** @scenario Prisma cannot leak through public declarations */
+  it("refuses a package whose declarations the build has not written", () => {
+    featurePackage({
+      feature: "agent",
+      role: "process",
+      source: 'export type Leaked = import("@prisma/client").PrismaClient;',
+    });
+    buildsDeclarations({
+      directory: "modules/agent/process",
+      sources: ["src/index.ts"],
+      emitted: {},
+    });
+
+    const refusal = lintWorkspace({ root, declarations: true }).find(
+      (violation) => violation.policy === "public-declarations",
+    );
+
+    expect(refusal?.message).toContain("has no declarations to read");
+    expect(refusal?.allowed).toContain("pnpm typecheck");
+  });
+
+  /** @scenario A cycle through a devDependency is a package cycle */
+  it("counts devDependencies as cycle edges", () => {
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/workflow-contract": "workspace:*" },
+    });
+    featurePackage({
+      feature: "workflow",
+      role: "contract",
+      devDependencies: { "@langwatch/agent-contract": "workspace:*" },
+    });
+    expect(policies()).toContain("package-cycle");
+  });
+
+  /** @scenario A cycle through a framework package is a package cycle */
+  it("counts framework packages as cycle nodes", () => {
+    write("pnpm-workspace.yaml", 'packages:\n  - "packages/*"\n');
+    write(
+      "packages/raw-client/package.json",
+      JSON.stringify({
+        name: "@langwatch/raw-client",
+        dependencies: { "@langwatch/agent-contract": "workspace:*" },
+      }),
+    );
+    featurePackage({
+      feature: "agent",
+      role: "contract",
+      dependencies: { "@langwatch/raw-client": "workspace:*" },
+    });
+
+    const messages = lintWorkspace({ root, declarations: false }).map((item) => item.message);
+    expect(messages).toContain(
+      "Package dependency cycle: @langwatch/agent-contract -> @langwatch/raw-client -> @langwatch/agent-contract",
+    );
+  });
+});

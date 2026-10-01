@@ -18,7 +18,7 @@ app:
     metrics:
       enabled: true
       apiKey:
-        value: "your-metrics-api-key"  # Authenticates scrape requests
+        value: "your-metrics-api-key" # Authenticates scrape requests
 
 prometheus:
   chartManaged: true
@@ -30,10 +30,10 @@ prometheus:
 
 ### What Gets Scraped
 
-| Component | Port | Endpoint | Metrics |
-|-----------|------|----------|---------|
-| App | 5560 | `/metrics` | HTTP request latency, error rates, active connections |
-| Workers | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
+| Component | Port | Endpoint   | Metrics                                                     |
+| --------- | ---- | ---------- | ----------------------------------------------------------- |
+| App       | 5560 | `/metrics` | HTTP request latency, error rates, active connections       |
+| Workers   | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
 
 ### Access Prometheus
 
@@ -64,7 +64,7 @@ You'll need to configure your external Prometheus to scrape the LangWatch pods. 
 
 ```yaml
 prometheus.io/scrape: "true"
-prometheus.io/port: "5560"    # or 2999 for workers
+prometheus.io/port: "5560" # or 2999 for workers
 prometheus.io/path: "/metrics"
 ```
 
@@ -75,6 +75,7 @@ Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
 ### Key Dashboards
 
 Set up dashboards for:
+
 - **Trace throughput**: traces ingested per minute
 - **Worker queue depth**: BullMQ queue backlog (indicates processing bottleneck)
 - **ClickHouse query latency**: p50/p95/p99 query times
@@ -102,10 +103,10 @@ histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
 
 ### Endpoints
 
-| Component | Endpoint | Method | Healthy Response |
-|-----------|----------|--------|-----------------|
-| App | `/api/health` | GET | 200 OK |
-| Workers | `/healthz` | GET | 200 OK |
+| Component | Endpoint      | Method | Healthy Response |
+| --------- | ------------- | ------ | ---------------- |
+| App       | `/api/health` | GET    | 200 OK           |
+| Workers   | `/healthz`    | GET    | 200 OK           |
 
 ### Kubernetes Probes
 
@@ -118,7 +119,7 @@ startupProbe:
     path: /api/health
     port: 5560
   periodSeconds: 5
-  failureThreshold: 30    # Up to 150s for startup
+  failureThreshold: 30 # Up to 150s for startup
 
 # Liveness probe (restarts unhealthy pods)
 livenessProbe:
@@ -153,15 +154,15 @@ kubectl -n langwatch exec deploy/langwatch-workers -- \
 
 Set up alerts for these critical conditions:
 
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| Worker queue backlog | Queue depth > 10,000 for 5 min | Warning |
+| Alert                           | Condition                       | Severity |
+| ------------------------------- | ------------------------------- | -------- |
+| Worker queue backlog            | Queue depth > 10,000 for 5 min  | Warning  |
 | Worker queue backlog (critical) | Queue depth > 100,000 for 5 min | Critical |
-| ClickHouse memory | Memory usage > 80% of limit | Warning |
-| ClickHouse disk | Hot storage > 85% full | Critical |
-| PostgreSQL connections | Active connections > 80% of max | Warning |
-| App error rate | HTTP 5xx rate > 5% for 5 min | Critical |
-| Pod restarts | Pod restart count > 3 in 15 min | Warning |
+| ClickHouse memory               | Memory usage > 80% of limit     | Warning  |
+| ClickHouse disk                 | Hot storage > 85% full          | Critical |
+| PostgreSQL connections          | Active connections > 80% of max | Warning  |
+| App error rate                  | HTTP 5xx rate > 5% for 5 min    | Critical |
+| Pod restarts                    | Pod restart count > 3 in 15 min | Warning  |
 
 ### Example Alertmanager Rule
 
@@ -183,14 +184,14 @@ groups:
 
 Full Prometheus configuration in the Helm chart:
 
-| Value | Description | Default |
-|-------|-------------|---------|
-| `prometheus.chartManaged` | Manage Prometheus via this chart | `true` |
-| `prometheus.server.retention` | Data retention period | `60d` |
-| `prometheus.server.persistentVolume.size` | Storage size | `6Gi` |
-| `prometheus.server.persistentVolume.storageClass` | Storage class | `""` (default) |
-| `prometheus.server.resources.requests.cpu` | CPU request | `200m` |
-| `prometheus.server.resources.requests.memory` | Memory request | `512Mi` |
-| `prometheus.server.resources.limits.cpu` | CPU limit | `500m` |
-| `prometheus.server.resources.limits.memory` | Memory limit | `2Gi` |
-| `prometheus.server.global.scrape_interval` | Scrape interval | `15s` |
+| Value                                             | Description                      | Default        |
+| ------------------------------------------------- | -------------------------------- | -------------- |
+| `prometheus.chartManaged`                         | Manage Prometheus via this chart | `true`         |
+| `prometheus.server.retention`                     | Data retention period            | `60d`          |
+| `prometheus.server.persistentVolume.size`         | Storage size                     | `6Gi`          |
+| `prometheus.server.persistentVolume.storageClass` | Storage class                    | `""` (default) |
+| `prometheus.server.resources.requests.cpu`        | CPU request                      | `200m`         |
+| `prometheus.server.resources.requests.memory`     | Memory request                   | `512Mi`        |
+| `prometheus.server.resources.limits.cpu`          | CPU limit                        | `500m`         |
+| `prometheus.server.resources.limits.memory`       | Memory limit                     | `2Gi`          |
+| `prometheus.server.global.scrape_interval`        | Scrape interval                  | `15s`          |

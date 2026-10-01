@@ -1,0 +1,1743 @@
+package apidiff
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"strconv"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+
+	"golang.org/x/sync/errgroup"
+)
+
+// Boot orchestration constants, verified against dev/compose.dev.yml and
+// apps/tasks/src/storage-seed/storage-seed.ts. The dev compose file publishes no
+// host ports for postgres/clickhouse, so boot generates a ports/volumes
+// override file and brings the stack up under its own compose project.
+const (
+	composeServiceFile = "dev/compose.dev.yml"
+
+	pgUser    = "prisma"
+	pgPass    = "prisma"
+	pgAdminDB = "mydb"
+
+	chUser = "default"
+	chPass = "langwatch"
+
+	// throwawayCredentialsSecret matches the cipher's 32-bytes-of-hex rule.
+	// Both instances share it; each hashes and verifies its own seeded keys
+	// under the same value, also injected as API_KEY_PEPPER below — the
+	// branch's storage-seed task and modules/api-key/contract's config.ts read
+	// the pepper under that name, not this one.
+	throwawayCredentialsSecret = "0000000000000000000000000000000000000000000000000000000000000000"
+	throwawayNextAuthSecret    = "apidiff-throwaway-nextauth-secret"
+
+	// Both layouts read LANGWATCH_INSTANCE_ADMIN_API_KEY for instance-admin
+	// operations (branch: apps/api api.config.ts; main: platform/app
+	// organizations route). Fixed and throwaway; probing defaults to it. The
+	// 32+ character length is main's env-create.mjs minimum.
+	throwawayInstanceAdminKey = "apidiff-instance-admin-key-00000000"
+
+	// The gateway secrets are all-or-none and each at least 32 characters
+	// (assertGatewaySecretsAllOrNone, modules/gateway/contract/src/gateway.config.ts).
+	// A developer .env carrying short placeholders is enough to make the api
+	// refuse to boot, so the run supplies its own rather than inheriting them —
+	// the same reason CREDENTIALS_SECRET is composed above. Never the
+	// developer's real values: a diff harness has no business handling them,
+	// and the gateway's control plane never calls an LLM provider.
+	throwawayGatewayInternalSecret = "apidiff-gateway-internal-secret-000000000000000000000000000000"
+	throwawayGatewayJWTSecret      = "apidiff-gateway-jwt-secret-0000000000000000000000000000000000"
+	throwawayVirtualKeyPepper      = "apidiff-virtual-key-pepper-0000000000000000000000000000000000"
+
+	// scimProbeToken is provisioned into both instances' ScimToken tables so
+	// scim_bearer operations authenticate. Tokens verify by plain sha256 in
+	// both layouts (scim.service.ts hashToken), so a fixed hash inserted at
+	// boot works everywhere. The table shape is identical on both layouts
+	// (branch adds a nullable connectionId, which stays NULL).
+	scimProbeToken   = "apidiff-scim-token-value"
+	scimProbeTokenID = "apidiff-scim-token"
+)
+
+// Seeded credential defaults from apps/tasks/src/storage-seed/storage-seed.ts.
+const (
+	DefaultProjectKey = "sk-lw-local-development-key"
+	DefaultOrgKey     = "sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000"
+)
+
+// BootConfig configures `apidiff run`.
+type BootConfig struct {
+	MainRef        string
+	BranchDir      string
+	WorkRoot       string
+	Keep           bool
+	ReuseWorktrees bool
+	SkipInstall    bool
+	BootTimeout    time.Duration
+	PGURL          string // external postgres server URL; empty = compose
+	CHURL          string
+	RedisURL       string
+	ComposeProject string
+	// UseHaven boots each instance as a haven stack under its own run-scoped
+	// slug instead of provisioning infrastructure here. Default wherever haven
+	// is installed; see haven.go for why.
+	UseHaven bool
+	// DryRun prints the plan (refs, worktree paths, slugs, commands) and runs
+	// nothing at all — no worktree, no haven command, no install.
+	DryRun bool
+	// ParityOnly stops the run after the parity phase, so it starts no
+	// infrastructure for a boot that will not follow.
+	ParityOnly bool
+	// BranchHead boots the branch from -branch-dir's HEAD in its persistent
+	// worktree under -no-haven too, leaving -branch-dir itself untouched.
+	BranchHead bool
+}
+
+// Instance is one booted API copy.
+type Instance struct {
+	Name    string // "branch" or "main"
+	Dir     string
+	URL     string
+	MailURL string // the stack's mail sink (mailsim), when haven routes one
+	Port    int
+	Profile bootProfile
+}
+
+// Booted holds the two running instances plus the teardown hooks.
+type Booted struct {
+	A        Instance // branch (candidate)
+	B        Instance // main (base)
+	WorkRoot string
+	Teardown func()
+	// ActivateEntitlement, when non-nil, lets the entitled pass elevate the
+	// seeded organization to an Enterprise plan on both instances' own
+	// databases mid-run. nil in probe mode, when the branch seed stored no
+	// licence (deferred), and when it could not be read or written.
+	ActivateEntitlement EntitlementActivator
+}
+
+// DatabaseName names each instance's Postgres and ClickHouse database,
+// run-scoped so no run can cross over with a previous run's data, even if a
+// previous teardown failed.
+func DatabaseName(runID, instance string) string {
+	return "apidiff_" + runID + "_" + instance
+}
+
+// RunID derives the run identity from the work root's base name (the
+// timestamp directory by default), sanitized to a valid Postgres identifier
+// fragment.
+func RunID(workRoot string) string {
+	base := strings.ToLower(filepath.Base(filepath.Clean(workRoot)))
+	var id strings.Builder
+	for _, character := range base {
+		if (character >= 'a' && character <= 'z') || (character >= '0' && character <= '9') {
+			id.WriteRune(character)
+			continue
+		}
+		id.WriteByte('_')
+	}
+	result := strings.Trim(id.String(), "_")
+	if result == "" {
+		return "run"
+	}
+	return result
+}
+
+// pgDatabaseURL points a postgres server URL at one database.
+func pgDatabaseURL(serverURL, database string) (string, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("postgres URL: %w", err)
+	}
+	parsed.Path = "/" + database
+	return parsed.String(), nil
+}
+
+// prismaOnlyQueryKeys are the connection-string parameters Prisma reads and
+// libpq refuses ("invalid URI query parameter"). A developer's DATABASE_URL
+// carries them; psql must not see them.
+var prismaOnlyQueryKeys = []string{"schema", "connection_limit", "pool_timeout", "pgbouncer", "statement_cache_size", "socket_timeout"}
+
+// psqlServerURL is the server URL with every Prisma-only parameter removed,
+// so the same -pg-url serves both the booted instances and psql. Prisma's
+// `schema` becomes libpq's search_path: the migrations table lives there.
+func psqlServerURL(serverURL string) (string, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("postgres URL: %w", err)
+	}
+	query := parsed.Query()
+	if schema := query.Get("schema"); schema != "" {
+		query.Set("options", "-csearch_path="+schema)
+	}
+	for _, key := range prismaOnlyQueryKeys {
+		query.Del(key)
+	}
+	parsed.RawQuery = query.Encode()
+	return parsed.String(), nil
+}
+
+// chDatabaseURL points a ClickHouse server URL at one database.
+func chDatabaseURL(serverURL, database string) (string, error) {
+	parsed, err := url.Parse(serverURL)
+	if err != nil {
+		return "", fmt.Errorf("clickhouse URL: %w", err)
+	}
+	parsed.Path = "/" + database
+	return parsed.String(), nil
+}
+
+// portsOverrideYAML renders the compose override that publishes host ports
+// and isolates volumes for the apidiff stack. The !override tag (compose
+// spec, docker compose v2.24+) replaces the base file's list entries rather
+// than merging with them — redis's fixed 6379 binding and the shared named
+// volumes must not leak into this stack. Memory: ClickHouse is capped at 2g
+// (the dev stack's 4g does not fit a 4 GiB VM beside everything else) and
+// postgres raised to 512m — the dev stack's 256m cgroup limit is a plausible
+// kill reason when 297 migrations run while two Node APIs boot. ClickHouse
+// also gets what the LangWatchQL access model needs: access management and
+// named-collection control for the default user, and the custom_ settings
+// prefix (inline, as compose configs, since the run's work root is not
+// mounted into a container VM).
+func portsOverrideYAML(pgPort, chPort, redisPort int) string {
+	return fmt.Sprintf(`services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:%d:5432"
+    volumes: !override
+      - apidiff-pg-data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+  redis:
+    ports: !override
+      - "127.0.0.1:%d:6379"
+    volumes: !override
+      - apidiff-redis-data:/data
+  clickhouse:
+    environment:
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    configs:
+      - source: apidiff-lwql-prefixes
+        target: /etc/clickhouse-server/config.d/apidiff-lwql.xml
+      - source: apidiff-lwql-grants
+        target: /etc/clickhouse-server/users.d/apidiff-lwql.xml
+    ports: !override
+      - "127.0.0.1:%d:8123"
+    volumes: !override
+      - apidiff-ch-data:/var/lib/clickhouse
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "1.0"
+configs:
+  apidiff-lwql-prefixes:
+    content: |
+      <clickhouse><custom_settings_prefixes>custom_</custom_settings_prefixes></clickhouse>
+  apidiff-lwql-grants:
+    content: |
+      <clickhouse><users><default><named_collection_control>1</named_collection_control></default></users></clickhouse>
+volumes:
+  apidiff-pg-data:
+  apidiff-redis-data:
+  apidiff-ch-data:
+`, pgPort, redisPort, chPort)
+}
+
+// managedEnvKeys are removed from the inherited environment before the
+// composed values are appended, so the instance env always wins.
+var managedEnvKeys = []string{
+	"API_PORT", "PORT", "LANGWATCH_API_PORT",
+	"DATABASE_URL", "CLICKHOUSE_URL", "REDIS_URL", "REDIS_DB_INDEX",
+	"CREDENTIALS_SECRET", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "BASE_HOST",
+	"API_KEY_PEPPER",
+	"NODE_ENV",
+	"API_TOKEN_JWT_SECRET", "LANGWATCH_NLP_SERVICE", "LANGWATCH_ENDPOINT",
+	"LANGWATCH_INSTANCE_ADMIN_API_KEY",
+	"LW_GATEWAY_INTERNAL_SECRET", "LW_GATEWAY_JWT_SECRET", "LW_VIRTUAL_KEY_PEPPER",
+	"FEATURE_FLAG_FORCE_ENABLE", "LANGWATCH_LOCAL_STORAGE_PATH",
+	"API_RATE_LIMIT_REQUESTS", "API_RATE_LIMIT_SECONDS",
+	"LANGWATCH_LICENSE_PUBLIC_KEY",
+}
+
+// Both instances run with the API's request limiter raised out of reach: the
+// scenario phase sends thousands of requests a minute, and a 429 there is a
+// harness error, never a retry.
+const (
+	raisedRateLimitRequests = "1000000"
+	raisedRateLimitSeconds  = "60"
+)
+
+// instanceEnvSpec carries the per-instance values instanceEnv composes.
+type instanceEnvSpec struct {
+	port          int
+	portEnv       []string // profile-specific port variables
+	extraEnv      []string // profile-specific extras (see bootProfile.extraEnv)
+	database      string
+	chDatabase    string
+	redisURL      string
+	redisDBIndex  string
+	storagePath   string   // LANGWATCH_LOCAL_STORAGE_PATH: where each side stores dataset files
+	publicKey     string   // LANGWATCH_LICENSE_PUBLIC_KEY both sides verify licences with (see licensePublicKey)
+	collaborators []string // collaboratorEnv: LangWatchQL, the judge, the Langy agent stub
+}
+
+// instanceEnv composes one instance's process environment: user env
+// passthrough minus the managed keys, plus the composed values.
+func instanceEnv(inherit []string, spec instanceEnvSpec) []string {
+	managed := map[string]bool{}
+	for _, key := range managedEnvKeys {
+		managed[key] = true
+	}
+	for _, key := range collaboratorEnvKeys {
+		managed[key] = true
+	}
+	env := make([]string, 0, len(inherit)+10)
+	for _, entry := range inherit {
+		name, _, _ := strings.Cut(entry, "=")
+		if managed[name] {
+			continue
+		}
+		env = append(env, entry)
+	}
+	base := fmt.Sprintf("http://localhost:%d", spec.port)
+	env = append(env,
+		"NODE_ENV=development",
+		"DATABASE_URL="+spec.database,
+		"CLICKHOUSE_URL="+spec.chDatabase,
+		"REDIS_URL="+spec.redisURL,
+		"REDIS_DB_INDEX="+spec.redisDBIndex,
+		"CREDENTIALS_SECRET="+throwawayCredentialsSecret,
+		"NEXTAUTH_SECRET="+throwawayNextAuthSecret,
+		"API_KEY_PEPPER="+throwawayCredentialsSecret,
+		"LANGWATCH_INSTANCE_ADMIN_API_KEY="+throwawayInstanceAdminKey,
+		"FEATURE_FLAG_FORCE_ENABLE="+forcedFeatureFlags,
+		"API_RATE_LIMIT_REQUESTS="+raisedRateLimitRequests,
+		"API_RATE_LIMIT_SECONDS="+raisedRateLimitSeconds,
+		"LW_GATEWAY_INTERNAL_SECRET="+throwawayGatewayInternalSecret,
+		"LW_GATEWAY_JWT_SECRET="+throwawayGatewayJWTSecret,
+		"LW_VIRTUAL_KEY_PEPPER="+throwawayVirtualKeyPepper,
+		"BASE_HOST="+base,
+		"NEXTAUTH_URL="+base,
+	)
+	if spec.storagePath != "" {
+		env = append(env, "LANGWATCH_LOCAL_STORAGE_PATH="+spec.storagePath)
+	}
+	if spec.publicKey != "" {
+		env = append(env, licensePublicKeyEnv+"="+spec.publicKey)
+	}
+	env = append(env, spec.collaborators...)
+	env = append(env, spec.extraEnv...)
+	return append(env, spec.portEnv...)
+}
+
+// worktreeAddArgs builds `git worktree add --detach <dir> <ref>`.
+func worktreeAddArgs(dir, ref string) []string {
+	return []string{"worktree", "add", "--detach", dir, ref}
+}
+
+// composeCmd identifies one docker compose invocation target: project, repo
+// checkout holding the base file, and the generated override file.
+type composeCmd struct {
+	project   string
+	branchDir string
+	override  string
+}
+
+// composeArgs prefixes every docker compose invocation with the project, the
+// project directory and both compose files.
+//
+// --project-directory is not optional. compose.dev.yml declares `env_file:
+// .env`, and compose resolves that against the project directory, which
+// defaults to the directory holding the first -f file — dev/, where no .env
+// exists or ever has. Every other caller in the repository passes
+// `--project-directory .` for exactly this reason (Makefile:91,
+// dev/scripts/dev-up.sh:15, dev/scripts/dev.sh:18). Without it `up` and `down`
+// both fail with "env file .../dev/.env not found", and a failed `down` leaks
+// the run's containers.
+func composeArgs(cmd composeCmd, args ...string) []string {
+	base := []string{
+		"compose", "-p", cmd.project,
+		"--project-directory", cmd.branchDir,
+		"-f", filepath.Join(cmd.branchDir, composeServiceFile),
+	}
+	if cmd.override != "" {
+		base = append(base, "-f", cmd.override)
+	}
+	return append(base, args...)
+}
+
+// pgAdminArgs runs one SQL statement against a database on the compose
+// postgres service.
+func pgAdminArgs(cmd composeCmd, database, sql string) []string {
+	return composeArgs(cmd,
+		"exec", "-T", "postgres", "psql", "-U", pgUser, "-d", database, "-v", "ON_ERROR_STOP=1", "-c", sql)
+}
+
+// freePort allocates an ephemeral port that is free right now.
+func freePort() (int, error) {
+	listener, err := new(net.ListenConfig).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer listener.Close()
+	return listener.Addr().(*net.TCPAddr).Port, nil
+}
+
+// externalInfra reports whether all three infrastructure URLs point at
+// user-managed servers, skipping compose entirely.
+func externalInfra(cfg BootConfig) (bool, error) {
+	given := 0
+	for _, value := range []string{cfg.PGURL, cfg.CHURL, cfg.RedisURL} {
+		if value != "" {
+			given++
+		}
+	}
+	if given != 0 && given != 3 {
+		return false, errors.New("-pg-url, -ch-url and -redis-url must be given together or not at all")
+	}
+	return given == 3, nil
+}
+
+// commandSpec describes one external command invocation.
+type commandSpec struct {
+	name string
+	args []string
+	dir  string
+	env  []string
+}
+
+// runner executes external commands; tests swap it out.
+type runner func(ctx context.Context, spec commandSpec, log io.Writer) error
+
+// DryRunPlan is what `-dry-run` prints: the worktrees, slugs and commands a
+// run would use, computed without creating a worktree, starting anything, or
+// running any command at all.
+type DryRunPlan struct {
+	WorkRoot   string
+	RunID      string
+	MainRef    string
+	MainDir    string
+	MainSlug   string // empty on the -no-haven path
+	BranchDir  string
+	BranchSlug string // empty on the -no-haven path
+	UseHaven   bool
+	// BranchHead says the branch boots from its HEAD worktree, not in place.
+	BranchHead bool
+	Commands   []string
+}
+
+// PlanBoot computes a run's plan with no side effect: no worktree, no
+// process, no command. It is the same layout Boot would compute, so a plan
+// that names the invoking checkout as a worktree path is refused here too,
+// before anything real would have run.
+func PlanBoot(cfg BootConfig) (DryRunPlan, error) {
+	invoking, err := filepath.Abs(cfg.BranchDir)
+	if err != nil {
+		return DryRunPlan{}, err
+	}
+	workRoot := cfg.WorkRoot
+	if workRoot == "" {
+		workRoot = filepath.Join(invoking, ".apidiff", time.Now().Format("20060102-150405"))
+	}
+	workRoot, err = filepath.Abs(workRoot)
+	if err != nil {
+		return DryRunPlan{}, err
+	}
+	runID := RunID(workRoot)
+	mainDir := persistentWorktree(invoking, "main")
+	plan := DryRunPlan{
+		WorkRoot: workRoot, RunID: runID, MainRef: cfg.MainRef, MainDir: mainDir,
+		BranchDir: invoking, UseHaven: cfg.UseHaven,
+	}
+	plan.Commands = []string{checkoutPlanLine(mainDir, cfg.MainRef, invoking)}
+	if cfg.UseHaven || cfg.BranchHead {
+		plan.BranchDir, plan.BranchHead = persistentWorktree(invoking, "branch"), true
+		plan.Commands = append(plan.Commands, checkoutPlanLine(plan.BranchDir, "HEAD", invoking))
+	}
+	release := "release both persistent worktrees for the next run, deleting the env overlay (a worktree another live run held is <work-root>/<side>, moved aside and deleted in the background)"
+	if !cfg.UseHaven {
+		plan.Commands = append(plan.Commands,
+			"pnpm install / migrate / seed / start, both instances (see README: Boot details)",
+			"drop the run's databases; the compose project stays up for the next run", release)
+		return plan, nil
+	}
+	plan.MainSlug = HavenSlug(runID, "main")
+	plan.BranchSlug = HavenSlug(runID, "branch")
+	if plan.MainDir == invoking || plan.BranchDir == invoking {
+		return plan, fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
+	}
+	plan.Commands = append(plan.Commands,
+		havenPrepareCommandLine(mainDir),
+		havenPrepareCommandLine(plan.BranchDir),
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+mainDir+", stack "+plan.MainSlug+")",
+		havenCommand+" "+strings.Join(havenUpArgs(), " ")+" (in "+plan.BranchDir+", stack "+plan.BranchSlug+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.MainSlug), " ")+" (in "+workRoot+")",
+		havenCommand+" "+strings.Join(havenDestroyArgs(plan.BranchSlug), " ")+" (in "+workRoot+")",
+		release,
+	)
+	return plan, nil
+}
+
+// checkoutPlanLine is how a side's persistent worktree reaches ref's commit.
+func checkoutPlanLine(dir, ref, invoking string) string {
+	return "git worktree add --force --detach " + dir + " <" + ref + ">, or git checkout --detach --force <" + ref + "> in it once it exists (in " + invoking + ")"
+}
+
+// WriteDryRunPlan renders a plan the way visualdiff's own -dry-run does: the
+// paths and slugs a run would use, then the ordered commands, with nothing
+// started.
+func WriteDryRunPlan(w io.Writer, plan DryRunPlan) {
+	fmt.Fprintf(w, "apidiff run plan (dry run — nothing started)\n")
+	fmt.Fprintf(w, "  work root  %s\n", plan.WorkRoot)
+	fmt.Fprintf(w, "  main       %s -> %s\n", plan.MainRef, plan.MainDir)
+	if plan.UseHaven {
+		fmt.Fprintf(w, "             haven stack %s\n", plan.MainSlug)
+		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
+		fmt.Fprintf(w, "             haven stack %s\n", plan.BranchSlug)
+	} else if plan.BranchHead {
+		fmt.Fprintf(w, "  branch     HEAD -> %s\n", plan.BranchDir)
+	} else {
+		fmt.Fprintf(w, "  branch     %s (booted in place; -branch-head boots its HEAD in a worktree instead)\n", plan.BranchDir)
+	}
+	fmt.Fprintf(w, "  commands\n")
+	for _, command := range plan.Commands {
+		fmt.Fprintf(w, "    %s\n", command)
+	}
+}
+
+type bootState struct {
+	cfg      BootConfig
+	stderr   io.Writer
+	run      runner
+	workRoot string
+	runID    string
+	mainDir  string
+	// branchDir is the branch's own HEAD worktree, on the haven path and under
+	// -branch-head, so it never boots inside the invoking checkout (see
+	// refuseSelfCheckout and the package comment in haven.go).
+	branchDir string
+	// checkouts are the trees this run checked out (worktrees.go); teardown
+	// releases the persistent ones and discards the rest.
+	checkouts   []sideCheckout
+	checkoutsMu sync.Mutex
+	// detach starts a command that outlives the run; nil is detachCommand.
+	detach   func(spec commandSpec, log string) error
+	override string
+	// reusedPorts says override came from an earlier run, whose stack may
+	// still be up on its ports; startInfra falls back to fresh ones.
+	reusedPorts bool
+	infra       infraURLs
+	processes   []*exec.Cmd
+	// processesMu guards processes: a worker respawn appends from its own
+	// goroutine while teardown may be killing.
+	processesMu sync.Mutex
+	// havenSlugs are the stacks this run started, in order. The teardown
+	// destroys these and nothing else.
+	havenSlugs []string
+	// inherit overrides the process environment the child commands are
+	// composed from; nil means os.Environ(). Tests supply their own.
+	inherit []string
+	// langyStub stands in for the Langy agent manager on both sides (compose
+	// and external-infra paths only), started before the first migrate.
+	langyStub *langyAgentStub
+	// started is when the run began; timing lines are measured from it.
+	started time.Time
+	// prepared says the parity phase installed and generated both trees, so
+	// boot runs no install or prepare of its own.
+	prepared bool
+	// infraDone closes when the infrastructure startInfraEarly began is up;
+	// infraErr is what bringing it up returned.
+	infraDone    chan struct{}
+	infraErr     error
+	teardownOnce sync.Once
+}
+
+// environ is the environment child commands inherit.
+func (state *bootState) environ() []string {
+	if state.inherit != nil {
+		return state.inherit
+	}
+	return os.Environ()
+}
+
+type infraURLs struct {
+	pgServer    string
+	chServer    string
+	redisServer string
+	pgPort      int
+	chPort      int
+	redisPort   int
+	branchRedis int // run-scoped logical DB indices; see RedisIndices
+	mainRedis   int
+}
+
+func (state *bootState) logf(format string, args ...any) {
+	fmt.Fprintf(state.stderr, format+"\n", args...)
+}
+
+func (state *bootState) boot(ctx context.Context) (booted *Booted, err error) {
+	defer func() {
+		if err != nil && booted != nil {
+			booted.Teardown()
+			booted = nil
+		}
+	}()
+
+	if err := state.layOut(ctx); err != nil {
+		return nil, err
+	}
+
+	booted = &Booted{
+		WorkRoot: state.workRoot,
+		A:        Instance{Name: "branch", Dir: state.branchTree()},
+		B:        Instance{Name: "main", Dir: state.mainDir},
+	}
+	booted.Teardown = state.teardown
+
+	if state.cfg.UseHaven {
+		if err := state.bootHaven(ctx, booted); err != nil {
+			return booted, err
+		}
+		booted.ActivateEntitlement = state.buildEntitlementActivator(ctx, booted)
+		return booted, nil
+	}
+	if err := state.prepareInstances(booted); err != nil {
+		return booted, err
+	}
+	if err := state.bootInstances(ctx, booted); err != nil {
+		return booted, err
+	}
+	booted.ActivateEntitlement = state.buildEntitlementActivator(ctx, booted)
+	state.timing("both instances healthy")
+	return booted, nil
+}
+
+// layOut creates the work root and checks the trees out, unless the parity
+// phase already did both on this state.
+func (state *bootState) layOut(ctx context.Context) error {
+	if state.workRoot != "" {
+		return nil
+	}
+	if err := state.prepareLayout(); err != nil {
+		return err
+	}
+	return state.setupWorktree(ctx)
+}
+
+// branchTree is the tree the branch side runs from: its own HEAD worktree on
+// the haven path, -branch-dir itself on the -no-haven path.
+func (state *bootState) branchTree() string {
+	if state.branchDir != "" {
+		return state.branchDir
+	}
+	return state.cfg.BranchDir
+}
+
+// bootHaven is the haven-path half of boot(): the branch instance runs from
+// its own HEAD worktree, never from the invoking checkout — that directory
+// already carries the developer's own haven stack, and `haven up` there
+// replaced its registration.
+func (state *bootState) bootHaven(ctx context.Context, booted *Booted) error {
+	booted.A.Dir = state.branchDir
+	if err := state.prepareHavenInstances(ctx, booted); err != nil {
+		return err
+	}
+	return state.bootThroughHaven(ctx, booted)
+}
+
+// prepareLayout resolves the branch dir and creates the work root.
+func (state *bootState) prepareLayout() error {
+	branchDir, err := filepath.Abs(state.cfg.BranchDir)
+	if err != nil {
+		return err
+	}
+	state.cfg.BranchDir = branchDir
+	if state.started.IsZero() {
+		state.started = time.Now()
+	}
+	state.workRoot = state.cfg.WorkRoot
+	if state.workRoot == "" {
+		state.workRoot = filepath.Join(branchDir, ".apidiff", time.Now().Format("20060102-150405"))
+	}
+	if state.workRoot, err = filepath.Abs(state.workRoot); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(state.workRoot, "logs"), 0o750); err != nil {
+		return err
+	}
+	state.runID = RunID(state.workRoot)
+	if state.cfg.UseHaven {
+		// haven allocates this stack's Redis logical database against the ones
+		// live stacks hold. Deriving one here is what collided with a
+		// developer's own stack in the first place, so the haven path derives
+		// nothing.
+		state.logf("work root: %s (run %s, haven stacks %s / %s)",
+			state.workRoot, state.runID, HavenSlug(state.runID, "branch"), HavenSlug(state.runID, "main"))
+		return nil
+	}
+	branchRedis, mainRedis, err := RedisIndices(state.runID)
+	if err != nil {
+		return err
+	}
+	state.infra.branchRedis, state.infra.mainRedis = branchRedis, mainRedis
+	state.logf("work root: %s (run %s, redis DBs %d/%d)", state.workRoot, state.runID, branchRedis, mainRedis)
+	return nil
+}
+
+// prepareInstances detects each side's boot profile and allocates its API
+// port up front, so the env overlay (written before migrate) can carry the
+// final port values.
+func (state *bootState) prepareInstances(booted *Booted) error {
+	for _, instance := range []*Instance{&booted.A, &booted.B} {
+		profile, err := detectProfile(instance.Dir)
+		if err != nil {
+			return err
+		}
+		instance.Profile = profile
+		port, err := freePort()
+		if err != nil {
+			return err
+		}
+		instance.Port = port
+		instance.URL = fmt.Sprintf("http://127.0.0.1:%d", port)
+		state.logf("%s: %s profile (%s)", instance.Name, profile.name, instance.Dir)
+	}
+	return nil
+}
+
+// bootInstances brings both sides up at once: each side migrates, seeds,
+// provisions and starts its API and worker beside the other, on the
+// infrastructure startInfraEarly began while the trees were being prepared.
+func (state *bootState) bootInstances(ctx context.Context, booted *Booted) error {
+	if err := state.startLangyStub(); err != nil {
+		return err
+	}
+	if !state.prepared {
+		if err := bothSides(ctx, func(sideCtx context.Context, instance *Instance) error {
+			return state.install(sideCtx, *instance)
+		}, &booted.A, &booted.B); err != nil {
+			return err
+		}
+	}
+	if err := state.infraReady(ctx); err != nil {
+		return err
+	}
+	state.timing("infrastructure ready")
+	// Both sides provision LangWatchQL's server-wide ClickHouse identity, so
+	// main's provisioning still follows the branch's, in the order it always ran.
+	lwqlTurn := make(chan struct{})
+	stepCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	var group errgroup.Group
+	for _, side := range []sidePipeline{{instance: &booted.A, lwqlDone: lwqlTurn}, {instance: &booted.B, lwqlAfter: lwqlTurn}} {
+		group.Go(func() error { return cancelOnError(cancel, state.bringUp(ctx, stepCtx, side)) })
+	}
+	return group.Wait()
+}
+
+// sidePipeline is one side's bring-up and its place in the LangWatchQL
+// order: the side it provisions after, and the side waiting on it.
+type sidePipeline struct {
+	instance  *Instance
+	lwqlAfter <-chan struct{}
+	lwqlDone  chan<- struct{}
+}
+
+// bringUp is one side's pipeline from an empty database to a healthy API and
+// its worker. Steps run under stepCtx, which the other side's failure cancels;
+// the processes run under ctx, which lives as long as the run.
+func (state *bootState) bringUp(ctx, stepCtx context.Context, side sidePipeline) error {
+	instance := side.instance
+	steps := []func() error{
+		func() error { return state.writeOverlay(*instance) },
+		func() error { return state.migrateAndSeed(stepCtx, *instance) },
+		func() error { return state.verifyMigrationTarget(stepCtx, *instance) },
+		func() error { return state.provision(stepCtx, *instance) },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+	if side.lwqlAfter != nil {
+		select {
+		case <-side.lwqlAfter:
+		case <-stepCtx.Done():
+			return stepCtx.Err()
+		}
+	}
+	if err := state.provisionLwql(stepCtx, *instance); err != nil {
+		return err
+	}
+	if side.lwqlDone != nil {
+		close(side.lwqlDone)
+	}
+	state.timing("%s migrated, seeded and provisioned", instance.Name)
+	return state.startProcesses(ctx, stepCtx, instance)
+}
+
+// bothSides runs one step on both instances at once and returns the first
+// error; the first failure cancels the other side's step.
+func bothSides(ctx context.Context, step func(context.Context, *Instance) error, instances ...*Instance) error {
+	group, groupCtx := errgroup.WithContext(ctx)
+	for _, instance := range instances {
+		group.Go(func() error { return step(groupCtx, instance) })
+	}
+	return group.Wait()
+}
+
+// cancelOnError cancels the shared steps when one side fails, so the other
+// side stops waiting on a run that is already lost.
+func cancelOnError(cancel context.CancelFunc, err error) error {
+	if err != nil {
+		cancel()
+	}
+	return err
+}
+
+// setupWorktree checks the base ref out and, on the haven path or under
+// -branch-head, the branch's own HEAD: haven registers one stack per
+// directory, and a branch booted in the invoking checkout replaced and then
+// destroyed a developer's own stack (01:36, 2026-09-10). Both sides reuse
+// their persistent worktree (worktrees.go).
+func (state *bootState) setupWorktree(ctx context.Context) error {
+	main, err := state.checkOut(ctx, "main", state.cfg.MainRef)
+	if err != nil {
+		return err
+	}
+	state.mainDir = main.dir
+	if !state.cfg.UseHaven && !state.cfg.BranchHead {
+		return nil
+	}
+	branch, err := state.checkOut(ctx, "branch", "HEAD")
+	if err != nil {
+		return err
+	}
+	state.branchDir = branch.dir
+	return state.refuseSelfCheckout()
+}
+
+// refuseSelfCheckout is the backstop the 01:36 incident argues for: whatever
+// computed a worktree path, it must never equal the invoking checkout. Both
+// are .apidiff/... paths, so this only fires if a future change makes one
+// alias the checkout again.
+func (state *bootState) refuseSelfCheckout() error {
+	invoking := filepath.Clean(state.cfg.BranchDir)
+	for _, dir := range []string{state.mainDir, state.branchDir} {
+		if dir != "" && filepath.Clean(dir) == invoking {
+			return fmt.Errorf("refusing to boot a haven stack from the invoking checkout %s", invoking)
+		}
+	}
+	return nil
+}
+
+// runHost runs a command in the branch checkout with the inherited env.
+func (state *bootState) runHost(ctx context.Context, name string, args ...string) error {
+	return state.run(ctx, commandSpec{name: name, args: args, dir: state.cfg.BranchDir}, state.stderr)
+}
+
+// compose identifies this run's compose invocation target.
+func (state *bootState) compose() composeCmd {
+	return composeCmd{project: state.cfg.ComposeProject, branchDir: state.cfg.BranchDir, override: state.override}
+}
+
+func (state *bootState) install(ctx context.Context, instance Instance) error {
+	if state.cfg.SkipInstall || state.prepared {
+		state.logf("install %s: skipped", instance.Name)
+		return nil
+	}
+	state.logf("install %s: pnpm install --frozen-lockfile (this is the slow step)", instance.Name)
+	install := commandSpec{name: "pnpm", args: []string{"install", "--frozen-lockfile"}, dir: instance.Dir}
+	if err := state.run(ctx, install, state.sideLog(instance.Name)); err != nil {
+		return fmt.Errorf("install %s: %w", instance.Name, err)
+	}
+	for _, argv := range instance.Profile.prepareArgvs {
+		prepare := commandSpec{name: "pnpm", args: argv, dir: instance.Dir}
+		if err := state.run(ctx, prepare, state.sideLog(instance.Name)); err != nil {
+			return fmt.Errorf("prepare %s (%s): %w", instance.Name, strings.Join(argv, " "), err)
+		}
+	}
+	return nil
+}
+
+// writeOverlay writes the composed environment to the profile's env overlay
+// file. Only the monolith profile needs one: its env-load.ts applies
+// .env.portless with override:true, so the file must exist before any
+// task.ts/server.mts run — otherwise a .env copied into the worktree by the
+// post-checkout hook would clobber our per-instance DATABASE_URL.
+func (state *bootState) writeOverlay(instance Instance) error {
+	if !instance.Profile.overlay {
+		return nil
+	}
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
+	path := filepath.Join(instance.Dir, overlayEnvFile)
+	if err := os.WriteFile(path, []byte(overlayContent(env)), 0o600); err != nil {
+		return fmt.Errorf("env overlay %s: %w", instance.Name, err)
+	}
+	state.logf("env overlay %s: %s", instance.Name, path)
+	return nil
+}
+
+// resolveInfra decides where the infrastructure comes from: external servers
+// are adopted here, before anything is installed, so the preflight can reach
+// them; the managed stack only allocates its ports and writes its override.
+func (state *bootState) resolveInfra() error {
+	external, err := externalInfra(state.cfg)
+	if err != nil {
+		return err
+	}
+	if external {
+		state.infra.pgServer = state.cfg.PGURL
+		state.infra.chServer = state.cfg.CHURL
+		state.infra.redisServer = state.cfg.RedisURL
+		state.logf("infra: using external servers")
+		return nil
+	}
+	state.override = composeOverridePath(state.cfg.BranchDir, state.cfg.ComposeProject)
+	if ports, ok := readOverridePorts(state.override); ok {
+		state.infra.pgPort, state.infra.chPort, state.infra.redisPort = ports[0], ports[1], ports[2]
+		state.reusedPorts = true
+		state.logf("infra: reusing compose project %s's ports from %s", state.cfg.ComposeProject, state.override)
+	} else if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return nil
+}
+
+// allocateComposePorts picks three free ports and writes the override that
+// publishes the stack on them.
+func (state *bootState) allocateComposePorts() error {
+	for _, port := range []*int{&state.infra.pgPort, &state.infra.chPort, &state.infra.redisPort} {
+		value, err := freePort()
+		if err != nil {
+			return err
+		}
+		*port = value
+	}
+	state.reusedPorts = false
+	if err := os.MkdirAll(filepath.Dir(state.override), 0o750); err != nil {
+		return err
+	}
+	return os.WriteFile(state.override, []byte(portsOverrideYAML(state.infra.pgPort, state.infra.chPort, state.infra.redisPort)), 0o600)
+}
+
+// setComposeURLs points the three servers at the managed stack's ports.
+func (state *bootState) setComposeURLs() {
+	state.infra.pgServer = fmt.Sprintf("postgres://%s:%s@127.0.0.1:%d/%s", pgUser, pgPass, state.infra.pgPort, pgAdminDB)
+	state.infra.chServer = fmt.Sprintf("http://%s:%s@127.0.0.1:%d", chUser, chPass, state.infra.chPort)
+	state.infra.redisServer = fmt.Sprintf("redis://127.0.0.1:%d", state.infra.redisPort)
+}
+
+// preflight validates external infrastructure BEFORE the two pnpm installs.
+// Every precondition it checks used to surface eight minutes in, after two
+// installs and six builds: a Postgres URL without a username passes psql
+// (which falls back to $USER) and dies at prisma with P1010, and an admin
+// database that does not exist dies at the first CREATE DATABASE.
+func (state *bootState) preflight(ctx context.Context) error {
+	if state.override != "" {
+		state.logf("preflight: managed compose stack, no external endpoints to validate")
+		return nil
+	}
+	if err := validateInfraURLs(state.infra); err != nil {
+		return err
+	}
+	state.logf("preflight: checking postgres, clickhouse and redis are reachable")
+	if _, err := state.pgQuery(ctx, "SELECT 1"); err != nil {
+		return fmt.Errorf("preflight postgres %s: %w", redactURL(state.infra.pgServer), err)
+	}
+	if err := state.chAdmin(ctx, "SELECT 1"); err != nil {
+		return fmt.Errorf("preflight clickhouse: %w", err)
+	}
+	if err := redisPing(ctx, state.infra.redisServer); err != nil {
+		return fmt.Errorf("preflight redis: %w", err)
+	}
+	state.logf("preflight: all three endpoints answered")
+	return nil
+}
+
+// validateInfraURLs checks the shape of the three external URLs. The
+// Postgres username is required because prisma needs one and psql does not,
+// so its absence is invisible until migrate.
+func validateInfraURLs(infra infraURLs) error {
+	postgres, err := url.Parse(infra.pgServer)
+	if err != nil {
+		return fmt.Errorf("preflight: -pg-url: %w", err)
+	}
+	if postgres.User == nil || postgres.User.Username() == "" {
+		return errors.New("preflight: -pg-url needs a username (psql falls back to $USER, prisma does not: P1010)")
+	}
+	if postgres.Host == "" {
+		return errors.New("preflight: -pg-url needs a host")
+	}
+	if strings.Trim(postgres.Path, "/") == "" {
+		return errors.New("preflight: -pg-url needs a database to administer from, for example postgres://user@host:5432/postgres")
+	}
+	clickhouse, err := url.Parse(infra.chServer)
+	if err != nil {
+		return fmt.Errorf("preflight: -ch-url: %w", err)
+	}
+	if clickhouse.Host == "" {
+		return errors.New("preflight: -ch-url needs a host")
+	}
+	if _, err := parseRedisURL(infra.redisServer); err != nil {
+		return fmt.Errorf("preflight: -redis-url: %w", err)
+	}
+	return nil
+}
+
+// redactURL strips any password from a URL before it reaches a log line.
+func redactURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return "(unparseable URL)"
+	}
+	if parsed.User != nil {
+		parsed.User = url.User(parsed.User.Username())
+	}
+	return parsed.String()
+}
+
+// startInfra brings the managed compose stack up; with external servers there
+// is nothing to start (resolveInfra adopted them and preflight checked them).
+func (state *bootState) startInfra(ctx context.Context) error {
+	if state.override == "" {
+		return nil
+	}
+	err := state.composeUp(ctx)
+	if err == nil || !state.reusedPorts {
+		return err
+	}
+	state.logf("infra: compose up on the previous run's ports failed (%v); starting on fresh ports", err)
+	if err := state.allocateComposePorts(); err != nil {
+		return err
+	}
+	state.setComposeURLs()
+	return state.composeUp(ctx)
+}
+
+// composeUp starts the stack, or finds it already up from an earlier run.
+func (state *bootState) composeUp(ctx context.Context) error {
+	state.logf("infra: docker compose up (pg :%d, clickhouse :%d, redis :%d)", state.infra.pgPort, state.infra.chPort, state.infra.redisPort)
+	args := composeArgs(state.compose(), "up", "-d", "postgres", "redis", "clickhouse", "--wait")
+	if err := state.runHost(ctx, "docker", args...); err != nil {
+		return fmt.Errorf("compose up: %w", err)
+	}
+	return nil
+}
+
+// composeOverridePath is the managed stack's override, kept beside the
+// persistent worktrees so the next run finds the ports the stack is up on.
+func composeOverridePath(root, project string) string {
+	return filepath.Join(toolDir(root), "compose-"+project+".yml")
+}
+
+// overridePort reads one published port out of portsOverrideYAML's output.
+var overridePort = regexp.MustCompile(`"127\.0\.0\.1:(\d+):(5432|8123|6379)"`)
+
+// readOverridePorts answers the postgres, clickhouse and redis ports an
+// earlier run's override published, false unless it names all three.
+func readOverridePorts(path string) ([3]int, bool) {
+	content, err := os.ReadFile(path) // #nosec G304 -- the tool's own override under .apidiff.
+	if err != nil {
+		return [3]int{}, false
+	}
+	slots := map[string]int{"5432": 0, "8123": 1, "6379": 2}
+	var ports [3]int
+	for _, match := range overridePort.FindAllStringSubmatch(string(content), -1) {
+		port, err := strconv.Atoi(match[1])
+		if err != nil || port <= 0 {
+			return [3]int{}, false
+		}
+		ports[slots[match[2]]] = port
+	}
+	return ports, ports[0] > 0 && ports[1] > 0 && ports[2] > 0
+}
+
+// pgAdmin runs one SQL statement against the admin database, via compose exec
+// for the managed stack or a host psql for external servers.
+func (state *bootState) pgAdmin(ctx context.Context, sql string) error {
+	return state.pgAdminDB(ctx, state.adminDatabase(), sql)
+}
+
+// adminDatabase names the database administrative statements run against.
+// The compose stack always has "mydb"; an external server has whatever
+// -pg-url names, and hardcoding the compose constant there made every
+// external run fail at the first CREATE DATABASE with 'database "mydb" does
+// not exist'.
+func (state *bootState) adminDatabase() string {
+	if state.override != "" {
+		return pgAdminDB
+	}
+	parsed, err := url.Parse(state.infra.pgServer)
+	if err != nil {
+		return pgAdminDB
+	}
+	if database := strings.Trim(parsed.Path, "/"); database != "" {
+		return database
+	}
+	return pgAdminDB
+}
+
+// pgQuery runs one SQL statement and returns its stdout (psql -tA).
+func (state *bootState) pgQuery(ctx context.Context, sql string) (string, error) {
+	var output bytes.Buffer
+	if state.override != "" {
+		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", state.adminDatabase(), "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
+		return strings.TrimSpace(output.String()), err
+	}
+	if _, err := exec.LookPath("psql"); err != nil {
+		return "", errors.New("external -pg-url requires psql on PATH for database administration")
+	}
+	serverURL, err := psqlServerURL(state.infra.pgServer)
+	if err != nil {
+		return "", err
+	}
+	err = state.run(ctx, commandSpec{name: "psql", args: []string{serverURL, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
+	return strings.TrimSpace(output.String()), err
+}
+
+// pgQueryDB runs one SQL statement against a NAMED database and returns its
+// stdout (psql -tA).
+func (state *bootState) pgQueryDB(ctx context.Context, database, sql string) (string, error) {
+	var output bytes.Buffer
+	if state.override != "" {
+		args := composeArgs(state.compose(), "exec", "-T", "postgres", "psql", "-U", pgUser, "-d", database, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql)
+		err := state.run(ctx, commandSpec{name: "docker", args: args, dir: state.cfg.BranchDir}, &output)
+		return strings.TrimSpace(output.String()), err
+	}
+	if _, err := exec.LookPath("psql"); err != nil {
+		return "", errors.New("external -pg-url requires psql on PATH for database administration")
+	}
+	databaseURL, err := psqlDatabaseURL(state.infra.pgServer, database)
+	if err != nil {
+		return "", err
+	}
+	err = state.run(ctx, commandSpec{name: "psql", args: []string{databaseURL, "-tA", "-v", "ON_ERROR_STOP=1", "-c", sql}, dir: state.cfg.BranchDir}, &output)
+	return strings.TrimSpace(output.String()), err
+}
+
+// waitPostgres polls the server itself past the container healthcheck: a
+// fresh-volume postgres can still be in crash recovery when compose --wait
+// goes green, and migrating or probing against a recovering server produces
+// false findings (observed: P2039 wrapping 57P03 "the database system is in
+// recovery mode" mid-probe).
+func (state *bootState) waitPostgres(ctx context.Context) error {
+	deadline := time.Now().Add(state.bootTimeout())
+	for {
+		ready, err := state.postgresReady(ctx)
+		if err == nil && ready {
+			state.logf("infra: postgres accepting writes (not in recovery)")
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("postgres not ready within %s (last error: %w)", state.bootTimeout(), err)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+// postgresReady reports whether the server answers SELECT 1 and is not in
+// recovery.
+func (state *bootState) postgresReady(ctx context.Context) (bool, error) {
+	if _, err := state.pgQuery(ctx, "SELECT 1"); err != nil {
+		return false, err
+	}
+	recovery, err := state.pgQuery(ctx, "SELECT pg_is_in_recovery()")
+	if err != nil {
+		return false, err
+	}
+	return recovery == "f", nil
+}
+
+func (state *bootState) bootTimeout() time.Duration {
+	if state.cfg.BootTimeout <= 0 {
+		return 5 * time.Minute
+	}
+	return state.cfg.BootTimeout
+}
+
+// pgAdminDB runs one SQL statement against a specific database.
+func (state *bootState) pgAdminDB(ctx context.Context, database, sql string) error {
+	if state.override != "" {
+		return state.runHost(ctx, "docker", pgAdminArgs(state.compose(), database, sql)...)
+	}
+	if _, err := exec.LookPath("psql"); err != nil {
+		return errors.New("external -pg-url requires psql on PATH for database administration")
+	}
+	args, err := psqlArgs(state.infra.pgServer, database, sql)
+	if err != nil {
+		return err
+	}
+	return state.runHost(ctx, "psql", args...)
+}
+
+// psqlArgs builds the host psql argv for one statement against one database
+// on an external server.
+func psqlArgs(serverURL, database, sql string) ([]string, error) {
+	databaseURL, err := psqlDatabaseURL(serverURL, database)
+	if err != nil {
+		return nil, err
+	}
+	return []string{databaseURL, "-v", "ON_ERROR_STOP=1", "-c", sql}, nil
+}
+
+// psqlDatabaseURL is pgDatabaseURL for psql: one database, no Prisma-only
+// parameters.
+func psqlDatabaseURL(serverURL, database string) (string, error) {
+	serverURL, err := psqlServerURL(serverURL)
+	if err != nil {
+		return "", err
+	}
+	return pgDatabaseURL(serverURL, database)
+}
+
+// chAdmin runs one ClickHouse statement over the HTTP interface.
+func (state *bootState) chAdmin(ctx context.Context, query string) error {
+	endpoint, err := url.Parse(state.infra.chServer)
+	if err != nil {
+		return err
+	}
+	// A server URL may carry a database as its path; administrative
+	// statements address the server itself.
+	endpoint.Path = "/"
+	endpoint.RawQuery = "query=" + url.QueryEscape(query)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), nil)
+	if err != nil {
+		return err
+	}
+	client := &http.Client{Timeout: 30 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("clickhouse %q: %w", query, err)
+	}
+	defer response.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(response.Body, 4096))
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("clickhouse %q: status %d: %s", query, response.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
+// prepareDatabases recreates both instances' databases unless -keep is set.
+// ClickHouse databases are created by the clickhouse-migrate task's goose
+// bootstrap; here they only need dropping for freshness.
+func (state *bootState) prepareDatabases(ctx context.Context) error {
+	if state.cfg.Keep {
+		state.logf("databases: -keep set, reusing existing")
+		return nil
+	}
+	for _, instance := range []string{"branch", "main"} {
+		database := DatabaseName(state.runID, instance)
+		state.logf("databases: recreate %s", database)
+		if err := state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
+			return err
+		}
+		if err := state.pgAdmin(ctx, "CREATE DATABASE "+database); err != nil {
+			return err
+		}
+		if err := state.chAdmin(ctx, "DROP DATABASE IF EXISTS "+database); err != nil {
+			return err
+		}
+	}
+	return state.flushRedis(ctx)
+}
+
+// flushRedis empties both instances' logical databases. Without it a
+// previous run's queues, idempotency ledger and caches survive on external
+// infrastructure and one side boots onto another run's state.
+func (state *bootState) flushRedis(ctx context.Context) error {
+	for name, index := range map[string]int{"branch": state.infra.branchRedis, "main": state.infra.mainRedis} {
+		state.logf("databases: flush redis DB %d (%s)", index, name)
+		if err := redisFlushDB(ctx, state.infra.redisServer, index); err != nil {
+			return fmt.Errorf("flush redis DB %d: %w", index, err)
+		}
+	}
+	return nil
+}
+
+// migrateAndSeed runs the profile's migrate and seed commands in one
+// worktree with the instance environment.
+func (state *bootState) migrateAndSeed(ctx context.Context, instance Instance) error {
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
+	state.logf("migrate %s: prisma + clickhouse", instance.Name)
+	steps := []struct {
+		name string
+		args []string
+	}{
+		{"prisma migrate", instance.Profile.prismaMigrateArgv},
+		{"clickhouse migrate", instance.Profile.clickhouseMigrateArgv},
+		{"seed", instance.Profile.seedArgv},
+	}
+	for _, step := range steps {
+		spec := commandSpec{name: "pnpm", args: step.args, dir: instance.Dir, env: env}
+		if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
+			return fmt.Errorf("%s %s: %w", step.name, instance.Name, err)
+		}
+	}
+	return nil
+}
+
+// startLangyStub starts the stub Langy agent manager both instances dial.
+func (state *bootState) startLangyStub() error {
+	stub, err := startLangyAgentStub()
+	if err != nil {
+		return err
+	}
+	state.langyStub = stub
+	state.logf("langy agent stub on %s", stub.URL("<instance>"))
+	return nil
+}
+
+// provisionLwql converges the LangWatchQL access model into one instance's
+// databases, after the fixtures so the key map covers every fixture project.
+// The task is non-fatal by design, and so is this step: a refused statement
+// leaves LangWatchQL refused on that side, which the probes then compare.
+func (state *bootState) provisionLwql(ctx context.Context, instance Instance) error {
+	if len(instance.Profile.lwqlProvisionArgv) == 0 {
+		return nil
+	}
+	env, err := state.envFor(instance)
+	if err != nil {
+		return err
+	}
+	state.logf("lwql %s: provision the access model", instance.Name)
+	spec := commandSpec{name: "pnpm", args: instance.Profile.lwqlProvisionArgv, dir: instance.Dir, env: env}
+	if err := state.run(ctx, spec, state.sideLog(instance.Name)); err != nil {
+		state.logf("lwql %s: provisioning failed (%v); LangWatchQL stays refused on this side", instance.Name, err)
+	}
+	return nil
+}
+
+// provision inserts the run's fixed fixtures into one instance's database:
+// the SCIM probe token and the permission-probe projects/orgs.
+func (state *bootState) provision(ctx context.Context, instance Instance) error {
+	if err := state.seedScimToken(ctx, instance); err != nil {
+		return err
+	}
+	state.logf("fixtures %s: permission-probe projects", instance.Name)
+	if err := state.pgAdminDB(ctx, DatabaseName(state.runID, instance.Name), provisioningSQL()); err != nil {
+		return fmt.Errorf("fixtures %s: %w", instance.Name, err)
+	}
+	return nil
+}
+
+// seedScimToken provisions the fixed SCIM probe token into one instance's
+// database, so scim_bearer operations authenticate identically on both sides.
+func (state *bootState) seedScimToken(ctx context.Context, instance Instance) error {
+	hash := sha256Hex(scimProbeToken)
+	state.logf("scim token %s: provision %s", instance.Name, scimProbeTokenID)
+	sql := fmt.Sprintf(`INSERT INTO "ScimToken" ("id", "organizationId", "hashedToken", "description", "createdAt")`+
+		` VALUES ('%s', 'local-dev-organization', '%s', 'apidiff probe token', NOW())`+
+		` ON CONFLICT ("id") DO NOTHING`, scimProbeTokenID, hash)
+	if err := state.pgAdminDB(ctx, DatabaseName(state.runID, instance.Name), sql); err != nil {
+		return fmt.Errorf("scim token %s: %w", instance.Name, err)
+	}
+	return nil
+}
+
+func sha256Hex(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
+// envFor composes the process environment for one instance. A URL that will
+// not parse is an error, never a fallback to os.Environ(): the inherited
+// environment carries the developer's own DATABASE_URL, and migrating and
+// seeding into it is a data-loss event, not a warning.
+func (state *bootState) envFor(instance Instance) ([]string, error) {
+	database, err := pgDatabaseURL(state.infra.pgServer, DatabaseName(state.runID, instance.Name))
+	if err != nil {
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
+	}
+	chDatabase, err := chDatabaseURL(state.infra.chServer, DatabaseName(state.runID, instance.Name))
+	if err != nil {
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
+	}
+	redisIndex := state.infra.branchRedis
+	if instance.Name == "main" {
+		redisIndex = state.infra.mainRedis
+	}
+	baseURL := fmt.Sprintf("http://127.0.0.1:%d", instance.Port)
+	storagePath := filepath.Join(state.workRoot, "storage", instance.Name)
+	if err := os.MkdirAll(storagePath, 0o700); err != nil {
+		return nil, fmt.Errorf("env %s: %w", instance.Name, err)
+	}
+	langyURL := ""
+	if state.langyStub != nil {
+		langyURL = state.langyStub.URL(instance.Name)
+	}
+	return instanceEnv(os.Environ(), instanceEnvSpec{
+		collaborators: collaboratorEnv(instance.Name, langyURL),
+		port:          instance.Port,
+		portEnv:       instance.Profile.portEnv(instance.Port),
+		extraEnv:      instance.Profile.extraEnv(baseURL),
+		database:      database,
+		chDatabase:    chDatabase,
+		redisURL:      state.infra.redisServer,
+		redisDBIndex:  strconv.Itoa(redisIndex),
+		storagePath:   storagePath,
+		publicKey:     licensePublicKey(state.cfg.BranchDir),
+	}), nil
+}
+
+// verifyMigrationTarget proves the migrate that just ran landed in THIS
+// run's database and not in whatever DATABASE_URL a worktree's own .env
+// carries. The modular profile writes no env overlay and relies on node's
+// --env-file not overriding an already-set variable; that invariant is one
+// library swap away from pointing a migrate at the developer's database, so
+// it is asserted rather than commented.
+func (state *bootState) verifyMigrationTarget(ctx context.Context, instance Instance) error {
+	database := DatabaseName(state.runID, instance.Name)
+	applied, err := state.pgQueryDB(ctx, database, `SELECT count(*) FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`)
+	if err != nil {
+		return fmt.Errorf("verify migration target %s: %w", instance.Name, err)
+	}
+	count, err := strconv.Atoi(strings.TrimSpace(applied))
+	if err != nil || count == 0 {
+		return fmt.Errorf("verify migration target %s: %s holds %s applied migrations; the migrate did not target this run's database", instance.Name, database, applied)
+	}
+	state.logf("migrate %s: %d migrations applied in %s", instance.Name, count, database)
+	return nil
+}
+
+// startProcesses spawns one instance's API and worker together, then waits
+// for the API's health. The worker starts with the API rather than after both
+// are healthy, so what the first probes ingest is projected without delay.
+func (state *bootState) startProcesses(ctx, waitCtx context.Context, instance *Instance) error {
+	command, logPath, err := state.spawn(ctx, instanceProcess{instance: *instance, argv: instance.Profile.startArgv, logName: instance.Name})
+	if err != nil {
+		return err
+	}
+	state.logf("start %s on :%d (pid %d, log %s)", instance.Name, instance.Port, command.Process.Pid, logPath)
+	if err := state.startWorker(ctx, instance); err != nil {
+		return err
+	}
+	state.logf("%s: waiting for health", instance.Name)
+	if err := state.waitHealthy(waitCtx, instance.URL, instance.Profile.healthPath); err != nil {
+		return fmt.Errorf("health %s: %w (see %s)", instance.Name, err, logPath)
+	}
+	state.timing("%s healthy", instance.Name)
+	return nil
+}
+
+// startWorker spawns the instance's worker beside its API. Neither API
+// process projects what it ingests, so without one a trace, a scenario run or
+// a facet posted to either side never becomes readable, and every read of it
+// compares two empty answers. The worker's metrics port is allocated, since a
+// fixed default would collide with any other worker on this machine.
+func (state *bootState) startWorker(ctx context.Context, instance *Instance) error {
+	port, err := freePort()
+	if err != nil {
+		return err
+	}
+	process := instanceProcess{
+		instance: *instance, argv: instance.Profile.workerArgv, logName: instance.Name + "-worker",
+		extraEnv: []string{fmt.Sprintf("WORKER_METRICS_PORT=%d", port)},
+	}
+	command, logPath, err := state.spawn(ctx, process)
+	if err != nil {
+		return err
+	}
+	state.logf("start %s worker (pid %d, log %s)", instance.Name, command.Process.Pid, logPath)
+	go state.respawnOnEarlyExit(ctx, command, process)
+	return nil
+}
+
+// workerRespawnWindow is how soon after start a worker exit counts as a boot
+// failure worth one retry: main's worker migrates before it serves, and one
+// refused database connection there left a whole run with no projections.
+var workerRespawnWindow = 5 * time.Minute
+
+// respawnOnEarlyExit restarts a worker once when it dies during its own boot.
+func (state *bootState) respawnOnEarlyExit(ctx context.Context, command *exec.Cmd, process instanceProcess) {
+	started := time.Now()
+	if err := command.Wait(); err == nil || ctx.Err() != nil || time.Since(started) > workerRespawnWindow {
+		return
+	}
+	state.logf("%s exited during boot; starting it once more", process.logName)
+	if _, _, err := state.spawn(ctx, process); err != nil {
+		state.logf("%s restart: %v", process.logName, err)
+	}
+}
+
+// instanceProcess is one process an instance runs on its composed env.
+type instanceProcess struct {
+	instance Instance
+	argv     []string
+	logName  string
+	extraEnv []string
+}
+
+// spawn starts one instance process, logging to logs/<logName>.log.
+func (state *bootState) spawn(ctx context.Context, process instanceProcess) (*exec.Cmd, string, error) {
+	logPath := filepath.Join(state.workRoot, "logs", process.logName+".log")
+	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, "", err
+	}
+	env, err := state.envFor(process.instance)
+	if err != nil {
+		logFile.Close()
+		return nil, "", err
+	}
+	// Setpgid puts the pnpm wrapper and its tsx child in one process group so
+	// teardown can kill both — killing the parent alone orphans the server.
+	// #nosec G204 -- the executable is the allowlisted constant "pnpm" and
+	// argv comes from the two package-level bootProfile constants.
+	command := exec.CommandContext(ctx, "pnpm", process.argv...)
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	command.Dir = process.instance.Dir
+	env = append(env, process.extraEnv...)
+	command.Env = env
+	command.Stdout = logFile
+	command.Stderr = logFile
+	if err := command.Start(); err != nil {
+		logFile.Close()
+		return nil, "", fmt.Errorf("start %s: %w", process.logName, err)
+	}
+	state.processesMu.Lock()
+	state.processes = append(state.processes, command)
+	state.processesMu.Unlock()
+	return command, logPath, nil
+}
+
+// waitHealthy polls the health endpoint until it answers or the boot timeout
+// elapses.
+func (state *bootState) waitHealthy(ctx context.Context, baseURL, healthPath string) error {
+	timeout := state.bootTimeout()
+	deadline := time.Now().Add(timeout)
+	client := &http.Client{Timeout: 5 * time.Second}
+	healthURL := baseURL + healthPath
+	for {
+		if healthy(ctx, client, healthURL) {
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("no healthy response within %s", timeout)
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
+}
+
+// healthy performs one health-check attempt.
+func healthy(ctx context.Context, client *http.Client, healthURL string) bool {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, healthURL, nil)
+	if err != nil {
+		return false
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	return response.StatusCode >= 200 && response.StatusCode < 300
+}
+
+// teardown kills the instances, drops the run's databases and hands the
+// worktrees back, unless -keep is set. With -keep the API processes outlive
+// the tool (the context cancel kills the pnpm wrapper; the tsx child survives
+// for inspection). Nothing slow runs here: the compose stack stays up for the
+// next run, and a worktree's files are deleted by a process of its own.
+func (state *bootState) teardown() {
+	state.teardownOnce.Do(state.teardownOnceOnly)
+}
+
+// teardownOnceOnly is teardown's body: the parity phase's cleanup and the
+// booted instances share one state, and whichever runs second finds it done.
+func (state *bootState) teardownOnceOnly() {
+	defer phaseDone(state.stderr, "teardown", time.Now())
+	if state.infraDone != nil {
+		<-state.infraDone
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if state.langyStub != nil {
+		defer state.langyStub.Close()
+	}
+	if state.cfg.Keep {
+		if state.cfg.UseHaven {
+			state.logf("teardown: -keep set, leaving the stacks up - `haven destroy %s` when you are done",
+				strings.Join(state.havenSlugs, "` and `haven destroy "))
+			return
+		}
+		state.logf("teardown: -keep set, leaving infra, databases and worktree in place")
+		return
+	}
+	if state.cfg.UseHaven {
+		state.destroyHavenStacks(ctx)
+		state.releaseCheckouts(ctx)
+		return
+	}
+	state.killAPIProcesses()
+	state.teardownInfra(ctx)
+	state.releaseCheckouts(ctx)
+}
+
+// teardownInfra drops exactly the run-scoped databases and empties its two
+// Redis logical DBs. The managed compose stack stays up: the next run finds
+// its ports in the override file and skips the start (resolveInfra).
+func (state *bootState) teardownInfra(ctx context.Context) {
+	if state.infra.pgServer == "" {
+		// Nothing was provisioned: the run stopped before its infrastructure.
+		return
+	}
+	state.dropDatabases(ctx)
+	if err := state.flushRedis(ctx); err != nil {
+		state.logf("teardown: flush redis: %v", err)
+	}
+	if state.override != "" {
+		state.logf("teardown: compose project %s stays up for the next run; `docker compose -p %s down -v` stops it",
+			state.cfg.ComposeProject, state.cfg.ComposeProject)
+	}
+}
+
+// releaseCheckouts hands each persistent worktree to the next run without the
+// env overlay this run wrote, and discards the worktrees added for this run
+// alone. A worktree adopted with -reuse-worktrees is left as it was.
+func (state *bootState) releaseCheckouts(ctx context.Context) {
+	state.checkoutsMu.Lock()
+	checkouts := append([]sideCheckout(nil), state.checkouts...)
+	state.checkoutsMu.Unlock()
+	for _, checkout := range checkouts {
+		switch {
+		case checkout.persistent:
+			removeOverlay(checkout.dir)
+			releaseWorktree(checkout.dir, state.workRoot)
+		case checkout.owned:
+			state.discardWorktree(ctx, checkout.dir)
+		}
+	}
+}
+
+// discardWorktree takes a worktree out of git's list at once and leaves its
+// files to a process of its own: removing some 2 200 packages in place ran
+// past the teardown deadline and leaked the worktree (r47).
+func (state *bootState) discardWorktree(ctx context.Context, dir string) {
+	discarded := dir + ".discarded"
+	if err := os.Rename(dir, discarded); err != nil {
+		state.logf("teardown: move %s aside: %v; removing it in place", dir, err)
+		if err := state.runHost(ctx, "git", "worktree", "remove", "--force", dir); err != nil {
+			state.logf("teardown: worktree remove: %v", err)
+		}
+		return
+	}
+	if err := state.runHost(ctx, "git", "worktree", "prune"); err != nil {
+		state.logf("teardown: worktree prune: %v", err)
+	}
+	log := filepath.Join(state.workRoot, "logs", "teardown.log")
+	state.logf("teardown: deleting %s in the background (log %s)", discarded, log)
+	if err := state.detachRun(commandSpec{name: "rm", args: []string{"-rf", discarded}, dir: state.workRoot}, log); err != nil {
+		state.logf("teardown: delete %s: %v", discarded, err)
+	}
+}
+
+// detachRun starts a command that outlives the run.
+func (state *bootState) detachRun(spec commandSpec, log string) error {
+	if state.detach != nil {
+		return state.detach(spec, log)
+	}
+	return detachCommand(spec, log)
+}
+
+// killAPIProcesses kills each started API's whole process group — the pnpm
+// wrapper and its tsx child share the group Setpgid created.
+func (state *bootState) killAPIProcesses() {
+	state.processesMu.Lock()
+	defer state.processesMu.Unlock()
+	for _, command := range state.processes {
+		if command.Process != nil {
+			// Negative pid targets the process group.
+			_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
+		}
+	}
+}
+
+// dropDatabases drops this run's run-scoped databases on external
+// infrastructure. Best-effort: teardown never fails the run over cleanup.
+func (state *bootState) dropDatabases(ctx context.Context) {
+	for _, instance := range []string{"branch", "main"} {
+		database := DatabaseName(state.runID, instance)
+		if err := state.pgAdmin(ctx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", database)); err != nil {
+			state.logf("teardown: drop %s: %v", database, err)
+		}
+		if err := state.chAdmin(ctx, "DROP DATABASE IF EXISTS "+database); err != nil {
+			state.logf("teardown: drop clickhouse %s: %v", database, err)
+		}
+	}
+}
+
+// allowedCommands are the only executables the boot orchestration runs; every
+// commandSpec in this package is built from these constants, and the
+// allowlist proves subprocess names are never tainted input.
+var allowedCommands = map[string]bool{"git": true, "docker": true, "pnpm": true, "psql": true, "node": true, "env": true, "rm": true, havenCommand: true}
+
+// execRunner runs one command, streaming output to log.
+func execRunner(ctx context.Context, spec commandSpec, log io.Writer) error {
+	if !allowedCommands[spec.name] {
+		return fmt.Errorf("refusing to run unlisted command %q", spec.name)
+	}
+	// #nosec G204 -- spec.name is restricted to the allowedCommands allowlist
+	// above; args are built from constants and tool-owned config in this file.
+	command := exec.CommandContext(ctx, spec.name, spec.args...)
+	command.Dir = spec.dir
+	if spec.env != nil {
+		command.Env = spec.env
+	}
+	command.Stdout = log
+	command.Stderr = log
+	return command.Run()
+}
+
+// detachCommand starts spec in a process group of its own, its output
+// appended to log, and returns without waiting (visualdiff's stagger.go).
+func detachCommand(spec commandSpec, log string) error {
+	if !allowedCommands[spec.name] {
+		return fmt.Errorf("refusing to run unlisted command %q", spec.name)
+	}
+	output, err := os.OpenFile(log, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600) // #nosec G304 -- the run's own teardown log.
+	if err != nil {
+		return err
+	}
+	defer output.Close()
+	// #nosec G204 -- spec.name is restricted to the allowedCommands allowlist above.
+	command := exec.CommandContext(context.Background(), spec.name, spec.args...)
+	command.Dir, command.Stdout, command.Stderr = spec.dir, output, output
+	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := command.Start(); err != nil {
+		return err
+	}
+	return command.Process.Release()
+}

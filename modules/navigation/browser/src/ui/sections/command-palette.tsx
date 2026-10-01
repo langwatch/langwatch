@@ -1,0 +1,610 @@
+import { Box } from "@langwatch/design-system/primitives";
+import { useTheme } from "next-themes";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { useAutoFocusInput } from "../../behavior/use-auto-focus-input.ts";
+import { useCommandBarItems } from "../../behavior/use-command-bar-items.ts";
+import { useCommandBarKeyboard } from "../../behavior/use-command-bar-keyboard.ts";
+import { useCommandSearch } from "../../behavior/use-command-search.ts";
+import { useEasterEggEffects } from "../../behavior/use-easter-egg-effects.ts";
+import { useFilteredCommands } from "../../behavior/use-filtered-commands.ts";
+import { useFilteredProjects } from "../../behavior/use-filtered-projects.ts";
+import { useRecentItems } from "../../behavior/use-recent-items.ts";
+import { useReducedMotion } from "../../behavior/use-reduced-motion.ts";
+import { useScrollIntoView } from "../../behavior/use-scroll-into-view.ts";
+import type { Command } from "../../model/command-bar-types.ts";
+import { findEasterEgg, type EasterEgg } from "../../model/command-easter-eggs.ts";
+import type { ListItem } from "../../model/command-icon-info.ts";
+import { beginLangyHandoff } from "../../model/command-langy-handoff.ts";
+import {
+  type AddRecentItem,
+  handleCommandSelect,
+  handleProjectSelect,
+  handleRecentItemSelect,
+  handleSearchResultSelect,
+  type NavigationContext,
+  type OpenDrawer,
+} from "../../model/command-select-handlers.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import { CommandBarLangyMode } from "../blocks/command-bar-langy-mode.tsx";
+import { CommandBarFooter } from "../elements/command-bar-footer.tsx";
+import { HintsSection } from "../elements/command-bar-hints.tsx";
+import { CommandBarInput } from "../elements/command-bar-input.tsx";
+import { CommandBarResults } from "./command-bar-results.tsx";
+
+/** Never collapse the results to a sliver, however little room is left. */
+const RESULTS_PANEL_MIN_HEIGHT = 180;
+/** Breathing room between the panel's bottom edge and the viewport's. */
+const RESULTS_PANEL_VIEWPORT_MARGIN = 24;
+
+const THEME_BY_COMMAND: Partial<Record<string, "light" | "dark" | "system">> = {
+  "action-theme-light": "light",
+  "action-theme-dark": "dark",
+  "action-theme-system": "system",
+};
+
+/**
+ * The inline panel hangs off the ask field, so its room depends on where
+ * that field sits. Measured rather than guessed: a fixed `vh` cap that
+ * looks right on a laptop runs off a short window.
+ */
+function useInlinePanelMaxHeight({ inline, active }: { inline: boolean; active: boolean }): {
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  panelMaxHeight: number | null;
+} {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!inline || !active) return;
+    const measure = () => {
+      const node = panelRef.current;
+      if (!node) return;
+      const top = node.getBoundingClientRect().top;
+      setPanelMaxHeight(
+        Math.max(
+          RESULTS_PANEL_MIN_HEIGHT,
+          window.innerHeight - top - RESULTS_PANEL_VIEWPORT_MARGIN,
+        ),
+      );
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    // Capture: the page scrolls under the field, and the panel travels with it.
+    window.addEventListener("scroll", measure, true);
+    return () => {
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
+    };
+  }, [inline, active]);
+  return { panelRef, panelMaxHeight };
+}
+
+function runEasterEgg({
+  query,
+  triggerEffect,
+  onDone,
+}: {
+  query: string;
+  triggerEffect: (egg: EasterEgg) => void;
+  onDone: () => void;
+}): void {
+  const egg = findEasterEgg(query);
+  if (!egg) return;
+  triggerEffect(egg);
+  if (!egg.keepOpen) onDone();
+}
+
+/** What choosing one command does; everything that navigates goes through the shared handler. */
+function selectPaletteCommand({
+  cmd,
+  query,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+  openSupportChat,
+  setTheme,
+  triggerEffect,
+  handOffToLangy,
+  enterLangyMode,
+}: {
+  cmd: Command;
+  query: string;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+  openSupportChat: () => void;
+  setTheme: (theme: string) => void;
+  triggerEffect: (egg: EasterEgg) => void;
+  handOffToLangy: () => void;
+  enterLangyMode: () => void;
+}): void {
+  // Ask Langy doesn't navigate. A typed question is already the message, so
+  // selecting the row hands it straight to the panel — one Enter, no compose
+  // stop in between. Only an empty bar turns the field into Langy's own input
+  // first, because there is nothing to send yet.
+  if (cmd.id === "action-ask-langy") {
+    if (query.trim()) handOffToLangy();
+    else enterLangyMode();
+    return;
+  }
+  if (cmd.externalUrl) {
+    window.open(cmd.externalUrl, "_blank", "noopener,noreferrer");
+    ctx.close();
+    return;
+  }
+  // The bubble is the deployment's, and the host is what knows whether there
+  // is one: a deployment with none never lists this command.
+  if (cmd.id === "action-open-chat") {
+    openSupportChat();
+    ctx.close();
+    return;
+  }
+  const theme = THEME_BY_COMMAND[cmd.id];
+  if (theme) {
+    setTheme(theme);
+    ctx.close();
+    return;
+  }
+  if (cmd.id.startsWith("easter-")) {
+    runEasterEgg({ query, triggerEffect, onDone: ctx.close });
+    return;
+  }
+  handleCommandSelect({ cmd, projectSlug, ctx, addRecentItem, openDrawer });
+}
+
+function selectPaletteItem({
+  item,
+  projectSlug,
+  ctx,
+  addRecentItem,
+  openDrawer,
+  selectCommand,
+}: {
+  item: ListItem;
+  projectSlug: string;
+  ctx: NavigationContext;
+  addRecentItem: AddRecentItem;
+  openDrawer: OpenDrawer;
+  selectCommand: (cmd: Command) => void;
+}): void {
+  switch (item.type) {
+    case "command":
+      selectCommand(item.data);
+      return;
+    case "search":
+      handleSearchResultSelect({ result: item.data, projectSlug, ctx, addRecentItem, openDrawer });
+      return;
+    case "recent":
+      handleRecentItemSelect({ item: item.data, ctx, addRecentItem, openDrawer });
+      return;
+    case "project":
+      handleProjectSelect(item.data, ctx, addRecentItem);
+      return;
+  }
+}
+
+/** The address a row stands for, for "copy link"; empty when it has none. */
+function copyLinkPathOf({ item, projectSlug }: { item: ListItem; projectSlug: string }): string {
+  if (item.type === "command") return item.data.path?.replace("[project]", projectSlug) ?? "";
+  if (item.type === "project") return `/${item.data.slug}`;
+  return item.data.path;
+}
+
+/**
+ * Langy mode and the hand-off into Langy: the panel opens FIRST and
+ * auto-sends, then this surface dissolves over its entrance. Reduced motion
+ * keeps the same state ordering but closes synchronously.
+ */
+function useLangyHandoff({
+  active,
+  langyEnabled,
+  askLangy,
+  query,
+  onDone,
+  inputRef,
+  onHandoffStateChange,
+}: {
+  active: boolean;
+  langyEnabled: boolean;
+  askLangy: ((prompt: string) => void) | undefined;
+  query: string;
+  onDone: () => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onHandoffStateChange: ((exiting: boolean) => void) | undefined;
+}) {
+  const reduceMotion = useReducedMotion();
+  const [langyMode, setLangyMode] = useState(false);
+  const [langyExiting, setLangyExiting] = useState(false);
+  const handoffTimerRef = useRef<number | null>(null);
+  const handoffInFlightRef = useRef(false);
+
+  useEffect(() => {
+    onHandoffStateChange?.(langyExiting);
+  }, [langyExiting, onHandoffStateChange]);
+
+  const enterLangyMode = useCallback(() => {
+    if (!langyEnabled) return;
+    handoffInFlightRef.current = false;
+    setLangyExiting(false);
+    setLangyMode(true);
+  }, [langyEnabled]);
+
+  // Shared by Enter in Langy mode and by selecting a non-empty "Ask Langy"
+  // result — the same single gesture from two doors.
+  const handOffToLangy = useCallback(() => {
+    if (handoffInFlightRef.current || !askLangy) return;
+    handoffInFlightRef.current = true;
+    handoffTimerRef.current = beginLangyHandoff({
+      prompt: query,
+      askLangy,
+      closeCommandBar: onDone,
+      reducedMotion: reduceMotion,
+      setExiting: setLangyExiting,
+    });
+  }, [query, askLangy, onDone, reduceMotion]);
+
+  // Reset Langy mode and handoff timer on stand-down; onDone is idempotent across surfaces.
+  useEffect(() => {
+    if (active) return;
+    if (handoffTimerRef.current !== null) {
+      window.clearTimeout(handoffTimerRef.current);
+      handoffTimerRef.current = null;
+      if (handoffInFlightRef.current) onDone();
+    }
+    handoffInFlightRef.current = false;
+    setLangyMode(false);
+    setLangyExiting(false);
+  }, [active, onDone]);
+
+  useEffect(
+    () => () => {
+      if (handoffTimerRef.current !== null) {
+        window.clearTimeout(handoffTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  // Escape / Backspace-on-empty in Langy mode — back to normal command mode.
+  const exitLangyMode = useCallback(() => {
+    handoffInFlightRef.current = false;
+    setLangyMode(false);
+    setLangyExiting(false);
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }, [inputRef]);
+
+  return {
+    langyMode,
+    langyExiting,
+    handoffInFlightRef,
+    enterLangyMode,
+    handOffToLangy,
+    exitLangyMode,
+  };
+}
+
+/**
+ * Where this palette is mounted: `dialog` is the one Cmd+K raises over the
+ * page; `inline` is the one project home sets mid-page, at hero size,
+ * always there.
+ */
+export type CommandPaletteSurface = "dialog" | "inline";
+
+/**
+ * Palette: shared behaviors for command bar and home inline. Surface changes
+ * presentation only (dialog vs inline overlay behavior).
+ */
+export function CommandPalette({
+  surface,
+  active,
+  query,
+  setQuery,
+  onDone,
+  inputRef: providedInputRef,
+  placeholder,
+  onFocus,
+  onBlur,
+  onHandoffStateChange,
+}: {
+  surface: CommandPaletteSurface;
+  /**
+   * Whether the palette is what the reader is using right now (the dialog's
+   * open state, or whether the inline field holds focus). Selection and
+   * Langy mode reset when this goes false, so nothing resumes halfway.
+   */
+  active: boolean;
+  query: string;
+  setQuery: (query: string) => void;
+  /**
+   * The palette has finished and its surface should stand down. The dialog
+   * closes; the inline field clears itself.
+   */
+  onDone: () => void;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  placeholder?: string;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  /** Told when a hand-off to Langy starts, so a surface can animate its exit. */
+  onHandoffStateChange?: (exiting: boolean) => void;
+}) {
+  const inline = surface === "inline";
+  const host = useNavigationHost();
+
+  const { panelRef, panelMaxHeight } = useInlinePanelMaxHeight({ inline, active });
+
+  /**
+   * The ask field and Langy's own panel say the same thing, so offering
+   * both is the page talking over itself: a minimised Langy stands down
+   * while the field is in use, sinking away on its own close animation.
+   */
+  const langy = host.langy();
+  const setHomeAskOpen = langy?.setHomeAskOpen;
+  useEffect(() => {
+    if (!inline || !setHomeAskOpen) return;
+    setHomeAskOpen(active);
+    return () => setHomeAskOpen(false);
+  }, [inline, active, setHomeAskOpen]);
+  const currentUserId = host.currentUser()?.id;
+  // The one workspace graph the chrome already resolved. Reading it off the
+  // host is what keeps the palette's project list, the switcher's and the
+  // sidebar's the same list — and it never triggers a redirect, because the
+  // host answers with what has been read rather than reading for itself.
+  const project = host.project();
+  const organizations = host.organizations();
+  const openDrawer = host.openDrawer.bind(host);
+  const deployment = host.deployment();
+  const { setTheme } = useTheme();
+  const { idResult, searchResults, isLoading: searchLoading } = useCommandSearch(query, active);
+  const { groupedItems, addRecentItem } = useRecentItems();
+
+  const fallbackInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = providedInputRef ?? fallbackInputRef;
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Langy activation. Gated on the grant that STARTS a turn, not the one that
+  // opens the panel: the hand-off queues a prompt that auto-sends, so offering
+  // it to someone holding only `langy:view` would be inviting them into a 403.
+  // The host answers `null` for a reader who may not, which is that gate.
+  const langyEnabled = !!langy;
+  const {
+    langyMode,
+    langyExiting,
+    handoffInFlightRef,
+    enterLangyMode,
+    handOffToLangy,
+    exitLangyMode,
+  } = useLangyHandoff({
+    active,
+    langyEnabled,
+    askLangy: langy?.ask,
+    query,
+    onDone,
+    inputRef,
+    onHandoffStateChange,
+  });
+
+  // Detect platform for keyboard hints
+  const isMac =
+    typeof navigator !== "undefined" && navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+
+  const filteredCommands = useFilteredCommands({
+    query,
+    isSaas: deployment.isSaaS,
+    projectId: project?.id,
+    isDevMode: deployment.isDevelopment,
+  });
+  const filteredProjects = useFilteredProjects({
+    query,
+    organizations,
+    currentProjectSlug: project?.slug,
+    currentUserId,
+  });
+
+  const {
+    allItems,
+    recentItemsLimited,
+    searchInTracesItem,
+    searchInDocsItem,
+    easterEggItem,
+    askLangyItem,
+  } = useCommandBarItems({
+    query,
+    filteredCommands,
+    filteredProjects,
+    searchResults,
+    idResult,
+    groupedItems,
+    projectSlug: project?.slug,
+    langyEnabled,
+  });
+
+  const { triggerEffect } = useEasterEggEffects();
+
+  // Reset selection when results change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [allItems.length, query]);
+
+  useScrollIntoView(selectedIndex, resultsRef);
+
+  // The dialog takes focus the moment it opens. The inline field must NOT: it
+  // is on the page at load, and a page that grabs the caret on arrival has
+  // taken the keyboard from someone who was about to scroll.
+  useAutoFocusInput(!inline && active, inputRef);
+
+  const handleSelect = useCallback(
+    (item: ListItem, newTab = false) => {
+      // The surface is already dissolving into Langy; nothing else may fire.
+      if (handoffInFlightRef.current) return;
+
+      const projectSlug = project?.slug ?? "";
+      const ctx = { go: (to: string) => host.navigate(to), newTab, close: onDone };
+      selectPaletteItem({
+        item,
+        projectSlug,
+        ctx,
+        addRecentItem,
+        openDrawer,
+        selectCommand: (cmd) =>
+          selectPaletteCommand({
+            cmd,
+            query,
+            projectSlug,
+            ctx,
+            addRecentItem,
+            openDrawer,
+            openSupportChat: () => host.supportChat()?.open(),
+            setTheme,
+            triggerEffect,
+            handOffToLangy,
+            enterLangyMode,
+          }),
+      });
+    },
+    [
+      project?.slug,
+      host,
+      onDone,
+      openDrawer,
+      addRecentItem,
+      setTheme,
+      query,
+      triggerEffect,
+      enterLangyMode,
+      handOffToLangy,
+      handoffInFlightRef,
+    ],
+  );
+
+  const handleCopyLink = useCallback(() => {
+    const item = allItems[selectedIndex];
+    if (!item) return;
+
+    const path = copyLinkPathOf({ item, projectSlug: project?.slug ?? "" });
+
+    if (path) {
+      const url = `${window.location.origin}${path}`;
+      void navigator.clipboard.writeText(url);
+    }
+  }, [allItems, selectedIndex, project?.slug]);
+
+  // Keyboard navigation. Tab is the one addition: it takes whatever is typed
+  // straight to Langy. Reaching the assistant by arrowing to the bottom of a
+  // list of places to go made the more capable of the two routes read as the
+  // fallback after navigation failed to match.
+  const handleKeyDown = useCommandBarKeyboard({
+    allItems,
+    selectedIndex,
+    setSelectedIndex,
+    handleSelect,
+    handleCopyLink,
+    isMac,
+    onAskLangy: langyEnabled ? enterLangyMode : undefined,
+  });
+
+  if (langyMode) {
+    return (
+      <CommandBarLangyMode
+        query={query}
+        onQueryChange={setQuery}
+        onSubmit={handOffToLangy}
+        onExit={exitLangyMode}
+        exiting={langyExiting}
+        mark={langy?.mark}
+      />
+    );
+  }
+
+  const results = (
+    <CommandBarResults
+      ref={resultsRef}
+      query={query}
+      allItems={allItems}
+      selectedIndex={selectedIndex}
+      onSelect={handleSelect}
+      onMouseEnter={setSelectedIndex}
+      filteredNavigation={filteredCommands.navigation}
+      filteredActions={filteredCommands.actions}
+      filteredSupport={filteredCommands.support}
+      filteredTheme={filteredCommands.theme}
+      filteredPage={filteredCommands.page}
+      searchResults={searchResults}
+      filteredProjects={filteredProjects}
+      searchInTracesItem={searchInTracesItem}
+      searchInDocsItem={searchInDocsItem}
+      idResult={idResult}
+      recentItemsLimited={recentItemsLimited}
+      easterEggItem={easterEggItem}
+      askLangyItem={askLangyItem}
+      isLoading={searchLoading}
+      // The dialog holds the field and the list in one card, so the list
+      // draws the line between them. The inline panel is its own box under
+      // the field, and already has an edge there.
+      showTopDivider={!inline}
+    />
+  );
+
+  const showInlineOverlay = inline && active;
+  return (
+    <>
+      <CommandBarInput
+        inputRef={inputRef}
+        query={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={handleKeyDown}
+        isLoading={searchLoading}
+        placeholder={placeholder}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        size={inline ? "hero" : "dialog"}
+      />
+
+      {showInlineOverlay && (
+        // Overlaid, never in the flow: the home's results are a temporary
+        // layer over the page, so opening them cannot push the figures and
+        // recent work down and closing them cannot pull them back up.
+        <Box
+          ref={panelRef}
+          position="absolute"
+          top="calc(100% + 8px)"
+          left={0}
+          right={0}
+          zIndex={20}
+          background={{ base: "bg.panel/50", _dark: "bg.panel/70" }}
+          backdropFilter="blur(20px)"
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="16px"
+          boxShadow="0 2px 8px rgba(20, 20, 23, 0.08), 0 24px 70px -20px rgba(20, 20, 23, 0.35)"
+          overflow="hidden"
+          paddingTop={2}
+          // Capped to the room actually left below the field, so a long list
+          // scrolls inside the panel instead of running off the page where
+          // its last rows — and the footer's shortcuts — cannot be reached.
+          {...(panelMaxHeight !== null ? { maxHeight: `${panelMaxHeight}px` } : {})}
+          display="flex"
+          flexDirection="column"
+        >
+          {/* The list is the part that scrolls; the footer stays put, since
+                a legend you have to scroll to reach teaches nobody anything. */}
+          <Box overflowY="auto" minHeight={0} flex="1 1 auto">
+            {results}
+          </Box>
+          <Box flexShrink={0}>
+            <CommandBarFooter isMac={isMac} />
+          </Box>
+        </Box>
+      )}
+      {!inline && (
+        <>
+          {results}
+          <HintsSection />
+          <CommandBarFooter isMac={isMac} />
+        </>
+      )}
+    </>
+  );
+}

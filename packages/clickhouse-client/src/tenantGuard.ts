@@ -1,46 +1,9 @@
 /**
  * Refuses a statement that is not scoped to exactly one tenant.
- *
- * In this schema no identifier other than `TenantId` is unique across tenants -
- * a TraceId, a RunId or a SpanId can collide between customers - so a read that
- * omits the tenant predicate does not merely return too much, it returns
- * somebody else's rows. The failure is silent: the query succeeds, the shape is
- * right, and nothing looks wrong until a customer reports seeing data that is
- * not theirs.
- *
- * This is a guard against omission, not a security boundary. It matches on the
- * statement text, so the thing it has to stop is a normal engineer writing a
- * normal query and forgetting a WHERE clause. Real isolation is enforced by the
- * routing in ./tenancy.ts and by the credentials the server was given.
- *
- * A disjunction is refused rather than merely noted. `WHERE TenantId = {t} OR
- * Status = 'x'` contains the predicate and still returns every tenant's rows,
- * and it is not an exotic statement - it is what operator precedence produces
- * when somebody writes `WHERE TenantId = {t} AND A OR B` meaning `AND (A OR
- * B)`. Any `OR` at or above the predicate's parenthesis depth can weaken it, so
- * that is the rule: an `OR` nested deeper is inside a group and harmless, one
- * at the same depth or shallower is refused. Putting brackets round the
- * disjunction both satisfies the guard and fixes the query.
- *
- * Known and accepted limits, each pinned by a test in ./tenantGuard.test.ts so
- * they stay documented rather than becoming folklore. One match anywhere in the
- * statement satisfies the whole statement, so these still pass:
- *
- *   - a UNION whose second arm is unscoped.
- *   - a JOIN where only one side is scoped.
- *   - a scoped subquery or CTE beneath an unscoped outer query.
- *
- * Closing these needs a parser. If that day comes, the shape of this function
- * does not have to change - only `checkTenantScope`'s internals.
- *
- * The predicate must bind a parameter rather than inline a literal. An inlined
- * tenant is a string built by concatenation somewhere, which is the shape that
- * eventually becomes an injection, and it cannot be checked against the tenant
- * the caller claims to be acting for.
  */
 
-import { quietly } from "./observability";
-import type { QueryRequest } from "./query";
+import { quietly } from "./observability.ts";
+import type { InsertRequest, QueryRequest } from "./query.ts";
 
 export type TenantScopeViolation =
   | { kind: "missing-predicate" }
@@ -52,90 +15,45 @@ export type TenantScopeViolation =
       param: string;
       expected: string;
       actual: unknown;
-    };
+    }
+  | { kind: "tenant-set-mismatch"; declared: readonly string[]; bound: readonly unknown[] }
+  | { kind: "tenant-set-spans-organizations"; organizations: readonly string[] }
+  | { kind: "missing-row-tenant"; row: number }
+  | { kind: "row-tenant-mismatch"; row: number; actual: unknown };
 
 /** `TenantId = {someName:String}`, allowing an optional table alias. */
-const BOUND_TENANT_PREDICATE =
-  /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
+const BOUND_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/i;
+
+/** `TenantId IN ({a:String}, {b:String})`: a declared tenant set's placeholders only. */
+const BOUND_TENANT_SET =
+  /(?:^|[\s.(])TenantId\s+IN\s*\(\s*(\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*String\s*\}(?:\s*,\s*\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:\s*String\s*\})*)\s*\)/i;
+
+const PLACEHOLDER_NAME = /\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*:/g;
 
 /** `TenantId = 'literal'` or `= "literal"`, which is never acceptable. */
-const LITERAL_TENANT_PREDICATE =
-  /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
+const LITERAL_TENANT_PREDICATE = /(?:^|[\s.(])TenantId\s*=\s*(?:'[^']*'|"[^"]*")/i;
 
 /**
- * Returns the reason a statement is not tenant-scoped, or null when it is.
- *
- * Pure, so the rule can be exercised over a table of statements without a
- * driver, a server, or a pipeline.
- */
-/**
- * Blanks out comment bodies and string-literal bodies, keeping every other
- * character at its original index.
- *
- * Comments have to go before matching or the guard misses the case it most
- * exists for: someone debugging comments the WHERE clause out, and the
- * statement then reads every tenant's rows while still visibly "containing" the
- * predicate. String bodies go too, so that a literal containing `OR`, `--` or
- * `/*` cannot steer any of the checks below.
- *
- * Written as one pass rather than a pair of replaces because the obvious
- * `/\/\*[\s\S]*?\*\//` backtracks: against a long run of unterminated `/*` each
- * start position rescans to the end of the input, which is quadratic in the
- * length of the statement and reachable from any caller that builds SQL from
- * input it did not write. Here every character is visited once.
- *
- * Length is preserved so the returned indices still address the original text.
+ * Blanks out comment bodies and string-literal bodies, keeping every other character at its
+ * original index.
  */
 function maskNonCode(sql: string): string {
-  const out = [...sql];
-
-  const blank = (from: number, to: number): void => {
-    for (let i = from; i < to && i < out.length; i++) {
-      if (out[i] !== "\n") out[i] = " ";
-    }
-  };
-
+  const out = sql.split("");
   let cursor = 0;
   while (cursor < sql.length) {
-    const pair = sql.slice(cursor, cursor + 2);
-
-    if (pair === "/*") {
-      const close = sql.indexOf("*/", cursor + 2);
-      const end = close === -1 ? sql.length : close + 2;
-      blank(cursor, end);
-      cursor = end;
-      continue;
-    }
-
-    if (pair === "--") {
-      const newline = sql.indexOf("\n", cursor);
-      const end = newline === -1 ? sql.length : newline;
-      blank(cursor, end);
-      cursor = end;
+    const commentEnd = commentEndAt(sql, cursor);
+    if (commentEnd !== cursor) {
+      blankRange({ out, from: cursor, to: commentEnd });
+      cursor = commentEnd;
       continue;
     }
 
     const quote = sql[cursor];
     if (quote === "'" || quote === '"' || quote === "`") {
-      let scan = cursor + 1;
-      while (scan < sql.length) {
-        if (sql[scan] === "\\") {
-          scan += 2;
-          continue;
-        }
-        if (sql[scan] === quote) {
-          // A doubled quote is an escaped quote, not the end of the literal.
-          if (sql[scan + 1] === quote) {
-            scan += 2;
-            continue;
-          }
-          break;
-        }
-        scan += 1;
-      }
+      const scan = closingQuoteAt(sql, cursor);
       // The delimiters stay, so `TenantId = 'x'` is still recognisably a
       // literal predicate rather than becoming a bare `TenantId =`.
-      blank(cursor + 1, Math.min(scan, sql.length));
+      blankRange({ out, from: cursor + 1, to: Math.min(scan, sql.length) });
       cursor = Math.min(scan + 1, sql.length);
       continue;
     }
@@ -146,19 +64,65 @@ function maskNonCode(sql: string): string {
   return out.join("");
 }
 
+function blankRange({ out, from, to }: { out: string[]; from: number; to: number }): void {
+  for (let i = from; i < to && i < out.length; i++) {
+    if (out[i] !== "\n") out[i] = " ";
+  }
+}
+
+/** Where a comment starting at `cursor` ends; `cursor` itself when none starts there. */
+function commentEndAt(sql: string, cursor: number): number {
+  const pair = sql.slice(cursor, cursor + 2);
+  if (pair === "/*") {
+    const close = sql.indexOf("*/", cursor + 2);
+    return close === -1 ? sql.length : close + 2;
+  }
+  if (pair === "--") {
+    const newline = sql.indexOf("\n", cursor);
+    return newline === -1 ? sql.length : newline;
+  }
+  return cursor;
+}
+
+/** Where the literal opened at `open` closes; backslash and doubled quotes escape. */
+function closingQuoteAt(sql: string, open: number): number {
+  const quote = sql[open];
+  let scan = open + 1;
+  while (scan < sql.length) {
+    if (sql[scan] === "\\") {
+      scan += 2;
+      continue;
+    }
+    if (sql[scan] !== quote) {
+      scan += 1;
+      continue;
+    }
+    // A doubled quote is an escaped quote, not the end of the literal.
+    if (sql[scan + 1] !== quote) return scan;
+    scan += 2;
+  }
+  return scan;
+}
+
 const isWordCharacter = (character: string | undefined): boolean =>
   character !== undefined && /[A-Za-z0-9_]/.test(character);
 
 /**
- * Reports an `OR` that can disjoin the tenant predicate away.
- *
- * Depth is the test. An `OR` nested inside a bracketed group cannot weaken a
- * predicate outside it, so only one at the predicate's own depth or shallower
- * counts. That accepts `TenantId = {t} AND (a OR b)` and refuses both
- * `TenantId = {t} OR a` and `(TenantId = {t}) OR a`.
- *
- * One pass, so this cannot become the quadratic thing `maskNonCode` just
- * stopped being.
+ * Whether an `\bOR\b` token, by hand, starts at `masked[i]` (so `ORDER BY`
+ * and `colour` are not ORs).
+ */
+function isOrTokenAt(masked: string, i: number): boolean {
+  const character = masked[i];
+  if (character !== "o" && character !== "O") return false;
+  if (masked[i + 1] !== "r" && masked[i + 1] !== "R") return false;
+  if (isWordCharacter(masked[i - 1])) return false;
+  return !isWordCharacter(masked[i + 2]);
+}
+
+/**
+ * Reports an `OR` that can disjoin the tenant predicate away. Depth is the test. An `OR` nested
+ * inside a bracketed group cannot weaken a predicate outside it, so only one at the predicate's
+ * own depth or shallower counts.
  */
 function hasWeakeningDisjunction({
   masked,
@@ -184,13 +148,7 @@ function hasWeakeningDisjunction({
       continue;
     }
 
-    // `\bOR\b` by hand, so `ORDER BY` and a column called `colour` are not ORs.
-    if (
-      (character === "o" || character === "O") &&
-      (masked[i + 1] === "r" || masked[i + 1] === "R") &&
-      !isWordCharacter(masked[i - 1]) &&
-      !isWordCharacter(masked[i + 2])
-    ) {
+    if (isOrTokenAt(masked, i)) {
       disjunctionDepths.push(depth);
     }
   }
@@ -202,12 +160,16 @@ export function checkTenantScope({
   sql,
   params,
   tenantId,
+  tenantIds,
 }: {
   sql: string;
   params?: Record<string, unknown> | undefined;
   tenantId: string;
+  tenantIds?: readonly string[] | undefined;
 }): TenantScopeViolation | null {
   const statement = maskNonCode(sql);
+  if (tenantIds !== undefined)
+    return checkTenantSetScope({ statement, params, tenantId, tenantIds });
   const bound = BOUND_TENANT_PREDICATE.exec(statement);
 
   if (bound === null) {
@@ -216,9 +178,7 @@ export function checkTenantScope({
       : { kind: "missing-predicate" };
   }
 
-  if (
-    hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })
-  ) {
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
     return { kind: "weakening-disjunction" };
   }
 
@@ -237,17 +197,84 @@ export function checkTenantScope({
   return null;
 }
 
+/**
+ * A declared tenant set: the `IN` list binds exactly the declared tenants, the claimed tenant among
+ * them, and no `OR` can disjoin it away. That they share one organisation is the router's check.
+ */
+function checkTenantSetScope({
+  statement,
+  params,
+  tenantId,
+  tenantIds,
+}: {
+  statement: string;
+  params?: Record<string, unknown> | undefined;
+  tenantId: string;
+  tenantIds: readonly string[];
+}): TenantScopeViolation | null {
+  const bound = BOUND_TENANT_SET.exec(statement);
+  if (bound === null) return { kind: "missing-predicate" };
+  if (hasWeakeningDisjunction({ masked: statement, predicateIndex: bound.index })) {
+    return { kind: "weakening-disjunction" };
+  }
+
+  const names = [...(bound[1] ?? "").matchAll(PLACEHOLDER_NAME)].map((match) => match[1] ?? "");
+  const missing = names.find((name) => params?.[name] === undefined);
+  if (missing !== undefined) return { kind: "missing-param", param: missing };
+
+  const values = names.map((name) => params?.[name]);
+  const declared = new Set(tenantIds);
+  const matches =
+    declared.has(tenantId) &&
+    values.every((value) => typeof value === "string" && declared.has(value)) &&
+    new Set(values).size === declared.size;
+  return matches ? null : { kind: "tenant-set-mismatch", declared: tenantIds, bound: values };
+}
+
+/**
+ * The tenant predicate forms the repositories genuinely write. Wider than {@link
+ * BOUND_TENANT_PREDICATE} on purpose: that one backs the `QueryRequest` path, where the bound
+ * value is also checked against the caller's tenant and so has to name exactly one parameter.
+ */
+const SCOPED_PREDICATE =
+  /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*(?:=|IN)\s*\(?\s*\{\s*[A-Za-z_][A-Za-z0-9_]*\s*:/i;
+
+const LITERAL_PREDICATE =
+  /(?:^|[\s.(])(?:TenantId|tenant_id|project_id|ProjectId)\s*=\s*(?:'[^']*'|"[^"]*")/i;
+
+/**
+ * Returns the reason a statement names no tenant, or null when it names one. Text only: no
+ * parameters, no claimed tenant.
+ */
+export function checkStatementTenantScope({ sql }: { sql: string }): TenantScopeViolation | null {
+  const statement = maskNonCode(sql);
+  if (SCOPED_PREDICATE.test(statement)) return null;
+  return LITERAL_PREDICATE.test(statement)
+    ? { kind: "literal-predicate" }
+    : { kind: "missing-predicate" };
+}
+
+/** The first table the statement names, for the refusal message. */
+export function tableNamedBy(sql: string): string {
+  const match =
+    /(?:^|[\s(])(?:FROM|INSERT\s+INTO|ALTER\s+TABLE|OPTIMIZE\s+TABLE)\s+([A-Za-z_][A-Za-z0-9_.]*)/i.exec(
+      maskNonCode(sql),
+    );
+  return match?.[1] ?? "unknown";
+}
+
 export class TenantScopeError extends Error {
   constructor(
     public readonly violation: TenantScopeViolation,
     public readonly tenantId: string,
   ) {
-    super(`${describe(violation)} (tenant "${tenantId}")`);
+    super(`${describeTenantScopeViolation(violation)} (tenant "${tenantId}")`);
     this.name = "TenantScopeError";
   }
 }
 
-function describe(violation: TenantScopeViolation): string {
+/** The sentence a refusal reads out, shared by both guards. */
+export function describeTenantScopeViolation(violation: TenantScopeViolation): string {
   switch (violation.kind) {
     case "missing-predicate":
       return "Statement has no `TenantId = {param:String}` predicate. No other id in this schema is unique across tenants, so this would read another tenant's rows. Add the predicate, or declare `unscoped: { reason }` if the statement genuinely spans tenants.";
@@ -259,6 +286,14 @@ function describe(violation: TenantScopeViolation): string {
       return `Statement binds tenant parameter "${violation.param}" but no such parameter was supplied.`;
     case "param-mismatch":
       return `Statement binds tenant parameter "${violation.param}" to a different tenant than the request claims.`;
+    case "tenant-set-mismatch":
+      return "Statement's `TenantId IN (...)` list does not bind exactly the declared tenant set, or the request's tenant is not in it. Bind one placeholder per declared tenant and nothing else.";
+    case "tenant-set-spans-organizations":
+      return `The declared tenant set spans ${violation.organizations.length} organisations. A read across tenants stays inside one organisation, which is also the one server that can answer it.`;
+    case "missing-row-tenant":
+      return `Row ${violation.row} of the batch carries no TenantId. Every written row names the tenant it belongs to, so a later read scoped to one tenant can never miss it or find someone else's.`;
+    case "row-tenant-mismatch":
+      return `Row ${violation.row} of the batch carries TenantId "${String(violation.actual)}", which is not the tenant the batch is written for. Write one tenant's rows per batch.`;
   }
 }
 
@@ -268,35 +303,28 @@ export interface TenantGuardOptions {
 }
 
 /**
- * Refuses a statement that cannot name its tenant.
- *
- * Placed outermost by {@link ClickHouseQueryClient}: refusing costs nothing,
- * and it should happen before a rate-limit slot or a retry budget is spent on a
- * statement that must not run.
+ * Refuses a statement that cannot name its tenant. Placed outermost by {@link
+ * ClickHouseQueryClient}: refusing costs nothing, and it should happen before a rate-limit slot
+ * or a retry budget is spent on a statement that must not run.
  */
 export class TenantGuard {
-  private readonly onUnscoped:
-    | ((request: QueryRequest) => void)
-    | undefined;
+  private readonly onUnscoped: ((request: QueryRequest) => void) | undefined;
 
   constructor({ onUnscoped }: TenantGuardOptions = {}) {
     this.onUnscoped = onUnscoped;
   }
 
   /**
-   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or
-   * declares a written reason for not being.
-   *
-   * Returns nothing on success rather than the request: it is a check, and a
-   * caller that had to remember to use a returned value could forget to.
+   * Throws {@link TenantScopeError} unless the statement is tenant-scoped or declares a written
+   * reason for not being. Returns nothing on success rather than the request: it is a check,
+   * and a caller that had to remember to use a returned value could forget to.
    */
   assert(request: QueryRequest): void {
     if (request.unscoped !== undefined) {
-      // Guarded because `onUnscoped` is host code - an audit log, a counter -
-      // and this branch is the one where the guard has already decided to
-      // allow. An exception from it would propagate out of `assert` and refuse
-      // a statement the guard just approved, which is a reporting hook
-      // deciding policy. Observability must not change what it observes; see
+      // Guarded because `onUnscoped` is host code - an audit log, a counter - and this branch
+      // is the one where the guard has already decided to allow. An exception from it would
+      // propagate out of `assert` and refuse a statement the guard just approved, which is a
+      // reporting hook deciding policy. Observability must not change what it observes; see
       // ./observability.ts.
       quietly(() => this.onUnscoped?.(request));
       return;
@@ -306,9 +334,38 @@ export class TenantGuard {
       sql: request.sql,
       params: request.params,
       tenantId: request.tenantId,
+      tenantIds: request.tenantIds,
     });
     if (violation !== null) {
       throw new TenantScopeError(violation, request.tenantId);
     }
   }
+
+  /**
+   * Throws {@link TenantScopeError} unless every row names the tenant the
+   * batch is written for — the batch is its own evidence, since a write has
+   * no predicate. Every row is checked, not just the first, to catch a mixed batch.
+   */
+  assertInsert(request: InsertRequest): void {
+    const violation = checkInsertTenantScope(request);
+    if (violation !== null) {
+      throw new TenantScopeError(violation, request.tenantId);
+    }
+  }
+}
+
+/** Returns the reason a batch is not one tenant's, or null when it is. */
+export function checkInsertTenantScope(
+  request: Pick<InsertRequest, "tenantId" | "rows">,
+): TenantScopeViolation | null {
+  for (const [index, row] of request.rows.entries()) {
+    const tenantId = row.TenantId;
+    if (tenantId === undefined || tenantId === null || tenantId === "") {
+      return { kind: "missing-row-tenant", row: index };
+    }
+    if (tenantId !== request.tenantId) {
+      return { kind: "row-tenant-mismatch", row: index, actual: tenantId };
+    }
+  }
+  return null;
 }

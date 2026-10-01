@@ -1,0 +1,444 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant, toDate } from "@langwatch/time";
+/**
+ * @vitest-environment node
+ * Real Postgres. Routing policy, allowlist and safety type narrow a key's providers; a slow spend
+ * read ships the stored spend. Specs: governance/vk-provider-access.feature, budgets.feature
+ */
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
+import { PrismaGatewayAdapter } from "../app/gateway-composition.build.ts";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
+import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
+import { GatewayConfigAssemblyService } from "../services/gateway-config-assembly.service.ts";
+import {
+  CONFIG_SPEND_READ_TIMEOUT_MS,
+  GatewayConfigMaterialiserService,
+} from "../services/gateway-config-materialisation.service.ts";
+import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { seededCustomKeys } from "./support/seeded-custom-keys.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
+
+const noPlatformProviders = createApiFixture<ModelProviderApi>({
+  platformProviderChain: () => Promise.resolve([]),
+});
+
+const databaseUrl = process.env.DATABASE_URL;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
+const prisma = connection?.client as PrismaClient;
+
+/** The destination reads the materialiser makes, answered from seeded rows. */
+class SuiteProjectService extends TestProjectApi {
+  override async findTraceDestination(
+    projectId: string,
+  ): ReturnType<ProjectApi["findTraceDestination"]> {
+    return prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+  }
+
+  override async listTraceDestinations(
+    projectIds: string[],
+  ): ReturnType<ProjectApi["listTraceDestinations"]> {
+    return prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+  }
+
+  override async resolveTraceDestination(
+    input: Parameters<ProjectApi["resolveTraceDestination"]>[0],
+  ): ReturnType<ProjectApi["resolveTraceDestination"]> {
+    const projectId = input.traceProjectId ?? input.projectScopeIds[0];
+    if (!projectId) return { outcome: "no_destination" };
+    const project = await this.findTraceDestination(projectId);
+    return project ? { outcome: "resolved", project } : { outcome: "unknown" };
+  }
+}
+
+const suffix = nanoid(8);
+const ORG_ID = `org-mat-${suffix}`;
+const TEAM_ID = `team-mat-${suffix}`;
+const PROJECT_ID = `proj-mat-${suffix}`;
+const USER_ID = `usr-mat-${suffix}`;
+const MP_ID = `mp-mat-${suffix}`;
+const MP_CUSTOM_ID = `mp-mat-custom-${suffix}`;
+const MP_OPENAI_BASE_ID = `mp-mat-openai-base-${suffix}`;
+const MP_ANTHROPIC_BASE_ID = `mp-mat-anthropic-base-${suffix}`;
+const MP_ANTHROPIC_PLAIN_ID = `mp-mat-anthropic-plain-${suffix}`;
+const MP_ANTHROPIC_KEYLESS_ID = `mp-mat-anthropic-keyless-${suffix}`;
+const MP_SAFETY_ID = `mp-mat-safety-${suffix}`;
+// A dispatchable, org-scoped provider the routing policy deliberately leaves
+// OUT of its modelProviderIds. Scope-reachable, so savable in a key's
+// allowlist, but the policy must keep it out of the dispatch chain.
+const MP_POLICY_OMITTED_ID = `mp-mat-omitted-${suffix}`;
+const RP_ID = `rp-mat-${suffix}`;
+const VK_NO_RP_ID = `vk-mat-norp-${suffix}`;
+const VK_POLICY_ALLOWLIST_ID = `vk-mat-policy-allow-${suffix}`;
+
+const MODEL_PROVIDER_IDS = [
+  MP_ID,
+  MP_CUSTOM_ID,
+  MP_OPENAI_BASE_ID,
+  MP_ANTHROPIC_BASE_ID,
+  MP_ANTHROPIC_PLAIN_ID,
+  MP_ANTHROPIC_KEYLESS_ID,
+  MP_SAFETY_ID,
+  MP_POLICY_OMITTED_ID,
+];
+
+let gateway: GatewayService;
+
+const materialiser = (chRepo: GatewayBudgetSpend | null = null) =>
+  GatewayConfigMaterialiserService.create({
+    scopeResolution: GatewayScopeResolutionService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+      platformProviders: noPlatformProviders,
+    }),
+    projects: new SuiteProjectService(),
+    chRepo,
+    budgetDecisions: gateway,
+    modelProviders: seededCustomKeys(prisma),
+    assembly: GatewayConfigAssemblyService.create({
+      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+      platformProviders: noPlatformProviders,
+    }),
+  });
+
+async function bundleFor(keyId: string, chRepo: GatewayBudgetSpend | null = null) {
+  const vk = await PrismaGatewayVirtualKeyRepository.create(prisma).findById({
+    id: keyId,
+    organizationId: ORG_ID,
+  });
+  return materialiser(chRepo).materialise(vk!);
+}
+
+async function createProvider({
+  id,
+  name,
+  provider,
+  customKeys,
+}: {
+  id: string;
+  name: string;
+  provider: string;
+  customKeys: Record<string, string>;
+}) {
+  await prisma.modelProvider.create({
+    data: {
+      id,
+      name,
+      provider,
+      enabled: true,
+      organizationId: ORG_ID,
+      customKeys,
+      scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+    },
+  });
+}
+
+describe.skipIf(!databaseUrl)("gateway bundle provider access (real PG)", () => {
+  beforeAll(async () => {
+    gateway = PrismaGatewayAdapter.create({
+      database: prisma,
+      projects: new SuiteProjectService(),
+      evaluators: {} as never,
+      monitors: {} as never,
+      changes: {} as never,
+      audit: {} as never,
+    }).build();
+
+    await prisma.organization.create({
+      data: { id: ORG_ID, name: `Mat Org ${suffix}`, slug: `mat-${suffix}` },
+    });
+    await prisma.team.create({
+      data: {
+        id: TEAM_ID,
+        name: `Mat Team ${suffix}`,
+        slug: `mat-team-${suffix}`,
+        organizationId: ORG_ID,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_ID,
+        name: `Mat Project ${suffix}`,
+        slug: `mat-proj-${suffix}`,
+        teamId: TEAM_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `key-${suffix}`,
+      },
+    });
+    await prisma.user.create({
+      data: { id: USER_ID, email: `${suffix}@mat.local`, name: "Mat" },
+    });
+
+    await createProvider({ id: MP_ID, name: "openai", provider: "openai", customKeys: {} });
+    // Custom (OpenAI-compatible) provider: base URL required, API key
+    // legitimately empty (unauthenticated self-hosted vLLM/LiteLLM).
+    await createProvider({
+      id: MP_CUSTOM_ID,
+      name: "custom",
+      provider: "custom",
+      customKeys: { CUSTOM_API_KEY: "", CUSTOM_BASE_URL: "http://llm-server:8000/v1" },
+    });
+    await createProvider({
+      id: MP_OPENAI_BASE_ID,
+      name: "openai-proxy",
+      provider: "openai",
+      customKeys: {
+        OPENAI_API_KEY: "sk-proxy-test",
+        OPENAI_BASE_URL: "https://proxy.example.com/v1",
+      },
+    });
+    await createProvider({
+      id: MP_ANTHROPIC_BASE_ID,
+      name: "anthropic-selfhosted",
+      provider: "anthropic",
+      customKeys: {
+        ANTHROPIC_API_KEY: "sk-ant-selfhosted",
+        ANTHROPIC_BASE_URL: "http://vllm-anthropic:8000",
+      },
+    });
+    await createProvider({
+      id: MP_ANTHROPIC_PLAIN_ID,
+      name: "anthropic-plain",
+      provider: "anthropic",
+      customKeys: { ANTHROPIC_API_KEY: "sk-ant-plain" },
+    });
+    await createProvider({
+      id: MP_ANTHROPIC_KEYLESS_ID,
+      name: "anthropic-keyless",
+      provider: "anthropic",
+      customKeys: { ANTHROPIC_BASE_URL: "http://vllm-anthropic:8000" },
+    });
+    // Safety-type provider (azure_safety): holds evaluator credentials,
+    // not chat-dispatchable — must never appear in a bundle's providers[],
+    // because the Go router has no adapter for it.
+    await createProvider({
+      id: MP_SAFETY_ID,
+      name: "azure-safety",
+      provider: "azure_safety",
+      customKeys: {
+        AZURE_CONTENT_SAFETY_ENDPOINT: "https://safety.example.com",
+        AZURE_CONTENT_SAFETY_KEY: "safety-key",
+      },
+    });
+    // Dispatchable and scope-reachable, but intentionally NOT in the routing
+    // policy below. A key can still allowlist it; the policy keeps it out.
+    await createProvider({
+      id: MP_POLICY_OMITTED_ID,
+      name: "openai-omitted",
+      provider: "openai",
+      customKeys: { OPENAI_API_KEY: "sk-omitted-test" },
+    });
+
+    await prisma.routingPolicy.create({
+      data: {
+        id: RP_ID,
+        organizationId: ORG_ID,
+        scopes: { create: [{ scopeType: "ORGANIZATION", scopeId: ORG_ID }] },
+        name: `mat-rp-${suffix}`,
+        modelProviderIds: [
+          MP_ID,
+          MP_CUSTOM_ID,
+          MP_OPENAI_BASE_ID,
+          MP_ANTHROPIC_BASE_ID,
+          MP_ANTHROPIC_PLAIN_ID,
+          MP_ANTHROPIC_KEYLESS_ID,
+        ],
+        modelAliases: { "gpt-5": "gpt-5-mini" },
+        policyRules: {
+          tools: { deny: ["^shell_.*$"], allow: null },
+          mcp: { deny: [], allow: null },
+          urls: { deny: [], allow: null },
+          models: { deny: [], allow: null },
+        },
+        isDefault: true,
+      },
+    });
+
+    // No routing policy and no allowlist: every scope-reachable dispatchable
+    // provider is in the chain.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_NO_RP_ID,
+        organizationId: ORG_ID,
+        name: "vk-bare",
+        hashedSecret: `hash-bare-${suffix}`,
+        displayPrefix: "lw_vk_live_xxx_2",
+        principalUserId: USER_ID,
+        createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
+        config: {},
+        scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+      },
+    });
+    // On the routing policy, with an allowlist that names the policy-omitted
+    // provider. Dispatch must still exclude it.
+    await prisma.virtualKey.create({
+      data: {
+        id: VK_POLICY_ALLOWLIST_ID,
+        organizationId: ORG_ID,
+        name: "vk-policy-allowlist",
+        hashedSecret: `hash-policy-allow-${suffix}`,
+        displayPrefix: "lw_vk_live_xxx_5",
+        principalUserId: USER_ID,
+        createdById: USER_ID,
+        traceProjectId: PROJECT_ID,
+        routingPolicyId: RP_ID,
+        config: { providersAllowed: [MP_ID, MP_POLICY_OMITTED_ID] },
+        scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+      },
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    await prisma.virtualKey.deleteMany({
+      where: { id: { in: [VK_NO_RP_ID, VK_POLICY_ALLOWLIST_ID] } },
+    });
+    await prisma.routingPolicyScope.deleteMany({ where: { routingPolicyId: RP_ID } });
+    await prisma.routingPolicy.deleteMany({ where: { id: RP_ID } });
+    await prisma.modelProviderScope.deleteMany({
+      where: { modelProviderId: { in: MODEL_PROVIDER_IDS } },
+    });
+    await prisma.modelProvider.deleteMany({ where: { id: { in: MODEL_PROVIDER_IDS } } });
+    await prisma.gatewayChangeEvent.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.user.deleteMany({ where: { id: USER_ID } });
+    await prisma.project.deleteMany({ where: { id: PROJECT_ID } });
+    await prisma.team.deleteMany({ where: { id: TEAM_ID } });
+    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+    await connection?.closeOnce();
+  }, 60_000);
+
+  describe("when materialising a VK with no linked routing policy", () => {
+    /** @scenario "Safety-type providers are excluded from gateway dispatch chains" */
+    it("excludes safety-type providers from the dispatch chain", async () => {
+      const bundle = await bundleFor(VK_NO_RP_ID);
+
+      // Naming the LLM provider that must survive, rather than just asserting
+      // a non-empty list, keeps this from passing vacuously if the filter ever
+      // drops dispatchable providers too.
+      expect(bundle.providers.map((provider) => provider.id)).toContain(MP_ID);
+      expect(bundle.providers.map((provider) => provider.id)).not.toContain(MP_SAFETY_ID);
+      expect(bundle.fallback.chain).toContain(MP_ID);
+      expect(bundle.fallback.chain).not.toContain(MP_SAFETY_ID);
+    });
+  });
+
+  describe("when a VK on a routing policy allowlists a provider the policy omits", () => {
+    /** @scenario "The routing policy still narrows the dispatch chain when the allowlist names an omitted provider" */
+    it("excludes the policy-omitted provider from dispatch even though the allowlist names it", async () => {
+      const bundle = await bundleFor(VK_POLICY_ALLOWLIST_ID);
+
+      const dispatchIds = bundle.providers.map((provider) => provider.id);
+      // The allowlist named MP_ID and the policy-omitted provider; only MP_ID
+      // survives, because the routing policy keeps the omitted provider out of
+      // dispatch regardless of the allowlist. The allowlist narrows within the
+      // policy's set, it cannot widen past it.
+      expect(dispatchIds).toContain(MP_ID);
+      expect(dispatchIds).not.toContain(MP_POLICY_OMITTED_ID);
+      expect(bundle.fallback.chain).not.toContain(MP_POLICY_OMITTED_ID);
+    });
+
+    /** @scenario "The bundle names why each undispatchable provider was dropped" */
+    it("names why each undispatchable provider was dropped, so the gateway can say the reason", async () => {
+      const bundle = await bundleFor(VK_POLICY_ALLOWLIST_ID);
+
+      // Routing dropped the policy-omitted provider: scope-reachable and
+      // allowed, but not in the policy's own list.
+      expect(bundle.routing_excluded_providers).toEqual([
+        { id: MP_POLICY_OMITTED_ID, type: "openai" },
+      ]);
+      // Provider access dropped every scope-reachable dispatchable provider
+      // the allowlist leaves out. The non-dispatchable safety provider is not
+      // scope-reachable for dispatch, so it is in neither list.
+      expect(new Set(bundle.access_excluded_providers.map((provider) => provider.id))).toEqual(
+        new Set([
+          MP_CUSTOM_ID,
+          MP_OPENAI_BASE_ID,
+          MP_ANTHROPIC_BASE_ID,
+          MP_ANTHROPIC_PLAIN_ID,
+          MP_ANTHROPIC_KEYLESS_ID,
+        ]),
+      );
+      expect(bundle.access_excluded_providers.map((provider) => provider.id)).not.toContain(
+        MP_SAFETY_ID,
+      );
+      expect(bundle.routing_policy_name).toBe(`mat-rp-${suffix}`);
+    });
+  });
+
+  describe("when the ClickHouse spend read does not answer", () => {
+    const BUDGET_ID = `bdg-mat-slow-${suffix}`;
+
+    beforeAll(async () => {
+      await prisma.gatewayBudget.create({
+        data: {
+          id: BUDGET_ID,
+          name: `Slow spend ${suffix}`,
+          organizationId: ORG_ID,
+          scopeType: "ORGANIZATION",
+          scopeId: ORG_ID,
+          window: "MONTH",
+          limitUsd: "100.00",
+          spentUsd: "12.34",
+          onBreach: "BLOCK",
+          createdById: USER_ID,
+          resetsAt: toDate(nowInstant().add({ milliseconds: 30 * 24 * 60 * 60 * 1000 })),
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.gatewayBudget.deleteMany({ where: { id: BUDGET_ID } });
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend even when the read ignores its signal", async () => {
+      const ignoresSignal = createApiFixture<GatewayBudgetSpend>({
+        getSpendForBudgetsAcrossTenantsUntil: () => new Promise(() => undefined),
+      });
+      const startedAt = nowInstant().epochMilliseconds;
+
+      const bundle = await bundleFor(VK_NO_RP_ID, ignoresSignal);
+
+      expect(nowInstant().epochMilliseconds - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+    });
+
+    /** @scenario "A slow spend read does not hold up the key's config" */
+    it("ships the stored spend within the deadline and cancels the read", async () => {
+      let readSignal: AbortSignal | undefined;
+      const hangingSpendRead = createApiFixture<GatewayBudgetSpend>({
+        getSpendForBudgetsAcrossTenantsUntil: ({ signal }) =>
+          new Promise((_resolve, reject) => {
+            readSignal = signal;
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          }),
+      });
+      const startedAt = nowInstant().epochMilliseconds;
+
+      const bundle = await bundleFor(VK_NO_RP_ID, hangingSpendRead);
+
+      expect(nowInstant().epochMilliseconds - startedAt).toBeLessThan(
+        CONFIG_SPEND_READ_TIMEOUT_MS + 3_000,
+      );
+      const budget = bundle.budgets.find((b) => b.id === BUDGET_ID);
+      expect(budget?.spent_micro_usd).toBe(12_340_000);
+      expect(readSignal?.aborted).toBe(true);
+    });
+  });
+});

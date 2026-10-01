@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Run is the migrationorder CLI: it checks every migration set against the
@@ -18,11 +19,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 	baseRef := flags.String("base", "origin/main", "ref to check the migrations against")
 	root := flags.String("root", ".", "repository root")
 	asJSON := flags.Bool("json", false, "write the findings to stdout as JSON and always exit 0")
+	var released releasedRefs
+	flags.Var(&released, "released", "a release line whose migrations count as history (repeatable)")
 	if err := flags.Parse(args); err != nil {
 		return 2
 	}
 
-	inputs, err := Repo{Root: *root}.Inputs(context.Background(), *baseRef)
+	inputs, err := Repo{Root: *root}.Inputs(context.Background(), *baseRef, released...)
 	if err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
@@ -56,4 +59,14 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 	return 1
+}
+
+// releasedRefs collects every -released flag.
+type releasedRefs []string
+
+func (r *releasedRefs) String() string { return strings.Join(*r, ",") }
+
+func (r *releasedRefs) Set(value string) error {
+	*r = append(*r, value)
+	return nil
 }

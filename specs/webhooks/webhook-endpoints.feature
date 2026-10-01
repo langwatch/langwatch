@@ -1,10 +1,12 @@
 Feature: Webhook endpoints, signed outbound event delivery
   Stripe-shaped webhook platform: an organization registers endpoints with
   per-endpoint event subscriptions, and the platform delivers signed,
-  batched, versioned envelopes with a multi-day retry ladder, a visible
+  batched, versioned envelopes with a day-long retry ladder, a visible
   per-attempt delivery log carrying the receiver's own status codes, and
   automatic disabling of endpoints that fail for three days straight.
-  Delivery is push over a persisted event log, never the only copy of it.
+  Delivery is push over a persisted event log, never the only copy of it,
+  and a batch that exhausts its retries is parked for the operator, never
+  deleted.
 
   Background:
     Given an organization on an enterprise plan with webhook endpoints
@@ -259,6 +261,26 @@ Feature: Webhook endpoints, signed outbound event delivery
       # Messages already planned against the old transport are in flight in
       # the outbox.
 
+  Rule: A test fire reaches the receiver and reports its answer
+
+    # The API process sends a test fire itself, through the same egress and
+    # destination the delivery process manager uses, as main does.
+
+    @unit
+    Scenario: A test fire from the API process dispatches through the delivery egress
+      Given the API process
+      When an endpoint's test fire is requested
+      Then the fire goes through the delivery egress, marked as a test
+      And the attempt lands in the endpoint's delivery log
+
+    @unit
+    Scenario: A test fire the receiver refuses answers with the receiver's status and body
+      Given a receiver that answers the test fire with HTTP 405
+      When the test fire is requested over the REST API
+      Then data.delivered is false
+      And data.response_status is 405
+      And data.response_body carries the receiver's answer
+
   Rule: Deliveries are signed and attributable
 
     @unit
@@ -306,11 +328,24 @@ Feature: Webhook endpoints, signed outbound event delivery
 
   Rule: Retries follow the Stripe ladder and respect the receiver
 
+    # A day, not three: retrying is only worth what a receiver's outage costs
+    # to ride out, and past that the batch is better parked where an operator
+    # can see it and push it through. Parked is not dropped — the batch stays
+    # until it delivers or an operator discards it.
     @unit
-    Scenario: The retry ladder holds its last attempt inside seventy two hours
+    Scenario: The retry ladder holds its last attempt inside one day
       Given the ladder delays and the send attempt budget
-      Then the cumulative schedule stays within seventy two hours of the first failure
-      And the cadence settles at twelve hours
+      Then the cumulative schedule stays within one day of the first failure
+      And the cadence settles at four hours
+
+    # Everything that failed together would otherwise retry together, and a
+    # cohort that collided once re-collides at every rung.
+    @unit
+    Scenario: Retry delays spread so a failed cohort comes apart
+      Given a ladder step
+      When many retries are scheduled from it
+      Then their delays spread around the step instead of landing on one instant
+      And every delay stays within a fifth of the step either side
 
     @unit
     Scenario: A permanent receiver error retires the batch immediately
@@ -349,12 +384,30 @@ Feature: Webhook endpoints, signed outbound event delivery
       When a delivery attempt succeeds
       Then the streak is cleared
 
+    # Disabled and deleted are different promises. Deleted means the customer
+    # asked us to stop, so the queue drains without posting. Disabled means
+    # the receiver is expected back, so nothing the customer queued is lost
+    # to the pause: batches wait on the ladder, park when it runs out, and
+    # re-enabling revives them.
     @integration
-    Scenario: A disabled endpoint drains its queue without posting
+    Scenario: A disabled endpoint keeps its queued batches unsent
       Given a disabled endpoint with a pending batch
       When the batch dispatches
       Then nothing is sent to the receiver
+      And the batch stays queued for a later attempt
+
+    @integration
+    Scenario: A deleted endpoint discards its queued batches
+      Given a deleted endpoint with a pending batch
+      When the batch dispatches
+      Then nothing is sent to the receiver
       And the batch completes so the queue drains
+
+    @integration
+    Scenario: Re-enabling an endpoint revives its parked batches
+      Given a disabled endpoint whose batch exhausted its retries
+      When the endpoint is re-enabled
+      Then the parked batch is pending again with a fresh attempt budget
 
     @integration
     Scenario: Dead lettered batches can be requeued
@@ -376,6 +429,17 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the batch size, batch delay, and in-flight controls show their defaults
       And saving sends the edited values
 
+    # Appends have no order to preserve — two envelopes arriving together are
+    # equally valid in either sequence — so a racing append must never fail
+    # for having raced. Losing that race once cost the envelope a full
+    # delivery attempt and, eleven collisions later, the envelope itself.
+    @integration
+    Scenario: Concurrent envelopes for one endpoint all land
+      Given many spend events arriving together for one endpoint
+      When their appends race on the endpoint's stream
+      Then every envelope lands exactly once
+      And none of them fails for having raced
+
     @integration
     Scenario: Envelopes coalesce into one signed batch up to the endpoint's size
       Given an endpoint with a coalescing delay holding partial batches
@@ -388,6 +452,37 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given buffered envelopes fewer than the batch size
       When the coalescing deadline passes
       Then the wake flushes them as one batch
+
+    @unit
+    Scenario: The delivery process manager flushes an endpoint stream on its wake
+      Given an active endpoint with a coalescing delay
+      And a confirmed spend step buffered in the endpoint's stream
+      When the stream's wake fires
+      Then the buffered envelope is delivered to the endpoint once
+
+    @unit
+    Scenario: A memory-tier worker delivers a completed gateway request to its endpoint
+      Given a worker installed over memory stores with one active HTTP endpoint
+      When gateway hands over a request's admitted and confirmed spend steps
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: A memory-tier replay is delivered through the worker's endpoint stream
+      Given a memory-tier worker with one active HTTP endpoint and an emitted envelope
+      When the envelope is replayed to the endpoint
+      Then the endpoint's delivery log records one attempt
+
+    @unit
+    Scenario: Endpoint health reads the worker's pending endpoint stream
+      Given a memory-tier worker with an endpoint that holds envelopes for a minute
+      When a completed gateway request is still coalescing in its endpoint stream
+      Then the endpoint's health reports an undelivered envelope
+
+    @unit
+    Scenario: An operator wake on the delivery maintenance claim leaves it as it was
+      Given the hourly maintenance claim stored under the delivery process
+      When an operator wakes it from the ops console
+      Then the claim is read and committed unchanged
 
     @integration
     Scenario: Under backpressure batches grow toward the size cap
@@ -426,6 +521,14 @@ Feature: Webhook endpoints, signed outbound event delivery
       When it calls the webhook endpoints api
       Then the request is rejected as an enterprise feature
 
+    @integration
+    Scenario: The plan gate answers on a deployment with no Enterprise governance application
+      Given a deployment that composed no Enterprise governance application
+      And an organization whose plan lacks webhook endpoints
+      When it calls the webhook endpoints api
+      Then the request is refused as forbidden, naming the plan
+      So a knowable refusal is never reported as an unknown platform failure
+
   Rule: The emitted events log is the primitive, webhooks ride it
 
     @integration
@@ -441,6 +544,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       Then the settled record appears as its own event type with its reason
       And the admitted record never appears
       And filtering by an unknown type yields an empty page
+
+    @unit
+    Scenario: Every emitted-events statement names exactly one tenant
+      Given an organization with two projects
+      When its events log is listed or an event is read by id
+      Then each project is read by its own statement bound to that project's tenant
+      And no statement reads several tenants at once
+
+    @integration
+    Scenario: The events listing reads each of the organization's projects under its own tenant
+      Given spend records in two of the organization's projects
+      When the events log is read and paged, and one event is read by id
+      Then each project is read by a statement scoped to that project's tenant alone
+      And the pages merge newest first across both projects with a continuation cursor
+      And an event is found only when its project is among the organization's projects
 
     @integration
     Scenario: Each endpoint retries independently on its own ladder
@@ -497,7 +615,7 @@ Feature: Webhook endpoints, signed outbound event delivery
       When post-debit detection runs
       Then only the above-threshold bucket appends a threshold crossing
       And only the past-limit bucket appends a breach
-      And a detection failure never fails the debit that triggered it
+      And a detection failure re-drives the debit, which writes no row twice
 
     @unit
     Scenario: Governance events only reach endpoints subscribed to their types
@@ -535,6 +653,13 @@ Feature: Webhook endpoints, signed outbound event delivery
     Scenario: No Load more when the page is the last
       Given a deliveries page with no next cursor
       Then no load-more control is shown
+
+    @unit
+    Scenario: The delivery-log prune is admitted by the tenancy guard
+      Given the delivery log behind the production tenancy guard
+      When the hourly maintenance prunes deliveries older than 30 days
+      Then it runs the one system-owned retention sweep across every tenant
+      And the guard does not refuse it as a cross-tenant delete
 
     @unit
     Scenario: Webhook management is an organization-scoped permission

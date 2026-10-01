@@ -1,0 +1,405 @@
+import { createHmac } from "node:crypto";
+
+/**
+ * @vitest-environment node
+ * The installation flow's routes and their `/github-langy/*` aliases.
+ * @see specs/integrations/github-connection.feature
+ */
+import { createRestRuntime, HttpError, UnauthorizedError } from "@langwatch/api/rest";
+import type {
+  GithubApi,
+  GithubAppConfig,
+  GithubInstallStatePayload,
+} from "@langwatch/github-contract";
+import { HandledError } from "@langwatch/handled-error";
+import type { ErrorHandler } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
+import { GithubInstallStateService } from "../../services/github-install-state.service.ts";
+import { githubInstallRest, type GithubInstallApi } from "../github-install.rest.ts";
+
+const SIGNING_KEY = "x".repeat(64);
+const WEBHOOK_SECRET = "whsecret";
+const INSTALL_URL = "https://github.com/apps/langwatch/installations/new";
+
+const state = GithubInstallStateService.create({
+  signingKey: SIGNING_KEY,
+  nonces: unansweredRedisRepositories().installNonces,
+});
+
+const appConfig: GithubAppConfig = {
+  appSlug: "langwatch",
+  webhookSecret: WEBHOOK_SECRET,
+  configured: true,
+};
+
+function signedState(overrides: Partial<GithubInstallStatePayload> = {}): string {
+  return state.sign({
+    userId: "user_1",
+    organizationId: "org_1",
+    mode: "redirect",
+    returnTo: "/settings/integrations#github",
+    issuedAt: Date.now(),
+    nonce: "nonce_1",
+    nonceRegistered: false,
+    ...overrides,
+  });
+}
+
+function githubStub(overrides: Partial<GithubApi>): GithubApi {
+  return overrides as GithubApi;
+}
+
+/** The runtime writes route-door refusals before a handler can enter. */
+const renderError: ErrorHandler = (error, c) => {
+  if (HandledError.isHandled(error)) {
+    return c.json({ error: error.code }, (error.httpStatus ?? 500) as ContentfulStatusCode);
+  }
+  if (error instanceof HttpError) return c.json({ error: error.error }, error.status);
+
+  return c.json({ error: String(error) }, 500);
+};
+
+function mount(
+  options: {
+    member?: boolean;
+    canManage?: boolean;
+    configured?: boolean;
+    session?: { user: { id: string } } | null;
+  } = {},
+) {
+  const recorded: { installationId: string; organizationId: string }[] = [];
+  const webhookEvents: { action: string; installationId: string }[] = [];
+  const memberChecks: { userId: string; organizationId: string }[] = [];
+  const audits: { action: string }[] = [];
+  const sessionReads = { count: 0 };
+  const githubReads = { count: 0 };
+
+  const service: Partial<GithubApi> = {
+    getAppConfig: () => ({ ...appConfig, configured: options.configured ?? true }),
+    getAppInstallUrl: () => INSTALL_URL,
+    getInstallStateTtlMs: () => state.getTtlMs(),
+    registerInstallNonce: async () => false,
+    consumeInstallNonce: async () => "consumed",
+    signInstallState: (payload) => state.sign(payload),
+    parseInstallState: (token) => state.parse(token),
+    popupResponseHtml: (login) => `<p>${login}</p>`,
+    popupErrorHtml: (message) => `<p>${message}</p>`,
+    isOrganizationMember: async ({ userId, organizationId }) => {
+      memberChecks.push({ userId, organizationId });
+
+      return options.member ?? true;
+    },
+    recordInstallation: async (input) => {
+      recorded.push({
+        installationId: input.installationId,
+        organizationId: input.organizationId,
+      });
+
+      return { accountLogin: "acme" };
+    },
+    handleWebhookEvent: async (input) => {
+      webhookEvents.push({ action: input.action, installationId: input.installationId });
+    },
+    parsePullRequestEvent: () => null,
+    applyPullRequestEvent: async () => true,
+    applyWebhookPayload: async ({ payload, eventType }) => {
+      if (eventType !== "installation" && eventType !== "installation_repositories") return;
+
+      const action = typeof payload.action === "string" ? payload.action : undefined;
+      const installation = payload.installation;
+      const id =
+        typeof installation === "object" &&
+        installation !== null &&
+        "id" in installation &&
+        typeof installation.id === "number"
+          ? installation.id
+          : undefined;
+      if (action && id !== undefined) {
+        webhookEvents.push({ action, installationId: String(id) });
+      }
+    },
+  };
+
+  const installation: GithubInstallApi = {
+    github: () => {
+      githubReads.count += 1;
+
+      return githubStub(service);
+    },
+    isSignedInAs: async ({ userId }) => {
+      sessionReads.count += 1;
+      const session = options.session === undefined ? { user: { id: "user_1" } } : options.session;
+
+      return session?.user.id === userId;
+    },
+    canManageOrganization: async () => options.canManage ?? true,
+    recordAudit: async (entry) => {
+      audits.push({ action: entry.action });
+    },
+    backfillPullRequestMappings: async () => {},
+  };
+
+  const runtime = createRestRuntime({
+    identity: {
+      identify: () => {
+        const session =
+          options.session === undefined ? { user: { id: "user_1" } } : options.session;
+        if (!session) throw new UnauthorizedError("Not authenticated");
+
+        return {
+          actor: { type: "user" as const, id: session.user.id },
+          scope: null,
+        };
+      },
+      authenticate: () => {
+        const session =
+          options.session === undefined ? { user: { id: "user_1" } } : options.session;
+        if (!session) throw new UnauthorizedError("Not authenticated");
+
+        return {
+          actor: { type: "user" as const, id: session.user.id },
+          scope: { tier: "organization" as const, id: "org_1" },
+        };
+      },
+      authorize: () => ({ permitted: options.canManage ?? true, organizationRole: null }),
+    },
+  });
+
+  const app = runtime.mount(githubInstallRest.router(), {
+    app: () => installation,
+    onError: renderError,
+  });
+
+  return {
+    recorded,
+    webhookEvents,
+    memberChecks,
+    audits,
+    sessionReads,
+    githubReads,
+    install: (query: string) =>
+      app.fetch(new Request(`http://api.test/api/github/install?${query}`)),
+    setup: (path: string, query: string) =>
+      app.fetch(new Request(`http://api.test/api${path}?${query}`)),
+    webhook: (
+      path: string,
+      body: unknown,
+      webhookOptions: { signature?: string; event?: string } = {},
+    ) => {
+      const raw = JSON.stringify(body);
+      const signature =
+        webhookOptions.signature ??
+        `sha256=${createHmac("sha256", WEBHOOK_SECRET).update(raw).digest("hex")}`;
+
+      return app.fetch(
+        new Request(`http://api.test/api${path}`, {
+          method: "POST",
+          body: raw,
+          headers: {
+            "content-type": "application/json",
+            "x-github-event": webhookOptions.event ?? "installation_repositories",
+            "x-hub-signature-256": signature,
+          },
+        }),
+      );
+    },
+  };
+}
+
+describe("given the declared installation family", () => {
+  it("answers at exactly the addresses the App registrations point at", () => {
+    const declaration = githubInstallRest.router();
+
+    expect(
+      declaration.routes.map((route) => `${route.method.toUpperCase()} ${route.path}`),
+    ).toEqual([
+      "GET /api/github/install",
+      "GET /api/github/setup",
+      "POST /api/github/webhook",
+      "GET /api/github-langy/setup",
+      "POST /api/github-langy/webhook",
+    ]);
+    expect(declaration.addressing).toBe("literal");
+  });
+
+  it("declares the install permission and leaves callback protocols public", () => {
+    const declaration = githubInstallRest.router();
+
+    expect(declaration.credential).toBe("browser");
+    expect(declaration.routes.map((route) => route.access?.kind)).toEqual([
+      undefined,
+      "public",
+      "public",
+      "public",
+      "public",
+    ]);
+    expect(
+      declaration.routes.filter((route) => route.rawBody).map((route) => route.operation),
+    ).toEqual(["receiveGithubWebhook", "receiveGithubWebhookOnLegacyPath"]);
+  });
+});
+
+describe("given the GitHub installation routes", () => {
+  describe("when an organization manager starts an installation", () => {
+    let api: ReturnType<typeof mount>;
+    let response: Response;
+
+    beforeEach(async () => {
+      api = mount();
+      response = await api.install("organizationId=org_1");
+    });
+
+    /** @scenario Starting an installation redirects to GitHub with signed state */
+    it("redirects to GitHub carrying state bound to the session and organization", async () => {
+      expect(response.status).toBe(302);
+      const location = new URL(response.headers.get("location") ?? "");
+      expect(`${location.origin}${location.pathname}`).toBe(INSTALL_URL);
+      expect(state.parse(location.searchParams.get("state"))).toMatchObject({
+        userId: "user_1",
+        organizationId: "org_1",
+      });
+    });
+
+    /** @scenario Connecting is not gated by the Langy rollout */
+    it("begins the flow with no Langy capability consulted at all", async () => {
+      expect(response.status).toBe(302);
+      // Authorization is resolved by the door before the install operation begins.
+      expect(api.memberChecks).toEqual([]);
+    });
+  });
+
+  describe("when the instance registered no GitHub App", () => {
+    /**
+     * The session is an operation this handler calls, not a declared fact the
+     * runtime resolves ahead of it, so an instance that cannot start a flow
+     * answers without asking who is on the other end.
+     */
+    /** @scenario App not configured on the instance hides the feature */
+    it("answers 503 before it reads a session", async () => {
+      const api = mount({ configured: false });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(503);
+      expect(api.sessionReads.count).toBe(0);
+    });
+  });
+
+  describe("when nobody is signed in", () => {
+    /** @scenario Starting an installation requires organization management */
+    it("answers 401 rather than starting a flow with no owner", async () => {
+      const api = mount({ session: null });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(401);
+      expect(api.githubReads.count).toBe(0);
+    });
+  });
+
+  describe("when the start names no organization", () => {
+    /** @scenario Starting an installation without naming an organization is refused as invalid */
+    it("answers 422 before the installation operation can run", async () => {
+      const api = mount();
+
+      const response = await api.install("mode=popup");
+
+      expect(response.status).toBe(422);
+      expect(api.githubReads.count).toBe(0);
+    });
+  });
+
+  describe("when the caller lacks organization management", () => {
+    /** @scenario Starting an installation requires organization management */
+    it("refuses before the installation operation can run", async () => {
+      const api = mount({ canManage: false });
+
+      const response = await api.install("organizationId=org_1");
+
+      expect(response.status).toBe(403);
+      expect(api.githubReads.count).toBe(0);
+    });
+  });
+
+  describe("when GitHub redirects back to the setup callback", () => {
+    /** @scenario Completing an installation records the installation for my org */
+    it("records the installation against the organization the state names", async () => {
+      const api = mount();
+
+      const response = await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(signedState())}&installation_id=555`,
+      );
+
+      expect(response.status).toBe(302);
+      expect(api.recorded).toEqual([{ installationId: "555", organizationId: "org_1" }]);
+      expect(api.audits).toEqual([{ action: "github.connection.install" }]);
+    });
+
+    /** @scenario The setup callback on the legacy path still records */
+    it("records the same installation through the legacy github-langy path", async () => {
+      const api = mount();
+
+      const response = await api.setup(
+        "/github-langy/setup",
+        `state=${encodeURIComponent(signedState())}&installation_id=777`,
+      );
+
+      expect(response.status).toBe(302);
+      expect(api.recorded).toEqual([{ installationId: "777", organizationId: "org_1" }]);
+    });
+
+    /** @scenario Setup callback rejects a tampered or expired state */
+    it("records nothing and reports the failure when the state does not verify", async () => {
+      const api = mount();
+
+      const response = await api.setup(
+        "/github/setup",
+        `state=${encodeURIComponent(`${signedState()}tampered`)}&installation_id=555`,
+      );
+
+      expect(response.status).toBe(400);
+      expect(await response.text()).toContain("Invalid state or missing installation");
+      expect(api.recorded).toEqual([]);
+    });
+  });
+
+  describe("when GitHub delivers a webhook", () => {
+    /** @scenario The webhook on the legacy path still applies */
+    it("applies a signed installation_repositories event on the legacy path", async () => {
+      const api = mount();
+
+      const response = await api.webhook("/github-langy/webhook", {
+        action: "added",
+        installation: { id: 555 },
+      });
+
+      expect(response.status).toBe(200);
+      expect(api.webhookEvents).toEqual([{ action: "added", installationId: "555" }]);
+    });
+
+    /** @scenario Webhook rejects an unsigned or wrongly signed payload */
+    it("refuses a payload whose signature does not match and applies nothing", async () => {
+      const api = mount();
+
+      const wrong = await api.webhook(
+        "/github/webhook",
+        { action: "added", installation: { id: 555 } },
+        { signature: `sha256=${"0".repeat(64)}` },
+      );
+      expect(wrong.status).toBe(401);
+
+      const unsigned = await api.webhook(
+        "/github/webhook",
+        { action: "added", installation: { id: 555 } },
+        { signature: "" },
+      );
+      expect(unsigned.status).toBe(401);
+
+      expect(api.webhookEvents).toEqual([]);
+    });
+  });
+});

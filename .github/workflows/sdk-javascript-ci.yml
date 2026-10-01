@@ -77,22 +77,21 @@ jobs:
             # own; what has none is the seam between a socket and a handler,
             # which only a live request can exercise.
             ingest:
-              # The Hono route modules the SDK posts to, and the shared
-              # middleware under `_lib/` that the capped ones mount:
+              # The route modules the SDK posts to:
               # /api/otel/v1/{traces,logs,metrics} and /api/collector.
-              - 'platform/app/src/server/routes/**'
-              # Mounts those modules and fixes their order. A route that
-              # resolves in the router but not on the wire is a mount bug,
-              # and mount order has silently swallowed API surfaces before.
-              - 'platform/app/src/server/api-router.ts'
-              # Reads the OTLP request body for those routes and decodes it,
-              # including the byte ceiling they enforce on it.
-              - 'platform/app/src/server/otel/**'
-              # Wires the Node bridge into Hono and decides whether the
-              # process keeps its own global Request/Response. Behaviour that
-              # depends on that seam is invisible to every test that does not
-              # go over a real socket.
-              - 'platform/app/src/start.ts'
+              - 'modules/trace/process/src/transport/otlp-ingest.rest.ts'
+              - 'modules/trace/process/src/transport/collector.rest.ts'
+              # The REST runtime those routes run on, including the request
+              # body ceiling a capped declaration enforces.
+              - 'packages/api/src/rest/**'
+              # Mounts those modules and fixes their order, and wires the Node
+              # bridge into Hono. A route that resolves in the router but not
+              # on the wire is a mount bug, and mount order has silently
+              # swallowed API surfaces before.
+              - 'packages/api/src/hosting/**'
+              # Reads the OTLP request body for those routes and decodes it.
+              - 'packages/otlp/**'
+              - 'apps/api/src/main.ts'
 
   ci:
     needs: changes
@@ -113,7 +112,7 @@ jobs:
 
       - uses: ./.github/actions/setup-pnpm-node
         with:
-          install: "langwatch..."
+          install: "langwatch... @langwatch/workspace"
 
       # The "Install TypeScript Native Preview" step that used to sit here is
       # gone. It ran `pnpm install -D -w @typescript/native-preview`, and `-w`
@@ -127,11 +126,26 @@ jobs:
       # uses it: `lint` is `eslint .` and `typecheck` is `tsc --noEmit`, and
       # the SDK references neither `tsgo` nor native-preview anywhere. It was
       # installing a toolchain no step invokes.
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: sdk
+
       - name: Run lint check
         run: pnpm run lint
 
+      # `build` is `rm -rf dist && tsup` -- the type check is its own step now,
+      # because the root `pnpm build` and the Docker image also run this
+      # package's build and were paying a full SDK type check the
+      # workspace-wide `typecheck` job had already done.
+      #
+      # Build runs first: the typecheck's project references reach
+      # packages/observability, which imports this SDK through its built
+      # declarations, so a typecheck before the build cannot resolve them.
       - name: Build
-        run: pnpm run build
+        run: pnpm exec nx run langwatch:build --outputStyle=static
+
+      - name: Typecheck
+        run: pnpm run typecheck
 
       - name: Run tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
@@ -233,7 +247,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
-          version: 10.24.0
+          version: 12.6.0
 
       # Single setup-node call covers all three pnpm lockfiles used by the
       # e2e job (typescript-sdk, langwatch app, mcp-server). Calling
@@ -269,26 +283,52 @@ jobs:
       - name: Install dependencies
         run: >
           CI=true pnpm install --frozen-lockfile
-          --filter "@langwatch/web..."
+          --filter "@langwatch/platform-api..."
+          --filter "@langwatch/worker..."
+          --filter "@langwatch/ui..."
+          --filter "@langwatch/tasks..."
           --filter "langwatch..."
+          --filter "@langwatch/workspace"
+
+      - uses: ./.github/actions/nx-cache
+        with:
+          suffix: sdk-e2e
 
       - name: Build mcp-server
-        run: pnpm --filter @langwatch/mcp-server run build
+        run: pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
 
       - name: Prepare LangWatch files
-        working-directory: platform/app
-        run: pnpm start:prepare:files
+        working-directory: .
+        run: pnpm start:prepare:files && pnpm ensure:built
+
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        # The api and worker refuse to boot without a 32-byte hex encryption key,
+        # and the seed hashes the project key under it, so it comes before the seed.
+        # Generated per run: a committed hex literal reads as a leaked key to the scanner.
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
 
       - name: Setup database
-        working-directory: platform/app
+        working-directory: .
         run: pnpm prisma:migrate
 
       - name: Seed test project
-        working-directory: platform/app
+        working-directory: .
         env:
-          # Seed the credential the SDK test process receives without putting
-          # LANGWATCH_API_KEY on the platform process itself.
-          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-1234567890
+          # The e2e global setup probes the seed's DEFAULT_INGESTION_KEY, so
+          # the seed writes that key.
+          HAVEN_SEED_LANGWATCH_API_KEY: sk-lw-local-development-key
+          # The seed stores these as the organisation's OpenAI provider, which the
+          # simulator and judge of a scenario run call through nlpgo. They land in
+          # the database only, so the app and worker never inherit the gateway URL.
+          # Without the secret (forks, Dependabot) the seed skips the provider.
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_GATEWAY_VIRTUAL_KEY }}
+          OPENAI_BASE_URL: https://gateway.langwatch.ai/v1
         run: pnpm prisma:seed
 
       - name: Install goose
@@ -298,40 +338,56 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
-        working-directory: platform/app
-        run: pnpm clickhouse:migrate
+        working-directory: apps/tasks
+        run: pnpm task clickhouse-migrate
 
-      # Build the app so we can run a production server (dev mode is
-      # unreliable in CI — turbopack JIT compilation can hang under
-      # memory pressure, causing the server to become unresponsive).
-      - name: Build LangWatch app
-        working-directory: platform/app
-        run: NODE_ENV=test pnpm build
+      # Build the browser bundle so the API process serves a real SPA rather
+      # than 404ing every non-API route; the readiness probe below reads it.
+      - name: Build LangWatch browser bundle
+        working-directory: .
+        run: pnpm exec nx run workspace:build:types --outputStyle=static && pnpm exec nx run @langwatch/ui:build --outputStyle=static
+
+      # Scenario runs need the NLP engine: a worker without LANGWATCH_NLP_SERVICE
+      # composes no scenario executor and every queued run waits forever.
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+
+      - name: Build the Go service binary and the scenario child bundle
+        working-directory: .
+        run: |
+          go build -o /tmp/langwatch-service ./cmd/service
+          pnpm exec nx run @langwatch/scenario-child:build --outputStyle=static
 
       - name: Start LangWatch server and worker
-        working-directory: platform/app
+        working-directory: .
         env:
           # The workflow-global LANGWATCH_API_KEY is for the SDK under test.
-          # Platform processes refuse to boot with it set (the self-referencing
-          # ingest guard in langwatchPlatformGuard.ts), so blank it here.
+          # Pointing a LangWatch process at its own ingest is a feedback loop,
+          # so blank it here.
           LANGWATCH_API_KEY: ""
+          LANGWATCH_NLP_SERVICE: http://localhost:5561
         run: |
-          # Capture both processes' output: background-process stdout is lost
+          # Capture every process's output: background-process stdout is lost
           # once this step ends, which has already hidden one real regression
           # (a server-side 500 on the visibility poll shows up only as SDK
           # test timeouts). The failure step below tails these files.
-          NODE_ENV=production pnpm run start > /tmp/langwatch-server.log 2>&1 &
+          SERVER_ADDR=:5561 /tmp/langwatch-service nlpgo > /tmp/langwatch-nlpgo.log 2>&1 &
+          # The api listens on API_PORT (6560 by default); the SDK and the probe call 5560.
+          API_PORT=5560 NODE_ENV=production pnpm --filter @langwatch/platform-api start > /tmp/langwatch-server.log 2>&1 &
           # Start the worker process so the event-sourcing pipeline
           # consumes traces from Redis and writes them to ClickHouse
-          pnpm run start:workers > /tmp/langwatch-workers.log 2>&1 &
+          pnpm --filter @langwatch/worker start > /tmp/langwatch-workers.log 2>&1 &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
-          echo "✅ LangWatch server is ready"
+          timeout 30 bash -c 'until curl -sf http://localhost:5561/healthz >/dev/null; do sleep 1; done'
+          echo "✅ LangWatch server and nlpgo are ready"
 
       # Already installed above alongside the app; nothing further to fetch.
 
       - name: Build SDK
-        run: pnpm run build
+        run: pnpm exec nx run langwatch:build --outputStyle=static
 
       - name: Run e2e tests
         # Fork and Dependabot PRs don't receive repository secrets, so a
@@ -343,7 +399,7 @@ jobs:
           && (github.actor != 'dependabot[bot]'
            || github.event_name == 'pull_request_target')
         env:
-          LANGWATCH_API_KEY: sk-lw-1234567890
+          LANGWATCH_API_KEY: sk-lw-local-development-key
           # OpenAI traffic rides the LangWatch AI Gateway (virtual key +
           # gateway base URL). Step-scoped on purpose: the LangWatch app
           # booted above must not inherit a gateway base URL.
@@ -357,10 +413,21 @@ jobs:
       - name: Dump server and worker logs on failure
         if: failure()
         run: |
+          # The tails alone are mostly ClickHouse backup_log polling, so first
+          # pull out the warnings, errors and the scenario/suite/agent path.
+          for name in server workers nlpgo; do
+            log="/tmp/langwatch-$name.log"
+            echo "===== langwatch $name: errors, warnings, scenario/simulation/suite/agent lines ====="
+            grep -v -i "backup_log" "$log" \
+              | grep -i -E '"level":"(warn|error|fatal)"|\[error\]|scenario|simulation|suite|agent' \
+              | tail -400 || true
+          done
           echo "===== langwatch server (last 300 lines) ====="
           tail -300 /tmp/langwatch-server.log || true
           echo "===== langwatch workers (last 300 lines) ====="
           tail -300 /tmp/langwatch-workers.log || true
+          echo "===== nlpgo (last 100 lines) ====="
+          tail -100 /tmp/langwatch-nlpgo.log || true
 
   sdk-javascript-complete:
     needs: [changes, ci, e2e]

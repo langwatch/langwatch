@@ -1,0 +1,243 @@
+# visualdiff — what `visualdiff run` renders on both refs.
+#
+# Extending the coverage is editing this file: add a path under `routes`, or a
+# flow under `flows` whose steps name actions the runner implements
+# (tools/visualdiff/runner/src/flows). `{slug}` is the project slug the run
+# signs in as. See tools/visualdiff/README.md.
+
+viewport: 1440x900
+
+settle:
+  # The runner waits for its in-flight requests to finish and stay finished for
+  # quietMillis, and gives up at deadlineMillis rather than hanging on a page
+  # that polls forever. A request older than three seconds counts as a poll; the
+  # skeleton wait after it still keeps a screen whose data is late from a shot.
+  quietMillis: 500
+  deadlineMillis: 8000
+
+# Pages each side opens in one signed-in session, the larger of the two, used
+# only when the machine cannot be read: -pages (half the CPUs) decides it.
+concurrency:
+  routes: 6
+  flows: 6
+
+# After a run, the screens its pull request shows, in one comment edited in
+# place: these key pages, then findings and changes, largest first, one per
+# area before any repeats; never a blank or failed capture. Each is scaled to
+# `width` and cut at `maxHeight`. -no-publish skips it.
+publish:
+  screens: 12
+  width: 1000
+  maxHeight: 2000
+  keyPages:
+    - /{slug}
+    - /{slug}/traces
+    - /{slug}/traces/{trace}
+    - /settings/members
+    - /me
+
+# Ids the run seeds deterministically (seed.go), filling a route's {name}.
+# team and actor are the seeded identity's, the same on main and the branch.
+# {dataset} {experiment} {monitor} {graph} {virtualKey} {budget} need no line:
+# each stack's seed fills them with its own ids (seed_entities.go).
+fixtures:
+  trace: trace_visualdiff_0
+  openTab: spans
+  span: trace_visualdiff_0_llm
+  team: local-dev-team
+  actor: admin@mail.langwatch.localhost
+
+# Every route either ref declares is rendered above or excluded here with a
+# reason; anything else is an `uncovered` finding (coverage.go).
+coverage:
+  basePages: platform/app/src/pages
+  excluded:
+    - route: /dev/error-test
+      reason: a development page that throws on purpose to exercise the error boundary
+    - route: /{slug}/studio/{workflow}
+      reason: no REST route creates a workflow on main (/api/workflows lists, reads, patches, deletes and evaluates one; /api/agents only links an existing workflowId), so neither side has one to open
+    - route: /{slug}/chat/{workflow}
+      reason: needs a published workflow, which no REST route creates on main (see /{slug}/studio/{workflow})
+    - route: /share/{id}
+      reason: a share token is minted only by the signed-in share tRPC mutation; no REST route creates one on main
+    - route: /ops/projections/{runId}
+      reason: a run id exists only once an operator starts a projection replay, which rebuilds the stack's projections under the capture
+    - route: /governance/inventory/{id}
+      reason: declared by the candidate only, and the ingestion source it opens is created only through the governance tRPC; no REST route creates one on either ref
+
+routes:
+  # The landing first, alone, right after sign-in: it follows the product the
+  # session last visited, which concurrent pages would otherwise race to set.
+  - /
+  - /{slug}
+  - /{slug}/agents
+  - /{slug}/agent-testing
+  - /{slug}/analytics
+  - /{slug}/analytics/custom
+  - /{slug}/analytics/evaluations
+  - /{slug}/analytics/metrics
+  - /{slug}/analytics/reports
+  - /{slug}/analytics/topics
+  - /{slug}/analytics/users
+  - /{slug}/annotations
+  - /{slug}/annotations/all
+  - /{slug}/annotations/me
+  - /{slug}/annotations/my-queue
+  - /{slug}/automations
+  - /{slug}/automations/activity
+  - /{slug}/automations/alerts
+  - /{slug}/automations/automations
+  - /{slug}/automations/schedules
+  - /{slug}/datasets
+  - /{slug}/evaluations
+  - /{slug}/evaluations/new
+  - /{slug}/evaluations/new/choose
+  - /{slug}/evaluations/wizard
+  - /{slug}/evaluators
+  - /{slug}/experiments
+  - /{slug}/experiments/workbench
+  - /{slug}/messages
+  - /{slug}/online-evaluations
+  - /{slug}/prompts
+  - /{slug}/pull-requests
+  - /{slug}/sessions
+  - /{slug}/setup
+  - /{slug}/simulations
+  - /{slug}/simulations/scenarios
+  - /{slug}/traces
+  - /{slug}/workflows
+  - /me
+  - /me/configure
+  - /me/devices
+  - /me/sessions
+  - /me/pull-requests
+  - /me/budget/request
+  - /settings
+  - /settings/annotation-scores
+  - /settings/api-keys
+  - /settings/audit-log
+  - /settings/authentication
+  - /settings/data-privacy
+  - /settings/data-retention
+  - /settings/email-suppressions
+  - /settings/gateway
+  - /settings/governance
+  - /settings/groups
+  - /settings/integrations
+  - /settings/license
+  - /settings/members
+  - /settings/model-costs
+  - /settings/model-providers
+  - /settings/plans
+  - /settings/role-bindings
+  - /settings/roles
+  - /settings/routing-policies
+  - /settings/scim
+  - /settings/secrets
+  - /settings/subscription
+  - /settings/teams
+  - /settings/topic-clustering
+  - /settings/usage
+  - /gateway
+  - /gateway/billing-events
+  - /gateway/budgets
+  - /gateway/cache-rules
+  - /gateway/guardrails
+  - /gateway/routing-policies
+  - /gateway/usage
+  - /gateway/virtual-keys
+  - /gateway/webhooks
+  - /governance
+  - /governance/agents
+  - /governance/analytics
+  - /governance/anomaly-rules
+  - /governance/billed
+  - /governance/catalog
+  - /governance/cost-centers
+  - /governance/costs
+  - /governance/departments
+  - /governance/ingestion-sources
+  - /governance/insights
+  - /governance/inventory
+  - /governance/people
+  - /governance/signals
+  - /governance/teams
+  - /governance/tool-catalog
+  - /governance/users
+  - /ops
+  - /ops/cloud
+  - /ops/cloud/subscriptions
+  - /ops/cloud/licenses
+  - /ops/cloud/self-hosted-instances
+  - /ops/cloud/bug-reports
+  - /ops/users
+  - /ops/organizations
+  - /ops/projects
+  - /ops/sso-connections
+  - /ops/identity-lookup
+  - /ops/directory-sync
+  - /ops/blobs
+  - /ops/dejaview
+  - /ops/event-sourcing
+  - /ops/event-sourcing/dead-letters
+  - /ops/event-sourcing/processes
+  - /ops/event-sourcing/projections
+  - /ops/event-sourcing/schedules
+  - /ops/event-sourcing/subscribers
+  - /ops/feature-flags
+  - /ops/foundry
+  - /ops/migrations
+  - /ops/projections
+  - /ops/queues
+  - /ops/scheduler
+  - /auth/signin
+  - /auth/signup
+  - /auth/forgot-password
+  - /auth/error
+  - /auth/verify-email
+  - /auth/reset-password
+
+  # Added with coverage (coverage.go): the pages main and the branch declare
+  # that the list above did not render. Token- and callback-driven pages
+  # render their no-token state, which is still one screen to compare.
+  - /admin
+  - /not-found
+  - /settings/not-found
+  - /{slug}/not-found
+  - /@project/traces
+  - /{slug}/traces/{trace}
+  - /{slug}/messages/{trace}
+  - /{slug}/messages/{trace}/{openTab}
+  - /{slug}/messages/{trace}/{openTab}/{span}
+  - /{slug}/datasets/{dataset}
+  - /{slug}/experiments/workbench/{experiment}
+  - /{slug}/evaluations/wizard/{experiment}
+  - /{slug}/evaluations/{monitor}/edit
+  - /{slug}/evaluations/{monitor}/edit/choose
+  - /{slug}/analytics/custom/{graph}
+  - /gateway/virtual-keys/{virtualKey}
+  - /gateway/budgets/{budget}
+  - /settings/teams/{team}
+  - /onboarding/{team}/project
+  - /governance/teams/{team}
+  - /governance/users/{actor}
+  - /onboarding
+  - /onboarding/product
+  - /onboarding/welcome
+  - /settings/access
+  - /settings/authentication/connectors
+  - /settings/authentication/provider
+  - /settings/checkup
+  - /settings/connect
+  - /settings/directory
+  - /settings/profile
+  - /settings/security
+  - /auth/join
+  - /auth/sso-test-complete
+  - /authorize
+  - /mcp/authorize
+  - /cli/auth
+  - /invite/accept
+  - /unsubscribe
+
+# Flows live in flows/*.yaml (config.go merges them); none belong here.

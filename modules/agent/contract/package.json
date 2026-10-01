@@ -1,0 +1,43 @@
+{
+  "name": "@langwatch/agent-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Agents domain values, schemas, commands, queries, and capabilities.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./code-config": {
+      "types": "./dist/code-config.d.ts",
+      "default": "./src/code-config.ts"
+    },
+    "./http-test": {
+      "types": "./dist/http-test.d.ts",
+      "default": "./src/http-test.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

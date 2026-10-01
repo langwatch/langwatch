@@ -7,11 +7,15 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // The `haven logs` command: every service's captured output, from any
@@ -34,6 +38,43 @@ const logsTailLines = 200
 // the alternative was reading a file nothing was ever going to display.
 const logReadCapBytes = 8 << 20
 
+// apiLaneApps are the applications the one `api` lane hosts in a single Node
+// process (ADR-004, amendment 2026-09-07). They share a capture file, so each is
+// selected by which application wrote the line rather than by a file of its own
+// — which is why `haven logs worker` works with no worker.log on disk.
+var apiLaneApps = []string{"api", "worker"}
+
+// apiLaneFiles are the capture basenames that lane has been written under, the
+// current spelling first. An older capture is still on disk under the name the
+// lane had when it was written, and `haven logs worker` has to find it there.
+var apiLaneFiles = []string{"api", "backend"}
+
+// apiLaneFile is the capture this stack's api lane actually wrote, or "" when
+// it has none yet.
+func apiLaneFile(available map[string]bool) string {
+	for _, name := range apiLaneFiles {
+		if available[name] {
+			return name
+		}
+	}
+	return ""
+}
+
+// goLaneSimulators are the simulators a go.work checkout's sims lane hosts
+// (cmd/service/combined_dev.go), or its go lane on an older haven. They have
+// no capture of their own, so `haven logs idp` reads that lane's lines.
+var goLaneSimulators = []string{"idp", "mail", "storage", "voice", "llm", "analytics"}
+
+// logSource is one selected view: a capture file, the CLI name its lines are
+// labeled with, and — for one application of a shared lane — the application a
+// line must belong to. viewer.RouteLine decides that, so this command and the
+// dashboard's tabs split the lane by the same rule.
+type logSource struct {
+	file  string
+	label string
+	app   string
+}
+
 // cliToFileService maps a CLI service name to its capture-file basename.
 func cliToFileService(name string) string {
 	if name == "langy" {
@@ -52,7 +93,16 @@ func fileToCLIService(name string) string {
 // logServiceColors mirrors the supervisor's lane palette so a service reads
 // the same in `haven logs` as it did live.
 var logServiceColors = map[string]string{
-	"app": "34", "api": "35", "gateway": "33", "nlp": "36", "langy": "92", "workers": "32",
+	"ui": "34", "api": "32", "go": "33", "sims": "96", "langy": "92",
+	// The worker half, in the color of the lane that hosts it.
+	"worker": "32",
+	// The single Node lane of a monolith checkout, in the ui lane's color:
+	// it is the same half of the stack, in one process instead of two.
+	"app":           "34",
+	"design-system": "96", "mail-room": "95", "idp": "92", "mail": "94", "storage": "36", "voice": "93", "llm": "35", "analytics": "33",
+	// Earlier lane names. A log file written before the local topology changed
+	// still reads in its own color rather than falling to plain text.
+	"backend": "32", "workers": "32", "gateway": "33", "nlp": "36",
 }
 
 func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
@@ -75,7 +125,7 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		// home and prints whatever *.log files it finds there.
 		return fmt.Errorf("--stack %q is not a valid stack slug", slug)
 	}
-	dir := filepath.Join(havenHome(), "logs", slug)
+	dir := d.orch.LogDir(slug)
 
 	var since time.Time
 	if v := inv.value("--since"); v != "" {
@@ -106,8 +156,9 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		// rather than silently shown a shorter history than they asked for.
 		fmt.Fprintf(os.Stderr, "(reading the last %d MiB of each capture — older history elided)\n", logReadCapBytes>>20)
 	}
+	mode := renderModeFrom(inv)
 	for _, l := range lines {
-		printLogLine(l, d.isAgent)
+		printLogLine(l, mode, d.isAgent)
 	}
 	if !inv.has("--tail") {
 		if len(lines) == 0 {
@@ -115,37 +166,86 @@ func runLogsCmd(ctx context.Context, d deps, inv invocation) error {
 		}
 		return nil
 	}
-	return followLogs(ctx, dir, inv.args, offsets, since, level, d.isAgent)
+	follow := &follower{
+		dir: dir, sources: services, all: len(inv.args) == 0,
+		since: since, level: level, mode: mode, plain: d.isAgent,
+		state: followState{offsets: offsets, tailApp: map[string]string{}},
+	}
+	return follow.run(ctx)
 }
 
 // selectLogServices resolves which capture files to read: the named services,
 // or every one present. Naming a service that has no capture yet is an error
 // listing what exists — not silence.
-func selectLogServices(dir string, args []string) ([]string, error) {
+func selectLogServices(dir string, args []string) ([]logSource, error) {
 	available := capturedServices(dir)
-	if len(args) == 0 {
-		if len(available) == 0 {
-			return nil, fmt.Errorf("no captured logs for this stack yet — logs appear once `haven up` has run it")
-		}
-		return available, nil
-	}
 	availableSet := map[string]bool{}
 	for _, s := range available {
 		availableSet[s] = true
 	}
-	var out []string
-	for _, a := range args {
-		name := cliToFileService(a)
-		if !availableSet[name] {
-			cliNames := make([]string, len(available))
-			for i, s := range available {
-				cliNames[i] = fileToCLIService(s)
-			}
-			return nil, fmt.Errorf("no captured logs for %q — this stack has: %s (plus obs)", a, strings.Join(cliNames, ", "))
+	if len(args) == 0 {
+		if len(available) == 0 {
+			return nil, fmt.Errorf("no captured logs for this stack yet — logs appear once `haven up` has run it")
 		}
-		out = append(out, name)
+		// Unfiltered, the backend lane is shown whole: splitting it by default
+		// would drop every line the launcher itself wrote, which is where a
+		// boot failure that killed both halves is reported.
+		out := make([]logSource, 0, len(available))
+		for _, svc := range available {
+			out = append(out, logSource{file: svc, label: fileToCLIService(svc)})
+		}
+		return out, nil
+	}
+	var out []logSource
+	for _, a := range args {
+		src, ok := resolveLogSource(a, availableSet)
+		if !ok {
+			return nil, fmt.Errorf("no captured logs for %q — this stack has: %s (plus obs)", a, strings.Join(logSelectableNames(available), ", "))
+		}
+		out = append(out, src)
 	}
 	return out, nil
+}
+
+// resolveLogSource reads one CLI name as a view: an application of the backend
+// lane, or a capture file of its own.
+func resolveLogSource(name string, available map[string]bool) (logSource, bool) {
+	if file := apiLaneFile(available); file != "" && slices.Contains(apiLaneApps, name) {
+		return logSource{file: file, label: name, app: name}, true
+	}
+	for _, lane := range []string{app.SimsLane, app.GoLane} {
+		if available[lane] && slices.Contains(goLaneSimulators, name) {
+			return logSource{file: lane, label: name, app: name}, true
+		}
+	}
+	file := cliToFileService(name)
+	if !available[file] {
+		return logSource{}, false
+	}
+	return logSource{file: file, label: fileToCLIService(file)}, true
+}
+
+// logSelectableNames are the names `haven logs <name>` accepts: every capture
+// file, plus the halves of the backend lane, which have no file of their own.
+func logSelectableNames(available []string) []string {
+	out := make([]string, 0, len(available)+len(apiLaneApps))
+	for _, s := range available {
+		// The lane's capture may still be on disk under its old name, but both
+		// applications are addressable whichever name it was written under.
+		if slices.Contains(apiLaneFiles, s) {
+			out = append(out, apiLaneApps...)
+			continue
+		}
+		out = append(out, fileToCLIService(s))
+	}
+	if slices.Contains(available, app.GoLane) || slices.Contains(available, app.SimsLane) {
+		for _, sim := range goLaneSimulators {
+			if !slices.Contains(out, sim) {
+				out = append(out, sim)
+			}
+		}
+	}
+	return out
 }
 
 // capturedServices lists the services with capture files, in a stable order.
@@ -241,37 +341,114 @@ func dropPartialFirstLine(buf []byte) []byte {
 // first, then live), returning the parsed lines merged in time order, each
 // live file's end offset for a follow to continue from, and whether any file
 // was large enough that logReadCapBytes elided older history.
-func readLogTails(dir string, services []string) ([]logLine, map[string]int64, bool) {
+func readLogTails(dir string, services []logSource) ([]logLine, map[string]int64, bool) {
 	return readLogTailsCapped(dir, services, logReadCapBytes)
 }
 
-func readLogTailsCapped(dir string, services []string, capBytes int64) ([]logLine, map[string]int64, bool) {
+func readLogTailsCapped(dir string, services []logSource, capBytes int64) ([]logLine, map[string]int64, bool) {
 	var lines []logLine
 	offsets := map[string]int64{}
 	elided := false
-	for _, svc := range services {
-		live := filepath.Join(dir, svc+".log")
+	for _, src := range services {
+		live := filepath.Join(dir, src.file+".log")
 		for _, path := range []string{live + ".1", live} {
 			b, size, capped, err := readLogTailCapped(path, capBytes)
 			if err != nil {
 				continue
 			}
 			if path == live {
-				offsets[svc] = size
+				offsets[src.file] = size
 			}
 			elided = elided || capped
-			for _, raw := range strings.Split(string(b), "\n") {
-				if raw == "" {
-					continue
-				}
-				if l, ok := parseLogLine(svc, raw); ok {
-					lines = append(lines, l)
-				}
-			}
+			previous := ""
+			src.scanLines(b, &previous, func(l logLine) { lines = append(lines, l) })
 		}
 	}
 	sort.SliceStable(lines, func(i, j int) bool { return lines[i].ts.Before(lines[j].ts) })
 	return lines, offsets, elided
+}
+
+// scanLines parses one capture's bytes in file order and hands this view the
+// lines it owns. previous carries the application each lane's last structured
+// line resolved to, so an unstructured continuation follows its own record —
+// across a tick boundary as well as inside one read.
+func (s logSource) scanLines(b []byte, previous *string, keep func(logLine)) {
+	for _, raw := range strings.Split(string(b), "\n") {
+		if raw == "" {
+			continue
+		}
+		l, ok := parseLogLine(s.label, raw)
+		if !ok {
+			continue
+		}
+		app := viewer.RouteLine(s.file, l.text, *previous)
+		*previous = app
+		if s.app == "" || s.app == app {
+			keep(l)
+		}
+	}
+}
+
+// capturedSources is every capture present, as whole-lane views. A follow with
+// no explicit selection re-derives this each tick, so a lane that starts after
+// the follow began appears rather than being missing for the command's life.
+func capturedSources(dir string) []logSource {
+	out := []logSource{}
+	for _, svc := range capturedServices(dir) {
+		out = append(out, logSource{file: svc, label: fileToCLIService(svc)})
+	}
+	return out
+}
+
+// readAppended reads what one capture grew by since the last tick, advancing
+// this source's offset and the application its last structured line resolved
+// to. A file that is gone, unreadable or unchanged yields nothing.
+func readAppended(dir string, src logSource, state followState) []logLine {
+	path := filepath.Join(dir, src.file+".log")
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil
+	}
+	offset := state.offsets[src.file]
+	if info.Size() < offset {
+		offset = 0 // rotated underneath us — start over on the fresh file
+	}
+	if info.Size() == offset {
+		return nil
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+	// Same bound as the initial read: a service that dumps a burst between two
+	// ticks (or a rotation that reset the offset to 0 on a file that is already
+	// large) must not size an allocation off it.
+	start := offset
+	if info.Size()-start > logReadCapBytes {
+		start = info.Size() - logReadCapBytes
+	}
+	state.offsets[src.file] = info.Size()
+	buf := make([]byte, info.Size()-start)
+	if _, err := f.ReadAt(buf, start); err != nil {
+		return nil
+	}
+	if start != offset {
+		buf = dropPartialFirstLine(buf)
+	}
+	var fresh []logLine
+	previous := state.tailApp[src.file]
+	src.scanLines(buf, &previous, func(l logLine) { fresh = append(fresh, l) })
+	state.tailApp[src.file] = previous
+	return fresh
+}
+
+// followState is what a follow carries between ticks: how far each capture has
+// been read, and the application each lane's last structured line resolved to —
+// so a stack trace arriving a tick after its error still follows it.
+type followState struct {
+	offsets map[string]int64
+	tailApp map[string]string
 }
 
 // logLevelRank orders the severities a --level filter understands.
@@ -279,7 +456,7 @@ var logLevelRank = map[string]int{"trace": 1, "debug": 2, "info": 3, "warn": 4, 
 
 func minLevelRank(level string) int { return logLevelRank[strings.ToLower(level)] }
 
-// ansiSequence matches the escape sequences services colour their output with.
+// ansiSequence matches the escape sequences services color their output with.
 // Captured logs are raw service stdout, so a level word arrives wrapped —
 // pino-pretty and the Go services both emit things like
 // "\x1b[0m\x1b[33mWARN\x1b[0m". Tokenising that text without stripping the
@@ -299,6 +476,9 @@ const levelSniffTokens = 4
 // 0 means the line names no level (a continuation, a raw print) — such lines
 // pass an unfiltered view and are hidden by --level.
 func lineLevelRank(text string) int {
+	if rec, ok := logfmt.Parse(text); ok && rec.Level != logfmt.LevelNone {
+		return logLevelRank[string(rec.Level)]
+	}
 	fields := strings.Fields(stripANSI(text))
 	for i, tok := range fields {
 		if i >= levelSniffTokens {
@@ -327,40 +507,80 @@ func filterLogLines(lines []logLine, since time.Time, level string) []logLine {
 	return out
 }
 
-func printLogLine(l logLine, plain bool) { fmt.Println(formatLogLine(l, plain)) }
-
-// formatLogLine renders one captured line: plain for pipes/agents, coloured
-// label + warn/error highlighting for humans. Shared by `haven logs` and the
-// attached up viewer so a service reads the same everywhere.
-func formatLogLine(l logLine, plain bool) string {
-	if plain {
-		return fmt.Sprintf("%s %-8s | %s", l.ts.Format("15:04:05.000"), l.service, l.text)
+// printLogLine prints one captured line, unless the renderer found nothing in
+// it worth a row: a record with nothing to say, or a tool banner line haven
+// already covers another way.
+func printLogLine(l logLine, mode renderMode, plain bool) {
+	if rendered := formatLogLine(l, mode, plain); rendered != "" {
+		fmt.Println(rendered)
 	}
-	color := logServiceColors[l.service]
-	if color == "" {
-		color = "37"
-	}
-	return fmt.Sprintf("\x1b[2m%s\x1b[0m \x1b[%sm%-8s\x1b[0m │ %s", l.ts.Format("15:04:05.000"), color, l.service, highlightLevel(l.text))
 }
 
-// highlightLevel paints a line red at error-or-worse, yellow at warn.
-func highlightLevel(text string) string {
-	switch rank := lineLevelRank(text); {
-	case rank >= 5:
-		return "\x1b[31m" + text + "\x1b[0m"
-	case rank == 4:
-		return "\x1b[33m" + text + "\x1b[0m"
+// renderMode is what `haven logs` does with a captured payload.
+type renderMode int
+
+const (
+	// renderHuman is the shared reader format (dev-log-format.md).
+	renderHuman renderMode = iota
+	// renderRaw prints the payload exactly as the child wrote it — escapes,
+	// pretty consoles and all — which is the only way to see a line the
+	// renderer could not make sense of.
+	renderRaw
+	// renderJSON prints one JSON object per line with the lane stamped on it,
+	// for a machine consumer.
+	renderJSON
+)
+
+// renderModeFrom reads the two escape-hatch flags. --raw wins if both are
+// given: it is the one that changes nothing at all.
+func renderModeFrom(inv invocation) renderMode {
+	switch {
+	case inv.has("--raw"):
+		return renderRaw
+	case inv.has("--json"):
+		return renderJSON
 	}
-	return text
+	return renderHuman
+}
+
+// formatLogLine renders one captured line. Shared by `haven logs` and the
+// attached up viewer so a service reads the same everywhere; the rendering
+// itself lives in domain/logfmt, which the `pnpm dev` renderer mirrors.
+func formatLogLine(l logLine, mode renderMode, plain bool) string {
+	opts := logfmt.Options{
+		Lane:      l.service,
+		LaneColor: logServiceColors[l.service],
+		Time:      l.ts,
+		Color:     !plain,
+	}
+	switch mode {
+	case renderRaw:
+		return l.text
+	case renderJSON:
+		return logfmt.RenderJSON(l.text, opts)
+	case renderHuman:
+	}
+	return logfmt.Render(l.text, opts)
 }
 
 // followLogs streams appended lines until interrupted, re-scanning the
 // directory each pass so a service added by a later `up +svc` joins the view.
-func followLogs(ctx context.Context, dir string, args []string, offsets map[string]int64, since time.Time, level string, plain bool) error {
-	requested := map[string]bool{}
-	for _, a := range args {
-		requested[cliToFileService(a)] = true
-	}
+// followLogs tails the selected views. With no explicit selection the set is
+// re-derived each tick, so a lane that starts after the follow began appears
+// rather than being silently missing for the life of the command.
+type follower struct {
+	dir string
+	// sources is the selection; when all is set it is re-derived each tick.
+	sources []logSource
+	all     bool
+	since   time.Time
+	level   string
+	mode    renderMode
+	plain   bool
+	state   followState
+}
+
+func (f *follower) run(ctx context.Context) error {
 	t := time.NewTicker(300 * time.Millisecond)
 	defer t.Stop()
 	for {
@@ -369,54 +589,16 @@ func followLogs(ctx context.Context, dir string, args []string, offsets map[stri
 			return nil
 		case <-t.C:
 		}
+		if f.all {
+			f.sources = capturedSources(f.dir)
+		}
 		var fresh []logLine
-		for _, svc := range capturedServices(dir) {
-			if len(requested) > 0 && !requested[svc] {
-				continue
-			}
-			path := filepath.Join(dir, svc+".log")
-			info, err := os.Stat(path)
-			if err != nil {
-				continue
-			}
-			offset := offsets[svc]
-			if info.Size() < offset {
-				offset = 0 // rotated underneath us — start over on the fresh file
-			}
-			if info.Size() == offset {
-				continue
-			}
-			f, err := os.Open(path)
-			if err != nil {
-				continue
-			}
-			// Same bound as the initial read: a service that dumps a burst
-			// between two ticks (or a rotation that reset the offset to 0 on a
-			// file that is already large) must not size an allocation off it.
-			start := offset
-			if info.Size()-start > logReadCapBytes {
-				start = info.Size() - logReadCapBytes
-			}
-			buf := make([]byte, info.Size()-start)
-			if _, err := f.ReadAt(buf, start); err == nil {
-				if start != offset {
-					buf = dropPartialFirstLine(buf)
-				}
-				for _, raw := range strings.Split(string(buf), "\n") {
-					if raw == "" {
-						continue
-					}
-					if l, ok := parseLogLine(svc, raw); ok {
-						fresh = append(fresh, l)
-					}
-				}
-			}
-			_ = f.Close()
-			offsets[svc] = info.Size()
+		for _, src := range f.sources {
+			fresh = append(fresh, readAppended(f.dir, src, f.state)...)
 		}
 		sort.SliceStable(fresh, func(i, j int) bool { return fresh[i].ts.Before(fresh[j].ts) })
-		for _, l := range filterLogLines(fresh, since, level) {
-			printLogLine(l, plain)
+		for _, l := range filterLogLines(fresh, f.since, f.level) {
+			printLogLine(l, f.mode, f.plain)
 		}
 	}
 }

@@ -1,0 +1,605 @@
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { BackLink } from "@langwatch/design-system/back-link";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Badge,
+  Box,
+  Button,
+  Code,
+  Heading,
+  HStack,
+  Progress,
+  Separator,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { toEpochMs } from "@langwatch/time";
+import { Archive, FileClock, Pencil, Receipt, TimerReset } from "lucide-react";
+import { useState } from "react";
+
+import { api } from "../../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
+import { readableDate } from "../../../model/readable-date.ts";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+
+/** What can be done to the budget from its header, by its state and the viewer's grants. */
+function BudgetHeaderActions({
+  budgetId,
+  isArchived,
+  canUpdate,
+  canDelete,
+  onReset,
+  onEdit,
+  onArchive,
+}: {
+  budgetId: string;
+  isArchived: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  onReset: () => void;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  return (
+    <HStack>
+      {/* Audit history remains reachable even after archive —
+          the full lifecycle trail stays queryable so operators
+          can reconstruct why a budget was archived. */}
+      <Link href={`/settings/audit-log?targetKind=budget&targetId=${budgetId}`}>
+        <Button variant="outline" size="sm">
+          <FileClock size={14} /> Audit history
+        </Button>
+      </Link>
+      {!isArchived && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onReset}>
+          <TimerReset size={14} /> Reset period
+        </Button>
+      )}
+      {!isArchived && canUpdate && (
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          <Pencil size={14} /> Edit
+        </Button>
+      )}
+      {!isArchived && canDelete && (
+        <Button colorPalette="red" variant="outline" size="sm" onClick={onArchive}>
+          <Archive size={14} /> Archive
+        </Button>
+      )}
+    </HStack>
+  );
+}
+
+/** Runs one action on a loaded budget; a failure is shown to the user, not thrown. */
+async function runBudgetAction(input: {
+  budget: { id: string } | undefined;
+  organizationId: string | undefined;
+  action: (id: string, organizationId: string) => Promise<void>;
+  onFailure: (error: unknown) => void;
+}): Promise<void> {
+  if (!input.budget || !input.organizationId) return;
+  try {
+    await input.action(input.budget.id, input.organizationId);
+  } catch (err) {
+    input.onFailure(err);
+  }
+}
+
+/**
+ * Spend against the limit, and for per-person templates the headcount: they fan out into one
+ * bucket per end user, so their standing is people over the limit rather than one total.
+ */
+function budgetStanding(
+  budget:
+    | {
+        spentUsd: string;
+        limitUsd: string;
+        endUsersSeen?: number | null;
+        endUsersOver?: number | null;
+      }
+    | undefined,
+) {
+  const spent = budget ? Number.parseFloat(budget.spentUsd) : 0;
+  const limit = budget ? Number.parseFloat(budget.limitUsd) : 0;
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  const seatsSeen = budget?.endUsersSeen ?? 0;
+  const seatsOver = budget?.endUsersOver ?? 0;
+  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+  return { spent, limit, pct, seatsSeen, seatsOver, seatsOverPct };
+}
+
+function BudgetDetailPage() {
+  const showErrorToast = useShowErrorToast();
+  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const router = useGatewayRouter();
+  const budgetId = typeof router.query.id === "string" ? router.query.id : "";
+
+  const detailQuery = api.gatewayBudgets.get.useQuery(
+    { organizationId: organization?.id ?? "", id: budgetId },
+    { enabled: !!organization?.id && !!budgetId },
+  );
+  const utils = api.useUtils();
+  const archiveMutation = api.gatewayBudgets.archive.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayBudgets.list.invalidate({
+          organizationId: organization.id,
+        });
+        await utils.gatewayBudgets.get.invalidate({
+          organizationId: organization.id,
+          id: budgetId,
+        });
+      }
+    },
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const canUpdate = hasPermission("gatewayBudgets:update");
+  const canDelete = hasPermission("gatewayBudgets:delete");
+
+  const budget = detailQuery.data;
+
+  const confirmArchive = () =>
+    runBudgetAction({
+      budget,
+      organizationId: organization?.id,
+      action: async (id, organizationId) => {
+        await archiveMutation.mutateAsync({ organizationId, id });
+        setArchiving(false);
+      },
+      onFailure: (error) => showErrorToast({ error, fallbackTitle: "Couldn't archive the budget" }),
+    });
+
+  const resetMutation = api.gatewayBudgets.reset.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayBudgets.get.invalidate({
+          organizationId: organization.id,
+          id: budgetId,
+        });
+        await utils.gatewayBudgets.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
+
+  const confirmReset = () =>
+    runBudgetAction({
+      budget,
+      organizationId: organization?.id,
+      action: async (id, organizationId) => {
+        await resetMutation.mutateAsync({ organizationId, id });
+        setResetting(false);
+      },
+      onFailure: (error) =>
+        showErrorToast({ error, fallbackTitle: "Couldn't reset the budget period" }),
+    });
+
+  const { spent, limit, pct, seatsSeen, seatsOver, seatsOverPct } = budgetStanding(budget);
+  const isArchived = !!budget?.archivedAt;
+  const isLoadingBudget = detailQuery.isLoading;
+  const budgetMissing = !isLoadingBudget && !budget;
+
+  return (
+    <AiGatewayLayout>
+      <>
+        <PageLayout.Header>
+          <BackLink href="/gateway/budgets" onNavigate={(href) => router.push(href)}>
+            Budgets
+          </BackLink>
+          <PageLayout.Heading>
+            {budget?.name ?? "Budget"}
+            {isArchived && (
+              <Badge colorPalette="gray" ml={2}>
+                archived
+              </Badge>
+            )}
+          </PageLayout.Heading>
+          <Spacer />
+          {budget && (
+            <BudgetHeaderActions
+              budgetId={budget.id}
+              isArchived={isArchived}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              onReset={() => setResetting(true)}
+              onEdit={() => setEditing(true)}
+              onArchive={() => setArchiving(true)}
+            />
+          )}
+        </PageLayout.Header>
+
+        <PageLayout.Container>
+          {isLoadingBudget && <Spinner />}
+          {budgetMissing && <Text color="fg.muted">Budget not found.</Text>}
+          {!isLoadingBudget && budget && (
+            <VStack align="stretch" gap={6}>
+              {!budget.spendAvailable && (
+                <Alert.Root status="warning" data-testid="budget-spend-unavailable">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Spend figures are unavailable</Alert.Title>
+                    <Alert.Description>
+                      Spend cannot be totalled right now, so this budget is not stopping or warning
+                      about anything.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              {budget.unreachableByAnyKey && (
+                <Alert.Root status="warning" data-testid="budget-unreachable-alert">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>No key sends traffic here</Alert.Title>
+                    <Alert.Description>
+                      Traffic is attributed to the project a key is scoped to. No active key is
+                      scoped so that its traffic reaches this budget, so it will stay at zero and
+                      never stop a request.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              <Section title="Utilization">
+                <VStack align="stretch" gap={2}>
+                  <UtilizationHeadline
+                    spendAvailable={budget.spendAvailable}
+                    perPerson={budget.scopeType === "ATTRIBUTED_USER"}
+                    spent={spent}
+                    limit={limit}
+                    pct={pct}
+                    seatsSeen={seatsSeen}
+                    seatsOver={seatsOver}
+                    seatsOverPct={seatsOverPct}
+                  />
+                  <HStack fontSize="xs" color="fg.muted">
+                    <Text>
+                      Window: <strong>{budget.window.toLowerCase()}</strong>
+                    </Text>
+                    <Text>·</Text>
+                    <Text>
+                      Resets:{" "}
+                      <strong>
+                        {budget.window === "TOTAL" ? (
+                          "never"
+                        ) : (
+                          <Tooltip content={readableDate(budget.resetsAt).toLocaleString()}>
+                            <span>{formatTimeAgo(toEpochMs(budget.resetsAt))}</span>
+                          </Tooltip>
+                        )}
+                      </strong>
+                    </Text>
+                    <Text>·</Text>
+                    <Text>
+                      On breach: <strong>{budget.onBreach.toLowerCase()}</strong>
+                    </Text>
+                  </HStack>
+                </VStack>
+              </Section>
+
+              <Section title="Identity">
+                <DetailRow label="ID">
+                  <Code fontSize="xs">{budget.id}</Code>
+                </DetailRow>
+                {budget.description && (
+                  <DetailRow label="Description">
+                    <Text fontSize="sm">{budget.description}</Text>
+                  </DetailRow>
+                )}
+                <DetailRow label="Scope">
+                  <ScopeBadge target={budget.scopeTarget} projectSlug={project?.slug ?? null} />
+                </DetailRow>
+                <DetailRow label="Created">
+                  <Tooltip content={readableDate(budget.createdAt).toLocaleString()}>
+                    <Text fontSize="sm" color="fg.muted">
+                      {formatTimeAgo(toEpochMs(budget.createdAt))}
+                    </Text>
+                  </Tooltip>
+                </DetailRow>
+                {budget.lastResetAt && (
+                  <DetailRow label="Last reset">
+                    <Tooltip content={readableDate(budget.lastResetAt).toLocaleString()}>
+                      <Text fontSize="sm" color="fg.muted">
+                        {formatTimeAgo(toEpochMs(budget.lastResetAt))}
+                      </Text>
+                    </Tooltip>
+                  </DetailRow>
+                )}
+                {budget.timezone && (
+                  <DetailRow label="Timezone">
+                    <Code fontSize="xs">{budget.timezone}</Code>
+                  </DetailRow>
+                )}
+              </Section>
+
+              <Section title="Recent activity">
+                {budget.recentLedger.length === 0 ? (
+                  <NoDataInfoBlock
+                    title="No usage yet"
+                    description="Activity shows up here after the first completed request against a virtual key in this scope."
+                    icon={<Receipt size={24} />}
+                  />
+                ) : (
+                  <Table.Root size="sm">
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader>When</Table.ColumnHeader>
+                        <Table.ColumnHeader>Virtual key</Table.ColumnHeader>
+                        <Table.ColumnHeader>Model</Table.ColumnHeader>
+                        <Table.ColumnHeader>Amount</Table.ColumnHeader>
+                        <Table.ColumnHeader>Status</Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {budget.recentLedger.map((line) => (
+                        <Table.Row key={line.id}>
+                          <Table.Cell>
+                            <Tooltip content={readableDate(line.occurredAt).toLocaleString()}>
+                              <Text fontSize="xs" color="fg.muted">
+                                {formatTimeAgo(toEpochMs(line.occurredAt))}
+                              </Text>
+                            </Tooltip>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Link
+                              href={`/gateway/virtual-keys/${line.virtualKeyId}`}
+                              color="orange.600"
+                            >
+                              <Text fontSize="sm">{line.virtualKeyName}</Text>
+                            </Link>
+                          </Table.Cell>
+                          <Table.Cell>
+                            <Code fontSize="xs">{line.model}</Code>
+                          </Table.Cell>
+                          <Table.Cell>{formatAmount(line.amountUsd)}</Table.Cell>
+                          <Table.Cell>
+                            <StatusBadge status={line.status} />
+                          </Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                )}
+                <Text fontSize="xs" color="fg.muted" mt={1}>
+                  Most recent 20 requests. See Usage for aggregates over the full history.
+                </Text>
+              </Section>
+            </VStack>
+          )}
+        </PageLayout.Container>
+      </>
+
+      <BudgetEditDrawer
+        budget={editing && budget ? budget : null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(false);
+        }}
+        onSaved={() => {
+          setEditing(false);
+          void detailQuery.refetch();
+        }}
+      />
+      <ConfirmDialog
+        open={resetting}
+        onOpenChange={setResetting}
+        title={`Reset ${budget?.name ?? "budget"} period?`}
+        message="Starts a new period from now. Recorded spend and the ledger are untouched; only the boundary moves."
+        confirmLabel="Reset"
+        tone="warning"
+        loading={resetMutation.isPending}
+        onConfirm={confirmReset}
+      />
+      <ConfirmDialog
+        open={archiving}
+        onOpenChange={setArchiving}
+        title={`Archive ${budget?.name ?? "budget"}?`}
+        message="Debits against this budget stop counting. The historical ledger is preserved but new requests route as if the budget didn't exist."
+        confirmLabel="Archive"
+        tone="warning"
+        loading={archiveMutation.isPending}
+        onConfirm={confirmArchive}
+      />
+    </AiGatewayLayout>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Box>
+      <Heading size="sm" mb={2}>
+        {title}
+      </Heading>
+      <Separator mb={3} />
+      <VStack align="stretch" gap={2}>
+        {children}
+      </VStack>
+    </Box>
+  );
+}
+
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <HStack gap={4} align="flex-start">
+      <Text fontSize="sm" color="fg.muted" minWidth="140px">
+        {label}
+      </Text>
+      {children}
+    </HStack>
+  );
+}
+
+// Mirrors the wire shape of `BudgetScopeTargetInfo` (the shared
+// scope-target resolver): flat, with the kind-specific extras optional.
+type ScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary: string | null;
+  projectSlug?: string | null;
+  memberCount?: number;
+};
+
+function ScopeBadge({
+  target,
+  projectSlug: _projectSlug,
+}: {
+  target: ScopeTarget;
+  projectSlug: string | null;
+}) {
+  const kindLabel = target.kind.toLowerCase().replaceAll("_", " ");
+  const vkHref = target.kind === "VIRTUAL_KEY" ? `/gateway/virtual-keys/${target.id}` : null;
+  return (
+    <HStack gap={2} align="baseline">
+      <Badge colorPalette="gray">{kindLabel}</Badge>
+      {vkHref ? (
+        <Link href={vkHref} color="orange.600">
+          <Text fontSize="sm" fontWeight="medium">
+            {target.name}
+          </Text>
+        </Link>
+      ) : (
+        <Text fontSize="sm" fontWeight="medium">
+          {target.name}
+        </Text>
+      )}
+      {target.secondary && (
+        <Code fontSize="xs" color="fg.muted">
+          {target.secondary}
+        </Code>
+      )}
+      {target.kind === "GROUP" && typeof target.memberCount === "number" && (
+        <Text fontSize="xs" color="fg.muted">
+          {target.memberCount === 1 ? "1 member" : `${target.memberCount} members`}, each with their
+          own allowance
+        </Text>
+      )}
+    </HStack>
+  );
+}
+
+function UtilizationHeadline({
+  spendAvailable,
+  perPerson,
+  spent,
+  limit,
+  pct,
+  seatsSeen,
+  seatsOver,
+  seatsOverPct,
+}: {
+  spendAvailable: boolean;
+  perPerson: boolean;
+  spent: number;
+  limit: number;
+  pct: number;
+  seatsSeen: number;
+  seatsOver: number;
+  seatsOverPct: number;
+}) {
+  if (!spendAvailable) {
+    return (
+      <HStack>
+        <Text fontWeight="medium" fontSize="2xl" color="fg.muted">
+          Unavailable
+        </Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+      </HStack>
+    );
+  }
+  if (perPerson) {
+    // The template's limit belongs to each end user separately, so the
+    // headline is the per-person cap and the standing underneath is a headcount.
+    return (
+      <VStack align="stretch" gap={2} data-testid="budget-attributed-user-utilization">
+        <HStack>
+          <Text fontWeight="medium" fontSize="2xl">
+            {formatBudgetUsd(limit)}
+          </Text>
+          <Text color="fg.muted">per person</Text>
+          <Spacer />
+          <Badge colorPalette={seatsOver > 0 ? "red" : "green"}>
+            {seatsOver} of {seatsSeen} people over cap
+          </Badge>
+        </HStack>
+        <Progress.Root
+          value={seatsOverPct}
+          size="sm"
+          colorPalette={seatsOver > 0 ? "red" : "green"}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
+      </VStack>
+    );
+  }
+  return (
+    <>
+      <HStack>
+        <Text fontWeight="medium" fontSize="2xl">
+          {formatBudgetUsd(spent)}
+        </Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+        <Spacer />
+        <Badge colorPalette={usagePalette(pct)}>{pct.toFixed(1)}% used</Badge>
+      </HStack>
+      <Progress.Root value={pct} size="sm" colorPalette={usagePalette(pct)}>
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
+    </>
+  );
+}
+
+function usagePalette(pct: number): "red" | "orange" | "green" {
+  if (pct >= 100) return "red";
+  if (pct >= 80) return "orange";
+  return "green";
+}
+
+function statusPalette(
+  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED",
+): "green" | "red" | "orange" | "gray" {
+  if (status === "SUCCESS") return "green";
+  if (status === "BLOCKED_BY_GUARDRAIL") return "red";
+  if (status === "PROVIDER_ERROR") return "orange";
+  return "gray";
+}
+
+function StatusBadge({
+  status,
+}: {
+  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
+}) {
+  return <Badge colorPalette={statusPalette(status)}>{status.toLowerCase()}</Badge>;
+}
+
+// Per-row ledger debit formatter. Same precision tiers as
+// formatBudgetUsd but with one extra digit at $1+ (.0001 vs .00) so
+// per-request line items surface micro-cents even when summed totals
+// would round. Reuses the shared trim-trailing-zeros logic for a
+// consistent look across the budget surfaces.
+function formatAmount(raw: string | number): string {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.01) return `$${n.toFixed(5)}`;
+  return `$${n.toFixed(6)}`;
+}
+
+export default BudgetDetailPage;

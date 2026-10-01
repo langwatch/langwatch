@@ -1,12 +1,12 @@
 import chalk from "chalk";
+
 import { GroupsApiService } from "@/client-sdk/services/groups/groups-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { orDash, printFacts, runManagement } from "../management/_shared";
 
-export const getGroupCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const getGroupCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch group",
     pending: `Fetching group "${id}"...`,

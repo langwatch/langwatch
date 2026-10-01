@@ -1,10 +1,7 @@
 /**
  * The loop of a shared folder: a call arrives, the policy decides, the call
  * runs or the panel is asked, and the answer goes back on the same socket.
- *
- * Everything that decides is somewhere else. This module only sequences:
- * which call is waiting for which answer, which command is still running, and
- * what happens on Ctrl-C.
+ * Everything that decides is elsewhere — this module only sequences.
  */
 
 import {
@@ -13,6 +10,7 @@ import {
   type LocalCall,
   type LocalCallErrorCode,
   type LocalControlConversation,
+  type LocalRegisteredFrame,
   type LocalToolCall,
   type PermissionDecision,
   type TerminalPermissionDecision,
@@ -26,11 +24,7 @@ import {
   type TerminalApproval,
 } from "./approval";
 import { failureCode, failureMessage, LocalCallFailure } from "./errors";
-import {
-  startCommand,
-  timeoutSecondsFor,
-  type RunningCommand,
-} from "./executor";
+import { startCommand, timeoutSecondsFor, type RunningCommand } from "./executor";
 import {
   editFile,
   findFiles,
@@ -93,51 +87,146 @@ interface PendingPermission {
 }
 
 export function startLangySession(options: LangySessionOptions): LangySession {
-  const ui = options.ui ?? createUi();
-  const approvals =
-    options.approvals === undefined
-      ? createTerminalApprovals({ writer: ui.writer })
-      : options.approvals;
-  const root = options.workspace.root;
-  const grants = new Set<string>();
-  const running = new Map<string, RunningCommand>();
-  /** Every call this session took, so a replayed one is never taken twice. */
-  const handled = new Set<string>();
-  const pending = new Map<string, PendingPermission>();
-  const background: Array<{ pid: number; logPath: string }> = [];
-  /** Asks waiting for the selector, which draws one question at a time. */
-  const askQueue: Array<{
-    call: LocalCall;
-    summary: string;
-    reason: string;
-    patterns: string[];
-    timeoutSeconds?: number;
-  }> = [];
-  let selectorOpen = false;
-
-  let skipPermissions = false;
-  let announced = false;
-  /** The absolute link the terminal points the developer at. */
-  let conversationHref = conversationLink({
-    url: options.conversation.url,
-    endpoint: options.endpoint,
-  });
-  let shuttingDown = false;
-  let finished = false;
-  let settle: (code: number) => void = () => undefined;
-
-  const done = new Promise<number>((resolve) => {
-    settle = resolve;
-  });
-
-  const finish = (code: number) => {
-    if (finished) return;
-    finished = true;
-    ui.backgroundKept(background);
-    settle(code);
+  const session = new SharedFolderSession(options);
+  session.client.start();
+  return {
+    done: session.done,
+    requestShutdown: () => session.requestShutdown(),
+    client: session.client,
   };
+}
 
-  const sendResult = ({
+/** An ask waiting for the selector, which draws one question at a time. */
+interface TerminalAsk {
+  call: LocalCall;
+  summary: string;
+  reason: string;
+  patterns: string[];
+  timeoutSeconds?: number;
+}
+
+/** One shared folder's loop: the calls it took, the asks it holds, the commands it runs. */
+class SharedFolderSession {
+  readonly client: RelayClient;
+  readonly done: Promise<number>;
+  private readonly options: LangySessionOptions;
+  private readonly ui: LangyUi;
+  private readonly approvals: ApprovalPrompt | null;
+  private readonly root: string;
+  private readonly grants = new Set<string>();
+  private readonly running = new Map<string, RunningCommand>();
+  /** Every call this session took, so a replayed one is never taken twice. */
+  private readonly handled = new Set<string>();
+  private readonly pending = new Map<string, PendingPermission>();
+  private readonly background: { pid: number; logPath: string }[] = [];
+  private readonly askQueue: TerminalAsk[] = [];
+  private selectorOpen = false;
+  private skipPermissions = false;
+  private announced = false;
+  /** The absolute link the terminal points the developer at. */
+  private conversationHref: string;
+  private shuttingDown = false;
+  private finished = false;
+  private settle: (code: number) => void = () => undefined;
+
+  constructor(options: LangySessionOptions) {
+    this.options = options;
+    this.ui = options.ui ?? createUi();
+    this.approvals =
+      options.approvals === undefined
+        ? createTerminalApprovals({ writer: this.ui.writer })
+        : options.approvals;
+    this.root = options.workspace.root;
+    this.conversationHref = conversationLink({
+      url: options.conversation.url,
+      endpoint: options.endpoint,
+    });
+    this.done = new Promise<number>((resolve) => {
+      this.settle = resolve;
+    });
+    this.client = new RelayClient({
+      ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
+      sessionKey: options.sessionKey,
+      workspace: options.workspace,
+      ...(options.transport === undefined ? {} : { transport: options.transport }),
+      ...(options.socketFactory === undefined ? {} : { socketFactory: options.socketFactory }),
+      ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
+      handlers: {
+        onRegistered: (frame) => this.onRegistered(frame),
+        onCall: (call) => this.onCall(call),
+        onCancel: (callId) => this.onCancel(callId),
+        onPermission: (frame) => this.onPermission(frame),
+        onPolicy: ({ skipPermissions: next }) => {
+          this.skipPermissions = next;
+          this.ui.policyChanged({ skipPermissions: next });
+        },
+        onDisconnect: ({ reason }) => {
+          this.stopEverything();
+          this.ui.disconnected({ reason });
+          this.client.stopNow();
+          this.finish(0);
+        },
+        onRefused: (frame) => this.stopAndFinish({ note: frame.message, code: 1 }),
+        onGaveUp: ({ reason }) => this.stopAndFinish({ note: reason, code: 1 }),
+        onConnectionLost: ({ message }) => this.ui.connectionLost({ message }),
+      },
+    });
+  }
+
+  /**
+   * The first Ctrl-C tells the platform, stops the commands it started in the
+   * foreground and exits inside the deadline. A second one exits at once.
+   */
+  requestShutdown(): void {
+    if (this.shuttingDown) {
+      this.finish(130);
+      return;
+    }
+    this.shuttingDown = true;
+    this.stopEverything();
+    this.ui.leaving();
+    const deadline = setTimeout(() => this.finish(0), SHUTDOWN_DEADLINE_MS);
+    deadline.unref();
+    void this.client.stop().then(() => {
+      clearTimeout(deadline);
+      this.finish(0);
+    });
+  }
+
+  private finish(code: number): void {
+    if (this.finished) return;
+    this.finished = true;
+    this.ui.backgroundKept(this.background);
+    this.settle(code);
+  }
+
+  private stopAndFinish({ note, code }: { note: string; code: number }): void {
+    this.stopEverything();
+    this.ui.note(note);
+    this.finish(code);
+  }
+
+  private onRegistered(frame: LocalRegisteredFrame): void {
+    this.skipPermissions = frame.policy.skipPermissions;
+    if (this.announced) {
+      this.ui.reconnected();
+      return;
+    }
+    this.announced = true;
+    const { options } = this;
+    this.conversationHref = conversationLink({
+      url: frame.conversation.url || options.conversation.url,
+      endpoint: options.endpoint,
+    });
+    this.ui.connected({
+      root: this.root,
+      conversationTitle: frame.conversation.title || options.conversation.title,
+      conversationUrl: this.conversationHref,
+    });
+    if (options.withoutGit === true) this.ui.noGitRepository();
+  }
+
+  private sendResult({
     callId,
     text,
     output,
@@ -145,9 +234,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     callId: string;
     text?: string;
     output?: BashOutput;
-  }) => {
-    client.forgetInFlight(callId);
-    client.sendResult({
+  }): void {
+    this.client.forgetInFlight(callId);
+    this.client.sendResult({
       type: "result",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
       callId,
@@ -155,9 +244,9 @@ export function startLangySession(options: LangySessionOptions): LangySession {
       ...(text === undefined ? {} : { text }),
       ...(output === undefined ? {} : { output }),
     });
-  };
+  }
 
-  const sendFailure = ({
+  private sendFailure({
     callId,
     code,
     message,
@@ -165,49 +254,52 @@ export function startLangySession(options: LangySessionOptions): LangySession {
     callId: string;
     code: LocalCallErrorCode;
     message: string;
-  }) => {
-    client.forgetInFlight(callId);
-    client.sendResult({
+  }): void {
+    this.client.forgetInFlight(callId);
+    this.client.sendResult({
       type: "result",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
       callId,
       ok: false,
       error: { code, message },
     });
-  };
+  }
+
+  /** A call that threw, shown here and answered as failed. */
+  private failCall(call: LocalCall, error: unknown): void {
+    this.ui.callFailed({ call, message: failureMessage(error) });
+    this.sendFailure({
+      callId: call.callId,
+      code: failureCode(error),
+      message: failureMessage(error),
+    });
+  }
 
   /** Runs one call that the policy already allowed. */
-  const execute = async (call: LocalCall): Promise<void> => {
+  private async execute(call: LocalCall): Promise<void> {
     if (call.tool === "local_bash") {
-      await executeCommand(call);
+      await this.executeCommand(call);
       return;
     }
     try {
       const text =
         call.tool === "local_langwatch_env"
-          ? await writeCredentials(call)
-          : runFileTool({ call, root });
-      ui.callResult({ call, text });
-      sendResult({ callId: call.callId, text });
+          ? await this.writeCredentials(call)
+          : runFileTool({ call, root: this.root });
+      this.ui.callResult({ call, text });
+      this.sendResult({ callId: call.callId, text });
     } catch (error) {
-      ui.callFailed({ call, message: failureMessage(error) });
-      sendFailure({
-        callId: call.callId,
-        code: failureCode(error),
-        message: failureMessage(error),
-      });
+      this.failCall(call, error);
     }
-  };
+  }
 
   /**
    * The project's key, fetched here and written here. It goes into the file
    * and nowhere else: not the result, not the terminal, not the panel.
    */
-  const writeCredentials = async (call: LocalCall): Promise<string> => {
+  private async writeCredentials(call: LocalCall): Promise<string> {
     if (call.tool !== "local_langwatch_env") return "";
-    const project = options.project;
-    const readProjectApiKey = options.readProjectApiKey;
-    const endpoint = options.endpoint;
+    const { project, readProjectApiKey, endpoint } = this.options;
     const file = call.params.path ?? ".env";
     if (!project || !readProjectApiKey || !endpoint) {
       throw new LocalCallFailure({
@@ -215,243 +307,179 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         message: `This terminal cannot fetch the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written because the command line was started without a LangWatch endpoint, and offer to write them again once \`langwatch langy --share-control\` runs signed in.`,
       });
     }
-    let apiKey: string;
-    try {
-      apiKey = await readProjectApiKey(project.id);
-    } catch (error) {
-      const status = refusalStatus(error);
-      if (status === 401) {
-        throw new LocalCallFailure({
-          code: "key_refused",
-          message: `The LangWatch login on this machine has expired, so ${file} was not changed. Tell the user in one line to run \`langwatch login --device\` in that terminal, and offer to write the credentials again after.`,
-        });
-      }
-      const { stage, code } = refusalStep(error);
-      if (status === 403 && stage === "lookup") {
-        throw new LocalCallFailure({
-          code: "key_refused",
-          message: `The LangWatch login on this machine cannot see ${project.name} (it needs project:view), so ${file} was not changed. Tell the user in one line to sign in with an account that belongs to the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
-        });
-      }
-      if (status === 403) {
-        throw new LocalCallFailure({
-          code: "key_refused",
-          message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
-        });
-      }
-      if (code === "endpoint_missing") {
-        throw new LocalCallFailure({
-          code: "key_refused",
-          message: `This LangWatch server is older than the command line and cannot hand out a project's key to it, so ${file} was not changed. Tell the user in one line that the credentials were not written and that updating LangWatch fixes it.`,
-        });
-      }
-      if (status === 404) {
-        throw new LocalCallFailure({
-          code: "key_refused",
-          message: `LangWatch found no project ${project.name} for the login on this machine, so ${file} was not changed. Tell the user in one line to sign in to the organization that owns the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
-        });
-      }
-      throw new LocalCallFailure({
-        code: "exec_failed",
-        message: `LangWatch did not answer the request for the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written, and offer to try again.`,
-      });
-    }
+    const apiKey = await readKeyOrRefuse({ readProjectApiKey, project, file });
     return writeLangwatchEnv({
       params: call.params,
-      root,
+      root: this.root,
       apiKey,
       endpoint,
       projectName: project.name,
     });
-  };
+  }
 
-  const executeCommand = async (call: LocalCall): Promise<void> => {
+  private async executeCommand(call: LocalCall): Promise<void> {
     if (call.tool !== "local_bash") return;
     let command: RunningCommand;
     try {
       command = startCommand({
         command: call.params.command,
-        root,
+        root: this.root,
         callId: call.callId,
-        ...(call.params.timeout === undefined
-          ? {}
-          : { timeout: call.params.timeout }),
+        ...(call.params.timeout === undefined ? {} : { timeout: call.params.timeout }),
         ...(call.params.background === true ? { background: true } : {}),
       });
     } catch (error) {
-      ui.callFailed({ call, message: failureMessage(error) });
-      sendFailure({
-        callId: call.callId,
-        code: failureCode(error),
-        message: failureMessage(error),
-      });
+      this.failCall(call, error);
       return;
     }
-    running.set(call.callId, command);
-    const stopSpinner = ui.startRunning();
+    this.running.set(call.callId, command);
+    const stopSpinner = this.ui.startRunning();
     try {
       const output = await command.result;
       if (call.params.background === true && output.pid !== undefined) {
-        background.push({ pid: output.pid, logPath: output.logPath ?? "" });
+        this.background.push({ pid: output.pid, logPath: output.logPath ?? "" });
       }
       stopSpinner();
-      ui.callOutcome({ call, output });
-      sendResult({ callId: call.callId, output });
+      this.ui.callOutcome({ call, output });
+      this.sendResult({ callId: call.callId, output });
     } catch (error) {
       stopSpinner();
-      ui.callFailed({ call, message: failureMessage(error) });
-      sendFailure({
-        callId: call.callId,
-        code: failureCode(error),
-        message: failureMessage(error),
-      });
+      this.failCall(call, error);
     } finally {
-      running.delete(call.callId);
+      this.running.delete(call.callId);
     }
-  };
+  }
 
-  const onCall = (call: LocalCall): void => {
+  private onCall(call: LocalCall): void {
     // The platform replays the calls it has no answer for after a reconnect.
-    // A call this session already took is running here or has already run, so
-    // taking it again would run the same command a second time. One that ran
-    // is answered again, because the answer it was given may have gone down
-    // with the connection.
-    if (handled.has(call.callId)) {
-      client.resendResult(call.callId);
+    // A call this session already took is running here or has already run;
+    // one that ran is answered again, since its answer may have been lost.
+    if (this.handled.has(call.callId)) {
+      this.client.resendResult(call.callId);
       return;
     }
-    handled.add(call.callId);
-    client.noteInFlight(call.callId);
+    this.handled.add(call.callId);
+    this.client.noteInFlight(call.callId);
     const decision = decide({
       call: call as LocalToolCall,
-      root,
-      grants,
-      skipPermissions,
+      root: this.root,
+      grants: this.grants,
+      skipPermissions: this.skipPermissions,
     });
-    ui.call(call);
+    this.ui.call(call);
     if (decision.kind === "refuse") {
-      ui.callRefused({ call, message: decision.message });
-      sendFailure({
-        callId: call.callId,
-        code: decision.code,
-        message: decision.message,
-      });
+      this.ui.callRefused({ call, message: decision.message });
+      this.sendFailure({ callId: call.callId, code: decision.code, message: decision.message });
       return;
     }
     if (decision.kind === "ask") {
-      const timeoutSeconds =
-        call.tool === "local_bash"
-          ? timeoutSecondsFor(call.params.timeout)
-          : undefined;
-      pending.set(call.callId, {
-        call,
-        summary: decision.summary,
-        patterns: decision.patterns,
-      });
-      client.send({
-        type: "permission_required",
-        protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
-        callId: call.callId,
-        summary: decision.summary,
-        pattern: decision.pattern,
-        reason: decision.reason,
-        skipOffered: true,
-        ...(decision.segments === undefined
-          ? {}
-          : { segments: decision.segments }),
-        // Only a command runs under a time limit, so only a command carries one.
-        ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
-      });
-      askInTerminal({
-        call,
-        summary: decision.summary,
-        reason: decision.reason,
-        patterns: decision.patterns,
-        ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
-      });
+      this.askPermission({ call, decision });
       return;
     }
-    void execute(call);
-  };
+    void this.execute(call);
+  }
+
+  private askPermission({
+    call,
+    decision,
+  }: {
+    call: LocalCall;
+    decision: Extract<ReturnType<typeof decide>, { kind: "ask" }>;
+  }): void {
+    const timeoutSeconds =
+      call.tool === "local_bash" ? timeoutSecondsFor(call.params.timeout) : undefined;
+    this.pending.set(call.callId, {
+      call,
+      summary: decision.summary,
+      patterns: decision.patterns,
+    });
+    this.client.send({
+      type: "permission_required",
+      protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
+      callId: call.callId,
+      summary: decision.summary,
+      pattern: decision.pattern,
+      reason: decision.reason,
+      skipOffered: true,
+      ...(decision.segments === undefined ? {} : { segments: decision.segments }),
+      // Only a command runs under a time limit, so only a command carries one.
+      ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
+    });
+    this.askInTerminal({
+      call,
+      summary: decision.summary,
+      reason: decision.reason,
+      patterns: decision.patterns,
+      ...(timeoutSeconds === undefined ? {} : { timeoutSeconds }),
+    });
+  }
 
   /**
-   * Puts the ask to this terminal as well as to the card.
-   *
-   * The transcript is held while the selector owns the bottom of the screen,
-   * so a call that answers itself in the meantime does not scroll the box
-   * away; the held lines are printed the moment the question is gone. Two
-   * calls that both need an answer wait their turn rather than drawing two
-   * boxes over each other, and one the card settled first never opens.
+   * Puts the ask to this terminal as well as to the card. The transcript is
+   * held while the selector owns the screen so it isn't scrolled away; two
+   * calls needing an answer wait their turn rather than drawing two boxes.
    */
-  const askInTerminal = (ask: {
-    call: LocalCall;
-    summary: string;
-    reason: string;
-    patterns: string[];
-    timeoutSeconds?: number;
-  }): void => {
-    if (!approvals) {
-      ui.permissionAsked({ summary: ask.summary });
+  private askInTerminal(ask: TerminalAsk): void {
+    if (!this.approvals) {
+      this.ui.permissionAsked({ summary: ask.summary });
       return;
     }
-    askQueue.push(ask);
-    openNextAsk();
-  };
+    this.askQueue.push(ask);
+    this.openNextAsk();
+  }
 
-  const openNextAsk = (): void => {
-    if (selectorOpen || !approvals) return;
-    const ask = askQueue.shift();
+  private openNextAsk(): void {
+    if (this.selectorOpen || !this.approvals) return;
+    const ask = this.askQueue.shift();
     if (!ask) return;
-    const waiting = pending.get(ask.call.callId);
+    const waiting = this.pending.get(ask.call.callId);
     if (!waiting) {
-      openNextAsk();
+      this.openNextAsk();
       return;
     }
-    selectorOpen = true;
-    const open = approvals(
+    this.selectorOpen = true;
+    const open = this.approvals(
       approvalCardFor({
         call: ask.call,
-        workspaceName: options.workspace.name,
+        workspaceName: this.options.workspace.name,
         summary: ask.summary,
         reason: ask.reason,
         patterns: ask.patterns,
-        ...(ask.timeoutSeconds === undefined
-          ? {}
-          : { timeoutSeconds: ask.timeoutSeconds }),
+        ...(ask.timeoutSeconds === undefined ? {} : { timeoutSeconds: ask.timeoutSeconds }),
       }),
     );
     waiting.closeSelector = open.close;
-    ui.hold();
+    this.ui.hold();
     void open.answer.then((answer) => {
-      selectorOpen = false;
-      ui.release();
+      this.selectorOpen = false;
+      this.ui.release();
       // A null answer is the card getting there first: `onPermission` has
       // already settled the call.
-      if (answer) applyTerminalAnswer({ callId: ask.call.callId, answer });
-      openNextAsk();
+      if (answer) this.applyTerminalAnswer({ callId: ask.call.callId, answer });
+      this.openNextAsk();
     });
-  };
+  }
 
   /** The developer answered here, so the call is settled here and the platform told. */
-  const applyTerminalAnswer = ({
+  private applyTerminalAnswer({
     callId,
     answer,
   }: {
     callId: string;
     answer: TerminalApproval;
-  }): void => {
-    const waiting = pending.get(callId);
+  }): void {
+    const waiting = this.pending.get(callId);
     if (!waiting) return;
-    pending.delete(callId);
+    this.pending.delete(callId);
     const decision: TerminalPermissionDecision = answer.decision;
-    client.send({
+    this.client.send({
       type: "permission_answered",
       protocol: LOCAL_CONTROL_PROTOCOL_VERSION,
       callId,
       decision,
       ...(decision === "allow_pattern" ? { patterns: waiting.patterns } : {}),
     });
-    ui.permissionSettled({
+    this.ui.permissionSettled({
       call: waiting.call,
       text: settledLine({
         decision,
@@ -460,14 +488,8 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ...(answer.reason === undefined ? {} : { reason: answer.reason }),
       }),
     });
-    if (decision === "allow_pattern") {
-      for (const pattern of waiting.patterns) grants.add(pattern);
-    }
-    if (decision === "allow_once" || decision === "allow_pattern") {
-      void execute(waiting.call);
-      return;
-    }
-    sendFailure({
+    if (this.runIfAllowed({ waiting, decision })) return;
+    this.sendFailure({
       callId,
       code: "permission_denied",
       message: denialMessage({
@@ -475,23 +497,17 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         ...(answer.reason === undefined ? {} : { reason: answer.reason }),
       }),
     });
-  };
+  }
 
-  const onPermission = ({
-    callId,
-    decision,
-  }: {
-    callId: string;
-    decision: string;
-  }): void => {
-    const waiting = pending.get(callId);
+  private onPermission({ callId, decision }: { callId: string; decision: string }): void {
+    const waiting = this.pending.get(callId);
     // The terminal already answered, so the call has run or been refused and
     // the card is only reporting what it settled on.
     if (!waiting) return;
-    pending.delete(callId);
+    this.pending.delete(callId);
     waiting.closeSelector?.();
-    ui.release();
-    ui.permissionSettled({
+    this.ui.release();
+    this.ui.permissionSettled({
       call: waiting.call,
       text: settledLine({
         decision: decision as PermissionDecision,
@@ -499,14 +515,8 @@ export function startLangySession(options: LangySessionOptions): LangySession {
         source: "panel",
       }),
     });
-    if (decision === "allow_pattern") {
-      for (const pattern of waiting.patterns) grants.add(pattern);
-    }
-    if (decision === "allow_once" || decision === "allow_pattern") {
-      void execute(waiting.call);
-      return;
-    }
-    sendFailure({
+    if (this.runIfAllowed({ waiting, decision })) return;
+    this.sendFailure({
       callId,
       code: decision === "expired" ? "permission_expired" : "permission_denied",
       message:
@@ -514,138 +524,114 @@ export function startLangySession(options: LangySessionOptions): LangySession {
           ? `No answer arrived for ${waiting.summary}. Say what you need and end the turn; the next message will ask again.`
           : denialMessage({ summary: waiting.summary }),
     });
-  };
+  }
+
+  /** Whether the answer allowed the call; an allowed one is granted and run. */
+  private runIfAllowed({
+    waiting,
+    decision,
+  }: {
+    waiting: PendingPermission;
+    decision: string;
+  }): boolean {
+    if (decision === "allow_pattern") {
+      for (const pattern of waiting.patterns) this.grants.add(pattern);
+    }
+    if (decision !== "allow_once" && decision !== "allow_pattern") return false;
+    void this.execute(waiting.call);
+    return true;
+  }
 
   /**
    * Everything this session is holding, let go of: the questions on the
-   * screen, the questions waiting for one, and the commands still running in
-   * the folder.
-   *
-   * A folder stops being shared in four ways, and only Ctrl-C used to clear
-   * the work. A disconnect from the panel closed the socket and left the
-   * commands it had started running, writing files and reaching the network
-   * long after the panel said the folder was gone.
+   * screen, the questions waiting for one, and the commands still running
+   * in the folder. A folder stops being shared in four ways, all of them.
    */
-  const stopEverything = (): void => {
-    askQueue.length = 0;
-    for (const [callId, waiting] of pending) {
+  private stopEverything(): void {
+    this.askQueue.length = 0;
+    for (const [callId, waiting] of this.pending) {
       waiting.closeSelector?.();
-      ui.permissionSettled({
+      this.ui.permissionSettled({
         call: waiting.call,
         text: "The folder stopped being shared, so this question was dropped.",
       });
-      client.forgetInFlight(callId);
+      this.client.forgetInFlight(callId);
     }
-    pending.clear();
-    ui.release();
-    for (const command of running.values()) command.cancel();
-    running.clear();
-  };
+    this.pending.clear();
+    this.ui.release();
+    for (const command of this.running.values()) command.cancel();
+    this.running.clear();
+  }
 
-  const onCancel = (callId: string): void => {
-    const command = running.get(callId);
+  private onCancel(callId: string): void {
+    const command = this.running.get(callId);
     if (command) {
       command.cancel();
-      running.delete(callId);
+      this.running.delete(callId);
     }
-    pending.get(callId)?.closeSelector?.();
-    pending.delete(callId);
-    client.forgetInFlight(callId);
-  };
+    this.pending.get(callId)?.closeSelector?.();
+    this.pending.delete(callId);
+    this.client.forgetInFlight(callId);
+  }
+}
 
-  const client = new RelayClient({
-    ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
-    sessionKey: options.sessionKey,
-    workspace: options.workspace,
-    ...(options.transport === undefined ? {} : { transport: options.transport }),
-    ...(options.socketFactory === undefined
-      ? {}
-      : { socketFactory: options.socketFactory }),
-    ...(options.backoff === undefined ? {} : { backoff: options.backoff }),
-    handlers: {
-      onRegistered: (frame) => {
-        skipPermissions = frame.policy.skipPermissions;
-        if (announced) {
-          ui.reconnected();
-          return;
-        }
-        announced = true;
-        conversationHref = conversationLink({
-          url: frame.conversation.url || options.conversation.url,
-          endpoint: options.endpoint,
-        });
-        ui.connected({
-          root,
-          conversationTitle:
-            frame.conversation.title || options.conversation.title,
-          conversationUrl: conversationHref,
-        });
-        if (options.withoutGit === true) ui.noGitRepository();
-      },
-      onCall,
-      onCancel,
-      onPermission,
-      onPolicy: ({ skipPermissions: next }) => {
-        skipPermissions = next;
-        ui.policyChanged({ skipPermissions: next });
-      },
-      onDisconnect: ({ reason }) => {
-        stopEverything();
-        ui.disconnected({ reason });
-        client.stopNow();
-        finish(0);
-      },
-      onRefused: (frame) => {
-        stopEverything();
-        ui.note(frame.message);
-        finish(1);
-      },
-      onGaveUp: ({ reason }) => {
-        stopEverything();
-        ui.note(reason);
-        finish(1);
-      },
-      onConnectionLost: ({ message }) => ui.connectionLost({ message }),
-    },
-  });
-
-  /**
-   * The first Ctrl-C tells the platform, stops the commands it started in the
-   * foreground and exits inside the deadline. A second one exits at once.
-   */
-  const requestShutdown = (): void => {
-    if (shuttingDown) {
-      finish(130);
-      return;
+/** The project's key with the developer's own login; a 401 or 403 is `key_refused`. */
+async function readKeyOrRefuse({
+  readProjectApiKey,
+  project,
+  file,
+}: {
+  readProjectApiKey: (projectId: string) => Promise<string>;
+  project: { id: string; name: string };
+  file: string;
+}): Promise<string> {
+  try {
+    return await readProjectApiKey(project.id);
+  } catch (error) {
+    const status = refusalStatus(error);
+    if (status === 401) {
+      throw new LocalCallFailure({
+        code: "key_refused",
+        message: `The LangWatch login on this machine has expired, so ${file} was not changed. Tell the user in one line to run \`langwatch login --device\` in that terminal, and offer to write the credentials again after.`,
+      });
     }
-    shuttingDown = true;
-    stopEverything();
-    ui.leaving();
-    const deadline = setTimeout(() => finish(0), SHUTDOWN_DEADLINE_MS);
-    deadline.unref();
-    void client.stop().then(() => {
-      clearTimeout(deadline);
-      finish(0);
+    const { stage, code } = refusalStep(error);
+    if (status === 403 && stage === "lookup") {
+      throw new LocalCallFailure({
+        code: "key_refused",
+        message: `The LangWatch login on this machine cannot see ${project.name} (it needs project:view), so ${file} was not changed. Tell the user in one line to sign in with an account that belongs to the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
+      });
+    }
+    if (status === 403) {
+      throw new LocalCallFailure({
+        code: "key_refused",
+        message: `LangWatch did not hand out the project's key to this login: it needs admin access (project:manage) on ${project.name}, so ${file} was not changed. Tell the user in one line that a project admin can grant it, and offer to write the credentials again after.`,
+      });
+    }
+    if (code === "endpoint_missing") {
+      throw new LocalCallFailure({
+        code: "key_refused",
+        message: `This LangWatch server is older than the command line and cannot hand out a project's key to it, so ${file} was not changed. Tell the user in one line that the credentials were not written and that updating LangWatch fixes it.`,
+      });
+    }
+    if (status === 404) {
+      throw new LocalCallFailure({
+        code: "key_refused",
+        message: `LangWatch found no project ${project.name} for the login on this machine, so ${file} was not changed. Tell the user in one line to sign in to the organization that owns the project (\`langwatch login --device\`), and offer to write the credentials again after.`,
+      });
+    }
+    throw new LocalCallFailure({
+      code: "exec_failed",
+      message: `LangWatch did not answer the request for the project's key, so ${file} was not changed. Tell the user in one line that the credentials were not written, and offer to try again.`,
     });
-  };
-
-  client.start();
-  return { done, requestShutdown, client };
+  }
 }
 
 /**
- * What Langy is told when the developer says no.
- *
- * The frame carries no reason, so the reason travels in the call result the
- * CLI writes itself. With nothing typed, the refusal still says who refused.
+ * What Langy is told when the developer says no. The frame carries no
+ * reason, so it travels in the call result the CLI writes itself.
  */
-function denialMessage({
-  summary,
-  reason,
-}: {
-  summary: string;
-  reason?: string;
-}): string {
+function denialMessage({ summary, reason }: { summary: string; reason?: string }): string {
   if (reason === undefined || reason === "") {
     return `The developer denied ${summary}. Do not run it again in this turn; say what you needed it for.`;
   }
@@ -653,13 +639,7 @@ function denialMessage({
 }
 
 /** One file tool, as its text answer. */
-function runFileTool({
-  call,
-  root,
-}: {
-  call: LocalCall;
-  root: string;
-}): string {
+function runFileTool({ call, root }: { call: LocalCall; root: string }): string {
   switch (call.tool) {
     case "local_read":
       return readFile({ params: call.params, root });
@@ -682,7 +662,9 @@ function runFileTool({
 
 /** Which step refused the key (the key exchange unless the error names the lookup) and its code. */
 function refusalStep(error: unknown): { stage: "lookup" | "key"; code: string | undefined } {
-  const { stage, code } = (error ?? {}) as { stage?: unknown; code?: unknown };
+  if (typeof error !== "object" || error === null) return { stage: "key", code: undefined };
+  const stage = "stage" in error ? error.stage : undefined;
+  const code = "code" in error ? error.code : undefined;
   return {
     stage: stage === "lookup" ? "lookup" : "key",
     code: typeof code === "string" ? code : undefined,

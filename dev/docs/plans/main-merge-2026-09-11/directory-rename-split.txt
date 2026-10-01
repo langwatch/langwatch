@@ -1,0 +1,14 @@
+CONFLICT (directory rename split): Unclear where to rename platform/app/ee/governance/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/ee/governance/dashboard/logic to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/ee/governance/dashboard/logic/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/ee/governance/services/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/ee/governance/services/department/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/components/agents/connected/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/components/governance to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/components/scenarios/utils to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/server/app-layer/langy/execution/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/server/app-layer/langy/streaming to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/server/app-layer/traces to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/server/app-layer/traces/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/tasks/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.
+CONFLICT (directory rename split): Unclear where to rename platform/app/src/utils/__tests__ to; it was renamed to multiple other directories, with no destination getting a majority of the files.

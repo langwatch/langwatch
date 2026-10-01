@@ -447,6 +447,14 @@ Feature: Gateway service — public HTTP surface and operational basics
       And error.type equals "payload_too_large"
       And no provider dispatch occurs
 
+    # The OpenAI clients serialise `input` before `model`, so a large embeddings
+    # batch puts `model` past the peek window.
+    @integration
+    Scenario: a model field past the peek window still routes the request
+      When I POST /v1/embeddings with a 64 KiB input array followed by "model"
+      Then the response status is 200
+      And the provider receives that model and the whole body
+
   Rule: A request with no model says where THAT surface expects one
 
     # This is the gateway's largest single source of 400s, and for five days it

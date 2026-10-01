@@ -1,0 +1,79 @@
+import { AgentLabel, MISSING_VALUE } from "@langwatch/coding-agent-browser-kit";
+import { Table } from "@langwatch/design-system/primitives";
+import type React from "react";
+
+import { ActiveAndWaitingCell } from "./cells/active-and-waiting-cell.tsx";
+import { CompactionsCell } from "./cells/compactions-cell.tsx";
+import { ContextCell } from "./cells/context-cell.tsx";
+import { PullRequestsCell } from "./cells/pull-requests-cell.tsx";
+import { SessionNameCell } from "./cells/session-name-cell.tsx";
+import { TokenCostCell } from "./cells/token-cost-cell.tsx";
+import { formatLastUpdate } from "./last-update.ts";
+import type { SessionListRow, SessionPullRequest } from "./session-list-row.ts";
+import { SessionRowActions } from "./session-row-actions.tsx";
+
+/**
+ * One session, read left to right. The whole row is the target that opens the
+ * replay, and hovering it pays for the lookup the click needs, so the drawer
+ * usually opens on the next frame rather than after a round trip.
+ */
+export const SessionRow: React.FC<{
+  row: SessionListRow;
+  largestTotal: number;
+  largestCost: number;
+  isOpening: boolean;
+  onOpenReplay: () => void;
+  onOpenInExplorer: (() => void) | undefined;
+  onOpenPullRequest: (pullRequest: SessionPullRequest) => void;
+  onPrefetch: () => void;
+}> = ({
+  row,
+  largestTotal,
+  largestCost,
+  isOpening,
+  onOpenReplay,
+  onOpenInExplorer,
+  onOpenPullRequest,
+  onPrefetch,
+}) => (
+  <Table.Row
+    data-testid="coding-agent-session-row"
+    onClick={onOpenReplay}
+    onMouseEnter={onPrefetch}
+    aria-busy={isOpening}
+    cursor="pointer"
+    _hover={{ bg: "bg.subtle" }}
+  >
+    <Table.Cell maxWidth="320px">
+      <SessionNameCell row={row} isOpening={isOpening} onOpenReplay={onOpenReplay} />
+    </Table.Cell>
+    <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+      {row.agent ? <AgentLabel agent={row.agent} /> : MISSING_VALUE}
+    </Table.Cell>
+    <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+      {formatLastUpdate({ timestampMs: row.lastUpdateAtMs })}
+    </Table.Cell>
+    <Table.Cell textAlign="end">
+      <ContextCell row={row} largestTotal={largestTotal} />
+    </Table.Cell>
+    <Table.Cell>
+      <CompactionsCell row={row} />
+    </Table.Cell>
+    <Table.Cell>
+      <ActiveAndWaitingCell row={row} />
+    </Table.Cell>
+    <Table.Cell textAlign="end">
+      <TokenCostCell row={row} largestCost={largestCost} />
+    </Table.Cell>
+    <Table.Cell>
+      <PullRequestsCell pullRequests={row.pullRequests} onOpenDetail={onOpenPullRequest} />
+    </Table.Cell>
+    <Table.Cell>
+      <SessionRowActions
+        row={row}
+        onOpenReplay={onOpenReplay}
+        onOpenInExplorer={onOpenInExplorer}
+      />
+    </Table.Cell>
+  </Table.Row>
+);

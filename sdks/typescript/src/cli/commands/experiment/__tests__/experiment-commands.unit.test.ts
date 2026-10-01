@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+
+import {
+  ExperimentsApiServiceError,
+  ExperimentsApiService,
+} from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await importOriginal<typeof import("@/client-sdk/services/experiments/experiments-api.service")>();
+  const actual = await importOriginal<typeof experimentsApiServiceModule>();
   return {
     ...actual,
     ExperimentsApiService: vi.fn(),
@@ -11,7 +14,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -24,7 +31,8 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
+import type * as experimentsApiServiceModule from "@/client-sdk/services/experiments/experiments-api.service";
+
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
 
@@ -52,10 +60,12 @@ describe("runExperimentCommand()", () => {
     vi.clearAllMocks();
     mockStartRun = vi.fn();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: mockStartRun,
-      getRunStatus: mockGetRunStatus,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: mockStartRun,
+        getRunStatus: mockGetRunStatus,
+      } as unknown as ExperimentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -128,9 +138,7 @@ describe("runExperimentCommand()", () => {
         new ExperimentsApiServiceError("Not found", "start evaluation run"),
       );
 
-      await expect(
-        runExperimentCommand("nonexistent", {}),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(runExperimentCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
     });
   });
 });
@@ -141,16 +149,16 @@ describe("experimentStatusCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetRunStatus = vi.fn();
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: vi
-        .fn()
-        .mockRejectedValue(
-          new ExperimentsApiServiceError("Run not found", "get run results"),
-        ),
-      listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: vi
+          .fn()
+          .mockRejectedValue(new ExperimentsApiServiceError("Run not found", "get run results")),
+        listRuns: vi.fn().mockResolvedValue({ runs: [{ runId: "run_123" }] }),
+      } as unknown as ExperimentsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -195,9 +203,9 @@ describe("experimentStatusCommand()", () => {
         new ExperimentsApiServiceError("Not found", "get run status"),
       );
 
-      await expect(
-        experimentStatusCommand("doc-qa", { runId: "nonexistent" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(experimentStatusCommand("doc-qa", { runId: "nonexistent" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

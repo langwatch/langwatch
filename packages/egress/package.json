@@ -1,0 +1,49 @@
+{
+  "name": "@langwatch/egress",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The fence outbound requests leave LangWatch through: the SSRF address policy, the IP-pinned fetch it resolves, and the outbound proxy",
+  "keywords": [
+    "egress",
+    "langwatch",
+    "security",
+    "ssrf"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./ssrf": {
+      "types": "./dist/ssrf/address.d.ts",
+      "default": "./src/ssrf/address.ts"
+    },
+    "./ssrf/url-validator": {
+      "types": "./dist/ssrf/url-validator.d.ts",
+      "default": "./src/ssrf/url-validator.ts"
+    },
+    "./ssrf/fenced-fetch": {
+      "types": "./dist/ssrf/fenced-fetch.d.ts",
+      "default": "./src/ssrf/fenced-fetch.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "undici": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "packageManager": "pnpm@12.6.0"
+}

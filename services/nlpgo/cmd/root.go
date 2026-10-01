@@ -26,11 +26,30 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
+// Options are the per-instance overrides a host applies on top of the
+// service's own configuration.
+//
+// Addr exists because two services sharing one process cannot both read
+// SERVER_ADDR: the combined Go development process (`service combined`) hands
+// each one the port it was allocated instead. Empty means "whatever the
+// service's own configuration resolved", which is what every deployment uses.
+type Options struct {
+	Addr string
+}
+
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
+	return Run(ctx, Options{})
+}
+
+// Run boots the NLP engine with the host's overrides applied.
+func Run(ctx context.Context, opts Options) error {
 	cfg, err := nlpgo.LoadConfig(ctx)
 	if err != nil {
 		return err
+	}
+	if opts.Addr != "" {
+		cfg.Server.Addr = opts.Addr
 	}
 
 	info := contexts.MustGetServiceInfo(ctx)

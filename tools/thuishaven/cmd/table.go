@@ -192,8 +192,20 @@ var removed = map[string]string{
 	"moron":         "haven git",
 }
 
-// table is the whole CLI surface, in help order.
-var table = []commandSpec{
+// table is the whole CLI surface, in help order. The viewer's own tabs are
+// appended to it: every tab of the up viewer is a command too, so a stack is
+// as readable from a pipe as it is from a keyboard.
+var table = append(baseTable, tabSpecs()...)
+
+// baseTable is the surface that is not derived from the viewer's tabs.
+var baseTable = []commandSpec{
+	{
+		name:    "simulator",
+		args:    "<mail|idp|storage|voice|llm|analytics>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runBundledSimulator,
+	},
 	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
@@ -251,6 +263,16 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "destroy",
+		summary: "stop a stack by slug and DROP its databases - the data goes with it",
+		args:    "<slug>",
+		maxArgs: 1,
+		flags: []flagSpec{
+			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
+		},
+		run: runDestroy,
+	},
+	{
 		name:    "restart",
 		summary: "bounce one supervised service (or all) without tearing the stack down",
 		args:    "[service]",
@@ -268,11 +290,19 @@ var table = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "run only the IdP simulator — no app, API or databases; routed at idp.langwatch.localhost",
+		summary: "run the standalone IdP simulator; --json inspects this stack's identity providers",
 		flags: []flagSpec{
 			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
+			{long: "--json", summary: "read this stack's identity provider summaries"},
+			{long: "--stack", takesValue: true, value: "<slug>", summary: "with --json: inspect another stack"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if inv.has("--json") {
+				return printSimulator(d, inv, "idp")
+			}
+			if inv.value("--stack") != "" {
+				return fmt.Errorf("--stack requires --json")
+			}
 			tenants := 0
 			if raw := inv.value("--tenants"); raw != "" {
 				n, err := strconv.Atoi(raw)
@@ -285,6 +315,30 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "limits",
+		summary: "machine resource limits: show them, or set <name> <value> | unset <name>",
+		args:    "[set <name> <value> | unset <name>]",
+		maxArgs: 3,
+		flags: []flagSpec{
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: runLimits,
+	},
+	{
+		name:    "mail",
+		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
+		args:    "<address|list|get|wait|clear> [id]",
+		maxArgs: 2,
+		flags: []flagSpec{
+			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
+			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
+			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			{long: "--html", summary: "get: the message's raw HTML body instead of its text"},
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: runMail,
+	},
+	{
 		name:    "logs",
 		summary: "captured service logs from any terminal: all interleaved, or the named ones",
 		args:    "[service…]",
@@ -294,6 +348,8 @@ var table = []commandSpec{
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
+			{long: "--raw", summary: "the child's own bytes, unrendered"},
+			{long: "--json", summary: "one JSON object per line, lane stamped on"},
 		},
 		run: runLogsCmd,
 	},
@@ -302,18 +358,31 @@ var table = []commandSpec{
 		summary: "one-shot report: every stack, service health, shared servers, RAM",
 		flags: []flagSpec{
 			{long: "--json", summary: "machine-readable"},
+			{long: "--reveal", summary: "print this worktree's overlay secrets instead of masking them"},
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
-			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree)
+			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree, inv.has("--reveal"))
+		},
+	},
+	{
+		name:    "env",
+		summary: "print this stack's resolved environment: eval \"$(haven env --reveal)\" to load it in a shell",
+		flags: []flagSpec{
+			{long: "--json", summary: "machine-readable"},
+			{long: "--reveal", summary: "print secret values instead of masking them"},
+		},
+		run: func(_ context.Context, d deps, inv invocation) error {
+			return d.orch.Env(d.params, inv.has("--json"), inv.has("--reveal"))
 		},
 	},
 	{
 		name:    "db",
-		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url",
-		args:    "<reset|seed|url> [preset|engine]",
+		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test/apidiff databases; dry run unless --yes)",
+		args:    "<reset|seed|url|prune> [preset|engine]",
 		maxArgs: 2,
 		flags: []flagSpec{
-			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
+			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode); drops for prune"},
+			{long: "--dry-run", summary: "prune: list the stray databases only (the default)"},
 		},
 		run: runDB,
 	},
@@ -405,15 +474,16 @@ var table = []commandSpec{
 			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.lwDir, inv.raw)
+			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
 		},
 	},
 	{
 		name:    "clean",
-		summary: "one cleanup: worktree picker, then safe reclaim (artifacts, orphan processes)",
+		summary: "one cleanup: worktree picker, then job-scratch picker, then safe reclaim",
 		flags: []flagSpec{
-			{long: "--yes", summary: "no picker: build artefacts + orphan processes only — never worktrees or databases"},
+			{long: "--yes", summary: "no pickers: apply exactly the pre-tick defaults — never a database"},
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
+			{long: "--include-recent", summary: "also reclaim agent jobs that finished within the last 48h"},
 		},
 		run: runClean,
 	},
@@ -432,45 +502,74 @@ var table = []commandSpec{
 		run: runHeavy,
 	},
 	{
+		// install is about the MACHINE, setup about the CHECKOUT. Two commands
+		// rather than one because they answer to different people: everything
+		// here is something a developer installs once per laptop, and
+		// everything in setup is per worktree and gitignored.
+		name:    "install",
+		summary: "check this machine for what haven needs and offer to install it (portless, node, brew formulae, a runtime)",
+		args:    "[prerequisite…]",
+		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--list", summary: "report what is installed and what is missing; change nothing"},
+			{long: "--yes", summary: "install what haven needs without asking (leaves the optional ones alone)"},
+			{long: "--reset-skips", summary: "forget every never-ask-again, so the next run offers them all"},
+		},
+		run: runInstall,
+	},
+	{
 		name:    "setup",
 		summary: "install optional integrations into this checkout (interactive; nothing is assumed)",
 		args:    "[feature…]",
 		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--list", summary: "what can be installed, and what each one does"},
+			{long: "--off", summary: "turn a feature back off here, so haven up stops reinstalling it (e.g. gate-hook)"},
 		},
 		run: runSetup,
 	},
 	{
 		name:    "gate",
-		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
-		run:     runGate,
+		summary: "answer a coding-agent PreToolUse hook on stdin (opt in with `haven setup`)",
+		flags: []flagSpec{
+			{long: "--client", takesValue: true, value: "<client>", summary: "hook output protocol: claude (default) or codex"},
+		},
+		run: runGate,
 	},
 	{
 		name:    "slot",
 		summary: "run any command under the machine-wide check slot (`slot run -- <cmd>`, `slot explain`)",
-		args:    "run [--label <name>] -- <command> [args…] | explain",
+		args:    "run [--label <name>] [--timeout <duration>] -- <command> [args…] | explain",
 		maxArgs: -1,
-		// The wrapped command lives after the `--` separator; only --label is
-		// ours, and it arrives before the `--`.
+		// The wrapped command lives after the `--` separator; only --label and
+		// --timeout are ours, and they arrive before the `--`.
 		minusArgs: true,
 		flags: []flagSpec{
 			{long: "--label", value: "<name>", takesValue: true, summary: "how the run is named while it queues"},
+			{long: "--timeout", value: "<duration>", takesValue: true, summary: "stop the command and exit 124 once it has run this long (e.g. 10m)"},
 		},
 		run: runSlot,
 	},
 	{
 		name:    "typecheck",
-		summary: "pnpm typecheck under a machine-wide RAM slot (args forwarded)",
-		args:    "[args…]",
+		summary: "typecheck under the machine-wide RAM slot: --affected (agent default) or --all (human default); other args forwarded",
+		args:    "[--affected|--all] [args…]",
 		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--affected", summary: "nx affected -t typecheck from the merge-base with the upstream, or origin/main (the agent default)"},
+			{long: "--all", summary: "the whole-tree pnpm typecheck (the default for a person)"},
+		},
 		// The summary promises the arguments are forwarded, and they are handed
 		// to tsc verbatim — so tsc's own flags (--watch, --noEmit, -p) have to
 		// reach it. Without this every one of them was rejected as an unknown
 		// haven flag and the command could only ever run bare.
 		minusArgs: true,
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.Typecheck(ctx, d.lwDir, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
+			args, affected := typecheckScope(inv.raw, d.isAgent)
+			return d.orch.Typecheck(ctx, app.TypecheckRun{
+				RepoDir: d.worktree, ExtraArgs: args, Affected: affected,
+				SlotsOverride: envInt("HAVEN_TYPECHECK_SLOTS", 0), MaxRSSOverrideMB: envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0),
+			})
 		},
 	},
 	{
@@ -629,4 +728,23 @@ func commandNames() []string {
 		}
 	}
 	return names
+}
+
+// typecheckScope takes haven's own --affected/--all and the `--` separator out
+// of the forwarded args. An agent gets the affected run unless it asks for
+// --all; a person the reverse.
+func typecheckScope(raw []string, isAgent bool) (args []string, affected bool) {
+	affected = isAgent
+	for _, a := range raw {
+		switch a {
+		case "--":
+		case "--affected":
+			affected = true
+		case "--all":
+			affected = false
+		default:
+			args = append(args, a)
+		}
+	}
+	return args, affected
 }

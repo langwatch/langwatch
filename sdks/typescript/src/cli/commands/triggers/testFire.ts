@@ -1,10 +1,10 @@
 import chalk from "chalk";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import type { CommandResult } from "../../utils/output";
-import { createSpinner } from "../../utils/spinner";
-import { failSpinner } from "../../utils/spinnerError";
-import { triggerRequest } from "./triggerRequest";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Send an automation's message to the destination it is configured with, so

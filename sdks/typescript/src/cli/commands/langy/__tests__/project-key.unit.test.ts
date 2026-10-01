@@ -1,20 +1,24 @@
 /**
- * The project's key for Langy's credentials call, against a platform that
- * behaves as production does: the project routes refuse to reveal a base key
- * to any API key, and the device session trades for it by slug.
- *
+ * The project's key for Langy's credentials call, against a platform that refuses to reveal
+ * a base key to any API key: the device session trades for it by slug.
  * @see specs/langy/langy-local-control.feature
  */
 
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { createProjectKeyReader, platformProjectKeyReader } from "../project-key";
 
 const ENDPOINT = "http://app.test";
 
 type Seen = { method: string; path: string; authorization: string | null; body: unknown };
+
+function requestUrl(input: string | URL | Request): string | URL {
+  return input instanceof Request ? input.url : input;
+}
 
 /** The platform: a project lookup, the refused base-key route, the device-session key route. */
 function fakePlatform({ keyRouteStatus = 200 }: { keyRouteStatus?: number } = {}) {
@@ -22,7 +26,7 @@ function fakePlatform({ keyRouteStatus = 200 }: { keyRouteStatus?: number } = {}
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
+      const url = new URL(requestUrl(input));
       const headers = new Headers(init?.headers);
       const method = init?.method ?? "GET";
       const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;

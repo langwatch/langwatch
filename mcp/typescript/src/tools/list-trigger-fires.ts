@@ -1,4 +1,4 @@
-import { listTriggerFires as apiListTriggerFires } from "../langwatch-api-triggers.js";
+import { listTriggerFires as apiListTriggerFires } from "../langwatch-api-triggers.ts";
 
 /**
  * Handles the platform_list_trigger_fires MCP tool invocation: one page of

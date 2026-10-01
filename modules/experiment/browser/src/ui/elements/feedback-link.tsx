@@ -1,0 +1,44 @@
+import { Link } from "@langwatch/browser-host/link";
+import { GitHubIcon as GitHub } from "@langwatch/design-system/icons";
+import { Button, Text, useDisclosure, VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+
+import { Discord } from "./icons/discord.tsx";
+
+export function FeedbackLink() {
+  const { open, onOpen, setOpen } = useDisclosure();
+
+  return (
+    <>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        <Dialog.Content bg="bg">
+          <Dialog.Header>
+            <Dialog.Title>Feedback on LangWatch</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger />
+          <Dialog.Body>
+            <VStack align="start" paddingBottom={4}>
+              <Text paddingBottom={4}>
+                Join our Discord community or open a Github Issue for any issues, questions or
+                ideas.
+              </Text>
+              <Link href="https://discord.gg/kT4PhDS2gH" isExternal>
+                <Button variant="plain">
+                  <Discord /> Discord
+                </Button>
+              </Link>
+              <Link href="https://github.com/langwatch/langwatch" isExternal>
+                <Button variant="plain">
+                  <GitHub /> Github
+                </Button>
+              </Link>
+            </VStack>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog.Root>
+      <Button variant="plain" onClick={onOpen} fontWeight="normal" color="fg">
+        Give Feedback
+      </Button>
+    </>
+  );
+}

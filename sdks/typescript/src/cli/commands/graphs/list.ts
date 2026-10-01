@@ -1,15 +1,16 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -30,8 +31,8 @@ export const listGraphsCommand = async (options: {
     if (options.dashboardId) params.set("dashboardId", options.dashboardId);
     const qs = params.toString() ? `?${params}` : "";
 
-    const response = await langwatchFetch(`${endpoint}/api/graphs${qs}`, {
-      headers: buildAuthHeaders({ apiKey }),
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs${qs}`, {
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {
@@ -39,7 +40,7 @@ export const listGraphsCommand = async (options: {
       process.exit(1);
     }
 
-    const graphs = await response.json() as Array<{
+    const graphs = (await response.json()) as {
       id: string;
       name: string;
       dashboardId: string | null;
@@ -47,7 +48,7 @@ export const listGraphsCommand = async (options: {
       gridRow: number;
       colSpan: number;
       rowSpan: number;
-    }>;
+    }[];
 
     spinner.succeed(`Found ${graphs.length} graph${graphs.length !== 1 ? "s" : ""}`);
 
@@ -58,7 +59,11 @@ export const listGraphsCommand = async (options: {
           console.log();
           console.log(chalk.gray("No graphs found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\''));
+          console.log(
+            chalk.cyan(
+              '  langwatch graph create "My Graph" --dashboard-id <id> --graph \'{"type":"line"}\'',
+            ),
+          );
           return;
         }
 

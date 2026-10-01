@@ -7,7 +7,7 @@ Feature: SSO connection history - the raw events, read and live
   suspended, resumed, teardown requested, migration route decided, arrival
   policy set - without asking support to read the event log for me
 
-  # ADR-117 SS5 (D04) already event-sources every fact about a connection;
+  # ADR-117 §5 (D04) already event-sources every fact about a connection;
   # this is the first surface that reads the log itself rather than only the
   # folded projection. Unlike the SCIM request log (ADR-126,
   # specs/identity/scim-request-log.feature), which is deliberately a TABLE
@@ -25,7 +25,7 @@ Feature: SSO connection history - the raw events, read and live
   #
   # Tenancy is structural, the way the identity log's and the SCIM sync log's
   # both are: the connection pipeline's aggregate id is the connection and its
-  # tenant is the organization (ADR-117 SS5), so a read is a single-tenant scan
+  # tenant is the organization (ADR-117 §5), so a read is a single-tenant scan
   # by construction - naming another organization's connection finds nothing,
   # which reads exactly like a connection that does not exist.
   #

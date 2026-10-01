@@ -1,0 +1,115 @@
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Box } from "@langwatch/design-system/primitives";
+import {
+  useLangyStore,
+  LANGY_DOCKED_OFFSET,
+  LANGY_TRANSITION,
+  LangyProvider,
+  useLangy,
+} from "@langwatch/langy-browser-kit";
+import { UiRouteOutlet } from "@langwatch/ui-kernel/route-objects";
+import { memo, type ReactNode, useEffect } from "react";
+
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useLangyScopeReset } from "../../behavior/use-langy-scope-reset.ts";
+import { useShowLangy } from "../../behavior/use-show-langy.ts";
+import { LangySidecar } from "./langy-panel.tsx";
+
+/** The routed page, when the router mounts this layout with no children of its own. */
+const ROUTED_PAGE = <UiRouteOutlet />;
+
+/**
+ * Layout route that mounts Langy once per project, above the swapping page.
+ * Spec: specs/langy/langy-navigation-persistence.feature
+ */
+export default function ProjectLangyLayout({ children }: { children?: ReactNode }) {
+  const showLangy = useShowLangy();
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  useLangyScopeReset();
+
+  return (
+    <ProjectLangySubtree projectId={project?.id ?? "no-project"} showLangy={showLangy}>
+      {children ?? ROUTED_PAGE}
+    </ProjectLangySubtree>
+  );
+}
+
+/**
+ * A memo boundary between the layout's subscriptions and the whole routed app.
+ */
+const ProjectLangySubtree = memo(function ProjectLangySubtree({
+  projectId,
+  showLangy,
+  children,
+}: {
+  projectId: string;
+  showLangy: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <LangyProvider key={projectId}>
+      <LangyShiftedRoot showLangy={showLangy}>{children}</LangyShiftedRoot>
+    </LangyProvider>
+  );
+});
+
+/** Who reserves the dock's room: the page wrapper, a claiming app shell, or nobody. */
+function dockReservation({ shifted, shellClaimed }: { shifted: boolean; shellClaimed: boolean }) {
+  if (!shifted) return "none";
+  return shellClaimed ? "shell" : "page";
+}
+
+/**
+ * Wraps the routed page in a box that reserves room on the right while the docked panel
+ * is open (so content slides over instead of hiding under it), and renders the panel
+ * itself as a sibling.
+ */
+function LangyShiftedRoot({ showLangy, children }: { showLangy: boolean; children: ReactNode }) {
+  const isOpen = useLangyStore((s) => s.isOpen);
+  const panelMode = useLangyStore((s) => s.panelMode);
+  const shellClaimed = useLangyStore((s) => s.dockShellClaims > 0);
+  const setDockShifted = useLangyStore((s) => s.setDockShifted);
+  // While a drawer is open the panel rides beside it as a floating companion
+  // (see LangyPanel), so the dock's reservation releases and the page gets
+  // its width back underneath the overlay pair.
+  const { currentDrawer } = useDrawer();
+  // Only Sidebar mode reserves room (pushes content left). Floating mode
+  // overlays the page — content stays full width and the card floats over it.
+  const shifted = showLangy && isOpen && panelMode === "sidebar" && !currentDrawer;
+  // Publish the reservation truth for a claiming shell (see the store): this
+  // wrapper owns the visibility gate, the shell only consumes the result.
+  useEffect(() => {
+    setDockShifted(shifted);
+    return () => setDockShifted(false);
+  }, [shifted, setDockShifted]);
+  const reservation = dockReservation({ shifted, shellClaimed });
+  // The box sits in the shell's page body and passes its flex height on,
+  // or full-height pages (the prompt studio) collapse to their content.
+  return (
+    <>
+      <Box
+        width="full"
+        flex="1"
+        minHeight={0}
+        display="flex"
+        flexDirection="column"
+        data-langy-dock={reservation}
+        paddingRight={reservation === "page" ? `${LANGY_DOCKED_OFFSET}px` : 0}
+        transition={`padding-right ${LANGY_TRANSITION}`}
+      >
+        {children}
+      </Box>
+      {showLangy && <LangySidecarConnected />}
+    </>
+  );
+}
+
+function LangySidecarConnected() {
+  const { proposalHandlersRef, actionHandlersRef } = useLangy();
+  return (
+    <LangySidecar proposalHandlersRef={proposalHandlersRef} actionHandlersRef={actionHandlersRef} />
+  );
+}

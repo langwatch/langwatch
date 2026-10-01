@@ -1,0 +1,74 @@
+import { DatasetPreviewTable } from "@langwatch/dataset-browser-kit";
+import type { DatasetColumns, DatasetRecordInput } from "@langwatch/dataset-contract";
+import { Box, Center, HStack, Text } from "@langwatch/design-system/primitives";
+import { Pencil } from "lucide-react";
+import type { ComponentProps } from "react";
+
+/**
+ * The read-only table a prompt's demonstrations render in. The TABLE
+ * itself is not copied - `@langwatch/dataset-browser` publishes it. Dropped
+ * the image lightbox; an image cell just prints its URL.
+ */
+export function DatasetPreview({
+  rows,
+  columns,
+  onClick,
+  ...props
+}: {
+  // Accepts input records (optional id) since we're just displaying a preview
+  rows: DatasetRecordInput[];
+  columns: DatasetColumns;
+  onClick?: () => void;
+} & Omit<ComponentProps<typeof Box>, "columns" | "rows">) {
+  if (!rows) {
+    return null;
+  }
+
+  return (
+    <Box
+      width="100%"
+      maxHeight="200px"
+      overflow="auto"
+      borderBottom={rows.length === 0 ? "1px solid rgba(189, 195, 199, 0.58)" : "none"}
+      className="dataset-preview"
+      position="relative"
+      {...props}
+    >
+      {onClick && (
+        <Center
+          asChild
+          position="absolute"
+          top={0}
+          left={0}
+          width="100%"
+          height="100%"
+          background="rgba(0, 0, 0, 0.2)"
+          zIndex={10}
+          opacity={0}
+          cursor="pointer"
+          transition="opacity 0.2s ease-in-out"
+          _hover={{
+            opacity: 1,
+          }}
+        >
+          <button type="button" aria-label="Edit dataset" onClick={onClick}>
+            <HStack
+              gap={2}
+              fontSize="18px"
+              fontWeight="bold"
+              color="white"
+              background="rgba(0, 0, 0, .5)"
+              paddingY={2}
+              paddingX={4}
+              borderRadius="6px"
+            >
+              <Pencil size={20} />
+              <Text>Edit</Text>
+            </HStack>
+          </button>
+        </Center>
+      )}
+      <DatasetPreviewTable rows={rows} columns={columns} />
+    </Box>
+  );
+}

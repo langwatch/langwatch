@@ -464,12 +464,58 @@ Feature: Langy works in a folder shared from the developer's machine
 
   Rule: The session key is the only credential and it ends with the conversation
 
+    # The local surface declares `langy:create`, and a declaration nothing
+    # enforces is decoration: a key deliberately narrowed below it must be
+    # refused on the strength of its OWN grants, not on what the person who
+    # holds it may otherwise do in Langy.
+
+    @unit
+    Scenario: A key without the local surface's permission is refused
+      Given a key held by someone with Langy access, carrying no "langy:create"
+      When the command line calls the local surface with it
+      Then the call is refused before any conversation is read
+      And the refusal is the deployment's own key-ceiling refusal
+
+    @unit
+    Scenario: A key carrying the permission reaches the local surface
+      Given a key carrying "langy:create" for the conversation's project
+      When the command line calls the local surface with it
+      Then the call is served
+
     @integration
     Scenario: The CLI connects with the session key alone
       Given an approved control request
       When the CLI connects with an API key that is not the minted session key
       Then the connection is refused
       And the refusal names the reason
+
+    @unit
+    Scenario: The CLI may send the session key as a bearer token or as Basic credentials
+      Given an approved control request
+      When the CLI registers over long-poll with the session key as a bearer token or as Basic credentials
+      Then the folder is registered
+      And a key sent only as X-Auth-Token is refused with the frame that asks for a bearer token
+
+    @unit
+    Scenario: A long-poll register with a key that is not a Langy session key answers a refused frame
+      Given an approved control request
+      When the CLI registers over long-poll with a key that is not the minted session key
+      Then register answers 403 with a refused frame
+      And the frame names the reason: an invalid key, the wrong kind of key, or a key that controls no conversation
+
+    @unit
+    Scenario: A long-poll poll or post for an unknown instance token answers 410
+      Given a long-poll share registered on another pod, or one that has ended
+      When the CLI polls or posts frames with its instance token
+      Then the platform answers 410 with no frames and nothing accepted
+      And the CLI registers again, as it does after a dropped socket
+
+    @unit
+    Scenario: A pod that shuts down retires its long-poll shares before closing the session store
+      Given a folder shared over long-poll on a pod
+      When the pod shuts down
+      Then the pod retires every long-poll share it holds
+      And only then closes its session-state store
 
     @integration
     Scenario: Disconnecting from the panel revokes the key
@@ -521,3 +567,15 @@ Feature: Langy works in a folder shared from the developer's machine
       Given a follow-along link, whose path is the site root
       When the root resolves my home page
       Then the conversation parameter travels to the page it lands on
+
+  @unit
+  Scenario: A poll for a lapsed call or question answers a handled not found
+    Given the call or question the worker polls has lapsed
+    When the worker reads its answer
+    Then the platform answers not found with the code langy_local_record_not_found
+
+  @unit
+  Scenario: The control family answers at main's dated and latest addresses
+    Given a command line that pinned the control family at 2026-08-27 or at latest
+    When it lists, approves or cancels a request, or registers, polls or posts frames
+    Then the platform answers as it does at the undated address

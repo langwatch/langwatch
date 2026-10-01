@@ -1,12 +1,11 @@
 /**
- * What Experiment.compare() asks the judge for: one call per row, what each
- * candidate carries, and the settings left unset so the judge's own defaults
- * apply.
- *
+ * What Experiment.compare() asks the judge for: one call per row, what
+ * each candidate carries, and settings left unset for the judge's defaults.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
 import { describe, it, expect } from "vitest";
+
 import type { ComparisonMetric } from "../types";
 import {
   type ComparisonHarness,
@@ -38,11 +37,7 @@ describe("Experiment.compare", () => {
           "gemini-flash",
         ]);
         expect(request.settings).toEqual({});
-        expect(verdict?.candidates).toEqual([
-          "gpt-5-mini",
-          "claude-sonnet-5",
-          "gemini-flash",
-        ]);
+        expect(verdict?.candidates).toEqual(["gpt-5-mini", "claude-sonnet-5", "gemini-flash"]);
       });
 
       it("judges outputs the batch already sent and cleared", async () => {
@@ -55,15 +50,13 @@ describe("Experiment.compare", () => {
         // anyway, which is only possible because they are held elsewhere.
         const flushedBeforeJudging = harness.requestOrder.indexOf("batch");
         expect(flushedBeforeJudging).toBeGreaterThanOrEqual(0);
-        expect(flushedBeforeJudging).toBeLessThan(
-          harness.requestOrder.indexOf("judge")
-        );
+        expect(flushedBeforeJudging).toBeLessThan(harness.requestOrder.indexOf("judge"));
         expect(harness.loggedDatasetTargets.flat()).toEqual(
-          expect.arrayContaining(Object.keys(THREE_OUTPUTS))
+          expect.arrayContaining(Object.keys(THREE_OUTPUTS)),
         );
-        expect(
-          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)
-        ).toEqual(Object.keys(THREE_OUTPUTS));
+        expect(harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.id)).toEqual(
+          Object.keys(THREE_OUTPUTS),
+        );
       });
 
       /** @scenario "Judging on merits is the default" */
@@ -136,9 +129,7 @@ describe("Experiment.compare", () => {
         });
 
         expect(
-          harness.judgeRequests[0]!.data.candidates.map(
-            (candidate) => candidate.output
-          )
+          harness.judgeRequests[0]!.data.candidates.map((candidate) => candidate.output),
         ).toEqual(["Four.", "Four.", '{"answer":"Four.","confidence":0.9}']);
       });
     });

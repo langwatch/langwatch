@@ -1,5 +1,5 @@
-import { listTriggers as apiListTriggers } from "../langwatch-api-triggers.js";
-import type { Trigger } from "../schemas/triggers.js";
+import { listTriggers as apiListTriggers } from "../langwatch-api-triggers.ts";
+import type { Trigger } from "../schemas/triggers.ts";
 
 /**
  * Handles the platform_list_triggers MCP tool invocation.

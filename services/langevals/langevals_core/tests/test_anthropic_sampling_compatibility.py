@@ -1,6 +1,7 @@
 """
-Unit tests for the Claude temperature/top_p rule applied by langevals'
-litellm patch.
+Unit tests for the Claude-model sampling normalization applied by langevals'
+litellm patch: these models reject a request naming both `temperature` and
+`top_p`, so only the temperature is allowed to leave.
 
 Exercised at the patch seam (`patch_litellm_params`), which every litellm
 call in langevals flows through, so what is asserted is the request that
@@ -24,60 +25,71 @@ def scrubbed_litellm_env(monkeypatch):
             monkeypatch.delenv(key)
 
 
-# @scenario "A judge configured with both temperature and top_p still reaches a Claude model"
-def test_drops_top_p_when_temperature_is_also_set_on_claude():
+# @scenario "A judge asking for both sampling knobs still reaches a model that accepts only one"
+def test_drops_the_top_p_when_both_knobs_name_a_claude_model():
     kwargs = patch_litellm_params(
-        {"model": "anthropic/claude-sonnet-4-5", "temperature": 1.0, "top_p": 1.0}
+        {"model": "anthropic/claude-sonnet-4-5", "temperature": 0.0, "top_p": 0.9}
     )
 
-    assert kwargs["temperature"] == 1.0
     assert "top_p" not in kwargs
 
 
-# @scenario "A judge configured with both temperature and top_p still reaches a Claude model"
-def test_the_pair_arriving_through_request_env_is_resolved_the_same_way(monkeypatch):
-    monkeypatch.setenv("X_LITELLM_temperature", "1")
-    monkeypatch.setenv("X_LITELLM_top_p", "1")
+# @scenario "The temperature is the knob that survives"
+def test_keeps_the_temperature_the_evaluator_chose():
+    kwargs = patch_litellm_params(
+        {"model": "anthropic/claude-sonnet-4-5", "temperature": 0.3, "top_p": 0.5}
+    )
 
-    kwargs = patch_litellm_params({"model": "anthropic/claude-haiku-4-5"})
-
-    assert kwargs["temperature"] == 1.0
+    assert kwargs["temperature"] == 0.3
     assert "top_p" not in kwargs
 
 
-# @scenario "A Claude judge configured with top_p alone keeps it"
-def test_keeps_top_p_when_it_is_the_only_sampling_parameter():
+# @scenario "A top_p arriving as a request setting conflicts all the same"
+def test_drops_a_top_p_arriving_as_a_request_setting(monkeypatch):
+    monkeypatch.setenv("X_LITELLM_top_p", "0.9")
+
     kwargs = patch_litellm_params(
-        {"model": "anthropic/claude-sonnet-4-5", "top_p": 0.9}
+        {"model": "anthropic/claude-sonnet-4-5", "temperature": 0.0}
     )
 
-    assert kwargs["top_p"] == 0.9
-    assert "temperature" not in kwargs
+    assert "top_p" not in kwargs
 
 
-# @scenario "A Claude model served by another provider gets the same treatment"
+# @scenario "A Claude model is recognised behind any provider route"
 @pytest.mark.parametrize(
     "model",
     [
         "bedrock/anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
-        "vertex_ai/claude-opus-4-1",
+        "vertex_ai/claude-sonnet-4-5",
     ],
 )
-def test_applies_to_claude_on_other_providers(model):
-    kwargs = patch_litellm_params(
-        {"model": model, "temperature": 0.2, "top_p": 0.9}
-    )
+def test_recognises_a_claude_model_behind_a_cloud_provider_route(model):
+    kwargs = patch_litellm_params({"model": model, "temperature": 0.0, "top_p": 0.9})
 
-    assert kwargs["temperature"] == 0.2
     assert "top_p" not in kwargs
 
 
-# @scenario "A judge on a model that accepts the pair keeps both"
-def test_leaves_other_models_alone():
+# @scenario "Either knob alone is delivered as given"
+def test_leaves_a_lone_top_p_alone():
+    kwargs = patch_litellm_params({"model": "anthropic/claude-sonnet-4-5", "top_p": 0.9})
+
+    assert kwargs["top_p"] == 0.9
+
+
+# @scenario "Either knob alone is delivered as given"
+def test_leaves_a_lone_temperature_alone():
     kwargs = patch_litellm_params(
-        {"model": "openai/gpt-4.1-mini", "temperature": 0.5, "top_p": 0.9}
+        {"model": "anthropic/claude-sonnet-4-5", "temperature": 0.0}
     )
 
-    assert kwargs["temperature"] == 0.5
+    assert kwargs["temperature"] == 0.0
+
+
+# @scenario "Every other model keeps both knobs"
+def test_leaves_other_models_with_both_knobs():
+    kwargs = patch_litellm_params(
+        {"model": "gemini/gemini-2.5-flash", "temperature": 0.0, "top_p": 0.9}
+    )
+
+    assert kwargs["temperature"] == 0.0
     assert kwargs["top_p"] == 0.9

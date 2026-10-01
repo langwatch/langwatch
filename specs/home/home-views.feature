@@ -85,7 +85,7 @@ Feature: Adaptive home views
     And the announcement banners are demoted below recent items
     And the onboarding checklist is not shown
     # Triage has no automatic trigger yet — it needs an error-spike signal
-    # the backend does not expose today. Reachable via the dev switcher.
+    # the backend does not expose today.
 
   Scenario: The resolved view is cached so the page never assembles in front of the user
     Given the user resolved a view within the last fifteen minutes
@@ -94,8 +94,12 @@ Feature: Adaptive home views
     And if the fresh resolution disagrees, the middle modules crossfade to the new composition as one motion
     And under prefers-reduced-motion the change is instant, without animation
 
-  Scenario: Developers can preview any view
-    Given the app is running a development build
-    When I use the view switcher next to the greeting
-    Then I can pin the page to any view, or return it to automatic resolution
-    And the switcher is never rendered in production builds
+  # The home draws the traces overview out of
+  # the analytics surfaces, and those read the analytics host. Mounting only the
+  # home's own host left them with nothing to read and the page threw before it
+  # rendered anything — both at `/<project>` and at `/`, which lands there.
+  @integration
+  Scenario: The project home renders the analytics surfaces it draws
+    Given I open the project home
+    When the page renders its analytics surfaces
+    Then the home renders rather than failing on a missing analytics host

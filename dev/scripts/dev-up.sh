@@ -35,9 +35,11 @@ find_free_port() {
   echo "$port"
 }
 
+# The ui lane's published port, and the api lane's beside it. Both are searched
+# independently: a worktree that finds 5560 free may still find 6560 taken.
 APP_PORT=$(find_free_port 5560)
-AI_SERVER_PORT=$(find_free_port 3456)
-export APP_PORT AI_SERVER_PORT
+API_PORT=$(find_free_port 6560)
+export APP_PORT API_PORT
 
 # Strip any stale http://localhost:<oldport> exports of NEXTAUTH_URL /
 # BASE_HOST so dynamic-port worktrees don't 403 on login (lw#3453). Real
@@ -48,9 +50,9 @@ sanitize_localhost_dev_env
 # ---------------------------------------------------------------------------
 # Ensure .env files exist
 # ---------------------------------------------------------------------------
-if [ ! -f "platform/app/.env" ] && [ -f "platform/app/.env.example" ]; then
-  echo "Creating platform/app/.env from example..."
-  cp platform/app/.env.example platform/app/.env
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+  echo "Creating .env from example..."
+  cp .env.example .env
 fi
 
 # ---------------------------------------------------------------------------
@@ -59,14 +61,11 @@ fi
 # on the host before containers start.
 # ---------------------------------------------------------------------------
 echo "Preparing host files..."
-(
-  cd platform/app
-  if [ ! -d node_modules ]; then
-    echo "Installing host dependencies..."
-    pnpm install
-  fi
-  pnpm run start:prepare:files 2>/dev/null || echo "WARNING: start:prepare:files had errors (non-fatal)"
-)
+if [ ! -d node_modules ]; then
+  echo "Installing host dependencies..."
+  pnpm install
+fi
+pnpm run start:prepare:files 2>/dev/null || echo "WARNING: start:prepare:files had errors (non-fatal)"
 
 # ---------------------------------------------------------------------------
 # Build compose command with optional profile
@@ -81,7 +80,7 @@ fi
 # ---------------------------------------------------------------------------
 echo "Starting LangWatch (project=${COMPOSE_PROJECT_NAME}, app_port=${APP_PORT})..."
 
-# Write URL overrides into platform/app/.env.dev-up. Same shared helper as
+# Write URL overrides into .env.dev-up. Same shared helper as
 # dev/scripts/dev.sh — only the URLs whose services actually start for this
 # profile are overridden (#3860 AC#6). The helper honors each service's
 # compose profile membership: langwatch_nlp runs under [nlp, scenarios,
@@ -99,7 +98,7 @@ case "${PROFILE:-}" in
   nlp)                       DEV_UP_PRESET="all-local-nlp" ;;
   full|scenarios|workers)    DEV_UP_PRESET="full-local" ;;
 esac
-write_dev_overrides "$DEV_UP_PRESET" platform/app/.env.dev-up
+write_dev_overrides "$DEV_UP_PRESET" .env.dev-up
 
 $COMPOSE_CMD up -d
 
@@ -108,7 +107,7 @@ $COMPOSE_CMD up -d
 # ---------------------------------------------------------------------------
 cat > .dev-port <<EOF
 APP_PORT=${APP_PORT}
-AI_SERVER_PORT=${AI_SERVER_PORT}
+API_PORT=${API_PORT}
 COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}
 VOLUME_PREFIX=${VOLUME_PREFIX}
 BASE_URL=http://localhost:${APP_PORT}
@@ -117,6 +116,7 @@ EOF
 echo ""
 echo "Services starting in background."
 echo "  App:        http://localhost:${APP_PORT}"
+echo "  API:        http://localhost:${API_PORT}  (also at /api on the app port)"
 echo "  Project:    ${COMPOSE_PROJECT_NAME}"
 echo "  Port file:  .dev-port"
 echo ""

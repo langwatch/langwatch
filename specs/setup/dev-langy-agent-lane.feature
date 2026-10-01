@@ -30,29 +30,21 @@ Feature: `pnpm dev` starts the Langy agent manager
   Rule: The manager starts on the address the app dials
 
     # The launcher runs before every Node entry point and sees only the
-    # calling shell, while the app loads platform/app/.env and then the
-    # .env.portless haven overlay with override. A pinned agent URL is
+    # calling shell, while the applications load .env. A pinned agent URL is
     # therefore invisible to the launcher and authoritative for the app, the
     # same split the NLP engine had.
 
     @unit
     Scenario: The manager follows the address pinned in the app's env file
-      Given platform/app/.env pins the agent URL to port 8080
+      Given .env pins the agent URL to port 8080
       And this worktree runs on port slot 5590
       When the launcher resolves the agent address
       Then it resolves to the pinned port 8080
       And it says which file that came from
 
     @unit
-    Scenario: The haven overlay wins over the plain env file for the agent address
-      Given platform/app/.env pins one agent URL
-      And the haven overlay pins another
-      When the launcher resolves the agent address
-      Then it resolves to the overlay's address, the one the app loads last
-
-    @unit
     Scenario: An agent address pinned in a file beats one exported for a single run
-      Given platform/app/.env pins the agent URL
+      Given .env pins the agent URL
       And a different address is exported into the shell
       When the launcher resolves the agent address
       Then it resolves to the pinned one, because that is what the app will read
@@ -64,23 +56,15 @@ Feature: `pnpm dev` starts the Langy agent manager
       Then it leaves the address unset for the launcher to derive from the port
 
     @unit
-    Scenario: An overlay that clears the agent address is not read past
-      Given platform/app/.env pins the agent URL
-      And the haven overlay assigns it an empty value
-      When the launcher resolves the agent address
-      Then it derives the port slot, because the app reads the empty overlay too
-      And it does not fall back to the address in the plain env file
-
-    @unit
-    Scenario: An overlay that clears the agent address drops one exported for a single run
+    Scenario: An env file that clears the agent address drops one exported for a single run
       Given an agent URL exported into the shell
-      And the haven overlay assigns the agent URL an empty value
+      And .env assigns the agent URL an empty value
       When the launcher resolves the agent address
       Then it derives the port slot, because the file beats the exported value
 
     @unit
     Scenario: A commented-out pin is not an agent address
-      Given platform/app/.env has its agent URL commented out
+      Given .env has its agent URL commented out
       When the launcher resolves the agent address
       Then it leaves the address unset for the launcher to derive from the port
 
@@ -101,7 +85,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A pinned address decides the port the lane sets
-      Given platform/app/.env pins the agent URL to port 8080
+      Given .env pins the agent URL to port 8080
       When the launcher plans the langy lane
       Then the lane sets the manager's port to 8080
 
@@ -114,7 +98,7 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A missing Langy env block skips the lane and names the doctor
-      Given platform/app/.env has no LANGY_INTERNAL_SECRET
+      Given .env has no LANGY_INTERNAL_SECRET
       When the launcher plans the langy lane
       Then the lane is skipped
       And the reason names the missing setting
@@ -122,21 +106,20 @@ Feature: `pnpm dev` starts the Langy agent manager
 
     @unit
     Scenario: A missing workspace root skips the lane the same way
-      Given platform/app/.env has no LANGY_WORKSPACE_ROOT
+      Given .env has no LANGY_WORKSPACE_ROOT
       When the launcher plans the langy lane
       Then the lane is skipped
       And the reason names the missing setting
 
     @unit
-    Scenario: A setting only the haven overlay carries does not count as present
-      Given the Langy secret is only in the haven overlay, not in the app's env file
+    Scenario: A setting the shell alone carries counts as present
+      Given the Langy secret is exported into the shell, not in the app's env file
       When the launcher plans the langy lane
-      Then the lane is skipped
-      And the reason names the missing setting
-      # The manager reads its settings from the app's env file alone, so a value
-      # that lives only in the overlay would start a lane that cannot boot. The
-      # agent address is resolved from the overlay on purpose, because the app
-      # reads the overlay to decide where to dial.
+      Then the lane starts
+      # `make service` inherits the calling shell, so an exported secret is one
+      # the manager will actually have. There is no third place for a setting to
+      # hide any more: haven injects its own values into the processes it starts
+      # rather than writing them to a file this launcher could read.
 
     @unit
     Scenario: No Go toolchain skips the lane with the manual command
@@ -222,3 +205,94 @@ Feature: `pnpm dev` starts the Langy agent manager
       Then the worker pool is capped to the local size
       And an idle worker is reaped in minutes rather than the production wait
       And the caps can still be overridden from the environment
+
+  Rule: The launcher fills in the Langy settings rather than asking for them
+
+    # The lane above skips when the Langy block is missing, and the block was a
+    # developer's job: run the dogfood doctor, copy five lines, paste them into
+    # .env. Every one of those lines has exactly one sensible local value, so
+    # the launcher writes them itself, the way it already generates the three
+    # AI Gateway secrets a fresh clone cannot boot without. Only a missing or
+    # empty value is written; a developer's own value is never touched.
+
+    @unit
+    Scenario: A checkout with no Langy block gets one
+      Given .env carries none of the Langy settings
+      When the developer starts the stack
+      Then a shared secret is generated for the manager and the control plane
+      And the session and workspace roots point inside this developer's home
+      And the panel's release flag is force-enabled
+      And the isolation bypass a laptop needs is turned on
+
+    @unit
+    Scenario: Settings the developer already chose are left alone
+      Given .env already carries a Langy secret and its own workspace root
+      When the developer starts the stack
+      Then those values are unchanged
+      And only the settings that were missing are added
+
+    @unit
+    Scenario: The release flag joins the flags already forced on
+      Given .env forces another flag on
+      When the developer starts the stack
+      Then the Langy flag is added beside it
+      And the flag already there is kept
+
+    @unit
+    Scenario: A flag list that already names Langy is not rewritten
+      Given .env already force-enables the Langy flag
+      When the developer starts the stack
+      Then the flag list is unchanged
+
+    @unit
+    Scenario: A checkout with no env file is left to the env-file check
+      Given the developer has not created .env yet
+      When the developer starts the stack
+      Then nothing is written
+      # The env-files check fires first and points at .env.example, which is a
+      # better first message than a settings block appearing in a file the
+      # developer has not made yet.
+
+  Rule: The generated settings are development only
+
+    # Every setting the launcher writes trades isolation or a rollout gate for
+    # convenience on the machine that owns the code. None of them may be
+    # reachable from a deployed environment, so the refusal is by environment
+    # and not by a flag anyone can pass.
+
+    @unit
+    Scenario: A production launcher writes nothing
+      Given the environment is production
+      When the launcher is asked to fill in the Langy settings
+      Then nothing is written
+      And it says the settings are for development only
+
+    @unit
+    Scenario: The manager refuses the isolation bypass outside a local environment
+      Given the manager is configured with the isolation bypass turned on
+      And its environment is production
+      When the manager loads its configuration
+      Then it refuses to start
+      And the refusal names the bypass and the environment
+
+  Rule: The startup line says what Langy is running with
+
+    # Three things decide whether a local turn answers: where the manager is,
+    # which harness runs the turn, and whether the isolation a laptop cannot
+    # provide has been turned off. All three were only discoverable by reading
+    # the manager's config, so the launcher and the manager each say them once.
+
+    @unit
+    Scenario: The launcher names the harness, the address and the worker binary
+      Given the launcher plans the langy lane
+      When the stack starts
+      Then one line names the harness the turn runs under
+      And it names the address the app dials
+      And it names the worker binary the manager will spawn
+
+    @unit
+    Scenario: The manager says which isolation it booted with
+      Given the manager starts with the isolation bypass turned on
+      When it logs its startup line
+      Then the line says isolation is disabled
+      And it names its environment, its worker binary and its sessions root

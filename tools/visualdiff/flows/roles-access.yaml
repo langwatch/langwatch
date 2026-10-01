@@ -1,0 +1,203 @@
+# Roles & access, the Access tab (/settings/roles?tab=assignments): granting a role, changing it,
+# revoking it after a confirm, and what a manager who is not an admin is offered.
+# specs/rbac/roles-and-access-ui.feature. Branch-only: main's tab is the read-only role assignments
+# list with no grant dialog, so every step after the first `go` fails there by design.
+# Each flow makes its own group, roles and member under {uid} and reads each write back through
+# /api/grants with the organisation key. The Access list pages 50 grants oldest first, so on an
+# organisation holding more than 50 the new row sits on a later page and the row expects fail.
+flows:
+  - id: roles-access-grant-change-revoke
+    title: Grant a group a role on the Access tab, change its role, then revoke it after confirming
+    steps:
+      - action: request
+        with:
+          path: /api/groups
+          auth: "{orgKey}"
+          body: '{"name":"vd-grp-{uid}"}'
+          field: id
+          as: groupId
+      - action: go
+        with:
+          path: /settings/roles?tab=assignments
+      - action: click
+        with:
+          testId: grant-role-open
+      - action: select
+        with:
+          testId: grant-who
+          option: vd-grp-{uid}
+      - action: select
+        with:
+          testId: grant-role
+          option: Viewer
+      - action: click
+        with:
+          testId: grant-submit
+      - action: expect
+        with:
+          api: /api/grants?principalType=group&principalId={groupId}
+          auth: "{orgKey}"
+          field: grants.0.role.id
+          equals: viewer
+      - action: expect
+        with:
+          testId: grant-row
+          hasText: /vd-grp-{uid}[\s\S]*Viewer/
+      - action: click
+        with:
+          selector: '[data-testid="grant-row"]:has-text("vd-grp-{uid}") [data-testid="grant-row-actions"]'
+      - action: click
+        with:
+          testId: grant-change-role
+      - action: select
+        with:
+          testId: grant-role
+          option: Member
+      - action: click
+        with:
+          testId: grant-submit
+      - action: expect
+        with:
+          api: /api/grants?principalType=group&principalId={groupId}
+          auth: "{orgKey}"
+          field: grants.0.role.id
+          equals: member
+      - action: expect
+        with:
+          testId: grant-row
+          hasText: /vd-grp-{uid}[\s\S]*Member/
+      - action: click
+        with:
+          selector: '[data-testid="grant-row"]:has-text("vd-grp-{uid}") [data-testid="grant-row-actions"]'
+      - action: click
+        with:
+          testId: grant-revoke
+      - action: expect
+        with:
+          text: /vd-grp-{uid} loses Member on/
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Revoke\s*$/
+      - action: expect
+        with:
+          api: /api/grants?principalType=group&principalId={groupId}
+          auth: "{orgKey}"
+          field: grants
+          equals: "[]"
+      - action: expect
+        with:
+          testId: grant-row
+          hasText: vd-grp-{uid}
+          equals: "0"
+      - action: request
+        with:
+          path: /api/groups/{groupId}
+          method: DELETE
+          auth: "{orgKey}"
+
+  - id: roles-access-reader-sees-roles-beyond-them
+    title: A manager who is not an admin is offered a role beyond their own access, marked and disabled
+    steps:
+      - action: request
+        with:
+          path: /api/roles
+          auth: "{orgKey}"
+          body: '{"name":"vd-mgr-{uid}","permissions":["organization:view","organization:manage"]}'
+          field: id
+          as: managerRoleId
+      - action: request
+        with:
+          path: /api/roles
+          auth: "{orgKey}"
+          body: '{"name":"vd-wide-{uid}","permissions":["organization:view","project:delete"]}'
+          field: id
+          as: wideRoleId
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: "alice@example.com, bob@example.com"
+          value: "vd-rdr-{uid}@mail.langwatch.localhost"
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-rdr-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-rdr-{uid}@mail.langwatch.localhost
+          name: vd-rdr-{uid}
+      - action: go
+        with:
+          path: /settings/roles?tab=assignments
+      - action: click
+        with:
+          testId: grant-role-open
+      - action: select
+        with:
+          testId: grant-who
+          option: vd-rdr-{uid}
+      - action: select
+        with:
+          testId: grant-role
+          option: vd-mgr-{uid}
+      - action: click
+        with:
+          testId: grant-submit
+      - action: expect
+        with:
+          api: /api/grants?roleId={managerRoleId}
+          auth: "{orgKey}"
+          contains: vd-rdr-{uid}
+      - action: signIn
+        with:
+          anonymous: reader
+          email: vd-rdr-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: reader
+      - action: go
+        with:
+          path: /settings/roles?tab=assignments
+          anonymous: reader
+      - action: click
+        with:
+          testId: grant-role-open
+          anonymous: reader
+      - action: expect
+        with:
+          testId: grant-role
+          hasText: vd-wide-{uid} (more access than you have)
+          timeout: "20000"
+          anonymous: reader
+      - action: expect
+        with:
+          testId: grant-role
+          hasText: /vd-mgr-{uid}(?! \(more access)/
+          anonymous: reader
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: Actions for vd-rdr-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: request
+        with:
+          path: /api/roles/{wideRoleId}
+          method: DELETE
+          auth: "{orgKey}"

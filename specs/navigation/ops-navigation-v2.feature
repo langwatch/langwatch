@@ -28,6 +28,31 @@ Feature: Internal ops navigation
     When the settings sidebar renders
     Then there is no OPS group and no BACKOFFICE group
 
+  # The badge the legacy sidebar drew on its own Ops section: blocked groups
+  # plus dead-lettered jobs, the two integers `ops.getBadgeCounts` answers.
+  # The section went with the legacy chrome and the badge went with it, so an
+  # operator with parked work waiting read a menu that looked idle. It belongs
+  # on the entry that opens onto the same queues.
+  @integration
+  Scenario: The operations Dashboard entry carries the work waiting on it
+    Given I have ops access
+    And blocked groups and dead-lettered jobs are waiting
+    When the settings sidebar renders
+    Then the Dashboard entry carries their total
+
+  @integration
+  Scenario: An idle fleet leaves the operations entry unmarked
+    Given I have ops access
+    And nothing is blocked and nothing is dead-lettered
+    When the settings sidebar renders
+    Then the Dashboard entry carries no number
+
+  @integration
+  Scenario: A reader without operations access never asks for the counts
+    Given I do not have ops access
+    When the settings sidebar renders
+    Then the counts are not requested
+
   @unit
   Scenario: The settings menu reaches every internal ops page
     Given the route table registers the internal ops pages
@@ -56,3 +81,10 @@ Feature: Internal ops navigation
     Given I am on an ops page
     When the landing memory reads the address
     Then it resolves to no product
+
+  @unit
+  Scenario: The internal ops pages take the settings detour
+    Given a settings address or an internal ops address
+    When the chrome resolves which product and scope that address belongs to
+    Then it resolves as a settings route carrying organization scope
+    And it belongs to no product

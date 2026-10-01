@@ -1,11 +1,10 @@
 /**
- * The device login as a step of another command. `langy --share-control`
- * words the sign-in itself, so the flow prints the address to open, the code
- * and who signed in, and leaves the rest of the ceremony to `langwatch login`.
- *
- * Feature: specs/typescript-sdk/cli-langy-share-control.feature
+ * The device login as a step of another command. `langy --share-control` words the sign-in itself,
+ * so the flow prints the address to open, the code and who signed in, and leaves the rest of the
+ * ceremony to `langwatch login`. Feature: specs/typescript-sdk/cli-langy-share-control.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type * as deviceFlow from "../device-flow";
 
 vi.mock("../device-flow", async () => {

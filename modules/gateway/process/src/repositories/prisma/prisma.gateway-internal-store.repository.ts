@@ -1,0 +1,145 @@
+import type {
+  VirtualKeyWithScopes,
+  GatewayBudget,
+  GatewayBudgetBucketBoundary,
+} from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, type Instant, toDate } from "@langwatch/time";
+
+import { gatewayRoutingPolicySelect } from "../../repositories/gateway-virtual-key.repository.ts";
+import { GatewayInternalStoreRepository } from "../gateway-internal-store.repository.ts";
+import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
+
+const logger = createLogger("langwatch:gateway:internal-store");
+
+/**
+ * Every query here is transcribed from the route handler it replaced,
+ * include/select clauses intact — those clauses ARE the contract (e.g. the
+ * routingPolicy selection carries model aliases and deny rules).
+ */
+export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRepository {
+  static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreRepository {
+    return new PrismaGatewayInternalStoreRepository(options.database);
+  }
+
+  private constructor(private readonly database: PrismaClient) {
+    super();
+  }
+
+  async findVirtualKeyForConfig(virtualKeyId: string): Promise<VirtualKeyWithScopes | null> {
+    const found = await this.database.virtualKey.findUnique({
+      where: { id: virtualKeyId },
+      include: {
+        scopes: true,
+        // Part of the virtual-key record the materialiser is typed against, and
+        // read exactly as the gateway's own repository reads it.
+        principalUser: { select: { id: true, name: true, email: true } },
+        // The routing policy is where model_aliases and policy_rules live.
+        // Without it the materialiser reads an absent relation and emits an
+        // empty alias map plus empty deny/allow lists, so the gateway never
+        // resolves an alias and never enforces a model deny rule.
+        routingPolicy: { select: gatewayRoutingPolicySelect },
+      },
+    });
+    if (!found) return null;
+    // The record carries instants; the stored columns are Dates.
+    return {
+      ...found,
+      disabledAt: found.disabledAt ? fromDate(found.disabledAt) : null,
+      expiresAt: found.expiresAt ? fromDate(found.expiresAt) : null,
+      previousSecretValidUntil: found.previousSecretValidUntil
+        ? fromDate(found.previousSecretValidUntil)
+        : null,
+      revokedAt: found.revokedAt ? fromDate(found.revokedAt) : null,
+      createdAt: fromDate(found.createdAt),
+      updatedAt: fromDate(found.updatedAt),
+      lastUsedAt: found.lastUsedAt ? fromDate(found.lastUsedAt) : null,
+    } as VirtualKeyWithScopes;
+  }
+
+  async findBudget(budgetId: string): Promise<GatewayBudget | null> {
+    const row = await this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
+
+    return row ? PrismaGatewayBudgetRepository.toGatewayBudgetRow(row) : null;
+  }
+
+  async findBucketBoundary(input: {
+    budgetId: string;
+    bucketScopeId: string;
+  }): Promise<{ periodStartedAt: GatewayBudgetBucketBoundary["periodStartedAt"] } | null> {
+    const row = await this.database.gatewayBudgetBucketBoundary.findUnique({
+      where: {
+        budgetId_bucketScopeId: {
+          budgetId: input.budgetId,
+          bucketScopeId: input.bucketScopeId,
+        },
+      },
+      select: { periodStartedAt: true },
+    });
+
+    return row ? { periodStartedAt: fromDate(row.periodStartedAt) } : null;
+  }
+
+  async findProjectIdsForOrganization(organizationId: string): Promise<string[]> {
+    const projects = await this.database.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    return projects.map((project) => project.id);
+  }
+
+  async findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
+    {
+      id: string;
+      organizationId: string;
+      principalUserId: string | null;
+      lastUsedAt: Instant | null;
+    }[]
+  > {
+    const rows = await this.database.virtualKey.findMany({
+      where: { id: { in: [...virtualKeyIds] } },
+      select: {
+        id: true,
+        organizationId: true,
+        principalUserId: true,
+        lastUsedAt: true,
+      },
+    });
+
+    return rows.map((row) => ({
+      ...row,
+      lastUsedAt: row.lastUsedAt ? fromDate(row.lastUsedAt) : null,
+    }));
+  }
+
+  findProjectTeams(projectIds: readonly string[]): Promise<{ id: string; teamId: string }[]> {
+    return this.database.project.findMany({
+      where: { id: { in: [...projectIds] } },
+      select: { id: true, teamId: true },
+    });
+  }
+
+  /**
+   * Best effort, and the swallow is deliberate: this write is administrative
+   * oversight, and the caller is in the middle of appending billing records
+   * that must not be retried because a timestamp column would not move.
+   */
+  async touchVirtualKeysLastUsed(input: {
+    virtualKeyIds: readonly string[];
+    now: Instant;
+  }): Promise<void> {
+    if (input.virtualKeyIds.length === 0) return;
+    try {
+      await this.database.virtualKey.updateMany({
+        where: { id: { in: [...input.virtualKeyIds] } },
+        data: { lastUsedAt: toDate(input.now) },
+      });
+    } catch (error) {
+      logger.warn(
+        { virtualKeyIds: input.virtualKeyIds, error },
+        "failed to advance virtualKey.lastUsedAt for admitted spend commands",
+      );
+    }
+  }
+}

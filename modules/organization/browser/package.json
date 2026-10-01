@@ -1,0 +1,69 @@
+{
+  "name": "@langwatch/organization-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe organization settings screens: the audit trail an admin or compliance reviewer reads.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/organization.web.ts",
+      "types": "./dist/organization.web.d.ts",
+      "default": "./src/organization.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-browser-kit": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/user-browser-kit": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "papaparse": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-router": "catalog:",
+    "use-debounce": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/papaparse": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

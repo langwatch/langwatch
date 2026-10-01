@@ -1,20 +1,18 @@
+import { readFileSync } from "node:fs";
+
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import type * as NodeFs from "node:fs";
+
 import {
   type VirtualKeyBudgetInput,
   type VirtualKeyRoutingMode,
   VirtualKeysApiService,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import {
-  buildBudgetFlags,
-  formatScope,
-  parseRoutingModeArg,
-  parseScopeArg,
-} from "./_shared";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { buildBudgetFlags, formatScope, parseRoutingModeArg, parseScopeArg } from "./_shared";
 
 export interface UpdateVirtualKeyOptions {
   name?: string;
@@ -34,25 +32,24 @@ export interface UpdateVirtualKeyOptions {
   configFile?: string;
 }
 
-
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
     try {
       return JSON.parse(options.configJson) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   if (options.configFile) {
-    // Lazy-require so the import stays local to the --config-file path
-    // (the CLI is an entrypoint shared with scripts that may not need fs).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { readFileSync } = require("node:fs") as typeof NodeFs;
     const raw = readFileSync(options.configFile, "utf8");
     try {
       return JSON.parse(raw) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return undefined;
@@ -123,11 +120,7 @@ export const updateVirtualKeyCommand = async (
       name: options.name,
       description: options.clearDescription ? null : options.description,
       scopes,
-      ...(options.clearTraceProject
-        ? { trace_project_id: null }
-        : options.traceProject !== undefined
-          ? { trace_project_id: options.traceProject }
-          : {}),
+      ...traceProjectUpdate(options),
       routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
       routing_mode: routingMode,
       budget,
@@ -138,22 +131,36 @@ export const updateVirtualKeyCommand = async (
 
     return {
       data: updated,
-      table: () => {
-        console.log();
-        console.log(`${chalk.bold("ID:")}             ${updated.id}`);
-        console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
-        if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
-        console.log(`${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-        console.log(`${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-        console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
-        console.log();
-        console.log(chalk.gray("Config after update:"));
-        console.log(JSON.stringify(updated.config, null, 2));
-        console.log();
-      },
+      table: () => printUpdatedKey(updated),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "update virtual key" });
     process.exit(1);
   }
 };
+
+function traceProjectUpdate(options: { clearTraceProject?: boolean; traceProject?: string }): {
+  trace_project_id?: string | null;
+} {
+  if (options.clearTraceProject) return { trace_project_id: null };
+  if (options.traceProject !== undefined) return { trace_project_id: options.traceProject };
+  return {};
+}
+
+function printUpdatedKey(updated: Awaited<ReturnType<VirtualKeysApiService["update"]>>): void {
+  console.log();
+  console.log(`${chalk.bold("ID:")}             ${updated.id}`);
+  console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
+  if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
+  console.log(
+    `${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
+  );
+  console.log(
+    `${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`,
+  );
+  console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
+  console.log();
+  console.log(chalk.gray("Config after update:"));
+  console.log(JSON.stringify(updated.config, null, 2));
+  console.log();
+}

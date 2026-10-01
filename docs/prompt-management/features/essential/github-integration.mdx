@@ -8,6 +8,7 @@ LangWatch's prompt management integrates with GitHub through the [Prompts CLI](/
 ## How It Works
 
 The CLI creates standard YAML files that you commit like any other file:
+
 - **Local prompts** are stored as `.prompt.yaml` files in your repository
 - **Remote prompts** are materialized locally but gitignored (fetched fresh on each sync)
 - **Dependencies** are declared in `prompts.json` and locked in `prompts-lock.json`
@@ -28,6 +29,7 @@ langwatch prompt init
 ```
 
 This creates the essential files:
+
 ```
 your-repo/
 ├── prompts/
@@ -63,6 +65,7 @@ langwatch prompt push
 ```
 
 Commit your prompt files:
+
 ```bash
 git add prompts/features/user-onboarding.prompt.yaml prompts.json prompts-lock.json
 git commit -m "Add user onboarding prompt"
@@ -80,10 +83,10 @@ name: LangWatch Prompt Sync
 on:
   push:
     branches: [main, develop]
-    paths: ['prompts/**', 'prompts.json']
+    paths: ["prompts/**", "prompts.json"]
   pull_request:
     branches: [main]
-    paths: ['prompts/**', 'prompts.json']
+    paths: ["prompts/**", "prompts.json"]
 
 jobs:
   sync-prompts:
@@ -96,7 +99,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
 
       - name: Install LangWatch CLI
         run: npm install -g langwatch

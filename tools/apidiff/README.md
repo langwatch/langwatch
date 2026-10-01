@@ -1,0 +1,1000 @@
+# apidiff
+
+`apidiff` compares the live behavior of two LangWatch API instances. It
+fetches each instance's served OpenAPI document (`GET /api/openapi.json`),
+reports spec-level changes (via `openapidiff`), then probes the union of
+documented operations on both instances in lockstep — every probe case runs on
+the candidate first and immediately after on the base, keeping both databases
+in the same state — and reports behavioral differences: status codes,
+response shapes, validation envelopes, and mutation outcomes. Volatile values
+(ids, timestamps, secrets) are masked before comparison, so per-instance
+state never produces false diffs.
+
+```text
+apidiff run   [-main-ref REF] [-branch-dir DIR] [-work-root DIR]
+              [-keep] [-reuse-worktrees] [-skip-install] [-branch-head] [-boot-timeout DUR]
+              [-dry-run] [-no-haven] [-pg-url URL -ch-url URL -redis-url URL]
+              [-compose-project NAME] [-parity-only] [probe flags...]
+
+apidiff probe -a URL -b URL [-project-key KEY] [-org-key KEY] [-admin-key KEY]
+              [-scim-key KEY] [-project-key-b KEY] [-project-key-c KEY]
+              [-timeout DUR] [-settle-timeout DUR] [-path-prefix P]
+              [-method M] [-exact-status] [-exclude-prefix P]... [-max-ops N]
+              [-probe-concurrency N] [-json] [-report FILE] [-ledger FILE] [-ledger-baseline FILE] [-module NAME]...
+```
+
+`run` boots both instances itself — a detached git worktree for `-main-ref`
+(default `main`), and, wherever haven is selected, a second worktree checking
+out `-branch-dir`'s own HEAD — with isolated Postgres/ClickHouse databases
+(run-scoped: `apidiff_<runid>_branch` / `apidiff_<runid>_main`, where the run
+id derives from the work-root name) and two Redis logical DBs derived from the
+run id, migrates and seeds each, waits for health, probes, and tears
+everything down. Under `-no-haven` the branch side is `-branch-dir` itself,
+for the parity inventories and the boot alike, unless `-branch-head` checks
+its HEAD out into a worktree too (see "Persistent worktrees and caches").
+`probe` compares two already-running instances.
+
+**Neither haven stack ever boots inside the invoking checkout.** haven
+registers one stack per directory: booting the branch instance in place used
+to let `haven up` there replace a developer's own stack registration for that
+directory, and the run's teardown `haven destroy` take it down with it (an
+incident on 2026-09-10 — a developer's own stack vanished mid-session). The
+branch side now checks out its own HEAD into `.apidiff/worktrees/branch`, the
+same way the base side checks out into `.apidiff/worktrees/main`, and a run
+refuses outright if either worktree path would resolve to the invoking
+checkout. `-dry-run` prints the plan — both refs, both worktree paths, both
+haven slugs, and the ordered commands a real run would issue — and starts
+nothing at all: no worktree, no haven command, no install.
+
+Exit status is `0` for no behavioral differences, `1` for differences found,
+and `2` for operational or usage errors. With `-ledger-baseline`, only a
+root cause the baseline does not name sets `1`. An improved-error finding
+(see "Improved-error acceptance" below) never sets `1`, with or without a
+baseline — it is the one difference the tool accepts on sight. Progress (boot
+phases, per-operation probing) streams to stderr; stdout carries only the
+deterministic summary, or the machine report with `-json` (optionally to
+`-report FILE`).
+
+## Boot details
+
+- **Each instance is a haven stack** wherever `haven` is on PATH, under its own
+  run-scoped slug (`apidiff-<run>-branch`, `apidiff-<run>-main`). haven gives
+  each slug its own Postgres and ClickHouse database and its own Redis logical
+  database, allocated against the ones live stacks hold, and does the install,
+  codegen, migrate and seed itself - so `apidiff run` provisions nothing and a
+  run can never reach the datastores the stack you are using sits on. Readiness
+  is `haven status --json` reporting the stack's backend lane listening, and the
+  instance is addressed on the API port haven allocated. `haven up` runs from
+  each instance's own worktree — never from the invoking checkout, which is
+  what a directory-registered stack must never share. Teardown is
+  `haven destroy <slug>` for exactly those two slugs, run from the work root.
+  `-no-haven` boots the old way; `-env-file` is refused alongside haven,
+  because pointing the instances at the servers a dotenv names is the thing
+  haven exists to stop.
+- **A fresh worktree is prepared before either stack boots.** haven's own
+  automatic prep is migrate-and-seed, not install-and-build: a worktree
+  `git worktree add` just created carries none of a developer checkout's
+  generated or built artefacts (`node_modules`, the Prisma client, the
+  `langwatch` SDK's `dist`), so `haven up` there used to die in its own
+  prepare phase before it ever reached migrate (run 20260910-044221:
+  `Cannot find module '.../langwatch/dist/index.mjs'`, then
+  `migrations failed - nothing was dropped`). Before either instance's
+  `haven up`, both worktrees get the developer's own `.env*` copied in and
+  run install/generated-files/build — the identical steps visualdiff runs,
+  shared as `havenrun.CopyEnvFiles` and `havenrun.PrepareCommands`
+  (`tools/havenrun/prepare.go`) rather than a second definition. A boot that
+  never becomes ready reports progress every 30s instead of going silent for
+  the whole timeout, and its error carries the last 20 lines of the stack's
+  own haven log, read directly off disk
+  (`~/.langwatch/portless/logs/<slug>.log`) so a `haven logs` command that
+  itself fails does not blank out the failure.
+- The paths below describe `-no-haven`. Each worktree boots through a detected profile: `apps/api`
+  (`@langwatch/platform-api`) is the **modular** layout (root migrate/seed
+  scripts, `API_PORT` on process env — node `--env-file` never overrides it);
+  `platform/app` (`@langwatch/web`) is the **monolith** layout (ClickHouse
+  migration via `pnpm --filter @langwatch/web clickhouse:migrate`, start via
+  `start:app:dev`, `PORT`+`LANGWATCH_API_PORT` pinned to the allocated port).
+  The monolith's `env-load.ts` applies `.env` then `.env.portless` with
+  `override: true`, so its per-instance env is written to
+  `platform/app/.env.portless` before migrate/seed/start — that file wins over
+  any `.env` a post-checkout hook copied into the worktree. Any other layout
+  errors clearly.
+- Before the first install, `apidiff run` **preflights** external
+  infrastructure: all three URLs are parsed, the Postgres one must carry a
+  username (psql falls back to `$USER`, prisma does not — the failure is a
+  `P1010` eight minutes and two installs later), and each endpoint is dialled
+  (Postgres `SELECT 1`, ClickHouse `SELECT 1`, Redis `PING`). Administrative
+  statements run against the database `-pg-url` itself names; only the
+  compose stack uses the `mydb` constant.
+- Each instance gets its own **Redis logical database**, and both are emptied
+  before the run and on teardown. The two indices are derived from the run id
+  rather than fixed at 14/15, so two concurrent runs cannot collide and no
+  previous run's queues, idempotency ledger or caches survive into the next
+  one. (Measured before the fix: DB 15 still held 83 keys from the previous
+  run while DB 14 was empty — an asymmetry the harness itself introduced.)
+- After each side migrates, the run **asserts the migrate landed in this
+  run's database** (`_prisma_migrations` is non-empty in
+  `apidiff_<runid>_<side>`). The modular profile writes no env overlay and
+  relies on node's `--env-file` not overriding an already-set variable; that
+  is now an assertion rather than a comment. A URL that will not parse is an
+  error too — never a silent fall back to the developer's own environment.
+- Infrastructure comes from `dev/compose.dev.yml` under the `apidiff` compose
+  project with a generated ports/volumes override (`!override` requires
+  docker compose v2.24+), so the tool's stack never collides with a running
+  dev stack. ClickHouse is capped at 2g in the override (the dev stack's 4g
+  does not fit a 4 GiB VM beside postgres and redis). After compose `--wait`,
+  the tool polls postgres itself until `SELECT 1` succeeds AND
+  `pg_is_in_recovery()` is false — a fresh-volume postgres can still be in
+  crash recovery when the container healthcheck goes green, and probing a
+  recovering server produces false findings. On teardown without `-keep`,
+  exactly the run-scoped databases are dropped and the two Redis DBs emptied,
+  on the compose stack and external servers alike: the compose stack stays up
+  for the next run (see "Persistent worktrees and caches"). `-pg-url`/`-ch-url`/`-redis-url`
+  (given together) point at user-managed servers instead; external Postgres
+  administration then needs `psql` on PATH.
+- Credentials default to the deterministic seed identity:
+  `sk-lw-local-development-key` (project key) and the fixed local-dev private
+  access token (organization bearer, which also satisfies `admin_api_key`).
+  In `run` mode a throwaway `LANGWATCH_INSTANCE_ADMIN_API_KEY` is injected
+  into both instances and a fixed SCIM token (`ScimToken` row, plain sha256 —
+  both layouts verify identically) is inserted after seeding; probing defaults
+  `-admin-key`/`-scim-key` to them. In `probe` mode both stay explicit. A
+  scheme without a key never skips the operation — it is probed without that
+  credential, and a 401-vs-404 divergence is itself evidence.
+- The branch's `/api` ↔ `/api/v1` auto-alias is collapsed: `/api/v1/<rest>`
+  and `/api/<rest>` are the same operation for the spec diff, the union, and
+  findings — unless `<rest>` opens with its own version segment (`/api/v1/v2`,
+  and versioned families like `/api/otel/v1`, `/api/scim/v2`,
+  `/api/gateway/v1` never match the rule's prefix). Each side is probed at the
+  alias form its own spec documents (`/api/v1` preferred when both exist); a
+  side documenting neither is probed at the canonical bare form anyway, so an
+  undocumented-but-mounted route still shows up. The transcript records both
+  probed paths.
+- **Pairing ignores path-parameter NAMES.** Base `/api/projects/{id}` and
+  candidate `/api/projects/{projectId}` are one operation: pairing on the
+  literal template reported the pair as a removal AND an addition, silently,
+  for any renamed parameter (5 such pairs on run 24 of 2026-09-21). Only the
+  names are erased (`PairingPath`, `spec.go`) — arity and every literal
+  segment still decide identity — and each side is still probed at the
+  spelling its own document declares, with the candidate's spelling reported.
+- **URL version mounts are skipped, never reported.** Versioning is negotiated
+  through the `X-API-Version` header; `/api/<family>/latest/...` and
+  `/api/<family>/<YYYY-MM-DD>/...` are a supported convenience fallback the
+  document still publishes, but nothing is built against them, so a difference
+  on one is the mount doing its job rather than drift. Such an operation never
+  enters the union — not probed, not skipped, not a ledger row — and the spec
+  changes that only describe one are dropped with it (`VersionMountPath`,
+  `spec.go`). The test is positional, so a family carrying its OWN version
+  segment (`/api/scim/v2`, `/api/otel/v1`, `/api/webhooks/v1`) is the real
+  surface and stays, and a literal date deeper in a path stays a real segment.
+  Measured on run 24 of 2026-09-21: 412 of 615 findings and 346 of 739 spec
+  changes were version mounts, including every one of the 58
+  `permission-diff:404-200` rows that were queued for a baselining decision.
+- Status codes compare by CLASS (2xx/3xx/4xx/5xx): same-class differences
+  (400 vs 422, 403 vs 401) are suppressed — the error envelope is
+  handlederror's domain — and error bodies (both sides ≥ 400) are never
+  compared. Success bodies still get full shape + value comparison.
+  `-exact-status` restores exact-code and error-body comparison. The summary
+  ends with a `suppressed: N same-class status differences, M error-body
+comparisons` line.
+- Nothing is excluded by default; repeat `-exclude-prefix` to skip a family.
+- Idempotent probes (GET/HEAD/OPTIONS) retry up to 2 times on 5xx with
+  backoff (500ms, 1s), so a momentary database restart or recovery window
+  degrades into a slow probe instead of false findings. Mutations are never
+  retried — replaying one could double-apply — and transport errors fail
+  fast. A 5xx that persists through the retries is a real finding.
+
+## Probing depth
+
+- GET/HEAD: one valid request per operation.
+- POST/PUT/PATCH: a validation probe (empty or type-confused body, comparing
+  the full error envelope shape) plus a valid mutation synthesized from the
+  request schema — spec examples win; otherwise enums take their first value,
+  required fields only, `date-time` becomes the fixed `2026-01-01T00:00:00Z`.
+- DELETE: only with an ID captured from an earlier response this run or from
+  the seeded constants.
+- Path/required-query parameters resolve from spec examples/defaults, then
+  the seeded constants (`local-dev-project`, `local-dev-organization`,
+  `local-dev-team`), then IDs captured from earlier responses. Resolution
+  happens **once per side, against that side's own symbol table**: each
+  instance mints its own IDs, and one shared table sent the base's ID to the
+  candidate and manufactured 404-vs-200 status differences. When only one
+  side resolves, the operation is skipped with a reason naming that side
+  (root cause `harness-symbol-table`) rather than probed as an asymmetric
+  pair. Captured IDs are **typed** by the parameter they can satisfy — the
+  response key they came under, and for a bare `id` the resource its own path
+  names (`POST /api/prompts` files a `promptId`). There is no untyped
+  catch-all: an operation whose `{promptId}` has no captured prompt ID is
+  skipped, not probed with a trace ID.
+- The union's probing definition (parameters, body schema, security) comes
+  from the **candidate**, so an operation the branch changed is probed with
+  the branch's shape; each side's own declared body is kept on the operation
+  (`bodySchemaA` / `bodySchemaB`).
+- **Collection verification** (after the main pass): when a mutation created
+  an entity, every matching list GET (same path, or the GET path is an
+  ancestor of the POST path) is re-probed and the entity must be VISIBLE in
+  each side's list — `mutation_not_visible` when exactly one side loses it.
+  The re-probe is an **event-driven settle**, never a fixed sleep: the list
+  is re-read until the entity is visible on both sides or `-settle-timeout`
+  (default 10s) passes, and the finding says how long it waited and for what.
+  One side visible and the other not gets the whole timeout — that is the lag
+  worth waiting out; neither side visible gets a quarter of it, because that
+  is usually a collection the creation does not populate at all.
+  Visible-on-both means the non-empty list shapes get compared, which is the
+  real layout check. A list GET that answered 2xx with empty lists on both
+  sides and had no mutation coverage is reported as `unverified_shape`
+  (coverage note, never a difference, own section in the report).
+- **Permission probes** (after the main pass): every project-key read is
+  repeated with the sibling-project key (B: same org, wrong project) and the
+  foreign-org key (C). The foreign request carries **only** the project-key
+  header — an operation whose security also admits an organization bearer or
+  an admin key is skipped rather than probed with the owner's second
+  credential still attached, which used to make a legitimate success read as
+  a leak. The leak candidates are the IDs the OWNER key saw on **that same
+  operation**, minus the identities the foreign key legitimately owns (its
+  own project, and the organization and team it sits in — shared and
+  cascading scope is not a leak), and the finding **records the matched ID**.
+  A denial class disagreement is a `permission_diff`; an operation that
+  already differs on the owner key is skipped entirely, since replaying it
+  with two foreign keys only re-reports the same root cause twice more.
+  Mutations are never replayed with foreign keys.
+
+  One class survives the rule: an endpoint that serves the same instance-wide
+  document to every key (model defaults, providers) cannot be told apart,
+  from its responses alone, from one that leaks to every key. Those are
+  reported, and the recorded ID is what settles it on sight. `run` mode provisions the fixtures (org 2, project B,
+  project C — fixed IDs, plaintext legacy-format keys, `ON CONFLICT` safe)
+  and defaults the keys; `probe` mode needs `-project-key-b`/`-project-key-c`.
+
+## Self-protection — the run may not destroy what it authenticates as
+
+A difference that disappears must never be indistinguishable from a difference
+that was fixed. Run 8 of 2026-09-15 is the whole argument: probe #181 issued
+`DELETE /api/projects/{id}` against `local-dev-project`, whose `apiKey` **is**
+the probe credential. Both sides archived themselves, every project-key probe
+from #182 on answered `401` on both sides, the two sides AGREED — and seventeen
+differences left the report reading as fixes while coverage collapsed.
+
+Three mechanisms now stand between a run and that outcome
+(`self-protection.go`, `credentials.go`):
+
+- **Retargeting.** A destructive operation — any `DELETE`, plus the
+  `regenerate-api-key` / `rotate-api-key` forms — whose resolved parameters
+  name a row the run depends on is aimed at a **sacrificial** row of the same
+  kind instead (`fixtures.go` provisions `apidiff-project-doomed` and
+  `apidiff-team-doomed` in the seeded organization). Coverage is kept whole:
+  the same route, the same credential, the same authorization decision. Both
+  sides substitute from the same table of literal IDs, so A and B still issue
+  identical requests. Each substitution prints a `retarget` progress line and
+  is visible in the transcript's own `requestPathA`/`requestPathB`.
+- **A named skip.** A protected row with no sacrificial twin — an organization
+  carries the bearer token, the SCIM token and the plan the entitled pass
+  elevates, so a second one is not a substitute — blocks the operation. It is
+  reported as a skip whose root cause is `self-destructive-target`, its own
+  slug in the ledger, never folded into `unresolvable-parameter`. A lost
+  comparison is a row, not a silence.
+- **The closing assertion.** Every credential is read once before the first
+  probe and once after the last, through a parameterless operation its own
+  security scheme selects. A credential that authenticated at the start and is
+  refused at the end sets `lost` on its `credentialChecks` entry, prints
+  `CREDENTIAL LOST:` on stderr and exits **2**, because such a run measured two
+  refusals rather than the branch. A credential that never authenticated, and
+  one the union documents no way to read at all, are reported too — "nothing
+  printed" and "nothing checked" must not look alike.
+
+The first two stop the cause that is understood. The third is what catches the
+next one.
+
+## Entitled pass
+
+Some operations answer with the handled-error code `enterprise_plan_required`
+before they do anything else — the plan gate refuses the request outright.
+Stopping the comparison there tests only whether the two sides AGREE on the
+gate, never what either side does BEHIND it. After the main pass (and its
+collection/permission follow-ups), every operation either side gated is
+re-probed with the seeded organization (`local-dev-organization`) entitled to
+an Enterprise plan, tagged with its own case, `entitled`, so the report can
+tell "the gate disagreed" apart from "behavior behind the gate disagreed".
+Detection reads the `error.code` field out of the body — never a hardcoded
+path list — so a gate on a surface added later (SCIM, the webhook endpoints
+that already check `assertEndpointsEntitled`) is caught the same way.
+
+Activation writes the `Organization.license` column both layouts read fresh on
+every request (branch: `PrismaOrganizationLicenseRepository.tryReadLicense`;
+main: `LicenseHandler`'s `readStoredLicense`) for `local-dev-organization`, on
+BOTH instances' databases, with one licence: the one the branch seed stored.
+Both licence keys live in the root `.env`: `LANGWATCH_LICENSE_PUBLIC_KEY`,
+which both sides verify with, and `LANGWATCH_LICENSE_PRIVATE_KEY`, which the
+branch seed signs an ENTERPRISE licence with
+(`dev/docs/runbooks/license-generator.md`). On the haven path the root `.env`
+is copied into both worktrees; on `-no-haven` the public key is passed to both
+sides from the shell or the root `.env`. Main's own seed writes a licence
+signed for another key, so as soon as both sides are healthy `run` copies the
+branch's licence onto main (both start entitled), and the pass re-applies it
+to both. The haven path reaches each stack's database through `haven db url`
+and `psql`, as visualdiff's editions do. No restart, and nothing is skipped on
+the unentitled pass to make room for it: the original gate refusal stays its
+own finding, under the ordinary case.
+
+With no keys configured the branch seed stores no licence, so `run` clears
+main's too (never an entitled main against an unentitled branch) and prints
+one line, `entitled pass: deferred: no licence keys ...`; the pass then skips.
+`probe` mode has no database and never activates anything, noted on stderr
+rather than silently doing nothing.
+
+**The activation attempt can genuinely do nothing, and the pass reports that
+honestly rather than papering over it.** Elevating the database row only
+changes an operation's answer if that process actually reads a license
+source at all. If a layout's plan resolution never composes one — the branch
+process opened no license source, say — the re-probe still runs and still
+answers the same gate refusal, and that shows up as its own `entitled`-case
+finding: real signal that the gap is architectural, not a probe that forgot
+to check.
+
+## Improved-error acceptance
+
+One direction of drift is accepted by the tool itself rather than left for a
+human to baseline: **main answering a failure it does not attribute to any
+particular cause, and the branch answering a handled 4xx with its own stable
+code instead.** If it used to blow up and now it returns a 400 with a proper
+validation body, that is the fix working, not a regression to chase.
+
+A finding qualifies as `error_improved` iff BOTH hold:
+
+1. **Main's answer is unowned.** Status 5xx (unowned by construction,
+   whatever the body says — `apps/api/src/app/api-canonical-error.ts`'s
+   `handledErrorEnvelope` forces the generic `internal_error` code onto
+   every 5xx it emits, discarding even a `HandledError`'s own code), or a
+   body reporting that same generic code at some other status.
+2. **The branch's answer is a handled refusal at least as good.** A 4xx
+   whose body carries a stable code — either envelope shape apidiff probes:
+   the REST wrapper (`{"error":{"code":...}}`) or the flat shape
+   (`{"code":...}`) — and that code is not itself the generic placeholder.
+
+Every other direction keeps failing exactly as before. In particular:
+
+- **The reverse never qualifies.** Main answering a clean 4xx and the branch
+  degrading to a 5xx is `handled-refusal-degraded`, a defect, whichever
+  status pair it is — a 5xx is never auto-accepted on the candidate side,
+  even a named handled 503.
+- A main 2xx becoming anything else, a main 4xx becoming a _different_ 4xx
+  (401→402), and a main 4xx becoming a 2xx are all still ordinary drift —
+  the last one is a permission/publication change for a human to decide,
+  not something this rule grants.
+- **Ambiguity resolves to NOT improved.** An unparsable or codeless body on
+  either side fails the qualification closed, not open; the finding is
+  reported as the ordinary `status_diff` it would have been anyway.
+
+An improved-error finding still lands in the report (its own section,
+`error_improved`, plus a one-line count in the summary: `improved: N
+operation(s) replaced a base 5xx (or unhandled) failure with a branch
+handled 4xx`) and in the ledger, under its own root-cause slug,
+`error-improved:<before-status>-<after-status>`. It never counts toward
+`report.Differences`, and its ledger cause is always reported `known` —
+neither needs `-ledger-baseline` to stop failing the run. An improved-error
+finding raised by the entitled pass (see "Entitled pass" above) carries the
+same `entitled:` namespace every other entitled-pass cause does:
+`entitled:error-improved:402-400`.
+
+## The ledger
+
+A run's `-report` is the evidence; the **ledger** is the worklist. Every
+difference row carries a `rootCause`, a stable slug derived from the
+finding's kind and the specific status pair, and the ledger groups rows by
+it — so a report opens with `root causes: 13 causes across 41 operations`
+instead of 78 rows to sort by hand. In the 2026-09-05 trial run that single
+field collapses the 14 webhook rows into one
+`handled-refusal-degraded:403-503` and groups the five not-found regressions
+as one `not-found-as-500:404-500`.
+
+`ledger.json` is written beside `-report`'s file automatically, or wherever
+`-ledger FILE` says. Its shape:
+
+```json
+{
+  "totals": {
+    "unionOperations": 303,
+    "probed": 275,
+    "skipped": 4,
+    "differingOperations": 41,
+    "causes": 13,
+    "newCauses": 2,
+    "knownCauses": 11,
+    "modules": 35,
+    "unmappedOperations": 3,
+    "coverageNotes": 106
+  },
+  "scope": ["prompt"],
+  "modules": [
+    {
+      "module": "prompt",
+      "operations": 13,
+      "differingOperations": 4,
+      "newCauses": 0,
+      "coverageNotes": 0,
+      "causes": [
+        { "rootCause": "permission-leak", "known": true, "operations": ["GET /api/prompts"] }
+      ]
+    }
+  ],
+  "causes": [
+    {
+      "rootCause": "not-found-as-500:404-500",
+      "kind": "status_diff",
+      "count": 5,
+      "operations": ["GET /api/prompts/{id}"],
+      "known": false
+    }
+  ],
+  "coverageNotes": [
+    { "note": "unresolvable-parameter", "count": 89, "operations": ["GET /api/traces/{traceId}"] }
+  ],
+  "operations": [
+    {
+      "method": "GET",
+      "path": "/api/annotations",
+      "operationId": "listAnnotations",
+      "presence": "both",
+      "cases": ["read"],
+      "classification": "equal",
+      "rootCauses": [],
+      "sideStatus": [200, 200],
+      "known": false,
+      "module": "annotation"
+    }
+  ]
+}
+```
+
+There is **one row per operation in the union**, differing or not.
+`classification` is a closed enum: `equal` · `equal-suppressed` · `differs` ·
+`missing-a` · `missing-b` · `skipped` · `not-probed` · `unverified`.
+`sideStatus` and every `[before, after]` pair read `[base, candidate]`.
+
+Cause slugs: `not-found-as-500:<pair>`, `handled-refusal-degraded:<pair>`,
+`server-error-resolved:<pair>`, `route-absent-on-candidate:<pair>`,
+`route-absent-on-base:<pair>`, `status-class-mismatch:<pair>`,
+`error-improved:<pair>` (see "Improved-error acceptance" above — always
+reported `known`, baseline or not), `operation-missing-on-candidate`,
+`operation-missing-on-base`, `permission-leak`, `permission-diff:<pair>`,
+`mutation-not-visible`, `body-shape-diff`, `body-value-diff`,
+`error-shape-diff`, `probe-failed`, `self-destructive-target`,
+`unverified-list-shape`, and `spec-<change kind>`. A finding from the
+entitled pass (see "Entitled pass" above) gets the SAME slug an identical
+finding would get from the main pass, prefixed with its own namespace —
+`entitled:handled-refusal-degraded:402-200`, never bare
+`handled-refusal-degraded:402-200` — because "the gate disagrees" and
+"behavior behind the gate disagrees" are never the same fix.
+
+`-ledger-baseline FILE` takes a previous `ledger.json` (or a plain JSON array
+of slugs) and marks those causes **known**: they are still reported, still
+counted, and no longer fail the run. Only a cause the baseline does not name
+exits `1`. That is how a branch ratchets from 40 causes to 0 without the tool
+being red the whole way. Every `error-improved:<pair>` cause is marked known
+unconditionally, baseline present or not — it is the one cause that never
+needs to be named to stop failing the run.
+
+### Coverage notes are not causes
+
+`unresolvable-parameter` (no id to fill a path parameter) and
+`harness-symbol-table` (only one side could fill it) say the harness could
+not reach an operation, not that the branch behaves differently. They are
+**coverage notes**: the row stays `skipped` and names its `coverageNote`, the
+ledger counts them under `coverageNotes`, stdout gives them their own closing
+section, and they are never a cause — not in `causes`, not in the baseline
+ratchet, never exit `1`. A baseline that still lists either slug keeps
+loading; the slug is simply never looked up. Do not grow harness machinery to
+shrink this count: a module lane verifies what the run could reach.
+
+## Module view, `-module` and packets
+
+Every row carries the catalogue `module` that owns it, and both the ledger's
+`modules` array and stdout group **module -> cause -> operations**, modules
+with new causes first. The mapping (`ModuleFor` / `ModuleForNamespace` in
+`findings.go`) reads the branch checkout: `modules/catalogue.json` (core and
+enterprise features), then each feature's `process/src/transport/*.rest.ts`
+(a literal `/api/...` route wins, then a path segment that is exactly a
+feature id or subject, then its router's `withNamespace`), then feature ids
+and subjects, singular/plural tolerant. For a main-only tRPC namespace an
+exact id or subject also outranks a peer's namespace declaration, so
+`identityLookup`'s leading word gives the identity module, not the user
+contract that declares `identity`; `twoStepVerification` stays unowned. tRPC namespaces come from
+each contract's `defineTrpcContract("<ns>")`, trying dotted parents. On r28
+this left 3 of 347 operations in no module (`GET /`, `POST /`,
+`POST /api/track_event`), against 103 for the old first-segment guess.
+
+`-module NAME` (repeatable) probes only that module's operations, plus their
+**parameter producers**: operations outside the scope that need no id of
+their own, are a `GET` or `POST`, and name in a literal path segment a
+resource a scoped operation needs an id for (`POST /api/traces/search` for
+`GET /api/annotations/trace/{id}`). That is one level and by name only: a
+parameter a full run fills from an unrelated operation's response body can
+go unresolved under `-module`, and it surfaces as a coverage note, which
+never fails the run. Producers are probed for real, so their findings show
+under their own module. A module no union operation maps to is refused by
+name, exit `2`. The credential canaries still read the whole union.
+
+Beside the ledger, a packet per module with a cause or a coverage note lands
+in `<work-root>/probe/<module>.md` (`run`), or in `probe/` beside `-report`
+(`probe`); operations in no module go to `unmapped.md`. Each operation lists,
+per case, the finding kind, every differing pointer with both values, both
+sides' request path, status and a short body excerpt, and the request body,
+so a lane can act without opening the multi-megabyte report.
+
+## Round trips, verdict.md and signatures.md
+
+An equal wire shape does not prove a feature works. Before the main pass's first
+delete, each resource in `roundTrips` (roundtrip.go, beside `curatedCreates`) is
+walked on each side on its own: create (the curated body, under a name of its
+own) -> read back holds what was sent (ids, times and urls masked) -> appears
+in the list -> update is visible -> delete -> read misses (404/410). Reads poll
+up to `-settle-timeout`. Each step is recorded per side as `effect: ok|broken|not-run`
+in the report's `effects`. A step broken on the candidate and ok on the base is
+an `effect_broken` finding and fails the run; broken on both is recorded, not a
+finding.
+
+Beside the probe packets (or the report file) the run writes `verdict.md`, the
+file to read first: one line per round trip (`works`, `broken`, `broken-both`,
+`fixed`, `not-run`) with its first failure, the failing-finding count and the
+new log signature count. When the run kept `logs/`, `signatures.md` lists the
+warn-and-worse log messages, masked, as new on candidate, also on base and base
+only, with counts and the first file:line.
+
+## Findings stream
+
+`run` (not `probe`, which has no run directory) appends one JSON line to
+`<work-root>/findings.jsonl` as each operation's comparison completes — a
+reader can `tail -f` it during the run instead of waiting for the final
+report and ledger. Each line is its own `Write`, flushed immediately, so
+nothing is batched across findings:
+
+```json
+{
+  "surface": "rest",
+  "name": "GET /api/prompts",
+  "kind": "identical",
+  "module": "prompt",
+  "detail": "",
+  "capturedAt": "2026-09-10T00:00:00Z"
+}
+```
+
+`surface` is `rest` or `trpc` (the latter reserved — see "Not covered"
+below). `kind` is one of `absent-on-branch`, `status-differs`,
+`shape-differs`, `identical`, `probe-failed`; a probe failure or a
+missing-on-branch result wins over a mere status or shape difference. `module`
+is the catalogue module that owns the operation (see "Module view, `-module`
+and packets" above), empty only for the handful of paths no module declares. `detail` is one line: the status pair, the
+changed field pointers, or the skip/failure reason. The stream closes with one
+`{"kind":"run-complete","counts":{...}}` line totalling every kind emitted.
+
+## Run phases
+
+A full `-no-haven` run overlaps everything that does not depend on
+something else. Every boundary is logged as `timing +<elapsed>: <phase>`.
+
+1. Worktrees, then the infrastructure: compose (or the external servers) is
+   resolved and preflighted, then brought up (or found up from the last run)
+   and its databases recreated in the background.
+2. Both trees are prepared at once (see "Parity phase").
+3. The tRPC and route inventories of both sides run in the background, beside
+   migrate and seed; the probes start only after they are written.
+4. Each side then runs its own pipeline beside the other: migrate, seed,
+   fixtures, LangWatchQL provisioning (main's still after the branch's, since
+   both provision one server-wide ClickHouse identity), then its API and
+   worker spawned together and its health waited on.
+5. Probing: each case is sent to both sides at once, and the operation's
+   next case starts only when both answered, so each side keeps its own order.
+   The main pass runs in stages (probe-waves.go), each after the last:
+   1. the curated creates, as one lane in their own order (they feed each
+      other across modules);
+   2. every other operation that needs no captured id, so each producer
+      `-module` would add runs before any module that reads its ids;
+   3. the operations that read an id something captured;
+   4. after the collection checks and round trips, the deletes.
+
+   Within a stage each owning module is one lane that keeps probe order, and
+   up to `-probe-concurrency` lanes (default 16; 1 is serial) run at once.
+   Several lanes each resolve and capture ids against their own copy of the
+   symbol tables, filed into the shared ones in probe order when the stage
+   ends: a lane sees what earlier stages and its own module captured, never
+   a lane beside it, so its ids do not depend on timing. Findings, transcripts
+   and the report are filed in probe order; only progress lines interleave.
+   Lockstep now holds per module, not across modules: a read of another
+   module's data (an audit log, a spend total) can see a lane beside it on
+   one side first. `-probe-concurrency 1` rules that out when a difference
+   looks like it. Every trace or analytics operation waits for the
+   background fixture-trace wait, and one that had to wait logs it; a side
+   that never reads the trace back is logged as a `WARNING`. The collection
+   checks and the permission probes run in a pool of six and are filed in
+   probe order afterwards.
+
+6. Teardown, once, whichever of the parity cleanup and the boot's teardown
+   runs first. It kills the instances, drops the run's databases and hands
+   the persistent worktrees back; nothing in it waits on a slow step.
+
+### Timeline, phase durations and progress
+
+Every line the tool prints, the relayed `main |` and `branch |` child lines
+included, starts with `[HH:MM:SS]`; only the `-json` report on stdout is left
+bare. Each phase ends with a `phase <name>: <duration>` line: worktrees,
+install, prepare, boot (stacks up, migrated, seeded), parity inventories, seed
+fixtures, probe main pass, round trips, permission probes, entitled pass,
+scenario shards, scenarios, teardown. Phases that overlap (both installs, the
+inventories beside boot) print their own durations, which do not add up to the
+wall time. During the probe pass and the scenario phase a line is printed
+about every 5 s, for example
+`[12:04:31] scenarios 412/1830 · 398 pass 9 fail-branch 5 err · 41.2/s · ~34s left`.
+The per-operation `probe METHOD PATH [i/N]` lines are gone; the ticker
+replaces them.
+
+## Scenarios
+
+`tools/apidiff/scenarios/*.yaml` are cases with a request, an expectation and
+verify steps, run on both stacks at once after the main pass (`apidiff run`
+skips the phase quietly when no file matches, or with `-skip-scenarios`).
+Against two stacks that are already up:
+
+```bash
+go run ./cmd/apidiff scenarios -a BRANCH_URL -b MAIN_URL -admin-key KEY \
+  -scenarios 'tools/apidiff/scenarios/*.yaml' [-scenario-id 'evaluators-*']
+```
+
+The format and the verdicts (PASS, FAIL-branch, FAIL-main, FAIL-both,
+FAIL-diff, ERROR) are in `scenarios/_example.yaml` and scenario.go; files
+whose name starts with `_` are skipped by the default glob. A scenario that
+held on both sides still fails as FAIL-diff when the two main responses differ
+after normalization. Exit code: 2 if any ERROR (the harness could not
+measure, including a 429), else 1 if anything is not PASS, else 0.
+
+Under SaaS the instance-admin routes answer 404 (`instanceAdminDoor`), so the
+admin key is unusable. The phase probes `GET /api/organizations` with the key
+once per side; on a 404 it logs one line and drops the key. It then signs the
+seeded admin in and makes every second organization (`shard: org`, `org-c`,
+`org-c-org`, `project-c`) through that session: tRPC
+`organization.createAndAssign`, then `apiKey.create` for an organization admin
+key. What SaaS cannot run is deferred: scenarios using auth `admin`, ones
+marked `selfHosted: true` (a route Cloud does not serve), and, when the
+sign-in fails, every scenario that needs a second organization. They are
+listed by id on a `deferred:
+self-hosted pass` line, are not in the tally and are not failures. A 401 or 403
+keeps the key. The same ids go to `deferred.txt` in the run directory, one per
+line, and `-scenario-id @<file>` reads them back (a file naming no id is
+refused, since no pattern would select every scenario). `diffsuite
+-deployment self-hosted -deferred <file>` runs them on a self-hosted stack
+(`tools/diffsuite/README.md`). `-dry-run` prints how many a SaaS run defers.
+`scenarios.jsonl` lands in the run directory (`-run-dir` in the standalone
+mode). Under diffsuite, `-a`/`-mail-a` default to its branch stack and
+`-b`/`-mail-b` to its main stack when it has one (`tools/diffsuite/README.md`).
+
+- **One stack (PASS or FAIL):** `apidiff scenarios -a URL` with no `-b` runs
+  every scenario against that one stack; the verdicts are PASS, FAIL and
+  ERROR. Main-versus-branch comparison (`-a` and `-b`, or `run`) is for final
+  testing. Against a shared stack use the API lane's address (for example
+  `http://127.0.0.1:<apiPort>` from `haven status`) when the routed HTTPS name
+  is not registered, and `-mail-a` for its mail sink (`mail` service port).
+- **Shared seed:** shards are seeded through the public API once, under a
+  flock, and recorded in `<-seed-dir>/shared-seed.json` (default `.apidiff/`),
+  keyed by the stack's URL; a later lane reuses every recorded shard that still
+  authenticates and seeds only the missing ones. With `-admin-key` the seed
+  also provisions an `apidiff` organization of its own (own org key, project
+  and team) and the shared shard and all isolated projects live in it, never in
+  `local-dev-organization`; without it the seeded organization is used and
+  `org` shards are ERROR. `shard: serial` scenarios take a flock on
+  `.visualdiff/check/instance.lock` for the serial pass.
+- **Stopping when nothing works:** a scenario that ends ERROR (the harness or
+  the stack, never the API: a transport error, the rate limiter, a shard whose
+  seeding failed) counts; a PASS ends the streak; a FAIL, `FAIL-branch`,
+  `FAIL-main`, `FAIL-both` or `FAIL-diff` neither counts nor ends it. After
+  `-max-consecutive-errors N` ERROR scenarios in a row, in the order they
+  complete (default 50, `0` disables), scenarios in flight are cancelled and
+  left out, the rest are not started, the partial results and
+  `scenarios.jsonl` are written, and it prints `apidiff: stopping: N consecutive
+errors, most common cause: <cause> (xK)` and exits 3. A setup that leaves
+  nothing usable stops before any scenario with `apidiff: stopping: setup
+failed: <cause>` (exit 2): the shared or run organization could not be made
+  (with `-admin-key`; without it the seeded organization is still used), or
+  every isolated project, organization and sign-in the scenarios asked for
+  failed on a side.
+- **Pool:** `-scenario-concurrency` (default 48) scenarios in flight per side,
+  both sides of one scenario at once, over pooled keep-alive connections.
+- **Shards:** `shard: shared` (default) uses the seeded fixtures;
+  `project` and `org` run in one of `-scenario-shards` (default 8) isolated
+  projects or organizations; `serial` runs alone after the pool drains.
+  **A `shard: project` scenario gets its own project keys and ids** (its
+  `{projectId}` and `{projectKey}`, and `auth: project` sends that key), so a
+  `countDelta` on a project-level list such as `GET /api/evaluators` counts
+  only what scenarios in the same project do; eight shards means about a
+  scenario in eight shares a project, so keep the request's own name unique
+  with `{uid}`. Prefer it to `serial`. A `countDelta` on a shared list races.
+- **`serial: true`:** a scenario-level flag, orthogonal to `shard`: the
+  scenario keeps its shard kind (a `project` shard still gets isolated keys) but
+  runs in the serial pass, alone after the pool drains and under the instance
+  lock, its steps back to back. Use it for a rate-limit window
+  (`lim-files-read-121st-is-429`) or a scope another scenario claims
+  (`model-defaults-update-config`).
+- **tRPC bodies:** a step to `/api/trpc/<procedure>` writes its input once, plain
+  (`body: { projectId: ... }`); the harness wraps it per side as `{json: input}`
+  for a superjson side and leaves it plain otherwise, and lifts
+  `result.data.json` to `result.data` in a superjson answer, so a capture reads
+  `result.data.workflow.id` on both. In a two-sided run branch is `none` and main
+  is `superjson`; a single-sided stack sets `-trpc-transformer superjson|none`
+  (default `none`).
+- **Placeholders:** `{uid}` (fixed width, so one never prefixes another),
+  `{UID}` (upper case, for names like `^[A-Z][A-Z0-9_]*$`), `{uidHex16}`,
+  `{uidHex32}`, `{nowMs}` and `{nowMs-3600000}` / `{nowMs+60000}` (read when
+  the request is built), `{side}`, `{adminEmail}`, `{userId}` (the seeded admin
+  user), `{projectId}`, `{orgId}`, `{projectKey}`, `{orgKey}`, `{teamId}` and
+  every capture.
+- **Expect:** `body: { key: "<any>" }` is present and not null;
+  `body: { key: "<absent>" }` is not in the body at all;
+  `headers: { Deprecation: "true" }` wants each named response header to
+  contain the text (the name is case-insensitive). Methods: GET, HEAD,
+  POST, PUT, PATCH, DELETE (no multipart bodies yet).
+- **Absolute-URL and raw-body steps:** a request whose path is a placeholder
+  that expands to an `http(s)://` URL (`request: "PUT {uploadUrl}"`, with
+  `uploadUrl` captured by an earlier step) is sent to that URL as it is: not
+  the side's base URL, and none of the side's auth headers (a presigned URL
+  is its own credential; only the step's own `headers` go). A path that
+  expands to neither `/path` nor an absolute URL is ERROR. `bodyRaw: "text"`
+  sends the (placeholder-expanded) string as the body with no JSON encoding,
+  with `contentType` as its `Content-Type` (`bodyRaw: ""` sends an empty
+  body); it replaces `body`, and both keys work on a scalar step or in the
+  mapping form. The stored-object round trip (create, PUT, confirm, read) is
+  in `scenarios/stored-objects.yaml`. A capture reads a response body field,
+  so a presigned URL's required `headers` object cannot be forwarded yet.
+- **Auth kinds:** project, project-b, project-c, org, admin, scim, none,
+  restricted (a read-only key minted per shard), session, cli, and `org-c` /
+  `org-c-org`: the project key and the organization key of a second
+  organization the seed provisions per stack with `-admin-key` (recorded as
+  `foreign` in shared-seed.json). `{orgIdC}`, `{teamIdC}`, `{projectIdC}`,
+  `{orgKeyC}` and `{projectKeyC}` name it.
+- **Mail:** `-mail-a` / `-mail-b` are each side's mailsim base URL; `run`
+  takes them from haven. On the shared check stack an organization invite
+  returned 201 but no message reached the sink, so the `_example.yaml` mail
+  scenario fails there until mail is confirmed to be delivered on that stack.
+  **Rate limit:** `run` boots the stacks with `API_RATE_LIMIT_REQUESTS`
+  raised; a stack booted otherwise answers 429 as an ERROR naming the limiter.
+- **Sign-off:** `apidiff done -run RUN -scenario ID -note TEXT` copies a
+  passing scenario's proof from `.apidiff/<RUN>/scenarios.jsonl` into
+  `.apidiff/done/<ID>/meta.json`; `-list` prints the ledger, `-undo ID`
+  removes an entry, `-force` signs off a scenario that did not pass. Signed-off
+  scenarios are skipped by later runs unless `-final`.
+- **`-dry-run`** (standalone mode) loads and validates the files, prints how
+  many are valid and how many would run, and exits without a stack.
+- **`-repeat N`** repeats every selected scenario N times under suffixed ids,
+  to measure throughput. YAML: quote any flow-mapping value that contains a
+  `{placeholder}`.
+
+Scenario files keep one scenario per line in flow style, with authored comments, so
+`.oxfmtrc.json` leaves `tools/apidiff/scenarios/` out of formatting.
+
+## Persistent worktrees and caches
+
+A run reuses what the last one left, the way visualdiff does
+(`tools/visualdiff/worktrees.go`):
+
+- **Worktrees.** main checks out into `.apidiff/worktrees/main`, and the
+  branch's HEAD into `.apidiff/worktrees/branch` on the haven path or with
+  `-branch-head`. The first run adds each worktree; later runs move it to
+  their commit with `git checkout --detach --force`, so `node_modules`,
+  generated files and dists stay warm. `.apidiff/worktrees/<side>.owner`
+  names the run holding it (work root, pid, `-keep`): a worktree another live
+  or kept run holds is not shared, and this run adds `<work-root>/<side>` of
+  its own instead. A kept run's hold ends when its work root is deleted.
+- **Prepare.** `.apidiff/worktrees/<side>.prepared` records the key of the
+  last finished prepare: the layout, the steps and the commit's tree, spelled
+  as visualdiff's `PrepareKey`. A worktree whose tree has not moved skips the
+  install, `start:prepare:files` and `ensure-built` entirely.
+- **Inventories.** A checked-out side's tRPC and route manifests are kept in
+  `.apidiff/inventory-cache/<side>-<key>-{trpc,routes}.json`, keyed on the
+  tree and the embedded inventory scripts. A manifest that recorded a failure
+  is never cached. `-branch-dir` booted in place is never cached, since its
+  working tree can differ from any commit.
+- **Compose.** The managed stack's override is
+  `.apidiff/compose-<project>.yml`. The next run reads its ports from there
+  and `docker compose up --wait` finds the stack already up. If that fails
+  (the stack was down and a port is taken), the run starts it on fresh ports.
+  Teardown only drops the run's databases; `docker compose -p apidiff down -v`
+  stops the stack.
+- **Teardown.** The monolith's `platform/app/.env.portless` overlay is deleted
+  when a worktree is released, because its env-load applies the file with
+  `override: true` and a stack later started there would read this run's
+  dropped database. A worktree added for one run alone is moved aside to
+  `<dir>.discarded`, pruned from git's list, and deleted by a detached `rm`
+  logged to `<work-root>/logs/teardown.log`.
+- haven's disk reclaim treats everything under `.apidiff/` as scratch, so it
+  can offer a persistent worktree idle for a day for reclaim; the next run
+  then adds it again.
+
+## Parity phase
+
+Every `apidiff run` opens with a static surface comparison, before either
+stack boots, so missing work is found in bulk and handed out per module
+before a single request is probed. `-parity-only` stops after it: no haven,
+no database, no stack — only the two worktrees.
+
+1. **Trees, prepared once.** main is checked out into
+   `.apidiff/worktrees/main`; the branch side is `.apidiff/worktrees/branch`
+   (its HEAD) on the haven path or with `-branch-head`, and `-branch-dir`
+   itself otherwise, so parity always reads the tree the probes boot. Both trees are prepared at the same time, with havenrun's
+   steps for each tree's own layout (`pnpm install`, `start:prepare:files`,
+   and `ensure-built` on the modular layout). A full run boots those same
+   trees and runs no install or build of its own; `-skip-install` takes both
+   trees as they are. See "Run phases" below for what overlaps with what.
+2. **tRPC inventory, both sides.** A script embedded in the binary
+   (`inventory/*.mjs`) is written into the worktree as
+   `.apidiff-trpc-inventory.mjs`, run, and removed again — it is never committed and never written into the invoking
+   checkout. Which script runs depends on what the checkout holds, not which
+   side it is: a monolith (`platform/app/src/server/api/root.ts`) has its
+   `appRouter` imported and its procedure record walked, zod v3 inputs
+   converted with `zod-to-json-schema`, and each namespace's source read from
+   `root.ts`'s imports; a modular checkout has every contract file that calls
+   `defineTrpcContract` imported and its built declarations converted with
+   zod v4's `z.toJSONSchema`. The monolith runs under its own `tsx`; a
+   modular checkout under `node --experimental-transform-types`, the way its
+   applications run (its `packages/api` has no `tsx`). Every datastore URL the imports could read is
+   pointed at a closed port, and `SKIP_ENV_VALIDATION` is set. Both manifests
+   land as `parity/trpc-main.json` and `parity/trpc-branch.json`:
+   `{ path, kind, input, output, source }` per procedure.
+3. **Diff.** A procedure matches by its full dotted path. Main-only procedures
+   are **missing on branch**; branch-only ones are **extra** (never a defect).
+   A procedure on both sides is **breaking** when its kind changed, its input
+   accepts less (a property removed, one added as required, a type narrowed,
+   an optional field made required) or a declared output answers less. The
+   diff also proposes **rename candidates** (same namespace, similar name,
+   same input shape) and **namespace-move candidates** (same name, same
+   non-empty input shape, another namespace). `tracesV2.*` is compared
+   against `traces.*` (`acceptedNamespaceMoves`, `parity.go`). A move
+   candidate of the same kind whose branch module differs from the module
+   main's namespace maps to is a **ruled owner move** (ARCHITECTURE.md §3,
+   `parity-owner-moves.go`): listed under `ruledOwnerMoves` and in both
+   modules' packets, neither missing nor extra, its input still compared
+   field by field. A candidate within one module, or one of several for the
+   same path, stays missing.
+   An input node main left open (`{}`, a bare object or an itemless array,
+   as main's converter emits for a recursive schema) makes every change
+   under it `unknown`, never breaking.
+4. **REST.** Main's document is the artifact its monolith serves verbatim
+   (`platform/app/src/app/api/openapiLangWatch.json`); the branch generates
+   its document from the mounted routes, so it exists only once the branch
+   serves. `-parity-only` therefore reports main's REST count and leaves the
+   REST section of every packet open; a full run completes it from both
+   served documents right after the spec fetch, pairing operations that
+   differ only in path-parameter names and skipping URL version mounts.
+5. **Served routes, both sides.** REST parity reads documents, so a route
+   main serves without documenting it (a webhook, a UI door) is invisible to
+   it. `.apidiff-routes-inventory.mjs` is written, run and removed the same
+   way as the tRPC script: on main it builds `createApiRouter()` and walks its
+   Hono route table (middleware told apart the way `hono/dev` does); on the
+   branch it reads every installed server module's REST and socket
+   declarations through `@langwatch/api`'s own addressing, plus the API
+   application's lanes and the health door. Routes pair on method and
+   canonical path (`:param` and `{param}` alike, `/api/v1` folded, regex
+   constraints and a trailing slash dropped); ALL answers any method, GET
+   answers HEAD, and a branch wildcard answers everything under it. A main
+   route the branch does not serve is `servedOnly.missingOnBranch` and a row
+   in its module's packet, unless it is ruled retired (`RetiredRestOperation`),
+   documented on main (REST parity compares it), or on the ignore list in
+   `parity-served.go`: Better Auth's `/api/auth/*` catch-all, the tRPC lanes,
+   and URL version mounts. Every ignored route is kept with its reason in
+   `parity.json`. Served-only rows count in the module table; they do not
+   enter the ledger.
+6. **Output.** `<work-root>/parity.json` (everything, including additive
+   changes) and `<work-root>/parity/<module>.md`, one packet per owning
+   module: counts, each missing procedure with main's source file, each
+   breaking field difference, the rename/move candidates, and the extras.
+   Modules come from the branch contract that declares the procedure, else
+   `ModuleForNamespace` / `ModuleFor`; what nothing claims lands in
+   `unowned.md`. The module × {missing, breaking, extra} table, largest work
+   first, is printed on stdout by `-parity-only` and on stderr by a full run
+   (whose stdout stays the deterministic report).
+7. **Verdict.** Parity feeds the same report, ledger and exit code as every
+   other cause: a missing procedure is the cause `spec-trpc-missing`, a
+   breaking field `spec-trpc-input-<kind>` / `spec-trpc-output-<kind>` /
+   `spec-trpc-kind-changed`, keyed `TRPC <path>` in the ledger. Without a
+   baseline any of them exits 1; `-ledger-baseline` names the ones already
+   known. `-parity-only` writes its ledger to `<work-root>/ledger.json`
+   unless `-ledger` says otherwise.
+
+### Field-level REST changes
+
+A changed operation is no longer one `operation_changed` entry. Each
+difference is its own change with its own kind, tagged breaking or additive
+against the base: `param_added` / `param_removed` / `param_required_changed`
+(and `param_type_changed` for a parameter's schema), `request_body_added` /
+`request_body_removed` / `request_body_required_changed`,
+`request_property_added` / `_removed` / `_type_changed` / `_required_changed`,
+`response_property_*` for each success status both sides declare,
+`status_added` / `status_removed`, `security_changed`, and `docs_changed` for
+summary, description, tags, operationId and extensions. References are
+resolved against each side's own document, so renaming a component with
+identical content is no change at all; component and path-item entries are
+dropped because every effect they have is reported on the operation it
+reaches. The report and ledger count the breaking changes plus whole
+operations only the candidate documents (`operation_added`, kept until that
+is ruled a non-defect too); additive field changes live in `parity.json` only.
+
+The parity rulings of 2026-09-25 narrow what is breaking:
+
+- A documented error status (anything but 2xx) added or removed is
+  `not-compared`: never a cause, never listed in a packet, which only
+  counts the operations it touched.
+- A body main never documented (`request_body_added`) is additive. A request
+  body main documented and the branch documents with no properties is one
+  `request_body_undocumented` change, not one per property.
+- A nullable object written as `anyOf` / `oneOf` of one schema and
+  `{type: null}` keeps that schema's `required` list.
+
+## Not covered
+
+The behavioral probes describe the **REST** surface only. tRPC is covered
+statically by the parity phase (above): which procedures exist on each side,
+their kind and their input/output schemas — never how a procedure behaves.
+Procedures are not probed over the batch link, and the declared access policy
+is not compared. On main most outputs are inferred types, so an output schema
+is compared only where both sides declare one.
+
+On the compose path (`-no-haven`) each side boots a worker beside its API
+(respawned once if it dies during its own boot), and the run stands up the
+collaborators the gated families need, identically on both sides
+(`collaborators.go`, `side-credentials.go`):
+
+- LangWatchQL: throwaway passwords, sql access-model mode, one restricted user
+  per side, and the `lwql:provision` task after the fixtures; the compose
+  ClickHouse gets access management and the `custom_` settings prefix.
+- An Instant Evals judge key aimed at a dead https port.
+- A stub Langy agent manager (accepts warm, dispatch and cancel), plus the
+  Langy internal secret and a dead gateway base URL.
+- A widget project with `release_custom_chart_playground` targeted at it
+  through the flag store; every dashboard-widget route is sent there.
+- Before the first probe: the fixture trace, a Claude Code OTLP log for the
+  seeded coding-agent session, and a device-login bearer per side (seeded admin
+  sign-in, device-code, approve, exchange) for the CLI bearer routes.
+- After the webhook endpoint is created: a signed admit + confirm spend batch
+  through the gateway's own door, so webhook events and deliveries exist.
+
+Reads filled by a projection (`settledReads` in `probe-cases.go`) are re-read
+for up to 45 s until both sides have content. Ruled-retired REST operations
+are not probed and not counted.
+
+### The union blind spot — a route absent from _both_ documents
+
+The probe set is the union of the two OpenAPI documents. A route that appears
+in neither is not compared, not skipped, and not counted: it is invisible, and
+the run is silent about it. Silence here is indistinguishable from agreement.
+
+This is not hypothetical. On 2026-09-15 the entire trace **ingestion** surface
+— `POST /api/collector`, `POST /api/otel/v1/traces`, the OTLP path-alias
+dispatcher, tracked events and trace export — was found defined, exported and
+mounted nowhere on the candidate branch, while both shipped SDKs and our own
+`services/langyagent` post to those paths. Seven runs of this tool had reported
+on that branch and none could have found it, because the ingestion routes are
+not in the OpenAPI document on either side. The nine-operation REST teams
+family went the same way and was found only because it happened to be _in_
+main's document, which is the difference between a diff finding and a silent
+hole.
+
+So: **a clean apidiff run means the documented surfaces agree. It does not mean
+the branch serves what its customers call.** Two other instruments are needed
+and neither is this one.
+
+1. A static check that an exported transport factory is actually named in some
+   `withTransports(...)` list. It catches the defect at the commit that drops
+   the registration rather than months later, and it needs to allow one
+   aggregator hop (a router bundled by a mounted transport file) and to match
+   an initialiser loosely — the alias dispatcher is built with
+   `CANDIDATE_PATHS.reduce(...)`, so a declaration-shape regex misses the most
+   important case in the set.
+2. A contract test asking whether every route the SDKs, the docs and the
+   Terraform provider reference actually exists on a booted stack. That is
+   neither a diff nor a lint, and nothing in the repository does it today.
+
+Do not extend this tool to cover either. Its comparison is between two running
+stacks, and both of those questions are answerable without a second stack.
+
+Finding kinds: `status_diff` (status-class changes only, by default),
+`body_shape_diff`, `body_value_diff` (success bodies only), `error_shape_diff`
+(`-exact-status` mode only), `operation_missing`, `permission_leak`,
+`permission_diff`, `mutation_not_visible`, `probe_failed`, `skipped`
+(unresolvable parameters), `unverified_shape` (coverage notes).

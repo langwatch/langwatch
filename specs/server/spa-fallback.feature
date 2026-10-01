@@ -4,6 +4,10 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
   So that stale chunk URLs from previous deploys do not poison the CDN
   with HTML responses served under JavaScript MIME types
 
+  # ADR-111 moves the built UI artifact to apps/ui and its production server to
+  # apps/api. This file remains authoritative for HTTP fallback and cache
+  # semantics after that physical move.
+
   # Background: Vite hashes asset filenames per build. After a deploy, browsers
   # holding the previous index.html may request chunk URLs whose files no longer
   # exist on the new image. If the server falls back to index.html (HTML 200) for
@@ -39,6 +43,7 @@ Feature: Production HTTP server — static asset and SPA fallback behavior
   # The shell is served with the runtime asset-base resolver injected — see
   # cdn-asset-base.feature — so it is the index.html document plus that bootstrap,
   # not a byte-for-byte copy.
+  @integration
   Scenario: Unknown non-asset route falls back to index.html for SPA routing
     When a client requests /projects/foo/traces
     Then the response status is 200

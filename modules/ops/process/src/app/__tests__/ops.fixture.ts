@@ -1,0 +1,123 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+/**
+ * A real `OpsApp` over memory repositories, fixture peers and a literal
+ * members record. Every collaborator a test wants to watch is passed in
+ * rather than reached for.
+ */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AutomationApi } from "@langwatch/automation-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { IdentityApi } from "@langwatch/identity-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
+
+import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
+import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
+import type { OpsCheckupService } from "../../services/ops-checkup.service.ts";
+import {
+  OpsApp,
+  type OpsAppInfrastructure,
+  type OpsCapability,
+  type OpsEventingIntrospection,
+  type OpsSystemMigrationRunner,
+} from "../ops.app.ts";
+
+/** The staff address every fixture operator is measured against. */
+export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";
+
+/** Nothing registered: the graph a test does not care about. */
+class EmptyOpsIntrospection implements OpsEventingIntrospection {
+  projections() {
+    return [];
+  }
+  killSwitches() {
+    return [];
+  }
+  processManagers() {
+    return [];
+  }
+  dejaViewProjections() {
+    return [];
+  }
+}
+
+export type OpsTestAppOptions = Readonly<{
+  capability?: Partial<OpsCapability>;
+  members?: Partial<OpsAppInfrastructure>;
+  auditLog?: AuditLogApi;
+  apiKeys?: ApiKeyApi;
+  projects?: ProjectApi;
+  featureFlags?: FeatureFlagApi;
+  authz?: AuthzApi;
+  repositories?: OpsRepositories;
+  checkup?: OpsCheckupService;
+}>;
+
+export type OpsTestApp = Readonly<{ app: OpsApp; repositories: OpsRepositories }>;
+
+/** The members record a process supplies, with nothing configured. */
+export function createOpsTestInfrastructure(
+  overrides: Partial<OpsAppInfrastructure> = {},
+  capability: Partial<OpsCapability> = {},
+): OpsAppInfrastructure {
+  return {
+    createCapability: () =>
+      createApiFixture<OpsCapability>({
+        snapshots: null,
+        isAdmin: (identity: { email?: string | null }) => identity.email === OPS_STAFF_ADDRESS,
+        ...capability,
+      }),
+    eventingIntrospection: new EmptyOpsIntrospection(),
+    pipelines: { listRegistrations: () => ({ projections: [], eventSubscribers: [] }) },
+    eventLogWindow: {
+      read: () => ({ searchLookbackDays: 365, hotTierDays: null, hotTierEnvVar: null }),
+    },
+    grafana: { findLinkConfig: () => null },
+    createSystemMigrations: () =>
+      createApiFixture<OpsSystemMigrationRunner>({
+        requiresOperatorConfirmation: () => false,
+        enroll: async () => {},
+        withdraw: async () => {},
+        startPass: async () => {},
+      }),
+    bugReportRateLimiter: { consume: async () => ({ allowed: true }) },
+    bugReportNotifier: { notify: async () => {} },
+    explainClients: { findClient: () => null },
+    findOpsApiKey: () => null,
+    findProductAnalyticsTargets: () => [],
+    isProduction: false,
+    cloudOps: true,
+    ...overrides,
+  };
+}
+
+export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
+  const repositories = options.repositories ?? MemoryOpsRepositories.create();
+
+  const app = OpsApp.fromInfrastructure({
+    infrastructure: createOpsTestInfrastructure(options.members, options.capability),
+    dependencies: {
+      users: createApiFixture<UserApi>(),
+      auth: createApiFixture<AuthApi>(),
+      identity: createApiFixture<IdentityApi>(),
+      authz: options.authz ?? createApiFixture<AuthzApi>(),
+      retention: createApiFixture<DataRetentionApi>(),
+      projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      auditLog:
+        options.auditLog ??
+        createApiFixture<AuditLogApi>({ record: async () => ({ id: "audit", occurredAt: 0 }) }),
+      apiKeys:
+        options.apiKeys ?? createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
+      featureFlags: options.featureFlags ?? createApiFixture<FeatureFlagApi>(),
+      automations: createApiFixture<AutomationApi>(),
+    },
+    repositories,
+    ...(options.checkup === undefined ? {} : { checkup: options.checkup }),
+  });
+
+  return { app, repositories };
+}

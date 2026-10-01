@@ -1,19 +1,13 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
 import { config } from "dotenv";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
+
+import { LangWatch } from "../../../dist";
 import {
   expectations,
   CliRunner,
@@ -21,7 +15,6 @@ import {
   PROMPT_NAME_PREFIX,
   PromptFileManager,
 } from "./helpers";
-import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -70,7 +63,7 @@ describe("CLI E2E", () => {
     await apiHelpers.cleanUpTestPrompts();
   });
 
-  describe("push", () => {
+  describe("when running push", () => {
     describe("when local prompt exists", () => {
       it("creates prompt on remote", async () => {
         const initResult = cli.run("prompt init");
@@ -80,8 +73,7 @@ describe("CLI E2E", () => {
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
 
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         const pushResult = cli.run("prompt push");
@@ -112,8 +104,7 @@ describe("CLI E2E", () => {
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
 
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         // First push
@@ -122,7 +113,7 @@ describe("CLI E2E", () => {
 
         // Modify local file
         localPromptFileManagement.updatePromptFile(promptHandle, {
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           modelParameters: { temperature: 0.9 },
           messages: [
             { role: "system", content: "Updated system message." },
@@ -137,7 +128,7 @@ describe("CLI E2E", () => {
         // Verify remote is updated
         const remotePrompt = await langwatch.prompts.get(promptHandle);
         expect(remotePrompt).not.toBeNull();
-        expect(remotePrompt?.model).toBe("gpt-4-turbo");
+        expect(remotePrompt?.model).toBe("gpt-5-mini");
         expect(remotePrompt?.temperature).toBe(0.9);
 
         // Verify version incremented
@@ -154,8 +145,7 @@ describe("CLI E2E", () => {
       const createResult = cli.run(`prompt create ${promptHandle}`);
       expectCliResultSuccess(createResult);
 
-      const filePath =
-        localPromptFileManagement.getPromptFilePath(promptHandle);
+      const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
       cli.run(`prompt add ${promptHandle} ${filePath}`);
 
       // First push
@@ -171,7 +161,7 @@ describe("CLI E2E", () => {
       const promptHandle = createUniquePromptName();
       await langwatch.prompts.create({
         handle: promptHandle,
-        model: "gpt-4-turbo",
+        model: "gpt-5-mini",
         temperature: 0.9,
         prompt: "You are a helpful assistant.",
       });
@@ -193,10 +183,8 @@ describe("CLI E2E", () => {
       await langwatch.prompts.update(promptHandle, {
         commitMessage: "Updated remotely",
         temperature: 0.1,
-        model: "gpt-4-turbo",
-        messages: [
-          { role: "system", content: "Remotely updated message." },
-        ],
+        model: "gpt-5-mini",
+        messages: [{ role: "system", content: "Remotely updated message." }],
       });
 
       // Push should NOT pull the remote update

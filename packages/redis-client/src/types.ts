@@ -1,10 +1,9 @@
 import type { Cluster, Redis } from "ioredis";
 
 /**
- * The connection type the platform passes around. Standalone and cluster
- * clients differ in capability (cluster has no multi-key transactions across
- * slots, and only database 0), so consumers that care must narrow; everything
- * else treats them alike.
+ * Standalone and cluster clients differ in capability (cluster has no
+ * multi-key transactions across slots, and only database 0), so consumers
+ * that care must narrow.
  */
 export type RedisConnection = Redis | Cluster;
 

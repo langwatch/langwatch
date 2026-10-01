@@ -32,8 +32,8 @@ on:
       - "services/aigateway/**"
       - "pkg/**"
       - "cmd/**"
-      - "go.mod"
-      - "go.sum"
+      - "*/go.mod"
+      - "*/go.sum"
       - "infra/docker/Dockerfile.go_service"
       - ".github/workflows/go-services.yaml"
       # from `chart`
@@ -47,11 +47,10 @@ on:
       - "packages/langy/**"
       - "skills/**"
       - "feature-map.json"
-      - "platform/app/src/server/tracer/types.ts"
-      - "platform/app/src/server/filters/types.ts"
-      - "platform/app/src/server/evaluations/types.ts"
-      - "platform/app/src/server/modelProviders/llmModels.json"
-      - "platform/app/src/app/api/openapiLangWatch.json"
+      - "modules/trace/contract/src/trace-format.schemas.ts"
+      - "modules/evaluator/contract/src/evaluators.native.ts"
+      - "modules/model-provider/contract/src/catalog/model-catalog.json"
+      - "specs/api-reference/openapi-document.json"
       - "services/langevals/ts-integration/evaluators.generated.ts"
   workflow_dispatch:
 
@@ -91,8 +90,8 @@ jobs:
               - 'services/aigateway/**'
               - 'pkg/**'
               - 'cmd/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.go_service'
               - '.github/workflows/go-services.yaml'
             chart:
@@ -108,7 +107,7 @@ jobs:
               # The langyagent image bakes in the langwatch CLI, and that CLI is
               # generated AT IMAGE-BUILD TIME from inputs OUTSIDE the Go tree:
               # sdks/typescript/ + skills/ + feature-map.json + a handful of
-              # platform/app + services/langevals source files (sdks/typescript/copy-types.sh +
+              # packages + apps/api + services/langevals source files (sdks/typescript/copy-types.sh +
               # generate-skills-bundle.mjs). A change to any of those can break
               # `docker build -f infra/docker/Dockerfile.langyagent` with no Go source
               # touched — exactly the gap that shipped a broken build once
@@ -119,18 +118,17 @@ jobs:
               - 'pkg/**'
               - 'cmd/**'
               - 'sdks/go/**'
-              - 'go.mod'
-              - 'go.sum'
+              - '*/go.mod'
+              - '*/go.sum'
               - 'infra/docker/Dockerfile.langyagent'
               - 'sdks/typescript/**'
               - 'packages/langy/**'
               - 'skills/**'
               - 'feature-map.json'
-              - 'platform/app/src/server/tracer/types.ts'
-              - 'platform/app/src/server/filters/types.ts'
-              - 'platform/app/src/server/evaluations/types.ts'
-              - 'platform/app/src/server/modelProviders/llmModels.json'
-              - 'platform/app/src/app/api/openapiLangWatch.json'
+              - 'modules/trace/contract/src/trace-format.schemas.ts'
+              - 'modules/evaluator/contract/src/evaluators.native.ts'
+              - 'modules/model-provider/contract/src/catalog/model-catalog.json'
+              - 'specs/api-reference/openapi-document.json'
               - 'services/langevals/ts-integration/evaluators.generated.ts'
               - '.github/workflows/go-services.yaml'
 

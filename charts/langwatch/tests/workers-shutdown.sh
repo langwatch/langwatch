@@ -16,10 +16,11 @@
 # `Broken pipe, while writing to socket ... ParallelFormattingOutputFormat` and
 # the worker reports as `socket hang up`.
 #
-# The suite asserts both halves of the pair: the pod's grace period, and the
-# SHUTDOWN_DRAIN_TIMEOUT_MS the process is given. Both come from one value, and
-# a process running a budget its pod was not sized for is the whole failure.
-# See specs/event-sourcing/worker-graceful-shutdown.feature.
+# The suite asserts every clock: the pod's grace period, and the
+# SHUTDOWN_DRAIN_TIMEOUT_MS and PROCESS_SHUTDOWN_DEADLINE_MS the process is
+# given. All come from one value, and a process running a budget its pod was
+# not sized for is the whole failure.
+# See specs/background/worker-graceful-shutdown.feature.
 #
 # Scenario bindings use the same `@scenario` token as the bats suites,
 # expressed as a hash-comment above the test function it verifies — the next
@@ -33,10 +34,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# The default drain budget (workers.shutdownDrainSeconds) and the fixed margin
-# above it: 5s for App.close, 15s for process teardown, 10s of kubelet slack.
-# Mirrors platform/app/src/server/shutdown/budget.ts.
+# The default drain budget (shutdownDrainSeconds, read as the queue drain by
+# packages/process-stores/src/config-owner.ts), the process deadline above it
+# (drain + 20s, read by packages/process-server/src/config.ts) and the grace
+# period above that (deadline + 10s of kubelet slack).
 readonly DRAIN_SECONDS=25
+readonly DEADLINE_MARGIN_SECONDS=20
 readonly REQUIRED_MARGIN_SECONDS=30
 
 # Secret autogen, so the chart's own secret validation lets a bare render
@@ -121,12 +124,17 @@ test_app_grace_period_covers_the_drain() {
   expect_covers_drain "app grace period" "app"
 }
 
+# Both processes read the same variable, so each component's Deployment is
+# rendered on its own: a value from one pod can never satisfy the other.
 drain_env_of() {
-  printf '%s' "$1" | awk '
-    /name: SHUTDOWN_DRAIN_TIMEOUT_MS/ { want=1; next }
+  printf '%s' "$1" | awk -v var="$2" '
+    $0 ~ ("name: " var "$") { want=1; next }
     want && /value:/ { gsub(/"/,"",$2); print $2; want=0 }
   ' | head -n 1
 }
+
+readonly DRAIN_VAR="SHUTDOWN_DRAIN_TIMEOUT_MS"
+readonly DEADLINE_VAR="PROCESS_SHUTDOWN_DEADLINE_MS"
 
 # The pod is sized for a drain the process must be told about. A process
 # running a budget its pod was not sized for is the drift this pair exists to
@@ -134,23 +142,34 @@ drain_env_of() {
 # for — so assert they came from the same value rather than merely both being
 # present.
 expect_drain_env_matches() {
-  local label="$1" component="$2" flags="$3" want="$4" block got
+  local label="$1" component="$2" flags="$3" want="$4" var="$5" block got
   block=$(render_component "$component" "$BASE $flags")
-  got=$(drain_env_of "$block")
+  got=$(drain_env_of "$block" "$var")
   if [ "$got" != "$want" ]; then
-    fail "$label" "SHUTDOWN_DRAIN_TIMEOUT_MS is '${got:-<absent>}', expected $want"
+    fail "$label" "$var is '${got:-<absent>}', expected $want"
     return
   fi
-  echo "ok   [$label] SHUTDOWN_DRAIN_TIMEOUT_MS=$got"
+  echo "ok   [$label] $var=$got"
 }
 
 # @scenario "The process is told the same drain budget the pod is sized for"
 test_drain_env_matches_the_pod() {
-  expect_drain_env_matches "workers drain env" "workers" "" "$((DRAIN_SECONDS * 1000))"
-  expect_drain_env_matches "app drain env" "app" "" "$((DRAIN_SECONDS * 1000))"
-  expect_drain_env_matches "raised drain env" "workers" \
-    "--set workers.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=90" \
-    "60000"
+  local raised="--set workers.shutdownDrainSeconds=60 --set workers.terminationGracePeriodSeconds=90"
+  expect_drain_env_matches "workers drain env" "workers" "" \
+    "$((DRAIN_SECONDS * 1000))" "$DRAIN_VAR"
+  expect_drain_env_matches "app drain env" "app" "" \
+    "$((DRAIN_SECONDS * 1000))" "$DRAIN_VAR"
+  expect_drain_env_matches "raised drain env" "workers" "$raised" \
+    "60000" "$DRAIN_VAR"
+  expect_drain_env_matches "workers deadline env" "workers" "" \
+    "$(((DRAIN_SECONDS + DEADLINE_MARGIN_SECONDS) * 1000))" "$DEADLINE_VAR"
+  expect_drain_env_matches "app deadline env" "app" "" \
+    "$(((DRAIN_SECONDS + DEADLINE_MARGIN_SECONDS) * 1000))" "$DEADLINE_VAR"
+  expect_drain_env_matches "raised deadline env" "workers" "$raised" \
+    "80000" "$DEADLINE_VAR"
+  # Raising the workers drain leaves the app's own drain where it was.
+  expect_drain_env_matches "app drain unaffected" "app" "$raised" \
+    "$((DRAIN_SECONDS * 1000))" "$DRAIN_VAR"
 }
 
 # @scenario "Operators can raise the grace period for a slower drain"
@@ -179,8 +198,8 @@ test_short_grace_period_refuses_to_render() {
     "workers.terminationGracePeriodSeconds is 30"
 }
 
-# A value Helm keeps as a string renders `int` 0 — a zero drain the app rejects
-# at boot, while the required grace period collapses to the bare margin so the
+# A value Helm keeps as a string renders `int` 0 — a deadline with no drain in it,
+# while the required grace period collapses to the bare margin so the
 # guard passes. The render must refuse instead of shipping a crashloop.
 # @scenario "A drain budget that is not a positive whole number refuses to render"
 test_junk_drain_refuses_to_render() {
@@ -200,9 +219,12 @@ test_junk_drain_refuses_to_render() {
 
 # @scenario "The drain budget cannot be overridden behind the pod's back"
 test_extra_envs_cannot_override_the_drain() {
-  expect_render_refused "extraEnvs override" \
-    "--set workers.extraEnvs[0].name=SHUTDOWN_DRAIN_TIMEOUT_MS --set-string workers.extraEnvs[0].value=120000" \
-    "must not be set through extraEnvs"
+  expect_render_refused "extraEnvs deadline override" \
+    "--set workers.extraEnvs[0].name=PROCESS_SHUTDOWN_DEADLINE_MS --set-string workers.extraEnvs[0].value=120000" \
+    "PROCESS_SHUTDOWN_DEADLINE_MS must not be set through extraEnvs"
+  expect_render_refused "extraEnvs drain override" \
+    "--set app.extraEnvs[0].name=SHUTDOWN_DRAIN_TIMEOUT_MS --set-string app.extraEnvs[0].value=120000" \
+    "SHUTDOWN_DRAIN_TIMEOUT_MS must not be set through extraEnvs"
 }
 
 # @scenario "Raising the drain budget alone refuses to render"

@@ -44,7 +44,7 @@ describe("listSlackConnectionsCommand()", () => {
     const result = await listSlackConnectionsCommand();
 
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/slack-connections"),
+      expect.stringContaining("/api/v1/slack-connections"),
       expect.objectContaining({
         headers: expect.objectContaining({ authorization: "Bearer test-key" }),
       }),

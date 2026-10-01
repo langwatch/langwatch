@@ -1,12 +1,7 @@
 /**
- * The reconnect loop both LangWatch sockets run on.
- *
- * The connected-agents client (`client.ts`) and the local control client
- * (`cli/commands/langy/relay-client.ts`) open different sockets and speak
- * different frames, but they keep them alive the same way: open, register,
- * watch for a heartbeat, and come back with a jittered backoff when the
- * platform goes away. That part lives here so there is one implementation of
- * it rather than two that drift.
+ * The reconnect loop both LangWatch sockets run on: open, register, watch
+ * for a heartbeat, and come back with jittered backoff. Shared so the
+ * connected-agents and local-control clients don't drift apart.
  */
 
 import {
@@ -21,7 +16,7 @@ import {
 export const RECONNECT_BASE_MS = 1_000;
 export const RECONNECT_MAX_MS = 30_000;
 
-/** The delay before reconnect attempt `attempt` (0-based), with jitter, in the 1 s to 30 s window. */
+/** The delay before reconnect attempt `attempt` (0-based), with jitter, in the 1s-30s window. */
 export function reconnectDelayMs({
   attempt,
   baseMs = RECONNECT_BASE_MS,

@@ -1,30 +1,7 @@
 /**
- * Which codex session ran this command, read from the process tree instead of
- * inferred from file times.
- *
- * Codex exports nothing about itself into the processes it spawns
- * (openai/codex#8923), which is why the rest of this seam infers the session
- * from rollout timestamps. But codex holds its rollout transcript OPEN for the
- * whole session, and `langwatch ingest context` always runs as a descendant of
- * the codex process, because codex spawns the shell that runs it. So the
- * invoking session is identifiable by construction: walk up the parent chain
- * and the first ancestor holding a rollout file open IS the session asking.
- * Two sessions running side by side stop being ambiguous, because each one's
- * command reaches its own process, not the newest writer on the machine.
- *
- * The identifying property is the open rollout, never the process name. A
- * process called `codex` that holds no rollout is not a session, and a session
- * renamed or wrapped still holds its rollout. The rollout has to be one of
- * codex's own, inside the sessions tree, since any process can open a file
- * named like one.
- *
- * Every step of the walk is best-effort. A sandbox that blocks `lsof`, a
- * platform without it, a `ps` that fails, a process that exits mid-walk: all
- * of them return nothing and the caller falls back to the timestamp inference.
- * The whole walk is also bounded in time, because this runs in front of a live
- * agent turn.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Which codex session ran this command, found by walking the process tree — codex holds its
+ * rollout transcript open for the whole session, and this always runs as its descendant, so
+ * the first ancestor with an open rollout IS the session asking, best-effort throughout.
  */
 
 import { execFile } from "node:child_process";
@@ -69,11 +46,8 @@ function runCommand({
   timeoutMs: number;
 }): Promise<string> {
   return new Promise((resolve) => {
-    execFile(
-      file,
-      args,
-      { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 },
-      (error, stdout) => resolve(error ? "" : stdout),
+    execFile(file, args, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) =>
+      resolve(error ? "" : stdout),
     );
   });
 }
@@ -101,12 +75,9 @@ async function readParentPid(pid: number): Promise<number | null> {
 }
 
 /**
- * Resolve a directory of symlinks, in batches, giving up when the deadline
- * passes. A process can hold thousands of descriptors, and resolving all of
- * them would blow the walk budget before the walk got the chance to check it.
- *
- * The directory is streamed rather than listed, so a huge descriptor table is
- * never materialised and the clock is checked before every batch starts.
+ * Resolves a directory of symlinks in batches, giving up at the deadline --
+ * a process can hold thousands of descriptors, blowing the walk budget
+ * before it can even check. Streamed, not listed, so nothing huge materialises.
  */
 export async function readSymlinkedPaths({
   dir,
@@ -128,12 +99,6 @@ export async function readSymlinkedPaths({
   }
 
   const paths: string[] = [];
-  const drain = async (batch: string[]): Promise<void> => {
-    const resolved = await Promise.all(
-      batch.map((name) => readlink(join(dir, name)).catch(() => "")),
-    );
-    for (const path of resolved) if (path) paths.push(path);
-  };
 
   try {
     let batch: string[] = [];
@@ -141,27 +106,26 @@ export async function readSymlinkedPaths({
       if (nowMs() >= deadline) break;
       batch.push(entry.name);
       if (batch.length < FD_BATCH) continue;
-      await drain(batch);
+      paths.push(...(await readSymlinkBatch(dir, batch)));
       batch = [];
     }
-    if (batch.length > 0 && nowMs() < deadline) await drain(batch);
+    if (batch.length > 0 && nowMs() < deadline) paths.push(...(await readSymlinkBatch(dir, batch)));
   } catch {
     /* the process exited mid-read: what was resolved still counts */
+    void 0;
   } finally {
     try {
       await handle.close();
     } catch {
       /* finishing or breaking out of `for await` already closed it */
+      void 0;
     }
   }
   return paths;
 }
 
 /** `/proc/<pid>/fd` on linux, `lsof -Fn` everywhere else. */
-async function readOpenFiles(
-  pid: number,
-  timeoutMs: number,
-): Promise<string[]> {
+async function readOpenFiles(pid: number, timeoutMs: number): Promise<string[]> {
   if (isLinux) {
     return readSymlinkedPaths({ dir: `/proc/${pid}/fd`, timeoutMs });
   }
@@ -185,13 +149,7 @@ export const systemAncestorProbe: AncestorProbe = {
 };
 
 /** Whether a path sits inside a directory, symlink games and `..` resolved. */
-function isInside({
-  root,
-  candidate,
-}: {
-  root: string;
-  candidate: string;
-}): boolean {
+function isInside({ root, candidate }: { root: string; candidate: string }): boolean {
   const resolvedRoot = resolve(root);
   const resolvedCandidate = resolve(candidate);
   return (
@@ -231,23 +189,14 @@ export async function resolveCodexSessionFromAncestors({
 
     let openFiles: string[] = [];
     try {
-      openFiles = await probe.openFilesOf(
-        pid,
-        Math.min(OPEN_FILES_TIMEOUT_MS, remaining),
-      );
+      openFiles = await probe.openFilesOf(pid, Math.min(OPEN_FILES_TIMEOUT_MS, remaining));
     } catch {
       /* this ancestor does not answer: the next one still might */
+      void 0;
     }
 
-    for (const filePath of openFiles) {
-      const sessionId = ROLLOUT_SESSION_ID.exec(basename(filePath))?.[1];
-      // The name alone is not the property. Any process can hold a file
-      // called rollout-<uuid>.jsonl open; only codex writes one into the
-      // sessions tree, so a match outside that tree names no session.
-      if (!sessionId) continue;
-      if (!isInside({ root: sessionsRoot, candidate: filePath })) continue;
-      return { sessionId, rolloutPath: filePath };
-    }
+    const session = findOpenRollout(openFiles, sessionsRoot);
+    if (session) return session;
 
     if (deadline - nowMs() <= 0) return null;
     try {
@@ -257,4 +206,25 @@ export async function resolveCodexSessionFromAncestors({
     }
   }
   return null;
+}
+
+function findOpenRollout(openFiles: string[], sessionsRoot: string): AncestorCodexSession | null {
+  for (const filePath of openFiles) {
+    const sessionId = ROLLOUT_SESSION_ID.exec(basename(filePath))?.[1];
+    // The name alone is not the property. Any process can hold a file
+    // called rollout-<uuid>.jsonl open; only codex writes one into the
+    // sessions tree, so a match outside that tree names no session.
+    if (!sessionId) continue;
+    if (!isInside({ root: sessionsRoot, candidate: filePath })) continue;
+    return { sessionId, rolloutPath: filePath };
+  }
+
+  return null;
+}
+
+async function readSymlinkBatch(dir: string, batch: string[]): Promise<string[]> {
+  const resolved = await Promise.all(
+    batch.map((name) => readlink(join(dir, name)).catch(() => "")),
+  );
+  return resolved.filter((path) => Boolean(path));
 }

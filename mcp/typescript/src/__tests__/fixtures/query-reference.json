@@ -464,7 +464,8 @@
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -717,7 +718,8 @@
               "description": "Billed cost attributed to the span, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -727,7 +729,8 @@
               "description": "Cost attributed to the span that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1233,7 +1236,8 @@
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1243,7 +1247,8 @@
               "description": "Cost of the trace that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1379,7 +1384,8 @@
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1389,7 +1395,8 @@
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1503,7 +1510,8 @@
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1513,7 +1521,8 @@
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1721,7 +1730,8 @@
               "description": "Billed cost of running the evaluator, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1731,7 +1741,8 @@
               "description": "Cost of running the evaluator that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1861,7 +1872,8 @@
               "description": "Total cost of the bucket's evaluations, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1871,7 +1883,8 @@
               "description": "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -2225,7 +2238,8 @@
               "description": "Computed cost of the session, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -2235,7 +2249,8 @@
               "description": "Cost the agent reported for itself, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -2763,7 +2778,8 @@
               "description": "Cost of a model call, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3510,7 +3526,8 @@
               "description": "LlmCallsTotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3653,7 +3670,8 @@
               "description": "TargetCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3757,7 +3775,8 @@
               "description": "EvaluationCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3922,7 +3941,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4151,7 +4171,8 @@
               "description": "AmountUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4257,7 +4278,8 @@
               "description": "AmountNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -4333,7 +4355,8 @@
               "description": "SpendUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4391,7 +4414,8 @@
               "description": "SpendNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -4578,7 +4602,8 @@
               "description": "CostNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4792,7 +4817,8 @@
               "description": "CostSource",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4899,7 +4925,8 @@
               "description": "CostSource",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4973,7 +5000,8 @@
               "description": "AmountNanoUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4983,7 +5011,8 @@
               "description": "AmountNanoMinor",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -5041,7 +5070,8 @@
               "description": "PreviousAmountNanoUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -5180,7 +5210,8 @@
               "description": "SpendUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7743,7 +7774,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7753,7 +7785,8 @@
               "description": "RoleCosts",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7827,7 +7860,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7837,7 +7871,8 @@
               "description": "RoleCosts",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -8110,16 +8145,6 @@
               "description": "Type",
               "unit": null,
               "gates": [],
-              "available": true
-            },
-            {
-              "name": "Config",
-              "type": "String",
-              "description": "Config",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
               "available": true
             },
             {
@@ -9047,7 +9072,8 @@
               "description": "Numeric trigger context.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9206,16 +9232,6 @@
               "available": true
             },
             {
-              "name": "DestinationConfig",
-              "type": "String",
-              "description": "Alert routing per destination.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "Status",
               "type": "String",
               "description": "'active' (default - evaluator picks it up) | 'disabled' (admin paused; rule rows kept for audit). 'archived' uses archivedAt timestamp instead so we can filter `archivedAt IS NULL` cheaply.",
@@ -9354,7 +9370,8 @@
               "description": "Billed cost of running the evaluation, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9429,7 +9446,8 @@
               "description": "CostId",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9447,7 +9465,8 @@
               "description": "CostName",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9664,7 +9683,8 @@
               "description": "CustomLLMModelCostId",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9943,7 +9963,8 @@
           "grain": "one row per DatasetId",
           "joinKeys": [
             "TenantId",
-            "DatasetId"
+            "DatasetId",
+            "SourceStoredObjectId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10066,6 +10087,14 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "SourceStoredObjectId",
+              "type": "Nullable(String)",
+              "description": "SourceStoredObjectId",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {
@@ -10431,7 +10460,8 @@
               "description": "Set alongside `erasedAt` and cleared once the daily cost rows have been removed and their rebuild requested.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -10451,7 +10481,8 @@
               "description": "conflict rule: automatic linking has stopped for this identity because evidence pointed at two candidates, or contradicted an existing link.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -10461,7 +10492,8 @@
               "description": "What tripped the suspension, for the human who reviews it.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11072,7 +11104,8 @@
               "description": "AmountUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11222,7 +11255,8 @@
               "description": "LimitUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11268,7 +11302,8 @@
               "description": "SpentUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11825,7 +11860,8 @@
               "description": "VendorCostRaw",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -12006,16 +12042,6 @@
               "available": true
             },
             {
-              "name": "AccountLogin",
-              "type": "String",
-              "description": "The GitHub account the App is installed on.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "AccountType",
               "type": "String",
               "description": "\"Organization\" or \"User\".",
@@ -12057,7 +12083,8 @@
               "description": "Set when GitHub suspends the installation; cleared on unsuspend.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -12879,7 +12906,8 @@
               "description": "- the window this source read while pulled cost recording was off for the organization, so its spend was dropped rather than priced.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -12889,7 +12917,8 @@
               "description": "UnpricedUsageThrough",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -17178,16 +17207,6 @@
               "available": true
             },
             {
-              "name": "ActionParams",
-              "type": "String",
-              "description": "ActionParams",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "Filters",
               "type": "String",
               "description": "Filters",
@@ -17406,7 +17425,8 @@
             "TraceProjectId",
             "RevokedById",
             "CreatedById",
-            "RoutingPolicyId"
+            "RoutingPolicyId",
+            "LicenseInstanceId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -17609,6 +17629,32 @@
               "name": "RoutingMode",
               "type": "String",
               "description": "RoutingMode",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ConnectServices",
+              "type": "Array(String)",
+              "description": "ConnectServices",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "LicenseInstanceId",
+              "type": "Nullable(String)",
+              "description": "LicenseInstanceId",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LicenseExpiresAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "LicenseExpiresAt",
               "unit": null,
               "gates": [],
               "available": true
@@ -18024,7 +18070,7 @@
           "name": "conversation",
           "kind": "extraction",
           "signature": "conversation(thread_key)",
-          "description": "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
+          "description": "The whole thread as one markdown transcript that reads like the chat view: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. For questions about what was said; `llm_readable_thread` holds what the agent did.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18040,7 +18086,7 @@
           "name": "conversation_bounded",
           "kind": "extraction",
           "signature": "conversation_bounded(thread_key, max_tokens, until_trace_id)",
-          "description": "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
+          "description": "The same transcript under a token budget: every turn is shortened before one is dropped, and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18051,6 +18097,22 @@
           ],
           "available": true,
           "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "llm_readable_thread",
+          "kind": "extraction",
+          "signature": "llm_readable_thread(thread_key, max_tokens)",
+          "description": "The thread as the thread evaluators read it: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), under a token budget. For questions about what the agent did; `conversation` holds what was said.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "thread_traces",
@@ -18069,7 +18131,7 @@
           "name": "llm_readable_trace",
           "kind": "extraction",
           "signature": "llm_readable_trace(trace_id, max_tokens)",
-          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
+          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the tool calls, then the model calls, then the slowest.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "trace",
@@ -18171,7 +18233,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_criteria",
@@ -18184,7 +18246,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_criteria(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_criteria(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_passed",
@@ -18197,7 +18259,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_passed(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_passed(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_score",
@@ -18210,7 +18272,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_score(conversation_bounded(ConversationId, 8000, ''), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_score(llm_readable_thread(ConversationId, 8000), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category",
@@ -18223,7 +18285,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category_probs",
@@ -18236,7 +18298,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category_probs(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category_probs(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         }
       ]
     },
@@ -18903,7 +18965,8 @@
       "parameters": [],
       "requires": {
         "gates": [
-          "costs"
+          "costs",
+          "cost:view"
         ],
         "functions": []
       },

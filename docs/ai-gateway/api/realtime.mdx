@@ -12,7 +12,8 @@ The audio never passes through the gateway. The media socket runs from your clie
 One session is one spend record: admitted at the mint, settled when the call's usage arrives.
 
 <Note>
-Because the gateway is not in the audio path, a voice budget admits at session start and reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
+  Because the gateway is not in the audio path, a voice budget admits at session start and
+  reconciles when the call ends. Overshoot on voice is bounded by the length of a call.
 </Note>
 
 ## ElevenLabs Conversational AI
@@ -101,7 +102,7 @@ curl -X POST "https://gateway.langwatch.ai/v1/realtime/sessions/$SESSION_ID/usag
 ```
 
 ```json
-{"received":true}
+{ "received": true }
 ```
 
 The status is `202`. `SESSION_ID` is the `X-LangWatch-Session-Id` from the mint. Three body shapes are accepted, so you can forward the frame unchanged: the bare usage object, an object with a `usage` key, and the whole `response.done` event. The rest of the event is not read, and no transcript content is looked at. The body is capped at 64 KiB.
@@ -126,13 +127,13 @@ Turn-level transcripts and latency reach LangWatch through the SDK in your own a
 
 ## Errors
 
-| Code | Status | Cause |
-|---|---|---|
-| `bad_request` | 400 | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
-| `model_provider_not_bound` | 400 | The key has no credential for the vendor this route serves. |
-| `budget_exceeded` | 402 | A budget that applies to the key is over its limit. |
-| `realtime_session_limit` | 429 | The key holds its maximum of open voice sessions. Retry when a call ends. |
-| `realtime_registry_unavailable` | 503 | LangWatch could not record the session, so no session was minted. Retry. |
+| Code                            | Status | Cause                                                                                                                        |
+| ------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| `bad_request`                   | 400    | `agent_id` is missing on the ElevenLabs mint, a session id is missing on the usage report, or the usage body does not parse. |
+| `model_provider_not_bound`      | 400    | The key has no credential for the vendor this route serves.                                                                  |
+| `budget_exceeded`               | 402    | A budget that applies to the key is over its limit.                                                                          |
+| `realtime_session_limit`        | 429    | The key holds its maximum of open voice sessions. Retry when a call ends.                                                    |
+| `realtime_registry_unavailable` | 503    | LangWatch could not record the session, so no session was minted. Retry.                                                     |
 
 Each mint route serves one vendor: `/v1/realtime/client_secrets` needs an OpenAI credential, and `/v1/convai/conversation/get-signed-url` needs an ElevenLabs one. A mint never falls back to a second credential, because a session credential is bound to one account and a fallback would sign for an agent that does not exist there.
 

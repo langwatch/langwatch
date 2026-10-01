@@ -1,26 +1,13 @@
 /**
- * The invite grammar, which is the one management shape with two spellings.
- *
- * An invited person always lands on at least one team, and the role they hold
- * is per team, so an invite is a small tree rather than a value. Repeated flags
- * spell the common case (a few people onto the same teams); the JSON forms
- * carry per-person team assignments and custom roles. Both produce the same
- * request, so a run that started as flags can be captured as JSON without
- * changing what happens.
- *
- * It lives beside `managementFlags` rather than inside it because the JSON form
- * validates a document the caller wrote, which is a different job from reading
- * a single colon-separated flag.
+ * The invite grammar: a person always lands on at least one team, with a
+ * role per team, so an invite is a small tree, not a value. Lives beside
+ * `managementFlags` because the JSON form validates a whole document.
  */
 import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
 import type { ManagementRole } from "@/client-sdk/services/_shared/management-types";
 import type { InviteInput } from "@/client-sdk/services/organization/organization-api.service";
-import {
-  ManagementFlagError,
-  oneOf,
-  parseOrganizationRole,
-  parseRoleIn,
-} from "./managementFlags";
+
+import { ManagementFlagError, oneOf, parseOrganizationRole, parseRoleIn } from "./managementFlags";
 
 type TeamAssignment = InviteInput["teams"][number];
 
@@ -32,18 +19,11 @@ type TeamAssignment = InviteInput["teams"][number];
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * One invited address, refused before the batch is sent.
- *
- * An invite batch is all-or-nothing at the platform, so one mistyped address
- * costs the caller the whole run. `source` names which one was wrong.
+ * One invited address, refused before the batch is sent. An invite batch is
+ * all-or-nothing at the platform, so one mistyped address costs the caller
+ * the whole run; `source` names which one was wrong.
  */
-const parseEmail = ({
-  value,
-  source,
-}: {
-  value: string;
-  source: string;
-}): string => {
+const parseEmail = ({ value, source }: { value: string; source: string }): string => {
   const email = value.trim();
   if (!EMAIL_SHAPE.test(email)) {
     throw new ManagementFlagError(
@@ -57,12 +37,22 @@ const parseEmail = ({
  * `teamId:role`, repeated: the teams an invited person lands on and the role
  * they hold there. A team id never contains a colon.
  */
-export const parseTeamFlags = (
-  values: string[] = [],
-): Array<{ teamId: string; role: ManagementRole }> =>
+export const parseTeamFlags = (values: string[] = []): { teamId: string; role: ManagementRole }[] =>
   values.map((value) => {
     const parts = value.split(":");
-    if (parts.length !== 2 || parts.some((part) => !part.trim())) {
+    if (parts.length !== 2) {
+      throw new ManagementFlagError(
+        `Invalid team assignment "${value}". Expected teamId:role, for example team_abc:MEMBER.`,
+      );
+    }
+    let hasEmptyPart = false;
+    for (const part of parts) {
+      if (!part.trim()) {
+        hasEmptyPart = true;
+        break;
+      }
+    }
+    if (hasEmptyPart) {
       throw new ManagementFlagError(
         `Invalid team assignment "${value}". Expected teamId:role, for example team_abc:MEMBER.`,
       );
@@ -86,17 +76,11 @@ export interface InviteFlagInput {
 }
 
 /**
- * The invite batch the flags describe.
- *
- * One `--role` covers the whole batch; several must line up one-per-email, so
- * a mismatch is caught here rather than silently pairing the wrong role with
- * the wrong person. The team assignments apply to every invite in the batch:
- * an invite with per-person teams is a JSON batch, which the same command
- * accepts through `--json`, `--file` or `--stdin`.
+ * The invite batch the flags describe. One `--role` covers the whole batch;
+ * several must line up one-per-email, so a mismatch is caught here rather
+ * than silently pairing the wrong role with the wrong person.
  */
-export const composeInvitesFromFlags = (
-  options: InviteFlagInput,
-): InviteInput[] => {
+export const composeInvitesFromFlags = (options: InviteFlagInput): InviteInput[] => {
   const emails = (options.email ?? []).map((email) => email.trim()).filter(Boolean);
   if (emails.length === 0) {
     throw new ManagementFlagError(
@@ -153,11 +137,7 @@ const parseTeamAssignment = ({
   roleSource: string;
 }): TeamAssignment => {
   const assignment = team as Partial<TeamAssignment> | null;
-  if (
-    !assignment ||
-    typeof assignment.teamId !== "string" ||
-    !assignment.teamId.trim()
-  ) {
+  if (!assignment || typeof assignment.teamId !== "string" || !assignment.teamId.trim()) {
     throw new ManagementFlagError(`${source} has no teamId.`);
   }
   const customRoleId = parseCustomRoleId({
@@ -175,13 +155,7 @@ const parseTeamAssignment = ({
 };
 
 /** One invite out of a JSON batch, numbered so a refusal says which one. */
-const parseInviteEntry = ({
-  entry,
-  index,
-}: {
-  entry: unknown;
-  index: number;
-}): InviteInput => {
+const parseInviteEntry = ({ entry, index }: { entry: unknown; index: number }): InviteInput => {
   const invite = entry as Partial<InviteInput> | null;
   const position = `Invite ${index + 1}`;
   if (!invite || typeof invite.email !== "string" || !invite.email.trim()) {
@@ -220,18 +194,15 @@ const parseInviteEntry = ({
 
 /**
  * The invite batch a JSON document describes. Both the bare array and the
- * `{ invites: [...] }` envelope are accepted, because the first is what a
- * person writes and the second is what the API answers with, and pasting back
- * a previous response is the obvious thing to try.
+ * `{ invites: [...] }` envelope are accepted -- the first is what a person
+ * writes, the second what the API answers with (pasting one back is obvious).
  */
 export const parseInvitesJson = (raw: string): InviteInput[] => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new ManagementFlagError(
-      "Invalid JSON: could not parse the invite batch.",
-    );
+    throw new ManagementFlagError("Invalid JSON: could not parse the invite batch.");
   }
 
   const invites = Array.isArray(parsed)
@@ -244,9 +215,7 @@ export const parseInvitesJson = (raw: string): InviteInput[] => {
     );
   }
   if (invites.length === 0) {
-    throw new ManagementFlagError(
-      "Invalid invite batch: the invites array is empty.",
-    );
+    throw new ManagementFlagError("Invalid invite batch: the invites array is empty.");
   }
 
   return invites.map((entry, index) => parseInviteEntry({ entry, index }));

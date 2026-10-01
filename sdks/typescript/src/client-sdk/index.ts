@@ -1,4 +1,5 @@
 import { scopedApiKey } from "@/internal/credentialContext";
+
 import { PromptsFacade, PromptsApiService } from "./services/prompts";
 export { FetchPolicy, type GetPromptOptions } from "./services/prompts";
 export type {
@@ -22,7 +23,13 @@ export type {
   UploadResponse,
   DatasetRecordResponse,
 } from "./services/datasets";
-export { DatasetError, DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "./services/datasets";
+export {
+  DatasetError,
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+} from "./services/datasets";
 export type {
   ExperimentRunResult,
   RunExperimentOptions,
@@ -37,7 +44,12 @@ export {
   ExperimentRunFailedError,
   ExperimentsApiError,
 } from "./services/experiments";
-export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./services/evaluations";
+export type {
+  EvaluationResult,
+  EvaluateOptions,
+  EvaluationStatus,
+  EvaluationCost,
+} from "./services/evaluations";
 export {
   EvaluationError,
   EvaluatorCallError,
@@ -52,9 +64,18 @@ export { InstantEvalsApiService, InstantEvalsApiError } from "./services/instant
 export { TestSuitesApiService, TestSuitesApiError } from "./services/test-suites";
 export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
 export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
-export { AnnotationsApiService, AnnotationsApiError } from "./services/annotations/annotations-api.service";
-export { DashboardsApiService, DashboardsApiError } from "./services/dashboards/dashboards-api.service";
-export { ModelProvidersApiService, ModelProvidersApiError } from "./services/model-providers/model-providers-api.service";
+export {
+  AnnotationsApiService,
+  AnnotationsApiError,
+} from "./services/annotations/annotations-api.service";
+export {
+  DashboardsApiService,
+  DashboardsApiError,
+} from "./services/dashboards/dashboards-api.service";
+export {
+  ModelProvidersApiService,
+  ModelProvidersApiError,
+} from "./services/model-providers/model-providers-api.service";
 export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
 export { QueryApiService, QueryApiError } from "./services/query/query-api.service";
 export { TriggersApiService, TriggersApiError } from "./services/triggers";
@@ -63,9 +84,18 @@ export { SimulationRunsApiService, SimulationRunsApiError } from "./services/sim
 export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
 export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
 export { SecretsApiService, SecretsApiError } from "./services/secrets";
-export { VirtualKeysApiService, VirtualKeysApiError } from "./services/virtual-keys/virtual-keys-api.service";
-export { GatewayBudgetsApiService, GatewayBudgetsApiError } from "./services/gateway-budgets/gateway-budgets-api.service";
-export { SpendEventsApiService, SpendEventsApiError } from "./services/spend-events/spend-events-api.service";
+export {
+  VirtualKeysApiService,
+  VirtualKeysApiError,
+} from "./services/virtual-keys/virtual-keys-api.service";
+export {
+  GatewayBudgetsApiService,
+  GatewayBudgetsApiError,
+} from "./services/gateway-budgets/gateway-budgets-api.service";
+export {
+  SpendEventsApiService,
+  SpendEventsApiError,
+} from "./services/spend-events/spend-events-api.service";
 export { WebhooksApiService, WebhooksApiError } from "./services/webhooks/webhooks-api.service";
 export { TeamsApiService, TeamsApiError } from "./services/teams/teams-api.service";
 export type {
@@ -84,43 +114,45 @@ export type {
   CreateProjectInput,
   UpdateProjectInput,
 } from "./services/projects/projects-api.service";
-import { LocalPromptsService } from "./services/prompts/local-prompts.service";
-import { ExperimentsFacade } from "./services/experiments";
+import { resolveEndpoint } from "@/internal/endpoint";
+
+import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
+import { type Logger, NoOpLogger } from "../logger";
+import { AgentsApiService } from "./services/agents/agents-api.service";
+import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
+import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
 import { DatasetsFacade } from "./services/datasets";
 import { EvaluationsFacade } from "./services/evaluations";
 import { EvaluatorsApiService } from "./services/evaluators";
-import { ScenariosApiService } from "./services/scenarios";
-import { SuitesApiService } from "./services/suites";
-import { RunPlansApiService } from "./services/run-plans";
-import { InstantEvalsApiService } from "./services/instant-evals";
-import { TestSuitesApiService } from "./services/test-suites";
-import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
-import { AgentsApiService } from "./services/agents/agents-api.service";
-import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
-import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
-import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
-import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
-import { QueryApiService } from "./services/query/query-api.service";
-import { TriggersApiService } from "./services/triggers";
-import { GraphsApiService } from "./services/graphs";
-import { SimulationRunsApiService } from "./services/simulation-runs";
-import { MonitorsApiService } from "./services/monitors";
-import { SecretsApiService } from "./services/secrets";
-import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { ExperimentsFacade } from "./services/experiments";
 import { GatewayBudgetsApiService } from "./services/gateway-budgets/gateway-budgets-api.service";
-import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
-import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
-import { TeamsApiService } from "./services/teams/teams-api.service";
+import { GraphsApiService } from "./services/graphs";
+import { InstantEvalsApiService } from "./services/instant-evals";
+import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
+import { MonitorsApiService } from "./services/monitors";
 import { ProjectsApiService } from "./services/projects/projects-api.service";
-import { type InternalConfig } from "./types";
-import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
-import { type Logger, NoOpLogger } from "../logger";
+import { LocalPromptsService } from "./services/prompts/local-prompts.service";
+import { QueryApiService } from "./services/query/query-api.service";
+import { RunPlansApiService } from "./services/run-plans";
+import { ScenariosApiService } from "./services/scenarios";
+import { SecretsApiService } from "./services/secrets";
+import { SimulationRunsApiService } from "./services/simulation-runs";
+import { SpendEventsApiService } from "./services/spend-events/spend-events-api.service";
+import { SuitesApiService } from "./services/suites";
+import { TeamsApiService } from "./services/teams/teams-api.service";
+import { TestSuitesApiService } from "./services/test-suites";
 import { TracesFacade } from "./services/traces/facade";
-import { resolveEndpoint } from "@/internal/endpoint";
+import { TriggersApiService } from "./services/triggers";
+import { VirtualKeysApiService } from "./services/virtual-keys/virtual-keys-api.service";
+import { WebhooksApiService } from "./services/webhooks/webhooks-api.service";
+import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
+import { type InternalConfig } from "./types";
 
 export interface LangWatchConstructorOptions {
   apiKey?: string;
   endpoint?: string;
+  projectId?: string;
   options?: {
     logger?: Logger;
   };
@@ -135,43 +167,19 @@ export class LangWatch {
 
   /**
    * Run experiments on LangWatch platform or via SDK.
-   *
-   * Platform experiments (CI/CD):
-   * ```typescript
-   * const result = await langwatch.experiments.run("my-experiment-slug");
-   * result.printSummary();
-   * ```
-   *
-   * SDK-defined experiments:
-   * ```typescript
-   * const experiment = await langwatch.experiments.init("my-experiment");
-   * // ... run evaluators using experiment.evaluate()
-   * ```
    */
   readonly experiments: ExperimentsFacade;
 
   /**
    * Run evaluators and guardrails in real-time (Online Evaluations).
-   *
    * @example
-   * ```typescript
-   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
-   *   data: { input: userInput, output: generatedResponse },
-   *   name: "PII Detection",
-   *   asGuardrail: true,
-   * });
-   *
-   * if (!guardrail.passed) {
-   *   return "I'm sorry, I can't do that.";
-   * }
-   * ```
    */
   readonly evaluations: EvaluationsFacade;
 
   readonly evaluators: EvaluatorsApiService;
   readonly scenarios: ScenariosApiService;
   /**
-   * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+   * @deprecated Use runPlans and testSuites; /api/v1/suites is a frozen alias.
    */
   readonly suites: SuitesApiService;
   readonly runPlans: RunPlansApiService;
@@ -184,7 +192,7 @@ export class LangWatch {
   readonly dashboards: DashboardsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;
-  /** The raw LangWatchQL door — run a governed SELECT or discover the analytics schema directly, outside a saved chart. */
+  /** The raw LangWatchQL door: a governed SELECT or schema discovery outside a saved chart. */
   readonly query: QueryApiService;
   readonly triggers: TriggersApiService;
   readonly graphs: GraphsApiService;
@@ -253,7 +261,11 @@ export class LangWatch {
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);
     this.monitors = new MonitorsApiService({ apiKey, endpoint });
-    this.secrets = new SecretsApiService({ apiKey, endpoint });
+    this.secrets = new SecretsApiService({
+      apiKey,
+      endpoint,
+      projectId: options.projectId,
+    });
     this.virtualKeys = new VirtualKeysApiService({ apiKey, endpoint });
     this.gatewayBudgets = new GatewayBudgetsApiService({ apiKey, endpoint });
     this.spendEvents = new SpendEventsApiService({ apiKey, endpoint });
@@ -265,13 +277,8 @@ export class LangWatch {
   }
 
   /**
-   * Teams, which group projects and the members who can reach them. These
-   * routes want an organization API key.
-   *
-   * Built on first use rather than in the constructor: the management
-   * families resolve their credential when constructed and refuse an empty
-   * one, so building this eagerly would make `new LangWatch()` throw for
-   * every caller that never touches a team.
+   * Teams, which group projects and the members who can reach them. These routes want an
+   * organization API key.
    */
   get teams(): TeamsApiService {
     this.#teams ??= new TeamsApiService(this.#managementConfig());

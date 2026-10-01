@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PROVIDER_ID, buildModelsJson } from "./models.js";
+
 import type { LangyWorkerModelConfig } from "./config.js";
+import { PROVIDER_ID, buildModelsJson } from "./models.js";
 
 const model: LangyWorkerModelConfig = {
   id: "gpt-5-mini",
@@ -36,7 +37,9 @@ describe("buildModelsJson", () => {
         model: { ...model, samplingParams: { temperature: 1 } } as LangyWorkerModelConfig,
         env: { OPENAI_BASE_URL: "http://x", OPENAI_API_KEY: "k" },
       });
-      const provider = generated.providers[PROVIDER_ID] as { models: Record<string, unknown>[] };
+      const provider = generated.providers[PROVIDER_ID] as {
+        models: Record<string, unknown>[];
+      };
       const entry = provider.models[0] as Record<string, unknown>;
       expect(entry.id).toBe("gpt-5-mini");
       expect(entry.reasoning).toBe(true);
@@ -97,7 +100,9 @@ describe("buildModelsJson", () => {
       expect(provider.baseUrl).toBe("http://127.0.0.1:41234");
       expect(entry.baseUrl).toBeUndefined();
       expect(entry.provider).toBeUndefined();
-      expect(JSON.stringify(buildModelsJson({ model: claude, env }))).not.toContain("api.anthropic.com");
+      expect(JSON.stringify(buildModelsJson({ model: claude, env }))).not.toContain(
+        "api.anthropic.com",
+      );
     });
 
     /** @scenario A known model's registry entry keeps pi's own catalog knowledge */

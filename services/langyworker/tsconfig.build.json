@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "./dist",
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker-build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    // tsc is the whole build: .ts specifiers are rewritten to .js in dist.
+    "rewriteRelativeImportExtensions": true,
     "declaration": false,
     "sourceMap": false
   },

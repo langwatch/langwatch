@@ -8,8 +8,19 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import {
+  type LangWatchHandledErrorShape,
+  readCliErrorDocument,
+} from "@langwatch/handled-error/langwatch-handled-error";
+
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
+
+/** The CLI error document stdout carried; these cases all expect one. */
+function cliErrorDocument(output: unknown): LangWatchHandledErrorShape {
+  const read = readCliErrorDocument(output);
+  if (read.kind !== "error") throw new Error("stdout held no CLI error document");
+  return read.error;
+}
 
 /**
  * The dispatch body is always a JSON string. Reading it back is how these tests
@@ -46,8 +57,7 @@ describe("the ui call command", () => {
   describe("given the page applies the action", () => {
     it("sends the dispatch with a deadline on it", async () => {
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -89,7 +99,7 @@ describe("the ui call command", () => {
     it("sets a deadline the agent harness cannot outrun", () => {
       // Both numbers belong to other layers, so they are written here as the
       // boundary this test pins. UI_ACTION_MAX_BUDGET_MS lives in
-      // platform/app/src/server/app-layer/langy/ui-actions/ui-action.service.ts.
+      // modules/langy/process/src/services/langy-ui-action.service.ts.
       const SERVER_BUDGET_CEILING_MS = 15_000;
       const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
 
@@ -107,9 +117,7 @@ describe("the ui call command", () => {
         }),
       );
 
-      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow(
-        "fetch failed",
-      );
+      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow("fetch failed");
     });
   });
 
@@ -141,8 +149,7 @@ describe("the ui call command", () => {
       await writeFile(file, JSON.stringify(AWKWARD), "utf8");
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -161,8 +168,7 @@ describe("the ui call command", () => {
       );
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -188,11 +194,9 @@ describe("the ui call command", () => {
   });
 
   /**
-   * The failure used to be written to stderr as the platform's REST envelope,
-   * which is not the document this CLI's readers parse. The panel's tool card
-   * therefore fell back to printing the whole thing, so a customer watching
-   * Langy work saw a wall of escaped JSON with the one useful sentence buried
-   * in the middle of it.
+   * The failure used to be written to stderr as the platform's REST
+   * envelope, not the document this CLI's readers parse, so the panel's
+   * tool card fell back to printing a wall of escaped JSON.
    */
   describe("given the platform refuses the action", () => {
     /** @scenario "A refused action reaches the reader as a sentence, not the wire envelope" */
@@ -227,20 +231,18 @@ describe("the ui call command", () => {
       });
 
       expect(process.exitCode).toBe(1);
-      const document = readCliErrorDocument(stdout.join("\n"));
+      const document = cliErrorDocument(stdout.join("\n"));
       expect(document).toMatchObject({
         code: "langy_ui_payload_invalid",
-        message:
-          'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
+        message: 'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
       });
     });
   });
 
   /**
    * The page claims an action and carries it out before it answers, so a
-   * failed dispatch is the ANSWER going missing rather than the work. A caller
-   * told only that the request failed retries, and a retried duplicate leaves
-   * a second column beside the one that was made.
+   * failed dispatch is the ANSWER going missing, not the work. A caller told
+   * only "failed" retries, leaving a duplicate column beside the real one.
    */
   describe("given the dispatch fails after the page may have acted", () => {
     /** @scenario "A failed dispatch says the action may still have applied" */

@@ -1,0 +1,283 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // The entry point. The langwatch/* rules live beside the plugin that
+  // implements them; the built-in rules are configured here. Every rule is
+  // `error` or absent: lint runs with --quiet, so `warn` reports nothing.
+  "extends": ["./packages/architecture-enforcer/oxlint.architecture.jsonc"],
+
+  // A suppression that suppresses nothing is a lie about the code.
+  "options": { "reportUnusedDisableDirectives": "error" },
+
+  // Generated files are fixed in their generator; `session-context.mjs` and
+  // `session-guidance.mjs` are vendored minified bundles the plugin ships and
+  // builds elsewhere.
+  "ignorePatterns": [
+    "**/*.generated.ts",
+    "**/*.generated.tsx",
+    "**/*.generated.js",
+    "plugins/langwatch/scripts/session-context.mjs",
+    "plugins/langwatch/scripts/session-guidance.mjs",
+    "tools/apidiff/inventory/**",
+  ],
+
+  // The correctness tier defaults to `warn`, which --quiet drops.
+  "categories": { "correctness": "error" },
+
+  // Setting this key replaces oxlint's default set. jest is absent on purpose:
+  // the runner is vitest, and both together report every test finding twice.
+  "plugins": [
+    "react",
+    "unicorn",
+    "typescript",
+    "oxc",
+    "vitest",
+    "import",
+    "promise",
+    "jsx-a11y",
+    "node",
+  ],
+  "rules": {
+    "no-nested-ternary": "error",
+    // A comment inside the block counts as the decision to swallow the failure.
+    "no-empty": ["error", { "allowEmptyCatch": false }],
+    "typescript/array-type": ["error", { "default": "array" }],
+    // A binding used only as a type is imported as one, so nothing of the target runs.
+    "typescript/consistent-type-imports": "error",
+    // Settings are read through the config tier; the overrides below name the
+    // categories of path where that tier does not exist.
+    "node/no-process-env": "error",
+
+    "import/no-cycle": "error",
+    "import/export": "error",
+    "import/no-self-import": "error",
+    "import/no-empty-named-blocks": "error",
+    "import/no-absolute-path": "error",
+    "import/no-mutable-exports": "error",
+    "import/no-duplicates": "error",
+
+    "promise/no-multiple-resolved": "error",
+    "promise/catch-or-return": "error",
+    "promise/no-return-wrap": "error",
+
+    "unicorn/no-array-sort": "error",
+
+    // React Compiler rules (correctness since oxlint 1.84): off until the ~680 findings are fixed (ruling 2026-09-30).
+    "react/error-boundaries": "off",
+    "react/globals": "off",
+    "react/immutability": "off",
+    "react/incompatible-library": "off",
+    "react/preserve-manual-memoization": "off",
+    "react/purity": "off",
+    "react/refs": "off",
+    "react/set-state-in-effect": "off",
+    "react/set-state-in-render": "off",
+    "react/static-components": "off",
+    "react/use-memo": "off",
+    "react/void-use-memo": "off",
+
+    "jsx-a11y/no-autofocus": "error",
+    "jsx-a11y/no-static-element-interactions": "error",
+    "jsx-a11y/click-events-have-key-events": "error",
+    "jsx-a11y/aria-role": "error",
+    "jsx-a11y/media-has-caption": "error",
+    "jsx-a11y/mouse-events-have-key-events": "error",
+    "jsx-a11y/role-supports-aria-props": "error",
+    "jsx-a11y/no-noninteractive-tabindex": "error",
+    "jsx-a11y/img-redundant-alt": "error",
+    "jsx-a11y/autocomplete-valid": "error",
+
+    // The type argument has to be the mocked function's real signature, so
+    // nothing can fix it mechanically, and bare `vi.fn()` is the suite's idiom.
+    "vitest/require-mock-type-parameters": "off",
+    // `expect(actual, message)` labels which loop iteration failed.
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+    // A named `expect*`/`assert*` helper that calls `expect` or throws counts as the test's assertion.
+    "vitest/expect-expect": ["error", { "assertFunctionNames": ["expect", "expect*", "assert*"] }],
+    // A title states what the test does, not a prediction ("should ...").
+    "vitest/valid-title": [
+      "error",
+      { "mustNotMatch": { "it": "(?i)^should\\b", "test": "(?i)^should\\b" } },
+    ],
+  },
+
+  "overrides": [
+    {
+      // `return await` belongs inside a try, where it decides which handler
+      // sees the rejection; anywhere else it is noise.
+      "files": [
+        "modules/**",
+        "enterprise/modules/**",
+        "apps/**",
+        "packages/**",
+        "sdks/typescript/src/**",
+        "mcp/typescript/src/**",
+      ],
+      "rules": { "typescript/return-await": ["error", "in-try-catch"] },
+    },
+    {
+      // More than three parameters is a call site nobody can read: take one
+      // object and destructure it (CLAUDE.md: named parameters).
+      "files": ["modules/**", "enterprise/modules/**", "packages/**", "apps/*/src/**"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*", "**/tests/**", "**/e2e/**"],
+      "rules": { "max-params": ["error", { "max": 3 }] },
+    },
+    {
+      // Source, not tests: a test double may be loosely typed on purpose.
+      "files": ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*", "**/tests/**", "**/e2e/**"],
+      "rules": { "typescript/no-explicit-any": "error" },
+    },
+    {
+      // A type test's spread is the assertion itself (Alex, 2026-09-27); scoped to type-tests only.
+      "files": ["packages/*/type-tests/**"],
+      "rules": { "typescript/no-misused-spread": "off" },
+    },
+    {
+      // Published SDK surface keeps its public `any`s (Alex, 2026-09-27); internal SDK code stays strict.
+      "files": [
+        "sdks/typescript/src/client-sdk/services/prompts/errors/prompt-compilation.error.ts",
+        "sdks/typescript/src/client-sdk/services/traces/types.ts",
+        "sdks/typescript/src/observability-sdk/features/data-capture/types.ts",
+        "sdks/typescript/src/observability-sdk/span/types.ts",
+      ],
+      "rules": { "typescript/no-explicit-any": "off" },
+    },
+    {
+      // Prisma's extended client has no nameable type; the one cast stays (Alex, 2026-09-27).
+      "files": ["packages/prisma-client/src/connection.ts"],
+      "rules": { "langwatch/stand-in-cast": "off" },
+    },
+    {
+      // Process source logs through `createLogger`, and a REST handler throws a
+      // HandledError rather than building its own error response.
+      "files": [
+        "apps/api/src/**",
+        "apps/worker/src/**",
+        "apps/tasks/src/**",
+        "modules/*/process/src/**",
+        "enterprise/modules/*/process/src/**",
+      ],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": {
+        "no-console": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/api/rest",
+                "importNames": ["RestErrorHandler", "jsonResponse", "rateLimitedResponse"],
+                "message": "Delete it and throw a HandledError from the handler; the mount serialises every response.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // Customer-configured Slack never uses our own notice templates (Alex, 2026-09-28).
+      "files": ["modules/automation/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/internal-slack",
+                "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // Repeats both entries: a later override replaces the rule's options for the files it matches.
+      "files": ["modules/automation/process/src/**"],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@langwatch/api/rest",
+                "importNames": ["RestErrorHandler", "jsonResponse", "rateLimitedResponse"],
+                "message": "Delete it and throw a HandledError from the handler; the mount serialises every response.",
+              },
+              {
+                "name": "@langwatch/internal-slack",
+                "message": "Internal Slack is for messages LangWatch sends itself; customer Slack stays in automation's channels.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      // A module's contract and process export the shapes other modules call.
+      "files": [
+        "modules/*/contract/src/**",
+        "modules/*/process/src/**",
+        "enterprise/modules/*/contract/src/**",
+        "enterprise/modules/*/process/src/**",
+      ],
+      "excludeFiles": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"],
+      "rules": { "typescript/explicit-module-boundary-types": "error" },
+    },
+    {
+      // A spawned child reads the environment its parent computed for it.
+      "files": ["services/langyworker/**"],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // Substrate that boots below the config layer: the logger and the
+      // migration runner run before any composed config exists.
+      "files": ["packages/observability/**", "packages/clickhouse-migrations/src/**"],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // A test stands a process up under an environment it chooses.
+      "files": [
+        "**/__tests__/**",
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.test.mjs",
+        "**/*.spec.ts",
+        "**/tests/**",
+        "**/e2e/**",
+        "packages/test-harness/**",
+        "skills/_tests/**",
+      ],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // Published artefacts: for an SDK and a CLI the environment IS the
+      // documented configuration surface.
+      "files": ["sdks/**", "mcp/**", "apps/server/**"],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // Build and development tooling, run by a contributor or CI with the
+      // environment its invoker exported.
+      "files": [
+        "dev/**",
+        ".github/scripts/**",
+        "plugins/**",
+        "**/scripts/**",
+        "**/vite.config.ts",
+        "**/vitest.config.ts",
+        "**/prisma.config.ts",
+        "apps/ui/vite/**",
+      ],
+      "rules": { "node/no-process-env": "off" },
+    },
+    {
+      // The one place each process reads its environment into typed config; the test
+      // process's is packages/vitest-config (Alex, 2026-09-27).
+      "files": ["apps/*/src/config.ts", "**/*.entrypoint.ts", "packages/vitest-config/src/**"],
+      "rules": { "node/no-process-env": "off" },
+    },
+  ],
+}

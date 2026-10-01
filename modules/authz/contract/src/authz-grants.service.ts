@@ -1,0 +1,115 @@
+import type {
+  AuthzChangeGrantRoleInput,
+  AuthzCreateGrantInput,
+  AuthzGetGrantInput,
+  AuthzListGrantsInput,
+  AuthzRevokeGrantByIdInput,
+  Grant,
+  GrantPage,
+  GrantRevoked,
+} from "./authz-grants-rest.schemas.ts";
+import type {
+  AuthzAttachBindingsInput,
+  AuthzAttachBindingsOutput,
+  AuthzAttachResourceGrantInput,
+  AuthzAttachResourceGrantOutput,
+  AuthzChangeBindingRoleInput,
+  AuthzChangeBindingRoleOutput,
+  AuthzDefineRoleInput,
+  AuthzDefineRoleOutput,
+  AuthzDeleteRoleInput,
+  AuthzDeleteRoleOutput,
+  AuthzOffboardMemberInput,
+  AuthzOffboardMemberOutput,
+  AuthzOffboardInput,
+  AuthzOffboardOutput,
+  AuthzRevokeBindingsInput,
+  AuthzRevokeBindingsOutput,
+  AuthzRevokeBindingsWhereInput,
+  AuthzDirectoryCausedChangesInput,
+  AuthzDirectoryCausedChangesOutput,
+  AuthzRetireDirectoryGrantsInput,
+  AuthzRetireDirectoryGrantsOutput,
+  AuthzRevokeBindingsWhereOutput,
+  AuthzRevokeGrantInput,
+  AuthzRevokeResourceGrantsInput,
+  AuthzRevokeResourceGrantsOutput,
+} from "./authz.commands.ts";
+import type {
+  AuthzApplyMemberBindingsInput,
+  AuthzBindingMutationSuccess,
+  AuthzCreateBindingInput,
+  AuthzCreateBindingOutput,
+  AuthzDeleteBindingInput,
+  AuthzUpdateBindingInput,
+} from "./authz.grant-management.ts";
+
+/** The one portable mutation and offboarding capability for authorization. */
+export abstract class AuthzGrantsService {
+  abstract revoke(args: AuthzRevokeGrantInput): Promise<void>;
+
+  abstract offboard(args: AuthzOffboardInput): Promise<AuthzOffboardOutput>;
+
+  /**
+   * Retire every cached authorization snapshot for one organization. Grant
+   * writes do this themselves; this is for writes that change who may do
+   * what WITHOUT touching a grant, like a membership being disabled.
+   */
+  abstract invalidateOrganization(args: { organizationId: string }): Promise<void>;
+
+  /** Lossless compatibility operations for existing application writers.
+   * They live on this capability so no public ledger-writer surface escapes. */
+  abstract attachBindings(args: AuthzAttachBindingsInput): Promise<AuthzAttachBindingsOutput>;
+
+  abstract attachResourceGrant(
+    args: AuthzAttachResourceGrantInput,
+  ): Promise<AuthzAttachResourceGrantOutput>;
+
+  abstract revokeResourceGrants(
+    args: AuthzRevokeResourceGrantsInput,
+  ): Promise<AuthzRevokeResourceGrantsOutput>;
+
+  abstract changeBindingRole(
+    args: AuthzChangeBindingRoleInput,
+  ): Promise<AuthzChangeBindingRoleOutput>;
+
+  abstract revokeBindings(args: AuthzRevokeBindingsInput): Promise<AuthzRevokeBindingsOutput>;
+
+  abstract revokeBindingsWhere(
+    args: AuthzRevokeBindingsWhereInput,
+  ): Promise<AuthzRevokeBindingsWhereOutput>;
+
+  abstract retireDirectoryGrants(
+    args: AuthzRetireDirectoryGrantsInput,
+  ): Promise<AuthzRetireDirectoryGrantsOutput>;
+
+  abstract findDirectoryCausedChanges(
+    args: AuthzDirectoryCausedChangesInput,
+  ): Promise<AuthzDirectoryCausedChangesOutput>;
+
+  abstract offboardMember(args: AuthzOffboardMemberInput): Promise<AuthzOffboardMemberOutput>;
+
+  abstract defineRole(args: AuthzDefineRoleInput): Promise<AuthzDefineRoleOutput>;
+
+  abstract deleteRole(args: AuthzDeleteRoleInput): Promise<AuthzDeleteRoleOutput>;
+
+  abstract listGrants(args: AuthzListGrantsInput): Promise<GrantPage>;
+
+  abstract getGrant(args: AuthzGetGrantInput): Promise<Grant>;
+
+  abstract createGrant(args: AuthzCreateGrantInput): Promise<Grant>;
+
+  abstract changeGrantRole(args: AuthzChangeGrantRoleInput): Promise<Grant>;
+
+  abstract revokeGrant(args: AuthzRevokeGrantByIdInput): Promise<GrantRevoked>;
+
+  abstract createBinding(args: AuthzCreateBindingInput): Promise<AuthzCreateBindingOutput>;
+
+  abstract updateBinding(args: AuthzUpdateBindingInput): Promise<AuthzCreateBindingOutput>;
+
+  abstract deleteBinding(args: AuthzDeleteBindingInput): Promise<AuthzBindingMutationSuccess>;
+
+  abstract applyMemberBindings(
+    args: AuthzApplyMemberBindingsInput,
+  ): Promise<AuthzBindingMutationSuccess>;
+}

@@ -1,0 +1,41 @@
+/**
+ * Opens one run of a run plan from the Scenarios tab.
+ * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agent-testing/page-structure.feature
+ */
+
+import { useRouter } from "@langwatch/browser-host/use-router";
+import { useCallback } from "react";
+
+import { buildAgentTestingPush } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
+
+export type OpenPlanRunParams = {
+  /** The address segment of the plan, which for a test suite is its slug. */
+  planSlug: string;
+  batchRunId: string;
+};
+
+export function useOpenPlanRun(): (params: OpenPlanRunParams) => void {
+  const router = useRouter();
+  const projectSlug = router.query.project as string | undefined;
+
+  return useCallback(
+    ({ planSlug, batchRunId }: OpenPlanRunParams) => {
+      if (!projectSlug) return;
+
+      const address = buildAgentTestingPush({
+        projectSlug,
+        state: {
+          tab: "results",
+          selection: { kind: "suite", slug: null },
+          planSlug,
+          batchRunId,
+        },
+        query: router.query,
+      });
+
+      void router.push(address);
+    },
+    [router, projectSlug],
+  );
+}

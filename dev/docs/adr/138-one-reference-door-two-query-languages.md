@@ -57,7 +57,7 @@ MCP server's committed fixture be generated from it.
 
 **Four rules follow from wanting one door rather than two descriptions.**
 
-*Every published query is checked by machine, not by reading.* The two example
+_Every published query is checked by machine, not by reading._ The two example
 libraries (`server/analytics/lwql/examples` and
 `app-layer/traces/query-language/examples.ts`) are pinned by a test: each
 LangWatchQL statement goes through the real validator against the real catalog,
@@ -73,19 +73,19 @@ hold, or a project with no LangWatchQL surface at all. Unavailable examples stay
 published, with their requirements intact, because the requirement is the useful
 part of the answer.
 
-*Live values are not in the reference.* The values a field actually holds are
+_Live values are not in the reference._ The values a field actually holds are
 tenant data, they move under the caller, and reading them all costs about thirty
 aggregate queries. They live at `GET /api/traces/facets` and the reference names
 that endpoint instead of inlining a snapshot of it. That is also what keeps the
 reference cacheable.
 
-*An unavailable example stays published.* An example whose columns need a
+_An unavailable example stays published._ An example whose columns need a
 permission the caller lacks is published with `available: false` and its
 `requires.gates` intact — the same rule `/schema` applies to a withheld column,
 for the same reason: hiding it would hide the one fact that makes the refusal
 actionable.
 
-*Every consumer reads the door, never a copy of it.* The MCP server's
+_Every consumer reads the door, never a copy of it._ The MCP server's
 `discover_schema` fetches it (so `schemas/filter-fields.ts` is deleted, and its
 categories now need the API key), the CLI's `query reference`, `query examples`
 and `trace fields` fetch it, and the MCP fixture is generated from the builder by

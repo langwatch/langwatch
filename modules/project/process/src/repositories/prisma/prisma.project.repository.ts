@@ -1,0 +1,701 @@
+import { parseOnboardingVariant } from "@langwatch/onboarding-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import {
+  Prisma,
+  type PrismaClient,
+  type Project as PrismaProject,
+} from "@langwatch/prisma-client/generated";
+import {
+  PROJECT_KIND,
+  ProjectNotFoundError,
+  internalProjectSchema,
+  projectSchema,
+  type ActiveProjectsByScopesInput,
+  type CreateProjectInput,
+  type InternalProject,
+  type InternalProjectKind,
+  type PaginatedProjects,
+  type ArchivedProject,
+  type Project,
+  type ProjectIdentity,
+  type ProjectPath,
+  type ProjectWithTeam,
+  type SearchProjectsResult,
+  type TraceSharingConfig,
+  type TraceDestinationProject,
+  type UpdateProjectInput,
+  type UpdateProjectMetadataInput,
+  type ProjectUsageCount,
+} from "@langwatch/project-contract";
+import { fromDate, toDate } from "@langwatch/time";
+
+import type {
+  ProjectRepository,
+  ProjectWithOrgAdmin,
+  TouchCodingAgentActivityInput,
+} from "../project.repository.ts";
+import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
+
+/**
+ * Models used by this repository; lets composition roots hand a typed client
+ * subset without describing full PrismaClient at the seam.
+ */
+export type PrismaProjectDatabase = Pick<PrismaClient, "project" | "team">;
+
+export class PrismaProjectRepository
+  extends PrismaRepository.for("Project")
+  implements ProjectRepository
+{
+  async findProjectsWithDepartments({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{ id: string; name: string; departmentId: string | null }[]> {
+    return this.prisma.project.findMany({
+      where: { team: { organizationId }, kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } },
+      select: { id: true, name: true, departmentId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async assignProjectDepartment(input: {
+    organizationId: string;
+    projectId: string;
+    departmentId: string | null;
+  }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, team: { organizationId: input.organizationId } },
+      data: { departmentId: input.departmentId },
+    });
+    return result.count > 0;
+  }
+
+  async findPaths(input: { projectIds: string[] }): Promise<ProjectPath[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: input.projectIds } },
+      select: {
+        id: true,
+        name: true,
+        team: { select: { name: true, organization: { select: { name: true } } } },
+      },
+    });
+
+    return projects.map((project) => ({
+      projectId: project.id,
+      fullPath: `${project.team.organization.name} / ${project.team.name} / ${project.name}`,
+    }));
+  }
+
+  static readonly create = this.factory((prisma) => new PrismaProjectRepository(prisma));
+
+  async countUsage({
+    organizationIds,
+    since,
+  }: {
+    organizationIds: readonly string[];
+    since?: number;
+  }): Promise<ProjectUsageCount> {
+    const inOrganizations = { team: { organizationId: { in: [...organizationIds] } } };
+    const after = since === undefined ? {} : { gte: new Date(since) };
+    const [projects, updatedProjects, first] = await Promise.all([
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, createdAt: after },
+      }),
+      this.prisma.project.count({
+        where: since === undefined ? inOrganizations : { ...inOrganizations, updatedAt: after },
+      }),
+      this.prisma.project.findFirst({
+        where: inOrganizations,
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
+    ]);
+    return {
+      projects,
+      updatedProjects,
+      ...(first ? { firstProjectAt: first.createdAt.getTime() } : {}),
+    };
+  }
+
+  async countWithTraces({ organizationId }: { organizationId: string }): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        archivedAt: null,
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        firstMessage: true,
+      },
+    });
+  }
+
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
+    organizationId: string;
+    memberUserId?: string;
+    limit: number;
+  }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        team: {
+          organizationId,
+          isPersonal: false,
+          ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
+        },
+        archivedAt: null,
+      },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      select: { slug: true },
+    });
+    return projects.map((project) => project.slug);
+  }
+
+  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+    return this.mapInternal(
+      await this.prisma.project.findFirst({
+        where: {
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          team: { organizationId },
+          archivedAt: null,
+        },
+      }),
+    );
+  }
+
+  async findLiveInternalIds({ kind }: { kind: InternalProjectKind }): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { kind, archivedAt: null },
+      select: { id: true },
+    });
+
+    return projects.map(({ id }) => id);
+  }
+
+  async findInternalBySlug(slug: string): Promise<InternalProject | null> {
+    return this.mapInternal(await this.prisma.project.findUnique({ where: { slug } }));
+  }
+
+  async createInternalOrFindWinner(input: {
+    id: string;
+    name: string;
+    slug: string;
+    apiKey: string;
+    teamId: string;
+  }): Promise<InternalProject> {
+    try {
+      return this.mapInternalRequired(
+        await this.prisma.project.create({
+          data: {
+            ...input,
+            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+            language: "internal",
+            framework: "governance",
+            traceSharingEnabled: false,
+          },
+        }),
+      );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const winner = await this.prisma.project.findUnique({
+          where: { slug: input.slug },
+        });
+        const mapped = this.mapInternal(winner);
+        if (mapped) return mapped;
+      }
+      throw error;
+    }
+  }
+
+  async isPresenceEnabled(projectId: string): Promise<boolean> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: {
+        presenceEnabled: true,
+        team: { select: { organization: { select: { presenceEnabled: true } } } },
+      },
+    });
+    return Boolean(project?.presenceEnabled && project.team.organization.presenceEnabled);
+  }
+
+  async findById(id: string): Promise<Project | null> {
+    return this.mapProject(await this.prisma.project.findUnique({ where: { id } }));
+  }
+
+  async findOrganizationId(projectId: string): Promise<string | undefined> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    return project?.team?.organizationId;
+  }
+
+  async findWithTeam(id: string): Promise<ProjectWithTeam | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { id, archivedAt: null },
+      include: { team: true },
+    });
+    if (!row) return null;
+    const { team, ...projectRow } = row;
+    return {
+      ...this.mapProjectRequired(projectRow),
+      team,
+    };
+  }
+
+  async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
+    await this.prisma.project.update({ where: { id }, data });
+  }
+
+  async touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: input.projectId,
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentSessionAt: null },
+          { lastCodingAgentSessionAt: { lte: toDate(input.staleBefore) } },
+        ],
+      },
+      data: { lastCodingAgentSessionAt: toDate(input.at) },
+    });
+  }
+
+  async touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void> {
+    await this.prisma.project.updateMany({
+      where: {
+        id: input.projectId,
+        archivedAt: null,
+        OR: [
+          { lastCodingAgentPullRequestAt: null },
+          { lastCodingAgentPullRequestAt: { lte: toDate(input.staleBefore) } },
+        ],
+      },
+      data: { lastCodingAgentPullRequestAt: toDate(input.at) },
+    });
+  }
+
+  async findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        firstMessage: true,
+        team: {
+          select: {
+            organization: {
+              select: {
+                id: true,
+                createdAt: true,
+                signupData: true,
+                members: {
+                  where: { role: "ADMIN" },
+                  select: { userId: true },
+                  orderBy: { createdAt: "asc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!project) return null;
+    return {
+      firstMessage: project.firstMessage,
+      organizationId: project.team?.organization?.id ?? null,
+      onboardingVariant: parseOnboardingVariant(project.team?.organization?.signupData),
+      organizationCreatedAt: project.team?.organization?.createdAt
+        ? fromDate(project.team.organization.createdAt)
+        : null,
+      adminUserId: project.team?.organization?.members?.[0]?.userId ?? null,
+    };
+  }
+
+  async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: {
+        traceSharingEnabled: true,
+        team: { select: { organization: { select: { traceSharingEnabled: true } } } },
+      },
+    });
+    if (!project) return null;
+    return {
+      orgEnabled: project.team.organization.traceSharingEnabled,
+      projectEnabled: project.traceSharingEnabled,
+    };
+  }
+
+  async searchByQuery(input: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    const where: Record<string, unknown> = {
+      OR: [
+        { id: { contains: input.query } },
+        { name: { contains: input.query, mode: "insensitive" } },
+        { slug: { contains: input.query, mode: "insensitive" } },
+      ],
+    };
+    if (input.organizationId) where.team = { organizationId: input.organizationId };
+    return this.prisma.project.findMany({
+      where,
+      select: { id: true, name: true, slug: true },
+      take: input.limit ?? 20,
+    });
+  }
+
+  async create(input: CreateProjectInput): Promise<Project> {
+    return this.mapProjectRequired(await this.prisma.project.create({ data: input }));
+  }
+
+  async update(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    for (let attempt = 1; attempt < TEAM_MOVE_ATTEMPTS; attempt++) {
+      try {
+        return await this.updateOnce(input);
+      } catch (error) {
+        if (!isRecordNotFound(error)) throw error;
+      }
+    }
+    return this.updateOnce(input);
+  }
+
+  private async updateOnce(input: {
+    id: string;
+    organizationId: string;
+    data: UpdateProjectInput;
+  }): Promise<Project> {
+    const where = {
+      id: input.id,
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+    };
+    const movedFrom = await this.teamBeingLeft({ where, teamId: input.data.teamId });
+    if (movedFrom === null) {
+      const result = await this.prisma.project.updateMany({ where, data: input.data });
+      if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+      return this.mapProjectRequired(
+        await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+      );
+    }
+
+    // The gateway caches a key's team budgets by the team of its project. A
+    // team move appends to the change feed it long-polls, in the same write,
+    // and only while the project is still on the team read above, so a
+    // concurrent move re-reads instead of recording a stale origin.
+    return this.mapProjectRequired(
+      await this.prisma.project.update({
+        where: { ...where, teamId: movedFrom },
+        data: {
+          ...input.data,
+          gatewayChangeEvents: {
+            create: {
+              organizationId: input.organizationId,
+              kind: "BUDGET_UPDATED",
+              payload: { projectTeamMoved: { fromTeamId: movedFrom, toTeamId: input.data.teamId } },
+            },
+          },
+        },
+      }),
+    );
+  }
+
+  /**
+   * The team a project is leaving, when an update moves it to another one;
+   * `null` when the update keeps its team. A project outside the organization
+   * reads as not moving, so the plain update path refuses it as not found.
+   */
+  private async teamBeingLeft({
+    where,
+    teamId,
+  }: {
+    where: Prisma.ProjectWhereInput & { id: string };
+    teamId: string | undefined;
+  }): Promise<string | null> {
+    if (teamId === undefined) return null;
+    const current = await this.prisma.project.findFirst({ where, select: { teamId: true } });
+    if (!current || current.teamId === teamId) return null;
+    return current.teamId;
+  }
+
+  async archive(input: { id: string; organizationId: string }): Promise<ArchivedProject> {
+    const archivedAt = new Date();
+    const result = await this.prisma.project.updateMany({
+      where: {
+        id: input.id,
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+      },
+      data: { archivedAt },
+    });
+    if (result.count === 0) throw new ProjectNotFoundError("Project not found");
+    const project = this.mapProjectRequired(
+      await this.prisma.project.findUniqueOrThrow({ where: { id: input.id } }),
+    );
+    return { ...project, archivedAt };
+  }
+
+  async listAllByOrganization(input: {
+    organizationId: string;
+    page: number;
+    limit: number;
+    projectIds?: string[];
+    includeGovernance?: boolean;
+  }): Promise<PaginatedProjects> {
+    const where = {
+      archivedAt: null,
+      team: { organizationId: input.organizationId },
+      ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
+      ...(input.projectIds ? { id: { in: input.projectIds } } : {}),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.project.findMany({
+        where,
+        skip: (input.page - 1) * input.limit,
+        take: input.limit,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+      this.prisma.project.count({ where }),
+    ]);
+    return {
+      data: rows.map((row) => this.mapProjectRequired(row)),
+      pagination: { page: input.page, limit: input.limit, total },
+    };
+  }
+
+  async findAllByTeam(input: {
+    organizationId: string;
+    teamId: string;
+    includeGovernance?: boolean;
+  }): Promise<Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        teamId: input.teamId,
+        archivedAt: null,
+        ...(input.includeGovernance ? {} : { kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE } }),
+        team: { organizationId: input.organizationId },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => this.mapProjectRequired(row));
+  }
+
+  async findIdentity(id: string): Promise<ProjectIdentity | null> {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+      select: PROJECT_IDENTITY_SELECT,
+    });
+
+    return project ? mapProjectIdentityRow(project) : null;
+  }
+
+  async findNamesByIds(projectIds: string[]): Promise<ProjectIdentity[]> {
+    if (projectIds.length === 0) {
+      return [];
+    }
+
+    const projects = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: PROJECT_IDENTITY_SELECT,
+    });
+
+    return projects.map(mapProjectIdentityRow);
+  }
+
+  async findIdsByOrganization(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
+  }
+
+  async findLiveNonGovernanceIds(organizationId: string): Promise<string[]> {
+    const projects = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+      },
+      select: { id: true },
+    });
+
+    return projects.map((project) => project.id);
+  }
+
+  async findLiveByIdInOrganization(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { id: input.id, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
+  async findLiveBySlugInOrganization(input: {
+    slug: string;
+    organizationId: string;
+  }): Promise<Project[]> {
+    const row = await this.prisma.project.findFirst({
+      where: { slug: input.slug, archivedAt: null, team: { organizationId: input.organizationId } },
+    });
+
+    return row ? [this.mapProjectRequired(row)] : [];
+  }
+
+  async findActiveByScopes(input: ActiveProjectsByScopesInput): Promise<Project[]> {
+    const rows = await this.prisma.project.findMany({
+      where: {
+        archivedAt: null,
+        team: { organizationId: input.organizationId },
+        ...(input.organizationWide
+          ? {}
+          : {
+              OR: [
+                ...(input.projectIds.length > 0 ? [{ id: { in: input.projectIds } }] : []),
+                ...(input.teamIds.length > 0 ? [{ teamId: { in: input.teamIds } }] : []),
+              ],
+            }),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: input.limit + 1,
+    });
+    return rows.map((row) => this.mapProjectRequired(row));
+  }
+
+  async findBySlugInTeam(input: { slug: string; teamId: string }): Promise<Project | null> {
+    return this.mapProject(await this.prisma.project.findFirst({ where: input }));
+  }
+
+  async findLiveTraceDestination(input: {
+    organizationId: string;
+    projectId: string;
+  }): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findFirst({
+      where: {
+        id: input.projectId,
+        team: { organizationId: input.organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+  }
+
+  async findOldestGovernanceTraceDestination(
+    organizationId: string,
+  ): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findFirst({
+      where: {
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        team: { organizationId },
+        archivedAt: null,
+      },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+  }
+
+  countLiveNonGovernanceProjects(organizationId: string): Promise<number> {
+    return this.prisma.project.count({
+      where: {
+        team: { organizationId },
+        kind: { not: PROJECT_KIND.INTERNAL_GOVERNANCE },
+        archivedAt: null,
+      },
+    });
+  }
+
+  async findTraceDestination(projectId: string): Promise<TraceDestinationProject | null> {
+    return this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+  }
+
+  async findTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]> {
+    if (projectIds.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true, teamId: true, apiKey: true, archivedAt: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return projectIds.flatMap((projectId) => {
+      const project = byId.get(projectId);
+      return project ? [project] : [];
+    });
+  }
+
+  async findIdByLegacyApiKey(input: { token: string }): Promise<string | null> {
+    const row = await this.prisma.project.findUnique({
+      where: { apiKey: input.token, archivedAt: null },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+
+  async rotateLegacyApiKey(input: { projectId: string; token: string }): Promise<boolean> {
+    const result = await this.prisma.project.updateMany({
+      where: { id: input.projectId, archivedAt: null },
+      data: { apiKey: input.token },
+    });
+    return result.count > 0;
+  }
+
+  async findPersonalProjectOwner(input: {
+    organizationId: string;
+    scopeId: string;
+  }): Promise<{ ownerUserId: string | null } | null> {
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: input.scopeId,
+        team: { organizationId: input.organizationId },
+        OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+      },
+      select: { team: { select: { ownerUserId: true } } },
+    });
+    return project?.team ?? null;
+  }
+
+  private mapProject(row: PrismaProject | null): Project | null {
+    return row ? projectSchema.parse(row) : null;
+  }
+
+  private mapProjectRequired(row: PrismaProject): Project {
+    return projectSchema.parse(row);
+  }
+
+  private mapInternal(row: PrismaProject | null): InternalProject | null {
+    if (!row || row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    return this.mapInternalRequired(row);
+  }
+
+  private mapInternalRequired(row: PrismaProject): InternalProject {
+    return internalProjectSchema.parse({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      teamId: row.teamId,
+      kind: row.kind,
+      archivedAtMs: row.archivedAt?.getTime() ?? null,
+      traceSharingEnabled: row.traceSharingEnabled,
+    });
+  }
+}
+
+/** How many times an update re-reads the team when a concurrent move changed it underneath. */
+const TEAM_MOVE_ATTEMPTS = 3;
+
+/** Prisma P2025: the conditional move found the project on another team than the one it read. */
+function isRecordNotFound(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2025";
+}

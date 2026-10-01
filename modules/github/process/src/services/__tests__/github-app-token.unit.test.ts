@@ -1,0 +1,607 @@
+/**
+ * @vitest-environment node
+ * GitHub App token service security: RS256 app JWT, scoped installation tokens,
+ * per-scope caching with stable key ordering.
+ */
+import { generateKeyPairSync } from "node:crypto";
+
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import jwt from "jsonwebtoken";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { unansweredRedisRepositories } from "../../__tests__/support/github-unanswered-redis.support.ts";
+import {
+  GithubInstallationNotFoundError,
+  GithubRateLimitedError,
+} from "../../channels/github-api.channel.ts";
+import type { GithubTokenCacheRepository } from "../../repositories/github-token-cache.repository.ts";
+import { GithubTokenCacheRedisRepository } from "../../repositories/redis/redis.github-token-cache.repository.ts";
+import {
+  GITHUB_READ_PULL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+} from "../../rules/github-app-permissions.rules.ts";
+import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
+
+function requestBody(init: RequestInit | undefined): string {
+  const body = init?.body;
+  if (body instanceof URLSearchParams) return body.toString();
+  if (typeof body !== "string") throw new Error("expected a string request body");
+  return body;
+}
+
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
+const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+  privateKeyEncoding: { type: "pkcs1", format: "pem" },
+  publicKeyEncoding: { type: "spki", format: "pem" },
+});
+
+/** The live token cache over a scripted Redis whose rows the test can read and seed. */
+function fakeRedis(): { tokenCache: GithubTokenCacheRepository; store: Map<string, string> } {
+  const store = new Map<string, string>();
+  const redis = redisDouble({
+    get: (key: unknown) => Promise.resolve(store.get(String(key)) ?? null),
+    set: (rawKey: unknown, value: unknown, ...args: unknown[]) => {
+      const key = String(rawKey);
+      const locking = args.includes("NX");
+      if (locking && store.has(key)) return Promise.resolve(null);
+      store.set(key, String(value));
+      return Promise.resolve("OK");
+    },
+    eval: (_script: unknown, _numKeys: unknown, ...args: unknown[]) => {
+      const [key, token] = args.map(String);
+      if (key !== undefined && store.get(key) === token) {
+        store.delete(key);
+        return Promise.resolve(1);
+      }
+      return Promise.resolve(0);
+    },
+  });
+  return { tokenCache: GithubTokenCacheRedisRepository.create(redis), store };
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("computeRepoScopeKey", () => {
+  it("is stable and independent of repository id order", () => {
+    const a = GithubAppTokenService.computeRepoScopeKey({
+      repositoryIds: ["1", "2", "3"],
+    });
+    const b = GithubAppTokenService.computeRepoScopeKey({
+      repositoryIds: ["3", "1", "2"],
+    });
+    expect(a).toBe(b);
+  });
+
+  it("differs between the full-installation scope and a single repo", () => {
+    const all = GithubAppTokenService.computeRepoScopeKey({});
+    const one = GithubAppTokenService.computeRepoScopeKey({ repositoryIds: ["42"] });
+    expect(all).not.toBe(one);
+  });
+});
+
+describe("signAppJwt", () => {
+  /** @scenario "installation tokens are ephemeral" */
+  it("signs an RS256 JWT issued by the app id, backdated, ≤10 minutes", () => {
+    const svc = GithubAppTokenService.create({
+      appId: "app-123",
+      privateKey,
+      tokenCache: unansweredRedisRepositories().tokenCache,
+    });
+    const now = 1_000_000;
+    const token = svc.signAppJwt(now);
+    const decoded = jwt.verify(token, publicKey, {
+      algorithms: ["RS256"],
+      // Verify relative to the same fixed clock we signed at (the token's iat/exp
+      // are anchored to `now`, not the wall clock).
+      clockTimestamp: now,
+    }) as jwt.JwtPayload;
+    expect(decoded.iss).toBe("app-123");
+    expect(decoded.iat).toBe(now - 30);
+    expect(decoded.exp).toBeLessThanOrEqual(now + 600);
+    expect(decoded.exp).toBeGreaterThan(now);
+  });
+});
+
+describe("mintInstallationToken", () => {
+  describe("when scoped to a single repository", () => {
+    it("POSTs repository_ids + minimal permissions and caches the token", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({
+            token: "ghs_minted",
+            expires_at: "2030-01-01T00:00:00Z",
+            repository_selection: "selected",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const result = await svc.mintInstallationToken({
+        installationId: "99",
+        repositoryIds: ["42"],
+      });
+
+      expect(result.token).toBe("ghs_minted");
+      // Exactly one GitHub call (the mint) and the request scopes the token.
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
+      expect(mintCall).toBeDefined();
+      const body = JSON.parse(requestBody(mintCall?.[1]));
+      expect(body.repository_ids).toEqual([42]);
+      expect(body.permissions).toEqual(GITHUB_WRITE_PERMISSIONS);
+
+      // Cached under (installation, scope).
+      const scope = GithubAppTokenService.computeRepoScopeKey({ repositoryIds: ["42"] });
+      expect(redis.store.get(`langy:gh:insttoken:99:${scope}`)).toBe("ghs_minted");
+    });
+  });
+
+  describe("when the same scope is requested twice", () => {
+    it("serves the second from cache without a second mint", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({
+            token: "ghs_1",
+            expires_at: "2030-01-01T00:00:00Z",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({ installationId: "5" });
+
+      const mintCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
+      expect(mintCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when a different scope is requested", () => {
+    it("mints again because the cache key differs", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(
+          JSON.stringify({
+            token: "ghs_x",
+            expires_at: "2030-01-01T00:00:00Z",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({
+        installationId: "5",
+        repositoryIds: ["7"],
+      });
+
+      const mintCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
+      expect(mintCalls).toHaveLength(2);
+    });
+  });
+
+  describe("when GitHub rejects the mint", () => {
+    it("throws without caching", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("nope", { status: 403 })),
+      );
+      await expect(svc.mintInstallationToken({ installationId: "5" })).rejects.toThrow(
+        "GitHub token mint failed: 403",
+      );
+      expect(redis.store.size).toBe(0);
+    });
+  });
+
+  describe("when GitHub confirms the installation no longer exists (404)", () => {
+    it("throws GithubInstallationNotFoundError, distinct from other failures", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("not found", { status: 404 })),
+      );
+      await expect(
+        svc.mintInstallationToken({ installationId: "dead-inst" }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFoundError);
+      expect(redis.store.size).toBe(0);
+    });
+  });
+
+  describe("when a token is cached but the installation was uninstalled since it was minted", () => {
+    it("rejects with GithubInstallationNotFoundError instead of serving the stale cached token", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      // Simulate an already-warm cache entry from an earlier, successful mint —
+      // the exact state a missed deletion webhook leaves behind for up to the
+      // token's ~50min TTL.
+      redis.store.set(`langy:gh:insttoken:dead-inst:${scope}`, "ghs_stale");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("not found", { status: 404 })),
+      );
+
+      await expect(
+        svc.mintInstallationToken({ installationId: "dead-inst" }),
+      ).rejects.toBeInstanceOf(GithubInstallationNotFoundError);
+    });
+  });
+
+  describe("when a token is cached and the liveness probe itself fails transiently", () => {
+    it("still serves the cached token (fails open, not closed)", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 })),
+      );
+
+      const result = await svc.mintInstallationToken({ installationId: "5" });
+
+      expect(result.token).toBe("ghs_cached");
+    });
+  });
+
+  describe("when many concurrent calls hit a cached token for the same installation", () => {
+    it("probes GitHub liveness only once, not once per caller", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const results = await Promise.all(
+        Array.from({ length: 5 }, () => svc.mintInstallationToken({ installationId: "5" })),
+      );
+
+      expect(results.every((r) => r.token === "ghs_cached")).toBe(true);
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the same installation is checked across multiple sequential turns", () => {
+    it("probes GitHub once, then trusts the liveness marker for later cached calls", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      // Three separate turns, one after another — no overlap, so the
+      // stampede lock alone would not prevent a probe on every single one.
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({ installationId: "5" });
+      await svc.mintInstallationToken({ installationId: "5" });
+
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
+
+  describe("when the liveness marker has expired", () => {
+    it("probes GitHub again on the next cached call", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => {
+        return new Response(JSON.stringify({ id: 5, account: { login: "acme", type: "User" } }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.mintInstallationToken({ installationId: "5" });
+      redis.store.delete("langy:gh:insttoken:5:liveness"); // simulate TTL expiry
+      await svc.mintInstallationToken({ installationId: "5" });
+
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(2);
+    });
+  });
+
+  describe("when a liveness probe fails transiently", () => {
+    it("backs off instead of probing again on the very next cached call", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      redis.store.set(`langy:gh:insttoken:5:${scope}`, "ghs_cached");
+      const fetchMock = vi.fn<typeof fetch>(async () => new Response("boom", { status: 500 }));
+      vi.stubGlobal("fetch", fetchMock);
+
+      const first = await svc.mintInstallationToken({ installationId: "5" });
+      const second = await svc.mintInstallationToken({ installationId: "5" });
+
+      expect(first.token).toBe("ghs_cached");
+      expect(second.token).toBe("ghs_cached");
+      const livenessCalls = fetchMock.mock.calls.filter((c) =>
+        requestUrl(c[0]).includes("/app/installations/5"),
+      );
+      expect(livenessCalls).toHaveLength(1);
+    });
+  });
+});
+
+describe("listPullRequestsForHead", () => {
+  describe("when asking GitHub about a branch", () => {
+    /** @scenario "Pull request reads mint a read-only token" */
+    it("mints a repository-scoped token that can only read pull requests", async () => {
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: fakeRedis().tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        const urlText = requestUrl(url);
+        if (urlText.includes("/access_tokens")) {
+          return new Response(
+            JSON.stringify({
+              token: "ghs_read",
+              expires_at: "2030-01-01T00:00:00Z",
+            }),
+            { status: 201, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        return new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await svc.listPullRequestsForHead({
+        installationId: "99",
+        repositoryId: "42",
+        owner: "acme",
+        repo: "service-x",
+        branch: "feature/thing",
+      });
+
+      const mintCall = fetchMock.mock.calls.find((c) =>
+        requestUrl(c[0]).includes("/access_tokens"),
+      );
+      const body = JSON.parse(requestBody(mintCall?.[1]));
+      expect(body.permissions).toEqual(GITHUB_READ_PULL_PERMISSIONS);
+      expect(body.permissions).not.toHaveProperty("contents");
+      expect(body.repository_ids).toEqual([42]);
+    });
+
+    it("asks for the branch's pull requests in any state", async () => {
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: fakeRedis().tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        const urlText = requestUrl(url);
+        if (urlText.includes("/access_tokens")) {
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response(
+          JSON.stringify([
+            {
+              number: 7,
+              html_url: "https://github.com/acme/service-x/pull/7",
+              title: "Add the thing",
+              state: "closed",
+              draft: false,
+              merged_at: "2026-01-02T00:00:00Z",
+              closed_at: "2026-01-02T00:00:00Z",
+              created_at: "2026-01-01T00:00:00Z",
+              updated_at: "2026-01-02T00:00:00Z",
+              user: { login: "octocat" },
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const pulls = await svc.listPullRequestsForHead({
+        installationId: "99",
+        repositoryId: "42",
+        owner: "acme",
+        repo: "service-x",
+        branch: "feature/thing",
+      });
+
+      const readCall = fetchMock.mock.calls.find((c) => requestUrl(c[0]).includes("/pulls"));
+      expect(requestUrl(readCall?.[0])).toContain("head=acme%3Afeature%2Fthing");
+      expect(requestUrl(readCall?.[0])).toContain("state=all");
+      expect(pulls).toEqual([
+        {
+          number: 7,
+          htmlUrl: "https://github.com/acme/service-x/pull/7",
+          title: "Add the thing",
+          state: "closed",
+          draft: false,
+          mergedAt: "2026-01-02T00:00:00Z",
+          closedAt: "2026-01-02T00:00:00Z",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+          authorLogin: "octocat",
+        },
+      ]);
+    });
+  });
+
+  describe("when GitHub answers 403 with its rate-limit headers", () => {
+    it("reports a rate limit, not a permission failure", async () => {
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: fakeRedis().tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        const urlText = requestUrl(url);
+        if (urlText.includes("/access_tokens")) {
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response("", {
+          status: 403,
+          headers: {
+            "x-ratelimit-remaining": "0",
+            "x-ratelimit-reset": "1900000000",
+          },
+        });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        svc.listPullRequestsForHead({
+          installationId: "99",
+          repositoryId: "42",
+          owner: "acme",
+          repo: "service-x",
+          branch: "main",
+        }),
+      ).rejects.toBeInstanceOf(GithubRateLimitedError);
+    });
+  });
+
+  describe("when the repository is not on the installation", () => {
+    it("reports it as unreachable rather than as an unknown failure", async () => {
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: fakeRedis().tokenCache,
+      });
+      const fetchMock = vi.fn<typeof fetch>(async (url) => {
+        const urlText = requestUrl(url);
+        if (urlText.includes("/access_tokens")) {
+          return new Response(JSON.stringify({ token: "ghs_read", expires_at: "" }), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        return new Response("", { status: 404 });
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      await expect(
+        svc.listPullRequestsForHead({
+          installationId: "99",
+          repositoryId: "42",
+          owner: "acme",
+          repo: "hidden",
+          branch: "main",
+        }),
+      ).rejects.toMatchObject({ code: "github_repo_not_accessible" });
+    });
+  });
+});
+
+describe("configured", () => {
+  it("is false without a private key, true with app id + key", () => {
+    expect(
+      GithubAppTokenService.create({
+        appId: "app",
+        privateKey: "",
+        tokenCache: unansweredRedisRepositories().tokenCache,
+      }).configured,
+    ).toBe(false);
+    expect(
+      GithubAppTokenService.create({
+        appId: "app",
+        privateKey,
+        tokenCache: unansweredRedisRepositories().tokenCache,
+      }).configured,
+    ).toBe(true);
+  });
+});

@@ -1,35 +1,12 @@
 /**
- * The committed launcher against the built CLI, run the way Claude Code runs
- * it: a real process, a real payload on its stdin, a real git checkout to
- * describe and a real collector to reach.
- *
- * Integration rather than unit on purpose. What the hook REPORTS is covered
- * beside the command (specs/ai-governance/cli-wrappers/session-context-hook
- * .feature) and how the launcher RESOLVES the CLI is covered by
- * launcher.unit.test.ts against fakes. What has no coverage anywhere else is
- * the pair: whether the launcher, handed the CLI dist as it ships, gets a
- * session context record to a collector, gets the guidance JSON to stdout,
- * and says the right thing when there is no CLI at all.
- *
- * Every case runs with an explicitly constructed environment rather than an
- * extension of this process's own. These tests are frequently run FROM a coding
- * agent, whose variables would otherwise decide the outcome: `CLAUDECODE` would
- * defeat the misattribution case, `TRACEPARENT` would attach a trace context
- * nothing asked for, and `HOME` would put the developer's own credentials and
- * fingerprint files in front of the scratch ones.
- *
- * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
+ * The committed launcher against the built CLI, as Claude Code runs it: real process, payload, git
+ * checkout and collector. Covers the pair no unit test does; each case builds its environment from
+ * scratch.
+ * @see specs/ai-governance/agent-plugin/plugin-package.feature
  */
 
 import { execFileSync, spawn } from "node:child_process";
-import {
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -148,13 +125,9 @@ const cliOnPath = (): string => {
 };
 
 /**
- * Run the launcher exactly as the plugin's `hooks.json` does, minus the shell:
- * one `node` process, the hook event as its only argument, the payload on
- * stdin. `PATH` carries a scratch directory holding a single `git` shim (the
- * CLI shells out to git) plus whatever the case added, and nothing else. Both
- * the real git directory and node's own would defeat the no-CLI case on a
- * machine that installed `langwatch` beside either of them. The dist is always
- * run by absolute path.
+ * Run the launcher as `hooks.json` does, minus the shell. `PATH` holds a scratch dir with one `git`
+ * shim plus what the case added, so no installed `langwatch` is found by accident; dist by absolute
+ * path.
  */
 const runHook = ({
   hook,
@@ -206,8 +179,7 @@ const gitPath = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" 
  * when the hook has already exited. Give it a moment before concluding nothing
  * was sent, otherwise the silent cases would pass for the wrong reason.
  */
-const settle = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 250));
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 250));
 
 const sessionStart = (cwd: string) => ({
   session_id: "session-abc",
@@ -271,14 +243,14 @@ describe("the launcher running the session context hook", () => {
       expect(request.authorization).toBe(`Bearer ${INGEST_KEY}`);
 
       const record = JSON.parse(request.body) as {
-        resourceLogs: Array<{
-          scopeLogs: Array<{
-            logRecords: Array<{
+        resourceLogs: {
+          scopeLogs: {
+            logRecords: {
               eventName: string;
-              attributes: Array<{ key: string; value: { stringValue: string } }>;
-            }>;
-          }>;
-        }>;
+              attributes: { key: string; value: { stringValue: string } }[];
+            }[];
+          }[];
+        }[];
       };
       const logRecord = record.resourceLogs[0]?.scopeLogs[0]?.logRecords[0];
       expect(logRecord?.eventName).toBe("langwatch.session_context");
@@ -406,9 +378,7 @@ describe("the launcher running the session guidance hook", () => {
         hookSpecificOutput: { hookEventName: string; additionalContext: string };
       };
       expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
-      expect(parsed.hookSpecificOutput.additionalContext).toContain(
-        "langwatch ingest context",
-      );
+      expect(parsed.hookSpecificOutput.additionalContext).toContain("langwatch ingest context");
     });
   });
 

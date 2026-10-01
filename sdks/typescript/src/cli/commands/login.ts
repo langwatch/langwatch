@@ -1,38 +1,25 @@
 import * as fs from "fs";
 import * as path from "path";
+
 import chalk from "chalk";
 import prompts from "prompts";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { rememberProjectName } from "@/cli/utils/identityNotice";
-import {
-  runDeviceFlowLogin,
-  runUnifiedLoginFlow,
-} from "@/cli/utils/governance/login-flow";
-import {
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "@/cli/utils/governance/config";
-import {
-  fetchProjectKeyBySlug,
-  SessionApiError,
-} from "@/cli/utils/governance/session-api";
+
 import { recordCliLocation } from "@/cli/utils/governance/cli-location";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import {
   globalConfigIsolationWarning,
   rewritesGlobalConfigForLocalInstance,
 } from "@/cli/utils/governance/global-config-isolation";
+import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
+import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
+import { rememberProjectName } from "@/cli/utils/identityNotice";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * Always-on agent-hint banner shown above the interactive prompts on
- * `langwatch login` (no flags). Some agent harnesses fake a TTY but can't
- * actually answer prompts — this banner names the escape-hatch flags so
- * the agent (or the human staring at the stuck prompt) can re-invoke
- * with the right flag and proceed.
- *
+ * Agent-hint banner with escape-hatch flags (--device, --project).
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 function printAgentHintBanner(): void {
@@ -42,8 +29,11 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
+    chalk.gray("  --device                   AI tools / SSO (claude, codex, gemini, opencode)"),
+  );
+  console.log(
     chalk.gray(
-      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
+      "  --device --management     same, plus the management access you hold (teams, organization)",
     ),
   );
   console.log(
@@ -52,39 +42,27 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --api-key <KEY>            project SDK key you already have, into .env",
-    ),
+    chalk.gray("  --api-key <KEY>            project SDK key you already have, into .env"),
   );
   console.log(
     chalk.gray(
       "  --token <TOKEN>            pre-minted device session (writes ~/.langwatch/config.json)",
     ),
   );
-  console.log(
-    chalk.gray(
-      "  --endpoint <URL>           self-hosted instance URL",
-    ),
-  );
+  console.log(chalk.gray("  --endpoint <URL>           self-hosted instance URL"));
   console.log();
 }
 
 /**
- * Says once, on stderr, that the control plane just persisted is a local
- * instance and the whole machine now follows it. `~/.langwatch/config.json` is
- * one file for every shell, so a QA login against a dev server takes over the
- * next `langwatch ingest context` and every wrapped tool until the next login.
- * Not a refusal: logging into a local instance is a normal thing to do.
- * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * Warns once, on stderr, that a local control plane now owns the machine's
+ * one global config. Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 const warnIfLocalEndpointTakesOverGlobalConfig = (endpoint: string): void => {
   if (!rewritesGlobalConfigForLocalInstance({ endpoint })) return;
   console.error(chalk.yellow(globalConfigIsolationWarning(endpoint)));
 };
 
-const updateEnvFile = (
-  apiKey: string,
-): { created: boolean; updated: boolean; path: string } => {
+const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; path: string } => {
   const envPath = path.join(process.cwd(), ".env");
 
   // Check if .env exists
@@ -122,17 +100,12 @@ const updateEnvFile = (
 };
 
 /**
- * Headless guidance for project login. A browser device-code poll can wait
- * up to ten minutes for an approval that can never happen in a VM or CI,
- * which reads as a hang to an agent, so a non-TTY `--project` (and the
- * non-TTY no-flags default that routes here) fails fast and names every
- * non-interactive path instead.
+ * Headless guidance for project login: a device-code poll can hang ten
+ * minutes in a VM/CI, so a non-TTY caller fails fast and names every path.
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 const failFastHeadlessProjectLogin = (): never => {
-  console.error(
-    chalk.red("Error: project login needs a browser, and this terminal has no TTY."),
-  );
+  console.error(chalk.red("Error: project login needs a browser, and this terminal has no TTY."));
   console.error(chalk.gray("Non-interactive options:"));
   console.error(
     chalk.cyan("  langwatch login --project <slug>") +
@@ -143,8 +116,7 @@ const failFastHeadlessProjectLogin = (): never => {
       chalk.gray("    writes a key you already have to .env"),
   );
   console.error(
-    chalk.cyan("  export LANGWATCH_API_KEY=<key>") +
-      chalk.gray("     or put it in .env yourself"),
+    chalk.cyan("  export LANGWATCH_API_KEY=<key>") + chalk.gray("     or put it in .env yourself"),
   );
   console.error(
     chalk.gray(
@@ -155,17 +127,14 @@ const failFastHeadlessProjectLogin = (): never => {
 };
 
 /**
- * Non-interactive project login: `langwatch login --project <slug>` trades
- * the device session for the named project's EXISTING API key over
- * POST /api/auth/cli/project-key (write access enforced server-side) and
- * writes it to $CWD/.env. No browser, no prompts, works headless.
+ * Non-interactive project login: trades the device session for the named
+ * project's existing API key over POST /api/auth/cli/project-key and writes
+ * it to $CWD/.env. No browser, no prompts, works headless.
  */
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.red("Error: `--project <slug>` needs a device login to authenticate you."),
-    );
+    console.error(chalk.red("Error: `--project <slug>` needs a device login to authenticate you."));
     console.error(
       chalk.gray("Run ") +
         chalk.cyan("langwatch login") +
@@ -206,60 +175,194 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   }
 };
 
-export const loginCommand = async (
-  options?: {
-    apiKey?: string;
-    device?: boolean;
-    project?: boolean | string;
-    browser?: string;
-    endpoint?: string;
-    token?: string;
-  },
-): Promise<void> => {
+function persistPresetEndpoint(flagEndpoint: string | undefined): void {
+  const presetEndpoint = flagEndpoint ?? process.env.LANGWATCH_ENDPOINT?.trim();
+  if (!presetEndpoint) return;
+  const trimmed = normalizeEndpoint(presetEndpoint);
+  const cfg = loadConfig();
+  cfg.control_plane_url = trimmed;
+  saveConfig(cfg);
+  warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
+}
+
+function saveDeviceSessionToken(rawToken: string): void {
+  const token = rawToken.trim();
+  if (token.length < 10) {
+    console.error(chalk.red("Error: token seems too short. Please check and try again."));
+    process.exit(1);
+  }
+  const cfg = loadConfig();
+  cfg.access_token = token;
+  // No refresh_token / expires_at — that's the trade-off of bypassing
+  // the device flow. The wrapper auto-login will mint a real session
+  // if this token expires, since loadConfig+isLoggedIn only checks
+  // access_token presence.
+  saveConfig(cfg);
+  console.log(chalk.green("✓ device-session token saved"));
+  console.log(chalk.gray("  ~/.langwatch/config.json"));
+}
+
+function saveApiKeyFlag(rawApiKey: string): void {
+  const apiKey = rawApiKey.trim();
+  if (apiKey.length < 10) {
+    console.error(chalk.red("Error: API key seems too short. Please check and try again."));
+    process.exit(1);
+  }
+
+  const envResult = updateEnvFile(apiKey);
+  console.log(chalk.green("API key saved successfully."));
+  if (envResult.created) {
+    console.log(chalk.gray(`Created .env file at ${envResult.path}`));
+  } else if (envResult.updated) {
+    console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
+  } else {
+    console.log(chalk.gray(`Added API key to ${envResult.path}`));
+  }
+}
+
+const validateEndpointUrl = (v: string): string | true => {
   try {
+    const parsed = new URL(v);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return "URL must start with http(s)://";
+    }
+    return true;
+  } catch {
+    return "URL must be absolute (https://...)";
+  }
+};
+
+/** Asks cloud or self-hosted, and persists the answer so every later resolver targets it. */
+async function chooseEndpoint(): Promise<void> {
+  // When the user already resolved a non-cloud endpoint (local dev or a
+  // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),
+  // default to keeping it but still offer to switch endpoint or jump to
+  // Cloud. On a fresh install Cloud stays the priority default.
+  const current = resolveControlPlaneEndpoint();
+  const hasCustomEndpoint = current.url !== DEFAULT_ENDPOINT;
+
+  const cloudChoice = {
+    title: "LangWatch Cloud",
+    description: "app.langwatch.ai",
+    value: "cloud",
+  };
+  const choices = hasCustomEndpoint
+    ? [
+        {
+          title: `Self-hosted instance (${current.url})`,
+          description: "Keep using your current endpoint",
+          value: "keep",
+        },
+        {
+          title: "Self-hosted instance (different endpoint)",
+          description: "Point at another LangWatch deployment",
+          value: "self-hosted",
+        },
+        cloudChoice,
+      ]
+    : [
+        cloudChoice,
+        {
+          title: "Self-hosted instance",
+          description: "Your company's LangWatch deployment (custom URL)",
+          value: "self-hosted",
+        },
+      ];
+
+  const where = await prompts({
+    type: "select",
+    name: "where",
+    message: "Where do you want to log in?",
+    choices,
+    initial: 0,
+  });
+  if (!where.where) {
+    console.log(chalk.yellow("Login cancelled"));
+    process.exit(0);
+  }
+
+  const cfg = loadConfig();
+  if (where.where === "cloud") {
+    // Always repoint to cloud, overriding any stale local control_plane_url.
+    // Otherwise the device flow would dial the old localhost host and fail
+    // with ECONNREFUSED.
+    cfg.control_plane_url = DEFAULT_ENDPOINT;
+    saveConfig(cfg);
+  } else if (where.where === "keep") {
+    cfg.control_plane_url = current.url;
+    saveConfig(cfg);
+  } else if (where.where === "self-hosted") {
+    const url = await prompts({
+      type: "text",
+      name: "url",
+      message: "Self-hosted LangWatch URL (e.g. https://lw.acme.internal):",
+      validate: validateEndpointUrl,
+    });
+    if (!url.url) {
+      console.log(chalk.yellow("Login cancelled"));
+      process.exit(0);
+    }
+    cfg.control_plane_url = normalizeEndpoint(url.url as string);
+    saveConfig(cfg);
+  }
+  warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
+}
+
+/**
+ * Management access rides on the device login key only: a project key or a
+ * pre-minted token never passes through the approval that grants it.
+ */
+function refuseManagementOutsideDeviceLogin(
+  options: {
+    management?: boolean;
+    project?: boolean | string;
+    apiKey?: string;
+    token?: string;
+  } = {},
+): void {
+  if (!options.management) return;
+  if (!options.project && !options.apiKey && !options.token) return;
+  console.error(
+    chalk.red(
+      "Error: --management applies to the device login. Run `langwatch login --device --management`.",
+    ),
+  );
+  process.exit(1);
+}
+
+/** `--management` implies `--device`: management access only rides on the device login key. */
+function asksForDeviceLogin(options: { device?: boolean; management?: boolean } = {}): boolean {
+  return options.device === true || options.management === true;
+}
+
+export const loginCommand = async (options?: {
+  apiKey?: string;
+  device?: boolean;
+  project?: boolean | string;
+  browser?: string;
+  endpoint?: string;
+  token?: string;
+  management?: boolean;
+}): Promise<void> => {
+  try {
+    refuseManagementOutsideDeviceLogin(options);
+
     // First, so every flow below reads a config that already says how to run
     // this CLI; the Claude Code plugin's hooks look it up there.
     recordCliLocation();
 
-    // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
-    // resolved value BEFORE the chosen flow runs so subsequent reads
-    // (in the device flow, the API-key flow, any sub-command spawned
-    // later) see the right control-plane URL. The 4-source resolver
-    // (flag > env > config > default) honors this value via the
-    // persisted-config layer for any flow that doesn't explicitly take
-    // a flag. Only the flag skips the cloud/self-hosted picker; persisting
-    // the env var here is what makes that endpoint the picker's first and
-    // default choice, so `LANGWATCH_ENDPOINT=... langwatch login` is one
-    // Enter rather than a re-typed URL.
-    const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
-    const presetEndpoint = options?.endpoint ?? endpointFromEnv;
-    if (presetEndpoint) {
-      const trimmed = normalizeEndpoint(presetEndpoint);
-      const cfg = loadConfig();
-      cfg.control_plane_url = trimmed;
-      saveConfig(cfg);
-      warnIfLocalEndpointTakesOverGlobalConfig(trimmed);
-    }
+    // Honor `--endpoint`/`LANGWATCH_ENDPOINT`, persisted before the chosen flow
+    // runs so every subsequent read (device flow, API-key flow, spawned
+    // sub-commands) sees it — the env var becomes the picker's default choice,
+    // so `LANGWATCH_ENDPOINT=... langwatch login` is one Enter, not a retyped URL.
+    persistPresetEndpoint(options?.endpoint);
 
     // --token: pre-minted device-session escape hatch (CI / agent contexts
     // where the token was minted via the dashboard 'Personal Access Tokens'
     // surface). No browser, no prompts — just persist the token so
     // subsequent `langwatch claude/codex/...` invocations can use it.
     if (options?.token) {
-      const token = options.token.trim();
-      if (token.length < 10) {
-        console.error(chalk.red("Error: token seems too short. Please check and try again."));
-        process.exit(1);
-      }
-      const cfg = loadConfig();
-      cfg.access_token = token;
-      // No refresh_token / expires_at — that's the trade-off of bypassing
-      // the device flow. The wrapper auto-login will mint a real session
-      // if this token expires, since loadConfig+isLoggedIn only checks
-      // access_token presence.
-      saveConfig(cfg);
-      console.log(chalk.green("✓ device-session token saved"));
-      console.log(chalk.gray("  ~/.langwatch/config.json"));
+      saveDeviceSessionToken(options.token);
       return;
     }
 
@@ -267,17 +370,17 @@ export const loginCommand = async (
     // mints a personal virtual key bound to the user. This is the
     // governance-plane onboarding for enterprise users, distinct from the
     // single-user API-key flow below.
-    if (options?.device) {
-      await runDeviceFlowLogin({ browser: options.browser });
+    if (asksForDeviceLogin(options)) {
+      await runDeviceFlowLogin({
+        browser: options?.browser,
+        management: options?.management === true,
+      });
       return;
     }
 
-    // --project: force PROJECT login (a project SDK key into $CWD/.env).
-    // Symmetric to --device. With a slug, the key is resolved through the
-    // device session with no browser at all, which is the headless/agent
-    // path. Without a slug, the project is picked in the browser, so a
-    // terminal with no TTY fails fast instead of blocking on an approval
-    // that cannot happen.
+    // --project: force PROJECT login, symmetric to --device. With a slug,
+    // the key resolves through the device session with no browser (headless
+    // path); without one, a non-TTY terminal fails fast instead of blocking.
     if (typeof options?.project === "string") {
       await loginToProjectBySlug(options.project);
       return;
@@ -295,31 +398,14 @@ export const loginCommand = async (
 
     // Non-interactive mode: --api-key flag provided
     if (options?.apiKey) {
-      const apiKey = options.apiKey.trim();
-      if (apiKey.length < 10) {
-        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
-        process.exit(1);
-      }
-
-      const envResult = updateEnvFile(apiKey);
-      console.log(chalk.green("API key saved successfully."));
-      if (envResult.created) {
-        console.log(chalk.gray(`Created .env file at ${envResult.path}`));
-      } else if (envResult.updated) {
-        console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
-      } else {
-        console.log(chalk.gray(`Added API key to ${envResult.path}`));
-      }
+      saveApiKeyFlag(options.apiKey);
       return;
     }
 
-    // Interactive mode (no flags). On a non-TTY context (CI, an agent's
-    // piped stdin) we cannot prompt. Erroring here used to nudge agents
-    // toward `--device`, which signs them into a personal device-session and
-    // silently routed their evaluations to a personal project. Default to
-    // PROJECT login instead: it writes a real project's key to `.env`, which
-    // is what the SDK, `langwatch eval`, and the skills expect. AI-tools
-    // login stays explicit behind `--device`.
+    // Interactive mode, non-TTY (CI, agent piped stdin): default to PROJECT
+    // login, writing a real project's key to `.env` as the SDK and skills
+    // expect. AI-tools login stays explicit behind `--device` now, which
+    // used to be the nudge here and silently routed evals to a personal project.
     if (!process.stdin.isTTY) {
       console.log(
         chalk.gray(
@@ -343,96 +429,10 @@ export const loginCommand = async (
     console.log(chalk.blue("🔐 LangWatch Login"));
     console.log();
 
-    // Q1 — endpoint (cloud vs self-hosted). Skipped if --endpoint was
-    // passed (already persisted above). The chosen endpoint is persisted to
-    // ~/.langwatch/config.json on EVERY branch so the subsequent
-    // `runUnifiedLoginFlow`/`runDeviceFlowLogin` call (which reads
-    // control_plane_url directly) and every later CLI command's resolver read
-    // target the right host with no env-vs-config ambiguity.
-    if (!options?.endpoint) {
-      // When the user already resolved a non-cloud endpoint (local dev or a
-      // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),
-      // default to keeping it but still offer to switch endpoint or jump to
-      // Cloud. On a fresh install Cloud stays the priority default.
-      const current = resolveControlPlaneEndpoint();
-      const hasCustomEndpoint = current.url !== DEFAULT_ENDPOINT;
-
-      const cloudChoice = {
-        title: "LangWatch Cloud",
-        description: "app.langwatch.ai",
-        value: "cloud",
-      };
-      const choices = hasCustomEndpoint
-        ? [
-            {
-              title: `Self-hosted instance (${current.url})`,
-              description: "Keep using your current endpoint",
-              value: "keep",
-            },
-            {
-              title: "Self-hosted instance (different endpoint)",
-              description: "Point at another LangWatch deployment",
-              value: "self-hosted",
-            },
-            cloudChoice,
-          ]
-        : [
-            cloudChoice,
-            {
-              title: "Self-hosted instance",
-              description: "Your company's LangWatch deployment (custom URL)",
-              value: "self-hosted",
-            },
-          ];
-
-      const where = await prompts({
-        type: "select",
-        name: "where",
-        message: "Where do you want to log in?",
-        choices,
-        initial: 0,
-      });
-      if (!where.where) {
-        console.log(chalk.yellow("Login cancelled"));
-        process.exit(0);
-      }
-
-      const cfg = loadConfig();
-      if (where.where === "cloud") {
-        // Always repoint to cloud, overriding any stale local control_plane_url.
-        // Otherwise the device flow would dial the old localhost host and fail
-        // with ECONNREFUSED.
-        cfg.control_plane_url = DEFAULT_ENDPOINT;
-        saveConfig(cfg);
-      } else if (where.where === "keep") {
-        cfg.control_plane_url = current.url;
-        saveConfig(cfg);
-      } else if (where.where === "self-hosted") {
-        const url = await prompts({
-          type: "text",
-          name: "url",
-          message: "Self-hosted LangWatch URL (e.g. https://lw.acme.internal):",
-          validate: (v: string) => {
-            try {
-              const parsed = new URL(v);
-              if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-                return "URL must start with http(s)://";
-              }
-              return true;
-            } catch {
-              return "URL must be absolute (https://...)";
-            }
-          },
-        });
-        if (!url.url) {
-          console.log(chalk.yellow("Login cancelled"));
-          process.exit(0);
-        }
-        cfg.control_plane_url = normalizeEndpoint(url.url as string);
-        saveConfig(cfg);
-      }
-      warnIfLocalEndpointTakesOverGlobalConfig(cfg.control_plane_url);
-    }
+    // Q1 -- endpoint (cloud vs self-hosted), skipped if --endpoint was
+    // passed. Persisted to ~/.langwatch/config.json on every branch so the
+    // login call and every later resolver target the right host.
+    if (!options?.endpoint) await chooseEndpoint();
 
     // Q2 — auth mode (AI tools = device-flow vs Project SDK = API key)
     const mode = await prompts({
@@ -478,15 +478,7 @@ export const loginCommand = async (
     }
     return;
   } catch (error) {
-    console.error(
-      chalk.red(
-        `Error during login: ${
-          formatApiErrorMessage({ error })
-        }`,
-      ),
-    );
+    console.error(chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`));
     process.exit(1);
   }
 };
-
-

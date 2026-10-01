@@ -1,0 +1,341 @@
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
+import {
+  UserNotFoundError,
+  createCredentialUserInputSchema,
+  createPasskeyUserInputSchema,
+  createUserInputSchema,
+  removeUserAvatarInputSchema,
+  setUserAvatarInputSchema,
+  setUserHomePathInputSchema,
+  setFirstUserPasswordInputSchema,
+  updateUserProfileInputSchema,
+  userEmailInputSchema,
+  userIdInputSchema,
+  userProfilesInputSchema,
+  type CreateUserInput,
+  type CreateCredentialUserInput,
+  type CreatePasskeyUserInput,
+  type CreatedUser,
+  type RemoveUserAvatarInput,
+  type SetUserAvatarInput,
+  type SetUserHomePathInput,
+  type SetFirstUserPasswordInput,
+  type SetFirstUserPasswordResult,
+  type UpdateUserProfileInput,
+  type UserAccountInfo,
+  type UserAvatarResult,
+  type UserEmailInput,
+  type UserFullProfile,
+  type UserPasskeyNudgeStatus,
+  type UserIdInput,
+  type UserProfile,
+  type UserProfilesInput,
+  type UserSsoStatus,
+  type UserTourPreference,
+  type UserCodeAccessPreference,
+  type UserUsageCount,
+} from "@langwatch/user-contract";
+
+import type { UserAvatarStorage } from "../app/user.members.ts";
+import type { UserRepository } from "../repositories/user.repository.ts";
+import { UserAvatarCodecService } from "./user-avatar.service.ts";
+
+export class UserService {
+  private readonly avatars = UserAvatarCodecService.create();
+  private readonly repository: UserRepository;
+  private readonly organizations: OrganizationApi;
+  private readonly auth: AuthApi;
+  private readonly avatarStorage: UserAvatarStorage;
+  /** The issuer every credential account row this service mints is stored under. */
+  private readonly credentialIssuer: string;
+  private readonly now: () => Instant;
+
+  private constructor({
+    repository,
+    organizations,
+    auth,
+    avatarStorage,
+    credentialIssuer,
+    now,
+  }: {
+    repository: UserRepository;
+    organizations: OrganizationApi;
+    auth: AuthApi;
+    avatarStorage: UserAvatarStorage;
+    credentialIssuer: string;
+    now: () => Instant;
+  }) {
+    this.repository = repository;
+    this.organizations = organizations;
+    this.auth = auth;
+    this.avatarStorage = avatarStorage;
+    this.credentialIssuer = credentialIssuer;
+    this.now = now;
+  }
+
+  static create(options: {
+    repository: UserRepository;
+    organizations: OrganizationApi;
+    auth: AuthApi;
+    avatarStorage: UserAvatarStorage;
+    credentialIssuer: string;
+    now?: () => Instant;
+  }): UserService {
+    return new UserService({
+      repository: options.repository,
+      organizations: options.organizations,
+      auth: options.auth,
+      avatarStorage: options.avatarStorage,
+      credentialIssuer: options.credentialIssuer,
+      now: options.now ?? nowInstant,
+    });
+  }
+
+  countUsage(): Promise<UserUsageCount> {
+    return this.repository.countUsage();
+  }
+
+  countUsageForMembers({
+    memberUserIds,
+  }: {
+    memberUserIds: readonly string[];
+  }): Promise<UserUsageCount> {
+    return this.repository.countUsageAmong({ userIds: memberUserIds });
+  }
+
+  /** A domain with a wildcard in it is no domain, so it matches nobody. */
+  hasAccountOnDomain({ domain }: { domain: string }): Promise<boolean> {
+    const normalised = domain.trim().toLowerCase();
+    if (!normalised || normalised.includes("%")) return Promise.resolve(false);
+    return this.repository.hasAccountOnDomain(normalised);
+  }
+
+  getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
+    const parsed = userProfilesInputSchema.parse(input);
+
+    return this.repository.findProfiles([...new Set(parsed.userIds)]);
+  }
+
+  findById(input: UserIdInput): Promise<UserProfile | null> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findById(parsed.id);
+  }
+
+  findByEmail(input: UserEmailInput): Promise<UserProfile | null> {
+    const parsed = userEmailInputSchema.parse(input);
+
+    return this.repository.findByEmail(parsed.email);
+  }
+
+  /** A case-twin beside a taken address would leave two accounts answering for one person. */
+  async emailIsTaken(input: UserEmailInput): Promise<boolean> {
+    const parsed = userEmailInputSchema.parse(input);
+
+    return (await this.repository.findByEmail(parsed.email)) !== null;
+  }
+
+  create(input: CreateUserInput): Promise<UserProfile> {
+    return this.repository.create(createUserInputSchema.parse(input));
+  }
+
+  createCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    return this.repository.createCredentialUser({
+      ...createCredentialUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+      emailVerified: false,
+    });
+  }
+
+  /** The account a spent mailbox proof earned: born confirmed, as the proof confirmed
+   *  the address. */
+  createConfirmedCredentialUser(input: CreateCredentialUserInput): Promise<CreatedUser> {
+    return this.repository.createCredentialUser({
+      ...createCredentialUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+      emailVerified: true,
+    });
+  }
+
+  /** Only passkey sign-up mints this, after it spent the address proof: born confirmed. */
+  createPasskeyUser(input: CreatePasskeyUserInput): Promise<CreatedUser> {
+    return this.repository.createPasskeyUser({
+      ...createPasskeyUserInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+      emailVerified: true,
+    });
+  }
+
+  hasPassword(input: UserIdInput): Promise<boolean> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.hasPassword(parsed.id);
+  }
+
+  setFirstPassword(input: SetFirstUserPasswordInput): Promise<SetFirstUserPasswordResult> {
+    return this.repository.setFirstPassword({
+      ...setFirstUserPasswordInputSchema.parse(input),
+      issuer: this.credentialIssuer,
+    });
+  }
+
+  getPasskeyNudgeStatus(input: UserIdInput): Promise<UserPasskeyNudgeStatus> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findPasskeyNudgeStatus(parsed.id);
+  }
+
+  async dismissPasskeyNudge(input: UserIdInput): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+    await this.repository.setPasskeyNudgeDismissedAt({ id: parsed.id, dismissedAt: this.now() });
+  }
+
+  findJoinOfferDismissedDomains(input: UserIdInput): Promise<string[]> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findJoinOfferDismissedDomains(parsed.id);
+  }
+
+  /** Read first, so a second "no thanks" for the same domain writes nothing. */
+  async dismissJoinOffer(input: UserIdInput & { domain: string }): Promise<void> {
+    const parsed = userIdInputSchema.parse({ id: input.id });
+    const held = await this.repository.findJoinOfferDismissedDomains(parsed.id);
+    if (held.includes(input.domain)) return;
+    await this.repository.addJoinOfferDismissedDomain({ id: parsed.id, domain: input.domain });
+  }
+
+  async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
+    const parsed = updateUserProfileInputSchema.parse(input);
+    const normalizedEmail =
+      parsed.email === undefined ? undefined : parsed.email.trim().toLowerCase();
+    const current =
+      normalizedEmail === undefined ? null : await this.repository.findById(parsed.id);
+    if (normalizedEmail !== undefined && !current) {
+      throw new UserNotFoundError(parsed.id);
+    }
+
+    const update: UpdateUserProfileInput = { id: parsed.id };
+    if (parsed.name !== undefined) {
+      update.name = parsed.name;
+    }
+
+    if (normalizedEmail !== undefined) {
+      update.email = normalizedEmail;
+    }
+
+    const updated = await this.repository.updateProfile(update);
+
+    return updated;
+  }
+
+  async getAccountInfo(input: UserIdInput): Promise<UserAccountInfo> {
+    const parsed = userIdInputSchema.parse(input);
+    const account = await this.repository.findAccountInfo(parsed.id);
+    if (!account) {
+      throw new UserNotFoundError(parsed.id);
+    }
+
+    return account;
+  }
+
+  /** The stored flag is only cleared by a later sign-in, so once it is set
+   *  auth re-asks the question against the accounts held now. */
+  async getSsoStatus(input: UserIdInput): Promise<UserSsoStatus> {
+    const parsed = userIdInputSchema.parse(input);
+    const user = await this.repository.findById(parsed.id);
+    if (!user?.pendingSsoSetup) return { pendingSsoSetup: false };
+    if (!user.email) return { pendingSsoSetup: true };
+
+    return this.auth.getSsoSetupStatus({ userId: parsed.id, email: user.email });
+  }
+
+  getTraceExplorerTourPreference(input: UserIdInput): Promise<UserTourPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findTraceExplorerTourPreference(parsed.id);
+  }
+
+  getLangyCodeAccessPreference(input: UserIdInput): Promise<UserCodeAccessPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.getLangyCodeAccessPreference(parsed.id);
+  }
+
+  async setLangyCodeAccessPreference(input: UserIdInput & UserCodeAccessPreference): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+
+    await this.repository.setLangyCodeAccessPreference(parsed.id, input.preference);
+  }
+
+  dismissTraceExplorerTour(input: UserIdInput): Promise<UserTourPreference> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.setTraceExplorerTourDismissedAt({
+      id: parsed.id,
+      dismissedAt: this.now(),
+    });
+  }
+
+  async updateLastLogin(input: UserIdInput): Promise<void> {
+    const parsed = userIdInputSchema.parse(input);
+    await this.repository.setLastLoginAt({ id: parsed.id, lastLoginAt: this.now() });
+  }
+
+  findLastHomePath(input: UserIdInput): Promise<string | null> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.findLastHomePath(parsed.id);
+  }
+
+  async setLastHomePath(input: SetUserHomePathInput): Promise<void> {
+    const parsed = setUserHomePathInputSchema.parse(input);
+    await this.repository.setLastHomePath({ id: parsed.id, path: parsed.path });
+  }
+
+  async deactivate(input: UserIdInput): Promise<UserProfile> {
+    const parsed = userIdInputSchema.parse(input);
+    const user = await this.repository.setDeactivatedAt({
+      id: parsed.id,
+      deactivatedAt: this.now(),
+    });
+
+    return user;
+  }
+
+  reactivate(input: UserIdInput): Promise<UserProfile> {
+    const parsed = userIdInputSchema.parse(input);
+
+    return this.repository.setDeactivatedAt({ id: parsed.id, deactivatedAt: null });
+  }
+
+  async setAvatar(input: SetUserAvatarInput): Promise<UserAvatarResult> {
+    const parsed = setUserAvatarInputSchema.parse(input);
+    const { mediaType, bytes } = this.avatars.parse(parsed.imageDataUrl);
+    const workspace = await this.organizations.ensurePersonalWorkspace({
+      userId: parsed.userId,
+      organizationId: parsed.organizationId,
+      displayName: parsed.displayName,
+      displayEmail: parsed.displayEmail,
+    });
+    const stored = await this.avatarStorage.store({
+      projectId: workspace.project.id,
+      userId: parsed.userId,
+      mediaType,
+      bytes,
+    });
+    const image = this.avatars.buildUrl({
+      projectId: workspace.project.id,
+      id: stored.id,
+    });
+    await this.repository.setAvatar({ id: parsed.userId, image });
+
+    return { image };
+  }
+
+  async removeAvatar(input: RemoveUserAvatarInput): Promise<void> {
+    const parsed = removeUserAvatarInputSchema.parse(input);
+    await this.repository.setAvatar({ id: parsed.userId, image: null });
+  }
+}

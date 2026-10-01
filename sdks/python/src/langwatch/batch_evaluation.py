@@ -25,7 +25,7 @@ import pandas as pd
 
 from langwatch.http_client import create_async_client, create_client
 from langwatch.types import Money
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 
 
@@ -140,8 +140,8 @@ class BatchEvaluation:
         print("Starting batch evaluation...")
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers=build_auth_headers(langwatch.get_api_key() or ""),
+                f"{langwatch.get_endpoint()}/api/v1/experiment/init",
+                headers=build_request_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.experiment,
                     "experiment_slug": self.experiment,
@@ -367,8 +367,8 @@ class BatchEvaluation:
     def post_results(cls, api_key: str, body: dict):
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
-                headers=build_auth_headers(api_key),
+                f"{langwatch.get_endpoint()}/api/v1/evaluations/batch/log_results",
+                headers=build_request_headers(api_key),
                 json=body,
             )
         better_raise_for_status(response)
@@ -408,8 +408,8 @@ async def run_evaluation(
             json_data["settings"] = settings
 
         request_params = {
-            "url": langwatch.get_endpoint() + f"/api/evaluations/{evaluation}/evaluate",
-            "headers": build_auth_headers(langwatch.get_api_key() or ""),
+            "url": langwatch.get_endpoint() + f"/api/v1/evaluations/{evaluation}/evaluate",
+            "headers": build_request_headers(langwatch.get_api_key() or ""),
             "json": json_data,
         }
 
@@ -459,8 +459,8 @@ def get_dataset(
     slug: str,
 ) -> list[DatasetRecord]:
     request_params = {
-        "url": langwatch.get_endpoint() + f"/api/dataset/{slug}",
-        "headers": build_auth_headers(str(langwatch.get_api_key() or "")),
+        "url": langwatch.get_endpoint() + f"/api/v1/dataset/{slug}",
+        "headers": build_request_headers(str(langwatch.get_api_key() or "")),
     }
 
     with create_client(timeout=300) as client:

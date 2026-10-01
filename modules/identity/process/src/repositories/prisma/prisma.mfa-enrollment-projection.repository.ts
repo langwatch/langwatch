@@ -1,0 +1,90 @@
+import type {
+  ProjectionStoreContext,
+  StateProjectionStore,
+  StoredProjection,
+  StoredProjectionRead,
+} from "@langwatch/eventing";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import type { MfaFoldState } from "../../eventing/mfa-enrollment-state.projection.ts";
+import { mfaEnrollmentRowToState } from "./prisma.mfa-enrollment.mapper.ts";
+
+/**
+ * The two-step verification pipeline's projection store (D06): the Postgres `MfaEnrollment` head
+ * and its cursor, written under the queue's per-person lock.
+ */
+export class PrismaMfaEnrollmentProjectionRepository implements StateProjectionStore<MfaFoldState> {
+  static create(prisma: PrismaClient): PrismaMfaEnrollmentProjectionRepository {
+    return new PrismaMfaEnrollmentProjectionRepository(prisma);
+  }
+
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async get(
+    key: string,
+    _context: ProjectionStoreContext,
+  ): Promise<StoredProjectionRead<MfaFoldState>> {
+    const row = await this.prisma.mfaEnrollment.findUnique({
+      where: { userId: key },
+    });
+    if (!row) return { kind: "empty" };
+    return {
+      kind: "folded",
+      projection: {
+        state: {
+          ...mfaEnrollmentRowToState(row),
+          CreatedAt: row.createdAt.getTime(),
+          UpdatedAt: row.updatedAt.getTime(),
+          LastEventOccurredAt: row.occurredAt.getTime(),
+        },
+        cursor: {
+          acceptedAt: row.acceptedAt.getTime(),
+          eventId: row.lastEventId,
+        },
+        occurredAt: row.occurredAt.getTime(),
+        createdAt: row.createdAt.getTime(),
+        updatedAt: row.updatedAt.getTime(),
+        version: row.projectionVersion,
+      },
+    };
+  }
+
+  async store(
+    projection: StoredProjection<MfaFoldState>,
+    context: ProjectionStoreContext,
+  ): Promise<void> {
+    const userId = context.aggregateId;
+    const { state } = projection;
+    const columns = {
+      enrollmentId: state.enrollmentId,
+      method: state.method,
+      state: state.state,
+      enrolledAt: toDateFromMs(state.enrolledAtMs),
+      confirmedAt: toDateFromMs(state.confirmedAtMs),
+      expiredAt: toDateFromMs(state.expiredAtMs),
+      disabledAt: toDateFromMs(state.disabledAtMs),
+      disabledVia: state.disabledVia,
+      backupCodeCount: state.backupCodeCount,
+      consumedBackupCodeIndexes: state.consumedBackupCodeIndexes,
+      failedCount: state.failedCount,
+      occurredAt: new Date(projection.occurredAt),
+      lastEventId: projection.cursor.eventId,
+      acceptedAt: new Date(projection.cursor.acceptedAt),
+      projectionVersion: projection.version,
+      // Business time, from the events — not `now()`. A row whose timestamps
+      // came from the clock would differ from the row a replay rebuilds, and
+      // whole-row parity is what this projection promises.
+      createdAt: new Date(state.CreatedAt),
+      updatedAt: new Date(state.UpdatedAt),
+    };
+    await this.prisma.mfaEnrollment.upsert({
+      where: { userId },
+      create: { userId, ...columns },
+      update: columns,
+    });
+  }
+}
+
+function toDateFromMs(ms: number | null): Date | null {
+  return ms === null ? null : new Date(ms);
+}

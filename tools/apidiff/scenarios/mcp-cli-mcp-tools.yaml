@@ -1,0 +1,343 @@
+# The MCP server (mcp/typescript) as it calls the REST API: every request goes to /api/v1/<x>
+# with X-Auth-Token (auth: project), the body the tool builds in langwatch-api*.ts, and each
+# assertion names a field the tool's formatter reads. Written unrun. Existing scenarios cover
+# the same routes on /api/<x>; these pin the client's own paths, bodies and parsed fields.
+
+# prompts: platform_create_prompt, platform_update_prompt, platform_get_prompt (langwatch-api.ts)
+- id: "mcp-prompts-create-update-read-by-tag-and-version"
+  endpoint: "POST /api/v1/prompts"
+  request:
+    path: "/api/v1/prompts"
+    headers: {"X-Project-Id": "{projectId}"}
+    body:
+      handle: "vd-{uid}"
+      messages: [{"role": "system", "content": "You are a helpful assistant"}]
+      model: "openai/gpt-4o-mini"
+      tags: ["production"]
+  capture: {"promptId": "id", "versionId": "versionId"}
+  expect:
+    status: [200, 201]
+    body: {"id": "<any>", "handle": "vd-{uid}", "versionId": "<any>"}
+  verify:
+    - request: "PUT /api/v1/prompts/vd-{uid}"
+      body:
+        messages: [{"role": "system", "content": "Second version"}]
+        model: "openai/gpt-4o-mini"
+        commitMessage: "v2"
+        tags: ["production"]
+      expect:
+        status: 200
+        body: {"id": "{promptId}", "handle": "vd-{uid}", "versionId": "<any>"}
+    - request: "GET /api/v1/prompts/vd-{uid}?tag=production"
+      expect:
+        status: 200
+        body:
+          id: "{promptId}"
+          handle: "vd-{uid}"
+          version: 2
+          versionId: "<any>"
+          model: "openai/gpt-4o-mini"
+          tags: "<any>"
+        contains: "Second version"
+    - request: "GET /api/v1/prompts/{promptId}?version=1"
+      expect:
+        status: 200
+        body: {"handle": "vd-{uid}", "version": 1, "versionId": "{versionId}", "commitMessage": "<any>"}
+    - request: "GET /api/v1/prompts/vd-{uid}/versions"
+      expect: {"status": 200, "path": "", "length": 2, "contains": "commitMessage"}
+    - request: "GET /api/v1/prompts"
+      expect: {"status": 200, "contains": ["vd-{uid}", "handle"]}
+      eventually: 10s
+
+# platform_assign_prompt_tag, list, rename and delete tags
+- id: "mcp-prompts-tag-create-assign-rename-delete"
+  endpoint: "POST /api/v1/prompts/tags"
+  request:
+    path: "/api/v1/prompts/tags"
+    body: {"name": "vdtag-{uid}"}
+  expect:
+    status: 201
+    body: {"name": "vdtag-{uid}"}
+  setup:
+    - request: "POST /api/v1/prompts"
+      body:
+        handle: "vd-{uid}"
+        messages: [{"role": "system", "content": "hello"}]
+        model: "openai/gpt-4o-mini"
+      capture: {"versionId": "versionId"}
+      expect: {"status": [200, 201]}
+  verify:
+    - request: "PUT /api/v1/prompts/vd-{uid}/tags/vdtag-{uid}"
+      body: {"versionId": "{versionId}"}
+      expect: {"status": 200, "body": {"tag": "vdtag-{uid}", "versionId": "{versionId}"}}
+    - request: "GET /api/v1/prompts/vd-{uid}?tag=vdtag-{uid}"
+      expect: {"status": 200, "body": {"handle": "vd-{uid}", "version": 1}}
+    - request: "PUT /api/v1/prompts/tags/vdtag-{uid}"
+      body: {"name": "vdrenamed-{uid}"}
+      expect: {"status": 200, "body": {"name": "vdrenamed-{uid}"}}
+    - request: "GET /api/v1/prompts/tags"
+      expect: {"status": 200, "contains": "vdrenamed-{uid}", "notContains": "vdtag-{uid}"}
+    - request: "DELETE /api/v1/prompts/tags/vdrenamed-{uid}"
+      expect: {"status": 204}
+
+# The client reads `message` (or `error.message`) and `code` off a refusal to build its text.
+- id: "mcp-prompts-unknown-refusal-carries-message"
+  endpoint: "GET /api/v1/prompts/{id}"
+  request: {"path": "/api/v1/prompts/nope-{uid}"}
+  expect: {"status": 404, "contains": "message"}
+
+- id: "mcp-prompts-create-missing-model-refusal-carries-message"
+  endpoint: "POST /api/v1/prompts"
+  request:
+    path: "/api/v1/prompts"
+    body: {"handle": "vd-{uid}", "messages": [{"role": "user", "content": "hi"}]}
+  expect: {"status": [400, 422], "contains": "message"}
+
+# evaluators: platform_create_evaluator, get by slug, update, delete
+- id: "mcp-evaluators-create-get-by-slug-update-delete"
+  endpoint: "POST /api/v1/evaluators"
+  request:
+    path: "/api/v1/evaluators"
+    body: {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}
+  capture: {"evaluatorId": "id", "evaluatorSlug": "slug"}
+  expect:
+    status: [200, 201]
+    body: {"id": "<any>", "name": "ev-{uid}", "slug": "<any>", "type": "evaluator", "config": "<any>"}
+  verify:
+    - request: "GET /api/v1/evaluators/{evaluatorSlug}"
+      expect:
+        status: 200
+        body: {"id": "{evaluatorId}", "name": "ev-{uid}", "createdAt": "<any>", "updatedAt": "<any>"}
+    - request: "GET /api/v1/evaluators"
+      expect: {"status": 200, "contains": ["ev-{uid}", "exact_match"]}
+    - request: "PUT /api/v1/evaluators/{evaluatorId}"
+      body: {"name": "ev2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{evaluatorId}", "name": "ev2-{uid}"}}
+    # main resolves a slug on GET only; PUT and DELETE look the id up alone.
+    - request: "DELETE /api/v1/evaluators/{evaluatorId}"
+      expect: {"status": 200}
+    - request: "GET /api/v1/evaluators/{evaluatorId}"
+      expect: {"status": 404}
+
+# monitors: platform_create_monitor sends preconditions [] and parameters {} with the rest
+- id: "mcp-monitors-create-toggle-list-delete"
+  endpoint: "POST /api/v1/monitors"
+  setup:
+    - request: "POST /api/v1/evaluators"
+      body: {"name": "ev-{uid}", "config": {"evaluatorType": "langevals/exact_match"}}
+      capture: {"evaluatorId": "id"}
+  request:
+    path: "/api/v1/monitors"
+    body:
+      name: "mon-{uid}"
+      checkType: "langevals/exact_match"
+      executionMode: "ON_MESSAGE"
+      sample: 1
+      level: "trace"
+      evaluatorId: "{evaluatorId}"
+      preconditions: []
+      parameters: {}
+  capture: {"monitorId": "id"}
+  expect:
+    status: 201
+    body:
+      id: "<any>"
+      name: "mon-{uid}"
+      checkType: "langevals/exact_match"
+      enabled: true
+      executionMode: "ON_MESSAGE"
+      sample: 1
+      level: "trace"
+      evaluatorId: "{evaluatorId}"
+  verify:
+    - request: "POST /api/v1/monitors/{monitorId}/toggle"
+      body: {"enabled": false}
+      expect: {"status": 200, "body": {"id": "{monitorId}", "enabled": false}}
+    - request: "GET /api/v1/monitors"
+      expect: {"status": 200, "contains": ["mon-{uid}", "checkType"]}
+    - request: "DELETE /api/v1/monitors/{monitorId}"
+      expect: {"status": 200, "body": {"id": "{monitorId}", "deleted": true}}
+  teardown:
+    - request: "DELETE /api/v1/monitors/{monitorId}"
+
+# scenarios: platform_create_scenario, update, archive (reads `archived`)
+- id: "mcp-scenarios-create-update-archive"
+  endpoint: "POST /api/v1/scenarios"
+  request:
+    path: "/api/v1/scenarios"
+    body:
+      name: "vd-{uid}"
+      situation: "A customer asks for a refund"
+      criteria: ["Agent apologises"]
+      labels: ["vd"]
+  capture: {"scenarioId": "id"}
+  expect:
+    status: 201
+    body: {"id": "<any>", "name": "vd-{uid}", "situation": "A customer asks for a refund", "criteria": ["Agent apologises"], "labels": ["vd"]}
+  verify:
+    - request: "PUT /api/v1/scenarios/{scenarioId}"
+      body: {"name": "vd2-{uid}", "criteria": ["Agent apologises", "Agent offers a refund"]}
+      expect: {"status": 200, "body": {"id": "{scenarioId}", "name": "vd2-{uid}", "criteria": ["Agent apologises", "Agent offers a refund"]}}
+    - request: "GET /api/v1/scenarios"
+      expect: {"status": 200, "contains": "vd2-{uid}"}
+      eventually: 10s
+    - request: "DELETE /api/v1/scenarios/{scenarioId}"
+      expect: {"status": 200, "body": {"id": "{scenarioId}", "archived": true}}
+
+# dashboards: list answers { data: [...] }, delete echoes id and name
+- id: "mcp-dashboards-create-list-delete"
+  endpoint: "POST /api/v1/dashboards"
+  request: {"path": "/api/v1/dashboards", "body": {"name": "vd-dash-{uid}"}}
+  capture: {"dashboardId": "id"}
+  expect: {"status": 201, "body": {"id": "<any>", "name": "vd-dash-{uid}"}}
+  verify:
+    - request: "GET /api/v1/dashboards"
+      expect: {"status": 200, "body": {"data": "<any>"}, "contains": ["vd-dash-{uid}", "graphCount"]}
+    - request: "DELETE /api/v1/dashboards/{dashboardId}"
+      expect: {"status": 200, "body": {"id": "{dashboardId}", "name": "vd-dash-{uid}"}}
+
+# annotations: create answers { data: {...} }? the client reads the flat fields under either
+- id: "mcp-annotations-create-list-by-trace-delete"
+  endpoint: "POST /api/v1/annotations/trace/{id}"
+  request:
+    path: "/api/v1/annotations/trace/vd-trace-{uid}"
+    body: {"comment": "c-{uid}", "isThumbsUp": true, "email": "vd@example.com"}
+  capture: {"annotationId": "data.id"}
+  expect: {"status": 200, "contains": ["c-{uid}", "isThumbsUp"]}
+  verify:
+    - request: "GET /api/v1/annotations/trace/vd-trace-{uid}"
+      expect: {"status": 200, "contains": ["c-{uid}", "vd-trace-{uid}"]}
+    - request: "GET /api/v1/annotations"
+      expect: {"status": 200, "contains": "c-{uid}"}
+    - request: "DELETE /api/v1/annotations/{annotationId}"
+      expect: {"status": 200}
+
+# datasets: platform_create_dataset, add records, list, delete records (DELETE carries a body)
+- id: "mcp-datasets-records-add-list-delete-with-body"
+  endpoint: "POST /api/v1/dataset"
+  request:
+    path: "/api/v1/dataset"
+    body: {"name": "ds-{uid}", "columnTypes": [{"name": "input", "type": "string"}]}
+  capture: {"datasetId": "id", "datasetSlug": "slug"}
+  expect: {"status": 201, "body": {"id": "<any>", "name": "ds-{uid}", "slug": "<any>"}}
+  verify:
+    - request: "POST /api/v1/dataset/{datasetSlug}/records"
+      body: {"entries": [{"input": "one"}, {"input": "two"}]}
+      expect: {"status": 201, "path": "data", "length": 2}
+    - request: "GET /api/v1/dataset/{datasetSlug}/records?page=1&limit=10"
+      expect: {"status": 200, "path": "data", "length": 2, "contains": "two"}
+      eventually: 10s
+    - request: "GET /api/v1/dataset/{datasetSlug}"
+      expect: {"status": 200, "body": {"name": "ds-{uid}", "slug": "{datasetSlug}"}, "contains": "input"}
+    - request: "PATCH /api/v1/dataset/{datasetSlug}"
+      body: {"name": "ds2-{uid}"}
+      expect: {"status": 200, "body": {"id": "{datasetId}"}}
+    - request: "DELETE /api/v1/dataset/{datasetId}"
+      expect: {"status": 200}
+
+- id: "mcp-datasets-delete-records-reports-deleted-count"
+  endpoint: "DELETE /api/v1/dataset/{slugOrId}/records"
+  setup:
+    - request: "POST /api/v1/dataset"
+      body: {"name": "ds-{uid}", "columnTypes": [{"name": "input", "type": "string"}]}
+      capture: {"datasetSlug": "slug"}
+    - request: "POST /api/v1/dataset/{datasetSlug}/records"
+      body: {"entries": [{"input": "one"}]}
+      capture: {"recordId": "data.0.id"}
+  request:
+    path: "/api/v1/dataset/{datasetSlug}/records"
+    body: {"recordIds": ["{recordId}"]}
+  expect: {"status": 200, "body": {"deletedCount": 1}}
+
+# workflows and model providers are read as lists; the provider map is keyed by provider name
+- id: "mcp-model-providers-list-keyed-by-provider"
+  endpoint: "GET /api/v1/model-providers"
+  request: {"path": "/api/v1/model-providers"}
+  expect: {"status": 200, "body": {"openai": {"provider": "openai", "enabled": "<any>"}}}
+
+- id: "mcp-workflows-list-is-an-array"
+  endpoint: "GET /api/v1/workflows"
+  request: {"path": "/api/v1/workflows"}
+  expect: {"status": 200}
+
+# projects: the MCP calls /api/projects (no /v1) with the project key
+- id: "mcp-me-project-verifies-key"
+  endpoint: "GET /api/v1/me/project"
+  request: {"path": "/api/v1/me/project"}
+  expect: {"status": 200, "body": {"id": "{projectId}", "name": "<any>", "slug": "<any>"}}
+
+- id: "mcp-me-project-refuses-unknown-key"
+  endpoint: "GET /api/v1/me/project"
+  auth: "none"
+  request: {"path": "/api/v1/me/project", "headers": {"X-Auth-Token": "vd-not-a-key-{uid}"}}
+  expect: {"status": 401}
+
+# traces: search (format digest) and get (digest, json); analytics timeseries without timeScale
+- id: "mcp-traces-search-digest-reads-fields"
+  endpoint: "POST /api/v1/traces/search"
+  setup:
+    - request: "POST /api/collector"
+      body:
+        trace_id: "vdt{uid}"
+        spans:
+          - {"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}
+        metadata: {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}
+    - request: "GET /api/v1/traces/vdt{uid}"
+      eventually: 60s
+      expect: {"status": 200}
+  request:
+    path: "/api/v1/traces/search"
+    body:
+      filters: {"metadata.user_id": ["vd-user-{uid}"]}
+      startDate: 1700000000000
+      endDate: 4102444800000
+      pageSize: 10
+      format: "digest"
+  expect:
+    status: 200
+    path: "traces"
+    length: 1
+    body: {"traces": [{"trace_id": "vdt{uid}", "formatted_trace": "<any>"}]}
+
+- id: "mcp-traces-get-digest-and-json-read-fields"
+  endpoint: "GET /api/v1/traces/{traceId}"
+  setup:
+    - request: "POST /api/collector"
+      body:
+        trace_id: "vdt{uid}"
+        spans:
+          - {"type": "llm", "span_id": "vds{uid}", "trace_id": "vdt{uid}", "name": "vd-{uid}", "model": "gpt-5", "vendor": "openai", "input": {"type": "text", "value": "vd question {uid}"}, "output": {"type": "text", "value": "vd answer {uid}"}, "timestamps": {"started_at": 1790723307541, "finished_at": 1790723308041}}
+        metadata: {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}", "labels": ["vd-{uid}"]}
+    - request: "GET /api/v1/traces/vdt{uid}"
+      eventually: 60s
+      expect: {"status": 200}
+  request: {"path": "/api/v1/traces/vdt{uid}", "query": {"format": "digest"}}
+  expect:
+    status: 200
+    body:
+      trace_id: "vdt{uid}"
+      formatted_trace: "<any>"
+      timestamps: "<any>"
+      metadata: {"user_id": "vd-user-{uid}", "thread_id": "vd-thread-{uid}"}
+      evaluations: "<any>"
+  verify:
+    - request: "GET /api/v1/traces/vdt{uid}?format=json"
+      expect:
+        status: 200
+        body:
+          trace_id: "vdt{uid}"
+          ascii_tree: "<any>"
+          spans: [{"span_id": "vds{uid}", "name": "vd-{uid}", "type": "llm"}]
+          input: "<any>"
+          output: "<any>"
+
+- id: "mcp-analytics-timeseries-without-time-scale"
+  endpoint: "POST /api/v1/analytics/timeseries"
+  request:
+    path: "/api/v1/analytics/timeseries"
+    body:
+      series: [{"metric": "metadata.trace_id", "aggregation": "cardinality"}]
+      startDate: 1700000000000
+      endDate: 4102444800000
+      timeZone: "UTC"
+  expect: {"status": 200, "body": {"currentPeriod": "<any>", "previousPeriod": "<any>"}}

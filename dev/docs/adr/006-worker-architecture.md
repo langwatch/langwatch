@@ -34,6 +34,7 @@ Main Deployment (replicas: N)     Worker Deployment (replicas: 1-M)
 ```
 
 Use this pattern when:
+
 - You need to scale HTTP and workers independently
 - Workers are resource-intensive
 - You want isolation between web and worker failures
@@ -53,6 +54,7 @@ The `start.sh` script automatically detects Redis configuration and starts worke
 ### Local Development
 
 Workers start via:
+
 - **Docker profile**: `make dev-scenarios` includes a worker container
 - **Concurrent setup**: `pnpm start` runs both app and workers when Redis is configured
 
@@ -80,15 +82,18 @@ Workers start via:
 ## Consequences
 
 **Positive:**
+
 - Worker initialization is predictable and testable
 - Deployments are simpler to reason about
 - No risk of worker duplication in multi-pod deployments
 
 **Negative:**
+
 - Local development requires Docker or explicit worker start
 - Existing single-process deployments need migration (handled by start.sh)
 
 **Migration:**
+
 - Deployments calling `startApp()` expecting workers must add `start:workers`
 - The `start.sh` script handles this automatically for combined deployments
 

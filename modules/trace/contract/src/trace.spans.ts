@@ -1,0 +1,88 @@
+import { z } from "zod";
+
+/** OTLP span kinds after the ingest boundary has normalized numeric/string values. */
+export enum NormalizedSpanKind {
+  UNSPECIFIED = 0,
+  INTERNAL = 1,
+  SERVER = 2,
+  CLIENT = 3,
+  PRODUCER = 4,
+  CONSUMER = 5,
+}
+
+/** OTLP status codes after the ingest boundary has normalized numeric/string values. */
+export enum NormalizedStatusCode {
+  UNSET = 0,
+  OK = 1,
+  ERROR = 2,
+}
+
+const normalizedAttributeScalarSchema = z.union([z.string(), z.boolean(), z.number(), z.bigint()]);
+
+const normalizedAttributesValueSchema = z.union([
+  normalizedAttributeScalarSchema,
+  z.array(normalizedAttributeScalarSchema),
+]);
+
+const normalizedAttributesSchema = z.record(z.string(), z.unknown());
+
+const normalizedSpanKindSchema = z.nativeEnum(NormalizedSpanKind);
+const normalizedStatusCodeSchema = z.nativeEnum(NormalizedStatusCode);
+
+const normalizedInstrumentationScopeSchema = z.object({
+  name: z.string(),
+  version: z.string().nullable(),
+});
+
+const normalizedEventSchema = z.object({
+  name: z.string(),
+  timeUnixMs: z.number(),
+  attributes: normalizedAttributesSchema,
+});
+
+const normalizedLinkSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+  attributes: normalizedAttributesSchema,
+});
+
+/** The canonical span row shared by trace projections and trace readers. */
+export const normalizedSpanSchema = z.object({
+  id: z.string(),
+  traceId: z.string(),
+  spanId: z.string(),
+  tenantId: z.string(),
+  parentSpanId: z.string().nullable(),
+  parentTraceId: z.string().nullable(),
+  parentIsRemote: z.boolean().nullable(),
+  sampled: z.boolean(),
+  startTimeUnixMs: z.number(),
+  endTimeUnixMs: z.number(),
+  durationMs: z.number(),
+  name: z.string(),
+  kind: normalizedSpanKindSchema,
+  resourceAttributes: normalizedAttributesSchema,
+  spanAttributes: normalizedAttributesSchema,
+  events: z.array(normalizedEventSchema),
+  links: z.array(normalizedLinkSchema),
+  statusMessage: z.string().nullable(),
+  statusCode: normalizedStatusCodeSchema.nullable(),
+  instrumentationScope: normalizedInstrumentationScopeSchema,
+  droppedAttributesCount: z.literal(0),
+  droppedEventsCount: z.literal(0),
+  droppedLinksCount: z.literal(0),
+  // Cost is computed at projection time from usage and model pricing. It is
+  // null when the span has no costable usage or explicit cost.
+  cost: z.number().nullable(),
+  // The flat-plan portion of cost. The billed portion is cost - nonBilledCost.
+  nonBilledCost: z.number().nullable(),
+});
+
+export type NormalizedEvent = z.infer<typeof normalizedEventSchema>;
+export type NormalizedLink = z.infer<typeof normalizedLinkSchema>;
+export type NormalizedSpan = z.infer<typeof normalizedSpanSchema>;
+
+export type NormalizedAttributes = z.infer<typeof normalizedAttributesSchema>;
+
+export type NormalizedAttrScalar = z.infer<typeof normalizedAttributeScalarSchema>;
+export type NormalizedAttrValue = z.infer<typeof normalizedAttributesValueSchema>;

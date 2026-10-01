@@ -1,17 +1,12 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "es2022",
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "lib": ["es2023"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker.tsbuildinfo",
-    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
@@ -21,5 +16,10 @@
     // tsc; typechecked via `bun build` at the point of use (same convention as
     // sdks/typescript/scripts/build-cli-binary.ts).
     "scripts/build-binary.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/vitest-config/tsconfig.build.json"
+    }
   ]
 }

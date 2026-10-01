@@ -1,0 +1,200 @@
+# The `langwatch` CLI device-session routes, as sdks/typescript/src/cli/utils/governance/
+# {cli-api,session-api}.ts call them: the device access token as a Bearer (`auth: cli`), mutating
+# governance calls carrying `X-LangWatch-Surface: cli`, and the fields the client reads off each
+# answer. The login routes are in mcp-cli-login.yaml; the platform.yaml `cli-*` scenarios pin the
+# statuses and the 401s, these pin the bodies. Ingestion templates are the client's
+# `/api/v1/governance/ingestion-templates` paths (main serves `/api/governance/...`). The mint
+# routes have no client-side delete (a personal key is replaced by the next mint; the device
+# label names the rest), so those scenarios leave keys behind. Written unrun.
+
+# ── session: personal project and project key ────────────────────────────────
+
+- id: "cli-session-personal-project-carries-the-project-and-its-key"
+  endpoint: "GET /api/auth/cli/personal-project"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/personal-project"}
+  expect: {"status": 200, "body": {"project": {"id": "<any>", "slug": "<any>", "name": "<any>", "api_key": "<any>"}}}
+
+- id: "cli-session-project-key-by-slug-carries-the-key-and-project"
+  endpoint: "POST /api/auth/cli/project-key"
+  auth: "cli"
+  setup:
+    - request: "POST /api/projects"
+      auth: "org"
+      body: {"name": "vd-{uid}", "language": "python", "framework": "openai", "newTeamName": "vd-team-{uid}"}
+      capture: {"newProjectId": "id", "newSlug": "slug"}
+      expect: {"status": 201}
+  request:
+    path: "/api/auth/cli/project-key"
+    body: {"slug": "{newSlug}"}
+  expect: {"status": 200, "body": {"api_key": "<any>", "project": {"id": "{newProjectId}", "slug": "{newSlug}", "name": "vd-{uid}"}}}
+  teardown:
+    - request: "DELETE /api/projects/{newProjectId}"
+      auth: "org"
+
+- id: "cli-session-project-key-unknown-slug-names-not-found"
+  endpoint: "POST /api/auth/cli/project-key"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/project-key", "body": {"slug": "nope-{uid}"}}
+  expect: {"status": 404, "body": {"error": "not_found", "error_description": "<any>"}}
+
+- id: "cli-session-project-key-without-a-slug-is-refused"
+  endpoint: "POST /api/auth/cli/project-key"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/project-key", "body": {}}
+  expect: {"status": 400, "body": {"error": "invalid_request"}}
+
+# ── governance: status, sources, keys ────────────────────────────────────────
+
+- id: "cli-governance-status-carries-the-setup-state"
+  endpoint: "GET /api/auth/cli/governance/status"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/governance/status"}
+  expect: {"status": 200, "body": {"setup": "<any>"}}
+
+- id: "cli-governance-ingest-sources-list-carries-sources"
+  endpoint: "GET /api/auth/cli/governance/ingest/sources"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/governance/ingest/sources", "query": {"include_archived": "1"}}
+  expect: {"status": 200, "body": {"sources": "<any>"}}
+
+- id: "cli-governance-ingest-source-events-take-limit-and-cursor-on-unknown-source"
+  endpoint: "GET /api/auth/cli/governance/ingest/sources/{sourceId}/events"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/governance/ingest/sources/src-nope-{uid}/events", "query": {"limit": 10, "before_iso": "2026-01-01T00:00:00.000Z"}}
+  expect: {"status": 404, "body": {"error_description": "<any>"}}
+
+- id: "cli-governance-ingestion-key-mint-personal-carries-token-prefix-and-endpoint"
+  endpoint: "POST /api/auth/cli/governance/ingestion-key"
+  auth: "cli"
+  request:
+    path: "/api/auth/cli/governance/ingestion-key"
+    headers: {"X-LangWatch-Surface": "cli"}
+    body: {"source_type": "copilot_app"}
+  expect: {"status": [200, 201], "body": {"token": "<any>", "prefix": "<any>", "endpoint": "<any>"}, "contains": ["ik-lw-"]}
+  verify:
+    - request: "GET /api/auth/cli/governance/ingestion-keys"
+      auth: "cli"
+      expect: {"status": 200, "body": {"keys": "<any>"}, "contains": ["copilot_app", "lookup_id", "source_type", "ingestion_template_id"]}
+
+- id: "cli-governance-ingestion-key-mint-for-a-project-names-the-project"
+  endpoint: "POST /api/auth/cli/governance/ingestion-key"
+  auth: "cli"
+  request:
+    path: "/api/auth/cli/governance/ingestion-key"
+    headers: {"X-LangWatch-Surface": "cli"}
+    body: {"source_type": "copilot_app", "project": "{projectId}", "device_label": "vd-{uid}"}
+  expect: {"status": [200, 201], "body": {"token": "<any>", "prefix": "<any>", "endpoint": "<any>", "project": {"id": "{projectId}", "slug": "<any>", "name": "<any>"}}}
+
+- id: "cli-governance-ingestion-key-describe-reads-status-and-source-type"
+  endpoint: "GET /api/auth/cli/governance/ingestion-keys/{lookup_id}"
+  auth: "cli"
+  setup:
+    - request: "POST /api/auth/cli/governance/ingestion-key"
+      auth: "cli"
+      headers: {"X-LangWatch-Surface": "cli"}
+      body: {"source_type": "copilot_app"}
+      expect: {"status": [200, 201]}
+    - request: "GET /api/auth/cli/governance/ingestion-keys"
+      auth: "cli"
+      capture: {"lookupId": "keys.0.lookup_id"}
+      expect: {"status": 200}
+  request: {"path": "/api/auth/cli/governance/ingestion-keys/{lookupId}"}
+  expect: {"status": 200, "body": {"lookup_id": "{lookupId}", "status": "live", "source_type": "<any>"}, "contains": ["revocation_cause"]}
+
+- id: "cli-governance-ingestion-key-mint-without-a-source-type-names-invalid-request"
+  endpoint: "POST /api/auth/cli/governance/ingestion-key"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/governance/ingestion-key", "headers": {"X-LangWatch-Surface": "cli"}, "body": {"device_label": "vd-{uid}"}}
+  expect: {"status": 400, "body": {"error": "invalid_request", "error_description": "<any>"}}
+
+- id: "cli-governance-ingestion-key-mint-for-an-unknown-project-is-refused"
+  endpoint: "POST /api/auth/cli/governance/ingestion-key"
+  auth: "cli"
+  request:
+    path: "/api/auth/cli/governance/ingestion-key"
+    headers: {"X-LangWatch-Surface": "cli"}
+    body: {"source_type": "copilot_app", "project": "nope-{uid}", "device_label": "vd-{uid}"}
+  expect: {"status": [400, 403, 404, 422]}
+
+# The personal virtual key is issued on demand; an org with no provider answers 409.
+- id: "cli-virtual-key-issue-with-a-device-label-answers-201-or-no-eligible-providers"
+  endpoint: "POST /api/auth/cli/virtual-key"
+  auth: "cli"
+  request:
+    path: "/api/auth/cli/virtual-key"
+    headers: {"X-LangWatch-Surface": "cli"}
+    body: {"device_label": "vd-{uid}"}
+  expect: {"status": [201, 409]}
+
+- id: "cli-virtual-key-issue-with-an-empty-body-answers-201-or-no-eligible-providers"
+  endpoint: "POST /api/auth/cli/virtual-key"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/virtual-key", "headers": {"X-LangWatch-Surface": "cli"}, "body": {}}
+  expect: {"status": [201, 409]}
+
+- id: "cli-virtual-key-issue-with-a-non-string-label-is-refused"
+  endpoint: "POST /api/auth/cli/virtual-key"
+  auth: "cli"
+  request: {"path": "/api/auth/cli/virtual-key", "headers": {"X-LangWatch-Surface": "cli"}, "body": {"device_label": 7}}
+  expect: {"status": 400, "body": {"error": "invalid_request"}}
+
+# ── governance: ingestion templates ──────────────────────────────────────────
+
+# Main's project-keyed REST refuses a device token (401 Invalid auth token), so these send the
+# user-bound org key. The client's device-token calls to it fail on main too; it also reads
+# `ingestion_templates` where the route answers `data`.
+- id: "cli-governance-templates-admin-list-carries-ingestion-templates"
+  endpoint: "GET /api/governance/ingestion-templates/admin"
+  auth: "org"
+  request: {"path": "/api/governance/ingestion-templates/admin", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 200, "body": {"data": "<any>"}}
+
+- id: "cli-governance-templates-create-get-update-rules-archive"
+  endpoint: "POST /api/governance/ingestion-templates"
+  auth: "org"
+  request:
+    path: "/api/governance/ingestion-templates"
+    headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
+    body: {"source_type": "otel_generic", "display_name": "vd-{uid}", "description": "apidiff", "credential_schema": "otlp_token", "ottl_rules": "# none"}
+  capture: {"templateId": "ingestion_template.id"}
+  expect:
+    status: 201
+    body: {"ingestion_template": {"id": "<any>", "source_type": "otel_generic", "display_name": "vd-{uid}", "platform_published": false, "enabled": true, "ottl_rules": "# none"}}
+  verify:
+    - request: "GET /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"ingestion_template": {"id": "{templateId}", "display_name": "vd-{uid}"}}}
+    - request: "PATCH /api/governance/ingestion-templates/{templateId}/ottl-rules"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
+      body: {"ottl_rules": "# rules-{uid}"}
+      expect: {"status": 200, "body": {"ingestion_template": {"id": "{templateId}", "ottl_rules": "# rules-{uid}"}}}
+    - request: "DELETE /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
+      expect: {"status": 200, "body": {"archived": true}}
+    - request: "GET /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-Project-Id": "{projectId}"}
+      expect: {"status": 404}
+  teardown:
+    - request: "DELETE /api/governance/ingestion-templates/{templateId}"
+      auth: "org"
+      headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
+
+- id: "cli-governance-templates-get-unknown-is-404"
+  endpoint: "GET /api/governance/ingestion-templates/{id}"
+  auth: "org"
+  request: {"path": "/api/governance/ingestion-templates/tpl-nope-{uid}", "headers": {"X-Project-Id": "{projectId}"}}
+  expect: {"status": 404}
+
+- id: "cli-governance-templates-create-without-a-display-name-is-refused"
+  endpoint: "POST /api/governance/ingestion-templates"
+  auth: "org"
+  request:
+    path: "/api/governance/ingestion-templates"
+    headers: {"X-LangWatch-Surface": "cli", "X-Project-Id": "{projectId}"}
+    body: {"source_type": "otel_generic"}
+  expect: {"status": [400, 422]}

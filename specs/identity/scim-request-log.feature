@@ -36,26 +36,26 @@ Feature: The SCIM request log - what the provider asked, and what we answered
 
   # ── What gets recorded ─────────────────────────────────────────────────
 
-  @integration
+  @unit
   Scenario: A request the directory makes is recorded with what we answered
     When the directory creates a person over SCIM with "acme-okta"'s token
     Then the request is recorded against "acme-okta"
     And it carries when it arrived, what it asked for, and the status we answered
 
-  @integration
+  @unit
   Scenario: A refusal we can attribute is recorded as a refusal
     Given "acme"'s plan no longer carries directory provisioning
     When the directory pushes with "acme-okta"'s token
     Then the request is recorded as refused
     And it carries a reason a customer can act on rather than an error code
 
-  @integration
+  @unit
   Scenario: A request we cannot attribute is answered and not recorded
     When something pushes with a token nothing in the product issued
     Then it is refused
     And no request is recorded for anybody, because there is no anybody to record it for
 
-  @integration
+  @unit
   Scenario: The log never carries the credential that was presented
     When the directory pushes with "acme-okta"'s token
     Then the recorded request carries no token, no hash of one, and no request header
@@ -74,7 +74,7 @@ Feature: The SCIM request log - what the provider asked, and what we answered
     When "ana" reads the requests for "acme"
     Then none of "globex"'s requests are listed
 
-  @integration
+  @unit
   Scenario: Reading the requests takes seeing single sign-on, and writes nothing
     Given "acme" has a reader who may see single sign-on but not manage it
     When that reader opens the SCIM settings page
@@ -102,6 +102,13 @@ Feature: The SCIM request log - what the provider asked, and what we answered
     When the retention sweep runs
     Then those requests are gone
     And requests inside the window are untouched
+
+  @unit
+  Scenario: The worker runs the request log's retention sweep on a schedule
+    Given the SCIM module is installed on the worker
+    When its six-hourly schedule fires
+    Then the retention sweep runs once
+    And the sweep's own bookkeeping older than a week is pruned
 
   @unit
   Scenario: An absent request is not evidence that it never happened

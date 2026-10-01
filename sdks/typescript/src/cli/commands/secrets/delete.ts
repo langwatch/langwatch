@@ -1,33 +1,37 @@
-import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
-
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /**
  * Returns the deletion result rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteSecretCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
-  await resolveCredentials();
+export const deleteSecretCommand = async (id: string): Promise<CommandResult | void> => {
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Deleting secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secrets/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: buildAuthHeaders({ apiKey }),
+      headers: {
+        "Content-Type": "application/json",
+        ...buildRequestHeaders({ apiKey }),
+      },
+      body: JSON.stringify({ projectId: credentials.projectId }),
     });
 
     if (!response.ok) {

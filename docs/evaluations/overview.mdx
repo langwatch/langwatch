@@ -64,9 +64,10 @@ import langwatch
 evaluation = langwatch.experiment.init("my-first-experiment")
 
 for idx, row in evaluation.loop(dataset.iterrows()):
-    response = my_llm(row["input"])
-    evaluation.log("quality", index=idx, score=0.95)
-```
+response = my_llm(row["input"])
+evaluation.log("quality", index=idx, score=0.95)
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -79,7 +80,8 @@ await evaluation.run(dataset, async ({ item, index }) => {
   const response = await myLLM(item.input);
   evaluation.log("quality", { index, score: 0.95 });
 });
-```
+````
+
   </Tab>
 </Tabs>
 

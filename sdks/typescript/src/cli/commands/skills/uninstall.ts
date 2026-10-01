@@ -1,14 +1,4 @@
-/**
- * `langwatch skills uninstall [names...] [--all] [--dir] [--dry-run] [-y]`
- * — remove installed skills. Only files the bundle manages are ever removed
- * (byte-identical installs, or files carrying the managed-by marker; a
- * modified managed file additionally needs -y). Files a user wrote or
- * another installer placed stay put.
- *
- * Confirmation mirrors gcx: a TTY is asked before anything is deleted; a
- * non-TTY/agent caller is NEVER prompted — without -y it gets a structured
- * error instead, because a blocked prompt reads to a script as a hang.
- */
+// Uninstall only bundle-managed skills; requires confirmation (-y for non-TTY).
 import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   applyUninstall,
@@ -16,12 +6,7 @@ import {
   resolveSkillsRoot,
   SKILLS_BUNDLE_VERSION,
 } from "./installer";
-import {
-  confirm,
-  isInteractiveConsole,
-  renderSkillFileResults,
-  resolveTargets,
-} from "./shared";
+import { confirm, isInteractiveConsole, renderSkillFileResults, resolveTargets } from "./shared";
 import { throwValidationError } from "./validation";
 
 export interface SkillsUninstallOptions extends RawOutputFlags {

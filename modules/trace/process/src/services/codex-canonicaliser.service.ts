@@ -1,0 +1,27 @@
+import type {
+  AttributeCanonicaliser,
+  ExtractorContext,
+  LogExtractorContext,
+} from "../rules/canonical-attributes.rules.ts";
+import { CodexLogCanonicaliserService } from "./codex-log.service.ts";
+import { CodexSpanCanonicaliserService } from "./codex-span.service.ts";
+
+export class CodexCanonicaliserService implements AttributeCanonicaliser {
+  static create(): CodexCanonicaliserService {
+    return new CodexCanonicaliserService();
+  }
+
+  private constructor() {}
+
+  readonly id = "codex";
+  private readonly logCanonicaliser = CodexLogCanonicaliserService.create();
+  private readonly spanCanonicaliser = CodexSpanCanonicaliserService.create();
+
+  apply(ctx: ExtractorContext): void {
+    this.spanCanonicaliser.apply(ctx);
+  }
+
+  applyLog(ctx: LogExtractorContext): void {
+    this.logCanonicaliser.apply(ctx);
+  }
+}

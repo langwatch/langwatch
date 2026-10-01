@@ -1,0 +1,115 @@
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { Field, VStack } from "@langwatch/design-system/primitives";
+import { AnimatePresence, motion } from "motion/react";
+import { useState } from "react";
+
+import { companySizeItems, solutionTypeItems } from "../../behavior/onboarding-data.ts";
+import type {
+  CompanySize,
+  OnboardingScreenProps,
+  SolutionType,
+  UsageStyle,
+} from "../../behavior/types.ts";
+import { IconRadioCardGroup } from "../elements/forms/icon-radio-card-group.tsx";
+import { PhoneNumberInput } from "../elements/inputs/phone-number-input.tsx";
+
+interface BasicInfoConditionalFieldsProps extends OnboardingScreenProps {
+  usageStyle: UsageStyle | undefined;
+  phoneNumber: string | undefined;
+  setPhoneNumber: (value: string) => void;
+  setPhoneHasValue: (value: boolean) => void;
+  setPhoneIsValid: (value: boolean) => void;
+  companySize: CompanySize | undefined;
+  setCompanySize: (value: CompanySize) => void;
+  solutionType: SolutionType | undefined;
+  setSolutionType: (value: SolutionType | undefined) => void;
+}
+
+export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProps> = ({
+  surface,
+  usageStyle,
+  phoneNumber,
+  setPhoneNumber,
+  setPhoneHasValue,
+  setPhoneIsValid,
+  companySize,
+  setCompanySize,
+  solutionType,
+  setSolutionType,
+}) => {
+  const showFields = usageStyle !== void 0 && usageStyle !== "For myself";
+
+  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
+  const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
+  const analytics = useUiAnalytics();
+  // `usageStyle` was a hook-level attribute, which the vendor spread last.
+  const track = (action: string, name: string, attributes?: Record<string, unknown>) =>
+    analytics.track({
+      boundary: surface.boundary,
+      action,
+      name,
+      attributes: { ...surface.attributes, ...attributes, usageStyle },
+    });
+
+  return (
+    <AnimatePresence>
+      {showFields && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          style={{ width: "100%", overflow: "hidden" }}
+        >
+          <VStack gap={6} align="stretch" pt={4} w="full" minW="0">
+            <Field.Root colorPalette="orange" w="full" invalid={phoneHasValue && !phoneIsValid}>
+              <Field.Label>{"What is your phone number?"}</Field.Label>
+              <PhoneNumberInput
+                autoDetectDefaultCountry
+                value={phoneNumber}
+                onFocus={() => track("focused", "phone_number")}
+                onChange={(e164, meta) => {
+                  setPhoneNumber(e164 ?? "");
+                  const hasValue = meta.national.trim().length > 0;
+                  setLocalPhoneHasValue(hasValue);
+                  setLocalPhoneIsValid(Boolean(meta.isValid));
+                  setPhoneHasValue(hasValue);
+                  setPhoneIsValid(Boolean(meta.isValid));
+                }}
+              />
+            </Field.Root>
+
+            <Field.Root colorPalette="orange" w="full">
+              <Field.Label>{"How large is your company?"}</Field.Label>
+              <IconRadioCardGroup<CompanySize>
+                items={companySizeItems}
+                value={companySize}
+                onChange={(value) => {
+                  if (value) {
+                    setCompanySize(value);
+                    track("selected", "company_size", { value });
+                  }
+                }}
+                direction="horizontal"
+                maxColumns={3}
+              />
+            </Field.Root>
+
+            <Field.Root colorPalette="orange" w="full">
+              <Field.Label>{"How do you plan to deploy LangWatch?"}</Field.Label>
+              <IconRadioCardGroup<SolutionType>
+                items={solutionTypeItems}
+                value={solutionType}
+                onChange={(value) => {
+                  setSolutionType(value);
+                  track("selected", "solution_type", { value });
+                }}
+                direction="horizontal"
+              />
+            </Field.Root>
+          </VStack>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};

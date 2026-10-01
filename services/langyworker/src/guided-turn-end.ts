@@ -1,31 +1,7 @@
 /**
- * The guard on how a guided onboarding turn ends.
- *
- * The guided skill names the calls a turn may end on: the question card of
- * step 3, the closing line after `langwatch onboarding complete-path`, or the
- * one line of a failed step. Films kept ending the step 2 turn on the plan
- * write instead, the card never asked, and one of them ticked "the three step
- * 2 lines said" with one of the lines never said. The prose does not hold on
- * its own, so the runner reads the turn's own calls: a guided turn that ends
- * bare gets one continuation message naming what it still owes, and the model
- * goes on in the same turn. Once per segment; a second bare end is reported
- * and left. Both reports ride the protocol as `guided_turn` events: the
- * manager does not read worker stderr, so it logs them under their names.
- *
- * A card is an ending only while it waits. The product answers a card inside
- * the turn when the person picks before the turn ends, and the tool result
- * then carries the answer and the go, so the turn owes the work that
- * follows. The calls after an answered card are read as a segment of their
- * own, with one continuation of their own, and a small cap over the turn.
- *
- * The closing line has a rule of its own, read by the `say` tool as the line
- * is said rather than at the turn's end: it comes after the complete-path
- * command, and a say that carries it earlier is refused and draws nothing,
- * since a line already drawn is not taken back by a continuation.
- *
- * The step 2 lines, the closing line and the checklist item are the skill's
- * own words. This package does not depend on the skills tree, so the copies
- * here are pinned to the skill source by a test rather than imported.
+ * The guard on how a guided onboarding turn ends: a bare end gets one
+ * continuation per segment naming what it owes, before a second bare end
+ * is reported as `guided_turn` and left.
  */
 
 import { contentText } from "./events.js";
@@ -68,14 +44,13 @@ const FRAMEWORK_LINE_PATTERN = /^I found an? .+ agent in .+\.$/;
 /** The templates of the other step 2 lines, brace for brace as the skill writes them. */
 export const STEP2_LINE_TEMPLATES = {
   branch: "I left branch {branch} checked out: the agent you started runs on it.",
-  pullRequest:
-    "I opened a pull request with the tracing change: {link}. You can merge it already.",
+  pullRequest: "I opened a pull request with the tracing change: {link}. You can merge it already.",
   noRemote:
     "No pull request was opened, since the folder has no remote or gh is not signed in: branch {branch} holds the commit.",
   failedOpen: "The branch {branch} is pushed; opening the pull request failed with: {error}.",
 } as const;
 
-/** The tools whose card holds the turn: a turn that ends on one, still waiting, ended as written. */
+/** The tools whose card holds the turn: ending on one, still waiting, ended as written. */
 const CARD_TOOL_NAMES = new Set([QUESTION_TOOL_NAME, CODE_ACCESS_TOOL_NAME]);
 
 /** The message after a card answered inside the turn whose work never followed. */
@@ -85,7 +60,7 @@ export const ANSWERED_CARD_MESSAGE =
 /** Continuations over one turn, all its segments counted; one per segment within it. */
 export const MAX_TURN_CONTINUATIONS = 3;
 
-/** The llmops path's steps, numbered and titled as the skill writes them; the continuation names the one to continue from. */
+/** The llmops path's steps, numbered and titled as the skill writes them. */
 export const LLMOPS_STEP_TITLES = {
   2: "Read the code and wire it",
   3: "Propose the first scenario, and stop",
@@ -93,10 +68,10 @@ export const LLMOPS_STEP_TITLES = {
   5: "From one run to a suite",
 } as const;
 
-/** The path of the llmops steps above; the other paths have no numbered steps and get the plain continuation. */
+/** The path of the llmops steps above; other paths get the plain continuation. */
 const LLMOPS_PATH = "llmops";
 
-/** The kickoff's line naming the path; a later kickoff names the next path, so the last line counts. */
+/** The kickoff's line naming the path; the last one counts when there are several. */
 const PATH_LINE = /^Path to set up now: ([a-z]+)/gm;
 
 /** The runs of steps 4 and 5, as the skill writes the commands. */
@@ -110,40 +85,45 @@ const SHELL_TOOL_NAMES = new Set(["bash", "shell", "execute", "local_bash"]);
 const WRITING_TOOL_NAMES = new Set(["write", "edit", "local_write", "local_edit"]);
 
 /**
- * The calls the ender reads through. A plan write, a skill load and the
- * read-only lookups of both tool sets say nothing to the user, so a turn
- * whose last calls are these ended on whatever came before them. A `say`, a
- * card, a file write and a shell call are what a turn ends on, with one
- * exception: `langwatch navigate` below.
+ * The calls the ender reads through: plan writes, skill loads and
+ * read-only lookups say nothing, so a turn ending on these ended on
+ * whatever came before them (`langwatch navigate` is the one exception).
  */
 export const TRANSPARENT_TOOL_NAMES: ReadonlySet<string> = new Set<string>([
   TODOWRITE_TOOL_NAME,
   SKILL_TOOL_NAME,
   ...SANDBOX_FILE_TOOL_NAMES.filter((name) => !WRITING_TOOL_NAMES.has(name)),
-  ...LOCAL_TOOL_NAMES.filter((name) => !WRITING_TOOL_NAMES.has(name) && !SHELL_TOOL_NAMES.has(name)),
+  ...LOCAL_TOOL_NAMES.filter(
+    (name) => !WRITING_TOOL_NAMES.has(name) && !SHELL_TOOL_NAMES.has(name),
+  ),
 ]);
 
-/** `langwatch navigate ...` opens a page beside the panel and says nothing: a shell call the ender reads through. */
+/** `langwatch navigate ...` opens a page and says nothing: read through like a transparent call. */
 const NAVIGATE_COMMAND = /^(?:[A-Za-z_][A-Za-z0-9_]*=\S*\s+)*langwatch\s+navigate\b/;
 
 export type TurnCall = SettledCall;
 
 /** The calls of one turn, in order, read off pi's session events. */
+/** An event field read as a string, or "" when it is not one. */
+function stringField(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
 export class TurnCallLog {
   private readonly inputs = new Map<string, unknown>();
   readonly calls: TurnCall[] = [];
 
   record(event: { type: string; [key: string]: unknown }): void {
     if (event.type === "tool_execution_start") {
-      this.inputs.set(String(event.toolCallId ?? ""), event.args);
+      this.inputs.set(stringField(event.toolCallId), event.args);
       return;
     }
     if (event.type !== "tool_execution_end") return;
-    const id = String(event.toolCallId ?? "");
+    const id = stringField(event.toolCallId);
     const input = this.inputs.get(id);
     this.inputs.delete(id);
     this.calls.push({
-      name: String(event.toolName ?? "").toLowerCase(),
+      name: stringField(event.toolName).toLowerCase(),
       input,
       isError: event.isError === true,
       output: contentText(event.result),
@@ -230,7 +210,11 @@ export function closingLineRefusal({
  * connecting starts the next turn, so it is never one of these.
  */
 function answeredInTurn(call: TurnCall): boolean {
-  return call.name === QUESTION_TOOL_NAME && !call.isError && call.output.includes(ANSWERED_CONTINUE_LINE);
+  return (
+    call.name === QUESTION_TOOL_NAME &&
+    !call.isError &&
+    call.output.includes(ANSWERED_CONTINUE_LINE)
+  );
 }
 
 export type GuidedSegment = {
@@ -286,15 +270,23 @@ export function isStep2Turn(calls: readonly TurnCall[]): boolean {
   });
 }
 
+/** Does this line match any of the pull-request-outcome templates? */
+function isPullRequestLine(text: string): boolean {
+  return PULL_REQUEST_LINES.some((line) => line.test(text));
+}
+
+/** Did the turn's `say` calls carry the framework line? */
+function frameworkLineSaid(calls: readonly TurnCall[]): boolean {
+  return sayTexts(calls).some((text) => FRAMEWORK_LINE_PATTERN.test(text));
+}
+
 /** The step 2 lines the turn's `say` calls do not carry, by name. */
 export function missingStep2Lines(calls: readonly TurnCall[]): string[] {
   const texts = sayTexts(calls);
   const missing: string[] = [];
   if (!texts.some((text) => FRAMEWORK_LINE_PATTERN.test(text))) missing.push("the framework line");
   if (!texts.some((text) => BRANCH_LINE.test(text))) missing.push("the branch line");
-  if (!texts.some((text) => PULL_REQUEST_LINES.some((line) => line.test(text)))) {
-    missing.push("the pull request line or the no-remote line");
-  }
+  if (!texts.some(isPullRequestLine)) missing.push("the pull request line or the no-remote line");
   return missing;
 }
 
@@ -303,20 +295,24 @@ function listed(names: readonly string[]): string {
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
 }
 
-/** The path the kickoff in the history names, off its brief line; the last kickoff's when there are several. */
+/** A message's content, string or block array alike, joined as plain text. */
+function messageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((block) => (block as { text?: unknown })?.text)
+    .filter((t) => typeof t === "string")
+    .join("\n");
+}
+
+/** The path the kickoff names, off its brief line, the last one when there are several. */
 export function guidedPathInHistory(messages: readonly unknown[]): string | undefined {
   let path: string | undefined;
   for (const message of messages) {
     if (typeof message !== "object" || message === null) continue;
     const { role, content } = message as { role?: unknown; content?: unknown };
     if (role !== "user") continue;
-    const text =
-      typeof content === "string"
-        ? content
-        : Array.isArray(content)
-          ? content.map((block) => (block as { text?: unknown })?.text).filter((t) => typeof t === "string").join("\n")
-          : "";
-    for (const match of text.matchAll(PATH_LINE)) path = match[1] ?? path;
+    for (const match of messageText(content).matchAll(PATH_LINE)) path = match[1] ?? path;
   }
   return path;
 }
@@ -332,15 +328,39 @@ export type GuidedProgress = {
 
 /**
  * Where the llmops path stands, read off the calls the history carries. A
- * run counts once its command ran and answered: a failed verdict is a
- * finding step 5 goes on with, and a run that answered an error stopped the
- * path as a failed step, so the guard never reads past it.
+ * run counts once its command ran and answered clean.
  */
+function llmopsStep(number: keyof typeof LLMOPS_STEP_TITLES): string {
+  return `step ${number} (${LLMOPS_STEP_TITLES[number]})`;
+}
+
+/** The step to continue from, given how far the llmops path's markers reach. */
+function nextLlmopsStep({
+  completed,
+  suiteRan,
+  scenarioRan,
+  cardAnswered,
+  step2Lines,
+}: {
+  completed: boolean;
+  suiteRan: boolean;
+  scenarioRan: boolean;
+  cardAnswered: boolean;
+  step2Lines: boolean;
+}): string {
+  if (completed) return `the closing line of ${llmopsStep(5)}`;
+  if (suiteRan) return `item 8 of ${llmopsStep(5)}, Open the suite run`;
+  if (scenarioRan) return llmopsStep(5);
+  if (cardAnswered) return llmopsStep(4);
+  if (step2Lines) return llmopsStep(3);
+  return llmopsStep(2);
+}
+
 export function readGuidedProgress(calls: readonly TurnCall[]): GuidedProgress {
   const done: string[] = [];
   const step2Lines = missingStep2Lines(calls).length === 0;
   if (step2Lines) done.push("the three step 2 lines said");
-  else if (sayTexts(calls).some((text) => FRAMEWORK_LINE_PATTERN.test(text))) done.push("the framework line said");
+  else if (frameworkLineSaid(calls)) done.push("the framework line said");
   const cardAnswered = calls.some(answeredInTurn);
   if (cardAnswered) done.push("the first scenario card answered");
   const ran = (command: string) =>
@@ -351,24 +371,16 @@ export function readGuidedProgress(calls: readonly TurnCall[]): GuidedProgress {
   if (suiteRan) done.push("the suite run");
   const completed = completePathRan(calls);
   if (completed) done.push("complete-path run");
-  const step = (number: keyof typeof LLMOPS_STEP_TITLES) => `step ${number} (${LLMOPS_STEP_TITLES[number]})`;
-  const next = completed
-    ? `the closing line of ${step(5)}`
-    : suiteRan
-      ? `item 8 of ${step(5)}, Open the suite run`
-      : scenarioRan
-        ? step(5)
-        : cardAnswered
-          ? step(4)
-          : step2Lines
-            ? step(3)
-            : step(2);
+  const next = nextLlmopsStep({ completed, suiteRan, scenarioRan, cardAnswered, step2Lines });
   return { done, next, closingLineOnly: completed };
 }
 
 /** The continuation on a turn outside step 2, from what the history shows. */
 export function progressMessage({ done, next, closingLineOnly }: GuidedProgress): string {
-  const shows = done.length === 0 ? "The history shows none of the path's steps done." : `The history shows: ${listed(done)}.`;
+  const shows =
+    done.length === 0
+      ? "The history shows none of the path's steps done."
+      : `The history shows: ${listed(done)}.`;
   if (closingLineOnly) return `The path is not finished. ${shows} Say ${next}, and stop.`;
   return `The path is not finished. ${shows} Continue from ${next}, through \`${COMPLETE_PATH_COMMAND}\` and the closing line.`;
 }
@@ -400,15 +412,25 @@ export type GuidedContinuation =
   | { kind: "continue"; segment: number; missing: string[]; message: string }
   | { kind: "give_up"; segment: number; missing: string[] };
 
+/** What a bare-ended segment still owes, by where it sits in the turn. */
+function missingForSegment({
+  afterAnswer,
+  step2,
+  missingLines,
+}: {
+  afterAnswer: boolean;
+  step2: boolean;
+  missingLines: readonly string[];
+}): string[] {
+  if (afterAnswer) return ["the work that follows the answer"];
+  if (step2) return [...missingLines, "the first scenario card"];
+  return ["the next step"];
+}
+
 /**
- * What to do with a guided turn that just ended. The ender is read on the
- * turn's current segment, the calls since the last card answered inside the
- * turn. `continuations` counts the messages already appended to that
- * segment, one is the limit; `turnContinuations` counts them over the whole
- * turn, MAX_TURN_CONTINUATIONS is the cap. `history` is the conversation as
- * the worker holds it, a resumed conversation's seed included: on the llmops
- * path a continuation outside step 2 names what it shows done and the step
- * to continue from, so the model does not start the path over.
+ * What to do with a guided turn that just ended, read on its current
+ * segment; `continuations` caps one per segment, `turnContinuations` caps
+ * MAX_TURN_CONTINUATIONS over the whole turn.
  */
 export function decideGuidedContinuation({
   calls,
@@ -430,11 +452,7 @@ export function decideGuidedContinuation({
   const afterAnswer = segment.index > 1;
   const step2 = !afterAnswer && isStep2Turn(segment.calls);
   const missingLines = step2 ? missingStep2Lines(segment.calls) : [];
-  const missing = afterAnswer
-    ? ["the work that follows the answer"]
-    : step2
-      ? [...missingLines, "the first scenario card"]
-      : ["the next step"];
+  const missing = missingForSegment({ afterAnswer, step2, missingLines });
   if (continuations >= 1 || turnContinuations >= MAX_TURN_CONTINUATIONS) {
     return { kind: "give_up", segment: segment.index, missing };
   }
@@ -446,6 +464,8 @@ export function decideGuidedContinuation({
     kind: "continue",
     segment: segment.index,
     missing,
-    message: afterAnswer ? ANSWERED_CARD_MESSAGE : continuationMessage({ step2, missing: missingLines, progress }),
+    message: afterAnswer
+      ? ANSWERED_CARD_MESSAGE
+      : continuationMessage({ step2, missing: missingLines, progress }),
   };
 }

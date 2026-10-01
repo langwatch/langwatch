@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
+
 import {
   decideVendorLog,
   emitVendorLog,
   VENDOR_CAUSE_FIELD,
   type VendorLogRecord,
   type VendorLogSink,
-} from "../logging";
+} from "../logging.ts";
 
 const record: VendorLogRecord = {
   module: "Connection",
@@ -28,9 +29,7 @@ describe("decideVendorLog", () => {
       });
 
       it("drops it even when no cause is attached", () => {
-        expect(
-          decideVendorLog({ level: "error", record: { message: "boom" } }),
-        ).toBeNull();
+        expect(decideVendorLog({ level: "error", record: { message: "boom" } })).toBeNull();
       });
     });
   });
@@ -58,9 +57,7 @@ describe("decideVendorLog", () => {
       });
 
       it("carries the message through unchanged", () => {
-        expect(decideVendorLog({ level: "warn", record })?.message).toBe(
-          record.message,
-        );
+        expect(decideVendorLog({ level: "warn", record })?.message).toBe(record.message);
       });
 
       it("omits the cause field when there is no cause", () => {
@@ -81,15 +78,11 @@ describe("decideVendorLog", () => {
       });
 
       it("keeps debug on its own level", () => {
-        expect(decideVendorLog({ level: "debug", record })?.level).toBe(
-          "debug",
-        );
+        expect(decideVendorLog({ level: "debug", record })?.level).toBe("debug");
       });
 
       it("folds trace into debug", () => {
-        expect(decideVendorLog({ level: "trace", record })?.level).toBe(
-          "debug",
-        );
+        expect(decideVendorLog({ level: "trace", record })?.level).toBe("debug");
       });
     });
   });

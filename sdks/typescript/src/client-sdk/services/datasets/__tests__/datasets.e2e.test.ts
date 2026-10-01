@@ -1,11 +1,11 @@
 /**
- * End-to-end tests for Dataset TypeScript SDK
- *
- * These tests run against a real LangWatch backend.
- * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT environment variables.
+ * End-to-end tests for the Dataset SDK, against a real LangWatch backend.
+ * Set LANGWATCH_API_KEY and optionally LANGWATCH_ENDPOINT.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
+
 import { DatasetNotFoundError, DatasetValidationError } from "../errors";
 
 const SKIP = !process.env.LANGWATCH_API_KEY;
@@ -34,7 +34,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   // ── Dataset CRUD ──────────────────────────────────────────────────
 
-  describe("Dataset CRUD", () => {
+  describe("when managing datasets", () => {
     let datasetId: string;
     let datasetSlug: string;
 
@@ -109,15 +109,13 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const idx = createdSlugs.indexOf(datasetSlug);
       if (idx !== -1) createdSlugs.splice(idx, 1);
 
-      await expect(langwatch.datasets.get(datasetSlug)).rejects.toThrow(
-        DatasetNotFoundError
-      );
+      await expect(langwatch.datasets.get(datasetSlug)).rejects.toThrow(DatasetNotFoundError);
     });
   });
 
   // ── Record CRUD ───────────────────────────────────────────────────
 
-  describe("Record CRUD", () => {
+  describe("when managing dataset records", () => {
     let recordSlug: string;
     let recordIds: string[];
 
@@ -163,11 +161,10 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
     it("updates a record and verifies returned data", async () => {
       const recordId = recordIds[0]!;
-      const result = await langwatch.datasets.updateRecord(
-        recordSlug,
-        recordId,
-        { input: "updated-input", output: "updated-output" }
-      );
+      const result = await langwatch.datasets.updateRecord(recordSlug, recordId, {
+        input: "updated-input",
+        output: "updated-output",
+      });
 
       expect(result.id).toBe(recordId);
       expect(result.entry).toMatchObject({
@@ -178,10 +175,7 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
     it("batch deletes records and verifies deletedCount", async () => {
       const idsToDelete = recordIds.slice(1); // delete last 2
-      const result = await langwatch.datasets.deleteRecords(
-        recordSlug,
-        idsToDelete
-      );
+      const result = await langwatch.datasets.deleteRecords(recordSlug, idsToDelete);
 
       expect(result.deletedCount).toBe(2);
     });
@@ -205,18 +199,14 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
     });
 
     it("uploads CSV file to existing dataset and verifies records added", async () => {
-      const file = new File(
-        ["input,output\nhello,world\nfoo,bar"],
-        "data.csv",
-        { type: "text/csv" }
-      );
+      const file = new File(["input,output\nhello,world\nfoo,bar"], "data.csv", {
+        type: "text/csv",
+      });
 
       const result = await langwatch.datasets.upload(uploadSlug, file);
 
       // Upload to existing dataset returns records array
-      expect(
-        result.records?.length ?? result.recordsCreated
-      ).toBeGreaterThanOrEqual(2);
+      expect(result.records?.length ?? result.recordsCreated).toBeGreaterThanOrEqual(2);
     });
 
     it("uploads with replace strategy and verifies old records gone", async () => {
@@ -224,11 +214,9 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       const before = await langwatch.datasets.listRecords(uploadSlug);
       expect(before.pagination.total).toBeGreaterThanOrEqual(2);
 
-      const file = new File(
-        ["input,output\nreplaced,data"],
-        "replace.csv",
-        { type: "text/csv" }
-      );
+      const file = new File(["input,output\nreplaced,data"], "replace.csv", {
+        type: "text/csv",
+      });
 
       await langwatch.datasets.upload(uploadSlug, file, {
         ifExists: "replace",
@@ -250,11 +238,9 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
       if (idx !== -1) createdSlugs.splice(idx, 1);
 
       const newSlug = `${slug}-upload-new`;
-      const file = new File(
-        ["input,output\nnew,dataset"],
-        "new.csv",
-        { type: "text/csv" }
-      );
+      const file = new File(["input,output\nnew,dataset"], "new.csv", {
+        type: "text/csv",
+      });
 
       const result = await langwatch.datasets.upload(newSlug, file, {
         ifExists: "append",
@@ -272,17 +258,15 @@ describe.skipIf(SKIP)("Dataset E2E", () => {
 
   // ── Error Handling ────────────────────────────────────────────────
 
-  describe("Error handling", () => {
+  describe("when the dataset request fails", () => {
     it("throws DatasetNotFoundError for non-existent dataset", async () => {
-      await expect(
-        langwatch.datasets.get("does-not-exist-ever-" + Date.now())
-      ).rejects.toThrow(DatasetNotFoundError);
+      await expect(langwatch.datasets.get("does-not-exist-ever-" + Date.now())).rejects.toThrow(
+        DatasetNotFoundError,
+      );
     });
 
     it("throws DatasetValidationError for create with empty name", () => {
-      expect(() => langwatch.datasets.create({ name: "" })).toThrow(
-        DatasetValidationError
-      );
+      expect(() => langwatch.datasets.create({ name: "" })).toThrow(DatasetValidationError);
     });
   });
 });

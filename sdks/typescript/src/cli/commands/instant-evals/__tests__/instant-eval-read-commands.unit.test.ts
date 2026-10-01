@@ -1,10 +1,6 @@
 /**
- * The `instant-eval` subcommands that read: `estimate`, `status`, `list`,
- * `results` and `sample`, against a mocked service.
- *
- * What these pin is the request each one makes and the one document it
- * answers with, including the filters `results` forwards.
- *
+ * The `instant-eval` read subcommands (`estimate`, `status`, `list`, `results`, `sample`) against a
+ * mocked service: the request each makes and the one document it answers.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -69,9 +65,7 @@ describe("instant-eval estimate, given the same inputs a run takes", () => {
         [],
       );
 
-      expect(estimateSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ target: "threads" }),
-      );
+      expect(estimateSpy).toHaveBeenCalledWith(expect.objectContaining({ target: "threads" }));
       expect(result?.data).toEqual(ESTIMATE);
     });
   });

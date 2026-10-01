@@ -1,0 +1,150 @@
+import {
+  type Event,
+  killSwitchDescriptorsFor,
+  type Projection,
+  projectionConsumes,
+  type RegisteredCommand,
+  type SealedPipelineDefinition,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
+import type {
+  OpsEventSubscriberRegistration,
+  OpsPipelineRegistrations,
+} from "@langwatch/ops-contract";
+
+import {
+  type OpsEventingIntrospection,
+  type OpsPipelineRegistry,
+  type OpsDejaViewFold,
+  type OpsDejaViewProjection,
+  type OpsProcessManagerMetadata,
+  type OpsKillSwitchDescriptor,
+  type OpsProjectionMetadata,
+} from "../app/ops.app.ts";
+
+/**
+ * Reads the pipeline definitions the process composed. The definitions are
+ * resolved lazily on every call because a composition registers pipelines
+ * during boot and an explorer may be built before the last one lands.
+ */
+export class EventingIntrospectionService implements OpsEventingIntrospection, OpsPipelineRegistry {
+  private constructor(private readonly definitions: () => readonly SealedPipelineDefinition[]) {}
+
+  static create(
+    definitions: () => readonly SealedPipelineDefinition[],
+  ): EventingIntrospectionService {
+    return new EventingIntrospectionService(definitions);
+  }
+
+  projections(): OpsProjectionMetadata[] {
+    return this.definitions().flatMap((sealed) => sealed.open(projectionsOf));
+  }
+
+  /** What `listProjections` answers: projections and event subscribers, as main's registry did. */
+  listRegistrations(): OpsPipelineRegistrations {
+    return {
+      projections: this.projections(),
+      eventSubscribers: this.definitions().flatMap((sealed) => sealed.open(eventSubscribersOf)),
+    };
+  }
+
+  killSwitches(): OpsKillSwitchDescriptor[] {
+    return this.definitions().flatMap((sealed) =>
+      sealed.open((def) => killSwitchDescriptorsFor(def)),
+    );
+  }
+
+  processManagers(): OpsProcessManagerMetadata[] {
+    return this.definitions().flatMap((sealed) => {
+      const { name: pipelineName, aggregateType } = sealed.metadata;
+      return Array.from(sealed.processManagers.values()).map(({ config }) => ({
+        processName: config.name,
+        pipelineName,
+        aggregateType,
+        eventTypes: config.eventTypes,
+        intentTypes: Object.keys(config.intents ?? {}),
+        scheduled: Boolean(config.schedule),
+        everyMs: config.schedule?.everyMs ?? null,
+        hasWake: Boolean(config.onWake),
+      }));
+    });
+  }
+
+  dejaViewProjections(): OpsDejaViewProjection[] {
+    return this.definitions().flatMap((sealed) => sealed.open(dejaViewProjectionsOf));
+  }
+}
+
+function projectionsOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(def: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): OpsProjectionMetadata[] {
+  const { name: pipelineName, aggregateType } = def.metadata;
+  const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
+    projectionName: definition.name,
+    pipelineName,
+    aggregateType,
+    source: "pipeline" as const,
+    pauseKey: `${pipelineName}/projection/${definition.name}`,
+    kind: "fold" as const,
+  }));
+  const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
+    projectionName: definition.name,
+    pipelineName,
+    aggregateType,
+    source: "pipeline" as const,
+    // Maps run as `__jobType=handler` in the GroupQueue, so the pause-set
+    // entry must use the `handler` segment to match the dispatcher's Lua check.
+    pauseKey: `${pipelineName}/handler/${definition.name}`,
+    kind: "map" as const,
+  }));
+  const states = Array.from(def.stateProjections?.entries() ?? []).map(([name]) => ({
+    projectionName: name,
+    pipelineName,
+    aggregateType,
+    source: "pipeline" as const,
+    // State projections enqueue with `__jobType=stateProjection`; the
+    // dispatcher matches the pause key against that raw segment.
+    pauseKey: `${pipelineName}/stateProjection/${name}`,
+    kind: "state" as const,
+  }));
+  return [...folds, ...maps, ...states];
+}
+
+function eventSubscribersOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(
+  def: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>,
+): OpsEventSubscriberRegistration[] {
+  const { name: pipelineName, aggregateType } = def.metadata;
+  return Array.from(def.eventSubscribers.values()).map((definition) => ({
+    subscriberName: definition.name,
+    pipelineName,
+    aggregateType,
+    eventTypes: definition.eventTypes,
+  }));
+}
+
+function dejaViewProjectionsOf<
+  EventType extends Event,
+  ProjectionTypes extends Record<string, Projection>,
+  Commands extends RegisteredCommand,
+>(def: StaticPipelineDefinition<EventType, ProjectionTypes, Commands>): OpsDejaViewProjection[] {
+  return Array.from(def.foldProjections.values()).map(({ definition: d, open }) => {
+    const consumes = projectionConsumes<EventType, Event>(d);
+    return {
+      projectionName: d.name,
+      eventTypes: d.eventTypes,
+      replay: <R>(use: <State>(fold: OpsDejaViewFold<State>) => R): R =>
+        open((fold) =>
+          use({
+            init: () => fold.init(),
+            apply: (state, event) => (consumes(event) ? fold.apply(state, event) : state),
+          }),
+        ),
+    };
+  });
+}

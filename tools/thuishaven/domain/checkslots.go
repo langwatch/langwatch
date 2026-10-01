@@ -7,7 +7,7 @@ import (
 )
 
 // The machine-wide check queue (specs/setup/check-slots.feature). Whole-repo
-// checks — a tsgo typecheck, a biome lint — saturate the machine on purpose,
+// checks — a tsgo typecheck, a whole-tree lint — saturate the machine on purpose,
 // and several worktrees' worth at once is what makes a laptop unusable. The
 // queue used to live only in dev/scripts/check-queue.mjs; the decisions now
 // live here so `haven slot run` (and `haven typecheck`) gate against the same
@@ -27,6 +27,8 @@ type CheckEnv struct {
 	CheckSlots string // CHECK_SLOTS
 	CI         string // CI
 	Claudecode string // CLAUDECODE, set in every shell an agent runs
+	// TestWorkers is HAVEN_TEST_WORKERS as haven resolves it (env, .env, settings).
+	TestWorkers string
 	// HeldByQueue reports that CHECK_QUEUE_HELD names a live ancestor of this
 	// process that is itself one of the queue's wrappers: the queue spawned the
 	// run and already counted it. The caller resolves it, because the domain

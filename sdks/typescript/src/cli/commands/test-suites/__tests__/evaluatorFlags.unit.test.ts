@@ -1,21 +1,17 @@
 /**
- * The `--evaluator` family: references resolved against the platform, the
- * mappings inferred from the evaluator's inputs and the suite's fields, the
- * gate read from the flag or from what the evaluator produces, and the full
- * attachment list read from `--evaluators-json`.
- *
+ * The `--evaluator` family: platform references, inferred mappings, the
+ * gate flag, and full attachments from `--evaluators-json`.
  * Spec: specs/features/test-suite-cli.feature
  */
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import type { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
-import {
-  readEvaluators,
-  readEvaluatorsJson,
-  resolveEvaluatorAttachments,
-} from "../evaluatorFlags";
+
+import { readEvaluators, readEvaluatorsJson, resolveEvaluatorAttachments } from "../evaluatorFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -54,7 +50,7 @@ const answerJudge = {
 };
 
 const serviceWith = (
-  evaluators: Array<typeof sqlEquivalence | typeof answerJudge>,
+  evaluators: (typeof sqlEquivalence | typeof answerJudge)[],
 ): EvaluatorsApiService =>
   ({
     get: vi.fn(async (reference: string) => {
@@ -133,11 +129,7 @@ describe("resolveEvaluatorAttachments", () => {
         service: serviceWith([sqlEquivalence, answerJudge]),
       });
 
-      expect(resolved.map((entry) => entry.attachment.required)).toEqual([
-        true,
-        false,
-        false,
-      ]);
+      expect(resolved.map((entry) => entry.attachment.required)).toEqual([true, false, false]);
     });
   });
 
@@ -255,9 +247,7 @@ describe("readEvaluatorsJson", () => {
 
   describe("given text that is not JSON", () => {
     it("refuses the flag", () => {
-      expect(() =>
-        readEvaluatorsJson({ value: "not json", fields: [] }),
-      ).toThrow(ProcessExitError);
+      expect(() => readEvaluatorsJson({ value: "not json", fields: [] })).toThrow(ProcessExitError);
       expect(printedErrors()).toContain("--evaluators-json");
     });
   });

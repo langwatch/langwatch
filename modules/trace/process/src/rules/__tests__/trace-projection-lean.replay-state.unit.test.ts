@@ -1,0 +1,329 @@
+import {
+  type Event,
+  nullLog,
+  type ProjectionStoreContext,
+  type RegisteredStateProjection,
+  type ReplayContext,
+  replayStateProjection,
+  runFoldMapReplay,
+  sealStateProjection,
+  type StateProjectionDefinition,
+  type StateProjectionStore,
+  type StoredProjection,
+} from "@langwatch/eventing";
+import { EventingClickHouseReplayEventSource } from "@langwatch/eventing/server";
+import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
+import { redisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  makeFakeClickHouse,
+  type FakeEventLogRow as Row,
+} from "../../services/__tests__/fixtures/fake-event-log.ts";
+import { leanReplayEvent } from "../trace-projection-lean.rules.ts";
+
+interface CounterState {
+  count: number;
+}
+
+function counterEvent(o: {
+  tenant: string;
+  agg: string;
+  id: string;
+  ts: number;
+  occurredAt: number;
+  amount: number;
+  type?: string;
+}): Row {
+  return {
+    TenantId: o.tenant,
+    AggregateType: "langy_conversation",
+    AggregateId: o.agg,
+    EventId: o.id,
+    EventType: o.type ?? "counter.incremented",
+    EventTimestamp: o.ts,
+    EventOccurredAt: o.occurredAt,
+    EventVersion: "2026-07-16",
+    EventPayload: JSON.stringify({ amount: o.amount }),
+  };
+}
+
+function spyStore() {
+  const writes: {
+    projection: StoredProjection<CounterState>;
+    context: ProjectionStoreContext;
+  }[] = [];
+  const store: StateProjectionStore<CounterState> = {
+    get: vi.fn(async () => ({ kind: "empty" as const })),
+    store: vi.fn(async (projection, context) => {
+      writes.push({ projection, context });
+    }),
+  };
+  return { store, writes };
+}
+
+function registered(store: StateProjectionStore<CounterState>): RegisteredStateProjection {
+  const definition: StateProjectionDefinition<CounterState, Event> = {
+    name: "counter",
+    version: "2026-07-16",
+    eventTypes: ["counter.incremented"],
+    init: () => ({ count: 0 }),
+    apply: (state, event) => ({
+      count: state.count + ((event.data as { amount?: number })?.amount ?? 0),
+    }),
+    store,
+  };
+  return {
+    projectionName: "counter",
+    pipelineName: "langy_conversation_processing",
+    aggregateType: "langy_conversation",
+    source: "pipeline",
+    ...sealStateProjection(definition),
+    pauseKey: "langy_conversation_processing/stateProjection/counter",
+    kind: "state",
+  };
+}
+
+function replayRedis() {
+  const calls: string[] = [];
+  const redis = redisDouble({
+    sadd: vi.fn(async (_key: unknown, pauseKey: unknown) => {
+      calls.push(`pause:${String(pauseKey)}`);
+      return 1;
+    }),
+    scan: vi.fn(async () => ["0", []] as [string, string[]]),
+    srem: vi.fn(async (_key: unknown, pauseKey: unknown) => {
+      calls.push(`unpause:${String(pauseKey)}`);
+      return 1;
+    }),
+    lpush: vi.fn(async () => 1),
+  });
+  return { redis, calls };
+}
+
+/** Dry-run/guard sentinel: those paths must not touch the pause seam. */
+const forbiddenRedis = redisDouble();
+
+describe("replayStateProjection", () => {
+  it("reads canonical events, groups by tenant + key, and rebuilds each store row from init", async () => {
+    const rows = [
+      // tenant t-a, conv-1: two counter events + one non-declared type
+      counterEvent({
+        tenant: "t-a",
+        agg: "conv-1",
+        id: "a-001",
+        ts: 100,
+        occurredAt: 5_000,
+        amount: 2,
+      }),
+      counterEvent({
+        tenant: "t-a",
+        agg: "conv-1",
+        id: "a-002",
+        ts: 200,
+        occurredAt: 1_000,
+        amount: 3,
+      }),
+      counterEvent({
+        tenant: "t-a",
+        agg: "conv-1",
+        id: "a-003",
+        ts: 300,
+        occurredAt: 9_000,
+        amount: 99,
+        type: "counter.ignored",
+      }),
+      // tenant t-b, conv-9: one counter event
+      counterEvent({
+        tenant: "t-b",
+        agg: "conv-9",
+        id: "b-001",
+        ts: 150,
+        occurredAt: 4_000,
+        amount: 10,
+      }),
+    ];
+    const { client, queries, tenants: resolvedTenants } = makeFakeClickHouse(rows);
+    const { store, writes } = spyStore();
+    const { redis, calls: redisCalls } = replayRedis();
+
+    const ctx: ReplayContext = {
+      redis,
+      eventSource: new EventingClickHouseReplayEventSource({
+        clickhouse: client,
+        lean: leanReplayEvent,
+      }),
+      accumulatorOpts: {},
+    };
+
+    const result = await replayStateProjection({
+      ctx,
+      projection: registered(store),
+      projectionIndex: 0,
+      totalProjections: 1,
+      tenantIds: ["t-a", "t-b"],
+      since: "1970-01-01T00:00:00.000Z",
+      batchSize: 100,
+      aggregateBatchSize: 100,
+      dryRun: false,
+      log: nullLog,
+    });
+
+    // Never merged with an existing row.
+    expect(store.get).not.toHaveBeenCalled();
+    // Only SELECTs — the state path reads CH, never writes it.
+    expect(queries.every((q) => q.trim().toUpperCase().startsWith("SELECT"))).toBe(true);
+
+    // One row per (tenant, key).
+    expect(writes).toHaveLength(2);
+    const byKey = new Map(writes.map((w) => [`${w.context.tenantId}/${w.context.key}`, w]));
+
+    const a = byKey.get("t-a/conv-1")!;
+    // The non-declared event type was filtered out (only 2 + 3 folded).
+    expect(a.projection.state).toEqual({ count: 5 });
+    // Deterministic cursor + timestamps.
+    expect(a.projection.cursor).toEqual({ acceptedAt: 200, eventId: "a-002" });
+    expect(a.projection.createdAt).toBe(5_000); // first applied event's occurredAt
+    expect(a.projection.occurredAt).toBe(1_000); // last applied event's occurredAt
+    expect(a.projection.updatedAt).toBe(5_000); // max occurredAt
+    expect(a.projection.version).toBe("2026-07-16");
+
+    const b = byKey.get("t-b/conv-9")!;
+    expect(b.projection.state).toEqual({ count: 10 });
+
+    expect(result.aggregatesReplayed).toBe(2);
+    expect(result.totalEvents).toBe(3); // 2 (conv-1) + 1 (conv-9); ignored not loaded
+    expect(result.batchErrors).toBe(0);
+    expect(result.touchedTenants.toSorted()).toEqual(["t-a", "t-b"]);
+    expect(redisCalls).toEqual([
+      "pause:langy_conversation_processing/stateProjection/counter",
+      "unpause:langy_conversation_processing/stateProjection/counter",
+    ]);
+    // Every statement named one of the two tenants, so the member routed each to its server.
+    expect(new Set(resolvedTenants)).toEqual(new Set(["t-a", "t-b"]));
+  });
+
+  it("pages in accepted order when event IDs sort in the opposite order", async () => {
+    const rows = [
+      counterEvent({
+        tenant: "t-a",
+        agg: "evaluation-random-id",
+        id: "z-accepted-first",
+        ts: 100,
+        occurredAt: 100,
+        amount: 2,
+      }),
+      counterEvent({
+        tenant: "t-a",
+        agg: "evaluation-random-id",
+        id: "a-accepted-second",
+        ts: 200,
+        occurredAt: 200,
+        amount: 3,
+      }),
+    ];
+    const { client } = makeFakeClickHouse(rows);
+    const { store, writes } = spyStore();
+    const { redis } = replayRedis();
+
+    const result = await replayStateProjection({
+      ctx: {
+        redis,
+        eventSource: new EventingClickHouseReplayEventSource({
+          clickhouse: client,
+          lean: leanReplayEvent,
+        }),
+        accumulatorOpts: {},
+      },
+      projection: registered(store),
+      projectionIndex: 0,
+      totalProjections: 1,
+      tenantIds: ["t-a"],
+      since: "1970-01-01T00:00:00.000Z",
+      // Force the cursor to cross the reverse-sorted IDs between pages.
+      batchSize: 1,
+      aggregateBatchSize: 100,
+      dryRun: false,
+      log: nullLog,
+    });
+
+    expect(result.totalEvents).toBe(2);
+    expect(writes).toHaveLength(1);
+    expect(writes[0]!.projection.state).toEqual({ count: 5 });
+    expect(writes[0]!.projection.cursor).toEqual({
+      acceptedAt: 200,
+      eventId: "a-accepted-second",
+    });
+  });
+
+  it("writes nothing and touches no store on a dry run", async () => {
+    const rows = [
+      counterEvent({
+        tenant: "t-a",
+        agg: "conv-1",
+        id: "a-001",
+        ts: 100,
+        occurredAt: 100,
+        amount: 2,
+      }),
+    ];
+    const { client } = makeFakeClickHouse(rows);
+    const { store } = spyStore();
+    const ctx: ReplayContext = {
+      redis: forbiddenRedis,
+      eventSource: new EventingClickHouseReplayEventSource({
+        clickhouse: client,
+        lean: leanReplayEvent,
+      }),
+      accumulatorOpts: {},
+    };
+
+    const result = await replayStateProjection({
+      ctx,
+      projection: registered(store),
+      projectionIndex: 0,
+      totalProjections: 1,
+      tenantIds: ["t-a"],
+      since: "1970-01-01T00:00:00.000Z",
+      batchSize: 100,
+      aggregateBatchSize: 100,
+      dryRun: true,
+      log: nullLog,
+    });
+
+    expect(store.store).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalled();
+    expect(result.totalEvents).toBe(0);
+  });
+});
+
+describe("the fold/map engine with state projections", () => {
+  it("rejects a config carrying state projections rather than silently skipping them", async () => {
+    const { store } = spyStore();
+    const ctx: ReplayContext = {
+      redis: forbiddenRedis,
+      eventSource: new EventingClickHouseReplayEventSource({
+        // Scripts nothing: any statement throws, so the guard must fire first.
+        clickhouse: clickHouseQueryClientDouble(),
+        lean: leanReplayEvent,
+      }),
+      accumulatorOpts: {},
+    };
+
+    await expect(
+      runFoldMapReplay({
+        ctx,
+        config: {
+          projections: [],
+          stateProjections: [registered(store)],
+          tenantIds: ["t-a"],
+          since: "1970-01-01T00:00:00.000Z",
+        },
+      }),
+    ).rejects.toThrow(/does not support state projections/);
+
+    // The guard fired before any store or CH work.
+    expect(store.store).not.toHaveBeenCalled();
+    expect(store.get).not.toHaveBeenCalled();
+  });
+});

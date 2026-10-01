@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/rum-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The browser telemetry ingest door: caps, validates, rate-limits and forwards the platform's own browser traces to its collector.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/rum-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

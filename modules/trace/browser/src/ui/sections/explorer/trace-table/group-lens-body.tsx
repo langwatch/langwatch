@@ -1,0 +1,115 @@
+import { Flex, Text } from "@langwatch/design-system/primitives";
+import {
+  useExplorerStore,
+  type LensConfig,
+  groupByForGrouping,
+} from "@langwatch/trace-browser-kit";
+import {
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
+import type React from "react";
+import { useMemo, useState } from "react";
+
+import { VirtualSpacer } from "../../../blocks/explorer/trace-table/virtual-spacer.tsx";
+import type { TraceListItem } from "../types/trace.ts";
+import { buildGroupColumns } from "./columns.ts";
+import { buildGroups, groupRegistry, RegistryRow, type TraceGroup } from "./registry/index.ts";
+import { groupSelectColumnDef } from "./select-column.tsx";
+import { buildGroupPlaceholderRows } from "./skeleton-placeholders.ts";
+import { TraceTableShell } from "./trace-table-shell.tsx";
+import { useTraceTableVirtualizer } from "./use-trace-table-virtualizer.ts";
+
+const GROUP_MIN_WIDTH = "880px";
+
+interface GroupLensBodyProps {
+  traces: TraceListItem[];
+  lens: LensConfig;
+  isLoading?: boolean;
+}
+
+export const GroupLensBody: React.FC<GroupLensBodyProps> = ({
+  traces,
+  lens,
+  isLoading = false,
+}) => {
+  const groupBy = groupByForGrouping(lens.grouping);
+  const realGroups = useMemo(
+    () => (groupBy ? buildGroups(traces, groupBy) : []),
+    [traces, groupBy],
+  );
+  const pageSize = useExplorerStore((s) => s.pageSize);
+  const groups = useMemo(
+    () => (isLoading ? buildGroupPlaceholderRows(pageSize) : realGroups),
+    [isLoading, pageSize, realGroups],
+  );
+  const openKeys = useExplorerStore((s) => s.expandedRows);
+  const toggleExpandedRow = useExplorerStore((s) => s.toggleExpandedRow);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: lens.sort.columnId, desc: lens.sort.direction === "desc" },
+  ]);
+  const columns = useMemo(
+    () => (groupBy ? [groupSelectColumnDef, ...buildGroupColumns(lens.columns, groupBy)] : []),
+    [lens.columns, groupBy],
+  );
+
+  const table = useReactTable({
+    data: groups,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    enableSortingRemoval: false,
+    getRowId: (row) => row.key,
+  });
+
+  const rows = table.getRowModel().rows;
+  const colSpan = columns.length;
+  const { virtualizer, paddingTop, paddingBottom } = useTraceTableVirtualizer({
+    count: rows.length,
+    addonCount: lens.addons.length,
+  });
+  const virtualItems = virtualizer.getVirtualItems();
+
+  if (!groupBy) return <NoTracesToGroupMessage />;
+  if (!isLoading && groups.length === 0) return <NoTracesToGroupMessage />;
+
+  const toggleExpanded = (key: string) => toggleExpandedRow({ key });
+
+  return (
+    <TraceTableShell table={table} minWidth={GROUP_MIN_WIDTH} stickyFirstColumn>
+      <VirtualSpacer height={paddingTop} colSpan={colSpan} />
+      {virtualItems.map((virtualItem) => {
+        const row = rows[virtualItem.index];
+        if (!row) return null;
+        return (
+          <RegistryRow<TraceGroup>
+            key={row.id}
+            ref={virtualizer.measureElement}
+            data-index={virtualItem.index}
+            tanstackRow={row}
+            registry={groupRegistry}
+            addons={lens.addons}
+            status={row.original.worstStatus}
+            hoverScope="split"
+            isExpanded={!isLoading && openKeys.has(row.original.key)}
+            onToggleExpand={isLoading ? undefined : () => toggleExpanded(row.original.key)}
+            isLoading={isLoading}
+          />
+        );
+      })}
+      <VirtualSpacer height={paddingBottom} colSpan={colSpan} />
+    </TraceTableShell>
+  );
+};
+
+const NoTracesToGroupMessage: React.FC = () => (
+  <Flex align="center" justify="center" padding={8} direction="column" gap={2}>
+    <Text color="fg.muted" textStyle="sm">
+      No traces to group.
+    </Text>
+  </Flex>
+);

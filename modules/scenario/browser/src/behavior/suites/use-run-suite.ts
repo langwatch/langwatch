@@ -1,0 +1,373 @@
+/**
+ * Headless hook for running a suite with confirmation state management.
+ */
+
+import { useDrawer } from "@langwatch/browser-host/drawer";
+import {
+  displayTypedValue,
+  serializeOptionalTypedScalarValue,
+} from "@langwatch/design-system/json-value-text";
+import { toaster } from "@langwatch/design-system/toaster";
+import {
+  parseScenarioParameterDefinitions,
+  type RunParameterValues,
+  type ScenarioParameterDefinition,
+} from "@langwatch/scenario-contract";
+import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
+import { useCallback, useMemo, useRef, useState } from "react";
+
+import { api, type SimulationSuite, type RouterOutputs } from "../scenario-api.ts";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+import { showSuiteRunError } from "./show-suite-run-error.ts";
+import { useRunAttempt } from "./use-run-attempt.ts";
+
+export interface UseRunSuiteOptions {
+  onRunScheduled?: (suiteId: string, batchRunId: string) => void;
+  /**
+   * Invoked when the user clicks the "View run" action on the run-scheduled success
+   * toast. The consumer decides where to navigate (e.g. the run plan detail page). When
+   * omitted, the success toast carries no action — the hook never navigates on its own.
+   */
+  onViewRun?: (suiteId: string) => void;
+}
+
+/** Where a declared parameter comes from. */
+export type ParameterSource = "scenario" | "agent";
+
+/**
+ * One parameter a run can carry, with where it is declared: on a scenario of
+ * the run, or by an agent the run goes against.
+ */
+export type DeclaredParameter = ScenarioParameterDefinition & {
+  source: ParameterSource;
+  /** The label of the agent that declares it. Nothing for a scenario one. */
+  agentLabel?: string;
+};
+
+/** An agent of the run, with the parameters it declares. */
+export type ParameterDeclaringAgent = {
+  id: string;
+  name: string;
+  environment?: string | null;
+  owner?: { name: string | null } | null;
+  parameters?: readonly ScenarioParameterDefinition[];
+};
+
+/**
+ * The parameters the scenarios of the run declare, keyed by name.
+ */
+function scenarioDeclaredParameters({
+  scenarioIds,
+  scenarios,
+}: {
+  scenarioIds: string[];
+  scenarios: readonly { id: string; parameters: unknown }[];
+}): Map<string, DeclaredParameter> {
+  const inRun = new Set(scenarioIds);
+  const declared = scenarios
+    .filter((scenario) => inRun.has(scenario.id))
+    .flatMap((scenario) => parseScenarioParameterDefinitions(scenario.parameters));
+
+  const union = new Map<string, DeclaredParameter>();
+  for (const definition of declared) {
+    const seen = union.get(definition.name);
+    union.set(definition.name, {
+      ...(seen ?? definition),
+      name: definition.name,
+      description: seen?.description ?? definition.description,
+      defaultValue: seen?.defaultValue ?? definition.defaultValue,
+      secret: seen?.secret === true || definition.secret === true,
+      source: "scenario",
+    });
+  }
+  return union;
+}
+
+/** The parameters one agent declares, each tagged with the agent label. */
+function agentDeclaredParameters(agent: ParameterDeclaringAgent): DeclaredParameter[] {
+  const agentLabel = targetLabelOf({
+    name: agent.name,
+    environment: agent.environment,
+    ownerName: agent.owner?.name,
+    differingNames: new Set(),
+  });
+  return (agent.parameters ?? []).map((definition) => ({
+    ...definition,
+    source: "agent" as const,
+    agentLabel,
+  }));
+}
+
+/**
+ * Every parameter the run can carry: the union of what the scenarios in it declare,
+ * then what its agents declare.
+ */
+export function unionParameterDefinitions({
+  scenarioIds,
+  scenarios,
+  agents = [],
+}: {
+  scenarioIds: string[];
+  scenarios: readonly { id: string; parameters: unknown }[];
+  /** The agents the run goes against, for the parameters they declare. */
+  agents?: readonly ParameterDeclaringAgent[];
+}): DeclaredParameter[] {
+  const union = scenarioDeclaredParameters({ scenarioIds, scenarios });
+  for (const definition of agents.flatMap(agentDeclaredParameters)) {
+    if (union.has(definition.name)) continue;
+    union.set(definition.name, definition);
+  }
+  return [...union.values()];
+}
+
+/**
+ * The values the run sends, read back from what the confirmation shows.
+ */
+export function toRunParameters({
+  definitions,
+  values,
+}: {
+  definitions: ScenarioParameterDefinition[];
+  values: Record<string, string>;
+}): RunParameterValues | undefined {
+  const parameters: RunParameterValues = {};
+  for (const definition of definitions) {
+    const typed = values[definition.name] ?? "";
+    if (definition.secret === true) {
+      if (typed !== "") parameters[definition.name] = typed;
+      continue;
+    }
+    const value = serializeOptionalTypedScalarValue({
+      raw: typed,
+      type: definition.type,
+    });
+    if (value === undefined) continue;
+    parameters[definition.name] = value;
+  }
+  return Object.keys(parameters).length > 0 ? parameters : undefined;
+}
+
+function notifyRunScheduled({
+  result,
+  onEditRunPlan,
+  onViewRun,
+}: {
+  result: RouterOutputs["suites"]["run"];
+  onEditRunPlan: () => void;
+  onViewRun: (() => void) | undefined;
+}): void {
+  const archivedCount =
+    (result.skippedArchived?.scenarios?.length ?? 0) +
+    (result.skippedArchived?.targets?.length ?? 0);
+
+  if (archivedCount > 0) {
+    const parts: string[] = [];
+    if (result.skippedArchived.scenarios.length > 0) {
+      parts.push(
+        `${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`,
+      );
+    }
+    if (result.skippedArchived.targets.length > 0) {
+      parts.push(
+        `${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`,
+      );
+    }
+
+    toaster.create({
+      title: `Run plan scheduled (${result.jobCount} jobs)`,
+      description: `${parts.join(" and ")} skipped.`,
+      type: "warning",
+      action: {
+        label: "Edit Run Plan",
+        onClick: onEditRunPlan,
+      },
+    });
+  } else {
+    toaster.create({
+      title: `Run plan scheduled (${result.jobCount} jobs)`,
+      type: "success",
+      action: onViewRun
+        ? {
+            label: "View run",
+            onClick: onViewRun,
+          }
+        : void 0,
+    });
+  }
+}
+
+function parameterValuesOf({
+  parameterDefinitions,
+  parameterOverrides,
+}: {
+  parameterDefinitions: ScenarioParameterDefinition[];
+  parameterOverrides: Record<string, string>;
+}): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const definition of parameterDefinitions) {
+    values[definition.name] =
+      parameterOverrides[definition.name] ??
+      displayTypedValue({
+        value: definition.defaultValue,
+        type: definition.type,
+      });
+  }
+  return values;
+}
+
+function countActiveScenarios({
+  pendingSuite,
+  allScenarios,
+}: {
+  pendingSuite: SimulationSuite | null;
+  allScenarios: readonly { id: string }[] | undefined;
+}): number {
+  if (!pendingSuite || !allScenarios) {
+    return pendingSuite?.scenarioIds.length ?? 0;
+  }
+
+  const activeIds = new Set(allScenarios.map((scenario) => scenario.id));
+  return pendingSuite.scenarioIds.filter((id) => activeIds.has(id)).length;
+}
+
+export function useRunSuite(options: UseRunSuiteOptions = {}) {
+  const { project } = useOrganizationTeamProject();
+  const { openDrawer } = useDrawer();
+  const utils = api.useUtils();
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  const [pendingSuite, setPendingSuite] = useState<SimulationSuite | null>(null);
+  const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
+  /** Only the names typed over in the confirmation, keyed by name. */
+  const [parameterOverrides, setParameterOverrides] = useState<Record<string, string>>({});
+  const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
+
+  const runMutation = api.suites.run.useMutation({
+    onSuccess: (result, variables) => {
+      void utils.scenarios.getSuiteRunData.invalidate();
+      clearRunAttempt();
+      setPendingSuite(null);
+
+      notifyRunScheduled({
+        result,
+        onEditRunPlan: () => {
+          openDrawer("suiteEditor", { urlParams: { suiteId: variables.id } });
+        },
+        onViewRun: optionsRef.current.onViewRun
+          ? () => optionsRef.current.onViewRun?.(variables.id)
+          : void 0,
+      });
+
+      optionsRef.current.onRunScheduled?.(variables.id, variables.batchRunId ?? result.batchRunId);
+    },
+    onError: (err, variables) => {
+      setPendingSuite(null);
+      setPendingBatchRunId(null);
+
+      showSuiteRunError({
+        error: err,
+        fallbackTitle: "Couldn't start run plan",
+        onEditRunPlan: () => {
+          openDrawer("suiteEditor", { urlParams: { suiteId: variables.id } });
+        },
+      });
+    },
+  });
+
+  // Fetch active scenarios to exclude archived ones from the confirmation count
+  const { data: allScenarios } = api.scenarios.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project && !!pendingSuite },
+  );
+
+  const parameterDefinitions = useMemo(
+    () =>
+      unionParameterDefinitions({
+        scenarioIds: pendingSuite?.scenarioIds ?? [],
+        scenarios: allScenarios ?? [],
+      }),
+    [pendingSuite, allScenarios],
+  );
+
+  /**
+   * What the confirmation shows for each name: the declared default, replaced by
+   * whatever was typed over it. Only the overrides are held in state, so a default that
+   * arrives with the scenarios cannot overwrite an edit made before they loaded.
+   */
+  const parameterValues = useMemo(() => {
+    return parameterValuesOf({ parameterDefinitions, parameterOverrides });
+  }, [parameterDefinitions, parameterOverrides]);
+
+  const setParameterValue = useCallback((name: string, value: string) => {
+    setParameterOverrides((previous) => ({ ...previous, [name]: value }));
+  }, []);
+
+  const requestRun = useCallback(
+    (suite: SimulationSuite) => {
+      if (!project || runMutation.isPending) return;
+      setParameterOverrides({});
+      setPendingSuite(suite);
+    },
+    [project, runMutation.isPending],
+  );
+
+  const confirmRun = useCallback(() => {
+    if (!project || !pendingSuite || runMutation.isPending) return;
+    const parameters = toRunParameters({
+      definitions: parameterDefinitions,
+      values: parameterValues,
+    });
+    // The run being queued is the suite with these parameter values, and that
+    // is what the key identifies: a confirm that failed and is tried again
+    // carries the same key and the same batch id, so the server recognises it
+    // rather than queueing a second batch.
+    const attempt = takeRunAttempt(JSON.stringify([pendingSuite.id, parameters]));
+    setPendingBatchRunId(attempt.batchRunId);
+    runMutation.mutate({
+      projectId: project.id,
+      id: pendingSuite.id,
+      idempotencyKey: attempt.idempotencyKey,
+      batchRunId: attempt.batchRunId,
+      parameters,
+    });
+  }, [project, pendingSuite, runMutation, parameterDefinitions, parameterValues, takeRunAttempt]);
+
+  const cancelRun = useCallback(() => {
+    if (runMutation.isPending) return;
+    setParameterOverrides({});
+    setPendingSuite(null);
+  }, [runMutation.isPending]);
+
+  const activeScenarioCount = useMemo(
+    () => countActiveScenarios({ pendingSuite, allScenarios }),
+    [pendingSuite, allScenarios],
+  );
+
+  const targetCount = useMemo(() => {
+    if (!pendingSuite) return 0;
+    return parseSuiteTargets(pendingSuite.targets).length;
+  }, [pendingSuite]);
+
+  return {
+    requestRun,
+    confirmRun,
+    cancelRun,
+    isPending: runMutation.isPending,
+    pendingBatchRunId,
+    /** Props to spread onto SuiteRunConfirmationDialog */
+    dialogProps: {
+      open: !!pendingSuite,
+      onClose: cancelRun,
+      onConfirm: confirmRun,
+      suiteName: pendingSuite?.name ?? "",
+      scenarioCount: activeScenarioCount,
+      targetCount,
+      repeatCount: pendingSuite?.repeatCount ?? 1,
+      isLoading: runMutation.isPending,
+      parameters: parameterDefinitions,
+      parameterValues,
+      onParameterChange: setParameterValue,
+    },
+  };
+}

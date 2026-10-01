@@ -1,0 +1,338 @@
+import {
+  ACTIVATE_CONNECTION_COMMAND_TYPE,
+  type ActivateConnectionCommandData,
+  activateConnectionCommandDataSchema,
+  APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
+  type ApproveDomainClaimCommandData,
+  approveDomainClaimCommandDataSchema,
+  ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type AttestDomainCommandData,
+  attestDomainCommandDataSchema,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
+  CLAIM_DOMAIN_COMMAND_TYPE,
+  type ClaimDomainCommandData,
+  claimDomainCommandDataSchema,
+  COMPLETE_TEARDOWN_COMMAND_TYPE,
+  type CompleteTeardownCommandData,
+  completeTeardownCommandDataSchema,
+  DISCARD_CONNECTION_COMMAND_TYPE,
+  type DiscardConnectionCommandData,
+  discardConnectionCommandDataSchema,
+  GRANDFATHER_CONNECTION_COMMAND_TYPE,
+  type GrandfatherConnectionCommandData,
+  grandfatherConnectionCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  type RecordDomainProofPresentCommandData,
+  recordDomainProofPresentCommandDataSchema,
+  REGISTER_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  type RegisterReplacementConnectionCommandData,
+  registerReplacementConnectionCommandDataSchema,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  type RenameConnectionCommandData,
+  renameConnectionCommandDataSchema,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  type SelectMigrationRouteCommandData,
+  selectMigrationRouteCommandDataSchema,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  type BeginMigrationFinalizationCommandData,
+  beginMigrationFinalizationCommandDataSchema,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
+  type FinalizeMigrationCommandData,
+  finalizeMigrationCommandDataSchema,
+  REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
+  REQUEST_TEARDOWN_COMMAND_TYPE,
+  REQUEST_VERIFICATION_COMMAND_TYPE,
+  RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  type RegisterConnectionCommandData,
+  registerConnectionCommandDataSchema,
+  type RejectDomainClaimCommandData,
+  rejectDomainClaimCommandDataSchema,
+  type RequestTeardownCommandData,
+  requestTeardownCommandDataSchema,
+  type RequestVerificationCommandData,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
+  requestVerificationCommandDataSchema,
+  type ResumeConnectionCommandData,
+  resumeConnectionCommandDataSchema,
+  SUSPEND_CONNECTION_COMMAND_TYPE,
+  type SsoConnectionCommand,
+  type SsoConnectionFact,
+  type SsoConnectionFactInput,
+  type SuspendConnectionCommandData,
+  suspendConnectionCommandDataSchema,
+  VERIFY_DOMAIN_COMMAND_TYPE,
+  type VerifyDomainCommandData,
+  verifyDomainCommandDataSchema,
+} from "@langwatch/identity-contract";
+
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import type { SsoConnectionGuardsService } from "./sso-connection-guards.service.ts";
+
+/**
+ * The SSO connection write surface (D04, ADR-117 §5): one verb per command,
+ * each parsing its own data and committing what its guard allowed.
+ */
+export class SsoConnectionService {
+  static create(
+    guards: SsoConnectionGuardsService,
+    ledger: SsoConnectionLedger,
+  ): SsoConnectionService {
+    return new SsoConnectionService(guards, ledger);
+  }
+
+  private constructor(
+    private readonly guards: SsoConnectionGuardsService,
+    private readonly ledger: SsoConnectionLedger,
+  ) {}
+
+  // Arrow instance properties, not prototype methods: a test on the pipeline
+  // adapter extracts these members (`connections.registerConnection`) to
+  // assert they exist without calling them, which is unsafe against a
+  // method-shorthand member. No subclass extends this class and nothing
+  // enumerates its instances, so the conversion is safe.
+  registerConnection = async (
+    input: RegisterConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> => {
+    const data = registerConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REGISTER_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.registerConnection(data),
+    );
+  };
+
+  claimDomain = async (input: ClaimDomainCommandData): Promise<SsoConnectionFact[]> => {
+    const data = claimDomainCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: CLAIM_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.claimDomain(data),
+    );
+  };
+
+  async approveDomainClaim(input: ApproveDomainClaimCommandData): Promise<SsoConnectionFact[]> {
+    const data = approveDomainClaimCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: APPROVE_DOMAIN_CLAIM_COMMAND_TYPE, data },
+      await this.guards.approveDomainClaim(data),
+    );
+  }
+
+  async rejectDomainClaim(input: RejectDomainClaimCommandData): Promise<SsoConnectionFact[]> {
+    const data = rejectDomainClaimCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REJECT_DOMAIN_CLAIM_COMMAND_TYPE, data },
+      await this.guards.rejectDomainClaim(data),
+    );
+  }
+
+  async discardConnection(input: DiscardConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = discardConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: DISCARD_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.discardConnection(data),
+    );
+  }
+
+  async requestVerification(input: RequestVerificationCommandData): Promise<SsoConnectionFact[]> {
+    const data = requestVerificationCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REQUEST_VERIFICATION_COMMAND_TYPE, data },
+      await this.guards.requestVerification(data),
+    );
+  }
+
+  /** Tier 1's ceremony, in one verb: a platform operator states the domain is
+   *  the organization's, and the connection is VERIFIED with nothing
+   *  published anywhere. */
+  async attestDomain(input: AttestDomainCommandData): Promise<SsoConnectionFact[]> {
+    const data = attestDomainCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: ATTEST_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.attestDomain(data),
+    );
+  }
+
+  async withdrawDomain(input: WithdrawDomainCommandData): Promise<SsoConnectionFact[]> {
+    const data = withdrawDomainCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: WITHDRAW_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.withdrawDomain(data),
+    );
+  }
+
+  async verifyDomain(input: VerifyDomainCommandData): Promise<SsoConnectionFact[]> {
+    const data = verifyDomainCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: VERIFY_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.verifyDomain(data),
+    );
+  }
+
+  /** What a re-read of a published proof found (ADR-123). */
+  async setArrivalPolicy(input: SetArrivalPolicyCommandData): Promise<SsoConnectionFact[]> {
+    const data = setArrivalPolicyCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: SET_ARRIVAL_POLICY_COMMAND_TYPE, data },
+      await this.guards.setArrivalPolicy(data),
+    );
+  }
+
+  async recordDomainProofAbsent(
+    input: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofAbsentCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofAbsent(data),
+    );
+  }
+
+  async recordDomainProofPresent(
+    input: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofPresentCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofPresent(data),
+    );
+  }
+
+  async activateConnection(input: ActivateConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = activateConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: ACTIVATE_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.activateConnection(data),
+    );
+  }
+
+  async suspendConnection(input: SuspendConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = suspendConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: SUSPEND_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.suspendConnection(data),
+    );
+  }
+
+  async resumeConnection(input: ResumeConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = resumeConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RESUME_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.resumeConnection(data),
+    );
+  }
+
+  requestTeardown = async (input: RequestTeardownCommandData): Promise<SsoConnectionFact[]> => {
+    const data = requestTeardownCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REQUEST_TEARDOWN_COMMAND_TYPE, data },
+      await this.guards.requestTeardown(data),
+    );
+  };
+
+  async completeTeardown(input: CompleteTeardownCommandData): Promise<SsoConnectionFact[]> {
+    const data = completeTeardownCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: COMPLETE_TEARDOWN_COMMAND_TYPE, data },
+      await this.guards.completeTeardown(data),
+    );
+  }
+
+  /** The word on the card. Nothing routes on it (ADR-117). */
+  async renameConnection(input: RenameConnectionCommandData): Promise<SsoConnectionFact[]> {
+    const data = renameConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: RENAME_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.renameConnection(data),
+    );
+  }
+
+  /** The one direct replacement an organization may run beside its
+   *  grandfathered connection. */
+  registerReplacementConnection = async (
+    input: RegisterReplacementConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> => {
+    const data = registerReplacementConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.registerReplacementConnection(data),
+    );
+  };
+
+  /** Which of the migration pair decides an ordinary sign-in. */
+  async selectMigrationRoute(input: SelectMigrationRouteCommandData): Promise<SsoConnectionFact[]> {
+    const data = selectMigrationRouteCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: SELECT_MIGRATION_ROUTE_COMMAND_TYPE, data },
+      await this.guards.selectMigrationRoute(data),
+    );
+  }
+
+  async beginMigrationFinalization(
+    input: BeginMigrationFinalizationCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = beginMigrationFinalizationCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE, data },
+      await this.guards.beginMigrationFinalization(data),
+    );
+  }
+
+  async finalizeMigration(input: FinalizeMigrationCommandData): Promise<SsoConnectionFact[]> {
+    const data = finalizeMigrationCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: FINALIZE_MIGRATION_COMMAND_TYPE, data },
+      await this.guards.finalizeMigration(data),
+    );
+  }
+
+  async grandfatherConnection(
+    input: GrandfatherConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = grandfatherConnectionCommandDataSchema.parse(input);
+
+    return this.commit(
+      { type: GRANDFATHER_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.grandfatherConnection(data),
+    );
+  }
+
+  private async commit(
+    command: SsoConnectionCommand,
+    facts: SsoConnectionFactInput[],
+  ): Promise<SsoConnectionFact[]> {
+    if (facts.length === 0) {
+      return [];
+    }
+
+    return this.ledger.commit({ command, facts });
+  }
+}

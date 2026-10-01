@@ -1,0 +1,180 @@
+/**
+ * The HTTP shapes of local control (ADR-129), shared by the CLI, the worker,
+ * and the panel (tRPC). Browser-safe: zod and nothing else. See the route
+ * declarations under `process/src/transport` for the full path list.
+ */
+
+import { z } from "zod";
+
+import {
+  bashOutputSchema,
+  localCallErrorSchema,
+  localToolCallSchema,
+  workspaceInfoSchema,
+} from "./langy.local-control-protocol.ts";
+
+/** A control request as the CLI lists it. */
+export const controlRequestSchema = z.object({
+  id: z.string(),
+  conversationId: z.string(),
+  conversationTitle: z.string(),
+  conversationUrl: z.string(),
+  projectId: z.string(),
+  projectName: z.string(),
+  createdAt: z.string(),
+  expiresAt: z.string(),
+});
+export type ControlRequest = z.infer<typeof controlRequestSchema>;
+
+export const listControlRequestsResponseSchema = z.object({
+  requests: z.array(controlRequestSchema),
+});
+
+/** A bodiless control action: an absent body reads as this empty object (§8). */
+export const controlActionBodySchema = z.object({});
+
+export type ListControlRequestsResponse = z.infer<typeof listControlRequestsResponseSchema>;
+
+export const approveControlRequestBodySchema = z.object({
+  workspace: workspaceInfoSchema,
+});
+
+export const approveControlRequestResponseSchema = z.object({
+  /** The Langy session key the CLI connects with; never shown again. */
+  sessionKey: z.string(),
+  endpoint: z.string(),
+  conversation: z.object({
+    id: z.string(),
+    title: z.string(),
+    url: z.string(),
+  }),
+});
+export type ApproveControlRequestResponse = z.infer<typeof approveControlRequestResponseSchema>;
+
+/** What the worker's code_access tool reads before it decides to ask. */
+export const workspaceStatusSchema = z.object({
+  connected: z.boolean(),
+  workspace: workspaceInfoSchema.optional(),
+  /** The user's remembered choice, when there is one. */
+  codeAccessPreference: z.enum(["github"]).nullable(),
+  github: z.object({
+    installed: z.boolean(),
+    accountLogin: z.string().optional(),
+  }),
+  /** An open request not yet approved, so the card can show it. */
+  pendingRequest: controlRequestSchema.optional(),
+});
+export type WorkspaceStatus = z.infer<typeof workspaceStatusSchema>;
+
+export const createControlRequestResponseSchema = z.object({
+  request: controlRequestSchema,
+  /** The one command the card shows. */
+  command: z.string(),
+});
+
+export type CreateControlRequestResponse = z.infer<typeof createControlRequestResponseSchema>;
+
+export const startCallBodySchema = localToolCallSchema;
+
+export const startCallResponseSchema = z.object({
+  callId: z.string(),
+});
+export type StartCallResponse = z.infer<typeof startCallResponseSchema>;
+
+export const cancelCallResponseSchema = z.object({
+  callId: z.string(),
+  cancelled: z.literal(true),
+});
+export type LangyLocalCallCancelled = z.infer<typeof cancelCallResponseSchema>;
+
+export const CALL_STATES = ["pending", "running", "awaiting_permission", "done"] as const;
+export type CallState = (typeof CALL_STATES)[number];
+
+/** One long-poll answer. `done` carries the result; the rest say wait more. */
+export const pollCallResponseSchema = z.object({
+  callId: z.string(),
+  state: z.enum(CALL_STATES),
+  ok: z.boolean().optional(),
+  text: z.string().optional(),
+  output: bashOutputSchema.optional(),
+  error: localCallErrorSchema.optional(),
+});
+export type PollCallResponse = z.infer<typeof pollCallResponseSchema>;
+
+/** The worker's question tool, the same shape the panel bridge already maps. */
+export const questionOptionSchema = z.object({
+  label: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  /** Rendered as a quiet link under the bordered options; still an answer. */
+  quiet: z.boolean().optional(),
+});
+
+export const questionSchema = z.object({
+  question: z.string().min(1).max(2000),
+  header: z.string().max(60).optional(),
+  options: z.array(questionOptionSchema).min(1).max(8),
+  multiple: z.boolean().optional(),
+  /** Offer a free-text answer next to the options. */
+  allowOther: z.boolean().optional(),
+  /** Draw the question as reply prose above the options, not as a title. */
+  bare: z.boolean().optional(),
+});
+
+export const startWaitBodySchema = z.object({
+  kind: z.literal("question"),
+  questions: z.array(questionSchema).min(1).max(4),
+});
+
+export const startWaitResponseSchema = z.object({
+  waitId: z.string(),
+});
+export type StartWaitResponse = z.infer<typeof startWaitResponseSchema>;
+
+export const WAIT_STATES = ["pending", "answered", "expired", "cancelled"] as const;
+
+/** The user's answer to one question: the labels picked, or their own words. */
+export const questionAnswerSchema = z.object({
+  question: z.string(),
+  selected: z.array(z.string()),
+  other: z.string().optional(),
+});
+
+export const pollWaitResponseSchema = z.object({
+  waitId: z.string(),
+  state: z.enum(WAIT_STATES),
+  answers: z.array(questionAnswerSchema).optional(),
+});
+export type PollWaitResponse = z.infer<typeof pollWaitResponseSchema>;
+
+/** The cards one conversation raised, as `langy.localRecord` answers them. */
+export const langyLocalRecordSchema = z.object({
+  waits: z.array(z.looseObject({ turnId: z.string(), toolCallId: z.string() })),
+  workspaceConnected: z.boolean(),
+});
+
+/** What became of a conversation's latest request to share a folder. */
+export const langyControlRequestStateSchema = z.enum([
+  "open",
+  "approved",
+  "expired",
+  "declined",
+  "ended",
+  "none",
+]);
+export type LangyControlRequestState = z.infer<typeof langyControlRequestStateSchema>;
+
+/** What the panel chip and the code access card read. */
+export const langyLocalWorkspaceStatusSchema = z.object({
+  connected: z.boolean(),
+  workspace: z.looseObject({}).nullable(),
+  skipAllowed: z.boolean(),
+  skipPermissions: z.boolean(),
+  pendingRequest: z.looseObject({}).nullable(),
+  requestState: langyControlRequestStateSchema,
+  codeAccessPreference: z.literal("github").nullable(),
+});
+
+/** The remembered choice on its own, for the settings page. */
+export const langyCodeAccessPreferenceSchema = z.object({
+  preference: z.literal("github").nullable(),
+});

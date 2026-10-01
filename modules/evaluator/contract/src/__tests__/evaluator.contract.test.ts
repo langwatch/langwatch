@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import {
+  API_KEYS_AND_SECRETS_DETECTION,
+  AVAILABLE_EVALUATORS,
+  codeEvaluatorConfigSchema,
+  getCodeEvaluatorId,
+  defaultCodeEvaluatorConfig,
+  evaluatorDisplayName,
+  evaluatorSchema,
+  evaluatorTypeSchema,
+  createEvaluatorInputSchema,
+  getEvaluatorDefaultSettings,
+  findEvaluatorDefinitions,
+  isNativeEvaluatorType,
+  isCodeEvaluatorCheckType,
+} from "../index.ts";
+
+describe("evaluator contract", () => {
+  it("keeps the public evaluator type vocabulary explicit", () => {
+    expect(evaluatorTypeSchema.validate("workflow")).toBe(true);
+    expect(evaluatorTypeSchema.validate("unknown")).toBe(false);
+  });
+
+  it("validates the transport-neutral evaluator value", () => {
+    expect(
+      evaluatorSchema.parse({
+        id: "e1",
+        projectId: "p1",
+        name: "Quality",
+        slug: "quality",
+        type: "evaluator",
+        config: {},
+        workflowId: null,
+        copiedFromEvaluatorId: null,
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).projectId,
+    ).toBe("p1");
+  });
+
+  it("resolves configured models without leaking persistence concerns", () => {
+    expect(
+      getEvaluatorDefaultSettings(
+        {
+          name: "x",
+          description: "x",
+          category: "quality",
+          isGuardrail: false,
+          requiredFields: [],
+          optionalFields: [],
+          envVars: [],
+          result: {},
+          settings: {
+            model: { default: "wrong" },
+            embeddings_model: { default: "wrong" },
+          },
+        },
+        { defaultModel: "provider/chat", embeddingsModel: "provider/embed" },
+      ),
+    ).toEqual({
+      model: "provider/chat",
+      embeddings_model: "provider/embed",
+    });
+  });
+
+  it.each(["lingua/language_detection", "langevals/exact_match"])(
+    "creates %s from its bare body with defaults the row can store as JSON",
+    (evaluatorType) => {
+      const body = { name: "vd", config: { evaluatorType } };
+      const defaults = getEvaluatorDefaultSettings(AVAILABLE_EVALUATORS[evaluatorType]);
+
+      expect(createEvaluatorInputSchema.validate(body)).toBe(true);
+      expect(z.json().validate({ ...body.config, settings: defaults })).toBe(true);
+    },
+  );
+
+  /** @scenario "Evaluator vocabulary has one portable source" */
+  it("keeps code evaluator defaults and display names in the portable vocabulary", () => {
+    expect(codeEvaluatorConfigSchema.parse(defaultCodeEvaluatorConfig)).toEqual(
+      defaultCodeEvaluatorConfig,
+    );
+    expect(evaluatorDisplayName("OpenAI Moderation")).toBe("Moderation");
+    expect(isCodeEvaluatorCheckType("code/evaluator_abc")).toBe(true);
+    expect(getCodeEvaluatorId("code/evaluator_abc")).toBe("evaluator_abc");
+    expect(() => getCodeEvaluatorId("workflow")).toThrow("is not a code evaluator check type");
+  });
+
+  /** @scenario "Evaluator vocabulary has one portable source" */
+  it("merges native and generated evaluators into one catalogue", () => {
+    const native = AVAILABLE_EVALUATORS[API_KEYS_AND_SECRETS_DETECTION];
+    if (!native) throw new Error("Missing native evaluator definition");
+
+    expect(native.category).toBe("safety");
+    expect(native.isGuardrail).toBe(true);
+    expect(AVAILABLE_EVALUATORS["presidio/pii_detection"]).toBeDefined();
+    expect(AVAILABLE_EVALUATORS["langevals/exact_match"]).toBeDefined();
+    expect(isNativeEvaluatorType(API_KEYS_AND_SECRETS_DETECTION)).toBe(true);
+    expect(isNativeEvaluatorType("presidio/pii_detection")).toBe(false);
+    expect(findEvaluatorDefinitions(API_KEYS_AND_SECRETS_DETECTION)).toEqual([native]);
+  });
+});

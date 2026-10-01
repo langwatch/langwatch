@@ -54,6 +54,11 @@ Feature: OTLP endpoint path canonicalisation
       When an exporter posts spans to the canonical path with a trailing slash
       Then the request is served as trace ingestion
 
+    @unit
+    Scenario: An endpoint with a doubled slash before the signal
+      When an exporter posts metrics to the canonical path with a doubled slash before the signal
+      Then the request is served as metric ingestion
+
   Rule: The appended suffix decides the signal, not the base endpoint
 
     @unit
@@ -64,13 +69,13 @@ Feature: OTLP endpoint path canonicalisation
 
   Rule: Correcting the path changes nothing else about the request
 
-    @unit
+    @integration
     Scenario: A corrected path still needs a valid key
       Given an exporter with no ingestion key
       When it posts to a misconfigured path
       Then the response refuses the request for want of credentials
 
-    @unit
+    @integration
     Scenario: A corrected path answers like the canonical one
       When an exporter posts spans to a misconfigured path
       Then the response is the ordinary ingestion response
@@ -80,7 +85,7 @@ Feature: OTLP endpoint path canonicalisation
     # correction rebuilds the request around a new path. A body dropped there
     # would be answered with a cheerful 200, which is the failure this whole
     # feature exists to remove.
-    @unit @regression
+    @integration @regression
     Scenario: A streamed payload survives the correction
       When an exporter streams spans to a misconfigured path
       Then the whole payload reaches ingestion
@@ -108,7 +113,7 @@ Feature: OTLP endpoint path canonicalisation
     # A misconfigured fleet posts continuously and every batch carries the same
     # project and the same path, so reporting each one costs money on an
     # ingestion hot path and says nothing the first line did not.
-    @unit
+    @integration
     Scenario: A repeated misconfiguration is reported once a window
       When an exporter posts repeatedly to the same misconfigured path
       Then the platform reports it once rather than once per batch

@@ -1,0 +1,386 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * The password section: changing it, setting a first one, and validation.
+ */
+
+import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../testing.tsx";
+import { PasswordSection } from "../password-section.tsx";
+
+const { state } = vi.hoisted(() => ({
+  state: {
+    authProvider: "email" as string | undefined,
+    emailPasswordEnabled: false,
+    accounts: [] as { id?: string; provider: string; providerAccountId: string }[],
+    hasPassword: true,
+    changeRejectsWith: void 0 as unknown,
+    identifiers: [] as Record<string, unknown>[],
+  },
+}));
+
+const calls = vi.hoisted(() => ({
+  changePassword: vi.fn(),
+  setPassword: vi.fn(),
+  unlinkAccount: vi.fn(),
+}));
+
+vi.mock("../../../behavior/personal-workspace-api.ts", () => {
+  const mutation = (run: (input: unknown) => unknown) => ({
+    useMutation: () => ({
+      isPending: false,
+      mutateAsync: async (input: unknown) => run(input),
+    }),
+  });
+  const api = {
+    useUtils: () => ({
+      user: { getLinkedAccounts: { invalidate: vi.fn() }, hasPassword: { invalidate: vi.fn() } },
+      identity: { myIdentifiers: { invalidate: vi.fn() } },
+    }),
+    identity: {
+      myIdentifiers: {
+        useQuery: () => ({ data: state.identifiers, isPending: false, error: null }),
+      },
+    },
+    user: {
+      unlinkAccount: mutation((input) => {
+        calls.unlinkAccount(input);
+        return { ok: true };
+      }),
+      hasPassword: {
+        useQuery: () => ({ data: { hasPassword: state.hasPassword }, isLoading: false }),
+      },
+      getLinkedAccounts: { useQuery: () => ({ data: state.accounts }) },
+      changePassword: mutation((input) => {
+        calls.changePassword(input);
+        if (state.changeRejectsWith) throw state.changeRejectsWith;
+        return { ok: true };
+      }),
+      setPassword: mutation((input) => {
+        calls.setPassword(input);
+        return { ok: true };
+      }),
+    },
+  };
+  return { personalWorkspaceApi: api, api };
+});
+
+beforeEach(() => {
+  state.authProvider = "email";
+  state.emailPasswordEnabled = false;
+  state.accounts = [];
+  state.hasPassword = true;
+  state.changeRejectsWith = void 0;
+  state.identifiers = [];
+  calls.unlinkAccount.mockReset();
+  calls.changePassword.mockReset();
+  calls.setPassword.mockReset();
+});
+
+afterEach(() => cleanup());
+
+function renderSection(options: Parameters<typeof fakePersonalWorkspaceHost>[0] = {}) {
+  const host = fakePersonalWorkspaceHost({
+    ...options,
+    deployment: {
+      isSaas: true,
+      appBaseUrl: "https://app.langwatch.ai",
+      passkeysEnabled: false,
+      authProvider: state.authProvider,
+      emailPasswordEnabled: state.emailPasswordEnabled,
+      ...options.deployment,
+    },
+  });
+  renderWithPersonalWorkspaceHost(<PasswordSection />, { host });
+  return host;
+}
+
+async function openChangePassword() {
+  await userEvent.click(screen.getByRole("button", { name: /Change Password/i }));
+  await waitFor(() => expect(screen.getByLabelText(/Current Password/i)).toBeTruthy());
+}
+
+async function fillAndSubmit({
+  current = "old-pw-123",
+  next = "new-pw-123456",
+}: { current?: string; next?: string } = {}) {
+  await userEvent.type(screen.getByLabelText(/Current Password/i), current);
+  await userEvent.type(screen.getByLabelText(/^New Password$/i), next);
+  await userEvent.type(screen.getByLabelText(/Confirm New Password/i), next);
+  const submit = screen
+    .getAllByRole("button", { name: /Change Password/i })
+    .find((button) => (button as HTMLButtonElement).type === "submit");
+  await userEvent.click(submit!);
+}
+
+describe("given an email deployment", () => {
+  describe("when the reader has a password", () => {
+    /** @scenario "The password and the linked accounts are separate sections" */
+    it("shows a dedicated password section with just a button", () => {
+      renderSection();
+
+      expect(screen.getByTestId("password-action")).toHaveTextContent("Change Password");
+      expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+    });
+
+    it("describes the section in the words the page always used", () => {
+      renderSection();
+
+      expect(
+        screen.getByText(
+          "The password this account signs in with, on the screens that ask for one.",
+        ),
+      ).toBeTruthy();
+    });
+
+    /** @scenario "Every password field on the page masks what is typed into it" */
+    /** @scenario The dialog asks for current + new password in both modes */
+    it("masks all three fields in the change dialog", async () => {
+      renderSection();
+
+      await openChangePassword();
+
+      for (const label of [/Current Password/i, /^New Password$/i, /Confirm New Password/i]) {
+        expect((screen.getByLabelText(label) as HTMLInputElement).type).toBe("password");
+      }
+    });
+
+    describe("when the change succeeds", () => {
+      /** @scenario Successful change shows a toast and closes the dialog */
+      it("sends both passwords, says so, and closes the dialog", async () => {
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit();
+
+        await waitFor(() => expect(calls.changePassword).toHaveBeenCalledTimes(1));
+        expect(calls.changePassword.mock.calls[0]?.[0]).toEqual({
+          currentPassword: "old-pw-123",
+          newPassword: "new-pw-123456",
+        });
+        await waitFor(() =>
+          expect(host.recording.successes).toContainEqual(
+            expect.objectContaining({ title: "Password changed successfully" }),
+          ),
+        );
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+      });
+    });
+
+    describe("when the server fails on submit", () => {
+      /** @scenario Server error keeps the dialog open and shows the error */
+      it("keeps the dialog open and shows nothing the server wrote", async () => {
+        state.changeRejectsWith = {
+          message: "AUTH0_CLIENT_SECRET scope missing",
+          data: { httpStatus: 500 },
+        };
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit();
+
+        await waitFor(() => expect(host.recording.failures).toHaveLength(1));
+        expect(host.recording.failures[0]).toMatchObject({
+          fallbackTitle: "Couldn't change your password",
+        });
+        expect(host.recording.failures[0]?.description).toBeUndefined();
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
+    });
+
+    describe("when the dialog is cancelled", () => {
+      /** @scenario Cancel button closes the dialog without submitting */
+      it("closes without calling the server", async () => {
+        renderSection();
+
+        await openChangePassword();
+        await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+        expect(calls.changePassword).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the dialog is reopened", () => {
+      /** @scenario Reopening the dialog clears any previously-typed values */
+      it("starts with the new password field empty", async () => {
+        renderSection();
+
+        await openChangePassword();
+        await userEvent.type(screen.getByLabelText(/^New Password$/i), "half-typed-secret");
+        await userEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+        await waitFor(() => expect(screen.queryByLabelText(/Current Password/i)).toBeNull());
+        await openChangePassword();
+
+        expect((screen.getByLabelText(/^New Password$/i) as HTMLInputElement).value).toBe("");
+      });
+    });
+
+    describe("when the server rejects the current password", () => {
+      /** @scenario Wrong current password keeps the dialog open and shows an error */
+      it("keeps the dialog open and carries the server's own sentence", async () => {
+        state.changeRejectsWith = {
+          message: "Current password is incorrect",
+          data: { httpStatus: 401, authored: true },
+        };
+        const host = renderSection();
+
+        await openChangePassword();
+        await fillAndSubmit({ current: "wrong-pw" });
+
+        await waitFor(() =>
+          expect(host.recording.failures).toContainEqual(
+            expect.objectContaining({
+              fallbackTitle: "Couldn't change your password",
+              description: "Current password is incorrect",
+            }),
+          ),
+        );
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      });
+    });
+  });
+
+  describe("when the reader has none", () => {
+    /** @scenario "An account with no password is offered one rather than a change" */
+    it("offers to set a first one instead", async () => {
+      state.hasPassword = false;
+      renderSection();
+
+      expect(screen.getByTestId("password-action")).toHaveTextContent("Set a password");
+
+      await userEvent.click(screen.getByTestId("password-action"));
+
+      await waitFor(() => expect(screen.getByLabelText(/^Password$/i)).toBeTruthy());
+      expect(screen.queryByLabelText(/Current Password/i)).toBeNull();
+    });
+
+    it("asks the offer again after one is set, so the button does not linger", async () => {
+      state.hasPassword = false;
+      renderSection();
+
+      await userEvent.click(screen.getByTestId("password-action"));
+      await waitFor(() => expect(screen.getByLabelText(/^Password$/i)).toBeTruthy());
+      await userEvent.type(screen.getByLabelText(/^Password$/i), "new-pw-123456");
+      await userEvent.type(screen.getByLabelText(/Confirm password/i), "new-pw-123456");
+      await userEvent.click(screen.getByRole("button", { name: /^Set password$/i }));
+
+      await waitFor(() =>
+        expect(calls.setPassword).toHaveBeenCalledWith({ password: "new-pw-123456" }),
+      );
+    });
+  });
+});
+
+function passwordVerdict(overrides: Record<string, unknown> = {}) {
+  return {
+    identifierId: "id-1",
+    accountId: "acc-pw",
+    provider: "email",
+    value: "sam@acme.test",
+    isPrimary: true,
+    confirmed: true,
+    resendable: false,
+    removable: true,
+    refusalCode: null,
+    demotesFirst: false,
+    ...overrides,
+  };
+}
+
+describe("given an account that holds a password and the identity module's verdict on it", () => {
+  beforeEach(() => {
+    state.accounts = [{ id: "acc-pw", provider: "credential", providerAccountId: "u-1" }];
+  });
+
+  describe("when the detach guard allows it", () => {
+    /** @scenario "Removing the password asks first and says what stays" */
+    it("offers Remove password, asks first, and unlinks the credential account on confirm", async () => {
+      state.identifiers = [passwordVerdict()];
+      const host = renderSection();
+
+      await userEvent.click(screen.getByTestId("remove-password"));
+      await waitFor(() => expect(screen.getByTestId("unlink-method-dialog")).toBeTruthy());
+      expect(calls.unlinkAccount).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByTestId("confirm-unlink-method"));
+
+      await waitFor(() =>
+        expect(calls.unlinkAccount).toHaveBeenCalledWith({ accountId: "acc-pw" }),
+      );
+      await waitFor(() =>
+        expect(host.recording.successes).toContainEqual(
+          expect.objectContaining({ title: "Password removed" }),
+        ),
+      );
+    });
+  });
+
+  describe("when the detach guard refuses it", () => {
+    /** @scenario "Removing the password is refused before it is clicked where it is the last way in" */
+    it("stands the button down and says why on hover", async () => {
+      state.identifiers = [
+        passwordVerdict({ removable: false, refusalCode: "last_sign_in_method" }),
+      ];
+      renderSection();
+
+      expect((screen.getByTestId("remove-password") as HTMLButtonElement).disabled).toBe(true);
+      expect(screen.getByTestId("remove-password-blocked")).toBeTruthy();
+    });
+  });
+
+  describe("when the identity module has no verdict for the account yet", () => {
+    it("offers no removal rather than a guess", () => {
+      renderSection();
+
+      expect(screen.queryByTestId("remove-password")).toBeNull();
+    });
+  });
+});
+
+describe("given a deployment on an identity provider the product cannot reach", () => {
+  describe("when the page renders", () => {
+    it("offers no password control at all", () => {
+      state.authProvider = "google";
+      renderSection();
+
+      expect(screen.queryByRole("button", { name: /Change Password/i })).toBeNull();
+      expect(screen.queryByTestId("password-section")).toBeNull();
+    });
+  });
+});
+
+describe("given a self-hosted deployment behind an enterprise provider", () => {
+  /** @scenario A self-hosted passkey-only administrator can still set a password */
+  it("offers to set a password to a passkey-only account, though the provider is not email", () => {
+    // Self-hosted issues its own passwords even behind an enterprise IdP, so
+    // the deployment reports it; a passkey-only admin needs the offer.
+    state.authProvider = "auth0";
+    state.emailPasswordEnabled = true;
+    state.hasPassword = false;
+    renderSection();
+
+    expect(screen.getByTestId("password-action").textContent).toMatch(/Set a password/i);
+  });
+
+  /** @scenario The dialog asks for current + new password in both modes */
+  it("asks an Auth0 database identity for its current password as well", async () => {
+    state.authProvider = "auth0";
+    state.accounts = [{ id: "acc-db", provider: "auth0", providerAccountId: "auth0|abc" }];
+    renderSection();
+
+    await openChangePassword();
+
+    expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+    expect(screen.getByLabelText(/Confirm New Password/i)).toBeTruthy();
+  });
+
+  it("offers nothing under Auth0 to an account holding no database identity there", () => {
+    state.authProvider = "auth0";
+    renderSection();
+
+    expect(screen.queryByTestId("password-section")).toBeNull();
+  });
+});

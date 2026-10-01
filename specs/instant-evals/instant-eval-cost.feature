@@ -4,7 +4,7 @@ Feature: What an Instant Eval run costs, and what the customer is charged
   I want a run's spend reported once, priced the same way everywhere
   So that the estimate a caller reads before a run and the bill after it come from one rule
 
-  Issue: Instant Evals, PR 4. ADR-137.
+  Issue: Instant Evals, PR 4. ADR-153.
 
   The shape:
   - The run accumulates the tokens each page reported and reports one spend record at the

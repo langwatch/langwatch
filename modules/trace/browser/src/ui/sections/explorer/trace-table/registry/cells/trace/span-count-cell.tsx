@@ -1,0 +1,16 @@
+import { Text } from "@langwatch/design-system/primitives";
+
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
+
+export const SpanCountCell = {
+  id: "spans",
+  label: "Spans",
+  render: ({ row }) => <MonoCell>{row.spanCount.toLocaleString()}</MonoCell>,
+  renderComfortable: ({ row }) => (
+    <Text textStyle="sm" color="fg.muted" textAlign="right">
+      {row.spanCount.toLocaleString()}
+    </Text>
+  ),
+} as const satisfies CellDef<TraceListItem>;

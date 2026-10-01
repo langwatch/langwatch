@@ -48,13 +48,12 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 	}
 	// NLPGO_SPAN_SYNC=1 swaps the per-tenant BatchSpanProcessor for a
 	// SimpleSpanProcessor — every span.End() blocks on the OTLP
-	// roundtrip. The integration test
-	// platform/app/src/server/nlpgo/__tests__/traceparent-roundtrip.integration.test.ts
-	// flips this on so it can assert on persisted spans without
-	// chasing async BSP-flush windows under saturated-CI scheduler
-	// contention. Production deployments must leave this off — async
-	// batching is what keeps the request hot path independent of
-	// collector RTT.
+	// roundtrip. Integration tests flip this on so they can assert on
+	// persisted spans without chasing async BSP-flush windows under
+	// saturated-CI scheduler contention; the surviving one is
+	// packages/test-harness/src/__tests__/nlpgo-eval-trace-id-roundtrip.integration.test.ts.
+	// Production deployments must leave this off — async batching is
+	// what keeps the request hot path independent of collector RTT.
 	syncExport := strings.TrimSpace(os.Getenv("NLPGO_SPAN_SYNC")) == "1"
 	debugEndpoint, debugHeaders := cfg.OTel.DebugCollector()
 	// The service's OWN spans (startup, health, background work — anything
@@ -72,6 +71,11 @@ func configureNLPGoOTel(ctx context.Context, cfg Config, nodeID string) (*otelse
 		OpsHeaders:             opsHeaders,
 		DebugCollectorEndpoint: debugEndpoint,
 		DebugCollectorHeaders:  debugHeaders,
+		// The same switch every service built through OTel.Configure honors.
+		// nlpgo builds its Options by hand (its spans route per tenant), and
+		// without this line it was the one Go lane still posting metrics to a
+		// debug collector a developer had not started.
+		MetricsDisabled: cfg.OTel.MetricsExportDisabled(),
 	})
 }
 

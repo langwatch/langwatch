@@ -1,0 +1,223 @@
+/**
+ * Registering a connected-agent process: upserting the agent rows its frame declares, and
+ * recording the instance as live.
+ */
+
+import {
+  AgentRegisterRefusedError,
+  type ConnectedAgentScope,
+  DEFAULT_CALL_TIMEOUT_MS,
+  DEFAULT_CONCURRENCY,
+  MAX_CALL_TIMEOUT_MS,
+  PROTOCOL_VERSION,
+  type RegisterFrame,
+  type RegisteredFrame,
+  type RegisteredScope,
+  deriveScope,
+  identityKeyOf,
+  isValidEnvironment,
+  sanitizeEnvironment,
+  scopeColumns,
+} from "@langwatch/agent-contract";
+import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
+
+import { nextAgentId } from "../rules/agent-id.rules.ts";
+import {
+  type NormalizedParameters,
+  normalizeParameterSchema,
+} from "../rules/connected-agent-parameter-spec.rules.ts";
+import type { AgentService } from "./agent.service.ts";
+import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
+import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
+import type { SessionInfo } from "./connected-agent-session.service.ts";
+
+const logger = createLogger("langwatch:connected-agents:registration");
+
+type ConnectedAgentRegistrationOptions = {
+  runtime: ConnectedAgentRuntime;
+  agents: AgentService;
+  publicBaseUrl: string;
+  now: () => number;
+};
+
+export class ConnectedAgentRegistrationService {
+  static create(options: ConnectedAgentRegistrationOptions): ConnectedAgentRegistrationService {
+    return new ConnectedAgentRegistrationService(options);
+  }
+
+  readonly #runtime: ConnectedAgentRuntime;
+  readonly #agents: AgentService;
+  readonly #publicBaseUrl: string;
+  readonly #now: () => number;
+
+  private constructor(options: ConnectedAgentRegistrationOptions) {
+    this.#runtime = options.runtime;
+    this.#agents = options.agents;
+    this.#publicBaseUrl = options.publicBaseUrl.replace(/\/+$/, "");
+    this.#now = options.now;
+  }
+
+  /** Upserts the rows of a register frame and records the instance as live. */
+  async registerInstance({
+    frame,
+    resolved,
+    heartbeatIntervalMs,
+  }: {
+    frame: RegisterFrame;
+    resolved: ResolvedConnectCredential;
+    heartbeatIntervalMs: number;
+  }): Promise<{ session: SessionInfo; registered: RegisteredFrame }> {
+    const projectId = resolved.project.id;
+    const userId = resolved.userId;
+    await this.#runtime.ownership.claim({
+      projectId,
+      instanceId: frame.instance.id,
+      principalId: resolved.principalId,
+    });
+    const agents = await this.#registerAgents({ frame, projectId, userId });
+
+    const meta: InstanceMeta = {
+      instanceId: frame.instance.id,
+      projectId,
+      hostname: frame.instance.hostname,
+      username: frame.instance.username,
+      pid: frame.instance.pid,
+      sdk: frame.sdk,
+      label: frame.instance.label ?? null,
+      podId: this.#runtime.podId,
+      connectedAt: this.#now(),
+      maxConcurrency: frame.instance.maxConcurrency ?? DEFAULT_CONCURRENCY,
+    };
+    const session: SessionInfo = {
+      principalId: resolved.principalId,
+      instanceId: frame.instance.id,
+      projectId,
+      projectSlug: resolved.project.slug,
+      agentIds: new Set(agents.map((agent) => agent.id)),
+      meta,
+    };
+    await this.#runtime.registry.register({
+      meta,
+      agentIds: [...session.agentIds],
+      now: this.#now(),
+    });
+    logger.info(
+      {
+        projectId,
+        instanceId: session.instanceId,
+        agentIds: [...session.agentIds],
+        hostname: frame.instance.hostname,
+      },
+      "connected agent instance registered",
+    );
+
+    return {
+      session,
+      registered: {
+        type: "registered",
+        protocol: PROTOCOL_VERSION,
+        agents: agents.map((agent) => ({
+          name: agent.name,
+          environment: agent.environment,
+          id: agent.id,
+          url: `${this.#publicBaseUrl}/${session.projectSlug}/agents?drawer.open=agentConnectedDetail&drawer.agentId=${encodeURIComponent(agent.id)}`,
+          parameterNotes: agent.notes,
+          scope: wireScope(agent.scope),
+        })),
+        heartbeatIntervalMs,
+        instanceId: session.instanceId,
+      },
+    };
+  }
+
+  /** Upserts every agent of the frame; refuses the frame on the first bad one. */
+  async #registerAgents({
+    frame,
+    projectId,
+    userId,
+  }: {
+    frame: RegisterFrame;
+    projectId: string;
+    userId: string | null;
+  }): Promise<RegisteredAgentRow[]> {
+    const registered: RegisteredAgentRow[] = [];
+    for (const agent of frame.agents) {
+      const environment = sanitizeEnvironment(agent.environment);
+      if (!isValidEnvironment(environment)) {
+        throw new AgentRegisterRefusedError({
+          reason: "environment_invalid",
+          message: `The environment "${agent.environment}" is not valid. Use letters, digits, dashes and underscores, up to 32 characters.`,
+        });
+      }
+
+      let normalized: NormalizedParameters;
+      try {
+        normalized = normalizeParameterSchema(agent.parameters);
+      } catch (error) {
+        if (!HandledError.isHandled(error)) {
+          throw error;
+        }
+
+        throw new AgentRegisterRefusedError({
+          reason: "parameters_invalid",
+          message: `${agent.name}: ${error.message}`,
+          meta: { agentName: agent.name, ...error.meta },
+        });
+      }
+
+      const scope = deriveScope({
+        environment,
+        userId,
+        hostname: frame.instance.hostname,
+      });
+      const identityKey = identityKeyOf({
+        name: agent.name,
+        environment,
+        scope,
+      });
+      const row = await this.#agents.registerConnected({
+        id: nextAgentId(),
+        projectId,
+        name: agent.name,
+        config: {
+          parameters: normalized.parameters,
+          timeoutMs: Math.min(agent.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS, MAX_CALL_TIMEOUT_MS),
+          concurrency: agent.concurrency,
+          sticky: agent.sticky,
+          sdk: frame.sdk,
+        },
+        identity: { environment, identityKey, ...scopeColumns(scope) },
+      });
+      registered.push({
+        id: row.id,
+        name: row.name,
+        environment,
+        notes: normalized.notes,
+        scope,
+      });
+    }
+
+    return registered;
+  }
+}
+
+interface RegisteredAgentRow {
+  id: string;
+  name: string;
+  environment: string;
+  notes: string[];
+  scope: ConnectedAgentScope;
+}
+
+/** The scope as the registered frame carries it: the owner's id stays here. */
+function wireScope(scope: ConnectedAgentScope): RegisteredScope {
+  switch (scope.kind) {
+    case "shared":
+      return { kind: "shared" };
+    case "owner":
+      return { kind: "owner" };
+    case "host":
+      return { kind: "host", hostLabel: scope.hostLabel };
+  }
+}

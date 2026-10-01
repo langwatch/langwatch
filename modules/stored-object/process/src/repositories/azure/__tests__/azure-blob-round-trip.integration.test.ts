@@ -1,0 +1,160 @@
+/**
+ * @vitest-environment node
+ * Round-trip bytes through Azure Blob with real driver, registry, and policy.
+ * @see specs/features/scenarios/externalize-event-byte-content.feature
+ */
+import type { Readable } from "node:stream";
+
+import { TieredBlobStore } from "@langwatch/group-queue/operational";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AzureStoredObjectBlobRepository } from "#repositories/azure/azure.stored-object-blob.repository";
+import {
+  StoredObjectAzureDestination,
+  StoredObjectDestinationPolicyService,
+  StoredObjectProjectS3Config,
+  type StoredObjectProjectBucket,
+} from "#services/stored-object-destination-policy.service";
+import { StoredObjectStorageRegistryService } from "#services/stored-object-storage-registry.service";
+
+function requestUrl(input: RequestInfo | URL | undefined): string {
+  if (input === undefined) return "";
+  return input instanceof Request ? input.url : input.toString();
+}
+
+const ACCOUNT = "lwacct";
+const CONTAINER = "stored-objects";
+const PROJECT_ID = "proj-1";
+
+/**
+ * An Azure Blob account at the HTTP boundary: PUT stores, GET returns, HEAD probes, DELETE
+ * removes, and anything absent answers 404 the way the service expects. Only `fetch` is
+ * replaced, so signing, URI parsing and scheme dispatch are all the production code.
+ */
+function installBlobAccount(): Map<string, Buffer> {
+  const blobs = new Map<string, Buffer>();
+  vi.spyOn(globalThis, "fetch").mockImplementation((async (
+    input: string | URL | Request,
+    init?: RequestInit,
+  ) => {
+    const url = requestUrl(input);
+    const method = init?.method ?? "GET";
+    if (method === "PUT") {
+      blobs.set(url, Buffer.from(init?.body as Uint8Array));
+      return new Response(null, { status: 201 });
+    }
+    if (method === "DELETE") {
+      const existed = blobs.delete(url);
+      return new Response(null, { status: existed ? 202 : 404 });
+    }
+    const stored = blobs.get(url);
+    if (!stored) return new Response(null, { status: 404 });
+    if (method === "HEAD") return new Response(null, { status: 200 });
+    return new Response(new Uint8Array(stored), { status: 200 });
+  }) as typeof fetch);
+  return blobs;
+}
+
+function azureDriver(): AzureStoredObjectBlobRepository {
+  return AzureStoredObjectBlobRepository.create({
+    mode: "sharedKey",
+    accountName: ACCOUNT,
+    accountKey: Buffer.from("account-key").toString("base64"),
+  });
+}
+
+/** Only the Azure arm can serve a request: an S3 or file dispatch is a failure. */
+function azureOnlyRegistry(): StoredObjectStorageRegistryService {
+  const driver = azureDriver();
+  const refuse = {
+    get: async () => {
+      throw new Error("no S3 or filesystem provider exists on this install");
+    },
+    put: async () => {
+      throw new Error("no S3 or filesystem provider exists on this install");
+    },
+    delete: async () => {
+      throw new Error("no S3 or filesystem provider exists on this install");
+    },
+    exists: async () => {
+      throw new Error("no S3 or filesystem provider exists on this install");
+    },
+  };
+  return StoredObjectStorageRegistryService.create({
+    s3: refuse,
+    file: refuse,
+    "azure-blob": driver,
+  });
+}
+
+class NoPrivateBucket extends StoredObjectProjectS3Config {
+  async resolveBucket(): Promise<StoredObjectProjectBucket> {
+    return { kind: "platform" };
+  }
+}
+
+class ConfiguredAzure extends StoredObjectAzureDestination {
+  resolve() {
+    return { accountName: ACCOUNT, container: CONTAINER };
+  }
+}
+
+/** The one deployment both cases run on: azure selected, no S3 anywhere. */
+function azureOnlyPolicy(): StoredObjectDestinationPolicyService {
+  return StoredObjectDestinationPolicyService.create({
+    selection: {
+      backend: "azure",
+      localFilesystemRoot: "/var/lib/langwatch/objects",
+      azure: new ConfiguredAzure(),
+    },
+    projects: new NoPrivateBucket(),
+  });
+}
+
+beforeEach(() => {
+  installBlobAccount();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe("given a deployment whose object storage is Azure Blob and nothing else", () => {
+  describe("when the groupQueue offloads an oversized envelope", () => {
+    /** @scenario "The groupQueue durable blob tier works on an Azure-only install" */
+    it("puts the bytes in Azure Blob under the durable tier and reads them back", async () => {
+      const threshold = 64;
+      const store = new TieredBlobStore({
+        redisBlobs: {
+          put: vi.fn(async () => undefined),
+          get: vi.fn(async () => null),
+          peek: vi.fn(async () => null),
+          delete: vi.fn(async () => undefined),
+        },
+        objectStoreFor: () => azureOnlyRegistry(),
+        resolveDestination: (projectId) => azureOnlyPolicy().resolve(projectId),
+        s3ThresholdBytes: threshold,
+      });
+      const body = Buffer.from("x".repeat(threshold * 4));
+
+      const ref = await store.put({
+        projectId: PROJECT_ID,
+        data: body,
+        mediaType: "application/json",
+      });
+
+      // "s3" names the durable TIER, not the provider it landed on.
+      expect(ref.tier).toBe("s3");
+      const roundTripped = await store.get(ref);
+      expect(await drain(roundTripped)).toBe(body.toString());
+    });
+  });
+});
+
+async function drain(stream: Readable | Buffer | null): Promise<string> {
+  if (stream === null) return "";
+  if (Buffer.isBuffer(stream)) return stream.toString("utf8");
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf8");
+}

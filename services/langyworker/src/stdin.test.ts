@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
+
 import { describe, expect, it } from "vitest";
+
 import { attachJsonlReader } from "./stdin.js";
 
 function makeSource() {

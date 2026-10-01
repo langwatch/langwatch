@@ -4,11 +4,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_webhooks_v1_event_types_response_200 import GetApiWebhooksV1EventTypesResponse200
-from ...models.get_api_webhooks_v1_event_types_response_400 import GetApiWebhooksV1EventTypesResponse400
-from ...models.get_api_webhooks_v1_event_types_response_401 import GetApiWebhooksV1EventTypesResponse401
-from ...models.get_api_webhooks_v1_event_types_response_403 import GetApiWebhooksV1EventTypesResponse403
-from ...models.get_api_webhooks_v1_event_types_response_500 import GetApiWebhooksV1EventTypesResponse500
+from ...models.get_api_webhooks_v1_event_types_response_200_item import GetApiWebhooksV1EventTypesResponse200Item
 from ...types import Response, safe_http_status
 
 
@@ -24,38 +20,16 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-    | None
-):
+) -> list[GetApiWebhooksV1EventTypesResponse200Item] | None:
     if response.status_code == 200:
-        response_200 = GetApiWebhooksV1EventTypesResponse200.from_dict(response.json())
+        response_200 = []
+        _response_200 = response.json()
+        for response_200_item_data in _response_200:
+            response_200_item = GetApiWebhooksV1EventTypesResponse200Item.from_dict(response_200_item_data)
+
+            response_200.append(response_200_item)
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = GetApiWebhooksV1EventTypesResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiWebhooksV1EventTypesResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 403:
-        response_403 = GetApiWebhooksV1EventTypesResponse403.from_dict(response.json())
-
-        return response_403
-
-    if response.status_code == 500:
-        response_500 = GetApiWebhooksV1EventTypesResponse500.from_dict(response.json())
-
-        return response_500
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -65,13 +39,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-]:
+) -> Response[list[GetApiWebhooksV1EventTypesResponse200Item]]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -86,13 +54,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-]:
+) -> Response[list[GetApiWebhooksV1EventTypesResponse200Item]]:
     """List subscribable event types
 
      The event catalog: every subscribable type, grouped by family; types marked emitting=false are
@@ -103,7 +65,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWebhooksV1EventTypesResponse200 | GetApiWebhooksV1EventTypesResponse400 | GetApiWebhooksV1EventTypesResponse401 | GetApiWebhooksV1EventTypesResponse403 | GetApiWebhooksV1EventTypesResponse500]
+        Response[list[GetApiWebhooksV1EventTypesResponse200Item]]
     """
 
     kwargs = _get_kwargs()
@@ -118,14 +80,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-    | None
-):
+) -> list[GetApiWebhooksV1EventTypesResponse200Item] | None:
     """List subscribable event types
 
      The event catalog: every subscribable type, grouped by family; types marked emitting=false are
@@ -136,7 +91,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWebhooksV1EventTypesResponse200 | GetApiWebhooksV1EventTypesResponse400 | GetApiWebhooksV1EventTypesResponse401 | GetApiWebhooksV1EventTypesResponse403 | GetApiWebhooksV1EventTypesResponse500
+        list[GetApiWebhooksV1EventTypesResponse200Item]
     """
 
     return sync_detailed(
@@ -147,13 +102,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-]:
+) -> Response[list[GetApiWebhooksV1EventTypesResponse200Item]]:
     """List subscribable event types
 
      The event catalog: every subscribable type, grouped by family; types marked emitting=false are
@@ -164,7 +113,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiWebhooksV1EventTypesResponse200 | GetApiWebhooksV1EventTypesResponse400 | GetApiWebhooksV1EventTypesResponse401 | GetApiWebhooksV1EventTypesResponse403 | GetApiWebhooksV1EventTypesResponse500]
+        Response[list[GetApiWebhooksV1EventTypesResponse200Item]]
     """
 
     kwargs = _get_kwargs()
@@ -177,14 +126,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiWebhooksV1EventTypesResponse200
-    | GetApiWebhooksV1EventTypesResponse400
-    | GetApiWebhooksV1EventTypesResponse401
-    | GetApiWebhooksV1EventTypesResponse403
-    | GetApiWebhooksV1EventTypesResponse500
-    | None
-):
+) -> list[GetApiWebhooksV1EventTypesResponse200Item] | None:
     """List subscribable event types
 
      The event catalog: every subscribable type, grouped by family; types marked emitting=false are
@@ -195,7 +137,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiWebhooksV1EventTypesResponse200 | GetApiWebhooksV1EventTypesResponse400 | GetApiWebhooksV1EventTypesResponse401 | GetApiWebhooksV1EventTypesResponse403 | GetApiWebhooksV1EventTypesResponse500
+        list[GetApiWebhooksV1EventTypesResponse200Item]
     """
 
     return (

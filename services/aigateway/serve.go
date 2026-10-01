@@ -26,7 +26,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 	if !cfg.ControlPlane.BaseURLExplicit {
 		deps.Logger.Warn("aigateway_control_plane_base_url_not_explicit",
 			zap.String("control_plane_base_url", cfg.ControlPlane.BaseURL),
-			zap.String("fix", "set LW_GATEWAY_BASE_URL explicitly, see platform/app/.env.example"),
+			zap.String("fix", "set LW_GATEWAY_BASE_URL explicitly, see .env.example"),
 		)
 	}
 

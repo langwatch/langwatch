@@ -49,6 +49,7 @@ Concretely:
 ## Consequences
 
 **Positive.**
+
 - Org admins configure OpenAI once; every project in the org inherits. Rotation is one-click at the org row.
 - Team admins carve out team-specific accounts (think: team X has a fine-tuning contract, everyone else defaults to the org credential).
 - AI Gateway binding picker surfaces all three scopes with clear badges — operators understand at a glance where a credential came from.
@@ -56,11 +57,13 @@ Concretely:
 - Non-breaking: every existing project keeps its providers, keeps its behavior, keeps its bindings.
 
 **Negative.**
+
 - Settings → Model Providers has more surface area. The scope picker and the badge column add columns and clicks.
 - RBAC permission surface grows (three new manage permissions per resource type). Documented in the spec §4; existing roles extend naturally.
 - `getAllAccessible` walks three scopes per call. For a project in an org with 1 org-scoped + 10 team-scoped + 5 project-scoped providers, the result is 16 rows. Trivial in absolute terms; worth a SQL index on `(scopeType, scopeId)`.
 
 **Neutral.**
+
 - `DefaultModel` inherits the same ladder. Same migration shape, same walk, same UX. Reuse of the pattern means the DX stays consistent.
 
 ## References

@@ -1,0 +1,32 @@
+import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
+
+import { MetricDataPointAppendRepository } from "./metric-data-point-append.repository.ts";
+
+/** One series' total over a window, with the label set that identifies it. */
+export interface SeriesTotalByPointAttribute {
+  metricName: string;
+  /** Sum of the delta-converged rollup buckets — the series' total. */
+  total: number;
+  pointAttributes: Record<string, string>;
+}
+
+/**
+ * The whole metric surface: the append port durable processing uses, plus the
+ * two reads that only a query graph makes.
+ */
+export abstract class MetricDataPointRepository extends MetricDataPointAppendRepository {
+  abstract queryUsageEstimates(query: MetricUsageEstimateQuery): Promise<MetricUsageEstimate[]>;
+
+  /**
+   * Totals for series matching `attributeKey = attributeValue`, summed from
+   * delta-converged 30s rollups (sum IS the total regardless of temporality)
+   * — the session-keyed read coding agents need, given no trace-correlating exemplars.
+   */
+  abstract findSeriesTotalsByPointAttribute(args: {
+    tenantId: string;
+    attributeKey: string;
+    attributeValue: string;
+    /** Partition-pruning lower bound for the rollup scan. */
+    fromMs: number;
+  }): Promise<SeriesTotalByPointAttribute[]>;
+}

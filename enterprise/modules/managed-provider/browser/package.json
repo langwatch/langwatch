@@ -1,0 +1,35 @@
+{
+  "name": "@langwatch/enterprise-managed-provider-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Enterprise managed-provider UI.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {},
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -1,0 +1,481 @@
+/**
+ * What an API key may be granted, and what the CALLER may grant it, per
+ * `@langwatch/authz-contract` — its `admin` bag lists `langy:create/update/delete`
+ * explicitly where the legacy bag implied them; see `cli-key-defaults.unit.test.ts`.
+ */
+
+import {
+  type AccessLevel,
+  type ApiKeyRole,
+  categorizablePermissions,
+  PERMISSION_CATEGORIES,
+  type PermissionCategory,
+} from "@langwatch/api-key-contract";
+import { permissionSatisfiedBy } from "@langwatch/authorization";
+import {
+  bindingScopeCanGrantPermission,
+  builtinRolePermissions,
+  roleKeyForTeamRole,
+} from "@langwatch/authz-contract";
+
+/** The team-role vocabulary the API key surfaces speak. */
+export type ApiKeyTeamRole = "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+
+/**
+ * Every permission a built-in team role holds. Injectable below, because the
+ * ceiling calculations are the part of this family most worth testing in
+ * isolation.
+ */
+export function teamRolePermissions(role: string): string[] {
+  return [...builtinRolePermissions(roleKeyForTeamRole(role as ApiKeyTeamRole))];
+}
+
+/**
+ * Whether the user may hand a category's read or write level to an API key.
+ * The non-empty guard keeps a write-only category (project administration)
+ * from reading as available: `[].every(...)` is `true`.
+ */
+export function categoryAccessAvailability({
+  category,
+  userPermissions,
+}: {
+  category: PermissionCategory;
+  userPermissions: string[];
+}): { canRead: boolean; canWrite: boolean } {
+  const granted = new Set(userPermissions);
+  const holdsAll = (permissions: readonly string[]) =>
+    permissions.length > 0 &&
+    permissions.every((permission) => permissionSatisfiedBy({ granted, requested: permission }));
+  return {
+    canRead: category.accessLevels.includes("read") && holdsAll(category.readPermissions),
+    canWrite: category.accessLevels.includes("write") && holdsAll(category.writePermissions),
+  };
+}
+
+export type PermissionMode = "all" | "readonly" | "restricted";
+
+export type PermissionLabel = "Read" | "Write";
+
+export const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
+
+export const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin",
+  MEMBER: "Member",
+  VIEWER: "Viewer",
+  NONE: "None",
+};
+
+/** Returns the list of standard roles at or below the given role in the hierarchy, plus "None". */
+export function rolesAtOrBelow(role: string): { label: string; value: string }[] {
+  const idx = STANDARD_ROLES.indexOf(role as (typeof STANDARD_ROLES)[number]);
+  if (idx === -1) return [];
+  const roles: { label: string; value: string }[] = STANDARD_ROLES.slice(idx).map((r) => ({
+    label: ROLE_LABELS[r] ?? r,
+    value: r,
+  }));
+  roles.push({ label: "None", value: "NONE" });
+  return roles;
+}
+
+export function roleToPermissionLabel(role: string): PermissionLabel {
+  return role === "ADMIN" ? "Write" : "Read";
+}
+
+export function permissionLabelToRole(label: PermissionLabel): string {
+  return label === "Write" ? "ADMIN" : "VIEWER";
+}
+
+type BindingInput = {
+  id: string;
+  role: string;
+  customRoleId: string | null;
+  scopeType: string;
+  scopeId: string;
+};
+
+type BindingOutput = {
+  role: string;
+  customRoleId: string | null | undefined;
+  scopeType: string;
+  scopeId: string;
+};
+
+/** Computes the effective bindings array based on the selected permission mode. */
+export function computeBindings({
+  data,
+  permissionMode,
+  roleOverrides,
+}: {
+  data: BindingInput[] | undefined;
+  permissionMode: PermissionMode;
+  roleOverrides: Record<string, string>;
+}): BindingOutput[] {
+  if (!data) return [];
+  switch (permissionMode) {
+    case "all":
+      return data.map((b) => ({
+        role: b.role,
+        customRoleId: b.customRoleId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "readonly":
+      return data.map((b) => ({
+        role: "VIEWER" as const,
+        customRoleId: null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "restricted":
+      return data
+        .filter((b) => (roleOverrides[b.id] ?? b.role) !== "NONE")
+        .map((b) => {
+          const overriddenRole = roleOverrides[b.id];
+          if (overriddenRole && overriddenRole !== b.role) {
+            return {
+              role: overriddenRole,
+              customRoleId: null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            };
+          }
+          return {
+            role: b.role,
+            customRoleId: b.customRoleId,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          };
+        });
+    default: {
+      const _exhaustive: never = permissionMode;
+      return _exhaustive;
+    }
+  }
+}
+
+function scopeTypeLabel(scopeType: string, count: number): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  if (scopeType === "TEAM") return count === 1 ? "Team" : `${count} Teams`;
+  return count === 1 ? "Project" : `${count} Projects`;
+}
+
+/** One-line summary of a role-binding set for table display. */
+export function roleSummary(
+  bindings: {
+    role: string;
+    scopeType: string;
+    scopeId: string;
+  }[],
+): string {
+  if (bindings.length === 0) return "No permissions";
+
+  const counts: Record<string, number> = {};
+  for (const b of bindings) {
+    counts[b.scopeType] = (counts[b.scopeType] ?? 0) + 1;
+  }
+
+  return Object.entries(counts)
+    .map(([type, count]) => scopeTypeLabel(type, count))
+    .join(", ");
+}
+
+export function permissionsSummary({
+  permissionMode,
+  grantedCount,
+  totalCount,
+}: {
+  permissionMode: string;
+  grantedCount: number;
+  totalCount: number;
+}): string {
+  if (permissionMode === "all") return "All";
+  return `${grantedCount} of ${totalCount} permissions`;
+}
+
+export function findBindingAtScope<T extends { scopeType: string; scopeId: string }>({
+  bindings,
+  scopeType,
+  scopeId,
+  organizationId,
+  orgProjects,
+}: {
+  bindings: T[] | undefined;
+  scopeType: string;
+  scopeId: string;
+  organizationId: string;
+  orgProjects: { id: string; teamId: string }[];
+}): T | undefined {
+  if (!bindings) return undefined;
+
+  const find = (st: string, sid: string) =>
+    bindings.find((b) => b.scopeType === st && b.scopeId === sid);
+
+  return (
+    find(scopeType, scopeId) ??
+    (scopeType === "PROJECT"
+      ? find("TEAM", orgProjects.find((p) => p.id === scopeId)?.teamId ?? "")
+      : undefined) ??
+    (scopeType !== "ORGANIZATION" ? find("ORGANIZATION", organizationId) : undefined)
+  );
+}
+
+export function deriveBindingRole({
+  permissionMode,
+  scopeType,
+  scopeId,
+  myBindings,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+}: {
+  permissionMode: string;
+  scopeType: string;
+  scopeId: string;
+  myBindings: { scopeType: string; scopeId: string; role: ApiKeyRole }[] | undefined;
+  organizationId: string;
+  orgProjects: { id: string; teamId: string }[];
+  isServiceKey: boolean;
+}): ApiKeyRole {
+  if (permissionMode !== "all") return "CUSTOM";
+  if (isServiceKey) return "ADMIN";
+  if (!myBindings) return "VIEWER";
+
+  const binding = findBindingAtScope({
+    bindings: myBindings,
+    scopeType,
+    scopeId,
+    organizationId,
+    orgProjects,
+  });
+
+  return binding?.role ?? "VIEWER";
+}
+
+export function scopeLabel({
+  scopeType,
+  scopeName,
+}: {
+  scopeType: string;
+  scopeName?: string;
+}): string {
+  if (scopeType === "ORGANIZATION") return "Organization";
+  const prefix = scopeType === "TEAM" ? "Team" : "Project";
+  return scopeName ? `${prefix}: ${scopeName}` : prefix;
+}
+
+export function bindingsToScopes(
+  grants: { scopeType: string; scopeId: string }[],
+): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[] {
+  return grants.map((rb) => ({
+    scopeType: rb.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+    scopeId: rb.scopeId,
+  }));
+}
+
+export function bindingsToPermissionMode(apiKey: {
+  permissionMode: string;
+  grants: { role: string }[];
+}): "all" | "restricted" {
+  const mode = apiKey.permissionMode as PermissionMode;
+  if (mode === "readonly" || mode === "restricted") return "restricted";
+  const [onlyBinding] = apiKey.grants;
+  const hasSingleCustomBinding = apiKey.grants.length === 1 && onlyBinding?.role === "CUSTOM";
+  if (hasSingleCustomBinding) {
+    return "restricted";
+  }
+  return "all";
+}
+
+export function bindingsToSelections(
+  apiKey: {
+    permissionMode: string;
+    grants: {
+      role: string;
+      customRoleId: string | null;
+      customRolePermissions: string[] | null;
+    }[];
+  },
+  deps: {
+    permissionCategories: readonly {
+      key: string;
+      accessLevels: readonly string[];
+    }[];
+    selectionsFromPermissions: (perms: string[]) => Record<string, string>;
+    getTeamRolePermissions: (role: string) => string[];
+  },
+): Record<string, string> {
+  const mode = apiKey.permissionMode as PermissionMode;
+
+  if (mode === "readonly") return readSelections(deps.permissionCategories);
+
+  const binding = apiKey.grants[0];
+  if (!binding) return {};
+
+  if (binding.role === "CUSTOM" && binding.customRoleId) {
+    const permissions = binding.customRolePermissions;
+    if (Array.isArray(permissions)) {
+      return deps.selectionsFromPermissions(permissions);
+    }
+  }
+
+  if (binding.role === "VIEWER") return readSelections(deps.permissionCategories);
+
+  if (binding.role === "MEMBER") {
+    return deps.selectionsFromPermissions(deps.getTeamRolePermissions("MEMBER"));
+  }
+
+  return fullAccessSelections(deps.permissionCategories);
+}
+
+type PermissionCategoryLevels = { key: string; accessLevels: readonly string[] };
+
+/** Read on every category that has a read level; write-only categories show nothing. */
+function readSelections(categories: readonly PermissionCategoryLevels[]): Record<string, string> {
+  const selections: Record<string, string> = {};
+  for (const cat of categories) {
+    if (cat.accessLevels.includes("read")) selections[cat.key] = "read";
+  }
+  return selections;
+}
+
+/** The broadest level on every category: write where it exists, else read. */
+function fullAccessSelections(
+  categories: readonly PermissionCategoryLevels[],
+): Record<string, string> {
+  const selections: Record<string, string> = {};
+  for (const cat of categories) {
+    selections[cat.key] = cat.accessLevels.includes("write") ? "write" : "read";
+  }
+  return selections;
+}
+
+export function getUserPermissionsAtScope({
+  myBindings,
+  scopeType,
+  scopeId,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+  getTeamRolePermissions: getRolePerms = teamRolePermissions,
+}: {
+  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
+  scopeType: string;
+  scopeId: string;
+  organizationId: string;
+  orgProjects: { id: string; teamId: string }[];
+  isServiceKey: boolean;
+  getTeamRolePermissions?: (role: string) => string[];
+}): string[] {
+  // Service keys and organization admins can grant anything grantable: the
+  // permission resolver short-circuits an ORGANIZATION-scoped ADMIN binding to
+  // full access, so the team-role bags (which carry no organization, gateway,
+  // governance or playground permissions) understate their ceiling.
+  if (isServiceKey) return categorizablePermissions();
+
+  const binding = findBindingAtScope({
+    bindings: myBindings,
+    scopeType,
+    scopeId,
+    organizationId,
+    orgProjects,
+  });
+  if (!binding) return [];
+  if (binding.scopeType === "ORGANIZATION" && binding.role === "ADMIN") {
+    return categorizablePermissions();
+  }
+  // A non-ADMIN ORGANIZATION-scoped builtin binding grants the org-member bag
+  // only, narrowed to what a binding at the REQUESTED scope may carry: both
+  // bag permissions are org-exclusive, and the CLI mint strips org-exclusive
+  // permissions from a selection with no ORGANIZATION binding
+  // (`filterToGrantable`).
+  if (binding.scopeType === "ORGANIZATION" && binding.role !== "CUSTOM") {
+    return [...builtinRolePermissions("org-member")].filter((permission) =>
+      bindingScopeCanGrantPermission({
+        scopeType: scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        permission,
+      }),
+    );
+  }
+  return getRolePerms(binding.role);
+}
+
+/**
+ * The ceiling for a key bound to several scopes: the intersection of what
+ * the caller holds at each. One list serves every binding on a key —
+ * `assertSelectionWithinCeiling` refuses the whole selection otherwise.
+ */
+export function getUserPermissionsAcrossScopes({
+  myBindings,
+  scopes,
+  organizationId,
+  orgProjects,
+  isServiceKey,
+  getTeamRolePermissions: getRolePerms = teamRolePermissions,
+}: {
+  myBindings: { scopeType: string; scopeId: string; role: string }[] | undefined;
+  scopes: { scopeType: string; scopeId: string }[];
+  organizationId: string;
+  orgProjects: { id: string; teamId: string }[];
+  isServiceKey: boolean;
+  getTeamRolePermissions?: (role: string) => string[];
+}): string[] {
+  const perScope = scopes.map(
+    (scope) =>
+      new Set(
+        getUserPermissionsAtScope({
+          myBindings,
+          scopeType: scope.scopeType,
+          scopeId: scope.scopeId,
+          organizationId,
+          orgProjects,
+          isServiceKey,
+          getTeamRolePermissions: getRolePerms,
+        }),
+      ),
+  );
+
+  const [first, ...rest] = perScope;
+  if (!first) return [];
+  return [...first].filter((permission) => rest.every((held) => held.has(permission)));
+}
+
+/**
+ * Narrows category selections to what the moving ceiling still allows:
+ * write falls back to read where read survives, else to none. A category
+ * no longer covered renders locked, per `categoryAccessAvailability`.
+ */
+export function clampSelectionsToAvailability({
+  selections,
+  userPermissions,
+}: {
+  selections: Record<string, AccessLevel | "none">;
+  userPermissions: string[];
+}): Record<string, AccessLevel | "none"> {
+  const clamped: Record<string, AccessLevel | "none"> = {};
+  for (const [key, level] of Object.entries(selections)) {
+    const category = PERMISSION_CATEGORIES.find((c) => c.key === key);
+    clamped[key] =
+      level === "none" || !category
+        ? "none"
+        : highestLevelStillGranted({
+            level,
+            ...categoryAccessAvailability({ category, userPermissions }),
+          });
+  }
+  return clamped;
+}
+
+/** Write where write survives, otherwise read, otherwise nothing. */
+function highestLevelStillGranted({
+  level,
+  canRead,
+  canWrite,
+}: {
+  level: AccessLevel;
+  canRead: boolean;
+  canWrite: boolean;
+}): AccessLevel | "none" {
+  if (level === "write" && canWrite) return "write";
+  if (canRead) return "read";
+  return "none";
+}

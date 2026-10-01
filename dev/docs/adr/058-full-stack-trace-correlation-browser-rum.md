@@ -115,7 +115,7 @@ does not answer for this codebase:
    the navigating stack is gone by the time the new page's queries dispatch.
    The difference is that a navigation is a singular, page-wide state with a
    beginning and an end the router announces, so it can be published as an
-   *ambient* context — a parent for spans that would otherwise have no parent
+   _ambient_ context — a parent for spans that would otherwise have no parent
    at all — instead of needing context to be threaded through arbitrary async
    code. That is why this works without zone.js and the per-procedure link did
    not.
@@ -131,6 +131,7 @@ does not answer for this codebase:
 
    Span duration ends at commit rather than at that point: the duration should
    be what the user waited for, not how long we kept the parent open.
+
 3. **A session span processor** that stamps `session.id` (per OpenTelemetry
    session semantic conventions) on every span. The web SDK has no session
    concept; without this, "show me everything this user did around the failure"
@@ -162,7 +163,7 @@ taking that seriously:
   a repeated attribute list where the collector takes the last value and a
   first-match check takes the first — so a second `service.name` slips a forged
   identity past any check. Overwriting removes the question.
-- **Limits are enforced per caller *and* globally.** The per-caller bucket is
+- **Limits are enforced per caller _and_ globally.** The per-caller bucket is
   fairness; since it keys on self-asserted values it bounds accidents, not
   abuse. The global bucket is what actually caps what the route can push at the
   collector.

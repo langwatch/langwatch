@@ -1,7 +1,9 @@
 # Directory paths
 DOCS_DIR = api-reference
 API_SPEC_FILE = openapiLangWatch.json
-CANONICAL_SPEC = ../platform/app/src/app/api/$(API_SPEC_FILE)
+# `specs/` owns the document; the docs site keeps a copy under its own
+# historical name so the Mintlify page references do not have to change.
+CANONICAL_SPEC = ../specs/api-reference/openapi-document.json
 
 
 .PHONY: sync-api-spec
@@ -14,13 +16,13 @@ sync-api-spec:
 .PHONY: generate-openapi-evals
 generate-openapi-evals:
 	@echo "Generating OpenAPI spec for evaluators from langevals..."
-	@npx tsx scripts/generate-openapi-evals.ts
+	@node scripts/generate-openapi-evals.ts
 	@echo "✅ Evaluators OpenAPI spec generated successfully"
 
 .PHONY: generate-api-reference
 generate-api-reference:
 	@echo "Generating API reference pages from OpenAPI spec..."
-	@../platform/app/node_modules/.bin/tsx scripts/generate-api-reference-pages.ts
+	@node --experimental-transform-types --no-warnings scripts/generate-api-reference-pages.ts
 	@echo "✅ API reference pages generated and docs.json updated"
 
 .PHONY: view-docs

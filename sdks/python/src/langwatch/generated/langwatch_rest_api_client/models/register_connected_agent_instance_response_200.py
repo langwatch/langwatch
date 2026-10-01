@@ -9,11 +9,8 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.register_connected_agent_instance_response_200_frame_type_0 import (
-        RegisterConnectedAgentInstanceResponse200FrameType0,
-    )
-    from ..models.register_connected_agent_instance_response_200_frame_type_1 import (
-        RegisterConnectedAgentInstanceResponse200FrameType1,
+    from ..models.register_connected_agent_instance_response_200_frame import (
+        RegisterConnectedAgentInstanceResponse200Frame,
     )
 
 
@@ -24,27 +21,17 @@ T = TypeVar("T", bound="RegisterConnectedAgentInstanceResponse200")
 class RegisterConnectedAgentInstanceResponse200:
     """
     Attributes:
-        frame (RegisterConnectedAgentInstanceResponse200FrameType0 |
-            RegisterConnectedAgentInstanceResponse200FrameType1): The registered frame, or the refused frame with its
-            reason.
+        frame (RegisterConnectedAgentInstanceResponse200Frame): The registered frame.
         instance_token (str | Unset): The token the poll and frames endpoints are addressed with, in the X-Agent-
-            Instance-Token header. Present when the register was accepted.
+            Instance-Token header.
     """
 
-    frame: RegisterConnectedAgentInstanceResponse200FrameType0 | RegisterConnectedAgentInstanceResponse200FrameType1
+    frame: RegisterConnectedAgentInstanceResponse200Frame
     instance_token: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.register_connected_agent_instance_response_200_frame_type_0 import (
-            RegisterConnectedAgentInstanceResponse200FrameType0,
-        )
-
-        frame: dict[str, Any]
-        if isinstance(self.frame, RegisterConnectedAgentInstanceResponse200FrameType0):
-            frame = self.frame.to_dict()
-        else:
-            frame = self.frame.to_dict()
+        frame = self.frame.to_dict()
 
         instance_token = self.instance_token
 
@@ -62,33 +49,12 @@ class RegisterConnectedAgentInstanceResponse200:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.register_connected_agent_instance_response_200_frame_type_0 import (
-            RegisterConnectedAgentInstanceResponse200FrameType0,
-        )
-        from ..models.register_connected_agent_instance_response_200_frame_type_1 import (
-            RegisterConnectedAgentInstanceResponse200FrameType1,
+        from ..models.register_connected_agent_instance_response_200_frame import (
+            RegisterConnectedAgentInstanceResponse200Frame,
         )
 
         d = dict(src_dict)
-
-        def _parse_frame(
-            data: object,
-        ) -> RegisterConnectedAgentInstanceResponse200FrameType0 | RegisterConnectedAgentInstanceResponse200FrameType1:
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                frame_type_0 = RegisterConnectedAgentInstanceResponse200FrameType0.from_dict(data)
-
-                return frame_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            frame_type_1 = RegisterConnectedAgentInstanceResponse200FrameType1.from_dict(data)
-
-            return frame_type_1
-
-        frame = _parse_frame(d.pop("frame"))
+        frame = RegisterConnectedAgentInstanceResponse200Frame.from_dict(d.pop("frame"))
 
         instance_token = d.pop("instanceToken", UNSET)
 

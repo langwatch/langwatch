@@ -1,0 +1,211 @@
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel/module-api";
+import type { Instant } from "@langwatch/time";
+
+import type { InstantEvalJudgement, InstantEvalQuestion } from "./instant-eval-judging.ts";
+import type { InstantEvalJudgmentStatus, InstantEvalTarget } from "./instant-eval-limits.ts";
+import type {
+  InstantEvalEstimateWire,
+  InstantEvalResultsWire,
+  InstantEvalRunWire,
+  InstantEvalSampleWire,
+  InstantEvalShorthandInput,
+} from "./instant-eval.schemas.ts";
+
+/**
+ * What a caller sends to start or price a run: a statement or a target, never
+ * both and never neither. A target is expanded into a statement first, so
+ * every field below it describes that statement too.
+ */
+export interface InstantEvalRunInput {
+  readonly sql?: string;
+  readonly parameters?: Readonly<Record<string, unknown>>;
+  /** A target, a trace filter and the questions, in place of a statement. */
+  readonly shorthand?: InstantEvalShorthandInput;
+  readonly name?: string;
+  /**
+   * Rows the run may judge. Ten thousand on every plan rather than the plan's
+   * own cap: a run is charged for what it judges, so an absent field must not
+   * silently bill a paid plan for ten times what the caller meant to ask for.
+   */
+  readonly limit?: number;
+}
+
+/**
+ * Who is asking. A run executes a statement as the project's restricted
+ * identity, and what that statement may read is the asker's own protections:
+ * a member's, resolved from their session, or a credential's.
+ */
+export type InstantEvalActor =
+  | Readonly<{ kind: "member"; userId: string }>
+  | Readonly<{ kind: "credential"; credential: RestCredentialPrincipal }>;
+
+/** One run's counters, which is all a chip and a progress bar read. */
+export interface InstantEvalRunProgress {
+  readonly id: string;
+  readonly status: InstantEvalRunWire["status"];
+  readonly total: number | null;
+  readonly progress: number;
+  readonly matched: number | null;
+  readonly failed: number;
+  readonly skipped: number;
+  /** The code of the failure that ended the run, when one did. */
+  readonly error: string | null;
+  readonly priceUsd: number;
+  readonly finishedAtMs: number | null;
+}
+
+/** A run a client claims it registered for a chip. */
+export interface InstantEvalRunReference {
+  readonly question: string;
+  readonly target: InstantEvalTarget;
+  readonly runId: string;
+}
+
+/**
+ * A run the project owns, and the window its judgements were written in. Both
+ * ends are widened past the run's own clock, because the service that accepted
+ * the run and the worker that judged it read different ones.
+ */
+export interface InstantEvalRunWindow extends InstantEvalRunReference {
+  readonly writtenFrom: Instant;
+  readonly writtenUntil: Instant;
+}
+
+/**
+ * The Instant Evals capability: one LangWatchQL statement judged as a job; every read polls what
+ * the pipeline wrote.
+ */
+
+/**
+ * What the install-wide usage report counts (ADR-156 section 10): runs and judgements since
+ * `since`, and when the first run was. Epoch milliseconds.
+ */
+export interface InstantEvalUsageCount {
+  readonly runs: number;
+  readonly judgments: number;
+  readonly firstRunAt?: number;
+}
+
+export interface InstantEvalApi {
+  /** Whether this project may run Instant Evals at all. */
+  isEnabled(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * The product decision alone, whatever the deployment has configured: a
+   * released project with no judge still gets the "configure a model" primer.
+   */
+  isReleased(input: { projectId: string }): Promise<boolean>;
+
+  /**
+   * Accepts a statement, holds its price against the free budget, records the
+   * run and queues it. Everything after this is the pipeline's.
+   */
+  createRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalRunWire>;
+
+  /** What the run would read and what judging it would cost, judging nothing. */
+  estimateRun(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    input: InstantEvalRunInput;
+  }): Promise<InstantEvalEstimateWire>;
+
+  /** Asks a run to stop. A run that already finished is refused by name. */
+  cancelRun(input: {
+    projectId: string;
+    runId: string;
+    requestedByUserId?: string;
+  }): Promise<InstantEvalRunWire>;
+
+  /** A few of a run's rows, with the text that was judged beside the verdict. */
+  getSample(input: {
+    projectId: string;
+    actor: InstantEvalActor;
+    runId: string;
+    rows: number;
+  }): Promise<InstantEvalSampleWire>;
+
+  /** The project's runs, newest first. Empty when it has none. */
+  findRuns(input: {
+    projectId: string;
+    limit: number;
+    /** With `beforeId`: the two together are the list's cursor. */
+    before?: Instant;
+    beforeId?: string;
+  }): Promise<InstantEvalRunWire[]>;
+
+  getRun(input: { projectId: string; runId: string }): Promise<InstantEvalRunWire>;
+
+  /** One page of a run's judgements. */
+  getResultsPage(input: {
+    projectId: string;
+    runId: string;
+    limit: number;
+    questionId?: string;
+    isMatched?: boolean;
+    status?: InstantEvalJudgmentStatus;
+    cursor?: string;
+  }): Promise<InstantEvalResultsWire>;
+
+  /**
+   * The counters of the runs a client named, dropping ids it may not read.
+   * Lenient by design: the read carrying them is the list the user is looking
+   * at, and a refusal there would blank the table for a chip matching nothing.
+   */
+  findRunProgress(input: {
+    projectId: string;
+    runIds: readonly string[];
+  }): Promise<InstantEvalRunProgress[]>;
+
+  /**
+   * The runs a reader named, dated, so a judgement read can be bounded by the
+   * window each was written in. Lenient like {@link findRunProgress}: a run
+   * this project does not own is dropped rather than refused.
+   */
+  findRunWindows(input: {
+    projectId: string;
+    references: readonly InstantEvalRunReference[];
+  }): Promise<InstantEvalRunWindow[]>;
+
+  /**
+   * One classification of a peer's own text rather than a run's rows, which is
+   * how the trace search bar routes a sentence. A judge that cannot answer
+   * skips, so the caller falls back instead of failing the read.
+   */
+  classify(input: {
+    projectId: string;
+    text: string;
+    questions: readonly InstantEvalQuestion[];
+    /** Aborts the judgement when the caller has gone, as a hosted call's request does. */
+    signal?: AbortSignal;
+  }): Promise<InstantEvalJudgement>;
+
+  /** What judging these input tokens cost LangWatch and what the customer is charged, in USD. */
+  priceOf(input: { inputTokens: number }): { costUsd: number; priceUsd: number };
+
+  /**
+   * Main's hosted-call recorder: a Connect licence's judgements, billed to the calling key. It
+   * throws where the spend spine is not registered, so the caller keeps the spend and retries.
+   */
+  recordSpendForHostedCalls(input: {
+    projectId: string;
+    virtualKeyId: string;
+    inputTokens: number;
+    requests: number;
+    costUsd: number;
+    priceUsd: number;
+    occurredAt: Instant;
+  }): Promise<void>;
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: {
+    projectIds: readonly string[];
+    since?: number;
+  }): Promise<InstantEvalUsageCount>;
+}
+
+export const InstantEvalApi = moduleApi<InstantEvalApi>()("instant-eval");

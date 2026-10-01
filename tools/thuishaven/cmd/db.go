@@ -18,13 +18,13 @@ import (
 // drop and asks, `--yes` replaces the prompt for scripts, and agent mode
 // never destroys without it.
 func runDB(ctx context.Context, d deps, inv invocation) error {
-	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
+	usage := "usage: haven db reset [preset] [--yes] | haven db seed [preset] | haven db url [postgres|clickhouse|redis] | haven db prune [--dry-run|--yes]\n  presets: " + strings.Join(app.SeedPresetNames(), ", ")
 	if len(inv.args) == 0 {
 		return errors.New(usage)
 	}
 	switch inv.args[0] {
 	case "reset":
-		if err := guardSeedEnv(d.lwDir); err != nil {
+		if err := guardSeedEnv(d); err != nil {
 			return err
 		}
 		slug, err := d.orch.ResolveSlug(d.params)
@@ -46,10 +46,30 @@ func runDB(ctx context.Context, d deps, inv invocation) error {
 		if inv.has("--yes") {
 			return fmt.Errorf("db seed is non-destructive (an idempotent upsert, nothing dropped) — no confirmation to give")
 		}
-		if err := guardSeedEnv(d.lwDir); err != nil {
+		if err := guardSeedEnv(d); err != nil {
 			return err
 		}
 		return d.orch.DBSeed(ctx, d.params, dbPresetArg(inv))
+	case "prune":
+		if inv.has("--dry-run") && inv.has("--yes") {
+			return fmt.Errorf("--dry-run and --yes contradict each other")
+		}
+		shouldAct := inv.has("--yes")
+		dbs, err := d.orch.PruneStrayDatabases(ctx, shouldAct)
+		verb := "would drop"
+		if shouldAct {
+			verb = "dropped"
+		}
+		for _, db := range dbs {
+			fmt.Printf("  %s %s\n", verb, db)
+		}
+		if !shouldAct && len(dbs) > 0 {
+			fmt.Println("dry run: re-run with --yes to drop these")
+		}
+		if len(dbs) == 0 {
+			fmt.Println("no stray databases older than HAVEN_DB_TTL")
+		}
+		return err
 	case "url":
 		if inv.has("--yes") {
 			return fmt.Errorf("--yes does not apply to `haven db url`")
@@ -98,7 +118,7 @@ func confirmDBReset(c dbResetConfirm) (bool, error) {
 			c.db)
 	case c.isAgent:
 		return false, fmt.Errorf(
-			"db reset drops and recreates database %q on the managed ClickHouse and Postgres — pass --yes to confirm", c.db)
+			"db reset drops and recreates database %q on the managed ClickHouse and Postgres and flushes this stack's Redis db — pass --yes to confirm", c.db)
 	}
 
 	answer := askDBReset(c, shared)

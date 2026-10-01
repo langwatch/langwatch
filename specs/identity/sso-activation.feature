@@ -90,6 +90,24 @@ Feature: Going live with your own identity provider, without asking us
     Then it is sent to the connection this organization registered
     And nothing about anybody else's sign-in changes
 
+  # The addresses an identity provider posts back to are served by the single
+  # sign-on module, so the setup read folds them in beside identity's own
+  # reading of the journey rather than asking identity to answer them.
+
+  @unit
+  Scenario: The setup read carries the addresses an identity provider is pointed at
+    Given an organization whose identity provider is registered
+    When its administrator opens single sign-on setup
+    Then the addresses to paste into the identity provider name that connection
+    And they come from the deployment that serves them
+
+  @unit
+  Scenario: Before a connection exists the addresses show their shape
+    Given an organization that has registered no identity provider yet
+    When its administrator opens single sign-on setup
+    Then the addresses show where the connection's identifier will go
+    And no identifier is invented to fill the gap
+
   @integration
   Scenario: The test sign-in is offered on the setup screen once a provider is registered
     When the administrator opens single sign-on setup

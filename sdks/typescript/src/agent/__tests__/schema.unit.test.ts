@@ -72,7 +72,10 @@ describe("toParameterSchema()", () => {
 
     it("reads a zod 4 schema through the same interface without touching zod", () => {
       const schema = toParameterSchema(
-        z.object({ model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"), plan: z.string() }),
+        z.object({
+          model: z.enum(["gpt-5", "gpt-5-mini"]).default("gpt-5-mini"),
+          plan: z.string(),
+        }),
       );
 
       expect(schema.type).toBe("object");
@@ -180,18 +183,20 @@ describe("resolveParameterValues()", () => {
     });
 
     it("refuses text that is not a number", () => {
-      expect(() => resolveParameterValues({ specs, supplied: { plan: "pro", maxTools: "many" } })).toThrow(
-        /"maxTools" must be a number/,
-      );
+      expect(() =>
+        resolveParameterValues({ specs, supplied: { plan: "pro", maxTools: "many" } }),
+      ).toThrow(/"maxTools" must be a number/);
     });
   });
 
   describe("when a boolean arrives as text", () => {
     it("reads true and false and refuses anything else", () => {
-      expect(resolveParameterValues({ specs, supplied: { plan: "pro", verbose: "true" } }).verbose).toBe(true);
-      expect(() => resolveParameterValues({ specs, supplied: { plan: "pro", verbose: "yes" } })).toThrow(
-        /"verbose" must be true or false/,
-      );
+      expect(
+        resolveParameterValues({ specs, supplied: { plan: "pro", verbose: "true" } }).verbose,
+      ).toBe(true);
+      expect(() =>
+        resolveParameterValues({ specs, supplied: { plan: "pro", verbose: "yes" } }),
+      ).toThrow(/"verbose" must be true or false/);
     });
   });
 

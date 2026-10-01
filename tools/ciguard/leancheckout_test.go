@@ -23,7 +23,6 @@ const leanJob = `jobs:
             /*
             !/docs/media/
             !/docs/images/
-            !/assets/
           sparse-checkout-cone-mode: false
       - name: Next
         run: echo hi
@@ -45,14 +44,14 @@ const bareJob = `jobs:
         run: echo hi
 `
 
-// allowlistJob names one file and nothing else, the way shard-durations takes
-// only the committed vitest.durations.json.
+// allowlistJob names one path and nothing else, the way deployment-impact-check
+// takes only .github/scripts.
 const allowlistJob = `jobs:
-  shard-durations:
+  deployment-impact:
     steps:
       - uses: actions/checkout@abc123
         with:
-          sparse-checkout: platform/app/vitest.durations.json
+          sparse-checkout: .github/scripts
           sparse-checkout-cone-mode: false
 `
 
@@ -142,11 +141,10 @@ func TestLeanCheckoutStillRequiresExclusionsOnAWholeTreeCheckout(t *testing.T) {
 	problems, err := ciguard.LeanCheckout(root)
 
 	require.NoError(t, err)
-	require.Len(t, problems, 3)
+	require.Len(t, problems, 2)
 	joined := strings.Join(problems, "\n")
 	assert.Contains(t, joined, "does not exclude /docs/media/")
 	assert.Contains(t, joined, "does not exclude /docs/images/")
-	assert.Contains(t, joined, "does not exclude /assets/")
 }
 
 // @scenario "Prose under docs/ is kept, because CI reads it"
@@ -191,7 +189,7 @@ func TestLeanCheckoutRejectsAnUnparseableConeModeValue(t *testing.T) {
 // @scenario "The exclusions are root-anchored"
 func TestLeanCheckoutRejectsAnUnanchoredExclusion(t *testing.T) {
 	root := writeWorkflows(t, map[string]string{
-		ciguard.LeanCheckoutWorkflows[0]: strings.Replace(leanJob, "!/assets/", "!assets/", 1),
+		ciguard.LeanCheckoutWorkflows[0]: strings.Replace(leanJob, "!/docs/images/", "!docs/images/", 1),
 	})
 
 	problems, err := ciguard.LeanCheckout(root)

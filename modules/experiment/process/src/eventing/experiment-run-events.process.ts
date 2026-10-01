@@ -1,0 +1,252 @@
+import { EventSchema } from "@langwatch/eventing";
+import {
+  experimentRunEventingTargetSchema as targetSchema,
+  experimentRunPlanSchema,
+} from "@langwatch/experiment-contract";
+import {
+  type SerializedHandledError,
+  serializedHandledErrorSchema,
+} from "@langwatch/handled-error";
+import { z } from "zod";
+
+import { EXPERIMENT_RUN_EVENT_TYPES } from "../rules/experiment-run-event-types.rules.ts";
+
+/**
+ * Base metadata for experiment run events.
+ */
+const experimentRunEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Experiment run started event - emitted when an experiment run begins.
+ */
+export const experimentRunStartedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  workflowVersionId: z.string().nullable().optional(),
+  total: z.number(),
+  targets: z.array(targetSchema),
+  /** What the run executes; absent on a run from before the pipeline drove runs. */
+  plan: experimentRunPlanSchema.optional(),
+});
+
+export const experimentRunStartedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.STARTED),
+  data: experimentRunStartedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type ExperimentRunStartedEventData = z.infer<typeof experimentRunStartedEventDataSchema>;
+export type ExperimentRunStartedEvent = z.infer<typeof experimentRunStartedEventSchema>;
+
+/**
+ * Target result event - emitted when a target execution completes for a row.
+ */
+export const targetResultEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  index: z.number(),
+  targetId: z.string(),
+  entry: z.record(z.string(), z.unknown()),
+  predicted: z.record(z.string(), z.unknown()).nullable().optional(),
+  cost: z.number().nullable().optional(),
+  duration: z.number().nullable().optional(),
+  error: z.string().nullable().optional(),
+  /**
+   * The failure's stable code, as the serialised handled error the SSE frame
+   * carries (`target_result.domainError`).
+   * the same registry copy the live stream does (ADR-045).
+   */
+  domainError: z
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
+    .nullable()
+    .optional(),
+  traceId: z.string().nullable().optional(),
+  targets: z.array(targetSchema).optional(),
+  /**
+   * True when the cell was copied into this run from the board rather than
+   * produced by it.
+   */
+  carriedOver: z.boolean().optional(),
+});
+
+export const targetResultEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TARGET_RESULT),
+  data: targetResultEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type TargetResultEventData = z.infer<typeof targetResultEventDataSchema>;
+export type TargetResultEvent = z.infer<typeof targetResultEventSchema>;
+
+/**
+ * Evaluator result event - emitted when an evaluator completes for a row.
+ */
+export const evaluatorResultEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  index: z.number(),
+  targetId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorName: z.string().nullable().optional(),
+  status: z.enum(["processed", "error", "skipped"]),
+  score: z.number().nullable().optional(),
+  label: z.string().nullable().optional(),
+  passed: z.boolean().nullable().optional(),
+  details: z.string().nullable().optional(),
+  cost: z.number().nullable().optional(),
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
+  duration: z.number().nullable().optional(),
+  /** What a failed evaluator's frame showed (ARCHITECTURE §9): its error type, trace and code. */
+  errorType: z.string().nullable().optional(),
+  traceback: z.array(z.string()).nullable().optional(),
+  domainError: z
+    .custom<SerializedHandledError>((value) => typeof value === "object" && value !== null)
+    .nullable()
+    .optional(),
+  /** The evaluator's raw answer, and the currency its cost is in. */
+  rawResponse: z.unknown().optional(),
+  costCurrency: z.string().nullable().optional(),
+  /**
+   * True when the verdict was copied into this run from the board rather than
+   * produced by it. See `targetResultEventDataSchema.carriedOver`.
+   */
+  carriedOver: z.boolean().optional(),
+});
+
+export const evaluatorResultEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT),
+  data: evaluatorResultEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type EvaluatorResultEventData = z.infer<typeof evaluatorResultEventDataSchema>;
+export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
+
+/**
+ * Trace metrics computed event - emitted when trace cost data is synced
+ * from the trace processing pipeline (ECST pattern).
+ */
+export const traceMetricsComputedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+});
+
+export const traceMetricsComputedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED),
+  data: traceMetricsComputedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type TraceMetricsComputedEventData = z.infer<typeof traceMetricsComputedEventDataSchema>;
+export type TraceMetricsComputedEvent = z.infer<typeof traceMetricsComputedEventSchema>;
+
+/**
+ * Experiment run completed event - emitted when an experiment run finishes.
+ */
+export const experimentRunCompletedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  finishedAt: z.number().nullable().optional(),
+  stoppedAt: z.number().nullable().optional(),
+  /** Absent on runs completed before the pipeline drove runs. */
+  outcome: z.enum(["finished", "stopped", "failed"]).optional(),
+  /** Why a run failed before any cell ran: a workflow evaluation the worker couldn't prepare. */
+  error: serializedHandledErrorSchema.optional(),
+  /** A run refused before its start: its planned cell count, which its poller keeps reading. */
+  total: z.number().int().nonnegative().optional(),
+});
+
+export const experimentRunCompletedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.COMPLETED),
+  data: experimentRunCompletedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type ExperimentRunCompletedEventData = z.infer<typeof experimentRunCompletedEventDataSchema>;
+export type ExperimentRunCompletedEvent = z.infer<typeof experimentRunCompletedEventSchema>;
+
+/** One cell's terminal: every cell finishes exactly once, whatever happened to it. */
+export const cellFinishedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  ordinal: z.number().int().nonnegative(),
+  phase: z.union([z.literal(1), z.literal(2)]),
+  outcome: z.enum(["succeeded", "failed", "stopped", "skipped"]),
+  error: serializedHandledErrorSchema.optional(),
+});
+
+export const cellFinishedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.CELL_FINISHED),
+  data: cellFinishedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type CellFinishedEventData = z.infer<typeof cellFinishedEventDataSchema>;
+export type CellFinishedEvent = z.infer<typeof cellFinishedEventSchema>;
+
+/** A run was asked to stop; the manager honours it and sends no further cell. */
+export const abortRequestedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  requestedBy: z.string().nullable(),
+});
+
+export const abortRequestedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.ABORT_REQUESTED),
+  data: abortRequestedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type AbortRequestedEventData = z.infer<typeof abortRequestedEventDataSchema>;
+export type AbortRequestedEvent = z.infer<typeof abortRequestedEventSchema>;
+
+export const workflowEvaluationRequestedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  experimentSlug: z.string(),
+  projectSlug: z.string(),
+  workflowId: z.string(),
+  workflowVersionId: z.string(),
+  total: z.number(),
+  data: z.array(z.record(z.string(), z.unknown())).optional(),
+  datasetId: z.string().optional(),
+  parameters: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  rowIndices: z.array(z.number()).optional(),
+});
+
+export const workflowEvaluationRequestedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.WORKFLOW_EVALUATION_REQUESTED),
+  data: workflowEvaluationRequestedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type WorkflowEvaluationRequestedEventData = z.infer<
+  typeof workflowEvaluationRequestedEventDataSchema
+>;
+export type WorkflowEvaluationRequestedEvent = z.infer<
+  typeof workflowEvaluationRequestedEventSchema
+>;
+
+export type ExperimentRunProcessingEvent =
+  | ExperimentRunStartedEvent
+  | TargetResultEvent
+  | EvaluatorResultEvent
+  | TraceMetricsComputedEvent
+  | ExperimentRunCompletedEvent
+  | WorkflowEvaluationRequestedEvent
+  | CellFinishedEvent
+  | AbortRequestedEvent;

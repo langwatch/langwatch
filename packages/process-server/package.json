@@ -1,0 +1,52 @@
+{
+  "name": "@langwatch/process-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Process composition, transport selection and lifecycle for API and worker applications.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b tsconfig.test.json",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/enterprise-scim-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/time": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

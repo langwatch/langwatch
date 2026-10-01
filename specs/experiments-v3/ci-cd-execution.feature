@@ -203,3 +203,13 @@ Feature: CI/CD Execution of Platform Evaluations
     When execution completes
     Then the run appears in the evaluation's run history
     And can be viewed in the LangWatch UI
+
+  # ==========================================================================
+  # The SDKs' older path
+  # ==========================================================================
+
+  Scenario: The evaluations v3 alias answers what the experiments run doors answer
+    Given the SDK still calls "/api/evaluations/v3" instead of "/api/experiments"
+    When it starts a run, polls it, reads its results, or reads, saves or pages the saved setup
+    Then the status and body equal those of the same call under "/api/experiments"
+    And the older path is left out of the published API reference

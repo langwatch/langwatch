@@ -652,6 +652,9 @@ test_size_overlays() {
 # "no untriaged workloads" check below — that is deliberate.
 HARDENED_WORKLOADS=(
   "templates/app/deployment.yaml"
+  # The pre-upgrade migration Job runs the app image with the app's own
+  # security contexts and never calls the Kubernetes API.
+  "templates/app/migrate-pre-roll-job.yaml"
   "templates/workers/deployment.yaml"
   "templates/langwatch_nlp/deployment.yaml"
   "templates/langevals/deployment.yaml"
@@ -1123,8 +1126,8 @@ test_overlay_stacking() {
 # ways, and both are default-ish configurations:
 #
 #   1. Stock install — app.telemetry.metrics.enabled is false, so
-#      METRICS_API_KEY is never emitted; with NODE_ENV=production the endpoint
-#      fails closed with 500 to every caller.
+#      LANGWATCH_METRICS_TOKEN is never emitted; with NODE_ENV=production the
+#      process mounts no scrape door and /metrics answers 404.
 #   2. secretKeyRef install — a kubelet httpGet probe cannot read a Secret, so
 #      no rendered Authorization header can carry the key and the probe gets 401.
 #

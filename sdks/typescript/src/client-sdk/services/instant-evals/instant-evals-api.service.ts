@@ -1,14 +1,11 @@
-import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import type { InternalConfig } from "@/client-sdk/types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 /** One Instant Eval run, exactly as the REST surface answers it. */
 export type InstantEvalRun =
@@ -55,15 +52,9 @@ export class InstantEvalsApiError extends Error {
 }
 
 /**
- * Typed client for the Instant Evals family (`/api/v1/instant-evals`).
- *
- * A run judges one LangWatchQL statement across the project's history. The
- * statement is the same one the query door runs, so a working query is a
- * working run once it projects `TraceId` and at least one eval function
- * column. Starting one answers the queued run, and its progress is polled.
- *
- * The project comes from the credential, so no method takes a project id.
- *
+ * Typed client for Instant Evals (`/api/v1/instant-evals`): a run judges one LangWatchQL statement
+ * that projects `TraceId` and an eval column. Progress is polled; the project comes from the
+ * credential.
  * @see specs/instant-evals/instant-eval-api.feature
  */
 export class InstantEvalsApiService {
@@ -73,11 +64,7 @@ export class InstantEvalsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation,
@@ -113,10 +100,7 @@ export class InstantEvalsApiService {
 
   /** Starts a run. The judging happens on the queue. */
   async create(body: InstantEvalRunBody): Promise<InstantEvalRun> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/instant-evals",
-      { body },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/instant-evals", { body });
     return this.unwrap<InstantEvalRun>({
       operation: "start an instant eval run",
       data,
@@ -127,10 +111,9 @@ export class InstantEvalsApiService {
 
   /** Prices a run without starting it. Nothing is judged and nothing is charged. */
   async estimate(body: InstantEvalRunBody): Promise<InstantEvalEstimate> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/instant-evals/estimate",
-      { body },
-    );
+    const { data, error, response } = await this.apiClient.POST("/api/v1/instant-evals/estimate", {
+      body,
+    });
     return this.unwrap<InstantEvalEstimate>({
       operation: "estimate an instant eval run",
       data,
@@ -148,14 +131,11 @@ export class InstantEvalsApiService {
     const query = {
       ...(options?.limit === undefined ? {} : { limit: options.limit }),
       ...(options?.before === undefined ? {} : { before: options.before }),
-      ...(options?.beforeId === undefined
-        ? {}
-        : { beforeId: options.beforeId }),
+      ...(options?.beforeId === undefined ? {} : { beforeId: options.beforeId }),
     };
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/instant-evals",
-      { params: { query } as never },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/instant-evals", {
+      params: { query } as never,
+    });
     return this.unwrap<{ runs: InstantEvalRun[] }>({
       operation: "list instant eval runs",
       data,
@@ -165,10 +145,9 @@ export class InstantEvalsApiService {
   }
 
   async get(id: string): Promise<InstantEvalRun> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/instant-evals/{id}",
-      { params: { path: { id } } },
-    );
+    const { data, error, response } = await this.apiClient.GET("/api/v1/instant-evals/{id}", {
+      params: { path: { id } },
+    });
     return this.unwrap<InstantEvalRun>({
       operation: `get instant eval run "${id}"`,
       data,
@@ -192,10 +171,8 @@ export class InstantEvalsApiService {
   }
 
   /**
-   * One page of a run's judgements.
-   *
-   * Pass the `nextCursor` a page answers with to read the page after it. The
-   * last page carries none.
+   * One page of a run's judgements. Pass the `nextCursor` a page answers with to read the page
+   * after it. The last page carries none.
    */
   async results(
     id: string,
@@ -208,9 +185,7 @@ export class InstantEvalsApiService {
     },
   ): Promise<InstantEvalResultsPage> {
     const query = {
-      ...(options?.questionId === undefined
-        ? {}
-        : { questionId: options.questionId }),
+      ...(options?.questionId === undefined ? {} : { questionId: options.questionId }),
       // The query key stays `matched`, which is what the endpoint reads; the
       // option is named for what it is, which is a boolean.
       ...(options?.isMatched === undefined

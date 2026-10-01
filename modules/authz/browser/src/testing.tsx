@@ -1,0 +1,103 @@
+/**
+ * What this package's screen suites mount a screen inside. A test
+ * constructs the abstract host port rather than mocking a module: the
+ * fake RECORDS what a screen asked and reported. Not exported.
+ */
+
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { UiCapabilityContextProvider } from "@langwatch/browser-host/capabilities";
+import { uiSlots } from "@langwatch/browser-host/slots";
+import { createUiCapabilitiesFromHost } from "@langwatch/browser-host/testing";
+import { render } from "@testing-library/react";
+import type { ReactElement } from "react";
+
+import {
+  AuthzHostApi,
+  AuthzHostProvider,
+  type AuthzFailureNotice,
+  type AuthzHostScope,
+  type AuthzOrganizationStructure,
+  type AuthzPlanReading,
+  type AuthzRouteReading,
+  type AuthzSuccessNotice,
+} from "./model/authz-host.ts";
+
+export class FakeAuthzHost extends AuthzHostApi {
+  readonly successes: AuthzSuccessNotice[] = [];
+  readonly failures: AuthzFailureNotice[] = [];
+  readonly queries: Record<string, string | undefined>[] = [];
+
+  constructor(
+    private readonly options: {
+      scope?: AuthzHostScope;
+      grants?: ReadonlySet<string>;
+      plan?: AuthzPlanReading;
+      query?: Readonly<Record<string, string | undefined>>;
+      structure?: AuthzOrganizationStructure;
+    } = {},
+  ) {
+    super();
+  }
+
+  scope(): AuthzHostScope {
+    return this.options.scope ?? { organizationId: "org-1" };
+  }
+
+  hasPermission(permission: string): boolean {
+    return (this.options.grants ?? new Set(["organization:manage"])).has(permission);
+  }
+
+  plan(): AuthzPlanReading {
+    return this.options.plan ?? { isEnterprise: true, isLoading: false };
+  }
+
+  route(): AuthzRouteReading {
+    return { query: this.options.query ?? {} };
+  }
+
+  organizationStructure(): AuthzOrganizationStructure {
+    return this.options.structure ?? { organizationName: "Acme", teams: [], projects: [] };
+  }
+
+  setQuery(next: Readonly<Record<string, string | undefined>>): void {
+    this.queries.push({ ...next });
+  }
+
+  succeeded(notice: AuthzSuccessNotice): void {
+    this.successes.push(notice);
+  }
+
+  failed(failure: AuthzFailureNotice): void {
+    this.failures.push(failure);
+  }
+}
+
+/** Renders a screen inside the Design System's provider and a host. */
+/**
+ * Fills the sales slot the way the browser app does; screens under test
+ * only ask for the block by name.
+ */
+const filledSlots = {
+  ...createUiCapabilitiesFromHost({ route: () => ({ params: {}, query: {} }), navigate: () => {} }),
+  slots: uiSlots({
+    components: {
+      contactSales: () => <div data-testid="contact-sales-block">Need more?</div>,
+    },
+  }),
+};
+
+export function renderWithAuthzHost(
+  element: ReactElement,
+  host: FakeAuthzHost = new FakeAuthzHost(),
+) {
+  return {
+    host,
+    ...render(
+      <ChakraProvider value={defaultSystem}>
+        <UiCapabilityContextProvider value={filledSlots}>
+          <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+        </UiCapabilityContextProvider>
+      </ChakraProvider>,
+    ),
+  };
+}

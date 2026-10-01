@@ -11,7 +11,7 @@ pytestmark = pytest.mark.unit
 
 
 def _response(status_code: int, json_body: object | None = None) -> httpx.Response:
-    request = httpx.Request("POST", "https://app.langwatch.ai/api/evaluations/batch/log_results")
+    request = httpx.Request("POST", "https://app.langwatch.ai/api/v1/evaluations/batch/log_results")
     if json_body is None:
         return httpx.Response(status_code, request=request)
     return httpx.Response(status_code, json=json_body, request=request)

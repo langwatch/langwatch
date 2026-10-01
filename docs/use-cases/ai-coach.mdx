@@ -9,13 +9,15 @@ This guide demonstrates how to build an evaluation pipeline for a conversational
 We'll use LangWatch to orchestrate this evaluation, track the boolean (pass/fail) outputs from each judge, and compare them against an expert-annotated dataset.
 
 ### **1. The Scenario**
+
 Our AI coach needs to hold nuanced, reflective conversations. We want to verify that its responses adhere to our desired coaching methodology. For example, we want it to ask open-ended questions but avoid giving direct advice or repeating itself.
 
-* **Input**: The user's message and the full conversation_history.
-* **Output**: The AI coach's response.
-* **Evaluation**: A set of boolean judgments on the quality and style of the response.
+- **Input**: The user's message and the full conversation_history.
+- **Output**: The AI coach's response.
+- **Evaluation**: A set of boolean judgments on the quality and style of the response.
 
 ### **2. Setup and Data Preparation**
+
 Our evaluation dataset is key. It contains not only the conversation turns but also the expected outcomes for each of our custom judges. These ground truth labels are typically annotated by domain experts.
 
 ```python
@@ -54,6 +56,7 @@ print(df)
 ```
 
 ### **3. Defining the Custom LLM Judges**
+
 Each "judge" is a function that calls an LLM with a specific prompt, asking it to evaluate one aspect of the AI's response. It takes the conversation context and returns a simple boolean.
 
 Here are two example judges:
@@ -100,6 +103,7 @@ def run_looping_judge_llm(model_output: str, history_json: str) -> bool:
 ```
 
 ### **4. Implementing the Evaluation Script**
+
 Now we'll use LangWatch to run our judges against the dataset and log the results. We'll use `evaluation.submit()` to run the evaluations in parallel, which is highly effective when running multiple independent judges per data sample.
 
 ```python
@@ -152,11 +156,12 @@ print("\nEvaluation complete! Check your results in the LangWatch dashboard.")
 ```
 
 ### **5. Analyzing the Results in LangWatch**
+
 This script produces a detailed, multi-faceted evaluation of your AI coach. In the LangWatch dashboard, you can:
 
-* **See an Overview**: Get an aggregate pass/fail rate for each judge (e.g., `stacking_judge_passed`, `looping_judge_passed`) across your entire dataset.
-* **Filter for Failures**: Instantly isolate all conversation turns where a specific judge failed. For example, you can view all samples where `looping_judge_passed` was False to understand why your model is getting repetitive.
-* **Compare Runs**: Compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
+- **See an Overview**: Get an aggregate pass/fail rate for each judge (e.g., `stacking_judge_passed`, `looping_judge_passed`) across your entire dataset.
+- **Filter for Failures**: Instantly isolate all conversation turns where a specific judge failed. For example, you can view all samples where `looping_judge_passed` was False to understand why your model is getting repetitive.
+- **Compare Runs**: Compare results from `ai-coach-quality-v3-run-001` against future runs to track the impact of your changes and prevent regressions.
 
 ### **6. Conclusion**
 

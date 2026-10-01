@@ -1,0 +1,339 @@
+/**
+ * Building the data an evaluator sees: the trace or thread mappings resolved to values, with
+ * the server-only sources (formatted spans) filled in here rather than in the browser.
+ */
+
+import {
+  defaultEvaluatorMappings,
+  hasMappingEntries,
+  migrateLegacyMappings,
+  mapTraceToDatasetEntry,
+  type MappingState,
+  SERVER_ONLY_THREAD_SOURCES,
+  SERVER_ONLY_TRACE_SOURCES,
+  THREAD_MAPPINGS,
+  type TRACE_MAPPINGS,
+} from "@langwatch/dataset-contract";
+import { EvaluatorNotFoundError, TraceNotEvaluatableError } from "@langwatch/evaluation-contract";
+import {
+  AVAILABLE_EVALUATORS,
+  isCodeEvaluatorCheckType,
+  isLlmJudgeEvaluator,
+  type EvaluatorTypes,
+} from "@langwatch/evaluator-contract";
+import { EvaluatorConfigError } from "@langwatch/model-provider-contract";
+import { type Trace } from "@langwatch/trace-contract";
+
+import type { EvaluationTraceProtections } from "../app/evaluation.members.ts";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../rules/evaluation-thread-mapping-service.rules.ts";
+import {
+  findUnavailability,
+  unavailableEvaluatorMessage,
+} from "../rules/evaluator-availability-service.rules.ts";
+import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
+
+// Evaluations need full access to trace data — no user-facing redaction.
+const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
+  canSeeCosts: true,
+  canSeeCapturedInput: true,
+  canSeeCapturedOutput: true,
+};
+
+export class EvaluationDataService {
+  static create(deps: EvaluationExecutionDeps): EvaluationDataService {
+    return new EvaluationDataService(deps);
+  }
+
+  private constructor(private readonly deps: EvaluationExecutionDeps) {}
+
+  private async fillServerOnlyTraceSources({
+    mapping,
+    mappedData,
+    trace,
+    maxTokens,
+  }: {
+    mapping: MappingState["mapping"];
+    mappedData: Record<string, unknown>;
+    trace: Trace;
+    maxTokens: number;
+  }): Promise<void> {
+    for (const [field, config] of Object.entries(mapping)) {
+      if (
+        !("source" in config) ||
+        !(SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(config.source)
+      ) {
+        continue;
+      }
+
+      if (config.source === "formatted_trace") {
+        mappedData[field] = await this.deps.spanDigest.format({ trace, maxTokens });
+      }
+    }
+  }
+
+  async buildDataForEvaluation(params: {
+    evaluatorType: string;
+    trace: Trace;
+    mappings: MappingState | null;
+    isThreadLevel: boolean;
+    projectId: string;
+    /** The reader's redactions over the thread's other traces; full access when none is named. */
+    protections?: EvaluationTraceProtections;
+    /** Tokens the AI-readable trace and thread sources are rendered under. */
+    renderBudgetTokens: number;
+  }): Promise<DataForEvaluation> {
+    const {
+      evaluatorType,
+      trace,
+      isThreadLevel,
+      projectId,
+      protections = INTERNAL_PROTECTIONS,
+      renderBudgetTokens,
+    } = params;
+    const mappings = effectiveMappings({
+      evaluatorType,
+      mappings: params.mappings,
+      level: isThreadLevel ? "thread" : "trace",
+    });
+
+    let data: Record<string, unknown>;
+
+    if (isThreadLevel) {
+      data = await this.buildThreadData({
+        projectId,
+        trace,
+        mappings,
+        protections,
+        maxTokens: renderBudgetTokens,
+      });
+    } else {
+      const mappedData = mapTraceFields(trace, mappings);
+      if (!mappedData) {
+        throw new TraceNotEvaluatableError(trace.trace_id);
+      }
+
+      await this.fillServerOnlyTraceSources({
+        mapping: mappings.mapping,
+        mappedData: mappedData as Record<string, unknown>,
+        trace,
+        maxTokens: renderBudgetTokens,
+      });
+
+      data = mappedData as Record<string, unknown>;
+
+      // Resolve any thread-typed mappings mixed into trace-level evaluations
+      if (mappings && hasThreadMappings(mappings)) {
+        await resolveThreadMappingsIntoData({
+          data,
+          trace,
+          mappings,
+          spanDigest: this.deps.spanDigest,
+          maxTokens: renderBudgetTokens,
+          getThreadTraces: (threadId) =>
+            this.deps.traces.readThreadsTraces({
+              projectId,
+              threadIds: [threadId],
+              protections,
+            }),
+        });
+      }
+    }
+
+    // Workflow/code/custom evaluators pass data through as-is
+    if (
+      evaluatorType.startsWith("custom/") ||
+      evaluatorType === "workflow" ||
+      isCodeEvaluatorCheckType(evaluatorType)
+    ) {
+      return { type: "custom", data };
+    }
+
+    const evaluator = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes];
+    if (!evaluator) {
+      throw new EvaluatorNotFoundError(evaluatorType);
+    }
+
+    // An evaluator this install skipped is not a broken one. Say which it is,
+    // and how to get it, rather than letting the request reach an evaluator
+    // service with no route for it and come back as a bare 404.
+    const unavailable = findUnavailability({
+      evaluatorType,
+      environment: this.deps.installEnvironment,
+    });
+    if (unavailable) {
+      throw new EvaluatorConfigError(unavailableEvaluatorMessage({ unavailability: unavailable }), {
+        meta: { evaluatorType },
+      });
+    }
+
+    const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
+    const filtered = Object.fromEntries(fields.map((field) => [field, data[field] ?? ""]));
+
+    return { type: "default", data: filtered };
+  }
+
+  private async buildThreadData({
+    projectId,
+    trace,
+    mappings,
+    protections,
+    maxTokens,
+  }: {
+    projectId: string;
+    trace: Trace;
+    mappings: MappingState;
+    protections: EvaluationTraceProtections;
+    maxTokens: number;
+  }): Promise<Record<string, unknown>> {
+    const threadId = trace.metadata?.thread_id;
+    if (!threadId) {
+      throw new EvaluatorConfigError("Trace does not have a thread_id for thread-based evaluation");
+    }
+
+    const threadTraces = await this.deps.traces.readThreadsTraces({
+      projectId,
+      threadIds: [threadId],
+      protections,
+    });
+
+    const result: Record<string, unknown> = {};
+
+    for (const [targetField, mappingConfig] of Object.entries(mappings.mapping)) {
+      if (!("source" in mappingConfig)) continue;
+
+      const outcome = isThreadSourced(mappingConfig)
+        ? await this.resolveThreadSource({ mappingConfig, threadId, threadTraces, maxTokens })
+        : await this.resolveTraceSource({ targetField, mappingConfig, trace, maxTokens });
+      if (outcome.resolved) result[targetField] = outcome.value;
+    }
+
+    return result;
+  }
+
+  private async resolveThreadSource({
+    mappingConfig,
+    threadId,
+    threadTraces,
+    maxTokens,
+  }: {
+    mappingConfig: SourcedMapping;
+    threadId: string;
+    threadTraces: Trace[];
+    maxTokens: number;
+  }): Promise<FieldOutcome> {
+    const source = mappingConfig.source;
+    if (!source) return { resolved: false };
+
+    if ((SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(source)) {
+      if (source !== "formatted_traces") return { resolved: false };
+
+      return {
+        resolved: true,
+        value: await this.deps.spanDigest.formatThread({
+          threadKey: threadId,
+          traces: threadTraces,
+          maxTokens,
+        }),
+      };
+    }
+
+    const threadSource = source as keyof typeof THREAD_MAPPINGS;
+    const selectedFields =
+      ("selectedFields" in mappingConfig ? mappingConfig.selectedFields : undefined) ?? [];
+    return {
+      resolved: true,
+      value: THREAD_MAPPINGS[threadSource].mapping(
+        { thread_id: threadId, traces: threadTraces },
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
+      ),
+    };
+  }
+
+  private async resolveTraceSource({
+    targetField,
+    mappingConfig,
+    trace,
+    maxTokens,
+  }: {
+    targetField: string;
+    mappingConfig: SourcedMapping;
+    trace: Trace;
+    maxTokens: number;
+  }): Promise<FieldOutcome> {
+    if ((SERVER_ONLY_TRACE_SOURCES as readonly string[]).includes(mappingConfig.source)) {
+      if (mappingConfig.source !== "formatted_trace") return { resolved: false };
+
+      return { resolved: true, value: await this.deps.spanDigest.format({ trace, maxTokens }) };
+    }
+
+    const traceMappingConfig: { source: string; key?: string; subkey?: string } = {
+      source: mappingConfig.source,
+      key: "key" in mappingConfig ? mappingConfig.key : undefined,
+      subkey: "subkey" in mappingConfig ? mappingConfig.subkey : undefined,
+    };
+    const mapped = mapTraceToDatasetEntry({
+      trace,
+      mapping: { [targetField]: traceMappingConfig },
+      expansions: new Set(),
+    })[0];
+    return { resolved: true, value: mapped?.[targetField] };
+  }
+}
+
+/**
+ * The mappings an evaluation runs with. A built-in evaluator with no saved
+ * mapping (null, or the `{}` a create with no mappings stores) gets its
+ * defaults, so an LLM judge reads the whole trace instead of empty fields.
+ * @see specs/evaluators/judges-read-tool-evidence.feature
+ */
+function effectiveMappings({
+  evaluatorType,
+  mappings,
+  level,
+}: {
+  evaluatorType: string;
+  mappings: MappingState | null;
+  level: "trace" | "thread";
+}): MappingState {
+  if (hasMappingEntries(mappings)) return mappings;
+  if (mappings !== null && !(evaluatorType in AVAILABLE_EVALUATORS)) return mappings;
+  return defaultEvaluatorMappings({ level, readsWholeTrace: isLlmJudgeEvaluator(evaluatorType) });
+}
+
+type SourcedMapping = Extract<MappingState["mapping"][string], { source: unknown }>;
+
+type FieldOutcome = { resolved: true; value: unknown } | { resolved: false };
+
+function isThreadSourced(mappingConfig: SourcedMapping): boolean {
+  return (
+    ("type" in mappingConfig && mappingConfig.type === "thread") ||
+    mappingConfig.source in THREAD_MAPPINGS ||
+    (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(mappingConfig.source)
+  );
+}
+
+function mapTraceFields(
+  trace: Trace,
+  mapping_: MappingState,
+): Record<string, string | number> | undefined {
+  const mapping: MappingState =
+    "mapping" in mapping_ ? mapping_ : migrateLegacyMappings(legacyMappingOf(mapping_));
+
+  return mapTraceToDatasetEntry({
+    trace,
+    mapping: mapping.mapping as Record<string, { source: string; key?: string; subkey?: string }>,
+    expansions: new Set(),
+  })[0];
+}
+
+/** A pre-`MappingState` monitor mapping: each target field names its trace source. */
+function legacyMappingOf(value: object): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      (entry): entry is [string, string] => typeof entry[1] === "string",
+    ),
+  );
+}

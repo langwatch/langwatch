@@ -23,7 +23,7 @@ def normalize_endpoint(endpoint: str) -> str:
 
     Request URLs are built by appending paths that already carry a leading
     slash, so an endpoint written as ``https://app.langwatch.ai/`` would
-    produce ``https://app.langwatch.ai//api/experiment/init``. The router does
+    produce ``https://app.langwatch.ai//api/v1/experiment/init``. The router does
     not match that, and the caller gets an opaque 404 with nothing pointing at
     the endpoint as the cause.
     """

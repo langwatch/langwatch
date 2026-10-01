@@ -1,0 +1,401 @@
+import { EventUtils } from "@langwatch/eventing";
+import {
+  EVENTREF_ATTR_PREFIX,
+  TraceNotFoundError,
+  traceFullRecordSchema,
+  type NormalizedSpan,
+  type TraceFullRecord,
+  type TraceFullReadInput,
+  type TraceFullThreadReadInput,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
+
+import type { TraceFullIo } from "../../app/trace.members.ts";
+import {
+  applyTraceFullReadProtections,
+  internalTraceFullReadProtections,
+} from "../../rules/trace-full-protection.rules.ts";
+import {
+  type StoredSpanRow,
+  collectDroppedCategories,
+  deserializeStoredAttributes,
+  deserializeStoredValue,
+  extractFullRecordEvents,
+  mapNormalizedSpanToFullRecordSpan,
+  mapStoredSpanRow,
+  mapTraceMetadata,
+  withoutEventReferences,
+} from "../../rules/trace-full-record.rules.ts";
+import { TraceFullRecordRepository } from "../trace-full-record.repository.ts";
+import type { TracePayloadReaderRepository } from "../trace-payload-reader.repository.ts";
+import type {
+  TraceClickHouseClient,
+  TraceClickHouse,
+} from "./clickhouse.trace-member-client.repository.ts";
+import { chBoolean, chNumber, chString, chStringMap } from "./clickhouse.trace-row.mapper.ts";
+
+const PARTITION_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+const MAX_SPANS = 10_000;
+const MAX_THREAD_TRACES = 1_000;
+const PAYLOAD_READ_CONCURRENCY = 25;
+
+const summaryRowSchema = z.looseObject({
+  TraceId: chString,
+  Attributes: chStringMap,
+  ComputedInput: chString.nullable(),
+  ComputedOutput: chString.nullable(),
+  ContainsErrorStatus: chBoolean,
+  ErrorMessage: chString.nullable(),
+  TimeToFirstTokenMs: chNumber.nullable(),
+  TotalDurationMs: chNumber.nullable(),
+  TotalPromptTokenCount: chNumber.nullable(),
+  TotalCompletionTokenCount: chNumber.nullable(),
+  TotalCost: chNumber.nullable(),
+  TokensEstimated: chBoolean,
+  OccurredAtMs: chNumber,
+  CreatedAtMs: chNumber,
+  UpdatedAtMs: chNumber,
+});
+
+const summaryRowsSchema = z.array(summaryRowSchema);
+
+type SummaryRow = z.infer<typeof summaryRowSchema>;
+
+const threadTraceRowSchema = z.looseObject({ TraceId: chString, OccurredAtMs: chNumber });
+
+const threadTraceRowsSchema = z.array(threadTraceRowSchema);
+
+const storedSpanRowSchema: z.ZodType<StoredSpanRow> = z.looseObject({
+  SpanId: chString,
+  TraceId: chString,
+  TenantId: chString,
+  ParentSpanId: chString.nullable(),
+  ParentTraceId: chString.nullable(),
+  ParentIsRemote: chBoolean.nullable(),
+  Sampled: chBoolean,
+  StartTimeMs: chNumber,
+  EndTimeMs: chNumber,
+  DurationMs: chNumber,
+  SpanName: chString,
+  SpanKind: chNumber,
+  ResourceAttributes: chStringMap,
+  SpanAttributes: chStringMap,
+  StatusCode: chNumber.nullable(),
+  StatusMessage: chString.nullable(),
+  ScopeName: chString.nullable(),
+  ScopeVersion: chString.nullable(),
+  Events_Timestamp: z.array(chNumber).nullable(),
+  Events_Name: z.array(chString).nullable(),
+  Events_Attributes: z.array(chStringMap).nullable(),
+  Links_TraceId: z.array(chString).nullable(),
+  Links_SpanId: z.array(chString).nullable(),
+  Links_Attributes: z.array(chStringMap).nullable(),
+});
+
+const storedSpanRowsSchema = z.array(storedSpanRowSchema);
+
+type PayloadReference = { traceId: string; eventId: string; field: string };
+
+/** Full-record reader with package-owned normalized mapping and bounded recall. */
+export class ClickHouseTraceFullRecordRepository extends TraceFullRecordRepository {
+  private constructor(
+    private readonly clickhouse: TraceClickHouse,
+    private readonly payloads: TracePayloadReaderRepository,
+    private readonly io: TraceFullIo,
+  ) {
+    super();
+  }
+
+  static create(
+    clickhouse: TraceClickHouse,
+    payloads: TracePayloadReaderRepository,
+    io: TraceFullIo,
+  ): ClickHouseTraceFullRecordRepository {
+    return new ClickHouseTraceFullRecordRepository(clickhouse, payloads, io);
+  }
+
+  async get(input: TraceFullReadInput): Promise<TraceFullRecord> {
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceFullRecordRepository.get",
+    );
+    const client = await this.clickhouse.resolve(input.tenantId);
+    const summary = await this.summary(client, input);
+    if (!summary) throw new TraceNotFoundError(input.traceId);
+
+    const rows = await this.spans(client, input, input.occurredAtMs ?? summary.OccurredAtMs);
+    const resolved = await this.resolveAll(input.tenantId, rows);
+    const normalized = resolved.map(({ row, attributes }) => mapStoredSpanRow(row, attributes));
+    const spans = normalized.map((span) => mapNormalizedSpanToFullRecordSpan(span));
+    const fullIo = resolved.some(({ recalled }) => recalled) ? this.io.recompute(normalized) : null;
+    const droppedCategories = collectDroppedCategories(normalized);
+    const events = extractFullRecordEvents({
+      spans,
+      projectId: input.tenantId,
+      traceId: summary.TraceId,
+    });
+
+    const record: TraceFullRecord = {
+      trace_id: summary.TraceId,
+      project_id: input.tenantId,
+      metadata: mapTraceMetadata(summary.Attributes),
+      timestamps: {
+        started_at: summary.OccurredAtMs,
+        inserted_at: summary.CreatedAtMs,
+        updated_at: summary.UpdatedAtMs,
+      },
+      input:
+        fullIo?.input ?? ClickHouseTraceFullRecordRepository.summaryContent(summary.ComputedInput),
+      output:
+        fullIo?.output ??
+        ClickHouseTraceFullRecordRepository.summaryContent(summary.ComputedOutput),
+      ...(summary.ContainsErrorStatus
+        ? {
+            error: {
+              has_error: true,
+              message: summary.ErrorMessage ?? "Unknown error",
+              stacktrace: [],
+            },
+          }
+        : {}),
+      metrics: ClickHouseTraceFullRecordRepository.traceMetrics(summary),
+      spans,
+      ...(events.length > 0 ? { events } : {}),
+      ...(droppedCategories.length > 0 ? { privacy: { droppedCategories } } : {}),
+    };
+    return traceFullRecordSchema.parse(
+      applyTraceFullReadProtections(record, internalTraceFullReadProtections),
+    );
+  }
+
+  async findThread(input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
+    EventUtils.validateTenantId(
+      { tenantId: input.tenantId },
+      "ClickHouseTraceFullRecordRepository.findThread",
+    );
+    const client = await this.clickhouse.resolve(input.tenantId);
+    const result = await client.query({
+      query: `SELECT TraceId, toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs FROM trace_summaries
+        WHERE TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+        AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt) FROM trace_summaries
+          WHERE TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String} GROUP BY TenantId, TraceId)
+        ORDER BY OccurredAt ASC, TraceId ASC LIMIT {limit:UInt32}`,
+      query_params: {
+        tenantId: input.tenantId,
+        threadId: input.threadId,
+        limit: MAX_THREAD_TRACES,
+      },
+      format: "JSONEachRow",
+    });
+    const rows = threadTraceRowsSchema.parse(await result.json());
+    const records = await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
+      rows,
+      PAYLOAD_READ_CONCURRENCY,
+      (row) =>
+        this.get({
+          tenantId: input.tenantId,
+          traceId: row.TraceId,
+          occurredAtMs: row.OccurredAtMs,
+        }),
+    );
+    return records.toSorted(
+      (left, right) =>
+        left.timestamps.started_at - right.timestamps.started_at ||
+        left.trace_id.localeCompare(right.trace_id),
+    );
+  }
+
+  private async summary(
+    client: TraceClickHouseClient,
+    input: TraceFullReadInput,
+  ): Promise<SummaryRow | null> {
+    const result = await client.query({
+      query: `SELECT TraceId, Attributes, ComputedInput, ComputedOutput, ContainsErrorStatus, ErrorMessage,
+        TimeToFirstTokenMs, TotalDurationMs, TotalPromptTokenCount, TotalCompletionTokenCount, TotalCost, TokensEstimated,
+        toUnixTimestamp64Milli(OccurredAt) AS OccurredAtMs, toUnixTimestamp64Milli(CreatedAt) AS CreatedAtMs,
+        toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAtMs FROM trace_summaries WHERE TenantId = {tenantId:String}
+        AND TraceId = {traceId:String} AND (TenantId, TraceId, UpdatedAt) IN (SELECT TenantId, TraceId, max(UpdatedAt)
+          FROM trace_summaries WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} GROUP BY TenantId, TraceId) LIMIT 1`,
+      query_params: { tenantId: input.tenantId, traceId: input.traceId },
+      format: "JSONEachRow",
+    });
+    return summaryRowsSchema.parse(await result.json())[0] ?? null;
+  }
+
+  private async spans(
+    client: TraceClickHouseClient,
+    input: TraceFullReadInput,
+    occurredAtMs: number,
+  ): Promise<StoredSpanRow[]> {
+    const read = async (bounded: boolean): Promise<StoredSpanRow[]> => {
+      const filter = bounded
+        ? "AND StartTime BETWEEN fromUnixTimestamp64Milli({fromMs:Int64}) AND fromUnixTimestamp64Milli({toMs:Int64})"
+        : "";
+      const result = await client.query({
+        query: `SELECT SpanId, TraceId, TenantId, ParentSpanId, ParentTraceId, ParentIsRemote, Sampled,
+          toUnixTimestamp64Milli(StartTime) AS StartTimeMs, toUnixTimestamp64Milli(EndTime) AS EndTimeMs, DurationMs,
+          SpanName, SpanKind, ResourceAttributes, SpanAttributes, StatusCode, StatusMessage, ScopeName, ScopeVersion,
+          arrayMap(x -> toUnixTimestamp64Milli(x), \`Events.Timestamp\`) AS Events_Timestamp, \`Events.Name\` AS Events_Name,
+          \`Events.Attributes\` AS Events_Attributes, \`Links.TraceId\` AS Links_TraceId, \`Links.SpanId\` AS Links_SpanId,
+          \`Links.Attributes\` AS Links_Attributes FROM stored_spans WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String}
+          ${filter} AND (TenantId, TraceId, SpanId, StartTime) IN (SELECT TenantId, TraceId, SpanId, max(StartTime) FROM stored_spans
+            WHERE TenantId = {tenantId:String} AND TraceId = {traceId:String} ${filter} GROUP BY TenantId, TraceId, SpanId)
+          ORDER BY StartTime ASC, SpanId ASC LIMIT {limit:UInt32}`,
+        query_params: {
+          tenantId: input.tenantId,
+          traceId: input.traceId,
+          limit: MAX_SPANS,
+          ...(bounded
+            ? {
+                fromMs: occurredAtMs - PARTITION_WINDOW_MS,
+                toMs: occurredAtMs + PARTITION_WINDOW_MS,
+              }
+            : {}),
+        },
+        clickhouse_settings: { max_memory_usage: String(2 * 1024 * 1024 * 1024) },
+        format: "JSONEachRow",
+      });
+      return storedSpanRowsSchema.parse(await result.json());
+    };
+    // A summary occurrence anchor is authoritative for this trace. An empty
+    // window means there are no matching spans there; widening to every cold
+    // partition would turn ordinary span-less reads into unbounded scans.
+    return occurredAtMs > 0 ? read(true) : read(false);
+  }
+
+  private async resolveAll(
+    tenantId: string,
+    rows: StoredSpanRow[],
+  ): Promise<
+    {
+      row: StoredSpanRow;
+      attributes: NormalizedSpan["spanAttributes"];
+      recalled: boolean;
+    }[]
+  > {
+    const plans = rows.map((row) => ({
+      row,
+      original: deserializeStoredAttributes(row.SpanAttributes),
+    }));
+    const reads = new Map<string, PayloadReference>();
+    for (const plan of plans) {
+      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(plan.original)) {
+        reads.set(ClickHouseTraceFullRecordRepository.referenceKey(plan.row.TraceId, reference), {
+          traceId: plan.row.TraceId,
+          eventId: reference.eventId,
+          field: reference.field,
+        });
+      }
+    }
+    const values = new Map<string, string | null>();
+    await ClickHouseTraceFullRecordRepository.mapWithConcurrency(
+      [...reads.entries()],
+      PAYLOAD_READ_CONCURRENCY,
+      async ([key, reference]) => {
+        try {
+          values.set(key, await this.payloads.read({ tenantId, ...reference }));
+        } catch {
+          values.set(key, null);
+        }
+      },
+    );
+
+    return plans.map(({ row, original }) => {
+      const attributes = withoutEventReferences(original);
+      let recalled = false;
+      for (const reference of ClickHouseTraceFullRecordRepository.eventReferences(original)) {
+        const value = values.get(
+          ClickHouseTraceFullRecordRepository.referenceKey(row.TraceId, reference),
+        );
+        if (value !== null && value !== void 0) {
+          attributes[reference.attrKey] = deserializeStoredValue(value);
+          recalled = true;
+        }
+      }
+      return { row, attributes, recalled };
+    });
+  }
+
+  private static eventReferences(
+    attributes: NormalizedSpan["spanAttributes"],
+  ): { attrKey: string; eventId: string; field: string }[] {
+    const prefix = EVENTREF_ATTR_PREFIX;
+    return Object.entries(attributes).flatMap(([key, value]) => {
+      if (!key.startsWith(prefix)) return [];
+      const decoded =
+        typeof value === "string"
+          ? ClickHouseTraceFullRecordRepository.parseReference(value)
+          : value;
+      if (!ClickHouseTraceFullRecordRepository.isReference(decoded)) return [];
+      return [
+        { attrKey: key.slice(prefix.length), eventId: decoded.eventId, field: decoded.field },
+      ];
+    });
+  }
+
+  private static parseReference(value: string): unknown {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  private static isReference(value: unknown): value is { eventId: string; field: string } {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const eventId = ClickHouseTraceFullRecordRepository.ownString(value, "eventId");
+    const field = ClickHouseTraceFullRecordRepository.ownString(value, "field");
+    return eventId !== null && eventId.length > 0 && field !== null && field.length > 0;
+  }
+
+  private static ownString(value: object, key: string): string | null {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return typeof descriptor?.value === "string" ? descriptor.value : null;
+  }
+
+  private static referenceKey(
+    traceId: string,
+    reference: { eventId: string; field: string },
+  ): string {
+    return `${traceId}\u0000${reference.eventId}\u0000${reference.field}`;
+  }
+
+  private static summaryContent(value: string | null): { type: string; value: string } | null {
+    return value === null ? null : { type: "text", value };
+  }
+
+  private static traceMetrics(summary: SummaryRow): Record<string, number | boolean | null> {
+    return {
+      first_token_ms: summary.TimeToFirstTokenMs,
+      total_time_ms: summary.TotalDurationMs,
+      prompt_tokens: summary.TotalPromptTokenCount,
+      completion_tokens: summary.TotalCompletionTokenCount,
+      total_cost: summary.TotalCost,
+      tokens_estimated: summary.TokensEstimated,
+    };
+  }
+
+  private static async mapWithConcurrency<Input, Output>(
+    inputs: Input[],
+    concurrency: number,
+    operation: (input: Input) => Promise<Output>,
+  ): Promise<Output[]> {
+    const output = new Map<number, Output>();
+    let next = 0;
+    const workers = Array.from({ length: Math.min(concurrency, inputs.length) }, async () => {
+      while (next < inputs.length) {
+        const index = next++;
+        const input = inputs[index];
+        if (input === void 0) continue;
+        output.set(index, await operation(input));
+      }
+    });
+    await Promise.all(workers);
+    return inputs.map((_input, index) => {
+      for (const [completedIndex, result] of output) {
+        if (completedIndex === index) return result;
+      }
+      throw new Error(`Concurrent Trace read did not produce result ${index}`);
+    });
+  }
+}

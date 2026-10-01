@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+
 import { type LangWatch } from "../../../dist";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import { HandleUtil } from "./helpers/handle.util";
@@ -15,7 +16,9 @@ describe("Prompt tags and versions (real API)", () => {
     describe("when using explicit tag option", () => {
       it("fetches the tagged version via explicit option", async () => {
         const handle = HandleUtil.unique("tag-explicit");
-        const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
+        const tag = await langwatch.prompts.tags.create({
+          name: HandleUtil.unique("e2e-tag"),
+        });
         try {
           const v1 = await langwatch.prompts.create({
             handle,
@@ -50,7 +53,9 @@ describe("Prompt tags and versions (real API)", () => {
     describe("when using shorthand syntax", () => {
       it("fetches the tagged version via shorthand", async () => {
         const handle = HandleUtil.unique("tag-shorthand");
-        const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
+        const tag = await langwatch.prompts.tags.create({
+          name: HandleUtil.unique("e2e-tag"),
+        });
         try {
           const v1 = await langwatch.prompts.create({
             handle,
@@ -69,10 +74,9 @@ describe("Prompt tags and versions (real API)", () => {
             versionId: v1VersionId,
           });
 
-          const fetched = await langwatch.prompts.get(
-            `${handle}:${tag.name}`,
-            { fetchPolicy: "ALWAYS_FETCH" },
-          );
+          const fetched = await langwatch.prompts.get(`${handle}:${tag.name}`, {
+            fetchPolicy: "ALWAYS_FETCH",
+          });
 
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
@@ -122,10 +126,9 @@ describe("Prompt tags and versions (real API)", () => {
             commitMessage: "v2",
           });
 
-          const fetched = await langwatch.prompts.get(
-            `${handle}:${v1.version}`,
-            { fetchPolicy: "ALWAYS_FETCH" },
-          );
+          const fetched = await langwatch.prompts.get(`${handle}:${v1.version}`, {
+            fetchPolicy: "ALWAYS_FETCH",
+          });
 
           expect(fetched.prompt).toBe("Version 1 content");
         } finally {
@@ -138,7 +141,9 @@ describe("Prompt tags and versions (real API)", () => {
   describe("when fetching without tag or version", () => {
     it("returns the latest version", async () => {
       const handle = HandleUtil.unique("tag-latest");
-      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
+      const tag = await langwatch.prompts.tags.create({
+        name: HandleUtil.unique("e2e-tag"),
+      });
       try {
         const v1 = await langwatch.prompts.create({
           handle,
@@ -172,7 +177,9 @@ describe("Prompt tags and versions (real API)", () => {
   describe("when fetching with unassigned tag", () => {
     it("rejects with an error via shorthand", async () => {
       const handle = HandleUtil.unique("tag-unassigned-shorthand");
-      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
+      const tag = await langwatch.prompts.tags.create({
+        name: HandleUtil.unique("e2e-tag"),
+      });
       try {
         await langwatch.prompts.create({
           handle,
@@ -183,7 +190,7 @@ describe("Prompt tags and versions (real API)", () => {
           langwatch.prompts.get(`${handle}:${tag.name}`, {
             fetchPolicy: "ALWAYS_FETCH",
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ name: "PromptsError" });
       } finally {
         await langwatch.prompts.delete(handle);
         await langwatch.prompts.tags.delete(tag.name);
@@ -192,7 +199,9 @@ describe("Prompt tags and versions (real API)", () => {
 
     it("rejects with an error via explicit option", async () => {
       const handle = HandleUtil.unique("tag-unassigned-explicit");
-      const tag = await langwatch.prompts.tags.create({ name: HandleUtil.unique("e2e-tag") });
+      const tag = await langwatch.prompts.tags.create({
+        name: HandleUtil.unique("e2e-tag"),
+      });
       try {
         await langwatch.prompts.create({
           handle,
@@ -204,7 +213,7 @@ describe("Prompt tags and versions (real API)", () => {
             tag: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ name: "PromptsError" });
       } finally {
         await langwatch.prompts.delete(handle);
         await langwatch.prompts.tags.delete(tag.name);

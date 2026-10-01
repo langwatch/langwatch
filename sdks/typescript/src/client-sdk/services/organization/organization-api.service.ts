@@ -1,23 +1,16 @@
 /**
- * The `/api/organization` management family: the organization profile, its
- * members and its invites, all implied by the credential rather than addressed
- * by an id.
- *
- * CLI-only, like the other management services: it is deliberately not exported
- * from the client SDK's public index, because an application talking to
- * LangWatch instruments and reads data, it does not provision the organization
- * it runs inside.
+ * The `/api/v1/organization` management family: the organization profile, its members and
+ * its invites, all implied by the credential rather than addressed by an id.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
+
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
-import type {
-  ManagementScopeType,
-  OrganizationRole,
-} from "../_shared/management-types";
+import type { ManagementScopeType, OrganizationRole } from "../_shared/management-types";
 
 export interface OrganizationSettings {
   id: string;
@@ -71,7 +64,7 @@ export interface OrganizationMemberDetail extends OrganizationMember {
 
 export interface UpdatedOrganizationMember extends OrganizationMember {
   /** Teams the change left with no administrator. Informative, never blocking. */
-  teamsLeftWithoutAdmin?: Array<{ id: string; name: string }>;
+  teamsLeftWithoutAdmin?: { id: string; name: string }[];
 }
 
 export interface ListMembersOptions {
@@ -103,13 +96,13 @@ export interface MemberAccessBreakdown {
     orgRole: string;
     orgRolePermissions: string[];
   };
-  groups: Array<{
+  groups: {
     id: string;
     name: string;
     slug: string;
     scimSource: string | null;
     bindings: MemberAccessBinding[];
-  }>;
+  }[];
   directBindings: MemberAccessBinding[];
 }
 
@@ -140,7 +133,7 @@ export interface CreatedOrganizationInvite extends OrganizationInvite {
 export interface InviteInput {
   email: string;
   role: OrganizationRole;
-  teams: Array<{ teamId: string; role: string; customRoleId?: string }>;
+  teams: { teamId: string; role: string; customRoleId?: string }[];
 }
 
 export interface CreateInvitesInput {
@@ -173,25 +166,23 @@ export class OrganizationApiService {
   async get(): Promise<OrganizationSettings> {
     return this.#request({
       operation: "fetch the organization",
-      path: "/api/organization",
+      path: managementPath("/api/v1/organization"),
     });
   }
 
   async update(input: UpdateOrganizationInput): Promise<OrganizationSettings> {
     return this.#request({
       operation: "update the organization",
-      path: "/api/organization",
+      path: managementPath("/api/v1/organization"),
       method: "PATCH",
       body: input,
     });
   }
 
-  async listMembers(
-    options: ListMembersOptions = {},
-  ): Promise<ListMembersResponse> {
+  async listMembers(options: ListMembersOptions = {}): Promise<ListMembersResponse> {
     return this.#request({
       operation: "list organization members",
-      path: "/api/organization/members",
+      path: managementPath("/api/v1/organization/members"),
       query: {
         ...(options.includeDisabled !== undefined
           ? { includeDisabled: options.includeDisabled }
@@ -205,7 +196,7 @@ export class OrganizationApiService {
   async getMember(userId: string): Promise<OrganizationMemberDetail> {
     return this.#request({
       operation: `fetch member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/v1/organization/members/${encodeURIComponent(userId)}`),
     });
   }
 
@@ -218,7 +209,7 @@ export class OrganizationApiService {
   }): Promise<UpdatedOrganizationMember> {
     return this.#request({
       operation: `update member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/v1/organization/members/${encodeURIComponent(userId)}`),
       method: "PATCH",
       body: input,
     });
@@ -227,7 +218,7 @@ export class OrganizationApiService {
   async removeMember(userId: string): Promise<{ success: true }> {
     return this.#request({
       operation: `remove member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}`,
+      path: managementPath(`/api/v1/organization/members/${encodeURIComponent(userId)}`),
       method: "DELETE",
     });
   }
@@ -235,14 +226,14 @@ export class OrganizationApiService {
   async getMemberAccess(userId: string): Promise<MemberAccessBreakdown> {
     return this.#request({
       operation: `fetch the access of member "${userId}"`,
-      path: `/api/organization/members/${encodeURIComponent(userId)}/access`,
+      path: managementPath(`/api/v1/organization/members/${encodeURIComponent(userId)}/access`),
     });
   }
 
   async listInvites(): Promise<{ invites: OrganizationInvite[] }> {
     return this.#request({
       operation: "list organization invites",
-      path: "/api/organization/invites",
+      path: managementPath("/api/v1/organization/invites"),
     });
   }
 
@@ -251,7 +242,7 @@ export class OrganizationApiService {
   ): Promise<{ invites: CreatedOrganizationInvite[] }> {
     return this.#request({
       operation: "create organization invites",
-      path: "/api/organization/invites",
+      path: managementPath("/api/v1/organization/invites"),
       method: "POST",
       body: input,
     });
@@ -260,7 +251,7 @@ export class OrganizationApiService {
   async revokeInvite(inviteId: string): Promise<{ success: true }> {
     return this.#request({
       operation: `revoke invite "${inviteId}"`,
-      path: `/api/organization/invites/${encodeURIComponent(inviteId)}`,
+      path: managementPath(`/api/v1/organization/invites/${encodeURIComponent(inviteId)}`),
       method: "DELETE",
     });
   }

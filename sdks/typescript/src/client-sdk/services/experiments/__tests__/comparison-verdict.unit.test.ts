@@ -1,11 +1,11 @@
 /**
- * The verdict a comparison returns, and the row-level record it leaves in the
- * batch: winner, tie, inconclusive, and the statuses that pair with them.
- *
+ * The verdict a comparison returns, and the row-level record it leaves:
+ * winner, tie, inconclusive, and the statuses that pair with them.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
 import { describe, it, expect } from "vitest";
+
 import {
   type ComparisonHarness,
   type JudgeResponse,
@@ -52,8 +52,8 @@ describe("Experiment.compare", () => {
         await experiment.run([{ question: "What is 2 + 2?" }], async ({ index }) => {
           await Promise.all(
             Object.entries(THREE_OUTPUTS).map(([target, output]) =>
-              experiment.withTarget(target, () => output)
-            )
+              experiment.withTarget(target, () => output),
+            ),
           );
           await experiment.withTarget("verdict-wrapper", async () => {
             await experiment.compare({ index });
@@ -183,9 +183,7 @@ describe("Experiment.compare", () => {
           });
 
           expect(verdict?.status).toBe(testCase.status);
-          expect(comparisonEvaluations(harness)[0]!.status).toBe(
-            testCase.entryStatus
-          );
+          expect(comparisonEvaluations(harness)[0]!.status).toBe(testCase.entryStatus);
         }
       });
     });

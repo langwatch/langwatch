@@ -94,6 +94,11 @@ Rule: Search bar layout and behavior
     Then the trace table filters to show only error traces
     And no request went out before Enter
 
+  Scenario: The inline hint names Enter
+    Given the search bar is focused with text in it
+    Then the hint after the text reads "⏎ Enter to search"
+    And no other key submits the search
+
   @integration
   Scenario: Typing does not trigger live search
     When the user types "@status:err" without pressing Enter
@@ -101,10 +106,6 @@ Rule: Search bar layout and behavior
     And the filter store does not change
     And only autocomplete suggestions and chip highlighting update live
 
-  Scenario: The inline hint names Enter
-    Given the search bar is focused with text in it
-    Then the hint after the text reads "⏎ Enter to search"
-    And no other key submits the search
 
   # Pasting a multi-line error message used to create one Paragraph node
   # per line, growing the editor vertically until it pushed the rest of
@@ -1037,13 +1038,6 @@ Rule: Facet count updates
     And an absolute window still carries both bounds
 
   @unit
-  Scenario: A facet term under a NOT is removed with the rest
-    Given the query reads "NOT (status:error OR service:api)"
-    When the Status facet is counted
-    Then the term it is counted under no longer names status
-    And the rest of the negated group still applies
-
-  @unit
   Scenario: Facet counts are fetched in a single batched query
     When the user applies a filter
     Then all facet counts are fetched in one query, not one per facet
@@ -1061,14 +1055,6 @@ Rule: Facet count updates
     Then the table shows no traces
     And no facet the query does not name shows a nonzero count
 
-  @integration
-  Scenario: Facet counts leave out the hidden origin and the traces outside the window
-    Given the project has a trace from Langy's own origin in the window
-    And a trace outside the selected window
-    Then neither trace is counted in any facet but Origin
-    And the Origin facet still offers Langy with its count
-    And the counts read the window the table reads, never a rounded one
-
   @unit
   Scenario: A facet on spans or evaluations reads the listed traces once any filter is active
     Given the query names only an evaluator facet
@@ -1081,12 +1067,21 @@ Rule: Facet count updates
     Then the span and evaluation facets count every row in the window
     And they are counted again through the listed traces as soon as a filter is applied
 
+  # The sidebar's numbers come from the same predicate the table runs, so the
+  # read is never served from the shared discover cache while a query is on.
+  @unit
   @integration
   Scenario: Facet counts are cached only per query and window
     When the user changes the query or the time window
     Then the counts are requested again for the new input
     And a count kept for a previous input is never shown as the current one
 
+  Scenario: Facet counts leave out the hidden origin and the traces outside the window
+    Given the project has a trace from Langy's own origin in the window
+    And a trace outside the selected window
+    Then neither trace is counted in any facet but Origin
+    And the Origin facet still offers Langy with its count
+    And the counts read the window the table reads, never a rounded one
 
 # ─────────────────────────────────────────────────────────────────────────────
 # NUMBERS THAT AGREE
@@ -1385,6 +1380,12 @@ Rule: Enter routes a sentence
     Given the user is authenticated with "traces:view" permission
     And the project has traces
 
+  @unit
+  Scenario: A sentence about what the agent did is offered to the classifier as a judgement
+    When the classifier's routing question is built
+    Then the instant_eval option names judging what the agent did, such as a tool called with a wrong value or tests not re-run
+    And the free_text option says a description of something that happened is not a literal string
+
   @integration
   Scenario: Enter on a sentence asks the router
     Given the search bar contains the applied query "model:gpt-4o"
@@ -1427,6 +1428,26 @@ Rule: Enter routes a sentence
     Then the sentence is empty
     And the explicit query is "status:error OR refund"
     And the query is applied as typed rather than routed
+
+  @unit
+  Scenario: An apostrophe inside a word is part of the word, not a quote
+    When the user types "where did a member ask about cover their plan doesn't include?"
+    Then the whole text is the sentence and nothing is a syntax error
+    And contractions, possessives and a trailing plural possessive stay words too
+    And a value in single quotes is still a quoted value
+
+  @unit
+  Scenario: A lowercase "not" inside a sentence is a word of the sentence
+    When the user types "where did a member ask about cover that is not in their plan?"
+    Then the whole text, "not" included, is the sentence
+    And an uppercase NOT is still the negation operator
+
+  @unit
+  Scenario: The editor uppercases an operator only where it joins filter terms
+    When the user types "not" after a bare word of a sentence
+    Then it stays lowercase
+    And "and", "or" and "not" typed after a field:value term, a quoted phrase or a group are uppercased
+    And "not" typed at the start, after an opening parenthesis or after an operator is uppercased
 
   @unit
   Scenario: Joining a query that holds a top-level OR groups it first
@@ -1695,6 +1716,7 @@ Rule: The search bar's ask affordance belongs to Langy when Langy is available
     And the Langy panel opens and asks "why are these failing?"
     And the active search rides along as attached context
 
+  @unit
   @integration
   Scenario: Ask Langy sends the whole view with the question
     Given the search bar contains the applied query "status:error"
@@ -2370,12 +2392,14 @@ Rule: Attribute sections list values from their own attribute store
     Given the user is authenticated with "traces:view" permission
     And the project has traces with trace, span, and event attributes
 
+  @unit
   Scenario: Expanding an event-attribute key lists values observed on events
     Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
     And no trace-level attribute named "event.metrics.vote" exists
     When the user expands the "event.metrics.vote" key in the Event attributes section
     Then the value list shows "1" and "-1"
 
+  @unit
   Scenario: Expanding a span-attribute key lists values observed on spans
     Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
     And no trace-level attribute named "gen_ai.request.model" exists
@@ -2399,11 +2423,13 @@ Rule: Event filtering is reachable on the default sidebar
     And the user has never changed density
     And the project has traces with events carrying attributes
 
+  @unit
   Scenario: Event name and Event attributes sections show on the comfortable default
     Given the user has never changed facet visibility
     Then the sidebar shows the "Event name" section
     And the sidebar shows the "Event attributes" section
 
+  @unit
   Scenario: Span attributes stays behind the facet picker on comfortable density
     Given the user has never changed facet visibility
     And the project has traces with span attributes
@@ -2426,6 +2452,7 @@ Rule: Event rows drill down into their metric values
     Given the user is authenticated with "traces:view" permission
     And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
 
+  @unit @integration
   Scenario: Expanding the thumbs_up_down row shows its vote values with counts
     When the user expands the "thumbs_up_down" row in the Event name section
     Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
@@ -2437,11 +2464,13 @@ Rule: Event rows drill down into their metric values
   # named by whoever sent it, has no such mapping and shows as stored.
   # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
   # record of string to number — so "as stored" always means a decimal.)
+  @integration
   Scenario: A metric with no human name shows its stored value
     Given "checkout_survey" events carry "event.metrics.stars" with value "4"
     When the user expands the "checkout_survey" row in the Event name section
     Then the drilldown lists that value as "4"
 
+  @integration
   Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
     Given "event:thumbs_up_down" is already an active filter
     When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
@@ -2453,6 +2482,7 @@ Rule: Event rows drill down into their metric values
   # event type — a metric that never happened on "thumbs_up_down" would still
   # pass. Adding the anchor keeps the picked value scoped to the row the user
   # actually expanded.
+  @integration
   Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
     Given the "thumbs_up_down" row is not yet an active filter
     When the user expands the row and clicks the vote value shown as "thumbs down"
@@ -2494,6 +2524,7 @@ Rule: Event rows drill down into their metric values
     When the user clicks the vote value "-1" in the thumbs_up_down drilldown
     Then that trace still matches the resulting query
 
+  @integration
   Scenario: An event type with no metrics shows no drilldown affordance
     Given the project has "custom_marker" events carrying no event.metrics attributes
     Then the "custom_marker" row shows no expand affordance
@@ -2578,3 +2609,63 @@ Rule: Editing an existing token reopens the dropdown
     Given the search bar contains "@trace.attribute.langwatch.origin:application" with the dropdown open
     When the user presses the right arrow until the cursor sits past the token
     Then the dropdown closes
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENTER ROUTES A SENTENCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: Enter routes a sentence
+  Enter is the only way a typed text leaves the search bar. A text made of
+  `field:value` terms is applied as typed, with no request. A text with bare
+  words is a sentence, and `tracesV2.routeSearch` decides what it is: a
+  filter the query language can express, a judgement each trace needs (an
+  Instant Eval), a literal phrase, or a question for Langy. The classifier
+  makes the call in one category question over the sentence and a line of
+  context (lens, window, the filter fields, the evaluators and events the
+  project has); a deployment without the classifier asks the FAST model to
+  decide and build in one call; a deployment with neither searches the
+  phrase and says why. Routing is counted on a metric and never metered.
+  A failure on the way is a phrase search, never an error state in the bar.
+  See dev/docs/adr/139-trace-search-routes-on-enter.md.
+
+  Background:
+    Given the user is authenticated with "traces:view" permission
+    And the project has traces
+
+  # The two halves are rejoined with AND, so a word the writer put under an OR
+  # would come back meaning something else than they typed.
+  # A rejected key makes the provider's own response body the credential, so
+  # the log line gets the same curation the customer-facing disclosure gets.
+
+  Rule: A facet is counted under the query with its own field left out
+
+    @unit
+    Scenario: The facet's own terms are dropped and the rest kept
+      Given a query naming the status facet and another field
+      When the query is rewritten for the status facet's count
+      Then the status terms are gone and every other term is kept
+      And a field that merely shares the prefix is left alone
+      And a query that named only that facet becomes empty
+
+    @unit
+    Scenario: A facet term under a NOT is removed with the rest
+      Given a query negating a group that names the facet
+      When the query is rewritten for that facet's count
+      Then the negated group no longer carries the facet's term
+
+  Rule: The Explorer leaves Langy's own turns out unless the query names an origin
+
+    @unit
+    Scenario: The list leaves out Langy's turns by default
+      Given a query that does not name the origin field
+      When the Explorer's filter is compiled
+      Then the Langy origin is excluded after the query's own terms
+      And a trace with no origin still counts as the application's
+
+    @unit
+    Scenario: Naming an origin turns the default off
+      Given a query naming the origin field, negated or not
+      When the Explorer's filter is compiled
+      Then nothing is hidden, so picking Langy shows Langy's turns
+      And free text or an attribute holding the word does not count as naming it

@@ -1,0 +1,19 @@
+{
+  "extends": ["./tsconfig.json", "../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/hosted-mcp-contract": ["./src/index.ts"]
+    }
+  },
+  "files": ["./src/index.ts"],
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    }
+  ],
+  "exclude": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"]
+}

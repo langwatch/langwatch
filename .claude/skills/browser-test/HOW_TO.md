@@ -6,21 +6,28 @@ Lessons learned from running `/browser-test` against the LangWatch app.
 
 1. **Check the port is reachable** — try `browser_navigate` first. If it fails with `ERR_CONNECTION_REFUSED` or `ERR_CONNECTION_RESET`, the app isn't ready. Docker containers can take 1-2 minutes for migrations + compilation.
 
-2. **Dev mode is slow** — First visit to any page triggers Turbopack compilation. Expect **60-120 second waits** per new page. The orange bar at the top of the screen is the compilation indicator. Don't panic — just wait. Use `browser_wait_for` with `time: 120` for first page loads.
+2. **The first load is slow** — the browser application is a Vite SPA; the dev server
+   compiles a route's chunks on first visit. Expect tens of seconds, not minutes. Use
+   `browser_wait_for` with `time: 60` for a first page load.
 
-3. **Port mismatch kills auth** — `NEXTAUTH_URL` in `.env` must match the port the app is actually running on. If using `make quickstart` / `dev.sh`, the port auto-detects starting from 5560. The `compose.dev.yml` overrides `NEXTAUTH_URL` with `${APP_PORT:-5560}` so Docker should be fine. If running `pnpm dev` directly and the port increments (e.g. to 5561), auth callbacks will break.
+3. **Origin mismatch kills auth** — the trusted origin comes from `NEXTAUTH_URL`
+   (bound in `apps/api/src/platform/config/api.config.ts`; auth itself is better-auth).
+   It must match the origin you are browsing. Under haven it is set to the
+   real `https://app.<slug>.langwatch.localhost:<port>`, so browsing the app on
+   `127.0.0.1` will 403 the sign-in. Under a plain `pnpm dev`, `PORT` must match.
 
 ## Authentication
 
-- Local dev uses **NextAuth credentials** (not Auth0). Navigating to the app URL redirects to `/auth/signin` — a simple Email + Password form with a "Sign in" button.
+- Local dev uses an email + password credentials form, not a third-party identity
+  provider. Navigating to the app URL redirects to `/auth/signin`.
 - For fresh accounts, click **"Register new account"** on the sign-in page, fill in the credentials, then sign in.
-- After successful login, the app redirects to the dashboard. Dev mode may show a loading splash while Turbopack compiles — wait up to 120s.
+- After successful login, the app redirects to the dashboard. The dev server may show a loading splash while it builds the route's chunks — wait up to 60s.
 - **New accounts hit onboarding** — you'll need to fill in an org name (`Browser Test Org`), accept ToS, and pick a product flavour before reaching the main app.
 - After auth, you should see the dashboard with "Hello, Browser" and "Browser Test Org" in the header.
 
 ### Standard Test Credentials
 
-See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `dev/scripts/verify-browser-test.js`, `tests/agentic-e2e/tests/auth.setup.ts`, and interactive runs.
+See SKILL.md sub-agent template for current credentials. They're shared across `/browser-test`, `dev/scripts/verify-browser-test.js`, `dev/tests/agentic-e2e/tests/auth.setup.ts`, and interactive runs.
 
 ## Data Seeding
 
@@ -29,6 +36,7 @@ Many features require existing data to be testable. The sub-agent should create 
 ### Common Seeding Patterns
 
 **Creating a suite:**
+
 1. Navigate to the Suites page from the sidebar
 2. Click the "Create Suite" (or "New Suite") button
 3. Fill in the suite name (e.g., "Test Suite") and any required fields
@@ -36,17 +44,20 @@ Many features require existing data to be testable. The sub-agent should create 
 5. Verify the suite appears in the list before proceeding
 
 **Triggering test runs / batch runs:**
+
 1. Open an existing suite
 2. Click "Run" or "Run All" to trigger execution
 3. Wait for the run status to change from "Running" to "Completed" — use `browser_wait_for` with a generous timeout (60-120s)
 4. Refresh or re-navigate if the status does not update automatically
 
 **Waiting for results to appear:**
+
 - After triggering runs or sending traces, data may take a few seconds to propagate
 - Use `browser_wait_for` with `text` matching (e.g., wait for "Completed" or a result count) rather than fixed sleeps
 - If results depend on background workers, allow up to 120s
 
 **Creating traces via the SDK or API:**
+
 - Use a quick Bash command to send traces when UI seeding is impractical. The payload below is illustrative — replace placeholders with valid values:
   ```bash
   curl -X POST http://localhost:<port>/api/collector \
@@ -57,6 +68,7 @@ Many features require existing data to be testable. The sub-agent should create 
 - Find the project API key on the project settings page in the UI
 
 **Creating evaluations:**
+
 - Evaluations typically require traces to already exist
 - Navigate to the Evaluations section, configure an evaluator, and run it against existing traces
 
@@ -93,10 +105,10 @@ See `browser-tests/proof-of-concept/` for a complete proof-of-concept run with s
 
 ## Known Issues
 
-| Issue | Workaround |
-|-------|-----------|
-| Orange compile bar stuck for >60s | Hard refresh: `browser_navigate` to the same URL |
-| Auth callback goes to wrong port | Ensure `NEXTAUTH_URL` matches actual port, or use Docker which overrides it |
-| "New Scenario" opens duplicate dialogs | Press Escape twice to close both |
-| Checkbox click intercepted by overlay | Click the label or img element next to the checkbox |
-| Page shows splash but queries all resolved | Wait longer — Turbopack is still compiling the page JS |
+| Issue                                      | Workaround                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------------- |
+| First route load stalls past 60s           | Hard refresh: `browser_navigate` to the same URL                          |
+| Sign-in 403s                               | The origin does not match `NEXTAUTH_URL` — browse the configured hostname |
+| "New Scenario" opens duplicate dialogs     | Press Escape twice to close both                                          |
+| Checkbox click intercepted by overlay      | Click the label or img element next to the checkbox                       |
+| Page shows splash but queries all resolved | Wait longer — the dev server is still building the route's chunks         |

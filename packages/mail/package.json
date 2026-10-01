@@ -1,0 +1,50 @@
+{
+  "name": "@langwatch/mail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The transactional messages LangWatch sends, rendered here and sent through notification.",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/typecheck/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/typecheck/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "vite --config preview/vite.config.ts",
+    "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.9",
+    "react": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/design-system-internal": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "next-themes": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

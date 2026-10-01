@@ -58,16 +58,16 @@ gateway:
     existingSecretName: langwatch-app-secrets
     internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
     jwtSecretKey: LW_GATEWAY_JWT_SECRET
-    jwtSecretPreviousKey: ""      # set only during a JWT secret rotation
+    jwtSecretPreviousKey: "" # set only during a JWT secret rotation
 
   ingress:
     enabled: true
     className: nginx
-    host: gateway.acme.com        # your hostname, never the chart placeholder
+    host: gateway.acme.com # your hostname, never the chart placeholder
     path: /v1
     pathType: Prefix
     healthPath:
-      enabled: true               # publishes GET /health for uptime monitors
+      enabled: true # publishes GET /health for uptime monitors
       path: /health
     tls:
       enabled: true
@@ -90,7 +90,7 @@ gateway:
     endpoint: ""
 
   spend:
-    enabled: true                 # off means budgets are never debited
+    enabled: true # off means budgets are never debited
 
   shutdown:
     preDrainWaitSeconds: 5
@@ -127,7 +127,7 @@ kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
 Expected output:
 
 ```json
-{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}
+{ "status": "ok", "checks": { "gateway": "ok", "control_plane": "ok" } }
 ```
 
 Then run the [post-install checklist](/ai-gateway/self-hosting/post-install-checklist) to send a first completion through the gateway.
@@ -139,22 +139,22 @@ Then run the [post-install checklist](/ai-gateway/self-hosting/post-install-chec
 
 The chart passes these environment variables to the container. Every other key in the gateway `values.yaml` (`cache.*`, `bifrost.*`, `guardrails.*`, `budget.*`, `startup.*`, `otel.auth*`, `otel.batchTimeout`, `otel.maxQueueSize`, `security.*Timeout`, `controlPlane.*Timeout`) does not reach the pod.
 
-| Env var | Value source | Purpose |
-|---|---|---|
-| `SERVER_ADDR` | fixed `:5563` | Listen address. The Service targets port 5563 |
-| `LOG_LEVEL` | `logging.level` | `debug`, `info`, `warn` or `error` |
-| `LW_GATEWAY_BASE_URL` | `controlPlane.baseUrl`, else `http://<release>-app:5560` | Control plane URL |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set | OTLP/HTTP endpoint for the gateway's own spans |
-| `LW_GATEWAY_SPEND_ENABLED` | `spend.enabled` | Spend record emission |
-| `SERVER_MAX_REQUEST_BODY_BYTES` | `security.maxRequestBodyBytes` | Request body cap |
-| `SERVER_DRAIN_DELAY_SECONDS` | `shutdown.preDrainWaitSeconds` | Wait after `/readyz` flips to 503 |
-| `SERVER_GRACEFUL_SECONDS` | `shutdown.timeoutSeconds` | In-flight request budget on shutdown |
-| `BLOCK_LOCAL_HTTP_CALLS` | `security.blockLocalHTTPCalls` | Refuse provider endpoints on private addresses |
-| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `security.requireHTTPSCustomEndpoints` | Refuse `http://` provider endpoints |
-| `ALLOWED_PROXY_HOSTS` | `security.allowedProxyHosts`, comma-joined | Private hostnames exempt from the block |
-| `LW_GATEWAY_INTERNAL_SECRET` | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls |
-| `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey` | JWT verification secret |
-| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret, key `secrets.jwtSecretPreviousKey`, only when set | Previous JWT secret during rotation |
+| Env var                                                | Value source                                                         | Purpose                                        |
+| ------------------------------------------------------ | -------------------------------------------------------------------- | ---------------------------------------------- |
+| `SERVER_ADDR`                                          | fixed `:5563`                                                        | Listen address. The Service targets port 5563  |
+| `LOG_LEVEL`                                            | `logging.level`                                                      | `debug`, `info`, `warn` or `error`             |
+| `LW_GATEWAY_BASE_URL`                                  | `controlPlane.baseUrl`, else `http://<release>-app:5560`             | Control plane URL                              |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_OTLP_ENDPOINT` | `otel.endpoint`, only when set                                       | OTLP/HTTP endpoint for the gateway's own spans |
+| `LW_GATEWAY_SPEND_ENABLED`                             | `spend.enabled`                                                      | Spend record emission                          |
+| `SERVER_MAX_REQUEST_BODY_BYTES`                        | `security.maxRequestBodyBytes`                                       | Request body cap                               |
+| `SERVER_DRAIN_DELAY_SECONDS`                           | `shutdown.preDrainWaitSeconds`                                       | Wait after `/readyz` flips to 503              |
+| `SERVER_GRACEFUL_SECONDS`                              | `shutdown.timeoutSeconds`                                            | In-flight request budget on shutdown           |
+| `BLOCK_LOCAL_HTTP_CALLS`                               | `security.blockLocalHTTPCalls`                                       | Refuse provider endpoints on private addresses |
+| `REQUIRE_HTTPS_CUSTOM_ENDPOINTS`                       | `security.requireHTTPSCustomEndpoints`                               | Refuse `http://` provider endpoints            |
+| `ALLOWED_PROXY_HOSTS`                                  | `security.allowedProxyHosts`, comma-joined                           | Private hostnames exempt from the block        |
+| `LW_GATEWAY_INTERNAL_SECRET`                           | Secret `secrets.existingSecretName`, key `secrets.internalSecretKey` | HMAC secret for control plane calls            |
+| `LW_GATEWAY_JWT_SECRET`                                | Secret `secrets.existingSecretName`, key `secrets.jwtSecretKey`      | JWT verification secret                        |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS`                       | Secret, key `secrets.jwtSecretPreviousKey`, only when set            | Previous JWT secret during rotation            |
 
 The chart renders no authentication header for the OTLP export. Point `otel.endpoint` at a collector that accepts unauthenticated OTLP/HTTP, or leave it empty. The full variable reference is on [Config](/ai-gateway/self-hosting/config).
 
@@ -205,13 +205,13 @@ Watch `gateway_draining` together with `gateway_in_flight_requests`. During a he
 
 `networkPolicy.enabled` is `false` by default. When enabled the chart renders one deny-by-default policy:
 
-| Direction | Allowed | Value |
-|---|---|---|
-| Ingress | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom` |
-| Egress | DNS to `kube-system` on TCP and UDP 53 | fixed |
-| Egress | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560 | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
-| Egress | OTLP collector on port 4318, only when the list is non-empty | `networkPolicy.egressToOTLP` |
-| Egress | Any public IP on TCP 443, with private, loopback, link-local and cloud metadata ranges excluded | `networkPolicy.egressToProviders`, `networkPolicy.providerPorts` |
+| Direction | Allowed                                                                                                | Value                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
+| Ingress   | Pods in the `ingress-nginx` namespace, and Prometheus pods in the `monitoring` namespace, to port 5563 | `networkPolicy.ingressFrom`                                            |
+| Egress    | DNS to `kube-system` on TCP and UDP 53                                                                 | fixed                                                                  |
+| Egress    | Pods labelled `app.kubernetes.io/name: langwatch-app` on port 5560                                     | `networkPolicy.egressToControlPlane`, `networkPolicy.controlPlanePort` |
+| Egress    | OTLP collector on port 4318, only when the list is non-empty                                           | `networkPolicy.egressToOTLP`                                           |
+| Egress    | Any public IP on TCP 443, with private, loopback, link-local and cloud metadata ranges excluded        | `networkPolicy.egressToProviders`, `networkPolicy.providerPorts`       |
 
 Replace `egressToProviders` with explicit CIDR blocks when your policy requires a pinned provider egress set. Check the namespace labels on your cluster before enabling: the defaults match upstream ingress-nginx and kube-prometheus-stack.
 
@@ -237,13 +237,13 @@ Every new gateway pod starts with an empty auth cache and resolves each virtual 
 
 ## Common failures
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| Pod in `CreateContainerConfigError` | The Secret named by `gateway.secrets.existingSecretName` or one of its keys does not exist | Create the Secret from step 1, then delete the pod |
-| `helm upgrade` fails naming `gateway.secrets.existingSecretName` | The gateway Secret name differs from the app Secret name | Set both to the same name |
-| `helm upgrade` fails naming `terminationGracePeriodSeconds` | Drain timing exceeds the grace period | Raise `terminationGracePeriodSeconds` to the number in the message |
-| Pods healthy, every `/v1` call answers `503 auth_upstream_unavailable` | `LW_GATEWAY_BASE_URL` points at the wrong host or port | Set `gateway.controlPlane.baseUrl` to the app Service URL |
-| `/health` answers 503 with `control_plane: unreachable for Ns` | Control plane unreachable, or `LW_GATEWAY_INTERNAL_SECRET` differs between the two pods | Compare the value in both Deployments, then check the Service and DNS |
-| Pod refuses to start with `LW_GATEWAY_AUTH_CACHE_... is no longer read` | A retired duration-string variable is still set | Set the `_SECONDS` variable named in the message instead |
+| Symptom                                                                 | Cause                                                                                      | Fix                                                                   |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| Pod in `CreateContainerConfigError`                                     | The Secret named by `gateway.secrets.existingSecretName` or one of its keys does not exist | Create the Secret from step 1, then delete the pod                    |
+| `helm upgrade` fails naming `gateway.secrets.existingSecretName`        | The gateway Secret name differs from the app Secret name                                   | Set both to the same name                                             |
+| `helm upgrade` fails naming `terminationGracePeriodSeconds`             | Drain timing exceeds the grace period                                                      | Raise `terminationGracePeriodSeconds` to the number in the message    |
+| Pods healthy, every `/v1` call answers `503 auth_upstream_unavailable`  | `LW_GATEWAY_BASE_URL` points at the wrong host or port                                     | Set `gateway.controlPlane.baseUrl` to the app Service URL             |
+| `/health` answers 503 with `control_plane: unreachable for Ns`          | Control plane unreachable, or `LW_GATEWAY_INTERNAL_SECRET` differs between the two pods    | Compare the value in both Deployments, then check the Service and DNS |
+| Pod refuses to start with `LW_GATEWAY_AUTH_CACHE_... is no longer read` | A retired duration-string variable is still set                                            | Set the `_SECONDS` variable named in the message instead              |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).

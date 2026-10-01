@@ -1,14 +1,14 @@
 #!/bin/bash
 # Shared write_overrides helper.
 #
-# Writes `platform/app/.env.dev-up` listing ONLY the URLs whose services
+# Writes `.env.dev-up` listing ONLY the URLs whose services
 # starting locally for the given preset. Compose loads the overlay AFTER
-# `platform/app/.env`, so non-overridden URLs keep their .env values — the
+# `.env`, so non-overridden URLs keep their .env values — the
 # contributor's `.env` is the source of truth.
 #
 # Credentials NEVER go in the overlay (only non-rotating infrastructure
 # shape: bucket/endpoint/region/connection-host). Credentials live in
-# `.env`, refreshed by the operator (see platform/app/scripts/refresh-dev-s3-env.sh
+# `.env`, refreshed by the operator (see dev/scripts/refresh-dev-s3-env.sh
 # for the SSO/STS workflow).
 #
 # Presets (passed as $1):
@@ -35,7 +35,7 @@
 
 write_dev_overrides() {
   local preset="${1-}"
-  local out="${2:-platform/app/.env.dev-up}"
+  local out="${2:-.env.dev-up}"
 
   case "$preset" in
     all-local|all-local-nlp|dev-storage|dev-infra|frontend-only|migration|full-local) ;;
@@ -127,7 +127,7 @@ EOF
   # local. ONLY non-rotating infra shape goes in the overlay (bucket /
   # endpoint / region). Credentials (S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
   # S3_SESSION_TOKEN) must already be in `.env` — operator runs
-  # `bash platform/app/scripts/refresh-dev-s3-env.sh` when the SSO session
+  # `bash dev/scripts/refresh-dev-s3-env.sh` when the SSO session
   # expires (~hourly). The launcher checks for stale creds before starting.
   case "$preset" in
     dev-storage)

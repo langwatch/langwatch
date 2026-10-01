@@ -187,6 +187,45 @@ Feature: Local IdP simulator (idpsim)
     Then the connection is still there, because putting the seeded users back
       is not a reason to forget where they were going
 
+  # A real identity provider pushes a group by the ids the RECEIVING service
+  # minted for its people, not by its own. Sending its own ids writes a group
+  # of members nobody can resolve, which a target accepts and then shows
+  # empty — so a sync that reads as four groups written is four groups of
+  # nobody.
+
+  @unit
+  Scenario: Group sync references the receiving service's users and repeats without writes
+    Given a tenant connected to a SCIM service provider
+    When the tenant pushes its directory twice with groups turned on
+    Then the groups arrive naming the members by the ids the target minted
+    And the second push writes no group, because nothing changed
+    And a membership the tenant then changes is written once and no more
+    And somebody the tenant marks inactive stops being a member
+
+  @unit
+  Scenario: Group sync reports target failures instead of claiming success
+    Given a SCIM service provider that refuses every group write
+    When the tenant pushes its directory with groups turned on
+    Then the push reports a failure for each group it could not write
+    And each failure names what the target answered
+    And the people it did provision are still reported as created
+
+  @unit
+  Scenario: Directory readback follows every page of users and groups
+    Given a tenant of 250 people and 5 groups pushed at a service provider that pages
+    When the directory is read back
+    Then everybody and every group is reported exactly once
+    And the next push reports them all as unchanged
+
+  @unit
+  Scenario: An inactive person removed by the target is not provisioned again
+    Given somebody the tenant has marked inactive whose resource the target deleted
+    When the tenant pushes its directory again
+    Then nobody is created and nobody is updated
+    And the target still does not hold them
+    # A service provider that removes the resource on deactivation would
+    # otherwise be handed the person back on every pass, for ever.
+
   # --- Domain verification ---------------------------------------------
 
   @unit
@@ -272,35 +311,20 @@ Feature: Local IdP simulator (idpsim)
     When the stack is planned
     Then the idp service is planned with its own hostname under the worktree's slug
 
-  @unit @regression
-  Scenario: Group sync references the receiving service's users and repeats without writes
-    Given a tenant has provisioned users and groups into an application
-    When it syncs group membership
-    Then every active member is referenced by the application's SCIM user id
-    And existing groups keep their ids when membership changes
-    And inactive users are removed from group membership
-    And an unchanged repeat sends no user or group writes
+  # The landing page listed twelve identical cards and a paragraph of eleven
+  # control-API paths run together. Both are true; neither tells someone opening
+  # it for the first time what they are supposed to do with it.
 
-  @unit @regression
-  Scenario: Group sync reports target failures instead of claiming success
-    Given an application accepts users but refuses group writes
-    When the connected tenant syncs its directory with groups
-    Then successful users are counted
-    And every refused group is reported as a failure
-    And no refused group is counted as written
+  @unit
+  Scenario: The landing page says what to do before it lists the providers
+    Given someone opening the simulator for the first time
+    When they read the page top to bottom
+    Then it names the three steps in order before it lists the providers
+    And the machine's own base address is on the page and copyable
+    And the control API is folded away, each request saying what it does
 
-  @unit @regression
-  Scenario: Directory readback follows every page of users and groups
-    Given a target holds more users and groups than fit on one page
-    And the target caps pages below the simulator's requested size
-    When the connected tenant reads the target back
-    Then every user and group is included in the result
-    And a following unchanged sync sends no duplicate creates
-
-  @unit @regression
-  Scenario: An inactive person removed by the target is not provisioned again
-    Given a person is inactive in the identity provider
-    And the application removed their membership resource when deactivated
-    When the provider repeats its directory sync
-    Then it does not recreate that person in the application
-    And their group membership stays removed
+  @unit
+  Scenario: A provider that already has an application registered is marked as such
+    Given one tenant with a registered application and several without
+    When the landing page lists the providers
+    Then only that tenant is marked, because it is the one being come back to

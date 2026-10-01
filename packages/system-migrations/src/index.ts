@@ -1,13 +1,16 @@
-export { groupByTenantSource, type TenantSourceBucket } from "./grouping";
-export type { MigrationLeaseRepository } from "./lease.repository";
+export { groupByTenantSource, type TenantSourceBucket } from "./grouping.ts";
+export type { MigrationLeaseRepository } from "./lease.repository.ts";
 export {
   type MigrationCohort,
   type SystemMigrationRunnerDeps,
   SystemMigrationRunnerService,
-} from "./runner.service";
-export type { SystemMigrationStateRepository } from "./state.repository";
-export type { SystemMigration } from "./system-migration";
-export type { TenantSource } from "./tenant-source";
+} from "./runner.service.ts";
+export {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "./state.repository.ts";
+export type { SystemMigration } from "./system-migration.ts";
+export type { TenantSource } from "./tenant-source.ts";
 export {
   isTerminalTenantStatus,
   type MigrationPassSummary,
@@ -16,4 +19,12 @@ export {
   type TenantMigrationRecord,
   type TenantMigrationStatus,
   TERMINAL_TENANT_STATUSES,
-} from "./types";
+} from "./types.ts";
+export {
+  driveSystemMigrationsToConvergence,
+  runSystemMigrationsAtStartup,
+  startSystemMigrations,
+  SystemMigrationStartupIncompleteError,
+  type SystemMigrationExecutionMode,
+  type SystemMigrationPass,
+} from "./convergence.ts";

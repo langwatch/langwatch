@@ -1,20 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { ClickHouseQueryClient } from "../client";
-import type { QueryRequest } from "../query";
-import { ConcurrencyLimiter } from "../rateLimit";
-import { RetryPolicy } from "../retry";
-import { TenantGuard, TenantScopeError } from "../tenantGuard";
-import { QueryTracer } from "../tracing";
+
+import { ClickHouseQueryClient } from "../client.ts";
+import type { QueryRequest } from "../query.ts";
+import { ConcurrencyLimiter } from "../rateLimit.ts";
+import { RetryPolicy } from "../retry.ts";
+import { TenantGuard, TenantScopeError } from "../tenantGuard.ts";
+import { QueryTracer } from "../tracing.ts";
 
 /**
- * The order the client runs its policies in.
- *
- * This is the whole reason the class exists rather than a bag of helpers, and
- * every step of it is a decision someone made after an incident — so each is
- * pinned here rather than left to the prose on the class. The nesting is not
- * visible from any single collaborator's own tests: only running them together
- * can show that a retry keeps its concurrency slot, or that a refused statement
- * never reached the driver.
+ * The order the client runs its policies in: why the class exists rather
+ * than a bag of helpers — the nesting isn't visible from any one test alone.
+ * Only running them together shows a retry keeps its slot, or a refusal never reached the driver.
  */
 
 const request = (overrides: Partial<QueryRequest> = {}): QueryRequest => ({
@@ -24,12 +20,25 @@ const request = (overrides: Partial<QueryRequest> = {}): QueryRequest => ({
   ...overrides,
 });
 
+/** These cases are about reads; a write reaching the driver is the test failing. */
+const unusedInsert = async (): Promise<void> => {
+  throw new Error("insert is not part of this case");
+};
+const unusedCommand = async (): Promise<void> => {
+  throw new Error("command is not part of this case");
+};
+const unusedExecute = async (): Promise<never> => {
+  throw new Error("a read is not part of this case");
+};
+
 describe("ClickHouseQueryClient", () => {
   describe("given no policies at all", () => {
     describe("when a statement is executed", () => {
       it("passes it straight to the driver", async () => {
         const execute = vi.fn(async () => ({ rows: [1] }));
-        const client = new ClickHouseQueryClient({ driver: { execute } });
+        const client = new ClickHouseQueryClient({
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
+        });
 
         await expect(client.query(request())).resolves.toEqual({ rows: [1] });
         expect(execute).toHaveBeenCalledTimes(1);
@@ -47,7 +56,7 @@ describe("ClickHouseQueryClient", () => {
       it("refuses before the driver is reached", async () => {
         const execute = vi.fn(async () => ({ rows: [] }));
         const client = new ClickHouseQueryClient({
-          driver: { execute },
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
           tenantGuard: new TenantGuard(),
         });
 
@@ -62,17 +71,9 @@ describe("ClickHouseQueryClient", () => {
   describe("given both a concurrency limiter and a retry policy", () => {
     describe("when an attempt fails and is retried", () => {
       /**
-       * The slot is held across retries, not taken per attempt. Inside the
-       * retry loop, a retrying statement would release its slot, rejoin the
-       * back of the queue and compete with fresh work — which is how a queue
-       * turns a small overload into a persistent one (2026-07-31).
-       *
-       * Proven by contention rather than by a count. Sampling `inFlight` from
-       * inside the driver cannot tell the two arrangements apart: a limiter
-       * *inside* retry reacquires before each attempt and reads 1 just the
-       * same. The only observable difference is whether other work can take
-       * the slot mid-retry, so a second statement is offered the single slot
-       * while the first is between attempts, and must not get it.
+       * The slot is held across retries, not taken per attempt — releasing it
+       * mid-retry would rejoin the queue and compete with fresh work, turning a
+       * small overload into a persistent one (proven by contention, not a count).
        */
       it("holds its slot across a retry, so waiting work cannot start between attempts", async () => {
         const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });
@@ -97,7 +98,7 @@ describe("ClickHouseQueryClient", () => {
         });
 
         const client = new ClickHouseQueryClient({
-          driver: { execute },
+          driver: { execute, insert: unusedInsert, command: unusedCommand },
           limiter,
           retries: new RetryPolicy({
             sleep: async () => {
@@ -144,6 +145,8 @@ describe("ClickHouseQueryClient", () => {
         let release: (() => void) | undefined;
         const client = new ClickHouseQueryClient({
           driver: {
+            insert: unusedInsert,
+            command: unusedCommand,
             execute: async () =>
               new Promise((resolve) => {
                 release = () => resolve({ rows: [] });
@@ -191,6 +194,8 @@ describe("ClickHouseQueryClient", () => {
 
         const client = new ClickHouseQueryClient({
           driver: {
+            insert: unusedInsert,
+            command: unusedCommand,
             execute: async () => {
               events.push("driver");
               return { rows: [] };
@@ -217,6 +222,98 @@ describe("ClickHouseQueryClient", () => {
         await pending;
 
         expect(events).toEqual(["span.start", "driver", "span.end"]);
+      });
+    });
+  });
+
+  describe("given a tenant guard", () => {
+    describe("when a batch names the tenant it is written for", () => {
+      it("writes it", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await client.insert({
+          tenantId: "project_1",
+          table: "suite_runs",
+          rows: [{ TenantId: "project_1", BatchRunId: "batch_1" }],
+        });
+
+        expect(insert).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a batch carries a row belonging to another tenant", () => {
+      /**
+       * A write has no predicate to read, so the batch itself is the evidence.
+       * One mixed batch writes rows a tenant-scoped read can never find again,
+       * which is why the check is per row rather than on the first.
+       */
+      it("refuses the whole batch before the driver is reached", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.insert({
+            tenantId: "project_1",
+            table: "suite_runs",
+            rows: [{ TenantId: "project_1" }, { TenantId: "project_2" }],
+          }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+        expect(insert).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a batch carries a row that names no tenant at all", () => {
+      it("refuses it", async () => {
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert: unusedInsert, command: unusedCommand },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.insert({
+            tenantId: "project_1",
+            table: "suite_runs",
+            rows: [{ BatchRunId: "b" }],
+          }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+      });
+    });
+
+    describe("when a command has no tenant predicate", () => {
+      it("refuses before the driver is reached", async () => {
+        const command = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert: unusedInsert, command },
+          tenantGuard: new TenantGuard(),
+        });
+
+        await expect(
+          client.command({ tenantId: "project_1", sql: "ALTER TABLE t UPDATE x = 1" }),
+        ).rejects.toBeInstanceOf(TenantScopeError);
+        expect(command).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an empty batch", () => {
+    describe("when it is written", () => {
+      /** Nothing to route and nothing to write: a round trip nobody asked for. */
+      it("reaches no driver at all", async () => {
+        const insert = vi.fn(async () => {});
+        const client = new ClickHouseQueryClient({
+          driver: { execute: unusedExecute, insert, command: unusedCommand },
+        });
+
+        await client.insert({ tenantId: "project_1", table: "suite_runs", rows: [] });
+
+        expect(insert).not.toHaveBeenCalled();
       });
     });
   });

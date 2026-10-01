@@ -1,0 +1,195 @@
+import {
+  IDENTIFIER_PROVIDERS,
+  LIVE_IDENTIFIER_STATES,
+  routingStateOf,
+  SsoConnectionNotFoundError,
+  type SsoConnectionState,
+  ssoConnectionStateSchema,
+} from "@langwatch/identity-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+
+import {
+  teardownCandidateUserIds,
+  usersWithAnotherWayIn,
+} from "../../rules/sso-connection-stranding.rules.ts";
+import type {
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+} from "../sso-connection.repository.ts";
+import { PrismaSsoConnectionProjectionRepository } from "./prisma.sso-connection-projection.repository.ts";
+
+/** The connection heads the guards read, and the ownership rows beside them. */
+export type PrismaSsoConnectionReadDatabase = Pick<
+  PrismaClient,
+  "ssoConnection" | "ssoVerifiedDomain"
+>;
+
+/** The identity heads a teardown's stranding check is answered from. */
+export type PrismaSsoConnectionStrandingDatabase = Pick<
+  PrismaClient,
+  "identifier" | "ssoConnection" | "organizationUser"
+>;
+
+/**
+ * The reads the connection guards run (D04, ADR-117 §5), over the
+ * `SsoConnection` projection. Policy — what a state allows, who owns a domain
+ * — lives in `@langwatch/identity-process`; this class returns stored facts.
+ */
+export class PrismaSsoConnectionReadRepository implements SsoConnectionReadRepository {
+  static create(database: PrismaSsoConnectionReadDatabase): PrismaSsoConnectionReadRepository {
+    return new PrismaSsoConnectionReadRepository(database);
+  }
+
+  constructor(private readonly prisma: PrismaSsoConnectionReadDatabase) {}
+
+  async getConnection({ connectionId }: { connectionId: string }): Promise<SsoConnectionState> {
+    const row = await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
+    });
+    if (row === null)
+      throw new SsoConnectionNotFoundError(`connection ${connectionId} does not exist`);
+    return PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+  }
+
+  /**
+   * First verifier owns, and this is where the scope of "owns" is decided.
+   */
+  async getDomainOwner({
+    domain,
+  }: {
+    domain: string;
+  }): Promise<{ connectionId: string; organizationId: string }> {
+    // The ownership row, not the head's array: the row is what the database
+    // refuses a second organization on, so it is the only answer that cannot race.
+    const ownership = await this.prisma.ssoVerifiedDomain.findUnique({
+      where: { domain },
+      select: { organizationId: true, holders: { select: { connectionId: true } } },
+    });
+    if (ownership === null || ownership.holders.length === 0) throw unowned(domain);
+    const holders = await this.prisma.ssoConnection.findMany({
+      where: {
+        id: { in: ownership.holders.map((holder) => holder.connectionId) },
+        state: { notIn: ["DISCARDED", "TORN_DOWN"] },
+      },
+      select: { id: true, replacesConnectionId: true },
+    });
+    const owner = holders.find((holder) => holder.replacesConnectionId === null) ?? holders[0];
+    if (owner === undefined) throw unowned(domain);
+    return { connectionId: owner.id, organizationId: ownership.organizationId };
+  }
+
+  async findForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState[]> {
+    const rows = await this.prisma.ssoConnection.findMany({
+      where: { organizationId },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows.map((row) => PrismaSsoConnectionProjectionRepository.rowToConnection(row));
+  }
+}
+
+/**
+ * D01's `Identifier` projection — because that is where "how can this person get in" is answered,
+ * and teardown must not invent a second answer.
+ * Who a teardown would strand (ADR-117 §5). Read over the identity heads —
+ */
+export class PrismaSsoConnectionStrandingRepository implements SsoConnectionStrandingRepository {
+  static create(
+    database: PrismaSsoConnectionStrandingDatabase,
+  ): PrismaSsoConnectionStrandingRepository {
+    return new PrismaSsoConnectionStrandingRepository(database);
+  }
+
+  constructor(private readonly prisma: PrismaSsoConnectionStrandingDatabase) {}
+
+  /** Who signs in through this connection and holds no verified way in that survives it.
+   *  Without the connection's projection nothing is assumed safe. */
+  async findStrandedUserIds({ connectionId }: { connectionId: string }): Promise<string[]> {
+    const row = await this.prisma.ssoConnection.findUnique({ where: { id: connectionId } });
+    if (row === null) {
+      throw new SsoConnectionNotFoundError(
+        `connection ${connectionId}: cannot assess teardown without its projection`,
+      );
+    }
+    const connection = PrismaSsoConnectionProjectionRepository.rowToConnection(row);
+    const legacyMembers =
+      connection.source === "legacy-grandfathered"
+        ? await this.prisma.organizationUser.findMany({
+            where: { organizationId: connection.organizationId },
+            select: { userId: true },
+          })
+        : [];
+    const candidates = await this.prisma.identifier.findMany({
+      where: {
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { connectionId },
+          { connectionId: null, providerId: connectionId },
+          ...(legacyMembers.length > 0
+            ? [
+                {
+                  connectionId: null,
+                  userId: { in: legacyMembers.map(({ userId }) => userId) },
+                  providerId: { in: ["auth0", connection.idpMetadata.providerId] },
+                },
+              ]
+            : []),
+        ],
+      },
+      select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
+    });
+    const userIds = teardownCandidateUserIds({ connection, candidates });
+    if (userIds.length === 0) return [];
+
+    const covered = await this.#usersWithAnotherWayIn({ connection, userIds });
+    return userIds.filter((userId) => !covered.has(userId));
+  }
+
+  /** A verified, non-address method that does not belong to this connection, through a
+   *  connection that is itself live - an address or a paused connection is not a way in. */
+  async #usersWithAnotherWayIn({
+    connection,
+    userIds,
+  }: {
+    connection: SsoConnectionState;
+    userIds: string[];
+  }): Promise<Set<string>> {
+    const alternatives = await this.prisma.identifier.findMany({
+      where: {
+        userId: { in: userIds },
+        state: { in: ["VERIFIED", "PRIMARY"] },
+        provider: { in: IDENTIFIER_PROVIDERS.filter((provider) => provider !== "email") },
+      },
+      select: { userId: true, connectionId: true, providerId: true, providerAccountId: true },
+    });
+    const referencedIds = [
+      ...new Set(
+        alternatives.flatMap(({ connectionId, providerId }) =>
+          [connectionId, providerId].filter((id): id is string => id !== null),
+        ),
+      ),
+    ];
+    const referenced =
+      referencedIds.length === 0
+        ? []
+        : await this.prisma.ssoConnection.findMany({
+            where: { id: { in: referencedIds } },
+            select: { id: true, state: true },
+          });
+    const routing = new Map(
+      referenced.map(({ id, state }) => [
+        id,
+        routingStateOf(ssoConnectionStateSchema.parse(state)),
+      ]),
+    );
+
+    return usersWithAnotherWayIn({ connection, alternatives, routing });
+  }
+}
+
+function unowned(domain: string): SsoConnectionNotFoundError {
+  return new SsoConnectionNotFoundError(`no live connection holds domain ${domain}`);
+}

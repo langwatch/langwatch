@@ -1,9 +1,6 @@
 /**
- * Filterable Batch Span Exporter for OpenTelemetry
- *
- * This module provides a BatchSpanProcessor subclass that allows filtering of spans before export
- * based on configurable rules. Spans matching any exclude rule are dropped and not exported.
- *
+ * A BatchSpanProcessor subclass that filters spans before export by
+ * configurable rules -- spans matching any exclude rule are dropped.
  * @module filterable-batch-span-exporter
  */
 
@@ -11,21 +8,11 @@ import {
   BatchSpanProcessor,
   type ReadableSpan,
   type SpanExporter,
-} from '@opentelemetry/sdk-trace-base';
+} from "@opentelemetry/sdk-trace-base";
 
 /**
- * A rule for excluding spans from export based on their name or instrumentation scope name.
- *
- * @property fieldName - The span field to match against ('span_name' or 'instrumentation_scope_name').
- * @property matchValue - The value to match against the field.
- * @property matchOperation - The operation to use for matching ('includes', 'exact_match', 'starts_with', 'ends_with').
- *
- * @example
- * const rule: SpanProcessingExcludeRule = {
- *   fieldName: 'span_name',
- *   matchValue: 'heartbeat',
- *   matchOperation: 'exact_match',
- * };
+ * A rule for excluding spans from export, matched on `fieldName` by
+ * `matchOperation` against `matchValue`.
  */
 export interface SpanProcessingExcludeRule {
   fieldName: "span_name" | "instrumentation_scope_name";
@@ -34,20 +21,8 @@ export interface SpanProcessingExcludeRule {
 }
 
 /**
- * A BatchSpanProcessor that filters out spans matching any of the provided exclude rules before export.
- *
- * This is useful for dropping noisy or irrelevant spans (e.g., health checks, heartbeats) from being exported to your tracing backend.
- *
- * @example
- * import { FilterableBatchSpanProcessor } from './filterable-batch-span-exporter';
- * import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
- *
- * const exporter = new OTLPTraceExporter({ url: '...' });
- * const filters = [
- *   { fieldName: 'span_name', matchValue: 'heartbeat', matchOperation: 'exact_match' },
- *   { fieldName: 'instrumentation_scope_name', matchValue: 'internal', matchOperation: 'starts_with' },
- * ];
- * provider.addSpanProcessor(new FilterableBatchSpanProcessor(exporter, filters));
+ * A BatchSpanProcessor that filters out spans matching any exclude rule
+ * before export — useful for dropping noisy spans like health checks.
  */
 export class FilterableBatchSpanProcessor extends BatchSpanProcessor {
   private readonly _filters: SpanProcessingExcludeRule[];
@@ -90,7 +65,8 @@ export class FilterableBatchSpanProcessor extends BatchSpanProcessor {
         case matchOperation === "ends_with" && sourceValue.endsWith(matchValue):
           return;
 
-        default: break;
+        default:
+          break;
       }
     }
 

@@ -29,13 +29,16 @@ import os
 import re
 from typing import Dict, Optional
 
+from langwatch.__version__ import __version__
+from langwatch.utils.sdk_identity import build_sdk_identity_headers
+
 PAT_PREFIX = "pat-lw-"
 API_KEY_PREFIX = "sk-lw-"
 INGEST_KEY_PREFIX = "ik-lw-"
 
 # Mirrors the server's strict new-format body shape:
 # {16-char lookupId}_{48-char secret}, both from an alphanumeric alphabet
-# (see `getTokenType` in platform/app/src/server/api-key/api-key-token.utils.ts).
+# (see `getTokenType` in modules/api-key/contract/src/api-key.tokens.ts).
 # Legacy project keys were minted from alphabets that include `_` and `-`, so
 # the mere presence of an underscore does not identify a new-format key.
 _NEW_FORMAT_BODY_RE = re.compile(r"^[0-9A-Za-z]{16}_[0-9A-Za-z]{48}$")
@@ -114,3 +117,14 @@ def build_auth_headers(
         headers["X-Project-Id"] = resolved_project_id
 
     return headers
+
+
+def build_request_headers(
+    api_key: str,
+    project_id: str | None = None,
+) -> dict[str, str]:
+    """Authenticate and identify every SDK request to the LangWatch API."""
+    return {
+        **build_auth_headers(api_key, project_id),
+        **build_sdk_identity_headers(str(__version__)),
+    }

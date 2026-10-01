@@ -1,24 +1,18 @@
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { getGovernanceStatus } from "@/cli/utils/governance/cli-api";
+
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { getGovernanceStatus } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 
 /**
- * `langwatch governance status [--json]`
- *
- * Quick org health check showing the persona-routing setup-state
- * OR-of-flags. Mirrors `api.governance.setupState` exactly — same
- * boolean shape that drives the MainMenu Governance entry promotion
- * in the web UI.
+ * `langwatch governance status [--json]`: quick org health check showing the
+ * persona-routing setup-state OR-of-flags. Mirrors `api.governance.setupState`
+ * exactly -- same boolean shape driving the web UI's MainMenu entry promotion.
  */
-export async function governanceStatusCommand(options: {
-  json?: boolean;
-}): Promise<void> {
+export async function governanceStatusCommand(options: { json?: boolean }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 

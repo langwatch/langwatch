@@ -1,0 +1,70 @@
+{
+  "name": "@langwatch/dataset-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Dataset UI, state, and upload helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/dataset.web.ts",
+      "types": "./dist/dataset.web.d.ts",
+      "default": "./src/dataset.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@emotion/react": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/dataset-browser-kit": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/error-presentation": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-browser-kit": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/stored-object-browser-kit": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/workflow-browser-kit": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-table": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "lucide-react": "catalog:",
+    "papaparse": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-papaparse": "^4.4.0",
+    "use-debounce": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/node": "catalog:",
+    "@types/papaparse": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

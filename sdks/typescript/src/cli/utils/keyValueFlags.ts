@@ -1,18 +1,10 @@
 /**
- * Repeatable `key=value` command-line flags.
- *
- * Two families share the same shape on the command line and differ in what a
- * key holds: a spend filter may repeat one key with several values, while a run
- * parameter holds exactly one value per name, read as the type it looks like.
- *
- * Equals rather than a colon, because a value may itself contain a colon and a
- * shell user expects `key=value`.
+ * Repeatable `key=value` command-line flags. A spend filter may repeat one
+ * key with several values; a run parameter holds one value per name. Equals
+ * rather than colon, because a value may itself contain a colon.
  */
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "./errorOutput";
+import { commandValidationError, reportCommandError } from "./errorOutput";
 
 /** The value types a run parameter may hold once read off the command line. */
 export type RunParameterValue = string | number | boolean;
@@ -48,12 +40,9 @@ const splitPair = ({
 };
 
 /**
- * `--metadata tier=gold`, repeated, collected into a record where one key may
- * carry several values.
- *
- * A key may not contain a colon: the server splits a pair on its FIRST colon,
- * so a key carrying one would silently address a different key. Refusing beats
- * reporting spend for a filter the caller did not write.
+ * `--metadata tier=gold`, repeated, collected where one key may carry
+ * several values. A key may not contain a colon: the server splits on the
+ * FIRST one, so a key carrying one would silently address a different key.
  */
 export const parseKeyValueFlags = ({
   pairs,
@@ -86,18 +75,9 @@ export const parseKeyValueFlags = ({
 };
 
 /**
- * Read one flag value as the type it looks like: exactly `true` or `false`
- * becomes a boolean, a number that renders back to exactly what was typed
- * becomes a number, and everything else stays text.
- *
- * The round-trip check is what keeps `007`, `1.50` and a twenty-digit account
- * number as text: they are identifiers that merely look numeric, and handing
- * the run a number would change the value it was given.
- *
- * A declared type settles the guess: a string parameter keeps "007" as text,
- * a number parameter reads "5" as 5 (and "007" as 7), and a boolean one reads
- * `true` and `false`. Text that cannot be read as the declared type stays
- * text, and the platform refuses it by name.
+ * Reads one flag value as the type it looks like: `true`/`false` becomes
+ * boolean, a round-tripping number becomes a number (keeping `007`/`1.50` as
+ * text), else text. A declared type overrides the guess.
  */
 export const coerceParameterValue = ({
   value,
@@ -108,10 +88,7 @@ export const coerceParameterValue = ({
   type?: RunParameterType;
 }): RunParameterValue => {
   if (type === "string") return value;
-  if (type === "number") {
-    const asNumber = Number(value);
-    return value.trim() !== "" && Number.isFinite(asNumber) ? asNumber : value;
-  }
+  if (type === "number") return coerceDeclaredNumber(value);
   if (type === "boolean") {
     if (value === "true") return true;
     if (value === "false") return false;
@@ -126,10 +103,8 @@ export const coerceParameterValue = ({
 
 /**
  * `--param account_tier=gold`, repeated, collected into the values a run
- * supplies for the names its scenarios declare.
- *
- * A name repeated across flags keeps the last value, so a wrapper script can
- * append an override to a command line it did not write.
+ * supplies for names its scenarios declare. A name repeated keeps the last
+ * value, so a wrapper script can append an override it did not write.
  */
 export const parseRunParameterFlags = ({
   pairs,
@@ -151,3 +126,10 @@ export const parseRunParameterFlags = ({
   }
   return Object.fromEntries(parsed);
 };
+
+function coerceDeclaredNumber(value: string): RunParameterValue {
+  const asNumber = Number(value);
+  if (value.trim() === "") return value;
+  if (!Number.isFinite(asNumber)) return value;
+  return asNumber;
+}

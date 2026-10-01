@@ -1,7 +1,6 @@
 /**
  * Declarations queued when the agent's own shell could not reach the
  * collector: what is kept, what is dropped, and what a drain records.
- *
  * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
@@ -101,11 +100,9 @@ describe("the declaration spool", () => {
       });
 
       expect(sent).toEqual([{ session: "fresh" }]);
-      expect(
-        fs.existsSync(
-          spoolFilePath({ stateDir, agent: "codex", sessionId: "stale" }),
-        ),
-      ).toBe(false);
+      expect(fs.existsSync(spoolFilePath({ stateDir, agent: "codex", sessionId: "stale" }))).toBe(
+        false,
+      );
     });
   });
 
@@ -115,9 +112,7 @@ describe("the declaration spool", () => {
         queue({ sessionId: `s${index}`, now: NOW - index });
       }
 
-      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(
-        SPOOL_MAX_ENTRIES,
-      );
+      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(SPOOL_MAX_ENTRIES);
     });
   });
 
@@ -134,11 +129,9 @@ describe("the declaration spool", () => {
 
       expect(delivered).toBe(1);
       expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
-      expect(
-        readFingerprint(
-          stateFilePath({ stateDir, agent: "codex", sessionId: "a" }),
-        ),
-      ).toBe("fingerprint-a");
+      expect(readFingerprint(stateFilePath({ stateDir, agent: "codex", sessionId: "a" }))).toBe(
+        "fingerprint-a",
+      );
     });
   });
 
@@ -154,13 +147,9 @@ describe("the declaration spool", () => {
       });
 
       expect(delivered).toBe(0);
-      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(
-        1,
-      );
+      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
       expect(
-        readFingerprint(
-          stateFilePath({ stateDir, agent: "codex", sessionId: "a" }),
-        ),
+        readFingerprint(stateFilePath({ stateDir, agent: "codex", sessionId: "a" })),
       ).toBeNull();
     });
   });
@@ -180,9 +169,7 @@ describe("the declaration spool", () => {
         }),
       ).resolves.toBe(0);
 
-      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(
-        1,
-      );
+      expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
     });
   });
 
@@ -216,10 +203,7 @@ describe("the declaration spool", () => {
 
       expect(
         fs.existsSync(
-          path.join(
-            fallbackSpoolDir(),
-            spoolFileName({ agent: "codex", sessionId: "sandboxed" }),
-          ),
+          path.join(fallbackSpoolDir(), spoolFileName({ agent: "codex", sessionId: "sandboxed" })),
         ),
       ).toBe(true);
 
@@ -234,9 +218,7 @@ describe("the declaration spool", () => {
 
       expect(sent).toEqual([{ session: "sandboxed" }]);
       expect(
-        readFingerprint(
-          stateFilePath({ stateDir, agent: "codex", sessionId: "sandboxed" }),
-        ),
+        readFingerprint(stateFilePath({ stateDir, agent: "codex", sessionId: "sandboxed" })),
       ).toBe("sandboxed-fingerprint");
     });
 

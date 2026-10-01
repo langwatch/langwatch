@@ -1,0 +1,242 @@
+Feature: Enterprise governance package boundary
+
+  Rule: Governance is the Enterprise AI control plane
+
+    Scenario: Governance orchestrates rather than absorbs infrastructure
+      Given gateway, billing, webhook, automation and audit capabilities exist
+      When governance enforces an organizational AI policy
+      Then governance owns the policy decision and its governance facts
+      And technical execution is delegated through narrow capability ports
+      And governance does not own those features' transport or persistence engines
+
+    @unit
+    Scenario: A new governance subject is deliberate
+      Given modules/catalogue.json declares every subject governance owns
+      And the governance feature.json selects only its layout version
+      When governance source introduces a module for a subject the catalogue withholds
+      Then architecture lint reports the module and names the feature that owns the subject
+      And adding that subject to the governance feature.json is refused in its own right
+      And it does not suppress the violation it was written to legitimise
+      And the boundary ADR and feature specification describe any catalogue expansion
+
+  @unit
+  Scenario: A pull schedule is validated portably
+    Given a five-field UTC cron schedule
+    When the governance contract validates it
+    Then runnable schedules are accepted
+    And impossible schedules are rejected
+
+  @unit
+  Scenario: Pull outcomes cannot regress the projected cursor
+    Given a completed pull has advanced a source cursor
+    When an older completion arrives later
+    Then the projected cursor remains at the newer completion
+
+  @unit
+  Scenario: Pulled usage keeps money lossless
+    Given a provider-reported decimal USD value
+    When governance prices the observation
+    Then the result is an exact integer nano-USD value
+    And values outside the safe JSON integer range are rejected
+
+  Scenario: Governance owns its persona-home decision
+    Given the application has loaded organization intent and governance setup state
+    When the portable persona-home policy resolves the user's destination
+    Then governance chooses between the governance and project homes
+    And the application remains responsible for authentication and redirect transport
+
+  @unit
+  Scenario: Governance evaluates quarantine fill without owning trace storage
+    Given the application supplies a governance tenant and trace-activity reader
+    When governance evaluates the current quarantine fill window
+    Then governance computes the per-source rate and warning threshold
+    And ClickHouse access remains behind the injected trace-activity capability
+
+  Scenario: Anomaly rules are validated before persistence
+    Given an administrator supplies an anomaly rule configuration
+    When Governance creates or updates the rule
+    Then the rule scope, severity, threshold and destinations are validated by the Governance contract
+    And Postgres access remains behind the Governance server repository
+
+  @unit
+  Scenario: Anomaly rule reads are tenant scoped
+    Given an anomaly rule belongs to one organization
+    When another organization requests that rule by identifier
+    Then Governance returns no rule
+
+  @unit
+  Scenario: Spend spike decisions are deterministic
+    Given a valid spend spike threshold and current and baseline spend windows
+    When Governance evaluates the threshold
+    Then an existing open alert takes precedence over another firing
+    And the decision fires only when the minimum baseline and configured ratio are met
+
+  @integration
+  Scenario: Anomaly delivery delegates network safety
+    Given a fired anomaly has one or more webhook destinations
+    When Governance dispatches the alert
+    Then Governance signs the exact payload and applies bounded retries
+    And every destination produces an auditable outcome
+    And the application supplies the SSRF-safe HTTP adapter
+
+  Scenario: Spend spike evaluation does not expose storage syntax
+    Given an active spend spike rule targets a source or source type
+    When Governance reads the current and baseline spend windows
+    Then the feature passes a structured source filter to the spend capability
+    And ClickHouse query syntax remains inside the application adapter
+
+  Scenario: Department assignments are organization scoped
+    Given a department belongs to one organization
+    When an administrator assigns a user, team or project to it
+    Then Governance verifies the department and target belong to that organization
+    And a missing target is not reported as a successful assignment
+    And the department remains an accounting dimension rather than an access grant
+
+  @unit
+  Scenario: OCSF export uses a stable compound cursor
+    Given Governance has OCSF events ordered by event time and event identifier
+    When a security consumer requests an export page
+    Then Governance returns the final event time and identifier as the next cursor
+    And an organization without a Governance tenant receives an empty page
+    And ClickHouse remains behind the injected event reader
+
+  @unit
+  Scenario: Ingestion template authoring is tenant safe and auditable
+    Given an organization can see platform templates and its own templates
+    When an administrator creates, updates, clones or archives a template
+    Then Governance validates the template and applies tenant visibility rules
+    And each mutation and its audit fact commit in one Postgres transaction
+    And a platform template is immutable while a cross-organization template is not found
+
+  Scenario: The platform ingestion template catalog reconciles idempotently
+    Given retired platform template rows may remain from an earlier release
+    When Governance synchronizes the current platform catalog
+    Then every retired platform copy is archived and disabled
+    And repeating the synchronization does not create duplicate templates
+
+  Scenario: Request transports reuse the process-owned Governance application
+    Given the process composition root has constructed the Governance capabilities
+    When a tRPC or Hono request resolves Governance setup state
+    Then the transport reads the capability directly from its typed request context
+    And it does not construct a service, adapter or database client for the request
+    And it does not fall back to a global application lookup
+
+  Scenario: Contracts are transport independent
+    Given a browser imports the governance contract root
+    Then no server, Eventing, application, environment, or generated database module loads
+
+  # governance-policy.service.ts
+
+  @unit
+  Scenario: A cost-attribution resolution is cached and an explicit billable tile is honored
+    Given a coding-assistant cost-attribution policy already resolved once
+    When the same source is resolved again
+    Then the cached resolution is reused and an explicit billable tile overrides it
+
+  @unit
+  Scenario: Governance answers whether a coding-assistant source is billed
+    Given an organization whose codex tile opts out of the bundled plan
+    When another module asks whether a source is billed
+    Then codex is billed, and every other source, or any source of another organization, is not
+
+  @unit
+  Scenario: Every governance REST family answers from the installed module
+    Given the governance module is installed in a process
+    When a request arrives on the project-scoped family, the CLI governance plane or a push-mode ingestion receiver
+    Then each family is served by the same installed governance application
+    And no family answers an unknown error because the capability its routes name was declared but never provided
+
+  # The guided tour turns the sample panels on while it runs and puts them
+  # back when it ends. Reaching into governance for the writer made one
+  # module's state another module's import; the declaration publishes it.
+
+  @unit
+  Scenario: The sample-data choice is offered as a capability, not an import
+    Given the guided tour needs governance's sample panels shown and then put back
+    When it sets the sample choice through the capability governance declares
+    Then the panels follow the choice, and forgetting it returns them to their default
+    And everything already rendering a sample affordance hears about the change
+    And no peer imports governance's own state to do it
+
+  @unit
+  Scenario: Asking for an agent listing without the pull pipeline is refused by name
+    Given this process runs no ingestion pull pipeline
+    And the organization has no source that can list agents
+    When an admin asks every source for its agents
+    Then the ask is refused with agent_listing_unavailable, as on main
+
+  @unit
+  Scenario: The api answers the CLI governance routes main serves
+    Given governance installed over memory stores in the api role
+    When a CLI presents a bearer the access-token store does not know on /api/auth/cli/budget/status
+    Then the family carries main's fourteen /api/auth/cli routes
+    And the route answers 401 with main's unauthorized body
+
+  @unit
+  Scenario: A personal ingestion key minted by a CLI without device metadata is named for an unknown device
+    Given a CLI session that sent neither a device label nor a hostname
+    When it mints a personal ingestion key for copilot_app
+    Then the key is minted with the device label "unknown-device", as its login key carries
+    And its name reads "Ingestion key (copilot_app, unknown-device)"
+
+  Rule: Governance-origin trace activity feeds the KPI rows and the OCSF export, as on main
+
+    @unit
+    Scenario: A governance trace's spend lands in governance_kpis
+      Given a trace in the hidden governance project carrying `langwatch.origin.kind = "ingestion_source"`
+      When governance reads the trace's summary
+      Then one governance_kpis row keyed by tenant, source, hour and trace carries its running spend and tokens
+      And a trace that is not governance-origin, names no source or has no moment writes nothing
+
+    @unit
+    Scenario: A governance trace derives one OCSF row
+      Given a governance-origin trace
+      When governance reads the trace's summary
+      Then one governance_ocsf_events row keyed by the trace id is written
+      And its severity is medium when the trace carries an anomaly alert id, informational otherwise
+
+    @unit
+    Scenario: A governance trace whose row write fails is written again without duplicate rows
+      Given a governance-origin trace whose KPI row write fails
+      When governance records the trace's facts
+      Then the recording fails rather than dropping the trace, as main's swallowed write did
+      And recording the trace again leaves one KPI row and one OCSF row
+
+    @unit
+    Scenario: A governance trace summary read that fails is re-driven without duplicate rows
+      Given governance pulls governance-origin trace summaries on a schedule
+      When the trace read fails
+      Then the pass fails and the same traces are read again by a later pass
+      And each trace still leaves one KPI row and one OCSF row
+
+    @unit
+    Scenario: Governance pulls each minute's updated traces with an overlap behind the last pass
+      Given the worker hosts the governance activity monitor
+      When its one-minute schedule wakes
+      Then one pass reads governance-origin trace summaries updated since five minutes before the last wake
+      And the window ends at the wake's own schedule time, never at a read's result
+
+    @unit
+    Scenario: A spend spike fires once the spend has landed
+      Given an active spend_spike rule over an organization's governance tenant
+      When governance-origin spend above the rule's ratio lands in governance_kpis
+      Then the next evaluation fires one anomaly alert
+
+    @unit
+    Scenario: Spend spike rules are evaluated every five minutes
+      Given the worker hosts the governance activity monitor
+      When its five-minute schedule wakes
+      Then one pass evaluates every active spend_spike rule
+
+    @unit
+    Scenario: A failed spend spike pass is evaluated again at the next wake
+      Given a spend spike pass whose evaluation fails
+      When the pass runs
+      Then the pass fails rather than reporting success
+      And the next wake evaluates every rule again
+
+    @unit
+    Scenario: CLI bootstrap reports the first admin's stored email as stored
+      Given an organisation whose first admin has a stored email that is not RFC-valid
+      When the CLI bootstrap answer is parsed
+      Then the answer carries that email unchanged

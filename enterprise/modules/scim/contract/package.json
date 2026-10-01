@@ -1,0 +1,40 @@
+{
+  "name": "@langwatch/enterprise-scim-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable SCIM 2.0 schemas, resources, errors, and role vocabulary.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./token-pepper": {
+      "types": "./dist/scim-token-pepper.d.ts",
+      "default": "./src/scim-token-pepper.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

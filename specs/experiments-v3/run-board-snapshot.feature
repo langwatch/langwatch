@@ -160,13 +160,13 @@ Feature: A run carries a snapshot of the board
   # What the run reports it spent
   # ==========================================================================
 
-  @unit
+  @integration
   Scenario: The run's cost summary leaves carried rows out
     Given a run whose items include carried rows and rows it produced
     When the run's cost and duration summary is read
     Then only the rows the run produced are counted
 
-  @unit
+  @integration
   Scenario: The run's evaluator breakdown keeps carried rows
     Given a run whose items include carried verdicts
     When the run's per-evaluator breakdown is read

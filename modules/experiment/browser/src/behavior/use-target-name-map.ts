@@ -1,0 +1,40 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useMemo } from "react";
+
+import { experimentApi } from "./experiment-api.ts";
+
+/**
+ * Fetches agents and prompts for the current project and builds a
+ * Map<id, displayName> so callers can resolve target reference IDs
+ * to human-readable names.
+ */
+export function useTargetNameMap(): Map<string, string> {
+  const { project } = useOrganizationTeamProject();
+
+  const { data: agents } = experimentApi.agents.getAll.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+  const { data: prompts } = experimentApi.prompts.getAllPromptsForProject.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project },
+  );
+
+  return useMemo(() => {
+    const map = new Map<string, string>();
+    if (agents) {
+      for (const agent of agents) {
+        map.set(agent.id, agent.name);
+      }
+    }
+    if (prompts) {
+      for (const prompt of prompts) {
+        // Prefer the globally-unique handle, then the plain name (always
+        // present), then the id as last resort. This keeps placeholder
+        // prompts (no handle yet) from collapsing to their raw cuid.
+        map.set(prompt.id, prompt.handle ?? prompt.name ?? prompt.id);
+      }
+    }
+    return map;
+  }, [agents, prompts]);
+}

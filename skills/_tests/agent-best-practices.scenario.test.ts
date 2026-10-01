@@ -1,16 +1,18 @@
-import scenario, { assertSkillWasRead } from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario, { assertSkillWasRead } from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   createClaudeCodeAgent,
   installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,7 +27,7 @@ describe("Agent Best Practices Skill", () => {
     "audits the project against best practices and closes the highest-impact gaps first",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-agent-best-practices-")
+        path.join(os.tmpdir(), "langwatch-skill-agent-best-practices-"),
       );
 
       // A minimal agent codebase with no scenarios, no versioned prompts, and
@@ -58,9 +60,7 @@ describe("Agent Best Practices Skill", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "where can I improve our agent development best practices?"
-          ),
+          scenario.user("where can I improve our agent development best practices?"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "agent-best-practices");
@@ -71,6 +71,6 @@ describe("Agent Best Practices Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

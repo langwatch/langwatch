@@ -1,0 +1,100 @@
+/**
+ * The naming contract between the approved views and the grants that reach
+ * them. The prefix is hardcoded here, not read from the catalog, so this
+ * guard can disagree with it when a view is renamed without matching grants.
+ * @see ../../services/langwatch-ql-view-provisioning.service.ts — the statements under test
+ * @see specs/lwql/api.feature
+ */
+
+import { describe, expect, it } from "vitest";
+
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
+
+const postgresViews = LangWatchQLPostgresViewsService.create();
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+/**
+ * The prefix the members bootstrap's grant predicate matches
+ * (`viewname LIKE 'lwql\_%'`). Held here as a literal because the contract is
+ * with a repository this one cannot import.
+ */
+const GRANTED_PREFIX = "lwql_";
+
+const SCHEMA = "public";
+
+/** Relation an approved-view `DO` block creates. */
+function createdRelation(statement: string): string {
+  const match = /CREATE VIEW "[^"]+"\."([^"]+)"/.exec(statement);
+  if (!match?.[1]) {
+    throw new Error(`not an approved-view DO block: ${statement.slice(0, 80)}`);
+  }
+  return match[1];
+}
+
+describe("given the LangWatchQL approved PostgreSQL views", () => {
+  describe("when the catalog's mappings are read", () => {
+    /** @scenario "Every approved view is named under the prefix the reader's grants match" */
+    it("names every approved view under the prefix the grants match", () => {
+      const mapped = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
+      expect(
+        mapped.length,
+        "no dataset is PostgreSQL-resident — this case is inspecting nothing",
+      ).toBeGreaterThan(0);
+      for (const view of mapped) {
+        expect(
+          view.postgres.approvedView,
+          `${view.name} maps to a view the reader is never granted`,
+        ).toMatch(new RegExp(`^${GRANTED_PREFIX}`));
+      }
+    });
+
+    /** @scenario "Every approved view is named under the prefix the reader's grants match" */
+    it("carries the prefix through to the names the grants are built from", () => {
+      const granted = postgresViews.approvedViewNames();
+      expect(granted.length).toBe(catalogShapes.postgresViews(LWQL_VIEW_CATALOG).length);
+      for (const name of granted) {
+        expect(name.startsWith(GRANTED_PREFIX), `${name} is ungranted`).toBe(true);
+      }
+    });
+  });
+
+  describe("when the provisioner's statements are read", () => {
+    /** @scenario "Every approved view is named under the prefix the reader's grants match" */
+    it("creates every view under that prefix, not merely declares one", () => {
+      const statements = postgresViews.approvedViewStatements({ schema: SCHEMA });
+      expect(statements.length).toBeGreaterThan(0);
+      for (const statement of statements) {
+        const relation = createdRelation(statement);
+        expect(
+          relation.startsWith(GRANTED_PREFIX),
+          `provisioning creates "${relation}", which no grant reaches`,
+        ).toBe(true);
+      }
+    });
+
+    /**
+     * The catalog is the only input that decides those names, so a check that
+     * cannot fail on a bad one proves nothing about the shipped catalog. This
+     * runs the same predicate over a mapping named the way the pre-rename
+     * catalog named them, and requires it to be rejected.
+     */
+    /** @scenario "Every approved view is named under the prefix the reader's grants match" */
+    it("rejects a mapping named the way the grants would miss", () => {
+      const [resident] = catalogShapes.postgresViews(LWQL_VIEW_CATALOG);
+      if (!resident) throw new Error("catalog has no PostgreSQL-resident view");
+      const renamed = {
+        ...resident,
+        postgres: { ...resident.postgres, approvedView: "governed_traces" },
+      };
+      const [statement] = postgresViews.approvedViewStatements({
+        schema: SCHEMA,
+        views: [renamed],
+      });
+      expect(statement).toBeDefined();
+      expect(createdRelation(statement!).startsWith(GRANTED_PREFIX)).toBe(false);
+    });
+  });
+});

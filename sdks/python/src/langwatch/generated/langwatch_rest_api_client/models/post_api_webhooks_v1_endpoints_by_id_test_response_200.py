@@ -1,16 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-if TYPE_CHECKING:
-    from ..models.post_api_webhooks_v1_endpoints_by_id_test_response_200_data import (
-        PostApiWebhooksV1EndpointsByIdTestResponse200Data,
-    )
-
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiWebhooksV1EndpointsByIdTestResponse200")
 
@@ -19,36 +15,64 @@ T = TypeVar("T", bound="PostApiWebhooksV1EndpointsByIdTestResponse200")
 class PostApiWebhooksV1EndpointsByIdTestResponse200:
     """
     Attributes:
-        data (PostApiWebhooksV1EndpointsByIdTestResponse200Data):
+        delivered (bool):
+        response_status (int | None):
+        response_body (str | Unset):
+        error (str | Unset):
     """
 
-    data: PostApiWebhooksV1EndpointsByIdTestResponse200Data
+    delivered: bool
+    response_status: int | None
+    response_body: str | Unset = UNSET
+    error: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        data = self.data.to_dict()
+        delivered = self.delivered
+
+        response_status: int | None
+        response_status = self.response_status
+
+        response_body = self.response_body
+
+        error = self.error
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "data": data,
+                "delivered": delivered,
+                "response_status": response_status,
             }
         )
+        if response_body is not UNSET:
+            field_dict["response_body"] = response_body
+        if error is not UNSET:
+            field_dict["error"] = error
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_webhooks_v1_endpoints_by_id_test_response_200_data import (
-            PostApiWebhooksV1EndpointsByIdTestResponse200Data,
-        )
-
         d = dict(src_dict)
-        data = PostApiWebhooksV1EndpointsByIdTestResponse200Data.from_dict(d.pop("data"))
+        delivered = d.pop("delivered")
+
+        def _parse_response_status(data: object) -> int | None:
+            if data is None:
+                return data
+            return cast(int | None, data)
+
+        response_status = _parse_response_status(d.pop("response_status"))
+
+        response_body = d.pop("response_body", UNSET)
+
+        error = d.pop("error", UNSET)
 
         post_api_webhooks_v1_endpoints_by_id_test_response_200 = cls(
-            data=data,
+            delivered=delivered,
+            response_status=response_status,
+            response_body=response_body,
+            error=error,
         )
 
         post_api_webhooks_v1_endpoints_by_id_test_response_200.additional_properties = d

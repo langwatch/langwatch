@@ -67,9 +67,9 @@ pg_query() {
 # pass a status-only assertion while collecting nothing.
 #
 # `node -e` rather than curl/wget — the app image is a Node image and is not
-# guaranteed to ship either. `process_cpu_user_seconds_total` is the sentinel
-# because prom-client's default-metrics collector always registers it, so its
-# presence means the registry was really serialized to the caller.
+# guaranteed to ship either. `process_cpu_time_total` is the sentinel because
+# the OpenTelemetry host-metrics collector every process starts in prometheus
+# mode always records it, so its presence means real samples reached the caller.
 #
 #   http_probe <target> <port> <path> [bearer-token]
 http_probe() {
@@ -84,7 +84,7 @@ require("http")
     r.setEncoding("utf8");
     r.on("data", (chunk) => { body += chunk; });
     r.on("end", () => {
-      const hasSamples = /(^|\n)process_cpu_user_seconds_total/.test(body);
+      const hasSamples = /(^|\n)process_cpu_time_total/.test(body);
       console.log(r.statusCode + " " + (hasSamples ? "samples" : "no-samples"));
     });
   })
@@ -519,7 +519,7 @@ test_lwql() {
     # lwql_ro reader role and the approved views are exercised on the first pod
     # below and by the app's own suites.
     assert_eq "[$p] named collection lwql_postgres exists" \
-      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
     # The restricted identity, on this pod: authenticates, reads zero key-map
     # rows without a tenant capability (row policy default-deny), no admin surface.
     assert_eq "[$p] restricted identity authenticates" \
@@ -571,7 +571,7 @@ test_lwql() {
   # rows nor the identity it already created.
   local rows_before rows_after provision_out
   rows_before=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
-  if provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
+  if provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1); then
     pass "re-running lwql:provision succeeds"
   else
     fail "re-running lwql:provision failed:
@@ -589,7 +589,7 @@ $provision_out"
   fi
   # Proof the provisioning path EXECUTED, not merely that it exited 0: the app
   # creates its catalog views in the LWQL database. `traces` is the canonical
-  # entry (platform/app/src/server/analytics/lwql/catalog/lwqlViews.ts).
+  # entry (modules/analytics/process/src/rules/lwql-view-catalog.rules.ts).
   assert_eq "app-owned LWQL view langwatch.traces provisioned" \
     "$(ch_query "$pod" "SELECT count() FROM system.tables WHERE database='langwatch' AND name='traces' AND engine='View'")" "1"
   rows_after=$(ch_query "$pod" "SELECT count() FROM langwatch.lwql_api_key_tenant_map")
@@ -608,14 +608,14 @@ $provision_out"
   # while the config still rendered. A wrong bridge password fails here; a correct
   # one returns a count. `lwql_annotations` is the approved view lwql:provision
   # created and granted lwql_ro SELECT on (postgres-resident dataset "annotations"
-  # in the app catalog, platform/app/src/server/analytics/lwql/catalog). The default ClickHouse user issues the query — the
+  # in the app catalog, modules/analytics/process/src/rules). The default ClickHouse user issues the query — the
   # collection fixes the PostgreSQL identity regardless of the ClickHouse caller,
   # so this probes the bridge, not langwatch_lwql's own grants. (The
   # postgres-resident ClickHouse views themselves are the full-model scenario
   # deferred to #7387; the collection is dialable without them.)
   local bridge_out
   if bridge_out=$(ch_query "$pod" \
-      "SELECT count() FROM postgresql(lwql_postgres, table='lwql_annotations')" 2>&1); then
+      "SELECT count() FROM postgresql(lwql_postgres_langwatch, table='lwql_annotations')" 2>&1); then
     pass "lwql_postgres bridge reads PostgreSQL as lwql_ro (count=$bridge_out)"
   else
     fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
@@ -663,7 +663,7 @@ $bridge_out"
   # NOT log the refusal, and it must show the config-store yield — proof the
   # sql-mode DDL path executed against a permitted node.
   local sql_provision_out
-  if sql_provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1); then
+  if sql_provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1); then
     pass "sql-mode lwql:provision succeeds on a single node"
   else
     fail "sql-mode lwql:provision failed on a single node:
@@ -754,7 +754,7 @@ test_lwql_replicas() {
       fail "[$p] expected the two LangWatchQL row policies, found ${pol:-0}"
     fi
     assert_eq "[$p] named collection lwql_postgres present" \
-      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+      "$(ch_query "$p" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
     assert_eq "[$p] restricted identity authenticates" \
       "$(kc exec "$p" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
   done
@@ -795,9 +795,19 @@ test_lwql_replicas() {
   assert_eq "scaled-up pod $new_pod carries langwatch_lwql in the users_xml store, no app action" \
     "$(ch_query "$new_pod" "SELECT storage FROM system.users WHERE name='langwatch_lwql'")" "users_xml"
   assert_eq "scaled-up pod $new_pod carries the lwql_postgres named collection" \
-    "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres'")" "1"
+    "$(ch_query "$new_pod" "SELECT count() FROM system.named_collections WHERE name='lwql_postgres_langwatch'")" "1"
   assert_eq "scaled-up pod $new_pod authenticates the restricted identity" \
     "$(kc exec "$new_pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" -q 'SELECT 1')" "1"
+
+  # Back to three before the next upgrade. Its pre-upgrade migrate hook dials the
+  # ClickHouse Service, and the fourth pod is outside the rendered cluster, so it
+  # never received the Replicated database: a statement routed there fails with
+  # "Database langwatch does not exist".
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=3
+  if ! kc wait --for=delete "pod/$new_pod" --timeout=180s; then
+    fail "scaled-up pod $new_pod did not go away after scaling back to 3"
+    return
+  fi
 
   # ── AC9: `sql` mode is REFUSED on a multi-host cluster (issue #8258) ─────────
   # The counterpart to the single-node case in test_lwql. This release is a
@@ -835,7 +845,7 @@ test_lwql_replicas() {
   # guard logs the refusal before throwing, and selfProvisionAll swallows the
   # throw (so the task still exits 0; `|| true` guards either way).
   local refuse_out
-  refuse_out=$(kc exec "$app_pod" -- sh -c 'cd /app/platform/app && pnpm run lwql:provision' 2>&1) || true
+  refuse_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1) || true
   if grep -qiE 'sql mode refused|LwqlSqlModeUnsafeOnClusterError' <<<"$refuse_out"; then
     pass "AC9 guard refuses sql mode on a multi-host cluster"
   else
@@ -844,9 +854,7 @@ $refuse_out"
   fi
 
   # (c) No SQL-store copy of the restricted user on any replica: the guard aborts
-  # before any access-model DDL, so only the rendered users_xml copy exists. The
-  # helm upgrade above reconciled the StatefulSet back to three replicas, so
-  # re-enumerate the current pods.
+  # before any access-model DDL, so only the rendered users_xml copy exists.
   pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
   for p in $pods; do
     assert_eq "[$p] no SQL-store copy of langwatch_lwql (guard blocked sql-mode DDL)" \
@@ -989,7 +997,7 @@ test_workers() {
   # ── the liveness probe contract ─────────────────────────────────────────
   # Regression guard for the CrashLoopBackOff class: probing /metrics instead
   # of /healthz crash-loops BOTH a stock install (production + no
-  # METRICS_API_KEY ⇒ the endpoint fails closed with 500) and a secretKeyRef
+  # LANGWATCH_METRICS_TOKEN ⇒ no scrape door, 404) and a secretKeyRef
   # install (an httpGet probe cannot read a Secret ⇒ 401). Assert the live
   # Deployment probes the unauthenticated liveness path and carries no
   # credentials, then prove the endpoint really answers that way in-cluster.
@@ -1015,11 +1023,11 @@ test_workers() {
     "$(http_probe "deploy/${RELEASE}-workers" 2999 /healthz)" "200 no-samples"
 
   # …and confirm WHY the probe cannot use /metrics in this configuration: the
-  # e2e release sets no metrics API key, so the bearer gate fails closed. If
-  # this ever stops being 500, the constraint that forced /healthz has changed
-  # and the probe design should be revisited.
+  # e2e release sets no metrics API key, so the process mounts no scrape door.
+  # If this ever stops being 404, the constraint that forced /healthz has
+  # changed and the probe design should be revisited.
   assert_eq "Worker /metrics fails closed without a key" \
-    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "500 no-samples"
+    "$(http_probe "deploy/${RELEASE}-workers" 2999 /metrics)" "404 no-samples"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

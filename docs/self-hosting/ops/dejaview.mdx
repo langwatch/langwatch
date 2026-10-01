@@ -6,7 +6,10 @@ description: "Time-travel debugger for event-sourced aggregates"
 **Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history, all from a single interface.
 
 <Frame>
-<img src="/images/ops/dejaview-detail.png" alt="Deja View showing event timeline and projection state" />
+  <img
+    src="/images/ops/dejaview-detail.png"
+    alt="Deja View showing event timeline and projection state"
+  />
 </Frame>
 
 ## When to Use Deja View
@@ -19,13 +22,14 @@ description: "Time-travel debugger for event-sourced aggregates"
 ## Searching for Aggregates
 
 The search bar at the top accepts:
+
 - **Aggregate ID** (required), the primary key of the aggregate you're looking for
 - **Tenant ID** (optional), filter to a specific project/tenant
 
 Results appear in a table showing matching aggregates. Click a row to load its event stream.
 
 <Frame>
-<img src="/images/ops/dejaview.png" alt="Deja View search interface" />
+  <img src="/images/ops/dejaview.png" alt="Deja View search interface" />
 </Frame>
 
 ## Event Timeline
@@ -39,11 +43,11 @@ Once an aggregate is selected, the bottom of the screen shows a **horizontal eve
 
 ### Keyboard Shortcuts
 
-| Key | Action |
-|---|---|
-| `h` or `←` | Previous event |
-| `l` or `→` | Next event |
-| `e` | Toggle event detail panel |
+| Key        | Action                    |
+| ---------- | ------------------------- |
+| `h` or `←` | Previous event            |
+| `l` or `→` | Next event                |
+| `e`        | Toggle event detail panel |
 
 ## Event Payload
 
@@ -61,6 +65,7 @@ The left panel lists all available **projections** and **subscribers** for the a
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
 
 For example:
+
 1. Select a projection (e.g., "TraceAnalytics")
 2. Navigate to event #5, see the projection state after events 1-5
 3. Step forward to event #6, see how the state changed

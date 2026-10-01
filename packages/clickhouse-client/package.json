@@ -4,25 +4,39 @@
   "private": true,
   "description": "The shared ClickHouse client contract: fail-closed tenant routing and scope guarding, bounded concurrency with shedding, retries and backoff, tracing and vendor logging policy, resilience over the vendor client, and fleet-aware connection-pool sizing - composed by a client class that states its order.",
   "license": "MIT",
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
-    }
-  },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "files": [
     "src"
   ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/clickhouse-test-endpoints.d.ts",
+      "default": "./src/clickhouse-test-endpoints.ts"
+    }
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest",
-    "test:unit": "vitest run"
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^7.0.2",
-    "vitest": "^4.1.9"
+    "@testcontainers/clickhouse": "catalog:",
+    "@types/node": "catalog:",
+    "nanoid": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

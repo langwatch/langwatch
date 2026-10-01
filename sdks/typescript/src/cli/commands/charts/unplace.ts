@@ -1,15 +1,16 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Returns the unplaced chart's identity rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- * Idempotent, like the endpoint: unplacing a chart that is not placed
- * succeeds all the same.
+ * Returns the unplaced chart's identity rather than printing it (output port
+ * renders per-format). Idempotent, like the endpoint: unplacing an already-
+ * unplaced chart succeeds all the same.
  */
 export const unplaceChartCommand = async (
   id: string,

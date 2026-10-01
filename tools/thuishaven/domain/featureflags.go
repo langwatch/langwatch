@@ -18,11 +18,15 @@ import (
 // FeatureFlag table — `key` is that table's primary key — so the control plane
 // resolves them exactly as it would an operator toggle from /ops/feature-flags.
 var SeededFeatureFlags = []string{
-	"release_langy_enabled",                // the in-product Langy assistant
-	"release_ui_ai_governance_enabled",     // personal keys, admin oversight, routing/ingestion UI
-	"release_ui_ai_gateway_menu_enabled",   // the AI Gateway menu in the project sidebar
-	"release_event_sourced_analytics_read", // analytics reads off the slim event-sourced tables
-	"release_es_graph_triggers_firing",     // event-sourced (vs cron) graph-trigger firing
+	"release_langy_enabled",                     // the in-product Langy assistant
+	"release_ui_ai_governance_enabled",          // personal keys, admin oversight, routing/ingestion UI
+	"release_ui_ai_gateway_menu_enabled",        // the AI Gateway menu in the project sidebar
+	"release_event_sourced_analytics_read",      // analytics reads off the slim event-sourced tables
+	"release_es_graph_triggers_firing",          // event-sourced (vs cron) graph-trigger firing
+	"release_lwql_workbench",                    // LangWatchQL: /api/v1/query, the workbench, charts
+	"release_instant_evals",                     // LangWatchQL eval functions
+	"release_custom_chart_playground",           // the custom-chart playground and its widget routes
+	"release_ui_governance_billed_cost_enabled", // governance Costs and Platform preview pages
 }
 
 // featureFlagSeedEditor is the FeatureFlag.lastEditedBy stamp haven writes, so an

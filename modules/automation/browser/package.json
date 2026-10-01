@@ -1,0 +1,68 @@
+{
+  "name": "@langwatch/automation-browser",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The automations family a project opens on itself: its alerts, schedules and trace automations, and the drawer that authors them.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/automation.web.ts",
+      "types": "./dist/automation.web.d.ts",
+      "default": "./src/automation.web.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/analytics-filters": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/browser-host": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/slack-browser-kit": "workspace:*",
+    "@langwatch/slack-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
+    "@langwatch/webhook-contract": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "liqe": "catalog:",
+    "lucide-react": "catalog:",
+    "react-feather": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/vitest-config": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "monaco-editor": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

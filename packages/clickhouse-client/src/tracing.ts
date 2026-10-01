@@ -1,31 +1,18 @@
 /**
- * Span and metric emission for a statement.
- *
- * Written against narrow ports rather than OpenTelemetry directly. The package
- * stays dependency-free, the host wires its own tracer, and a test asserts on a
- * recorded array instead of standing up an SDK.
- *
- * What is deliberately NOT recorded: the statement text and its parameters.
- * A span is shipped to whatever backend the host configured, and neither the
- * SQL nor the bound values have been through redaction - parameters carry ids,
- * and a hand-written statement can carry literals. This package already learned
- * that lesson at a different boundary, where unparsed request bodies reached a
- * third-party processor because nobody asked what was in them. The table name,
- * the tenant and the shape of the result are enough to find a slow or failing
- * query; the text of it belongs in the code, where it already is.
+ * Span and metric emission for a statement, against narrow ports so the
+ * package stays dependency-free. Deliberately does NOT record the statement
+ * text or parameters, since neither is redacted and could leak ids or literals.
  */
 
-import { quietly } from "./observability";
-import type { QueryRequest, QueryResult } from "./query";
+import { nowInstant } from "@langwatch/time";
+
+import { quietly } from "./observability.ts";
+import type { QueryRequest, QueryResult } from "./query.ts";
 
 /**
- * A failure, reduced to what is safe to ship.
- *
- * Deliberately not the error itself. A ClickHouse server error embeds the
- * failing statement in its message ("...(in query: SELECT ...)"), so handing
- * the raw error to a span backend re-opens the very hole the no-SQL rule above
- * closes - and does it on the failure path, where nobody looks until later.
- * The class and the server's error code are enough to group and alert on.
+ * A failure, reduced to what is safe to ship — never the raw error, since a
+ * ClickHouse server error embeds the failing statement in its message. The
+ * class and the server's error code are enough to group and alert on.
  */
 export interface QueryErrorDescriptor {
   name: string;
@@ -33,7 +20,7 @@ export interface QueryErrorDescriptor {
   status?: number | undefined;
 }
 
-export interface SpanPort {
+export interface Span {
   setAttribute(key: string, value: string | number | boolean): void;
   recordError(error: QueryErrorDescriptor): void;
   end(): void;
@@ -58,8 +45,8 @@ export function describeQueryError(error: unknown): QueryErrorDescriptor {
   };
 }
 
-export interface TracerPort {
-  startSpan(name: string): SpanPort;
+export interface Tracer {
+  startSpan(name: string): Span;
 }
 
 export interface QueryOutcome {
@@ -70,7 +57,7 @@ export interface QueryOutcome {
 }
 
 export interface TraceOptions {
-  tracer: TracerPort;
+  tracer: Tracer;
   /** Defaults to `clickhouse.query`. */
   spanName?: string | undefined;
   /** Called on every completion, success or failure. For counters. */
@@ -89,20 +76,13 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
-
 /**
- * Records one span per statement.
- *
- * {@link ClickHouseQueryClient} runs this *outside* the concurrency limiter, so
- * time spent waiting for a slot falls inside the span. That wait is latency the
- * caller experienced; a span opened after it would report a fast query on a
- * slow request.
- *
- * Every interaction with the host tracer is wrapped in `quietly`: a broken
- * tracer must not be able to fail a query that would otherwise have succeeded.
+ * Records one span per statement. Runs *outside* the concurrency limiter so
+ * queueing latency falls inside the span, and every tracer call is wrapped
+ * in `quietly` — a broken tracer must never fail an otherwise-good query.
  */
 export class QueryTracer {
-  private readonly tracer: TracerPort;
+  private readonly tracer: Tracer;
   private readonly spanName: string;
   private readonly onComplete: TraceOptions["onComplete"];
   private readonly now: () => number;
@@ -111,7 +91,7 @@ export class QueryTracer {
     tracer,
     spanName = "clickhouse.query",
     onComplete,
-    now = () => Date.now(),
+    now = () => nowInstant().epochMilliseconds,
   }: TraceOptions) {
     this.tracer = tracer;
     this.spanName = spanName;
@@ -127,7 +107,7 @@ export class QueryTracer {
     request: QueryRequest;
     task: () => Promise<QueryResult<Row>>;
   }): Promise<QueryResult<Row>> {
-    let span: SpanPort | undefined;
+    let span: Span | undefined;
     quietly(() => {
       span = this.tracer.startSpan(this.spanName);
     });
@@ -144,10 +124,7 @@ export class QueryTracer {
       // Recorded so an audit can enumerate every statement that opted out of
       // the tenant predicate, and why, without reading the code.
       if (request.unscoped !== undefined) {
-        span.setAttribute(
-          SPAN_ATTRIBUTES.unscopedReason,
-          request.unscoped.reason,
-        );
+        span.setAttribute(SPAN_ATTRIBUTES.unscopedReason, request.unscoped.reason);
       }
     });
 

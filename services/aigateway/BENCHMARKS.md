@@ -67,11 +67,11 @@ Allocating paths we accept:
 These benchmarks fire only when a guardrail/policy triggers a cache-control
 override — not on every request.
 
-| Benchmark                               |  ns/op |  B/op | allocs | Notes                                             |
-| --------------------------------------- | -----: | ----: | -----: | ------------------------------------------------- |
-| `ApplyCacheOverride_RuleHitModeDisable` | 4,706  | 5,840 |     35 | Strip all `cache_control` keys via sjson          |
-| `ApplyCacheOverride_RuleHitModeForce`   | 2,252  | 2,800 |     18 | Inject ephemeral into last system + content block |
-| `ApplyCacheOverride_NoOp`               |    2.2 |     0 |      0 | Respect mode — returns body unchanged             |
+| Benchmark                               | ns/op |  B/op | allocs | Notes                                             |
+| --------------------------------------- | ----: | ----: | -----: | ------------------------------------------------- |
+| `ApplyCacheOverride_RuleHitModeDisable` | 4,706 | 5,840 |     35 | Strip all `cache_control` keys via sjson          |
+| `ApplyCacheOverride_RuleHitModeForce`   | 2,252 | 2,800 |     18 | Inject ephemeral into last system + content block |
+| `ApplyCacheOverride_NoOp`               |   2.2 |     0 |      0 | Respect mode — returns body unchanged             |
 
 ## What's NOT benchmarked here
 
@@ -103,6 +103,7 @@ See `services/aigateway/PERF-ROADMAP.md` for the prioritised list of optimisatio
 ## When to re-run
 
 Before cutting a release, after touching any file in:
+
 - `adapters/{authresolver,budget,controlplane,httpapi}/`
 - `app/pipeline/`
 - `pkg/retry/`

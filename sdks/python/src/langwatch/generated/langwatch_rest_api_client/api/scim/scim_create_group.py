@@ -1,60 +1,59 @@
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_create_group_body import ScimCreateGroupBody
 from ...models.scim_create_group_response_201 import ScimCreateGroupResponse201
-from ...models.scim_create_group_response_400 import ScimCreateGroupResponse400
-from ...models.scim_create_group_response_401 import ScimCreateGroupResponse401
-from ...models.scim_create_group_response_403 import ScimCreateGroupResponse403
-from ...models.scim_create_group_response_409 import ScimCreateGroupResponse409
 from ...types import Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: ScimCreateGroupBody,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/scim/v2/Groups",
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-    | None
-):
+) -> Any | ScimCreateGroupResponse201 | None:
+    if response.status_code == 200:
+        response_200 = cast(Any, None)
+        return response_200
+
     if response.status_code == 201:
         response_201 = ScimCreateGroupResponse201.from_dict(response.json())
 
         return response_201
 
     if response.status_code == 400:
-        response_400 = ScimCreateGroupResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = ScimCreateGroupResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 403:
-        response_403 = ScimCreateGroupResponse403.from_dict(response.json())
-
+        response_403 = cast(Any, None)
         return response_403
 
     if response.status_code == 409:
-        response_409 = ScimCreateGroupResponse409.from_dict(response.json())
-
+        response_409 = cast(Any, None)
         return response_409
 
     if client.raise_on_unexpected_status:
@@ -65,13 +64,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-]:
+) -> Response[Any | ScimCreateGroupResponse201]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -86,13 +79,8 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-]:
+    body: ScimCreateGroupBody,
+) -> Response[Any | ScimCreateGroupResponse201]:
     """Provision a group
 
      Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints
@@ -100,15 +88,20 @@ def sync_detailed(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409]
+        Response[Any | ScimCreateGroupResponse201]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -120,14 +113,8 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-    | None
-):
+    body: ScimCreateGroupBody,
+) -> Any | ScimCreateGroupResponse201 | None:
     """Provision a group
 
      Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints
@@ -135,29 +122,28 @@ def sync(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409
+        Any | ScimCreateGroupResponse201
     """
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-]:
+    body: ScimCreateGroupBody,
+) -> Response[Any | ScimCreateGroupResponse201]:
     """Provision a group
 
      Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints
@@ -165,15 +151,20 @@ async def asyncio_detailed(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409]
+        Response[Any | ScimCreateGroupResponse201]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -183,14 +174,8 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> (
-    ScimCreateGroupResponse201
-    | ScimCreateGroupResponse400
-    | ScimCreateGroupResponse401
-    | ScimCreateGroupResponse403
-    | ScimCreateGroupResponse409
-    | None
-):
+    body: ScimCreateGroupBody,
+) -> Any | ScimCreateGroupResponse201 | None:
     """Provision a group
 
      Creates an access group. Members are given as LangWatch user ids, the same ids the Users endpoints
@@ -198,16 +183,20 @@ async def asyncio(
     group can be provisioned before everyone in it is. Granting the group access is a separate step: a
     group carries no permissions until a role binding is created for it.
 
+    Args:
+        body (ScimCreateGroupBody):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        ScimCreateGroupResponse201 | ScimCreateGroupResponse400 | ScimCreateGroupResponse401 | ScimCreateGroupResponse403 | ScimCreateGroupResponse409
+        Any | ScimCreateGroupResponse201
     """
 
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

@@ -1,4 +1,6 @@
 import chalk from "chalk";
+
+import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import type {
   VirtualKey,
   VirtualKeyBudgetInput,
@@ -6,7 +8,6 @@ import type {
   VirtualKeyScope,
   VirtualKeyScopeType,
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
-import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
@@ -20,10 +21,9 @@ export function formatStatus(status: VirtualKey["status"]): string {
 }
 
 /**
- * Build the public-facing LangWatch UI URL for a VK detail page. VKs live at
- * the org-scoped surface (/gateway/virtual-keys/:id) regardless of their
- * scope rows; the per-project gateway pages are gone. Honours
- * `LANGWATCH_UI_ENDPOINT` for split UI/API hosts.
+ * Builds the public UI URL for a VK detail page. VKs live at the org-scoped
+ * surface (/gateway/virtual-keys/:id) regardless of scope rows; per-project
+ * gateway pages are gone. Honours `LANGWATCH_UI_ENDPOINT` for split hosts.
  */
 export function virtualKeyDetailUrl(vkId: string): string {
   const uiOverride = process.env.LANGWATCH_UI_ENDPOINT;
@@ -35,25 +35,23 @@ export function virtualKeyDetailUrl(vkId: string): string {
 const SCOPE_TYPES: VirtualKeyScopeType[] = ["organization", "team", "project"];
 
 /**
- * Parse a single `--scope <TYPE>:<id>` CLI value into a `VirtualKeyScope`.
- * Accepts the canonical organization/team/project spellings (case-insensitive)
- * plus the friendly `org` alias for `organization`. Throws an Error with a
- * single-sentence message the CLI can print directly so users see what they
- * mistyped without a stack trace.
+ * Parses a single `--scope <TYPE>:<id>` value into a `VirtualKeyScope`.
+ * Accepts organization/team/project (case-insensitive) plus the `org` alias.
+ * Throws a single-sentence Error the CLI prints directly, no stack trace.
  */
 export function parseScopeArg(raw: string): VirtualKeyScope {
   const trimmed = raw.trim();
   const colon = trimmed.indexOf(":");
   if (colon < 1 || colon === trimmed.length - 1) {
-    throw new Error(`--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`);
+    throw new Error(
+      `--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`,
+    );
   }
   // Case-insensitive for the human typing it; the wire value is lowercase.
   const typeRaw = trimmed.slice(0, colon).toLowerCase();
   const scopeId = trimmed.slice(colon + 1).trim();
-  const scopeType: VirtualKeyScopeType | null =
-    typeRaw === "org" ? "organization" :
-    (SCOPE_TYPES as readonly string[]).includes(typeRaw) ? (typeRaw as VirtualKeyScopeType) :
-    null;
+  const scopeType =
+    typeRaw === "org" ? "organization" : SCOPE_TYPES.find((type) => type === typeRaw);
   if (!scopeType) {
     throw new Error(`--scope type "${typeRaw}" must be one of org | organization | team | project`);
   }
@@ -93,12 +91,9 @@ export interface BudgetFlagOptions {
 }
 
 /**
- * Assemble the key's own cap from the budget flags, shared by create and
- * update. The pair limit+window travels together: one without the other
- * is a half-said cap the server would refuse anyway, so refuse it here
- * with a usable message. Undefined leaves the cap alone; a value upserts
- * it; null (from --clear-budget, update only) archives it — mirroring the
- * wire contract exactly.
+ * Assembles the key's own cap from budget flags, shared by create and
+ * update. limit+window travel together, refused here if only one is given.
+ * Undefined leaves the cap alone; a value upserts; null archives it.
  */
 export function buildBudgetFlags(
   options: BudgetFlagOptions,

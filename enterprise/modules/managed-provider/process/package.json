@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/enterprise-managed-provider-process",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side Enterprise managed model-provider services.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sts": "^3.1080.0",
+    "@langwatch/enterprise-managed-provider-contract": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

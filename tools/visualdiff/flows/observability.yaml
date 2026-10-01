@@ -1,0 +1,653 @@
+# Observability: the trace explorer, trace sharing, annotations and the analytics query surface.
+#
+# Every name carries {uid}, so any number of flows share one stack. The seed is
+# expected to provide {errorTrace} (a trace whose root span failed) beside the
+# plain {trace}, to enable trace sharing for the project, and to leave at
+# least one active annotation score and one organisation member so a queue can
+# be created. The queue flows pick the first option of each picker.
+# The conversation flows open trace_visualdiff_turn_0, the first turn of the seeded two-turn thread.
+# Steps use handles both trees share (aria labels, button words, placeholders,
+# anchor-comment-button, tab and lens words).
+# trace-llm-call-in-drawer posts a fixed trace id in setup (a setup {uid} is not the flow's) and its
+# span times are fixed: refresh them within 31 days of the run, or the span is dropped as too old.
+# Not scripted: the user-events and sample-agents journeys (no UI).
+flows:
+  - id: trace-share-link
+    title: Share a trace, open the link with no session, revoke it and see it denied
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          label: Share trace
+      - action: click
+        with:
+          selector: 'button:text-is("Create link")'
+      - action: capture
+        with:
+          selector: 'p:has-text("/share/")'
+          as: shareToken
+          match: /share/([A-Za-z0-9_-]+)
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: handle_request
+          anonymous: "true"
+      - action: click
+        with:
+          selector: 'xpath=//p[contains(., "{shareToken}")]/ancestor::div[.//button[@aria-label="Revoke link"]][1]//button[@aria-label="Revoke link"]'
+      - action: go
+        with:
+          path: /share/{shareToken}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Create a free account
+          anonymous: "true"
+
+  - id: trace-open-spans
+    title: Open a trace, pick a span in the waterfall and read the trace over the API
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          text: /^Trace(?![a-z])/
+      - action: expect
+        with:
+          testId: waterfall-row
+          hasText: handle_request
+      - action: click
+        with:
+          testId: waterfall-row
+          hasText: chat_completion
+      - action: expect
+        with:
+          text: gpt-5-mini
+      - action: click
+        with:
+          text: /^Summary/
+      - action: expect
+        with:
+          api: /api/traces/{trace}
+          contains: handle_request
+
+  - id: trace-annotate-comment
+    title: Comment on the trace input from the drawer and read the annotation back
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: anchor-comment-button
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-note-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-note-{uid}
+
+  - id: trace-annotate-with-score
+    title: Create a score metric, rate a trace with it from the drawer and read note and score back
+    steps:
+      - action: go
+        with:
+          path: /settings/annotation-scores
+      - action: click
+        with:
+          text: Add new score metric
+      - action: fill
+        with:
+          label: /^Name/
+          value: vd-rate-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Rated by the visual diff flow {uid}
+      - action: fill
+        with:
+          selector: input[placeholder="value"]
+          value: good
+      - action: click
+        with:
+          text: Add Score Metric
+      - action: expect
+        with:
+          text: vd-rate-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/{trace}
+      - action: click
+        with:
+          testId: anchor-comment-button
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-scored-{uid}
+      - action: click
+        with:
+          selector: 'button:has-text("vd-rate-{uid}")'
+      - action: click
+        with:
+          text: /^good$/
+      - action: click
+        with:
+          selector: 'button:text-is("OK")'
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: vd-scored-{uid}
+      - action: expect
+        with:
+          api: /api/annotations/trace/{trace}
+          field: data
+          contains: good
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-scored-{uid}
+
+  - id: trace-annotation-add-edit-delete
+    title: Annotate a message in Conversation mode, edit it, delete it and see the annotations list follow
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_turn_0
+      - action: click
+        with:
+          text: /^Conversation$/
+      - action: hover
+        with:
+          selector: '.group:has([aria-label="Annotate this message"])'
+      - action: click
+        with:
+          label: Annotate this message
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-note-{uid}
+      - action: click
+        with:
+          selector: 'button:text-is("Save")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/trace_visualdiff_turn_0
+          field: data
+          contains: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-note-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_turn_0
+      - action: click
+        with:
+          text: /^Conversation$/
+      - action: click
+        with:
+          label: Edit annotation
+          hasText: vd-note-{uid}
+      - action: fill
+        with:
+          selector: 'textarea[placeholder="Optional"]'
+          value: vd-note-{uid}-edited
+      - action: click
+        with:
+          selector: 'button:text-is("Update")'
+      - action: expect
+        with:
+          api: /api/annotations/trace/trace_visualdiff_turn_0
+          field: data
+          contains: vd-note-{uid}-edited
+      - action: click
+        with:
+          label: Edit annotation
+          hasText: vd-note-{uid}-edited
+      - action: click
+        with:
+          label: Delete annotation
+      - action: expect
+        with:
+          text: vd-note-{uid}-edited
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: expect
+        with:
+          text: vd-note-{uid}
+          equals: "0"
+
+  - id: annotation-queue-add-trace
+    title: Create an annotation queue, add a trace to it from the drawer and open the queue
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: vd-queue-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Created by the visual diff flow {uid}
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: button[aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: Add Score Type
+      - action: click
+        with:
+          selector: button[aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          label: Actions for queue vd-queue-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace {trace}
+          timeout: 20000
+      - action: click
+        with:
+          label: Select trace {trace}
+      - action: click
+        with:
+          text: Add to annotation queue
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          text: vd-queue-{uid}
+      - action: click
+        with:
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          text: vd-queue-{uid}
+      - action: expect
+        with:
+          text: /^1 of 1$/
+
+  - id: annotation-queue-walk
+    title: Queue two traces and step through them with Next until Done
+    steps:
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="My Queues"]/following-sibling::*[1]
+      - action: fill
+        with:
+          label: /^Name Annotation Queue/
+          value: vd-walk-{uid}
+      - action: fill
+        with:
+          label: /^Description/
+          value: Walked by the visual diff flow {uid}
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          selector: button[aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: Add Score Type
+      - action: click
+        with:
+          selector: button[aria-pressed]
+      - action: click
+        with:
+          label: /^Description/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          label: Actions for queue vd-walk-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace {trace}
+          timeout: 20000
+      - action: click
+        with:
+          label: Select trace {trace}
+      - action: click
+        with:
+          text: Add to annotation queue
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          text: vd-walk-{uid}
+      - action: click
+        with:
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          label: Select trace trace_visualdiff_1
+          timeout: 20000
+      - action: click
+        with:
+          label: Select trace trace_visualdiff_1
+      - action: click
+        with:
+          text: Add to annotation queue
+      - action: click
+        with:
+          text: Add Participants
+      - action: click
+        with:
+          text: vd-walk-{uid}
+      - action: click
+        with:
+          text: /^Send to:/
+      - action: click
+        with:
+          text: /^\s*Send\s*$/
+      - action: go
+        with:
+          path: /{slug}/annotations
+      - action: click
+        with:
+          text: vd-walk-{uid}
+      - action: expect
+        with:
+          text: /^1 of 2$/
+      - action: click
+        with:
+          text: /^\s*Next\s*$/
+      - action: expect
+        with:
+          text: /^2 of 2$/
+      - action: expect
+        with:
+          text: /^Done$/
+      - action: click
+        with:
+          text: /^\s*Previous\s*$/
+      - action: expect
+        with:
+          text: /^1 of 2$/
+
+  - id: trace-errors-lens
+    title: The Errors lens lists the failed trace and only failed traces
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          selector: '[role="tab"]'
+          text: /^Errors/
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{errorTrace}"]
+      - action: expect
+        with:
+          count: tbody:not([data-row-variant="error"])
+          equals: '"0"'
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{errorTrace}"]
+      - action: click
+        with:
+          selector: '[role="tab"]'
+          text: /^All Traces/
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{trace}"]
+
+  - id: trace-search-query
+    title: Type a search query into the explorer and see the list narrow to matching traces
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{trace}"]
+      - action: type
+        with:
+          label: Search filters or type what you are looking for
+          text: status:error
+          submit: true
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{errorTrace}"]
+      - action: expect
+        with:
+          count: tbody:not([data-row-variant="error"])
+          equals: '"0"'
+
+  - id: trace-save-lens
+    title: Save the current view as a lens and find its tab after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Create new lens
+      - action: fill
+        with:
+          field: Lens name
+          value: vd-lens-{uid}
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: expect
+        with:
+          text: vd-lens-{uid}
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          text: vd-lens-{uid}
+
+  - id: trace-export
+    title: Open the export dialog from the toolbar and start an export
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: expect
+        with:
+          count: tbody[data-trace-id="{trace}"]
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: click
+        with:
+          selector: button:text-is("Export")
+      - action: expect
+        with:
+          text: Export Traces
+          equals: 0
+
+  - id: trace-export-download-csv
+    title: Export the current view as CSV, the download starts and its first line is the header row
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: download
+        with:
+          selector: 'button:text-is("Export")'
+          contains: trace_id,timestamp,input,output,labels
+          filename: '/\.csv$/'
+      - action: click
+        with:
+          label: Export traces
+      - action: expect
+        with:
+          text: Export Traces
+      - action: download
+        with:
+          selector: 'button:text-is("Export")'
+          contains: "{trace},"
+          filename: '/\.csv$/'
+
+  - id: trace-llm-call-in-drawer
+    title: An LLM span sent over the collector shows its model, input and output in the drawer
+    setup:
+      - post: /api/collector
+        body:
+          trace_id: vd-llm-call-trace
+          spans:
+            - type: llm
+              span_id: vd-llm-call-span
+              trace_id: vd-llm-call-trace
+              name: vd-llm-call
+              model: gpt-5
+              vendor: openai
+              input:
+                type: text
+                value: vd llm question
+              output:
+                type: text
+                value: vd llm answer
+              metrics:
+                prompt_tokens: 12
+                completion_tokens: 34
+              timestamps:
+                started_at: 1790723307541
+                finished_at: 1790723308041
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-llm-call-trace
+          contains: vd llm answer
+          timeout: "45000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-llm-call-trace
+      - action: expect
+        with:
+          text: vd llm answer
+          timeout: "20000"
+      - action: click
+        with:
+          text: /^Trace(?![a-z])/
+      - action: click
+        with:
+          testId: waterfall-row
+          hasText: vd-llm-call
+      - action: expect
+        with:
+          text: gpt-5
+      - action: expect
+        with:
+          api: /api/traces/vd-llm-call-trace
+          contains: vd llm question
+
+  - id: trace-conversation-thread
+    title: Open a conversation trace in Conversation mode and see its turns
+    steps:
+      - action: go
+        with:
+          path: /{slug}/traces/trace_visualdiff_turn_0
+      - action: click
+        with:
+          text: /^Conversation/
+      - action: expect
+        with:
+          text: /^Turn 1$/i
+      - action: expect
+        with:
+          text: /^Turn 2$/i
+
+  - id: analytics-custom-chart
+    title: Build a custom chart, save it and read it back from the graphs API
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/custom
+      - action: fill
+        with:
+          selector: input[name="title"]
+          value: vd-chart-{uid}
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          api: /api/graphs
+          contains: vd-chart-{uid}

@@ -16,7 +16,14 @@ Feature: langwatch doctor
   Scenario: The cheap checks print one line per row with the verdict
     When "langwatch doctor" runs
     Then every row prints its name and PASS, FAIL or NOT CHECKED
-    And a fail prints its fix under the row
+    And a fail prints its fix under the row where the install gives one
+
+  @unit
+  Scenario: A project key reads the verdicts and its organization's figures
+    Given the install answers the key verdicts only, as it answers every project key
+    When "langwatch doctor" runs
+    Then every row prints its name and verdict without a detail line
+    And the organization's usage figures print without a destination
 
   @unit
   Scenario: The explicit checks run only when asked for
@@ -28,7 +35,7 @@ Feature: langwatch doctor
   Scenario: The usage report prints after the rows
     When "langwatch doctor" runs
     Then the exact report the install sends is printed as JSON
-    And the host it goes to is named
+    And the host it goes to is named where the install names it
 
   @unit
   Scenario: A machine reader gets the whole answer as JSON

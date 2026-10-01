@@ -1,5 +1,4 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
 
 import {
   type ModelDefaultScopeType,
@@ -7,8 +6,9 @@ import {
 } from "@/client-sdk/services/model-defaults/model-defaults-api.service";
 
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 type ScopeKind = "project" | "team" | "organization";
 
@@ -28,7 +28,10 @@ function resolveScope(
   const kind: ScopeKind = options.scope ?? "project";
 
   if (options.scopeId) {
-    return { scopeType: kind.toUpperCase() as ModelDefaultScopeType, scopeId: options.scopeId };
+    return {
+      scopeType: kind.toUpperCase() as ModelDefaultScopeType,
+      scopeId: options.scopeId,
+    };
   }
 
   if (kind === "project") {
@@ -51,17 +54,8 @@ function resolveScope(
 }
 
 /**
- * Set a default model at the chosen scope. Read-modify-write: looks up
- * the existing config attached to the target scope and merges the new
- * key, or creates a new config when nothing is attached. Mirrors the
- * server-side `setRoleAtScope` upsert so CLI and UI converge on the
- * same single-config-per-scope shape.
- *
- * Returns what it did rather than printing it: the output port renders the
- * result in whatever format the caller asked for (utils/output.ts). Both paths
- * keep the shape the previous `--format json` branch established — including
- * the `created` discriminator, which is the only way a machine caller can tell
- * an upsert from a fresh config.
+ * Set default model at scope: read-modify-write upsert.
+ * Returns created discriminator so callers distinguish upsert from fresh config.
  */
 export const setModelDefaultCommand = async (
   key: string,
@@ -71,21 +65,15 @@ export const setModelDefaultCommand = async (
   await resolveCredentials();
 
   const service = new ModelDefaultsApiService();
-  const spinner = createSpinner(
-    `Setting ${chalk.cyan(key)} → ${chalk.green(model)}...`,
-  ).start();
+  const spinner = createSpinner(`Setting ${chalk.cyan(key)} → ${chalk.green(model)}...`).start();
 
   try {
     const snapshot = await service.getSnapshot();
     const target = resolveScope(options, snapshot.scope);
 
     const existing = snapshot.configs
-      .filter((c) =>
-        c.scopes.some(
-          (s) => s.type === target.scopeType && s.id === target.scopeId,
-        ),
-      )
-      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+      .filter((c) => c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId))
+      .toSorted((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
 
     const current = existing[0];
     if (current) {

@@ -1,13 +1,7 @@
 /**
- * Real-shell execution test for the Path-B `unset -f` neutralization in
- * `buildShellReapply()`. String assertions in the unit suite prove the
- * prefix TEXT; this proves the RUNTIME effect the way `runWrapped` uses it —
- * spawns `$SHELL -i -c`, sources a persisted `tool() { … }` scoped function,
- * applies the reapply prefix, and observes that the REAL binary (not the
- * shadowing function) runs and inherits the reapplied env.
- *
- * A quoting / ordering / `-i -c`-sourcing regression on a shipped tool
- * (gemini/opencode/copilot) would pass every string assertion but fail here.
+ * Real-shell test for `buildShellReapply()`'s Path-B `unset -f`. Unit tests
+ * prove the prefix TEXT; this proves the RUNTIME effect by spawning `$SHELL
+ * -i -c` and observing the real binary, not the shadow, actually runs.
  */
 
 import { execFileSync } from "node:child_process";
@@ -32,7 +26,8 @@ const SHELLS = ["bash", "zsh"].filter(has);
 const TOOLS = ["copilot", "gemini", "opencode"] as const;
 const combos = SHELLS.flatMap((shell) => TOOLS.map((tool) => ({ shell, tool })));
 
-describe("buildShellReapply real-shell execution", () => {
+// Without bash or zsh on PATH the suite reports skipped, never a green pass.
+describe.skipIf(combos.length === 0)("buildShellReapply real-shell execution", () => {
   let tmp: string;
   let binDir: string;
   let origHome: string | undefined;
@@ -53,11 +48,9 @@ describe("buildShellReapply real-shell execution", () => {
   function writeRealBinary(tool: string) {
     const bin = path.join(binDir, tool);
     // Proves IT ran (not the function) AND that the reapplied env reached it.
-    fs.writeFileSync(
-      bin,
-      `#!/bin/sh\necho REAL_BINARY_RAN OTEL=$OTEL_EXPORTER_OTLP_ENDPOINT\n`,
-      { mode: 0o755 },
-    );
+    fs.writeFileSync(bin, `#!/bin/sh\necho REAL_BINARY_RAN OTEL=$OTEL_EXPORTER_OTLP_ENDPOINT\n`, {
+      mode: 0o755,
+    });
   }
 
   function writeShadowFunction(shell: string, tool: string) {
@@ -79,14 +72,6 @@ describe("buildShellReapply real-shell execution", () => {
       // interactive shells without a tty warn to stderr ("cannot set
       // terminal process group") — ignore it, we assert on stdout.
       stdio: ["ignore", "pipe", "ignore"],
-    });
-  }
-
-  if (combos.length === 0) {
-    // Reported as skipped, not passed — a green "pass" here would claim
-    // real-shell coverage that never ran.
-    it.skip("no POSIX shell on PATH — real-shell coverage unavailable", () => {
-      throw new Error("unreachable: this suite requires bash or zsh on PATH");
     });
   }
 

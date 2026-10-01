@@ -1,0 +1,745 @@
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import {
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { PropertySectionTitle } from "@langwatch/design-system/property-section-title";
+import { SmallLabel } from "@langwatch/design-system/small-label";
+import { camelCaseToTitleCase, titleCase } from "@langwatch/design-system/string-casing";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import type { EvaluatorDefinition, EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { findEvaluatorDefinitions } from "@langwatch/evaluator-contract";
+import { allModelOptions } from "@langwatch/model-provider-browser-kit";
+import React, { useMemo } from "react";
+import { Info, Plus, Trash2, X } from "react-feather";
+import {
+  type Control,
+  Controller,
+  type ControllerRenderProps,
+  type FieldErrors,
+  type FieldValues,
+  useFieldArray,
+  useFormContext,
+  type UseFormRegister,
+} from "react-hook-form";
+import { type ZodType, z } from "zod";
+
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { ModelSelector } from "../../../behavior/lent-model-provider.tsx";
+import { EvaluatorLLMConfigField } from "../../elements/checks/evaluator-llm-config-field.tsx";
+import type { CheckConfigFormData } from "./check-config-form.tsx";
+
+const EvaluatorModelSelector = ({
+  selectorOptions,
+  field,
+  fieldName,
+  variant,
+}: {
+  selectorOptions: string[];
+  field: Pick<ControllerRenderProps, "value" | "onChange">;
+  fieldName: string;
+  variant: string;
+}) => (
+  <ModelSelector
+    options={selectorOptions}
+    model={field.value}
+    onChange={(model) => field.onChange(model)}
+    mode={fieldName === "model" ? "chat" : "embedding"}
+    size={variant === "studio" ? "sm" : "md"}
+  />
+);
+
+// Toggle-button field for array-of-literal-union fields (e.g. include_metrics),
+// replacing the generic dropdown + "Add" array UI where the option set is
+// small and fixed. A long, citation-heavy description splits into a short
+// helper line plus a hover tooltip — same pattern as METRIC_META below.
+const FIELD_HELPER_OVERRIDES: Record<string, { helper: string; tooltip: string }> = {
+  swap_and_confirm: {
+    helper:
+      "Run two judge calls with A/B positions swapped; tie on disagreement. Doubles judge cost.",
+    tooltip: "Studies show that swapping can reduce position bias from 68% to 51% (PandaLM paper).",
+  },
+  // The Comparison evaluator's field. Only its legacy predecessor
+  // (`swap_and_confirm`, above) was listed, so this one rendered its whole
+  // schema description — citation included — as the line under the toggle.
+  swap_and_reconcile: {
+    helper: "Check each row again with the candidates in the opposite order. Doubles judge cost.",
+    tooltip:
+      "Judges tend to favour whichever answer they read first, and reversing the order is the most reliable way to catch it: swapping alone flips 10-30% of verdicts on close rows. When the two checks disagree, the row is left without a result rather than called a tie: a tie would say the candidates are equally good, which is not what was found.",
+  },
+};
+
+type MetricMeta = { label: string; tooltip: string };
+const METRIC_META: Record<string, MetricMeta> = {
+  cost: {
+    label: "Cost",
+    tooltip:
+      "Per-candidate model spend (USD), summed across the candidate's run. Injected so the judge can prefer cheaper options when quality is comparable. Use cautiously: judges may over-weight cost.",
+  },
+  duration: {
+    label: "Duration",
+    tooltip:
+      "Per-candidate wall-clock latency (ms) for this row's call. For aggregate views, p95 is reported in the leaderboard; the value sent to the judge here is the single-row time.",
+  },
+};
+
+const MetricToggleField = ({
+  fieldName,
+  options,
+  variant,
+}: {
+  fieldName: string;
+  options: string[];
+  variant: "default" | "studio";
+}) => {
+  const { control } = useFormContext();
+  return (
+    <Controller
+      name={fieldName}
+      control={control}
+      defaultValue={[]}
+      render={({ field: { value, onChange } }) => {
+        const selected: string[] = Array.isArray(value) ? value : [];
+        const toggle = (opt: string) => {
+          const next = selected.includes(opt)
+            ? selected.filter((v) => v !== opt)
+            : [...selected, opt];
+          onChange(next);
+        };
+        return (
+          <VStack align="start" gap={2} width="full">
+            {options.map((opt) => {
+              const meta = METRIC_META[opt] ?? { label: opt, tooltip: opt };
+              const isOn = selected.includes(opt);
+              return (
+                <HStack key={opt} gap={2} width="full">
+                  <Switch
+                    id={`metric-${opt}`}
+                    checked={isOn}
+                    onCheckedChange={({ checked }) => {
+                      if (checked !== isOn) toggle(opt);
+                    }}
+                    size={variant === "studio" ? "sm" : "md"}
+                  />
+                  <Field.Label
+                    htmlFor={`metric-${opt}`}
+                    marginBottom="0"
+                    fontWeight={variant === "studio" ? 400 : undefined}
+                    fontSize={variant === "studio" ? "13px" : undefined}
+                    cursor="pointer"
+                  >
+                    Include {meta.label.toLowerCase()}
+                  </Field.Label>
+                  <Tooltip content={meta.tooltip} showArrow positioning={{ placement: "top" }}>
+                    <Box
+                      as="span"
+                      display="inline-flex"
+                      color="fg.subtle"
+                      _hover={{ color: "fg.muted" }}
+                      cursor="help"
+                    >
+                      <Info size={14} />
+                    </Box>
+                  </Tooltip>
+                </HStack>
+              );
+            })}
+          </VStack>
+        );
+      }}
+    />
+  );
+};
+
+function defaultArrayElementValues(element: ZodType) {
+  return element instanceof z.ZodObject
+    ? Object.fromEntries(
+        Object.entries(element.shape).flatMap(([key, value]) => {
+          if (value instanceof z.ZodUnion && value.options.length > 0) {
+            const firstOption = value.options[0];
+            if (firstOption instanceof z.ZodLiteral) {
+              return [[key, firstOption.value]];
+            }
+          }
+
+          return [];
+        }),
+      )
+    : {};
+}
+
+const isSelectLiteral = (value: z.util.Literal): value is string | number =>
+  typeof value === "string" || typeof value === "number";
+
+function selectOptionsFor(schema: ZodType): { value: string | number }[] {
+  if (schema instanceof z.ZodUnion) {
+    return schema.options.flatMap((option) =>
+      option instanceof z.ZodLiteral
+        ? [...option.values].filter(isSelectLiteral).map((value) => ({ value }))
+        : [],
+    );
+  }
+  if (schema instanceof z.ZodLiteral) {
+    return [...schema.values].filter(isSelectLiteral).map((value) => ({ value }));
+  }
+  return allModelOptions.map((option) => ({ value: option }));
+}
+
+function compositeLlmConfigField({
+  variant,
+  prefix,
+}: {
+  variant: "default" | "studio";
+  prefix: string;
+}) {
+  if (variant === "studio") {
+    return (
+      <VStack key="llm-config" as="form" align="start" gap={3} width="full">
+        <HStack width="full">
+          <PropertySectionTitle>Model</PropertySectionTitle>
+        </HStack>
+        <Field.Root>
+          <EvaluatorLLMConfigField prefix={prefix} />
+        </Field.Root>
+      </VStack>
+    );
+  }
+  return (
+    <React.Fragment key="llm-config">
+      <HorizontalFormControl label="Model" tooltip="The model to use for evaluation">
+        <EvaluatorLLMConfigField prefix={prefix} />
+      </HorizontalFormControl>
+    </React.Fragment>
+  );
+}
+
+// Separate component for array fields to handle useFieldArray hook
+const ArrayField = <T extends EvaluatorTypes>({
+  fieldSchema,
+  fieldName,
+  prefix,
+  evaluator,
+  variant = "default",
+  renderField,
+}: {
+  fieldSchema: ZodType;
+  fieldName: string;
+  prefix: string;
+  evaluator: EvaluatorDefinition<T> | undefined;
+  variant?: "default" | "studio";
+  renderField: <T extends EvaluatorTypes>(field: {
+    fieldSchema: ZodType;
+    fieldName: string;
+    evaluator: EvaluatorDefinition<T> | undefined;
+  }) => React.JSX.Element | null;
+}) => {
+  const { control } = useFormContext();
+  const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: fullPath,
+  });
+
+  // Cast to ZodArray to access element property
+  const arraySchema = fieldSchema as z.ZodArray<ZodType>;
+
+  const defaultValues = useMemo(
+    () => defaultArrayElementValues(arraySchema.element),
+    [arraySchema.element],
+  );
+
+  return (
+    <VStack align="start" width="full">
+      {variant === "studio" && (
+        <Button
+          position="absolute"
+          right={0}
+          top="-36px"
+          padding={0}
+          size="sm"
+          variant="ghost"
+          onClick={() => append(defaultValues)}
+        >
+          <Plus size={16} />
+        </Button>
+      )}
+      {fields.map((field, index) => (
+        <Box
+          key={field.id}
+          borderLeft={arraySchema.element instanceof z.ZodObject ? "4px solid" : undefined}
+          borderLeftColor={variant === "studio" ? "border" : "orange.400"}
+          width="full"
+        >
+          <HStack
+            borderLeftColor="reset"
+            padding={arraySchema.element instanceof z.ZodObject ? 3 : 0}
+            paddingRight={variant === "studio" ? 0 : 3}
+            width="full"
+            align="start"
+            position="relative"
+          >
+            <Button
+              position="absolute"
+              right={0}
+              top={0}
+              padding={0}
+              size="sm"
+              variant="ghost"
+              onClick={() => remove(index)}
+              color="fg.subtle"
+            >
+              {variant === "studio" ? <Trash2 size={14} /> : <X size={18} />}
+            </Button>
+            <Box width={variant === "studio" ? "100%" : "95%"}>
+              {renderField({
+                fieldSchema: arraySchema.element,
+                fieldName: `${fieldName}.${index}`,
+                evaluator,
+              })}
+            </Box>
+          </HStack>
+        </Box>
+      ))}
+      {variant !== "studio" && <Button onClick={() => append(defaultValues)}>Add</Button>}
+    </VStack>
+  );
+};
+
+const DynamicZodForm = ({
+  schema,
+  evaluatorType,
+  prefix,
+  errors,
+  variant = "default",
+  onlyFields,
+  skipFields,
+}: {
+  schema: ZodType;
+  evaluatorType: string;
+  prefix: string;
+  errors: FieldErrors<CheckConfigFormData>["settings"];
+  variant?: "default" | "studio";
+  onlyFields?: string[];
+  skipFields?: string[];
+}) => {
+  const { control, register } = useFormContext();
+  const { project } = useOrganizationTeamProject();
+
+  // Cascade-resolved defaults for evaluator model + embeddings fields.
+  const resolvedDefaultModel = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "prompt.create_default" },
+    { enabled: !!project?.id },
+  );
+  const resolvedDefaultEmbeddings = evaluatorApi.modelProvider.getResolvedDefault.useQuery(
+    {
+      projectId: project?.id ?? "",
+      featureKey: "analytics.topic_clustering_embeddings",
+    },
+    { enabled: !!project?.id },
+  );
+
+  const ctx: ZodFieldContext = {
+    register,
+    control,
+    variant,
+    prefix,
+    resolvedModels: {
+      model: resolvedDefaultModel.data?.model ?? "",
+      embeddingsModel: resolvedDefaultEmbeddings.data?.model ?? "",
+    },
+  };
+  const renderField = <T extends EvaluatorTypes>(field: ZodFieldArgs<T>) =>
+    renderZodField(ctx, field);
+
+  const renderSchema = <T extends EvaluatorTypes>(schema: ZodType, basePath = "") => {
+    if (schema instanceof z.ZodObject) {
+      const [evaluatorDefinition] = findEvaluatorDefinitions(
+        evaluatorType,
+      ) as EvaluatorDefinition<T>[];
+
+      const keys = Object.keys(schema.shape);
+
+      // Detect model + max_tokens pattern (but NOT embeddings_model)
+      // These should be rendered as a unified LLMConfigField
+      const hasModelField = keys.includes("model");
+      const hasMaxTokensField = keys.includes("max_tokens");
+      const shouldUseCompositeField = hasModelField && hasMaxTokensField;
+
+      // Filter out model/max_tokens when using composite field
+      const fieldsToRender = shouldUseCompositeField
+        ? keys.filter((k) => k !== "model" && k !== "max_tokens")
+        : keys;
+
+      // Render the composite LLM config field (if applicable)
+      const compositeField = shouldUseCompositeField
+        ? compositeLlmConfigField({ variant, prefix })
+        : null;
+
+      // Render remaining fields
+      const renderedFields = fieldsToRender
+        .filter((key) => !skipFields?.includes(key))
+        .filter((key) => (onlyFields ? onlyFields.includes(key) : true))
+        .map((key) => (
+          <SettingsFieldRow
+            key={key}
+            fieldKey={key}
+            field={schema.shape[key]}
+            fieldName={basePath ? `${basePath}.${key}` : key}
+            evaluatorDefinition={evaluatorDefinition}
+            isInvalid={!!errors && key in errors && !!errors[key]}
+            variant={variant}
+            renderField={renderField}
+          />
+        ));
+
+      // Return composite field first (if any), then remaining fields
+      return (
+        <>
+          {compositeField}
+          {renderedFields}
+        </>
+      );
+    }
+    return null;
+  };
+
+  return <>{renderSchema(schema)}</>;
+};
+
+export default DynamicZodForm;
+
+type ZodFieldContext = {
+  register: UseFormRegister<FieldValues>;
+  control: Control<FieldValues>;
+  variant: "default" | "studio";
+  prefix: string;
+  resolvedModels: { model: string; embeddingsModel: string };
+};
+
+type ZodFieldArgs<T extends EvaluatorTypes> = {
+  fieldSchema: ZodType;
+  fieldName: string;
+  evaluator: EvaluatorDefinition<T> | undefined;
+  // True when the caller already renders this field's title, so the boolean
+  // branch suppresses its own inline label. Nested ZodObject fields keep false.
+  isTopLevel?: boolean;
+};
+
+function fieldDefaultValue<T extends EvaluatorTypes>(
+  ctx: ZodFieldContext,
+  { fieldName, evaluator }: ZodFieldArgs<T>,
+): unknown {
+  if (fieldName === "model") return ctx.resolvedModels.model;
+  if (fieldName === "embeddings_model") return ctx.resolvedModels.embeddingsModel;
+  return evaluator?.settings?.[fieldName]?.default;
+}
+
+type ChoiceSchema = z.ZodUnion | z.ZodLiteral | z.ZodString;
+
+function isChoiceSchema(schema: unknown, fieldName: string): schema is ChoiceSchema {
+  const isModelFieldName = fieldName === "model" || fieldName === "embeddings_model";
+  return (
+    schema instanceof z.ZodUnion ||
+    schema instanceof z.ZodLiteral ||
+    (schema instanceof z.ZodString && isModelFieldName)
+  );
+}
+
+function renderZodField<T extends EvaluatorTypes>(
+  ctx: ZodFieldContext,
+  field: ZodFieldArgs<T>,
+): React.JSX.Element | null {
+  const { fieldSchema, fieldName } = field;
+  const fieldSchema_ = fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
+  if (fieldSchema_ instanceof z.ZodDefault) {
+    const innerSchema = fieldSchema_.unwrap();
+    if (!(innerSchema instanceof z.ZodType)) return null;
+    return renderZodField(ctx, { ...field, fieldSchema: innerSchema });
+  }
+  if (fieldSchema_ instanceof z.ZodNumber) return numberField(ctx, field);
+  if (fieldSchema_ instanceof z.ZodBoolean) return booleanField(ctx, field);
+  if (isChoiceSchema(fieldSchema_, fieldName)) return choiceField(ctx, field, fieldSchema_);
+  if (fieldSchema_ instanceof z.ZodString) return stringField(ctx, field);
+  if (fieldSchema_ instanceof z.ZodArray) return arrayField(ctx, field, fieldSchema_);
+  if (fieldSchema_ instanceof z.ZodObject) return objectField(ctx, field, fieldSchema_);
+  return null;
+}
+
+function fullPathOf(ctx: ZodFieldContext, fieldName: string): string {
+  return ctx.prefix ? `${ctx.prefix}.${fieldName}` : fieldName;
+}
+
+function numberField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: ZodFieldArgs<T>) {
+  const { register, variant } = ctx;
+  const fullPath = fullPathOf(ctx, field.fieldName);
+  const defaultValue = fieldDefaultValue(ctx, field);
+  return (
+    <Input
+      type="number"
+      size={variant === "studio" ? "sm" : "md"}
+      step={
+        typeof defaultValue === "number" && Math.round(defaultValue) !== defaultValue ? "0.01" : "1"
+      }
+      {...register(fullPath, { setValueAs: (val) => +val })}
+    />
+  );
+}
+
+function booleanField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: ZodFieldArgs<T>) {
+  const { control, variant } = ctx;
+  const { fieldName, isTopLevel = false } = field;
+  const fullPath = fullPathOf(ctx, fieldName);
+  return (
+    <Field.Root>
+      <HStack width="full" gap={2}>
+        <Controller
+          name={fullPath}
+          control={control}
+          render={({ field: { onChange, onBlur, value, name, ref } }) => (
+            <Switch
+              id={fullPath}
+              checked={value}
+              onCheckedChange={({ checked }) => onChange(checked)}
+              onBlur={onBlur}
+              name={name}
+              ref={ref}
+              size={variant === "studio" ? "sm" : "md"}
+              paddingLeft={variant === "studio" ? 2 : undefined}
+            />
+          )}
+        />
+        {/* When isTopLevel, HorizontalFormControl/PropertySectionTitle
+            already renders this field's title — repeating it here reads
+            as duplicated text at a jarringly different size. */}
+        {!isTopLevel && (
+          <Field.Label
+            htmlFor={fullPath}
+            marginBottom="0"
+            fontWeight={variant === "studio" ? 400 : undefined}
+            fontSize={variant === "studio" ? "13px" : undefined}
+          >
+            {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
+          </Field.Label>
+        )}
+      </HStack>
+    </Field.Root>
+  );
+}
+
+function choiceField<T extends EvaluatorTypes>(
+  ctx: ZodFieldContext,
+  field: ZodFieldArgs<T>,
+  fieldSchema_: ChoiceSchema,
+) {
+  const { control, variant } = ctx;
+  const { fieldName, evaluator, fieldSchema } = field;
+  const fullPath = fullPathOf(ctx, fieldName);
+  const options = selectOptionsFor(fieldSchema_);
+  if (
+    (fieldName === "model" || fieldName === "embeddings_model") &&
+    evaluator?.name !== "OpenAI Moderation"
+  ) {
+    const selectorOptions =
+      fieldName === "model"
+        ? options.map((option) => String(option.value))
+        : options.map((option) => String(option.value));
+
+    return (
+      <Controller
+        name={fullPath}
+        control={control}
+        render={({ field }) => {
+          return (
+            <EvaluatorModelSelector
+              selectorOptions={selectorOptions}
+              field={field}
+              fieldName={fieldName}
+              variant={variant}
+            />
+          );
+        }}
+      />
+    );
+  }
+
+  return (
+    <Controller
+      name={fullPath}
+      control={control}
+      render={({ field }) => (
+        <NativeSelect.Root size={variant === "studio" ? "sm" : "md"}>
+          <NativeSelect.Field
+            {...field}
+            onChange={(e) => {
+              const literalValues = options.map((option) => option.value);
+
+              if (e.target.value === "") {
+                field.onChange(undefined);
+              } else if (!isNaN(+e.target.value) && literalValues.includes(+e.target.value)) {
+                field.onChange(+e.target.value);
+              } else {
+                field.onChange(e.target.value);
+              }
+            }}
+          >
+            {fieldSchema instanceof z.ZodOptional && <option value="" aria-label="None"></option>}
+            {options.map((option, index) => (
+              <option key={index} value={option.value}>
+                {option.value}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      )}
+    />
+  );
+}
+
+function stringField<T extends EvaluatorTypes>(ctx: ZodFieldContext, field: ZodFieldArgs<T>) {
+  const { register, variant } = ctx;
+  const fullPath = fullPathOf(ctx, field.fieldName);
+  const fieldKey = field.fieldName.split(".").reverse()[0] ?? "";
+  if (["topic", "name"].includes(fieldKey) || !isNaN(+fieldKey)) {
+    return <Input size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />;
+  }
+  return <Textarea size={variant === "studio" ? "sm" : "md"} {...register(fullPath)} />;
+}
+
+function arrayField<T extends EvaluatorTypes>(
+  ctx: ZodFieldContext,
+  field: ZodFieldArgs<T>,
+  fieldSchema_: z.ZodArray,
+) {
+  const { variant, prefix } = ctx;
+  const { fieldName, evaluator } = field;
+  const fullPath = fullPathOf(ctx, fieldName);
+  const fieldKey = fieldName.split(".").reverse()[0] ?? "";
+  // Special-case: small, fixed sets of literal options render as toggle
+  // pills with hover-tooltips (e.g. include_metrics for pairwise_compare).
+  // The array UI's dropdown + "Add" pattern hides what each option means
+  // and over-fits to large open-ended arrays.
+  const element = fieldSchema_.element;
+  const isLiteralUnion =
+    element instanceof z.ZodUnion && element.options.every((o) => o instanceof z.ZodLiteral);
+  if (fieldKey === "include_metrics" && isLiteralUnion) {
+    const options = (element.options as z.ZodLiteral<string>[]).map((o) => o.value);
+    return <MetricToggleField fieldName={fullPath} options={options} variant={variant} />;
+  }
+  return (
+    <ArrayField
+      fieldSchema={fieldSchema_}
+      fieldName={fieldName}
+      prefix={prefix}
+      evaluator={evaluator}
+      variant={variant}
+      renderField={(field) => renderZodField(ctx, field)}
+    />
+  );
+}
+
+function objectField<T extends EvaluatorTypes>(
+  ctx: ZodFieldContext,
+  field: ZodFieldArgs<T>,
+  fieldSchema_: z.ZodObject,
+) {
+  const { fieldName, evaluator } = field;
+  return (
+    <VStack width="full" gap={2}>
+      {Object.keys(fieldSchema_.shape).map((key) => (
+        <VStack key={key} align="start" width="full">
+          {!(fieldSchema_.shape[key] instanceof z.ZodBoolean) && (
+            <SmallLabel>
+              {fieldName.startsWith("rubrics.")
+                ? `Level ${parseInt(fieldName.split(".")[1] ?? "0") + 1}`
+                : titleCase(key)}
+            </SmallLabel>
+          )}
+          {renderZodField(ctx, {
+            fieldSchema: fieldSchema_.shape[key],
+            fieldName: `${fieldName}.${key}`,
+            evaluator,
+          })}
+        </VStack>
+      ))}
+    </VStack>
+  );
+}
+
+function SettingsFieldRow<T extends EvaluatorTypes>({
+  fieldKey,
+  field,
+  fieldName,
+  evaluatorDefinition,
+  isInvalid,
+  variant,
+  renderField,
+}: {
+  fieldKey: string;
+  field: ZodType;
+  fieldName: string;
+  evaluatorDefinition: EvaluatorDefinition<T> | undefined;
+  isInvalid: boolean;
+  variant: "default" | "studio";
+  renderField: (field: ZodFieldArgs<T>) => React.JSX.Element | null;
+}) {
+  const isOptional = field instanceof z.ZodOptional;
+  const helperText = evaluatorDefinition?.settings?.[fieldKey]?.description ?? "";
+  const helperOverride = FIELD_HELPER_OVERRIDES[fieldKey];
+
+  if (variant === "studio") {
+    return (
+      <VStack as="form" align="start" gap={3} width="full">
+        <HStack width="full">
+          <PropertySectionTitle>{camelCaseToTitleCase(fieldKey)}</PropertySectionTitle>
+          {isOptional && (
+            <Text color="fg.muted" fontSize="12px">
+              (optional)
+            </Text>
+          )}
+          {helperText && (
+            <Tooltip content={helperText} positioning={{ placement: "top" }}>
+              <Info size={14} />
+            </Tooltip>
+          )}
+        </HStack>
+        <Field.Root invalid={isInvalid}>
+          {renderField({
+            fieldSchema: field,
+            fieldName,
+            evaluator: evaluatorDefinition,
+            isTopLevel: true,
+          })}
+        </Field.Root>
+      </VStack>
+    );
+  }
+
+  return (
+    <>
+      <HorizontalFormControl
+        label={camelCaseToTitleCase(fieldKey) + (isOptional ? " (Optional)" : "")}
+        helper={helperOverride?.helper}
+        tooltip={helperOverride?.tooltip ?? helperText}
+        invalid={isInvalid}
+      >
+        {renderField({
+          fieldSchema: field,
+          fieldName,
+          evaluator: evaluatorDefinition,
+          isTopLevel: true,
+        })}
+      </HorizontalFormControl>
+    </>
+  );
+}

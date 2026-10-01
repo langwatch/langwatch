@@ -1,14 +1,12 @@
 /**
- * The opencode session context plugin: where it lands, the marker that makes it
- * ours, the removal logout drives, and the two promises the generated module
- * makes to the session it runs in (never blocks, never throws).
- *
- * The generated module is exercised for real rather than asserted as a string:
- * a driver imports it in a fresh Node process with a stand-in `langwatch` first
- * on PATH, so a plugin that would fail to parse, fail to load, or spawn the
- * wrong thing inside opencode fails here instead. No module mocking, because a
- * mock that silently missed would run the real CLI.
- *
+ * The opencode session context plugin: where it lands, the marker that
+ * makes it ours, the removal logout drives, and the two promises it makes
+ * to the session it runs in (never blocks, never throws).
+ */
+
+/**
+ * Exercised for real, not asserted as a string: a driver imports the module
+ * in a fresh Node process with a stand-in `langwatch` on PATH.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -37,14 +35,15 @@ const origUserprofile = process.env.USERPROFILE;
 const origXdg = process.env.XDG_CONFIG_HOME;
 
 /**
- * Run the generated plugin against one event in a fresh Node process, with
- * `langwatch` on PATH resolving to a script that records its argv and stdin.
- * Returns what that stand-in was invoked with, or null when nothing ran.
- *
- * `expectInvocation` decides how the driver waits, because the plugin never
- * waits itself: expecting one polls for the record, expecting none gives the
- * spawn a grace period and then asserts the absence. Both keep the plugin's
- * own contract intact, which is that its handler resolves without waiting.
+ * Runs the generated plugin against one event in a fresh Node process, with
+ * `langwatch` on PATH resolving to a script recording its argv/stdin.
+ * Returns what that stand-in was invoked with, or null if nothing ran.
+ */
+
+/**
+ * `expectInvocation` decides how the driver waits, since the plugin itself
+ * never waits: expecting one polls for the record, expecting none gives a
+ * grace period then asserts absence -- both keep its no-wait contract intact.
  */
 const runPluginEvent = ({
   event,
@@ -134,13 +133,7 @@ beforeEach(() => {
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
   delete process.env.XDG_CONFIG_HOME;
-  pluginPath = path.join(
-    tmpHome,
-    ".config",
-    "opencode",
-    "plugins",
-    OPENCODE_PLUGIN_FILE_NAME,
-  );
+  pluginPath = path.join(tmpHome, ".config", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME);
 });
 
 afterEach(() => {
@@ -162,25 +155,15 @@ describe("installOpencodeSessionContextPlugin", () => {
 
       expect(result.action).toBe("created");
       expect(result.path).toBe(pluginPath);
-      expect(result.displayPath).toBe(
-        `~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`,
-      );
-      expect(fs.readFileSync(pluginPath, "utf8")).toContain(
-        OPENCODE_HOOK_COMMAND.split(" ")[0],
-      );
+      expect(result.displayPath).toBe(`~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`);
+      expect(fs.readFileSync(pluginPath, "utf8")).toContain(OPENCODE_HOOK_COMMAND.split(" ")[0]);
     });
 
     it("follows XDG_CONFIG_HOME when the user relocated the config directory", () => {
       process.env.XDG_CONFIG_HOME = path.join(tmpHome, "elsewhere");
 
       expect(opencodePluginTarget().path).toBe(
-        path.join(
-          tmpHome,
-          "elsewhere",
-          "opencode",
-          "plugins",
-          OPENCODE_PLUGIN_FILE_NAME,
-        ),
+        path.join(tmpHome, "elsewhere", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME),
       );
     });
   });
@@ -192,9 +175,7 @@ describe("installOpencodeSessionContextPlugin", () => {
 
       expect(installOpencodeSessionContextPlugin().action).toBe("unchanged");
       expect(fs.readFileSync(pluginPath, "utf8")).toBe(before);
-      expect(fs.readdirSync(path.dirname(pluginPath))).toEqual([
-        OPENCODE_PLUGIN_FILE_NAME,
-      ]);
+      expect(fs.readdirSync(path.dirname(pluginPath))).toEqual([OPENCODE_PLUGIN_FILE_NAME]);
     });
   });
 
@@ -204,9 +185,7 @@ describe("installOpencodeSessionContextPlugin", () => {
       fs.writeFileSync(pluginPath, "export const Mine = async () => ({});\n");
 
       expect(installOpencodeSessionContextPlugin().action).toBe("unchanged");
-      expect(fs.readFileSync(pluginPath, "utf8")).toBe(
-        "export const Mine = async () => ({});\n",
-      );
+      expect(fs.readFileSync(pluginPath, "utf8")).toBe("export const Mine = async () => ({});\n");
     });
   });
 });
@@ -225,9 +204,7 @@ describe("hasOpencodeSessionContextPlugin", () => {
     it("reports it present, by its marker", () => {
       installOpencodeSessionContextPlugin();
 
-      expect(fs.readFileSync(pluginPath, "utf8").startsWith(
-        OPENCODE_PLUGIN_MARKER,
-      )).toBe(true);
+      expect(fs.readFileSync(pluginPath, "utf8").startsWith(OPENCODE_PLUGIN_MARKER)).toBe(true);
       expect(hasOpencodeSessionContextPlugin()).toBe(true);
     });
   });
@@ -280,9 +257,7 @@ describe("the generated plugin module", () => {
       });
 
       expect(invocation).not.toBeNull();
-      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(
-        OPENCODE_HOOK_COMMAND,
-      );
+      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(OPENCODE_HOOK_COMMAND);
       expect(JSON.parse(invocation!.stdin)).toEqual({
         session_id: "ses_abc",
         cwd: "/repo/worktrees/review",
@@ -312,9 +287,7 @@ describe("the generated plugin module", () => {
       ["an event of another kind", { type: "message.updated" }],
       ["an event with no type at all", {}],
     ])("runs nothing for %s", (_label, event) => {
-      expect(
-        runPluginEvent({ directory: "/repo", event, expectInvocation: false }),
-      ).toBeNull();
+      expect(runPluginEvent({ directory: "/repo", event, expectInvocation: false })).toBeNull();
     });
   });
 

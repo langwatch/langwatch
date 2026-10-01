@@ -1,0 +1,431 @@
+/**
+ * @vitest-environment node
+ * How far one organization's cutover has come, read fresh: who is linked to
+ * the replacement, how quiet the old connection has gone, and what still
+ * stands between here and retiring it.
+ * @see specs/identity/sso-connection-lifecycle.feature
+ */
+import {
+  emptySsoConnection,
+  type BreakGlassBinding,
+  type IdentifierFact,
+  type SsoConnectionState,
+} from "@langwatch/identity-contract";
+import { describe, expect, it } from "vitest";
+
+import { identityRepositoriesOverMemory } from "../../repositories/memory/memory.identity.repositories.ts";
+import { MemoryIdentityStore } from "../../repositories/memory/memory.identity.store.ts";
+import {
+  SsoMigrationProgressService,
+  type SsoMigrationMember,
+} from "../sso-migration-progress.service.ts";
+
+const ORG = "org_acme";
+const LEGACY = "ssoc_legacy";
+const REPLACEMENT = "ssoc_replacement";
+const NOW = 1_756_000_000_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const ANA: SsoMigrationMember = { userId: "user_ana", name: "Ana", email: "ana@acme.com" };
+const BEN: SsoMigrationMember = { userId: "user_ben", name: "Ben", email: "ben@acme.com" };
+
+function legacy(over: Partial<SsoConnectionState> = {}): SsoConnectionState {
+  return {
+    ...emptySsoConnection({ connectionId: LEGACY }),
+    organizationId: ORG,
+    state: "ACTIVE",
+    source: "legacy-grandfathered",
+    verifiedDomains: ["acme.com"],
+    idpMetadata: {
+      issuer: null,
+      providerId: "auth0",
+      clientIdRef: null,
+      secretRef: null,
+      certRefs: [],
+    },
+    createdAtMs: NOW - 30 * DAY_MS,
+    ...over,
+  };
+}
+
+function replacement(over: Partial<SsoConnectionState> = {}): SsoConnectionState {
+  return {
+    ...emptySsoConnection({ connectionId: REPLACEMENT }),
+    organizationId: ORG,
+    state: "ACTIVE",
+    source: "self-serve",
+    replacesConnectionId: LEGACY,
+    migrationPhase: "GRACE_DIRECT",
+    routeChangedAtMs: NOW - 10 * DAY_MS,
+    graceStartedAtMs: NOW - 10 * DAY_MS,
+    verifiedDomains: ["acme.com"],
+    domainVerifications: [
+      {
+        domain: "acme.com",
+        method: "dns-txt",
+        actorId: "user_ana",
+        verifiedAtMs: NOW - 11 * DAY_MS,
+        proofState: "VERIFIED",
+        firstAbsentAtMs: null,
+        graceEndsAtMs: null,
+        tokenHash: "sha256:proof",
+      },
+    ],
+    testLoginAccountId: "acct_ana",
+    idpMetadata: {
+      issuer: "https://acme.okta.com",
+      providerId: "acme-okta",
+      clientIdRef: "cred_1",
+      secretRef: "cred_2",
+      certRefs: [],
+    },
+    createdAtMs: NOW - 20 * DAY_MS,
+    ...over,
+  };
+}
+
+function identifier(over: Partial<IdentifierFact> & { identifierId: string }): IdentifierFact {
+  return {
+    userId: ANA.userId,
+    provider: "oidc",
+    value: "ana@acme.com",
+    domain: "acme.com",
+    identifierHash: null,
+    accountId: null,
+    providerId: null,
+    issuer: null,
+    providerAccountId: null,
+    connectionId: null,
+    state: "VERIFIED",
+    verifiedAtMs: NOW - 5 * DAY_MS,
+    attachedAtMs: NOW - 5 * DAY_MS,
+    detachedAtMs: null,
+    ...over,
+  };
+}
+
+const liveBinding: BreakGlassBinding = {
+  bindingId: "bg_1",
+  organizationId: ORG,
+  userId: ANA.userId,
+  grantedByUserId: "user_ops",
+  grantedAtMs: NOW - DAY_MS,
+  expiresAtMs: NOW + 30 * DAY_MS,
+  supersededAtMs: null,
+  renewedFromBindingId: null,
+  warnedDays: [],
+};
+
+function scenario({
+  connections = [legacy(), replacement()],
+  identifiers = [identifier({ identifierId: "idf_ana", connectionId: REPLACEMENT })],
+  members = [ANA],
+  bindings = [liveBinding],
+  authentications = [],
+  legacyAccounts = 0,
+  otherAccounts = [],
+}: {
+  connections?: SsoConnectionState[];
+  identifiers?: IdentifierFact[];
+  members?: SsoMigrationMember[];
+  bindings?: BreakGlassBinding[];
+  authentications?: {
+    providerAccountId?: string | null;
+    organizationId: string;
+    connectionId: string;
+    userId: string;
+    authenticatedAtMs: number;
+  }[];
+  /** How many federated accounts the module that owns them still answers for. */
+  legacyAccounts?: number;
+  /** Addresses held by accounts outside the organization. */
+  otherAccounts?: string[];
+} = {}) {
+  const store = MemoryIdentityStore.create();
+  const accounts = [
+    ...members.map(({ userId, email }) => ({ userId, email })),
+    ...otherAccounts.map((email, index) => ({ userId: `user_other_${index}`, email })),
+  ];
+  for (const { userId, email } of accounts) {
+    store.users.set(userId, {
+      id: userId,
+      email,
+      emailVerified: false,
+      createdAtMs: NOW,
+      userHashKey: null,
+      payload: {},
+    });
+  }
+  for (const connection of connections)
+    store.ssoConnections.set(connection.connectionId, connection);
+  for (const fact of identifiers) store.identifiers.set(fact.identifierId, fact);
+  for (const binding of bindings) store.breakGlassBindings.set(binding.bindingId, binding);
+  for (const record of authentications) {
+    store.ssoAuthentications.push({ providerAccountId: null, ...record });
+  }
+  const repositories = identityRepositoriesOverMemory(store);
+
+  return SsoMigrationProgressService.create({
+    connections: repositories.ssoConnections,
+    evidence: repositories.ssoMigrationEvidence,
+    breakGlass: repositories.ssoBreakGlass,
+    memberships: { listActiveMembers: async () => members },
+    legacyAccess: { count: async () => legacyAccounts },
+    now: () => NOW,
+  });
+}
+
+const progress = async (service: SsoMigrationProgressService) =>
+  (await service.getProgress({ organizationId: ORG, cursor: null, limit: 25 })).migration;
+
+describe("given an organization running no migration", () => {
+  it("has no cutover to report", async () => {
+    await expect(progress(scenario({ connections: [legacy()] }))).resolves.toBeNull();
+  });
+
+  it("ignores a replacement that was abandoned", async () => {
+    const service = scenario({
+      connections: [legacy(), replacement({ state: "DISCARDED" })],
+    });
+
+    await expect(progress(service)).resolves.toBeNull();
+  });
+});
+
+describe("given a replacement registered beside the grandfathered connection", () => {
+  it("names both halves, the phase and the route the phase decides", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.legacy).toEqual({
+      connectionId: LEGACY,
+      source: "legacy-grandfathered",
+      providerId: "auth0",
+    });
+    expect(view?.replacement.providerId).toBe("acme-okta");
+    expect(view?.phase).toBe("GRACE_DIRECT");
+    expect(view?.selectedRoute).toBe("direct");
+  });
+
+  it("carries the domains it inherited, with what they were proved against", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.inheritedDomains).toEqual([
+      {
+        domain: "acme.com",
+        method: "dns-txt",
+        proofState: "VERIFIED",
+        evidenceRef: "sha256:proof",
+        verifiedAtMs: NOW - 11 * DAY_MS,
+      },
+    ]);
+  });
+
+  it("counts a member linked by an identifier the replacement issued", async () => {
+    const view = await progress(scenario({ members: [ANA, BEN] }));
+
+    expect(view?.members.activeCount).toBe(2);
+    expect(view?.members.linkedCount).toBe(1);
+    expect(view?.members.stragglers).toEqual([
+      {
+        userId: BEN.userId,
+        name: "Ben",
+        email: "ben@acme.com",
+        lastLegacyAuthenticationAtMs: null,
+        move: "matched",
+      },
+    ]);
+  });
+
+  /** @scenario "The new connection recognises members by address on a domain it proved, confirmed or not" */
+  it("says whether the replacement will recognise each member, and counts who moves at their next sign-in", async () => {
+    const view = await progress(
+      scenario({
+        members: [
+          ANA,
+          BEN,
+          { userId: "user_cyd", name: "Cyd", email: null },
+          { userId: "user_dee", name: "Dee", email: "dee@acme.com" },
+          { userId: "user_eve", name: "Eve", email: "eve@elsewhere.org" },
+        ],
+        otherAccounts: ["DEE@acme.com"],
+      }),
+    );
+
+    expect(view?.members.nextSignInCount).toBe(1);
+    expect(
+      Object.fromEntries(view?.members.stragglers.map((row) => [row.userId, row.move]) ?? []),
+    ).toEqual({
+      user_ben: "matched",
+      user_cyd: "no-address",
+      user_dee: "shared-address",
+      user_eve: "unproved-domain",
+    });
+  });
+
+  it("says when each straggler last came in through the old connection", async () => {
+    const view = await progress(
+      scenario({
+        members: [BEN],
+        identifiers: [],
+        authentications: [
+          {
+            organizationId: ORG,
+            connectionId: LEGACY,
+            userId: BEN.userId,
+            authenticatedAtMs: NOW - 2 * DAY_MS,
+          },
+        ],
+      }),
+    );
+
+    expect(view?.members.stragglers[0]?.lastLegacyAuthenticationAtMs).toBe(NOW - 2 * DAY_MS);
+  });
+
+  /** @scenario "Migration progress recognizes native identifiers without connection annotations" */
+  it("counts an adopted identifier that names the replacement's own provider", async () => {
+    const view = await progress(
+      scenario({
+        identifiers: [
+          identifier({
+            identifierId: "idf_native",
+            connectionId: null,
+            providerId: REPLACEMENT,
+            providerAccountId: "sub_ana",
+          }),
+        ],
+      }),
+    );
+
+    expect(view?.members.linkedCount).toBe(1);
+    expect(view?.members.stragglers).toEqual([]);
+  });
+
+  /** @scenario "Migration progress recognizes native identifiers without connection annotations" */
+  it("never overrides an explicit association to another connection", async () => {
+    const view = await progress(
+      scenario({
+        identifiers: [
+          identifier({
+            identifierId: "idf_elsewhere",
+            connectionId: "ssoc_elsewhere",
+            providerId: REPLACEMENT,
+            providerAccountId: "sub_ana",
+          }),
+        ],
+      }),
+    );
+
+    expect(view?.members.linkedCount).toBe(0);
+  });
+
+  it("hands back a cursor only while another page follows", async () => {
+    const service = scenario({ members: [ANA, BEN], identifiers: [] });
+
+    const { migration } = await service.getProgress({
+      organizationId: ORG,
+      cursor: null,
+      limit: 1,
+    });
+
+    expect(migration?.members.stragglers).toHaveLength(1);
+    expect(migration?.members.nextCursor).toBe(ANA.userId);
+  });
+});
+
+describe("given a cutover that is nearly done", () => {
+  it("lets it finalize once nothing is left to wait for", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.blockers).toEqual([]);
+    expect(view?.canFinalize).toBe(true);
+    expect(view?.quietPeriod.complete).toBe(true);
+  });
+
+  it("refuses while somebody signed in through the old connection this week", async () => {
+    const view = await progress(
+      scenario({
+        authentications: [
+          {
+            organizationId: ORG,
+            connectionId: LEGACY,
+            userId: ANA.userId,
+            authenticatedAtMs: NOW - DAY_MS,
+          },
+        ],
+      }),
+    );
+
+    expect(view?.blockers.map((blocker) => blocker.code)).toContain("legacy-activity-not-quiet");
+    expect(view?.quietPeriod.lastLegacyAuthenticationAtMs).toBe(NOW - DAY_MS);
+    expect(view?.canFinalize).toBe(false);
+  });
+
+  it("refuses while the old connection still decides sign-ins", async () => {
+    const view = await progress(
+      scenario({ connections: [legacy(), replacement({ migrationPhase: "GRACE_LEGACY" })] }),
+    );
+
+    expect(view?.blockers.map((blocker) => blocker.code)).toContain("direct-route-not-selected");
+    expect(view?.canFinalize).toBe(false);
+  });
+
+  it("refuses while nobody holds a way back in", async () => {
+    const view = await progress(scenario({ bindings: [] }));
+
+    expect(view?.blockers.map((blocker) => blocker.code)).toContain("recovery-path-missing");
+  });
+
+  /** @scenario "The ask to set a password lands while the old provider can still sign somebody in" */
+  it("carries the remedy in the blocker: a password, set while somebody is still signed in", async () => {
+    const view = await progress(scenario({ bindings: [] }));
+
+    const blocker = view?.blockers.find(({ code }) => code === "recovery-path-missing");
+    expect(blocker?.message).toContain("somebody who has set a password");
+    expect(blocker?.message).toContain("only be set while somebody is still signed in");
+  });
+
+  it("does not hold the update for a member who holds no identifier on the replacement", async () => {
+    const view = await progress(scenario({ members: [ANA, BEN] }));
+
+    expect(view?.blockers).toEqual([]);
+    expect(view?.canFinalize).toBe(true);
+  });
+
+  it("opens finishing two days after the switch-over when nobody used the old provider since", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.quietPeriod.clearsAtMs).toBe(NOW - 8 * DAY_MS);
+  });
+
+  it("says nothing about directory provisioning this installation does not run", async () => {
+    const view = await progress(scenario());
+
+    expect(view?.scim.status).toBe("not-applicable");
+  });
+});
+
+describe("when finishing re-reads whether the previous provider still lets anybody in", () => {
+  const evidence = async (service: SsoMigrationProgressService) =>
+    service.getFinalizationEvidence({ organizationId: ORG });
+
+  it("does not wait on the identity of a member for whom it is the only way in", async () => {
+    const service = scenario({
+      identifiers: [
+        identifier({ identifierId: "idf_legacy", connectionId: LEGACY, state: "PRIMARY" }),
+      ],
+    });
+
+    expect((await evidence(service)).legacyAccessRetired).toBe(true);
+  });
+
+  it("still waits on the identity of a member who has another way in", async () => {
+    const service = scenario({
+      identifiers: [
+        identifier({ identifierId: "idf_legacy", connectionId: LEGACY, state: "PRIMARY" }),
+        identifier({ identifierId: "idf_email", provider: "email", connectionId: null }),
+      ],
+    });
+
+    expect((await evidence(service)).legacyAccessRetired).toBe(false);
+  });
+});

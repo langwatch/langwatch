@@ -1,0 +1,77 @@
+/**
+ * One run plan: its runs in a rail on the left, the results of the selected
+ * run filling the rest of the page.
+ * @see specs/features/agent-testing/results-tabs.feature
+ * @see specs/suites/run-notes.feature
+ */
+import type { Period, PeriodMode, RelativePresetKey } from "@langwatch/analytics-browser-kit";
+import { HStack } from "@langwatch/design-system/primitives";
+import type { Instant } from "@langwatch/time";
+
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import {
+  useRunPlanBatches,
+  useSelectedBatch,
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { useAgentTestingStore } from "../../../../behavior/agent-testing/use-agent-testing-store.ts";
+import { RunPlanResultsColumn } from "./run-plan-results-column.tsx";
+import { RunsSidebar } from "./runs-sidebar.tsx";
+
+export type RunPlanDetailProps = {
+  plan: RunPlan;
+  batchRunId: string | null;
+  onSelectRun: (batchRunId: string) => void;
+  onBack: () => void;
+  onEditPlan: (suiteId: string) => void;
+  period: Period;
+  periodMode: PeriodMode;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
+  setRelativePeriod: (key: RelativePresetKey) => void;
+  /** While the live stream is up the fallback polling stands down. */
+  isSseConnected: boolean;
+};
+
+export function RunPlanDetail(props: RunPlanDetailProps) {
+  const { plan } = props;
+  const pendingRun = useAgentTestingStore((state) => state.pendingRun);
+  const pendingBatchRunId =
+    pendingRun?.scenarioSetId === plan.scenarioSetId ? pendingRun.batchRunId : null;
+
+  const batches = useRunPlanBatches({
+    plan,
+    period: props.period,
+    isSseConnected: props.isSseConnected,
+  });
+
+  const selection = useSelectedBatch({
+    batches,
+    batchRunId: props.batchRunId,
+  });
+
+  return (
+    <HStack
+      align="stretch"
+      gap={0}
+      width="full"
+      height="full"
+      data-testid="agent-testing-run-plan-detail"
+    >
+      <RunsSidebar
+        runs={batches}
+        selectedBatchRunId={selection.selectedBatch?.batchRunId ?? null}
+        pendingBatchRunId={pendingBatchRunId ?? selection.awaitedBatchRunId}
+        onSelectRun={props.onSelectRun}
+        onBack={props.onBack}
+        periodControls={props}
+      />
+
+      <RunPlanResultsColumn
+        plan={plan}
+        batches={batches}
+        selection={selection}
+        periodControls={props}
+        onEditPlan={props.onEditPlan}
+      />
+    </HStack>
+  );
+}

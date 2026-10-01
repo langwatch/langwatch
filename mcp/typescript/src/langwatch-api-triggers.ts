@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 import {
   deletedTriggerSchema,
   type GraphAlertRule,
@@ -15,10 +15,10 @@ import {
   testFireResultSchema,
   triggerFirePageSchema,
   triggerSchema,
-} from "./schemas/triggers.js";
+} from "./schemas/triggers.ts";
 
 /**
- * The `/api/triggers` calls, each answering with the shape `schemas/triggers`
+ * The `/api/v1/triggers` calls, each answering with the shape `schemas/triggers`
  * declares. Responses are read through that schema rather than cast to it, so
  * a deployment that stops sending something a tool renders is a loud failure
  * rather than an `undefined` in the middle of a message to an agent.
@@ -54,12 +54,12 @@ type UpdateTriggerInput = Partial<
 export async function listTriggers(): Promise<Trigger[]> {
   return z
     .array(triggerSchema)
-    .parse(await makeRequest("GET", "/api/triggers"));
+    .parse(await makeRequest("GET", "/api/v1/triggers"));
 }
 
 export async function getTrigger(id: string): Promise<Trigger> {
   return triggerSchema.parse(
-    await makeRequest("GET", `/api/triggers/${encodeURIComponent(id)}`),
+    await makeRequest("GET", `/api/v1/triggers/${encodeURIComponent(id)}`),
   );
 }
 
@@ -67,7 +67,7 @@ export async function createTrigger(
   input: CreateTriggerInput,
 ): Promise<Trigger> {
   return triggerSchema.parse(
-    await makeRequest("POST", "/api/triggers", {
+    await makeRequest("POST", "/api/v1/triggers", {
       ...input,
       actionParams: input.actionParams ?? {},
     }),
@@ -79,7 +79,7 @@ export async function updateTrigger({
   ...data
 }: UpdateTriggerInput): Promise<Trigger> {
   return triggerSchema.parse(
-    await makeRequest("PATCH", `/api/triggers/${encodeURIComponent(id)}`, data),
+    await makeRequest("PATCH", `/api/v1/triggers/${encodeURIComponent(id)}`, data),
   );
 }
 
@@ -88,7 +88,7 @@ export async function testFireTrigger(id: string): Promise<TestFireResult> {
   return testFireResultSchema.parse(
     await makeRequest(
       "POST",
-      `/api/triggers/${encodeURIComponent(id)}/test-fire`,
+      `/api/v1/triggers/${encodeURIComponent(id)}/test-fire`,
     ),
   );
 }
@@ -111,7 +111,7 @@ export async function listTriggerFires({
   return triggerFirePageSchema.parse(
     await makeRequest(
       "GET",
-      `/api/triggers/${encodeURIComponent(id)}/fires${search}`,
+      `/api/v1/triggers/${encodeURIComponent(id)}/fires${search}`,
     ),
   );
 }
@@ -120,6 +120,6 @@ export async function deleteTrigger(
   id: string,
 ): Promise<z.infer<typeof deletedTriggerSchema>> {
   return deletedTriggerSchema.parse(
-    await makeRequest("DELETE", `/api/triggers/${encodeURIComponent(id)}`),
+    await makeRequest("DELETE", `/api/v1/triggers/${encodeURIComponent(id)}`),
   );
 }

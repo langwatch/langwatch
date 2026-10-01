@@ -1,0 +1,188 @@
+# Every place main lets a person upload a file or media, each read back after a reload: the profile
+# photo, an image and a file in a dataset cell, an exported workflow imported from JSON. The dataset
+# CSV upload is datasets.yaml and evaluations.yaml. Not scripted, and why: the licence file (the
+# licence page has no upload form on SaaS, webhooks-billing.yaml), the governance AI tool icon (a
+# data URL kept on an entitlement-gated form) and Langy's drop zone (accepts only Langy's own payload).
+# Selectors are test ids and labels main and the branch share. Unrun: first run proves them.
+flows:
+  - id: files-avatar-upload-and-remove
+    title: Upload a profile photo, see it served after a reload, then remove it
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          testId: profile-name-input
+      - action: click
+        with:
+          label: Add profile photo
+      - action: expect
+        with:
+          text: Profile photo
+      - action: upload
+        with:
+          fixture: avatar.png
+      - action: click
+        with:
+          text: Save photo
+      - action: expect
+        with:
+          text: Photo updated
+          timeout: "20000"
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          count: img[src*="/api/user-avatar/"]:visible
+          timeout: "20000"
+      - action: click
+        with:
+          label: Edit profile photo
+      - action: click
+        with:
+          text: /^\s*Remove\s*$/
+      - action: expect
+        with:
+          text: Photo removed
+          timeout: "20000"
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          count: img[src*="/api/user-avatar/"]:visible
+          equals: "0"
+          timeout: "20000"
+
+  - id: files-dataset-image-cell-upload
+    title: Upload an image into a dataset cell and see it rendered after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsimg-{uid}
+          columnTypes:
+            - name: input
+              type: string
+            - name: photo
+              type: image
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd image row
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: upload
+        with:
+          selector: '[data-testid="attachment-cell-image"] input[type=file]'
+          fixture: avatar.png
+      - action: expect
+        with:
+          testId: save-status-saved
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/dataset/{dsSlug}
+          contains: /avatar.png
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          count: '[data-testid="attachment-cell-image"] img:visible'
+          timeout: "20000"
+
+  - id: files-dataset-file-cell-upload
+    title: Upload a file into a dataset cell and find its chip after a reload
+    setup:
+      - post: /api/dataset
+        body:
+          name: vd-dsfile-{uid}
+          columnTypes:
+            - name: input
+              type: string
+            - name: document
+              type: file
+        as:
+          dsId: id
+          dsSlug: slug
+      - post: /api/dataset/{dsSlug}/records
+        body:
+          entries:
+            - input: vd file row
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+      - action: upload
+        with:
+          selector: '[data-testid="attachment-cell-file"] input[type=file]'
+          fixture: sample.csv
+      - action: expect
+        with:
+          testId: save-status-saved
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/dataset/{dsSlug}
+          contains: /sample.csv
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/datasets/{dsId}
+      - action: expect
+        with:
+          testId: attachment-chip
+          hasText: sample.csv
+          timeout: "20000"
+
+  - id: files-workflow-import-from-json
+    title: Import an exported workflow JSON, create it and find it in the list after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: upload
+        with:
+          selector: '[data-testid="new-workflow-card-import"] input[type=file]'
+          fixture: workflow-export.json
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfimp-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wfimp-{uid}
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: vd-wfimp-{uid}

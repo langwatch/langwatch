@@ -1,0 +1,591 @@
+/**
+ * ADR-032 Decision 5: the async dataset-normalize job.
+ */
+
+import readline from "node:readline";
+import { Readable } from "node:stream";
+
+import {
+  convertValueToColumnType,
+  dedupeHeaders,
+  detectFileFormat,
+  renameReservedColumns,
+  type DatasetColumns,
+  type DatasetConfirmColumns,
+  type FileFormat,
+  type DatasetNormalizePayload,
+} from "@langwatch/dataset-contract";
+import type { StoredObjectApi } from "@langwatch/stored-object-contract";
+import Papa from "papaparse";
+
+import type { DatasetNormalize } from "../app/dataset.app.ts";
+import type { DatasetChunkRepository } from "../repositories/dataset-chunk.repository.ts";
+import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
+import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
+
+/**
+ * A single staged `.json` array can't be parsed without buffering the whole
+ * file (no streaming JSON-array parser is wired in v1), so it's hard-capped well
+ * below heap. JSONL is the streaming-friendly format for large datasets.
+ */
+export const LARGE_JSON_MAX_BYTES = 100 * 1024 * 1024;
+
+/**
+ * Max bytes for a single JSONL line (I-MEM). `readline` emits one line at a time, so a normal
+ * file never buffers more than a line; but a pathological file with no newlines (or one giant
+ * line) would make `readline` buffer the whole thing in memory.
+ */
+export const MAX_JSONL_LINE_BYTES = 8 * 1024 * 1024;
+
+/**
+ * Max bytes for a single CSV row (I-MEM), the CSV counterpart to `MAX_JSONL_LINE_BYTES`.
+ */
+export const MAX_CSV_ROW_BYTES = 8 * 1024 * 1024;
+
+/**
+ * papaparse read-buffer size — how many bytes it pulls from the source stream before emitting
+ * rows, so it reads in fixed-size I/O chunks rather than draining the stream as fast as the
+ * chunk writer allows (backpressure).
+ */
+export const CSV_IO_CHUNK_BYTES = 8 * 1024 * 1024;
+
+export type DatasetNormalizeDeps = {
+  repository: DatasetRepository;
+  chunks: DatasetChunkRepository;
+  /** The confirmed import file is read from here as a stream (ADR-158 §2). */
+  storedObjects: Pick<StoredObjectApi, "getById">;
+};
+
+async function deleteFlushedChunks({
+  storage,
+  projectId,
+  datasetId,
+}: {
+  storage: DatasetChunkRepository;
+  projectId: string;
+  datasetId: string;
+}): Promise<void> {
+  try {
+    await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
+  } catch (cleanupError) {
+    if (!(cleanupError instanceof Error)) {
+      throw cleanupError;
+    }
+    // non-fatal: a failed reap is preferable to masking the real error.
+  }
+}
+
+/**
+ * Thrown when a staged `.json` array is too large to buffer; surfaced to the
+ * user as the dataset's `statusError`. Convert to JSONL to stream it instead.
+ */
+export class LargeJsonUnsupportedError extends Error {
+  constructor(message = "Large .json files are not supported — convert to JSONL") {
+    super(message);
+    this.name = "LargeJsonUnsupportedError";
+  }
+}
+
+/**
+ * The payload names a different file than the dataset row: the payload is stale
+ * or forged, and the row is left untouched for its own job.
+ */
+export class ImportSourceMismatchError extends Error {
+  constructor(datasetId: string, payloadSource: string, rowSource: string | null) {
+    super(
+      `Dataset ${datasetId} import source mismatch: payload names "${payloadSource}" ` +
+        `but the row carries "${rowSource ?? "none"}"; refusing to read storage`,
+    );
+    this.name = "ImportSourceMismatchError";
+  }
+}
+
+const NULL_BYTE = "\u0000";
+
+/**
+ * Strip raw U+0000 from text before JSON.parse. JSON.parse rejects a literal
+ * null byte inside a string as a "Bad control character"; the chunk writer
+ * scrubs again per-record on write (I-NULL parity with the in-memory path).
+ */
+const scrubNullBytes = (text: string): string =>
+  text.includes(NULL_BYTE) ? text.replaceAll(NULL_BYTE, "") : text;
+
+/**
+ * Approximate the serialized byte size of one parsed CSV row from its field values (I-MEM
+ * guard).
+ */
+const csvRowBytes = (data: Record<string, unknown>): number => {
+  let bytes = 0;
+  for (const value of Object.values(data)) {
+    if (typeof value === "string") {
+      bytes += Buffer.byteLength(value, "utf8");
+    } else if (value != null) {
+      bytes += Buffer.byteLength(JSON.stringify(value) ?? "", "utf8");
+    }
+  }
+  return bytes;
+};
+
+/** A whole stream as one string (only the guarded small-json path), refused past `maxBytes`. */
+const streamToString = async (
+  stream: AsyncIterable<Uint8Array | string>,
+  maxBytes: number,
+): Promise<string> => {
+  const parts: string[] = [];
+  let seen = 0;
+  for await (const chunk of stream) {
+    const part = typeof chunk === "string" ? Buffer.from(chunk) : Buffer.from(chunk);
+    seen += part.byteLength;
+    if (seen > maxBytes) throw new LargeJsonUnsupportedError();
+    parts.push(part.toString("utf8"));
+  }
+  return parts.join("");
+};
+
+/**
+ * Build the original→safe column rename map (m4). Reserved column names (`id`, etc.) are
+ * renamed to a safe form (`id_`) exactly as `createDatasetFromUpload` does; only entries that
+ * actually changed are kept so the common case is a no-op pass-through.
+ */
+const buildRenameMap = (headers: string[]): Map<string, string> => {
+  const renamed = renameReservedColumns(headers);
+  const map = new Map<string, string>();
+  headers.forEach((original, i) => {
+    if (original !== renamed[i]) map.set(original, renamed[i]!);
+  });
+  return map;
+};
+
+/**
+ * Rewrite a record's keys through the rename map so the stored JSONL row keys
+ * match `columnTypes` (m4). Streaming — one record at a time, never buffers the
+ * file. A no-op when nothing was renamed.
+ */
+const applyRename = (
+  record: Record<string, unknown>,
+  renameMap: Map<string, string>,
+): Record<string, unknown> => {
+  if (renameMap.size === 0) return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[renameMap.get(key) ?? key] = value;
+  }
+  return out;
+};
+
+type TargetBinding =
+  | {
+      kind: "bound";
+      byCanonical: Map<string, DatasetColumns[number]>;
+      /** The file headers when bound by `sourceHeader`; null on the positional path. */
+      canonicalSet: Set<string> | null;
+    }
+  | { kind: "unbound" };
+
+/** Binds the confirmed columns to the file's canonical headers, or degrades to unbound. */
+const bindTargetColumns = ({
+  targetColumns,
+  canonical,
+}: {
+  targetColumns: DatasetConfirmColumns | DatasetColumns | null | undefined;
+  canonical: string[];
+}): TargetBinding => {
+  // An empty confirmed list can't produce a 0-column dataset; degrade instead.
+  if (!targetColumns || targetColumns.length === 0) return { kind: "unbound" };
+  // Confirmed names become the stored record keys (`out[target.name]` below), so a blank or
+  // duplicated name would collapse two columns onto one key (silent per-record data loss) or
+  // write an `""`-keyed column. The upload route's schema already rejects this, so reaching
+  // here means a malformed stored row — degrade to a derived all-`string` schema rather than
+  // emit the corruption.
+  const names = targetColumns.map((c) => c.name);
+  if (names.some((name) => name.trim() === "") || new Set(names).size !== names.length) {
+    return { kind: "unbound" };
+  }
+  // Prefer binding by the immutable `sourceHeader` (survives drag-reorder +
+  // rename + exclusion); fall back to positional binding for legacy bare
+  // name+type lists (which require an exact 1:1 count — no exclusion).
+  const hasSourceHeaders = targetColumns.every(
+    (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+  );
+  // A PARTIAL confirm payload (some items carry `sourceHeader`, some don't) is
+  // a client bug, not a legacy list — positional-binding it could silently map
+  // values to the wrong column. Mirror the upload route (which rejects any
+  // "looks like confirm" payload) and degrade rather than fall through to the
+  // positional branch below.
+  const hasAnySourceHeaders = targetColumns.some(
+    (c) => typeof (c as DatasetConfirmColumns[number]).sourceHeader === "string",
+  );
+  if (hasAnySourceHeaders && !hasSourceHeaders) return { kind: "unbound" };
+  if (hasSourceHeaders) {
+    const byHeader = new Map(
+      (targetColumns as DatasetConfirmColumns).map((c) => [c.sourceHeader, c]),
+    );
+    // Duplicate `sourceHeader`s collapse in the Map (last wins), which would
+    // bind fewer columns than `targetColumns` claims while `appliedColumnTypes`
+    // still persists the phantom duplicate. Degrade rather than emit that.
+    if (byHeader.size !== targetColumns.length) return { kind: "unbound" };
+    // Every confirmed column must reference a real file header (no phantom).
+    // A SUBSET is allowed — headers absent from the confirmed list are the
+    // columns the user excluded, and are dropped per-record below.
+    const canonicalHeaders = new Set(canonical);
+    const confirmedHeaders = [...byHeader.keys()];
+    const everyHeaderIsReal = confirmedHeaders.every((h) => canonicalHeaders.has(h));
+    if (!everyHeaderIsReal) return { kind: "unbound" };
+    return { kind: "bound", byCanonical: byHeader, canonicalSet: canonicalHeaders };
+  }
+  if (targetColumns.length !== canonical.length) return { kind: "unbound" };
+  return {
+    kind: "bound",
+    byCanonical: new Map(canonical.map((h, i) => [h, targetColumns[i]!])),
+    canonicalSet: null,
+  };
+};
+
+// CSV is parsed with `header:false` (rows as arrays) and mapped to objects by index here —
+// NOT papaparse's `header:true`. Under our pause/resume backpressure, papaparse re-runs its
+// duplicate-header dedup against the current data row on every resume, suffixing the second
+// of any two equal cells with `_1` (corrupting e.g. input==expected rows, or two blank
+// cells) and warning once per row. We dedup the real header row ONCE instead.
+const streamCsvRecords = ({
+  stream,
+  onHeaders,
+  onRecord,
+}: {
+  stream: Readable;
+  onHeaders: (headers: string[]) => void;
+  onRecord: (record: Record<string, unknown>) => Promise<void>;
+}): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    let csvHeaders: string[] | null = null;
+    // papaparse accepts a Node Readable and emits rows via `step`, so the
+    // whole CSV is never materialized in memory. Serialize the backpressured
+    // chunk writes by pausing the parser while a flush is in flight.
+    let chain: Promise<void> = Promise.resolve();
+    Papa.parse<string[]>(stream, {
+      header: false,
+      skipEmptyLines: true,
+      // Bound papaparse's read buffer so it pulls the stream in fixed-size
+      // chunks rather than draining it as fast as the chunk writer allows.
+      chunkSize: CSV_IO_CHUNK_BYTES,
+      step: (row, parser) => {
+        const values = row.data;
+        // The first row is the header: dedupe repeats + reserved-rename once.
+        if (csvHeaders === null) {
+          const raw = values.map((value) => (value == null ? "" : String(value)));
+          csvHeaders = renameReservedColumns(dedupeHeaders(raw));
+          onHeaders(csvHeaders);
+          return;
+        }
+        const record: Record<string, unknown> = {};
+        csvHeaders.forEach((header, i) => {
+          record[header] = values[i];
+        });
+        // I-MEM: reject a single row whose serialized fields cross
+        // MAX_CSV_ROW_BYTES (a malformed CSV with no row delimiter or one
+        // giant field), the CSV counterpart to the JSONL line cap — fail the
+        // dataset rather than risk an OOM accumulating an unbounded row.
+        if (csvRowBytes(record) > MAX_CSV_ROW_BYTES) {
+          parser.abort();
+          reject(new Error("CSV row exceeds max size — malformed file"));
+          return;
+        }
+        parser.pause();
+        chain = chain
+          .then(() => onRecord(record))
+          .then(() => parser.resume())
+          .catch((error: unknown) => {
+            parser.abort();
+            reject(error);
+          });
+      },
+      complete: () => {
+        chain.then(() => resolve()).catch(reject);
+      },
+      error: (error: unknown) => reject(error),
+    });
+  });
+
+// Rename confirmed keys to their new names and convert their values to the
+// confirmed types; drop excluded file headers; keep stray keys untouched.
+// Identity when nothing was confirmed (or on a mismatch) — preserving the
+// pre-v19 all-`string` pass-through. Streaming: one record at a time.
+const applyTargetBinding = (
+  record: Record<string, unknown>,
+  binding: TargetBinding,
+): Record<string, unknown> => {
+  if (binding.kind !== "bound") return record;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    const target = binding.byCanonical.get(key);
+    if (target) {
+      // Kept column: rename + type-convert.
+      out[target.name] = convertValueToColumnType(value, target.type);
+      continue;
+    }
+    // An excluded file header is dropped; a stray key (not a file header) is kept as-is.
+    if (binding.canonicalSet?.has(key)) continue;
+    out[key] = value;
+  }
+  return out;
+};
+
+// I-MEM: bound a pathological no-newline / giant-line file. `readline`
+// already buffers a line at a time; this caps that buffer's size.
+const parseJsonlLine = (
+  rawLine: string,
+): { kind: "record"; record: Record<string, unknown> } | { kind: "blank" } => {
+  if (Buffer.byteLength(rawLine, "utf8") > MAX_JSONL_LINE_BYTES) {
+    throw new Error("JSONL line exceeds max size — malformed file");
+  }
+  const line = scrubNullBytes(rawLine).trim();
+  if (line.length === 0) return { kind: "blank" };
+  return { kind: "record", record: JSON.parse(line) as Record<string, unknown> };
+};
+
+/** A JSON-array source, size-guarded and buffered whole; it must be an array of records. */
+const readJsonArray = async ({
+  stream,
+  sizeBytes,
+}: {
+  stream: Readable;
+  sizeBytes?: number;
+}): Promise<Record<string, unknown>[]> => {
+  if (sizeBytes !== undefined && sizeBytes > LARGE_JSON_MAX_BYTES) {
+    throw new LargeJsonUnsupportedError();
+  }
+  const content = scrubNullBytes(await streamToString(stream, LARGE_JSON_MAX_BYTES)).trim();
+  const parsed = JSON.parse(content);
+  if (!Array.isArray(parsed)) {
+    throw new Error("JSON content must be an array of objects");
+  }
+  return parsed as Record<string, unknown>[];
+};
+
+/**
+ * Stream-parse a staged source into the chunk writer and capture the (already reserved-renamed)
+ * column headers from the first record / CSV fields. Each record's keys are rewritten through
+ * the rename map as it streams through so stored rows match `columnTypes` (m4).
+ */
+const parseInto = async (params: {
+  stream: Readable;
+  format: FileFormat;
+  writer: StreamingChunkWriterService;
+  /** Known up front for a stored object; a staged file is bounded while it streams. */
+  sizeBytes?: number;
+  /**
+   * User-confirmed columns from the upload step (ADR-032 v19). When the confirm
+   */
+  targetColumns?: DatasetConfirmColumns | DatasetColumns | null;
+}): Promise<{
+  headers: string[];
+  appliedColumnTypes: DatasetColumns | null;
+}> => {
+  const { stream, format, writer, sizeBytes, targetColumns } = params;
+  let headers: string[] = [];
+  let renameMap = new Map<string, string>();
+  // Confirmed columns bound to the file headers once known; unbound (derive-all-string)
+  // until then, or when the confirmed columns do not bind cleanly.
+  let binding: TargetBinding = { kind: "unbound" };
+  const buildTargetMap = (canonical: string[]): void => {
+    const next = bindTargetColumns({ targetColumns, canonical });
+    if (next.kind === "bound") binding = next;
+  };
+  // The persisted columnTypes are the confirmed columns in the user's chosen
+  // (drag) order, with the transient `sourceHeader` stripped — null when nothing
+  // bound (the handler then derives all-`string`).
+  const appliedColumnTypes = (): DatasetColumns | null =>
+    binding.kind === "bound" ? targetColumns!.map(({ name, type }) => ({ name, type })) : null;
+  // Capture headers the first time we see them, derive the rename map, and
+  // expose headers in their safe (renamed) form so columnTypes matches the
+  // rewritten row keys.
+  const captureHeaders = (rawKeys: string[]): void => {
+    if (headers.length > 0) return;
+    renameMap = buildRenameMap(rawKeys);
+    headers = renameReservedColumns(rawKeys);
+    buildTargetMap(headers);
+  };
+  const pushRecord = async (record: Record<string, unknown>): Promise<void> => {
+    captureHeaders(Object.keys(record));
+    await writer.push(applyTargetBinding(applyRename(record, renameMap), binding));
+  };
+
+  if (format === "jsonl") {
+    const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+    for await (const rawLine of rl) {
+      const line = parseJsonlLine(rawLine);
+      if (line.kind === "blank") continue;
+      await pushRecord(line.record);
+    }
+    return {
+      headers,
+      appliedColumnTypes: appliedColumnTypes(),
+    };
+  }
+
+  if (format === "csv") {
+    await streamCsvRecords({
+      stream,
+      onHeaders: (csvHeaders) => {
+        headers = csvHeaders;
+        buildTargetMap(headers);
+      },
+      onRecord: (record) => writer.push(applyTargetBinding(record, binding)),
+    });
+    return {
+      headers,
+      appliedColumnTypes: appliedColumnTypes(),
+    };
+  }
+
+  // format === "json": a single array — guard the size, then buffer + parse.
+  for (const record of await readJsonArray({ stream, sizeBytes })) {
+    await pushRecord(record);
+  }
+  return {
+    headers,
+    appliedColumnTypes: appliedColumnTypes(),
+  };
+};
+
+/**
+ * Derive `columnTypes` from the (already reserved-renamed) headers, mirroring
+ * `createDatasetFromUpload`: default every column to `"string"`.
+ */
+const deriveColumnTypes = (headers: string[]): DatasetColumns =>
+  headers.map((name) => ({
+    name,
+    type: "string" as const,
+  }));
+
+/**
+ * The `datasetNormalize` work, over its injected boundaries. On success the dataset flips to
+ * `ready` with PG-authoritative counters; on any failure it flips to `failed` (staging file
+ * preserved for manual retry) and rethrows so the queue records the failure.
+ */
+export class DatasetNormalizeService implements DatasetNormalize {
+  static create(deps: DatasetNormalizeDeps): DatasetNormalizeService {
+    return new DatasetNormalizeService(deps);
+  }
+
+  private constructor(private readonly deps: DatasetNormalizeDeps) {}
+
+  async normalize(payload: DatasetNormalizePayload): Promise<void> {
+    const { projectId, datasetId, filename } = payload;
+    const staged = "stagingKey" in payload;
+
+    const dataset = await this.deps.repository.findOne({ id: datasetId, projectId });
+    // Idempotent re-drive guard (I-IDEM): only a `processing` dataset is
+    // normalizable. A re-enqueue after success (ready) or a concurrent finalize
+    // race is a no-op.
+    if (dataset?.status !== "processing") return;
+    const payloadSource = staged ? payload.stagingKey : payload.sourceStoredObjectId;
+    const rowSource = staged ? dataset.stagingKey : dataset.sourceStoredObjectId;
+    if (rowSource !== payloadSource) {
+      throw new ImportSourceMismatchError(datasetId, payloadSource, rowSource);
+    }
+
+    const storage = this.deps.chunks;
+
+    try {
+      const { bytes, sizeBytes } = await this.openSource(payload);
+      const format = detectFileFormat(filename);
+      const stream = Readable.from(bytes, { objectMode: false });
+      const writer = StreamingChunkWriterService.create({
+        storage,
+        projectId,
+        datasetId,
+      });
+
+      // ADR-032 v19: the upload's confirm step persists the user-chosen columns
+      // on the row (names + types). Honour them — rename + type-convert per
+      // record as it streams. Absent (SDK / REST / API-key callers that don't
+      // pass a schema) → null, so parseInto leaves rows as-is and we derive
+      // all-`string` below, exactly as before.
+      const confirmedColumns = (dataset.columnTypes as DatasetColumns) ?? [];
+      const { headers, appliedColumnTypes } = await parseInto({
+        stream,
+        format,
+        writer,
+        sizeBytes,
+        targetColumns: confirmedColumns.length > 0 ? confirmedColumns : null,
+      });
+      // I-MEM: finalize returns the aggregated meta built from per-chunk
+      // metadata only — the chunk `jsonl` payloads were released at each flush,
+      // so the whole normalized file is never accumulated in heap.
+      const meta = await writer.finalize();
+      const columnTypes = appliedColumnTypes ?? deriveColumnTypes(headers);
+
+      // m5: an empty upload is a failure, not a 0-chunk `ready` dataset — this
+      // matches the legacy upload contract (which rejects an empty file).
+      if (meta.rowCount === 0) {
+        throw new Error("Uploaded file is empty");
+      }
+
+      // I-IDEM: a re-drive that wrote fewer chunks than a crashed prior run
+      // leaves orphan `chunk-NNNNN` objects past this run's last index. Delete
+      // them before flipping to `ready` so the chunk set matches `chunkCount`.
+      await storage.deleteChunksFrom({
+        projectId,
+        datasetId,
+        fromIndex: meta.chunkCount,
+      });
+
+      await this.deps.repository.update({
+        id: datasetId,
+        projectId,
+        data: {
+          status: "ready",
+          statusError: null,
+          rowCount: meta.rowCount,
+          sizeBytes: BigInt(meta.sizeBytes),
+          chunkCount: meta.chunkCount,
+          chunkOffsets: meta.chunkOffsets,
+          columnTypes,
+        },
+      });
+      if (staged) await this.removeStaged({ projectId, stagingKey: payload.stagingKey });
+    } catch (error: unknown) {
+      // A failed dataset owns no valid chunks. parseInto flushes chunk objects to S3 as it
+      // streams, so a mid-stream failure (e.g. a JSONL parse error at row N of M) leaves
+      // chunk-0..k orphaned — and chunk keys, unlike staging keys, carry no lifecycle TTL to
+      // reap them, so a permanently-failed dataset would leak them forever. Best-effort delete
+      // every flushed chunk.
+      await deleteFlushedChunks({ storage, projectId, datasetId });
+      // Mark failed and rethrow so the queue records the failure; the source file
+      // stays, so a retry reads it again.
+      const statusError = error instanceof Error ? error.message : "Normalize failed";
+      await this.deps.repository.update({
+        id: datasetId,
+        projectId,
+        data: { status: "failed", statusError },
+      });
+      throw error;
+    }
+  }
+
+  private async openSource(
+    payload: DatasetNormalizePayload,
+  ): Promise<{ bytes: AsyncIterable<Uint8Array>; sizeBytes?: number }> {
+    if ("stagingKey" in payload) {
+      const bytes = await this.deps.chunks.readStagedUpload({
+        projectId: payload.projectId,
+        stagingKey: payload.stagingKey,
+      });
+      return { bytes };
+    }
+    const source = await this.deps.storedObjects.getById({
+      projectId: payload.projectId,
+      id: payload.sourceStoredObjectId,
+    });
+    return { bytes: source.bytes, sizeBytes: source.metadata.byteLength };
+  }
+
+  /** Best-effort, as the previous release's was: the bucket lifecycle reaps what is left. */
+  private async removeStaged(params: { projectId: string; stagingKey: string }): Promise<void> {
+    try {
+      await this.deps.chunks.removeStagedUpload(params);
+    } catch (error) {
+      if (!(error instanceof Error)) throw error;
+    }
+  }
+}

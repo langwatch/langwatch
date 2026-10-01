@@ -1,25 +1,17 @@
 /**
- * Comparison (n-way judging) for code-first experiments.
- *
- * Every target that recorded an output for a row is handed to
- * `langevals/select_best_compare` in a single call, and the winner comes back
- * named with the target name the caller registered.
- *
- * The judge owns its defaults. An option the caller did not set is absent from
- * the request, which is what lets the judge apply the default that fits the
- * row: it picks one of four prompts depending on whether the row carries a
- * reference answer and task context, so a copy of any of them shipped here
- * would both drift and silently disable that adaptation.
+ * Comparison (n-way judging) via one call to `langevals/select_best_compare`.
+ * The judge owns its defaults — an unset option stays absent from the request
+ * so it can pick the prompt that fits the row; a copied default here would drift and disable that.
  */
 
+import { ComparisonError } from "./errors";
 import type {
   ComparisonOptions,
   ComparisonStatus,
   ComparisonVerdict,
-  EvaluationStatus,
+  ExperimentEvaluationStatus,
   RunEvaluatorResponse,
 } from "./types";
-import { ComparisonError } from "./errors";
 
 /** The evaluator behind every comparison, in the workbench and in the SDK. */
 export const COMPARISON_EVALUATOR_SLUG = "langevals/select_best_compare";
@@ -48,18 +40,9 @@ export type ComparisonCandidatePayload = {
 };
 
 /**
- * Render a target's callback result as the text a judge can read.
- *
- * A lone `output` field is unwrapped to its own value, because that is the
- * shape a plain response is already recorded under, so returning the response
- * and returning `{ output: response }` reach the judge as the same text. A
- * response with several fields is presented whole, as JSON.
- *
- * An empty string means the target produced nothing for this row, and a target
- * with nothing to show is not a candidate: asking a judge to rank silence
- * produces a verdict about the wrong thing. A result that cannot be rendered
- * as text at all is treated the same way, since "[object Object]" tells a
- * judge even less than silence does.
+ * Render a target's callback result as text a judge can read. A lone `output`
+ * field unwraps to its own value; other shapes render as JSON. Empty string
+ * means nothing to show — an unparseable result is treated the same way.
  */
 export const renderTargetOutput = (result: unknown): string => {
   if (result === undefined || result === null) {
@@ -68,11 +51,7 @@ export const renderTargetOutput = (result: unknown): string => {
   if (typeof result === "string") {
     return result;
   }
-  if (
-    typeof result === "number" ||
-    typeof result === "boolean" ||
-    typeof result === "bigint"
-  ) {
+  if (typeof result === "number" || typeof result === "boolean" || typeof result === "bigint") {
     return String(result);
   }
   if (typeof result === "object" && !Array.isArray(result)) {
@@ -90,9 +69,8 @@ export const renderTargetOutput = (result: unknown): string => {
 
 /**
  * The judge settings for a comparison, carrying only what the caller set.
- *
- * `golden` is the single knob for reference-answer judging: passing one turns
- * `has_golden_answer` on, so the two can never disagree.
+ * `golden` is the single knob for reference-answer judging: passing one
+ * turns `has_golden_answer` on, so the two can never disagree.
  */
 export const buildComparisonSettings = (
   options: Pick<
@@ -105,7 +83,7 @@ export const buildComparisonSettings = (
     | "swapAndReconcile"
     | "includeMetrics"
     | "temperature"
-  >
+  >,
 ): Record<string, unknown> => {
   const settings: Record<string, unknown> = {};
 
@@ -130,39 +108,33 @@ export const buildComparisonSettings = (
 };
 
 /**
- * The candidates the judge will see, in the order given.
- *
- * A name with nothing recorded against it never reaches here, and if one ever
- * does it is a bug in candidate selection rather than a thin row, so it says
- * which target it was instead of judging a silent candidate.
+ * The candidates the judge will see, in the order given. A name with
+ * nothing recorded never reaches here; if one ever does, it's a bug in
+ * candidate selection, so it names the target instead of judging silently.
  */
 export const buildComparisonCandidates = (
   names: string[],
-  captured: Map<string, CapturedTargetOutput>
+  captured: Map<string, CapturedTargetOutput>,
 ): ComparisonCandidatePayload[] =>
   names.map((name) => {
     const output = captured.get(name);
     if (!output) {
       throw new ComparisonError(
         `Cannot compare: '${name}' was selected as a candidate but recorded no output.`,
-        [name]
+        [name],
       );
     }
     return {
       id: name,
       output: output.output,
-      ...(output.durationMs !== undefined
-        ? { duration: output.durationMs / 1000 }
-        : {}),
+      ...(output.durationMs !== undefined ? { duration: output.durationMs / 1000 } : {}),
     };
   });
 
 /**
- * The judge entry for a row.
- *
- * `row_index` seeds the judge's deterministic candidate shuffle, so it comes
- * from the row the caller is already naming rather than from a second argument
- * they would have to remember to keep in step.
+ * The judge entry for a row. `row_index` seeds the judge's deterministic
+ * candidate shuffle, coming from the row the caller already names rather
+ * than a second argument they'd have to keep in step.
  */
 export const buildComparisonData = ({
   input,
@@ -182,16 +154,9 @@ export const buildComparisonData = ({
 });
 
 /**
- * Translate the judge's result into a verdict.
- *
- * - a judged row with a winner is `decided`
- * - a judged row the judge called even is a `tie`
- * - a judged row the judge would not call, which under swap-and-reconcile
- *   means its two passes disagreed, is `inconclusive`: a finding about the
- *   candidates, and not a tie, which would claim a measurement never made
- * - a judge that failed or could not be reached is `error`, because nothing
- *   was measured about the candidates at all. Reporting that as
- *   `inconclusive` would dress a broken call up as a finding
+ * Translate the judge's result into a verdict: `decided`, `tie`, or
+ * `inconclusive` — the judge would not call it, a finding about the
+ * candidates, not a claimed tie — or `error` when nothing was measured at all.
  */
 export const toComparisonVerdict = ({
   response,
@@ -218,16 +183,11 @@ export const toComparisonVerdict = ({
 };
 
 /**
- * The batch status a verdict is recorded under.
- *
- * The batch protocol carries three statuses to the verdict's five, so the
- * mapping lives here and nowhere else: what the row records and what the
- * caller is handed are then two readings of one decision rather than two
- * decisions that can drift apart.
+ * The batch status a verdict is recorded under. The batch protocol carries
+ * three statuses to the verdict's five, so this mapping lives here alone --
+ * what the row records and what the caller reads are one decision, not two.
  */
-export const comparisonEntryStatus = (
-  status: ComparisonStatus
-): EvaluationStatus => {
+export const comparisonEntryStatus = (status: ComparisonStatus): ExperimentEvaluationStatus => {
   switch (status) {
     case "decided":
     case "tie":

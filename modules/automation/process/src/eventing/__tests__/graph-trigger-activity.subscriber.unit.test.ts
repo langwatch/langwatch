@@ -1,0 +1,115 @@
+import type { GraphTriggerEvaluationResult, TriggerSummary } from "@langwatch/automation-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  breachingAnalytics,
+  createGraphActivityPrismaDouble,
+  FrozenClock,
+  graphTriggerRow,
+  OneProject,
+  RecordingDelivery,
+  SilentLogger,
+  TestDispatchErrors,
+} from "../../__tests__/fixtures/graph-activity.fixture.ts";
+import type { AutomationGraphActivity } from "../../app/automation.members.ts";
+import { MemoryAutomationEmailCapRepository } from "../../repositories/memory/memory.automation-email-cap.repository.ts";
+import { PrismaCustomGraphRepository } from "../../repositories/prisma/prisma.custom-graph.repository.ts";
+import { PrismaEmailSuppressionRepository } from "../../repositories/prisma/prisma.email-suppression.repository.ts";
+import { PrismaGraphTriggerSentRepository } from "../../repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+import { PrismaTriggerRepository } from "../../repositories/prisma/prisma.trigger.repository.ts";
+import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
+import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
+import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
+import { AutomationEmailCapService } from "../../services/email-cap.service.ts";
+import { SlackDestinationService } from "../../services/slack-destination.service.ts";
+import { createGraphTriggerActivityHandler } from "../graph-trigger-activity.subscriber.ts";
+
+/**
+ * Spec: modules/automation/specs/graph-alert-worker-composition.feature
+ */
+
+const context = { tenantId: "project-1" } as never;
+const event = { occurredAt: Date.now() } as never;
+
+class ScriptedActivity implements AutomationGraphActivity {
+  readonly evaluated: string[] = [];
+
+  constructor(
+    private readonly triggerIds: string[],
+    private readonly failing: string,
+  ) {}
+
+  async getActiveGraphTriggersForProject(): Promise<TriggerSummary[]> {
+    return this.triggerIds.map((id) => ({ id }) as TriggerSummary);
+  }
+
+  async evaluateGraphTrigger(input: { triggerId: string }): Promise<GraphTriggerEvaluationResult> {
+    this.evaluated.push(input.triggerId);
+    if (input.triggerId === this.failing) {
+      throw new Error("analytics unavailable");
+    }
+
+    return { status: "not_breached" } as GraphTriggerEvaluationResult;
+  }
+}
+
+describe("createGraphTriggerActivityHandler", () => {
+  describe("given a project with several graph automations", () => {
+    describe("when evaluating one of them fails", () => {
+      /** @scenario "One trigger's failure does not starve the rest" */
+      it("evaluates every other automation and then reports the failure", async () => {
+        const activity = new ScriptedActivity(["a", "b", "c"], "b");
+
+        await expect(createGraphTriggerActivityHandler(activity)(event, context)).rejects.toThrow(
+          /1\/3 evaluations failed/,
+        );
+        expect(activity.evaluated).toEqual(["a", "b", "c"]);
+      });
+    });
+  });
+
+  describe("given the vertical a background process composes", () => {
+    /** @scenario "The two questions the real-time path asks are the whole port" */
+    it("is accepted by the handler with nothing else supplied", async () => {
+      const database = createGraphActivityPrismaDouble({ triggers: [graphTriggerRow()] });
+      const clock = new FrozenClock();
+      const delivery = new RecordingDelivery();
+      const crypto = { encrypt: (value: string) => value, decrypt: (value: string) => value };
+      const triggers = PrismaTriggerRepository.create(database.prisma, clock);
+      const handler = createGraphTriggerActivityHandler(
+        AutomationGraphActivityService.create({
+          triggers,
+          customGraphs: PrismaCustomGraphRepository.create(database.prisma),
+          graphTriggerSent: PrismaGraphTriggerSentRepository.create(database.prisma),
+          persistence: AutomationGraphDeliveryService.create({
+            triggers,
+            suppressions: PrismaEmailSuppressionRepository.create(database.prisma),
+          }),
+          clock,
+          projects: new OneProject(),
+          analytics: breachingAnalytics(),
+          delivery,
+          webhooks: AutomationWebhookSecretsService.create(crypto),
+          slackDestinations: SlackDestinationService.create({
+            slack: { findUsableSlackSecret: async () => [] },
+            crypto: crypto,
+          }),
+          emailCaps: AutomationEmailCapService.create({
+            store: MemoryAutomationEmailCapRepository.create(),
+            fallback: MemoryAutomationEmailCapRepository.create(),
+          }),
+          logger: new SilentLogger(),
+          dispatchErrors: new TestDispatchErrors(),
+          latestEvaluations: { record: async () => undefined },
+          baseHost: "https://app.langwatch.test",
+          emailHourlyCap: 100,
+          tenantDailyCap: 10_000,
+        }),
+      );
+
+      await handler(event, context);
+
+      expect(delivery.emails.map((email) => email.recipients)).toEqual([["ada@example.com"]]);
+    });
+  });
+});

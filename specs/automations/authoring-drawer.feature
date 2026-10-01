@@ -200,6 +200,51 @@ Feature: Staged automation authoring drawer
       Then the drawer says the automation no longer exists
       And it offers no Edit button
 
+    # The link is minted into a message that has already left the product, so a
+    # name that does not resolve cannot be corrected afterwards: every alert we
+    # have ever sent lands on the automations list with nothing open, and the
+    # reader is given no error to report. The receiving side is where this is
+    # fixed — the application registers the name the email already writes.
+    @integration
+    Scenario: An alert email's Edit automation link opens the automation it names
+      Given an alert email whose Edit automation link carries the automation's id
+      When the recipient follows that link into the application
+      Then the automation authoring drawer opens on that automation
+      And the drawer is told the reader arrived from an email
+
+  Rule: The list opens the same editor the links do
+
+    An automation is opened from a row on the automations page, from the "Edit
+    automation" link in an alert email, from the REST API's `platformUrl`, from
+    the trace explorer's Automate button and from the command bar. The page used
+    to open its own two overlays at addresses only that page understood, so a
+    reader who copied the URL out of the address bar and sent it to a colleague
+    sent a link that opened the list with nothing on it. Every way in writes the
+    same address now.
+
+    @integration
+    Scenario: The automations list opens its viewer at the registered address
+      Given the project has an automation
+      When the user clicks its row
+      Then the automation viewer opens on that automation
+      And the list does not draw a second copy of it
+
+    @integration
+    Scenario: The automations list opens its editor at the registered address
+      Given the project has an automation
+      When the user picks Edit from that row's actions
+      Then the automation editor opens on that automation
+
+    @integration
+    Scenario: Creating an automation opens the editor with no automation named
+      When the user starts a new automation
+      Then the automation editor opens naming no automation to load
+
+    @integration
+    Scenario: The automation viewer hands over to the editor at its registered address
+      Given the automation viewer is open on an automation
+      Then it is given a way to open the editor on the same automation
+
   Rule: An alert needs a custom graph to watch
 
     An alert's Subject is a series on a custom graph — there is nothing to
@@ -488,6 +533,13 @@ Feature: Staged automation authoring drawer
       Then the setup warns that this installation cannot send email
       And the automation can still be saved
 
+    @integration
+    Scenario: The email channel cannot be chosen when the installation cannot send email
+      Given the installation has no email provider configured
+      When the user picks how an automation delivers
+      Then the email channel is disabled
+      And hovering it says "Email is not configured. Ask an admin to set up a mail provider."
+
     @unit
     Scenario: An email test on an installation without email says email is not set up
       Given the installation has no email provider configured
@@ -571,8 +623,8 @@ Feature: Staged automation authoring drawer
       When the user opens the automation settings list
       Then each row shows the last-triggered timestamp and total fired count
 
-    Scenario: Pending and failed counts appear once outbox-backed dispatch is live
-      Given outbox-backed notify dispatch is wired in this environment
+    Scenario: Pending and failed counts reflect durable intent delivery
+      Given a notification automation has durable dispatch intents
       When the user opens the automation settings list
       Then each notification row shows pending, failed, and dead counts
 
@@ -581,6 +633,35 @@ Feature: Staged automation authoring drawer
       When the user opens the automation's detail panel
       Then the panel shows the template-error warning
       And the panel shows any missing variable names from that dispatch
+
+  Rule: A REST edit replaces delivery settings through the same persist path as a save
+
+    An automation's delivery settings carry secrets that are encrypted on the
+    way in and the creator an annotation queue attributes its items to. The
+    REST edit accepts new delivery settings and replaces the stored ones, but
+    runs them through the save's persist step, so secrets are never stored in
+    plaintext and the creator stays what is stored.
+
+    @unit
+    Scenario: A REST edit replaces an automation's delivery settings
+      Given a stored automation that delivers to a webhook
+      When a REST patch carries new delivery settings
+      Then the stored delivery settings are replaced
+      And the header values are stored encrypted, never in plaintext
+
+    @unit
+    Scenario: A REST edit cannot re-attribute an automation to another user
+      Given a stored automation that queues annotations for its creator
+      When a REST patch names a different creator in the delivery settings
+      Then the delivery settings are replaced
+      And the stored creator is unchanged
+
+    @unit
+    Scenario: A REST edit still changes an automation's name and state
+      Given a stored automation
+      When a REST patch renames it and pauses it
+      Then the edit is applied
+      And no delivery settings are forwarded to the write
 
   Rule: The trace query is only marked answered when it can match
 

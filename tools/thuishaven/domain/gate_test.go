@@ -45,7 +45,7 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 				"./node_modules/.bin/tsc --noEmit --project ./tsconfig.tsgo.json",
 				"pnpm exec tsc --noEmit -p tsconfig.json",
 				"pnpm exec tsgo --noEmit -p tsconfig.tsgo.json",
-				"cd platform/app && tsc -p tsconfig.tsgo.tests.json",
+				"cd apps/api && tsc -p tsconfig.test.json",
 			} {
 				if _, heavy := ClassifyCommand(cmd); !heavy {
 					t.Fatalf("%q should be gated", cmd)
@@ -59,8 +59,8 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 		// that has a developer wondering why `cat` was queued.
 		t.Run("but naming the config file is not running the compiler", func(t *testing.T) {
 			for _, cmd := range []string{
-				"cat platform/app/tsconfig.json",
-				"grep -n strict platform/app/tsconfig.json",
+				"cat apps/api/tsconfig.json",
+				"grep -n strict apps/api/tsconfig.json",
 				"git diff tsconfig.json",
 				"/x/bin/mytsc --noEmit",
 				"node dev/scripts/check-queue.mjs ./node_modules/.bin/tsc.real --noEmit -p tsconfig.json",
@@ -70,6 +70,46 @@ func TestClassifyCommandGatesOnlyWhatIsHeavy(t *testing.T) {
 				}
 			}
 		})
+	})
+}
+
+// @scenario "A command that only mentions a heavy tool is not gated"
+func TestClassifyCommandGatesOnInvocationNotSubstring(t *testing.T) {
+	t.Run("given a command that only reads, searches or prints text naming a heavy tool", func(t *testing.T) {
+		// The 2026-09-10 incident: a status read piped through head and awk, and
+		// a grep for the classifier's own source, were both queued behind the
+		// machine-wide slot for tens of minutes because they mentioned "vitest",
+		// "tsc" and "golangci" as plain text, never as a program they ran.
+		for _, cmd := range []string{
+			`HAVEN_AGENT=1 haven slot explain 2>&1 | head -20; echo ---; ps -eo rss,comm | awk '$2 ~ /node|tsgo|tsc|golangci|vitest/ {n[$2]++} END {for (k in n) print k, n[k]}'`,
+			`grep -rn 'func.*[Cc]lassif\|"vitest"\|"tsc"\|"golangci' --include='*.go' domain app | grep -v _test`,
+			"grep -rn vitest.config .",
+			"cat vitest.config.ts",
+			"echo typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); heavy {
+					t.Fatalf("mentioning a heavy tool must not gate: %q", cmd)
+				}
+			})
+		}
+	})
+
+	t.Run("given a command that genuinely invokes a heavy tool, however it is wrapped", func(t *testing.T) {
+		for _, cmd := range []string{
+			"pnpm typecheck:one apps/api",
+			"cd tools && pnpm --filter @langwatch/ui test:unit src/x.test.ts",
+			"HAVEN_AGENT=1 pnpm exec vitest run src/x.test.ts",
+			"./node_modules/.bin/tsc --noEmit -p tsconfig.json",
+			"golangci-lint run ./tools/...",
+			"make typecheck",
+		} {
+			t.Run(cmd, func(t *testing.T) {
+				if _, heavy := ClassifyCommand(cmd); !heavy {
+					t.Fatalf("an actual invocation must still gate: %q", cmd)
+				}
+			})
+		}
 	})
 }
 

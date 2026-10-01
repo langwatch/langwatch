@@ -5,9 +5,9 @@
 // domain.Credential, and forwards the call to the gateway dispatcher.
 //
 // Three TS callsites talk to /proxy/v1/*:
-//   - platform/app/src/server/routes/playground.ts
+//   - modules/model-provider/process/src/transport/api-rest/playground.api.ts
 //   - langwatch/src/server/modelProviders/model.factory.ts
-//   - platform/app/src/server/modelProviders/utils.ts
+//   - modules/model-provider/process/src/services/model-provider-execution-handle.service.ts
 //
 // All three send the customer's provider credentials as
 // `x-litellm-<field>` headers. This file owns the header → Credential
@@ -80,7 +80,8 @@ func ParseCredentialFromHeaders(h http.Header) (domain.Credential, error) {
 		Extra:      make(map[string]string),
 	}
 
-	//nolint:exhaustive // playground credential header extraction only models the provider shapes that ship credentials inline today; unmapped providers (e.g. ProviderVoyage) fall through with empty Extra.
+	// Only the provider shapes that ship credentials inline today are mapped;
+	// others (e.g. ProviderVoyage) fall through with an empty Extra.
 	switch provider {
 	case domain.ProviderOpenAI, domain.ProviderAnthropic, domain.ProviderGemini,
 		domain.ProviderXAI, domain.ProviderGroq, domain.ProviderCerebras,

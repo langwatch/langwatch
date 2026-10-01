@@ -10,6 +10,10 @@ The LangWatch AI Gateway uses the LangWatch permission model: a permission is `<
 
 The gateway adds its own resources to that model. Provider credentials, the audit log and the webhook endpoints are shared with the rest of LangWatch. See [Access Control (RBAC)](/platform/rbac) for the model and role bindings.
 
+<Note>
+  The matrix below is the default. Custom roles can carry any combination of the permissions listed, see [Custom Roles](/platform/rbac#custom-roles) for how to define one.
+</Note>
+
 ## Resources
 
 | Resource | Gates | Actions |
@@ -101,3 +105,11 @@ A call with an API key that lacks the route's permission gets HTTP 403 `api_key_
 <Note>
 **Also check:** [Access Control (RBAC)](/platform/rbac) for role bindings, [Virtual keys](/ai-gateway/virtual-keys) for scopes, and [Billing and spend events](/ai-gateway/billing-events) for the spend routes.
 </Note>
+
+## Changing the permission matrix
+
+Default roles are code-defined in `modules/authz/contract/src/roles.ts`, declared as differences rather than duplicate lists: `viewer` is the base set, `member` is `viewer` plus its additions, `admin` is `member` plus its additions, and `builtinRolePermissions()` resolves a role key to the permissions it ends up with. **Do not edit the default matrix in production**: a change to those built-in sets affects every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+
+## SCIM + SSO
+
+Default role matrix assignments flow through SCIM: when an IdP pushes a user with role `MEMBER`, they pick up the gateway permissions in the MEMBER column above. Custom roles must be assigned via the LangWatch UI (SCIM doesn't carry custom-role identifiers); the SCIM integration only maps to ADMIN, MEMBER, VIEWER.

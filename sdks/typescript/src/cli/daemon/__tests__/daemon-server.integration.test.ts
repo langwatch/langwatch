@@ -1,27 +1,26 @@
-/**
- * Integration tests over a real Unix domain socket.
- *
- * The command executor is injected, so these drive the parts that must not
- * break — handshake, framing, identity, lifecycle, cancellation, fallback —
- * without commander or the network in the picture. The real CLI running through
- * a real daemon is covered by daemon-cli.integration.test.ts.
- */
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
 import { Writable } from "node:stream";
 
+/**
+ * Integration tests over a real Unix domain socket, driving handshake,
+ * framing, identity, lifecycle, cancellation and fallback without commander.
+ * The full CLI-through-daemon path is covered elsewhere.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { execViaDaemon, requestStatus, requestStop } from "../client";
 import { secureSocketFile, UntrustedSocketDirError } from "../identity";
+import {
+  encodeFrame,
+  FrameDecoder,
+  PROTOCOL_VERSION,
+  type ClientFrame,
+  type ServerFrame,
+} from "../protocol";
+import type { CommandExecution, CommandExecutor } from "../runner";
 import {
   cleanStaleSocket,
   createDaemonServer,
@@ -31,8 +30,6 @@ import {
   stagingSocketPath,
   type DaemonServer,
 } from "../server";
-import { encodeFrame, FrameDecoder, PROTOCOL_VERSION, type ClientFrame } from "../protocol";
-import type { CommandExecution, CommandExecutor } from "../runner";
 import { noopTelemetry, type DaemonTelemetry } from "../telemetry";
 
 const CLI_VERSION = "9.9.9";
@@ -50,6 +47,26 @@ const collector = (): { stream: Writable; text: () => string } => {
     }),
     text: () => Buffer.concat(chunks).toString(),
   };
+};
+
+/** A client that cancels as soon as the daemon admits it, then reads to the exit frame. */
+const cancelOnceAdmitted = ({
+  frame,
+  socket,
+  out,
+  resolve,
+}: {
+  frame: ServerFrame;
+  socket: net.Socket;
+  out: ReturnType<typeof collector>;
+  resolve: (code: number) => void;
+}): void => {
+  if (frame.t === "hello-ok") socket.write(encodeFrame({ t: "cancel" }));
+  if (frame.t === "out") out.stream.write(Buffer.from(frame.d, "base64"));
+  if (frame.t === "exit") {
+    socket.destroy();
+    resolve(frame.code);
+  }
 };
 
 /** An executor that just replays a scripted result. */
@@ -220,13 +237,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * A symlink is the shape of debris the trust check deliberately lets through
-   * — `socket-not-a-socket` is NOT a squat, because inside our own 0700
-   * directory nobody else could have put it there. So it has to be cleanable,
-   * and a DANGLING one is the case that is invisible to `stat`: nothing exists
-   * to stat, yet the name is taken as far as `link(2)` is concerned. Every
-   * daemon then died at publish time with EEXIST, which `daemon.ts` reads as a
-   * lost start race and swallows — a permanent wedge with no output anywhere.
+   * A dangling symlink is invisible to `stat`, so `link(2)` still sees the
+   * name as taken and publish fails EEXIST, which `daemon.ts` reads as a
+   * lost start race and swallows -- a permanent wedge with no output.
    */
   describe("given a dangling symlink where the socket should be", () => {
     beforeEach(() => {
@@ -272,9 +285,7 @@ describe("daemon over a unix socket", () => {
           build: BUILD,
         });
 
-        await expect(second.listen()).rejects.toBeInstanceOf(
-          DaemonAlreadyRunningError,
-        );
+        await expect(second.listen()).rejects.toBeInstanceOf(DaemonAlreadyRunningError);
       });
 
       it("leaves nothing behind but the socket clients dial", async () => {
@@ -287,14 +298,9 @@ describe("daemon over a unix socket", () => {
     });
 
     /**
-     * `publishSocket`'s EEXIST branch, against the thing it actually guards: a
-     * real, listening socket that a real winner already published.
-     *
-     * Nothing else reaches it. `server.unit.test.ts` publishes regular files,
-     * and `listen()`'s own second-daemon case is answered by the `isSocketAlive`
-     * pre-check long before `linkSync` is called. So the one call whose
-     * fail-CLOSED behaviour the whole publish design rests on was never
-     * exercised on a socket at all.
+     * `publishSocket`'s EEXIST branch, against the thing it actually guards: a real, listening
+     * socket a real winner already published. Nothing else reaches it, so this is the only case
+     * that exercises the fail-CLOSED behaviour the whole publish design rests on.
      */
     describe("when a real socket already answers to the shared name", () => {
       it("refuses to publish over it and leaves the winner dialable", async () => {
@@ -313,9 +319,7 @@ describe("daemon over a unix socket", () => {
         // listening handles behind and turn a clean failure into a worker that
         // never settles.
         try {
-          expect(() => publishSocket(loserStaging, socketPath)).toThrow(
-            DaemonAlreadyRunningError,
-          );
+          expect(() => publishSocket(loserStaging, socketPath)).toThrow(DaemonAlreadyRunningError);
 
           // The winner is untouched and still answering — a rename here would
           // have left it alive on an inode no client can dial.
@@ -362,27 +366,23 @@ describe("daemon over a unix socket", () => {
 
     describe("when it shuts down", () => {
       it("unlinks its name while its socket is still bound, so the identity it matched cannot have been reused", async () => {
-        // The ORDER is the whole point, and it is invisible to an
-        // inode-comparison test: an orphan whose name is unlinked while it is
-        // still bound keeps its inode allocated, so a successor is handed a
-        // different number and the guard is right by luck rather than by rule.
-        // What the rule is actually for is the moment AFTER `close()`: the last
-        // reference is gone, the ino is free for immediate reuse (Linux reuses
-        // it readily), and a successor landing on it would be deleted by this
-        // daemon's own cleanup.
+        // The ORDER matters: unlinking while still bound keeps the inode
+        // allocated, so an inode-comparison test passes by luck. The real
+        // risk is AFTER close(): the inode frees for reuse, and a successor
+        // landing on it would be deleted by this daemon's own cleanup.
         const running = await startDaemon();
         expect(fs.statSync(socketPath).isSocket()).toBe(true);
 
         const nameAtClose: boolean[] = [];
-        // Captured only to delegate back to; the .call below supplies `this`.
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        const realClose = net.Server.prototype.close;
-        vi.spyOn(net.Server.prototype, "close").mockImplementation(function (
+        // Records the name at the first close, then hands back to the real close.
+        const closeSpy = vi.spyOn(net.Server.prototype, "close");
+        closeSpy.mockImplementation(function (
           this: net.Server,
           callback?: (error?: Error) => void,
         ) {
           nameAtClose.push(fs.existsSync(socketPath));
-          return realClose.call(this, callback);
+          closeSpy.mockRestore();
+          return this.close(callback);
         });
 
         await running.stop("stop-requested");
@@ -421,9 +421,7 @@ describe("daemon over a unix socket", () => {
 
         await exec(["trace", "get", "trace-123", "--format", "json"]);
 
-        expect(seen).toEqual([
-          ["trace", "get", "trace-123", "--format", "json"],
-        ]);
+        expect(seen).toEqual([["trace", "get", "trace-123", "--format", "json"]]);
       });
     });
 
@@ -491,18 +489,11 @@ describe("daemon over a unix socket", () => {
 
     describe("when several commands are dispatched at once", () => {
       it("serves them concurrently, each with its own output and exit code", async () => {
-        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE. The five commands
-        // are held at a rendezvous, so a daemon serving one at a time never
-        // gets past the first: it waits on four peers that cannot arrive until
-        // it returns.
-        //
-        // Concurrency is the whole point of the daemon, since an agent fanning
-        // out must not be slower than five cold processes running in parallel,
-        // and a rendezvous is what tests that property directly. No command
-        // emits its output or its exit code until all five are inside the
-        // daemon at the same moment, so being served concurrently is what lets
-        // this test finish at all. Nothing is measured against the clock, so
-        // machine load cannot decide the outcome.
+        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE: the five commands are held at a
+        // rendezvous, so a daemon serving one at a time never gets past the first. Nothing
+        // emits its output or exit code until all five arrive at once, so being served
+        // concurrently is what lets this test finish at all — nothing is measured against the
+        // clock, so machine load cannot decide the outcome.
         const fanOut = [1, 2, 3, 4, 5];
         let releaseAll: (() => void) | undefined;
         const allArrived = new Promise<void>((resolve) => {
@@ -538,9 +529,7 @@ describe("daemon over a unix socket", () => {
           },
         });
 
-        const results = await Promise.all(
-          fanOut.map((n) => exec(["cmd", String(n)])),
-        );
+        const results = await Promise.all(fanOut.map((n) => exec(["cmd", String(n)])));
 
         results.forEach((result, index) => {
           const n = index + 1;
@@ -607,9 +596,7 @@ describe("daemon over a unix socket", () => {
         // The one place a persistent OTLP exporter would get to complete a
         // flush — which is precisely what a 200ms CLI process cannot do.
         expect(shutdown).toHaveBeenCalledOnce();
-        expect(daemonStopping).toHaveBeenCalledWith(
-          expect.objectContaining({ reason: "idle" }),
-        );
+        expect(daemonStopping).toHaveBeenCalledWith(expect.objectContaining({ reason: "idle" }));
       });
 
       it("does not fire while a command is still in flight", async () => {
@@ -741,7 +728,7 @@ describe("daemon over a unix socket", () => {
 
         const out = collector();
         const socket = net.connect(socketPath);
-        const decoder = new FrameDecoder();
+        const decoder = new FrameDecoder<ServerFrame>();
 
         const exitCode = await new Promise<number>((resolve) => {
           socket.on("connect", () => {
@@ -766,16 +753,7 @@ describe("daemon over a unix socket", () => {
           });
           socket.on("data", (chunk: Buffer) => {
             for (const frame of decoder.push(chunk)) {
-              if (frame.t === "hello-ok") {
-                socket.write(encodeFrame({ t: "cancel" }));
-              }
-              if (frame.t === "out") {
-                out.stream.write(Buffer.from(frame.d, "base64"));
-              }
-              if (frame.t === "exit") {
-                socket.destroy();
-                resolve(frame.code);
-              }
+              cancelOnceAdmitted({ frame, socket, out, resolve });
             }
           });
         });
@@ -831,11 +809,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * The daemon's whole trust model is filesystem permissions. The server half
-   * (0600 socket in a 0700 directory) is worthless if the CLIENT will talk to
-   * any socket at that path — it pipelines `exec` before the handshake is
-   * answered, so a squatter is handed the caller's args, cwd and forwarded
-   * LANGWATCH_* env, API key included.
+   * The daemon's trust model is filesystem permissions; the 0600/0700
+   * server half is worthless if the client talks to any socket at the
+   * path, pipelining `exec` before the handshake answers.
    */
   describe("given a socket the caller cannot trust", () => {
     describe("when its directory is writable by other users", () => {
@@ -878,9 +854,7 @@ describe("daemon over a unix socket", () => {
         await startDaemon({ executor });
 
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         const { outcome, stdout } = await exec(["trace", "search"]);
 
@@ -903,23 +877,16 @@ describe("daemon over a unix socket", () => {
   describe("given somebody else already holds the socket path", () => {
     describe("when the real daemon tries to start", () => {
       it("names the squat instead of reporting a daemon that is already running", async () => {
-        // The DoS the trust check has to prevent. `isSocketAlive` used to
-        // connect blind, so a squatter binding the path first — reachable via
-        // LANGWATCH_DAEMON_DIR, XDG_RUNTIME_DIR or the tmp fallback — made
-        // `listen()` throw DaemonAlreadyRunningError, forever. Nothing is
-        // disclosed (no bytes are sent), but the daemon could never start again
-        // and nothing would ever say why: a permanent, silent denial of service.
-        // A stranger's listener, bound to our socket path first.
+        // The DoS this guards against: `isSocketAlive` used to connect
+        // blind, so a squatter binding the path first made `listen()` throw
+        // forever with no disclosure and no explanation -- a permanent,
+        // silent denial of service.
         const squatter = net.createServer();
-        await new Promise<void>((resolve) =>
-          squatter.listen(socketPath, resolve),
-        );
+        await new Promise<void>((resolve) => squatter.listen(socketPath, resolve));
         secureSocketFile(socketPath);
 
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         // A foreign socket is not "alive", because it is not ours...
         expect(await isSocketAlive(socketPath)).toBe(false);
@@ -953,12 +920,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * The shape from a customer report: one `ui call` printed the runtime's
-   * crash banner, and the very next identical invocation printed NOTHING and
-   * was killed by the agent harness at 30 seconds. The daemon had accepted the
-   * exec and then wedged, output is held back until the command finishes, and
-   * the daemon's own per-request timeout is ten minutes, so the client waited
-   * with zero bytes written until something outside killed it.
+   * Customer shape: a `ui call` crashed, then the next invocation printed
+   * NOTHING and was killed at 30s -- the daemon had wedged mid-exec, output
+   * held back until the command finishes.
    */
   describe("given a daemon that accepts a command and then stops answering", () => {
     /** A daemon that takes the exec, writes nothing, and never finishes. */
@@ -1036,15 +1000,11 @@ describe("daemon over a unix socket", () => {
   describe("given a daemon asked to stop while it is still serving", () => {
     describe("when a request is in flight", () => {
       it("waits for it before tearing the execution window down", async () => {
-        // What actually goes wrong without the drain is NOT a missing exit
-        // frame — the frame still arrives, and the client still reports exit 0.
-        // It is that `window.reset()` restores the daemon's OWN cwd and
-        // environment underneath a command that has not finished, so the
-        // command resolves its remaining paths and reads its credentials
-        // against the wrong globals and then reports a status the client
-        // trusts. That is invisible to the transcript, so the transcript is not
-        // what this asserts on: the executor records what it SEES at the moment
-        // it completes, the way `resumableProgram` does in the runner tests.
+        // Without the drain, `window.reset()` restores the daemon's OWN cwd and environment
+        // underneath a command that has not finished, so it resolves paths and reads
+        // credentials against the wrong globals yet still reports a status the client trusts.
+        // That is invisible to the transcript, so this asserts on what the executor SEES at
+        // the moment it completes instead, the way `resumableProgram` does in the runner tests.
         const seen: { cwd?: string; token?: string } = {};
         const savedCwd = process.cwd();
         const callerCwd = fs.realpathSync(dir);
@@ -1119,12 +1079,10 @@ describe("daemon over a unix socket", () => {
 
     describe("when the in-flight request has already flushed output to the caller", () => {
       it("reports the truncation honestly instead of pretending it can re-run", async () => {
-        // The case the drain-timeout guarantee does NOT cover. Once output
-        // crosses the client's buffer cap it is on the caller's real stdout,
-        // so the clean in-process re-run is off the table — re-running would
-        // print it twice. `trace search`, `analytics query` and any large
-        // `--format json` land here, and routine version-skew eviction
-        // (dispatch.ts requestStop) is what triggers it.
+        // What the drain-timeout guarantee does NOT cover: once output
+        // crosses the buffer cap it's already on the caller's real stdout,
+        // so a clean re-run would print it twice. Large `--format json`
+        // output lands here.
         const running = await startDaemon({
           shutdownGraceMs: 30,
           executor: (request): CommandExecution => {
@@ -1172,9 +1130,7 @@ describe("daemon over a unix socket", () => {
       it("tells the client to run it in-process, having emitted no output", async () => {
         await startDaemon({
           executor: (): CommandExecution => ({
-            completed: Promise.reject(
-              new Error("ENOENT: no such file or directory, chdir"),
-            ),
+            completed: Promise.reject(new Error("ENOENT: no such file or directory, chdir")),
             cancel: () => undefined,
           }),
         });
@@ -1182,9 +1138,7 @@ describe("daemon over a unix socket", () => {
         const { outcome, stdout } = await exec(["trace", "search"]);
 
         expect(outcome).toMatchObject({ served: false });
-        expect((outcome as { reason: string }).reason).toContain(
-          "daemon-declined",
-        );
+        expect((outcome as { reason: string }).reason).toContain("daemon-declined");
         expect(stdout).toBe("");
       });
     });

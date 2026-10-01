@@ -1,0 +1,44 @@
+{
+  "name": "@langwatch/config",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Config as declared deployment facts: owners attach hand-written Zod leaves with env spellings where they are defined, and the app's one parse meets them, refusing by owner, path and variable name.",
+  "keywords": [
+    "config",
+    "langwatch"
+  ],
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./public-app-config": {
+      "types": "./dist/public-app-config.d.ts",
+      "default": "./src/public-app-config.ts"
+    },
+    "./public-app-config/projection": {
+      "types": "./dist/public-app-config.projection.d.ts",
+      "default": "./src/public-app-config.projection.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

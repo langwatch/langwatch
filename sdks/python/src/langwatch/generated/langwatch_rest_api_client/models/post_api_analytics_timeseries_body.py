@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_analytics_timeseries_body_group_by import PostApiAnalyticsTimeseriesBodyGroupBy
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -29,8 +28,7 @@ class PostApiAnalyticsTimeseriesBody:
         filters (PostApiAnalyticsTimeseriesBodyFilters | Unset):
         trace_ids (list[str] | Unset):
         negate_filters (bool | Unset):
-        exclude_origins (list[str] | Unset):
-        group_by (PostApiAnalyticsTimeseriesBodyGroupBy | Unset):
+        group_by (str | Unset):
         group_by_key (str | Unset):
         time_scale (int | Literal['full'] | Unset):
     """
@@ -43,8 +41,7 @@ class PostApiAnalyticsTimeseriesBody:
     filters: PostApiAnalyticsTimeseriesBodyFilters | Unset = UNSET
     trace_ids: list[str] | Unset = UNSET
     negate_filters: bool | Unset = UNSET
-    exclude_origins: list[str] | Unset = UNSET
-    group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset = UNSET
+    group_by: str | Unset = UNSET
     group_by_key: str | Unset = UNSET
     time_scale: int | Literal["full"] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
@@ -75,13 +72,7 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = self.negate_filters
 
-        exclude_origins: list[str] | Unset = UNSET
-        if not isinstance(self.exclude_origins, Unset):
-            exclude_origins = self.exclude_origins
-
-        group_by: str | Unset = UNSET
-        if not isinstance(self.group_by, Unset):
-            group_by = self.group_by.value
+        group_by = self.group_by
 
         group_by_key = self.group_by_key
 
@@ -109,8 +100,6 @@ class PostApiAnalyticsTimeseriesBody:
             field_dict["traceIds"] = trace_ids
         if negate_filters is not UNSET:
             field_dict["negateFilters"] = negate_filters
-        if exclude_origins is not UNSET:
-            field_dict["excludeOrigins"] = exclude_origins
         if group_by is not UNSET:
             field_dict["groupBy"] = group_by
         if group_by_key is not UNSET:
@@ -159,14 +148,7 @@ class PostApiAnalyticsTimeseriesBody:
 
         negate_filters = d.pop("negateFilters", UNSET)
 
-        exclude_origins = cast(list[str], d.pop("excludeOrigins", UNSET))
-
-        _group_by = d.pop("groupBy", UNSET)
-        group_by: PostApiAnalyticsTimeseriesBodyGroupBy | Unset
-        if isinstance(_group_by, Unset):
-            group_by = UNSET
-        else:
-            group_by = PostApiAnalyticsTimeseriesBodyGroupBy(_group_by)
+        group_by = d.pop("groupBy", UNSET)
 
         group_by_key = d.pop("groupByKey", UNSET)
 
@@ -190,7 +172,6 @@ class PostApiAnalyticsTimeseriesBody:
             filters=filters,
             trace_ids=trace_ids,
             negate_filters=negate_filters,
-            exclude_origins=exclude_origins,
             group_by=group_by,
             group_by_key=group_by_key,
             time_scale=time_scale,

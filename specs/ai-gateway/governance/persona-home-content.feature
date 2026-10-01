@@ -234,6 +234,13 @@ Feature: Persona-aware home CONTENT — what each persona sees on landing
       | project_only       | Auto / Project home                                  | Personal home / Governance    |
       | governance_admin   | Auto / Personal home / Project home / Governance     | (none)                        |
 
+  @unit
+  Scenario: The picker's "Project home" option never names a personal workspace
+    Given the resolver excludes personal workspaces from the project it would route to (ADR-038 v6)
+    When the picker builds its "Project home" option
+    Then it reads the resolver's own firstProjectSlug
+    And it never offers a personal workspace slug a separate unfiltered query might return
+
   # ---------------------------------------------------------------------------
   # Customization — Org pin (follow-up PR; contract locked here)
   # ---------------------------------------------------------------------------

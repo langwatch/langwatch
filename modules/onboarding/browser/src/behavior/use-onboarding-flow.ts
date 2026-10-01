@@ -1,0 +1,241 @@
+import { useUiDeployment } from "@langwatch/browser-host/capabilities";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
+import type { OrganizationIntent } from "@langwatch/organization-contract";
+import { useMemo, useState } from "react";
+
+import { readAttribution } from "./attribution.ts";
+import { getOnboardingFlowConfig } from "./onboarding-flow.ts";
+import {
+  type CompanySize,
+  type DesireType,
+  type OnboardingFlowState,
+  type OnboardingFormData,
+  OnboardingScreenIndex,
+  type RoleType,
+  type SolutionType,
+  type UsageStyle,
+} from "./types.ts";
+import { useFeatureFlag } from "./use-feature-flag.ts";
+import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
+
+function isBasicInfoComplete({
+  usageStyle,
+  guided,
+  companySize,
+  solutionType,
+  phoneHasValue,
+  phoneIsValid,
+}: {
+  usageStyle: UsageStyle | undefined;
+  guided: boolean;
+  companySize: CompanySize | undefined;
+  solutionType: SolutionType | undefined;
+  phoneHasValue: boolean;
+  phoneIsValid: boolean;
+}): boolean {
+  if (usageStyle === void 0) return false;
+
+  const showFields = usageStyle !== "For myself";
+  if (!showFields) return true;
+
+  // The guided variant asks a company for its size and its deploy
+  // plan before Langy takes over; the phone number stays optional.
+  if (guided && (companySize === void 0 || solutionType === void 0)) {
+    return false;
+  }
+
+  return !(phoneHasValue && !phoneIsValid);
+}
+
+export const useOnboardingFlow = () => {
+  const { isSaaS } = useUiDeployment();
+
+  const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
+  const [agreement, setAgreement] = useState<boolean>(false);
+  const [intent, setIntent] = useState<OrganizationIntent | undefined>(void 0);
+  const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
+  const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
+  const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
+  const [phoneIsValid, setPhoneIsValid] = useState<boolean>(true);
+  const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
+  const [solutionType, setSolutionType] = useState<SolutionType | undefined>(void 0);
+  const [selectedDesires, setDesires] = useState<DesireType[]>([]);
+  const [role, setRole] = useState<RoleType | undefined>(void 0);
+
+  // The intent fork rides the governance flag, on by default (ADR-038
+  // v5): flag off (or loading, which reports enabled=false) = the exact
+  // pre-fork flow. User-level evaluation — there is no org yet during
+  // onboarding.
+  const { enabled: intentForkEnabled, isLoading: intentForkLoading } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    // Onboarding runs before either scope exists, so both targets are stated
+    // as absent rather than left out: a rule naming a project or organization
+    // can never match this read, and saying so is what the required fields
+    // are for.
+    { projectId: NOT_TARGETED, organizationId: NOT_TARGETED },
+  );
+
+  // The guided variant: Langy takes over after the tailor step. Read per
+  // user (the bucket is a sticky hash of the user id), before any
+  // organization exists. Loading reports disabled, and the first screen
+  // waits for it the same way it waits for the fork flag, so the variant
+  // is settled before the wizard's shape matters.
+  const { enabled: guided, isLoading: guidedLoading } = useFeatureFlag(
+    "experiment_onboarding_langy_guided",
+    {
+      projectId: NOT_TARGETED,
+      organizationId: NOT_TARGETED,
+    },
+  );
+
+  // Flow configuration — recomputed when the intent changes (ADR-038 fork).
+  // Safe mid-flow: intent only changes while ON the INTENT screen, whose
+  // index exists in every config variant.
+  const flow = useMemo(
+    () =>
+      getOnboardingFlowConfig({
+        isSaaS,
+        intent,
+        intentForkEnabled,
+        guided,
+      }),
+    [isSaaS, intent, intentForkEnabled, guided],
+  );
+
+  const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
+    switch (currentScreenIndex) {
+      case OnboardingScreenIndex.ORGANIZATION:
+        // Hold the first screen until the fork flag resolves: advancing
+        // while it loads would take the pre-fork path and, if the flag then
+        // resolves enabled, the (kept) BASIC_INFO position silently skips
+        // the required INTENT screen. Resolution is one query; on error the
+        // flag settles disabled and the pre-fork flow proceeds.
+        return (
+          Boolean(organizationName?.trim() && agreement) && !intentForkLoading && !guidedLoading
+        );
+
+      case OnboardingScreenIndex.INTENT:
+        return intent !== void 0;
+
+      case OnboardingScreenIndex.BASIC_INFO:
+        return isBasicInfoComplete({
+          usageStyle,
+          guided,
+          companySize,
+          solutionType,
+          phoneHasValue,
+          phoneIsValid,
+        });
+
+      case OnboardingScreenIndex.DESIRES:
+        return true;
+      case OnboardingScreenIndex.ROLE:
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  // Use generic flow hook for navigation
+  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(flow, canProceed);
+
+  // Snapshot first-touch attribution once per mount. `readAttribution` is a
+  // pure sessionStorage read; memoizing keeps getFormData / formContextValue
+  // consuming the same object and avoids six storage reads per render.
+  const attribution = useMemo(() => readAttribution(), []);
+
+  const getFormData = (): OnboardingFormData => ({
+    organizationName,
+    agreement,
+    intent,
+    usageStyle,
+    phoneNumber,
+    companySize,
+    solutionType,
+    selectedDesires,
+    role,
+    attribution,
+  });
+
+  const getFlowState = (): OnboardingFlowState => ({
+    currentScreenIndex,
+    direction,
+  });
+
+  const formContextValue = useMemo(
+    () => ({
+      organizationName,
+      agreement,
+      intent,
+      usageStyle,
+      phoneNumber,
+      companySize,
+      solutionType,
+      selectedDesires,
+      role,
+      attribution,
+      setOrganizationName,
+      setAgreement,
+      setIntent,
+      setUsageStyle,
+      setPhoneNumber,
+      setPhoneHasValue,
+      setPhoneIsValid,
+      setCompanySize,
+      setSolutionType,
+      setDesires,
+      setRole,
+    }),
+    [
+      organizationName,
+      agreement,
+      intent,
+      usageStyle,
+      phoneNumber,
+      companySize,
+      solutionType,
+      selectedDesires,
+      role,
+      attribution,
+    ],
+  );
+  return {
+    // Form state
+    organizationName,
+    setOrganizationName,
+    agreement,
+    setAgreement,
+    intent,
+    setIntent,
+    usageStyle,
+    setUsageStyle,
+    phoneNumber,
+    setPhoneNumber,
+    setPhoneHasValue,
+    setPhoneIsValid,
+    companySize,
+    setCompanySize,
+    solutionType,
+    setSolutionType,
+    selectedDesires,
+    setDesires,
+    role,
+    setRole,
+
+    // Flow state
+    currentScreenIndex,
+    direction,
+    flow,
+    isSaaS: Boolean(isSaaS),
+    /** Which onboarding this user goes through, recorded on the organization. */
+    onboardingVariant: guided ? ("guided" as const) : ("classic" as const),
+
+    // Navigation
+    navigation,
+
+    // Getters
+    getFormData,
+    getFlowState,
+    formContextValue,
+  };
+};

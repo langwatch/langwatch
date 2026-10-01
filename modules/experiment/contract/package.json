@@ -1,0 +1,45 @@
+{
+  "name": "@langwatch/experiment-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Experiment feature contract and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./mapping-validation": {
+      "types": "./dist/workbench/mapping-validation.d.ts",
+      "default": "./src/workbench/mapping-validation.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/authorization": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

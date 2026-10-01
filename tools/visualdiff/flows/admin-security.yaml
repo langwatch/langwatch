@@ -1,0 +1,359 @@
+# Admin and security flows (lane cov-flows-admin, coverage gap 8). Each navigates, asserts key
+# content with expect and, where the page saves something, changes one field, saves, reloads
+# and expects the saved value. Most of these pages carry no data-testid on the branch; steps
+# use role, label, placeholder or text, and the missing ids are listed in the lane handoff.
+# Deferred: needs cloud-ops. ops-licenses, ops-subscriptions and ops-cloud-bug-reports-and-installs
+# need LANGWATCH_CLOUD_OPS and a licence key the check stack lacks (/ops/backoffice/**).
+flows:
+  - id: settings-audit-log
+    title: Audit log lists entries and narrows by action
+    steps:
+      - action: go
+        with:
+          path: /settings/audit-log
+      - action: expect
+        with:
+          text: Audit Log
+      - action: expect
+        with:
+          label: Search by User
+      - action: expect
+        with:
+          text: Timestamp
+      - action: fill
+        with:
+          label: Filter by Action
+          value: zz-no-such-action-{uid}
+      - action: expect
+        with:
+          text: No audit logs found
+
+  - id: settings-data-retention
+    title: Add a retention policy for the project, reload and see it listed
+    steps:
+      - action: go
+        with:
+          path: /settings/data-retention
+      - action: expect
+        with:
+          text: Retention Policies
+      - action: click
+        with:
+          text: /^\s*Add retention policy\s*$/
+      - action: select
+        with:
+          field: Retention
+          option: 2 months
+      - action: click
+        with:
+          text: /^\s*Create\s*$/
+      - action: go
+        with:
+          path: /settings/data-retention
+      - action: expect
+        with:
+          text: 63 days
+
+  - id: settings-data-privacy
+    title: Add a privacy rule that drops input, reload and see it in the rules table
+    steps:
+      - action: go
+        with:
+          path: /settings/data-privacy
+      - action: expect
+        with:
+          text: Data Privacy
+      - action: click
+        with:
+          text: Add privacy rule
+      - action: select
+        with:
+          label: Input
+          option: Dropped
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: go
+        with:
+          path: /settings/data-privacy
+      - action: expect
+        with:
+          text: Input drop
+      # The rule gates content reads for every later flow and scenario on the shared stack: remove it.
+      - action: click
+        with:
+          selector: 'button[aria-label^="Actions for "][aria-label$=" privacy rule"]'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+
+  - id: settings-legacy-redirects
+    title: The retired access, scim and role-bindings addresses land on Directory and Roles
+    steps:
+      - action: go
+        with:
+          path: /settings/access
+      - action: expect
+        with:
+          url: /settings/directory
+      - action: expect
+        with:
+          text: Directory
+      - action: go
+        with:
+          path: /settings/scim
+      - action: expect
+        with:
+          url: /settings/directory
+      - action: go
+        with:
+          path: /settings/role-bindings
+      - action: expect
+        with:
+          url: /settings/roles
+      - action: expect
+        with:
+          text: Roles
+
+  - id: settings-profile
+    title: Profile shows who I am, how I sign in and my sessions
+    steps:
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          text: Profile
+      - action: expect
+        with:
+          testId: profile-name-input
+      - action: expect
+        with:
+          testId: profile-email
+
+  - id: me-pages
+    title: The personal workspace pages each render their heading
+    steps:
+      - action: go
+        with:
+          path: /me
+      - action: expect
+        with:
+          text: Your AI tools
+      - action: go
+        with:
+          path: /me/configure
+      - action: expect
+        with:
+          url: /me/configure
+      - action: expect
+        with:
+          text: Settings
+      - action: go
+        with:
+          path: /me/sessions
+      - action: expect
+        with:
+          text: Sessions
+      - action: go
+        with:
+          path: /me/pull-requests
+      - action: expect
+        with:
+          text: Pull requests
+      - action: go
+        with:
+          path: /me/devices
+      - action: expect
+        with:
+          url: /me/configure
+      - action: expect
+        with:
+          text: Devices and keys
+      - action: go
+        with:
+          path: /me/budget/request
+      - action: expect
+        with:
+          text: Request budget increase
+
+  - id: governance-pages
+    title: The governance pages behind the governance flag each render their heading
+    steps:
+      - action: go
+        with:
+          path: /governance
+      - action: expect
+        with:
+          text: AI Governance
+      - action: go
+        with:
+          path: /governance/agents
+      - action: expect
+        with:
+          text: Agents
+      - action: go
+        with:
+          path: /governance/people
+      - action: expect
+        with:
+          text: People
+      - action: go
+        with:
+          path: /governance/teams
+      - action: expect
+        with:
+          text: /All teams/
+
+  - id: gateway-cache-rules
+    title: Create a cache rule, reload and see it listed
+    steps:
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          text: Cache Rules
+      - action: click
+        with:
+          text: New rule
+      - action: fill
+        with:
+          field: e.g. force-cache-on-enterprise
+          value: vd-cache-{uid}
+      - action: fill
+        with:
+          field: Priority
+          value: "999"
+      - action: fill
+        with:
+          field: e.g. gpt-5-mini or claude-3-5-sonnet-latest
+          value: vd-model-{uid}
+      - action: click
+        with:
+          text: Create rule
+      - action: go
+        with:
+          path: /gateway/cache-rules
+      - action: expect
+        with:
+          text: vd-cache-{uid}
+
+  - id: analytics-topics-users-metrics
+    title: The topics, users and metrics analytics pages render their charts
+    steps:
+      - action: go
+        with:
+          path: /{slug}/analytics/topics
+      - action: expect
+        with:
+          text: Top Topics
+      - action: go
+        with:
+          path: /{slug}/analytics/users
+      - action: expect
+        with:
+          text: User Traces
+      - action: go
+        with:
+          path: /{slug}/analytics/metrics
+      - action: expect
+        with:
+          text: LLM Metrics
+
+  # Ops and health, coverage round 2. Every step uses text both trees draw (titles and column
+  # headers). Instance-admin screens (main /ops/backoffice/users, organizations, projects,
+  # sso-connections, identity-lookup, directory-sync; branch /ops/users ... /ops/directory-sync)
+  # are hidden on SaaS and belong to the self-hosted pass.
+  - id: ops-dashboard-and-event-sourcing
+    title: The ops dashboard and each event-sourcing workspace page draw their title, and the retired queue and scheduler addresses follow
+    steps:
+      - action: go
+        with:
+          path: /ops
+      - action: expect
+        with:
+          text: Ops Dashboard
+      - action: go
+        with:
+          path: /ops/event-sourcing
+      - action: expect
+        with:
+          text: Event Sourcing
+      - action: go
+        with:
+          path: /ops/event-sourcing/dead-letters
+      - action: expect
+        with:
+          text: Dead Letters
+      - action: go
+        with:
+          path: /ops/event-sourcing/processes
+      - action: expect
+        with:
+          text: Processes
+      - action: go
+        with:
+          path: /ops/event-sourcing/projections
+      - action: expect
+        with:
+          text: Projections
+      - action: go
+        with:
+          path: /ops/event-sourcing/subscribers
+      - action: expect
+        with:
+          text: Event Subscribers
+      - action: go
+        with:
+          path: /ops/scheduler
+      - action: expect
+        with:
+          url: /ops/event-sourcing/schedules
+      - action: expect
+        with:
+          text: Schedules
+      - action: go
+        with:
+          path: /ops/queues
+      - action: expect
+        with:
+          url: /ops
+      - action: expect
+        with:
+          text: Ops Dashboard
+
+  - id: ops-flags-migrations-foundry
+    title: Feature flags, migrations and the foundry each draw their title
+    steps:
+      - action: go
+        with:
+          path: /ops/feature-flags
+      - action: expect
+        with:
+          text: Feature Flags
+      - action: go
+        with:
+          path: /ops/migrations
+      - action: expect
+        with:
+          text: Migrations
+      - action: go
+        with:
+          path: /ops/foundry
+      - action: expect
+        with:
+          text: The Foundry
+
+  - id: settings-email-suppressions
+    title: Email suppressions lists who unsubscribed, or says there are none
+    steps:
+      - action: go
+        with:
+          path: /settings/email-suppressions
+      - action: expect
+        with:
+          text: Email Suppressions
+      - action: expect
+        with:
+          text: /No suppressions yet|All notifications/

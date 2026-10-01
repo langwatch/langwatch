@@ -71,17 +71,13 @@ describe("instantEvalProgressLine, given a run in flight", () => {
   describe("when it has judged some of its rows", () => {
     /** @scenario "--wait follows the run and reports progress on one line" */
     it("reads as the judged count out of the total, with the matches", () => {
-      expect(instantEvalProgressLine(run())).toBe(
-        "Judging... 3,200/10,000 (412 matched)",
-      );
+      expect(instantEvalProgressLine(run())).toBe("Judging... 3,200/10,000 (412 matched)");
     });
   });
 
   describe("when the run asked no boolean question", () => {
     it("leaves the matches out", () => {
-      expect(instantEvalProgressLine(run({ matched: null }))).toBe(
-        "Judging... 3,200/10,000",
-      );
+      expect(instantEvalProgressLine(run({ matched: null }))).toBe("Judging... 3,200/10,000");
     });
   });
 
@@ -128,9 +124,7 @@ describe("waitForInstantEvalRun, given a run being followed", () => {
       const get = vi
         .fn()
         .mockResolvedValueOnce(run())
-        .mockResolvedValueOnce(
-          run({ status: "finished", progress: 10_000, matched: 1_284 }),
-        );
+        .mockResolvedValueOnce(run({ status: "finished", progress: 10_000, matched: 1_284 }));
 
       const waited = await waitForInstantEvalRun({
         service: { get } as never,

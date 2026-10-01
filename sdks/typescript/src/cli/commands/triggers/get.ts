@@ -1,16 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import {
   summariseGraphAlert,
   summariseReport,
   summariseSlackConnection,
   type TriggerRecord,
-} from "./summary";
-import { triggerRequest } from "./triggerRequest";
+} from "./summary.ts";
+import { triggerRequest } from "./triggerRequest.ts";
 
 /**
  * Returns the trigger rather than printing it: the output port renders it in
@@ -18,9 +19,7 @@ import { triggerRequest } from "./triggerRequest";
  * record, so a machine caller keeps `actionParams` and `updatedAt`, which the
  * human view omits.
  */
-export const getTriggerCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getTriggerCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const spinner = createSpinner(`Fetching trigger "${id}"...`).start();
@@ -50,10 +49,14 @@ export const getTriggerCommand = async (
         if (trigger.kind) console.log(`    ${chalk.gray("Kind:")}    ${trigger.kind}`);
         const slack = summariseSlackConnection({ actionParams: trigger.actionParams });
         if (slack) console.log(`    ${chalk.gray("Slack:")}   ${slack}`);
-        console.log(`    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`);
+        console.log(
+          `    ${chalk.gray("Status:")}  ${trigger.active ? chalk.green("active") : chalk.gray("inactive")}`,
+        );
         console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
-        console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`,
+        );
         if (trigger.platformUrl) {
           console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
         }

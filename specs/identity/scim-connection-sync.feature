@@ -98,6 +98,13 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the push is refused with code scim_write_outside_connection and status 403
     And that person is unchanged
 
+  @unit @regression
+  Scenario: Group membership writes respect directory ownership
+    Given a group belongs to one directory and a member belongs to a sibling directory
+    When the first directory adds or removes that member through POST PUT PATCH or DELETE
+    Then the write is refused with scim_write_outside_connection
+    And no membership is changed by the refused operation
+
   # Proven at the service layer, with Prisma mocked
   # (ee/scim/__tests__/scim-token.service.unit.test.ts): the delete is scoped
   # to this connection's own tokens and the sync lifecycle folds to REVOKED
@@ -255,6 +262,26 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then the role they hold is the one the directory's mapping asserts
     And no membership is created with a role nothing asserted
 
+  # Older pushes minted an organization-scoped grant per person. With the flag
+  # on, a group's grant is what carries that access, so the direct one is a
+  # duplicate that outlives the group it was meant to stand in for.
+
+  @unit
+  Scenario: Group access replaces the membership grant an older push minted
+    Given the directory grants flag is on
+    When "okta-primary" pushes somebody who already holds a directory-written membership grant
+    Then that organization-scoped grant is retired as the directory
+    And no membership grant is written in its place
+
+  @unit
+  Scenario: Taking somebody out of a group retires the membership grant they kept
+    Given the directory grants flag is on
+    When "okta-primary" takes somebody out of a group, or deletes the group they were in
+    Then the membership grant the directory wrote for them at the organization is retired
+    And it is retired before their group membership goes
+    And a grant an administrator made for them by hand at the same scope stays
+
+  @unit @unimplemented
   @unit
   Scenario: Every membership a directory push causes is explained by an event
     Given "acme" has been synced through a full push, group and removal cycle
@@ -351,6 +378,40 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And access an administrator had given them by hand before they left stays gone
       until an administrator gives it again
 
+  # ── The organization's own way in is not the directory's to close ──────
+  #
+  # A full sync asserts the set it knows about and deactivates the rest, and
+  # the administrator somebody invited by hand is in nobody's directory. On a
+  # real stack the first sync reported "1 created and 4 deactivated" and one
+  # of the four was the organization's only administrator: their session died
+  # mid-page, their password was then refused, and no screen undoes it.
+  #
+  # What is refused is narrower than adoption, and is about the organization
+  # rather than the person: the one act that leaves nobody able to administer
+  # it. It is the refusal `setMemberDisabled` already makes by hand.
+
+  @unit
+  Scenario: A directory cannot deactivate the last administrator who can still sign in
+    Given "acme" whose only administrator was invited by hand
+    When the directory pushes that administrator as inactive
+    Then the push is refused
+    And the administrator is left exactly as they were
+
+  @unit
+  Scenario: A directory may deactivate an administrator while another can still get in
+    Given "acme" with a second administrator who can sign in
+    When the directory pushes the first administrator as inactive
+    Then the deprovision goes through
+
+  @unit
+  Scenario: An administrator who is already deactivated does not count as a way in
+    Given "acme" whose other administrators have all been deactivated
+    When the directory pushes the remaining administrator as inactive
+    Then the push is refused
+    # Counting memberships alone would let one sync deactivate two
+    # administrators in turn, each passing because the other's membership had
+    # not been marked yet.
+
   @unit
   Scenario: A removal that cannot prove itself empty fails loudly
     Given a removal whose proof still finds something resolving for the person
@@ -423,6 +484,26 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then membership lands the way it did before the flip
     And the tokens keep working throughout
 
+  # The flag chooses HOW access is removed. Whether an organization may be
+  # left with nobody able to administer it is not the flag's to answer, and
+  # the previous write path deletes the membership row itself.
+
+  @unit
+  Scenario: The refusal does not depend on the directory grants flag
+    Given the directory grants flag is off
+    And "acme" whose only administrator was invited by hand
+    When the directory pushes that administrator as inactive, or deletes them
+    Then the push is refused before the membership row or their grants go
+    And the refusal is the organization's own, not a second copy of the rule
+
+  # ── The tenant's own directory resource ────────────────────────────────
+  #
+  # A person's SCIM userName, display name and active flag belong to the
+  # organization whose directory pushed them, not to the account they sign in
+  # with: one account in two organizations carries two resources, and neither
+  # directory can rename, disable or delete the account itself.
+
+  @unit @regression
   # ── What a push does about the person on the other end ─────────────────
   #
   # The arrival matrix: every combination of "do they already have an
@@ -494,28 +575,6 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
   # it. It is the refusal `setMemberDisabled` already makes by hand.
 
   @unit
-  Scenario: A directory cannot deactivate the last administrator who can still sign in
-    Given "acme" whose only administrator was invited by hand
-    When the directory pushes that administrator as inactive
-    Then the push is refused
-    And the administrator is left exactly as they were
-
-  @unit
-  Scenario: A directory may deactivate an administrator while another can still get in
-    Given "acme" with a second administrator who can sign in
-    When the directory pushes the first administrator as inactive
-    Then the deprovision goes through
-
-  @unit
-  Scenario: An administrator who is already deactivated does not count as a way in
-    Given "acme" whose other administrators have all been deactivated
-    When the directory pushes the remaining administrator as inactive
-    Then the push is refused
-    # Counting memberships alone would let one sync deactivate two
-    # administrators in turn, each passing because the other's membership had
-    # not been marked yet.
-
-  @unit
   Scenario: Issuing a new token brings a revoked connection back
     Given a connection whose token was revoked
     When an administrator issues another one
@@ -567,13 +626,6 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When its last token is revoked
     Then the sync is revoked
 
-  @unit @regression
-  Scenario: Group membership writes respect directory ownership
-    Given a group belongs to one directory and a member belongs to a sibling directory
-    When the first directory adds or removes that member through POST PUT or PATCH
-    Then the write is refused with scim_write_outside_connection
-    And no membership is changed by the refused operation
-
   @integration @regression
   Scenario: Legacy SCIM tokens retain organization-wide group reads
     Given an organization has legacy and connection-owned groups
@@ -605,6 +657,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     Then no membership or grants are restored
     And a global account disable is not cleared
 
+  @unit @regression
   @integration @regression
   Scenario: Inactive directory resources remain readable without granting access
     When a directory provisions a person as inactive
@@ -619,6 +672,7 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     When the directory explicitly provisions the primary account again
     Then the tombstone is cleared without creating a second account
 
+  @unit @regression
   @integration @regression
   Scenario: An inactive directory user cannot sign in through its connection
     Given a directory resource is inactive in an organization

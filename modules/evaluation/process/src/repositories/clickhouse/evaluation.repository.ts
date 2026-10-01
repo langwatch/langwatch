@@ -1,0 +1,77 @@
+import type {
+  EvaluationInputsQuery,
+  EvaluationRunData,
+  EvaluationRunsByTraceQuery,
+  EvaluationSummariesByTraceIdsQuery,
+  EvaluationSummary,
+  TraceEvaluationData,
+  TraceEvaluationsQuery,
+} from "@langwatch/evaluation-contract";
+
+import {
+  EvaluationRunRepository,
+  type EvaluationRunFloorLookup,
+} from "../evaluation.repository.ts";
+import type { EvaluationClickHouseResolver } from "./clickhouse.evaluation-session.store.ts";
+import { EvaluationRunClickHouseReadRepository } from "./evaluation-run-read.repository.ts";
+import { EvaluationRunClickHouseWriteRepository } from "./evaluation-run-write.repository.ts";
+
+/** Composes the read and write adapters for the evaluation_runs table. */
+export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
+  static create(options: {
+    resolveClient: EvaluationClickHouseResolver;
+  }): ClickHouseEvaluationRepository {
+    return new ClickHouseEvaluationRepository(options);
+  }
+
+  private readonly reader: EvaluationRunClickHouseReadRepository;
+  private readonly writer: EvaluationRunClickHouseWriteRepository;
+
+  private constructor(options: { resolveClient: EvaluationClickHouseResolver }) {
+    super();
+    this.reader = EvaluationRunClickHouseReadRepository.create(options);
+    this.writer = EvaluationRunClickHouseWriteRepository.create(options);
+  }
+
+  upsert(input: {
+    data: EvaluationRunData;
+    tenantId: string;
+    retentionDays?: number;
+  }): Promise<void> {
+    return this.writer.upsert(input);
+  }
+
+  upsertBatch(
+    input: {
+      data: EvaluationRunData;
+      tenantId: string;
+      retentionDays?: number;
+    }[],
+  ): Promise<void> {
+    return this.writer.upsertBatch(input);
+  }
+
+  getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
+    return this.reader.getByEvaluationId(input);
+  }
+
+  findByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]> {
+    return this.reader.findByTraceId(input);
+  }
+
+  findSummariesByTraceIds(
+    input: EvaluationSummariesByTraceIdsQuery,
+  ): Promise<Record<string, EvaluationSummary[]>> {
+    return this.reader.findSummariesByTraceIds(input);
+  }
+
+  findTraceEvaluations(
+    input: TraceEvaluationsQuery,
+  ): Promise<Record<string, TraceEvaluationData[]>> {
+    return this.reader.findTraceEvaluations(input);
+  }
+
+  findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null> {
+    return this.reader.findInputs(input);
+  }
+}

@@ -1,0 +1,118 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ * When the back office writes the audit row: before the ledger is asked, as main's
+ * back office did, so a refused attempt still leaves its row.
+ */
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  createSsoTestApp,
+  createSsoTestUsers,
+  RecordingSsoConnectionLedger,
+  SSO_TEST_STAFF_EMAIL,
+} from "./sso.fixture.ts";
+
+const STAFF_ID = "user_olive";
+const CUSTOMER_ID = "user_customer";
+const TARGET = {
+  organizationId: "org_acme",
+  connectionId: "ssoc_1",
+  domain: "acme.com",
+  evidenceRef: "ticket:SEC-123",
+  note: "Signed contract names acme.com",
+};
+
+async function harness() {
+  const record = vi.fn<AuditLogApi["record"]>(async () => ({ id: "audit", occurredAt: 0 }));
+  const connections = RecordingSsoConnectionLedger.create();
+  const app = await createSsoTestApp({
+    dependencies: {
+      auditLog: createApiFixture<AuditLogApi>({ record }),
+      users: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL, [CUSTOMER_ID]: null }),
+    },
+    connections,
+  });
+
+  return { app, connections, record };
+}
+
+describe("the back office's audit trail", () => {
+  let context: Awaited<ReturnType<typeof harness>>;
+
+  beforeEach(async () => {
+    context = await harness();
+  });
+
+  describe("given a ledger that refuses the command", () => {
+    /** @scenario "A command the ledger refuses still leaves its audit row" */
+    it("writes the attempt's row even though the ledger threw", async () => {
+      const refusal = new Error("the ledger refused this transition");
+      context.connections.attestDomain.mockRejectedValueOnce(refusal);
+
+      await expect(context.app.attestDomain(TARGET, { id: STAFF_ID })).rejects.toBe(refusal);
+
+      expect(context.connections.attestDomain).toHaveBeenCalledTimes(1);
+      expect(context.record).toHaveBeenCalledTimes(1);
+      expect(context.record).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "ssoConnections.attestDomain" }),
+      );
+    });
+  });
+
+  describe("given somebody outside the staff list", () => {
+    /** @scenario "Somebody outside the staff list leaves no audit row" */
+    it("writes no audit row when the gate refuses before the ledger is asked", async () => {
+      const denial = await context.app.attestDomain(TARGET, { id: CUSTOMER_ID }).then(
+        () => {
+          throw new Error("attestDomain resolved: the back office gate let the call through");
+        },
+        (error: unknown) => error as AdminSurfaceHiddenError,
+      );
+
+      expect(denial).toBeInstanceOf(AdminSurfaceHiddenError);
+      expect(denial.code).toBe("not_found");
+      expect(context.connections.attestDomain).not.toHaveBeenCalled();
+      expect(context.record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a ledger that completes the command", () => {
+    /** @scenario "An operator command is recorded before it runs" */
+    it("writes exactly one row, before the ledger is asked", async () => {
+      await context.app.attestDomain(TARGET, { id: STAFF_ID });
+
+      expect(context.record).toHaveBeenCalledTimes(1);
+      expect(context.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: STAFF_ID,
+          action: "ssoConnections.attestDomain",
+          organizationId: "org_acme",
+          args: expect.objectContaining({ targetKind: "ssoConnection", targetId: "ssoc_1" }),
+        }),
+      );
+
+      // vitest numbers every mock call across the run, so the two orders read
+      // as one sequence: the row written first, the ledger asked second.
+      const commanded = context.connections.attestDomain.mock.invocationCallOrder[0];
+      const recorded = context.record.mock.invocationCallOrder[0];
+      expect(commanded).toBeDefined();
+      expect(recorded).toBeDefined();
+      expect(recorded!).toBeLessThan(commanded!);
+    });
+
+    /** @scenario "An operator command is recorded before it runs" */
+    it("records a read before the ledger answers it", async () => {
+      await context.app.listConnections({ page: 0, pageSize: 25 }, { id: STAFF_ID });
+
+      expect(context.record).toHaveBeenCalledTimes(1);
+      const listed = context.connections.list.mock.invocationCallOrder[0];
+      const recorded = context.record.mock.invocationCallOrder[0];
+      expect(listed).toBeDefined();
+      expect(recorded!).toBeLessThan(listed!);
+    });
+  });
+});

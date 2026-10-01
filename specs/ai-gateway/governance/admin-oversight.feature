@@ -48,7 +48,7 @@ Feature: AI Gateway Governance — Admin Oversight Dashboard
     Then the page renders with the heading "Governance Overview"
     And the URL stays at "/governance"
 
-  @bdd @ui @admin-oversight @feature-flag
+  @bdd @ui @admin-oversight @feature-flag @integration
   Scenario: Without the governance preview flag the page is hidden
     Given the feature flag "release_ui_ai_governance_enabled" is disabled
     When the admin navigates to "/governance"

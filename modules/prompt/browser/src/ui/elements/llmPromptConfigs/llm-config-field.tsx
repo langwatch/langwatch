@@ -1,0 +1,112 @@
+import { Popover as ChakraPopover } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
+import { Box, HStack } from "@langwatch/design-system/primitives";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-browser-kit";
+import type { ModelOption } from "@langwatch/topic-contract";
+import type { LLMConfig } from "@langwatch/workflow-contract";
+import { ChevronDown } from "lucide-react";
+import { useState } from "react";
+
+import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
+import { AddModelProviderKey } from "./add-model-provider-key.tsx";
+import { LLMConfigPopover, type Output } from "./llm-config-popover.tsx";
+
+type LLMConfigFieldProps = {
+  llmConfig: LLMConfig;
+  modelOption?: ModelOption;
+  requiresCustomKey: boolean;
+  onChange: (llmConfig: LLMConfig) => void;
+  showProviderKeyMessage?: boolean;
+  /** Outputs configuration (for structured outputs) */
+  outputs?: Output[];
+  /** Callback when outputs change */
+  onOutputsChange?: (outputs: Output[]) => void;
+  /** Whether to show the structured outputs section */
+  showStructuredOutputs?: boolean;
+  /** True when the project has zero enabled providers / models for
+   *  the requested mode. Renders the empty-state callout in place of
+   *  the model-picker trigger so the user never sees a stale persisted
+   *  model id (e.g. "openai/gpt-5.2") pretending to be a working
+   *  selection on a fresh account. */
+  noModelsConfigured?: boolean;
+};
+
+/**
+ * LLM Config field, usable outside form context (no react-hook-form).
+ * Compact clickable row; clicking opens LLMConfigPopover for configuration.
+ */
+export function LLMConfigField({
+  llmConfig,
+  onChange,
+  modelOption,
+  requiresCustomKey,
+  showProviderKeyMessage = true,
+  outputs,
+  onOutputsChange,
+  showStructuredOutputs = false,
+  noModelsConfigured = false,
+}: LLMConfigFieldProps) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const { model } = llmConfig ?? {};
+
+  // Check if the model is disabled (has line-through styling)
+  const isModelDisabled = modelOption?.isDisabled ?? false;
+
+  // No providers configured on the project: skip the popover entirely.
+  // The model id stored on this LLMConfig is meaningless without a
+  // provider key to back it, so don't echo it as if it were a real
+  // selection — show the honest empty-state callout instead.
+  if (noModelsConfigured) {
+    return <NoModelsConfiguredCallout size="sm" />;
+  }
+
+  return (
+    <>
+      <Popover.Root
+        positioning={{ placement: "bottom-start" }}
+        closeOnInteractOutside={false}
+        open={popoverOpen}
+        onOpenChange={({ open }) => setPopoverOpen(open)}
+      >
+        {/* Use Anchor (not Trigger) for positioning only — avoids Zag.js
+            installing an onClick handler that fights with the Drawer's
+            dismissable layer. See #2390. */}
+        <ChakraPopover.Anchor asChild>
+          <HStack
+            width="full"
+            paddingY={2}
+            paddingX={3}
+            borderRadius="md"
+            border="1px solid"
+            borderColor="border"
+            cursor="pointer"
+            _hover={{ bg: "bg.subtle" }}
+            transition="background 0.15s"
+            justify="space-between"
+            opacity={modelOption?.isDisabled ? 0.5 : 1}
+            onClick={() => setPopoverOpen((prev) => !prev)}
+          >
+            <LLMModelDisplay model={model ?? ""} />
+            <Box color="fg.muted">
+              <ChevronDown size={16} />
+            </Box>
+          </HStack>
+        </ChakraPopover.Anchor>
+
+        <LLMConfigPopover
+          values={llmConfig}
+          onChange={onChange}
+          outputs={outputs}
+          onOutputsChange={onOutputsChange}
+          showStructuredOutputs={showStructuredOutputs}
+        />
+      </Popover.Root>
+      {(requiresCustomKey || isModelDisabled) && showProviderKeyMessage && (
+        <AddModelProviderKey
+          runWhat="run this component"
+          nodeProvidersWithoutCustomKeys={[model?.split("/")[0] ?? "unknown"]}
+        />
+      )}
+    </>
+  );
+}

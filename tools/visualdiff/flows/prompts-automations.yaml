@@ -1,0 +1,938 @@
+# Flows for prompts, automations and dashboards (vf-prompts-automations).
+# Every flow creates what it needs under a {uid} name, so any number run side by side.
+# Not scripted: automation-activity-log (needs a seeded fired automation) and the widget
+# drag-to-move (the grid cards carry no test id); both are named in the lane handoff.
+flows:
+  - id: prompt-create-and-save
+    title: Create a prompt, name it and find it in the list
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "You are the visual diff assistant."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          text: /^vd-prompt-{uid}$/
+
+  - id: prompt-edit-new-version
+    title: Edit a saved prompt and commit it as a second version
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Version one of the visual diff prompt."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Version two of the visual diff prompt."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: Enter a description for this version
+          value: second version {uid}
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: "/api/prompts/vd-prompt-{uid}/versions"
+          min: "2"
+
+  # branch-only: main draws no per-version changes toggle (version-changes-toggle-2) in the history popover.
+  - id: prompt-version-history-and-diff
+    title: Open the version history and read a version's changes
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "History one."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "history edit {uid}"
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: Enter a description for this version
+          value: edit v2 {uid}
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: "/api/prompts/vd-prompt-{uid}/versions"
+          min: "2"
+      - action: click
+        with:
+          testId: "version-history-button"
+      - action: expect
+        with:
+          text: "Current"
+      - action: expect
+        with:
+          text: "edit v2 {uid}"
+      - action: click
+        with:
+          testId: "version-changes-toggle-2"
+      - action: expect
+        with:
+          text: "history edit {uid}"
+
+  - id: prompt-tags-and-deploy-labels
+    title: Add a deploy tag and point it at a prompt version
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Tagged prompt."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: click
+        with:
+          text: /^\s*Deploy\s*$/
+      - action: click
+        with:
+          text: /\+ Add tag/
+      - action: fill
+        with:
+          field: "Tag name (e.g. canary)"
+          value: "canary-{uid}"
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Add\s*$/
+      - action: click
+        with:
+          selector: 'xpath=//*[normalize-space()="canary-{uid}"]/ancestor::*[.//*[@role="combobox"]][1]//*[@role="combobox"]'
+      - action: click
+        with:
+          selector: '[role="option"]'
+          hasText: /^\s*v1\b/
+      - action: click
+        with:
+          selector: '[role="dialog"] button'
+          hasText: /^\s*Save\s*$/
+      - action: expect
+        with:
+          api: "/api/prompts/tags"
+          contains: "canary-{uid}"
+      - action: expect
+        with:
+          api: "/api/prompts/vd-prompt-{uid}:canary-{uid}"
+          contains: "vd-prompt-{uid}"
+
+  - id: prompt-playground-run-and-variables
+    title: Fill a variable and get a real model reply in the playground
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Repeat the input back exactly and nothing else: {{input}}"
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: click
+        with:
+          text: /^Variables$/
+      - action: fill
+        with:
+          testId: "variable-value-input-input"
+          value: "echo-{uid}"
+      - action: type
+        with:
+          placeholder: "Type your message here"
+          text: "Go"
+          submit: "true"
+      - action: expect
+        with:
+          text: "echo-{uid}"
+          timeout: "60000"
+
+  - id: prompt-playground-change-model
+    title: Pick another model and commit it as a new version
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Model change prompt."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: click
+        with:
+          selector: 'xpath=//div[svg[contains(@class,"lucide-chevron-down")]][preceding-sibling::*]'
+      - action: click
+        with:
+          selector: '[role="dialog"] [role="combobox"]'
+      - action: fill
+        with:
+          field: "Search models"
+          value: "mini"
+      - action: click
+        with:
+          selector: '[role="option"]'
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: Enter a description for this version
+          value: model change {uid}
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: "/api/prompts/vd-prompt-{uid}/versions"
+          min: "2"
+
+  - id: prompt-delete
+    title: Delete a prompt through the row menu and confirm it is gone
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          text: New Prompt
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "Doomed prompt."
+      - action: click
+        with:
+          testId: "save-prompt-button"
+      - action: expect
+        with:
+          text: Prompt Identifier
+      - action: fill
+        with:
+          field: prompt-name
+          value: vd-prompt-{uid}
+      - action: click
+        with:
+          text: /^Save$/
+      - action: expect
+        with:
+          api: "/api/prompts"
+          contains: "vd-prompt-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: click
+        with:
+          selector: xpath=//p[normalize-space()="vd-prompt-{uid}"]/following-sibling::*[1]//button
+      - action: click
+        with:
+          text: Delete prompt
+      - action: fill
+        with:
+          field: Type 'delete' to confirm
+          value: delete
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          api: "/api/prompts/vd-prompt-{uid}"
+          status: "404"
+
+  - id: automation-create-full-form
+    title: Create a trace automation with cadence and email delivery
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          text: "New automation"
+      - action: fill
+        with:
+          field: "Flag failing traces"
+          value: "vd-automation-{uid}"
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: fill
+        with:
+          field: "Settle window"
+          value: "30"
+      - action: select
+        with:
+          label: Batch window
+          option: every hour
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-automation-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          label: "Actions for vd-automation-{uid}"
+
+  - id: automation-create-alert
+    title: Create a graph alert with a series and a severity
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          text: "New automation"
+      - action: click
+        with:
+          text: A graph
+      - action: fill
+        with:
+          field: "High latency"
+          value: "vd-alert-{uid}"
+      - action: select
+        with:
+          field: "Custom graph"
+          option: "Visual Diff Graph"
+      - action: select
+        with:
+          field: "Series"
+          option: "Traces"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-alert-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/alerts"
+      - action: expect
+        with:
+          label: "Actions for vd-alert-{uid}"
+
+  - id: automation-schedule-report
+    title: Schedule a recurring graph report
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/schedules"
+      - action: click
+        with:
+          text: "New report"
+      - action: fill
+        with:
+          field: "Weekly quality digest"
+          value: "vd-schedule-{uid}"
+      - action: select
+        with:
+          field: "What to send"
+          option: "A custom graph (chart)"
+      - action: select
+        with:
+          field: "Custom graph"
+          option: "Visual Diff Graph"
+      - action: select
+        with:
+          field: "Frequency"
+          option: "Weekly"
+      - action: fill
+        with:
+          selector: 'input[type="time"]'
+          value: "09:30"
+      - action: click
+        with:
+          text: /^\s*Email/
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Create report\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-schedule-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/schedules"
+      - action: expect
+        with:
+          label: "Actions for vd-schedule-{uid}"
+
+  - id: automation-enable-disable
+    title: Switch an automation off and see it stay off after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          text: "New automation"
+      - action: fill
+        with:
+          field: "Flag failing traces"
+          value: "vd-toggle-{uid}"
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-toggle-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:checked'
+          equals: "1"
+      - action: click
+        with:
+          selector: 'label:has(input[aria-label="Toggle vd-toggle-{uid}"])'
+      - action: expect
+        with:
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:not(:checked)'
+          equals: "1"
+      - action: wait
+        with:
+          millis: "1000"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          count: 'input[aria-label="Toggle vd-toggle-{uid}"]:not(:checked)'
+          equals: "1"
+
+  - id: automation-edit
+    title: Rename an automation through its row menu and save the edit
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          text: "New automation"
+      - action: fill
+        with:
+          field: "Flag failing traces"
+          value: "vd-edit-{uid}"
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-edit-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          label: "Actions for vd-edit-{uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          field: "Flag failing traces"
+          value: "vd-edited-{uid}"
+      - action: click
+        with:
+          text: /^\s*Save changes\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-edited-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          label: "Actions for vd-edited-{uid}"
+
+  - id: automation-delete
+    title: Delete an automation and see it leave the list
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: click
+        with:
+          text: "New automation"
+      - action: fill
+        with:
+          field: "Flag failing traces"
+          value: "vd-delete-{uid}"
+      - action: click
+        with:
+          text: /^\s*Code\s*$/
+      - action: click
+        with:
+          text: "status:error"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
+      - action: fill
+        with:
+          field: "alerts@partner.com"
+          value: "vd-{uid}@example.com"
+      - action: click
+        with:
+          text: "Add email"
+      - action: click
+        with:
+          text: /^\s*Done\s*$/
+          optional: "true"
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          text: /^\s*Create automation\s*$/
+      - action: expect
+        with:
+          api: "/api/triggers"
+          contains: "vd-delete-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          label: "Actions for vd-delete-{uid}"
+      - action: click
+        with:
+          label: "Actions for vd-delete-{uid}"
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete automation\s*$/
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: go
+        with:
+          path: "/{slug}/automations/automations"
+      - action: expect
+        with:
+          text: "New automation"
+      - action: expect
+        with:
+          label: "Actions for vd-delete-{uid}"
+          equals: "0"
+
+  - id: dashboard-create
+    title: Create a dashboard and find it in the sidebar
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/analytics/reports"
+      - action: click
+        with:
+          text: "Add Dashboard"
+      - action: fill
+        with:
+          field: "Dashboard name"
+          value: "vd-dash-{uid}"
+      - action: click
+        with:
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
+      - action: expect
+        with:
+          api: "/api/dashboards"
+          contains: "vd-dash-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/analytics/reports"
+      - action: expect
+        with:
+          text: "vd-dash-{uid}"
+
+  - id: dashboard-widget-add-edit-delete
+    title: Add a chart to a dashboard, rename it, then delete it
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/analytics/reports"
+      - action: click
+        with:
+          text: "Add Dashboard"
+      - action: fill
+        with:
+          field: "Dashboard name"
+          value: "vd-widgets-{uid}"
+      - action: click
+        with:
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
+      - action: expect
+        with:
+          text: "vd-widgets-{uid}"
+      - action: click
+        with:
+          text: "Add chart"
+      - action: click
+        with:
+          label: "Rename New widget"
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: "vd-widget-{uid}"
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: "vd-widget-{uid}"
+      - action: click
+        with:
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit( Graph)?\s*$/
+      - action: click
+        with:
+          label: "Rename vd-widget-{uid}"
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: "vd-widget-edited-{uid}"
+      - action: click
+        with:
+          text: /^\s*Queries/
+      - action: click
+        with:
+          text: /^\s*Save\s*$/
+      - action: expect
+        with:
+          text: "vd-widget-edited-{uid}"
+      - action: click
+        with:
+          selector: 'button:has(svg.lucide-ellipsis-vertical[width="24"])'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete Graph\s*$/
+      - action: expect
+        with:
+          text: "vd-widget-edited-{uid}"
+          equals: "0"
+
+  - id: dashboard-rename-and-delete
+    title: Rename a dashboard from its menu, then delete it
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/analytics/reports"
+      - action: click
+        with:
+          text: "Add Dashboard"
+      - action: fill
+        with:
+          field: "Dashboard name"
+          value: "vd-rename-{uid}"
+      - action: click
+        with:
+          selector: button
+          hasText: /^\s*Create Dashboard\s*$/
+      - action: expect
+        with:
+          text: "vd-rename-{uid}"
+      - action: click
+        with:
+          selector: 'xpath=//a[normalize-space()="vd-rename-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Rename\s*$/
+      - action: fill
+        with:
+          selector: "input:focus"
+          value: "vd-renamed-{uid}"
+      - action: type
+        with:
+          selector: "input:focus"
+          text: ""
+          submit: "true"
+      - action: expect
+        with:
+          api: "/api/dashboards"
+          contains: "vd-renamed-{uid}"
+      - action: expect
+        with:
+          text: "vd-renamed-{uid}"
+      - action: click
+        with:
+          selector: 'xpath=//a[normalize-space()="vd-renamed-{uid}"]/following-sibling::button[contains(@class,"menu-btn")]'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: "/^Delete$/"
+      - action: expect
+        with:
+          text: "vd-renamed-{uid}"
+          equals: "0"

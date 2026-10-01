@@ -1,0 +1,130 @@
+import { Box, HStack, type StackProps, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
+
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../../../behavior/use-model-selection-options.ts";
+import { MODEL_ICON_SIZE } from "../../../../model/model-selection-constants.ts";
+import { modelProviderIcons } from "./model-provider-icons.tsx";
+import { OverflownTextWithTooltip } from "./overflown-text.tsx";
+
+export interface LLMModelDisplayProps extends StackProps {
+  model: string;
+  fontSize?: string;
+  /** Optional subtitle to display below the model name (e.g., "Temp 0.7") */
+  subtitle?: string;
+}
+
+function getModelDisplayState({
+  model,
+  isLoading,
+  groupedByProvider,
+  modelOption,
+}: {
+  model: string;
+  isLoading: boolean;
+  groupedByProvider: { provider: string }[];
+  modelOption: { icon?: ReactNode; isDisabled?: boolean; label?: string } | undefined;
+}) {
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !isLoading &&
+    groupedByProvider.length > 0 &&
+    !groupedByProvider.some((g) => g.provider === providerKey);
+  const iconNode =
+    modelOption?.icon ??
+    (isProviderMissing
+      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
+      : undefined);
+
+  return { iconNode, isProviderMissing, providerKey };
+}
+
+/**
+ * LLM Model Display
+ * Shows the model name with provider icon and optional parameter subtitle.
+ * Can be used outside of the form context (does not use react-hook-form)
+ */
+export function LLMModelDisplay({
+  model,
+  fontSize = "14px",
+  subtitle,
+  ...props
+}: LLMModelDisplayProps) {
+  const { modelOption, groupedByProvider, isLoading } = useModelSelectionOptions({
+    options: allModelOptions,
+    model,
+    mode: "chat",
+  });
+
+  // Model is disabled if explicitly marked or if provider is disabled
+  const isDisabled = modelOption?.isDisabled ?? false;
+
+  // Invalid = model points at a disabled/deleted/unconfigured provider; the
+  // resolver will fail on it at runtime. Same red-strike + AlertTriangle +
+  // tooltip pattern as the Default Models table. Skip while providers are
+  // in flight, to avoid a false-positive flash.
+  const { iconNode, isProviderMissing, providerKey } = getModelDisplayState({
+    model,
+    isLoading,
+    groupedByProvider,
+    modelOption,
+  });
+
+  const disabledColor = isDisabled ? "fg.muted" : undefined;
+  const labelColor = isProviderMissing ? "red.600" : disabledColor;
+
+  const stack = (
+    <HStack align="center" gap={2} {...props}>
+      {iconNode && (
+        <Box width={MODEL_ICON_SIZE} minWidth={MODEL_ICON_SIZE}>
+          {iconNode}
+        </Box>
+      )}
+      <VStack gap={0} align="start">
+        <OverflownTextWithTooltip
+          label={
+            isDisabled ? `${modelOption?.label ?? model} (disabled)` : (modelOption?.label ?? model)
+          }
+          fontSize={fontSize}
+          fontFamily="mono"
+          lineClamp={1}
+          wordBreak="break-all"
+          color={labelColor}
+          textDecoration={isProviderMissing || isDisabled ? "line-through" : undefined}
+        >
+          {modelOption?.label ?? model}
+        </OverflownTextWithTooltip>
+        {subtitle && (
+          <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+            {subtitle}
+          </Text>
+        )}
+      </VStack>
+      {isProviderMissing && (
+        <HStack gap={1} color="red.600" flexShrink={0}>
+          <AlertTriangle size={14} aria-hidden />
+          <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wide">
+            Update needed
+          </Text>
+        </HStack>
+      )}
+    </HStack>
+  );
+
+  if (!isProviderMissing) return stack;
+
+  return (
+    <Tooltip
+      content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+      positioning={{ placement: "top" }}
+      showArrow
+    >
+      <Box>{stack}</Box>
+    </Tooltip>
+  );
+}

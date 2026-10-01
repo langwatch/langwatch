@@ -1,10 +1,5 @@
 /**
- * The session-authenticated exchange calls are on every command's credential
- * path, so their failure modes are pinned here: a black-holed control plane
- * must time out (so the resolver can fall back to the cached key) and a
- * malformed 200 must fail loudly instead of handing `undefined` to the .env
- * writer.
- *
+ * Tests session-authenticated exchange calls: timeouts and malformed responses.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,13 +10,9 @@ vi.mock("../config", () => ({
   saveConfig: (...args: unknown[]) => saveConfig(...args),
 }));
 
-import {
-  fetchPersonalProject,
-  fetchProjectKeyBySlug,
-  SessionApiError,
-} from "../session-api";
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
+import { fetchPersonalProject, fetchProjectKeyBySlug, SessionApiError } from "../session-api";
 
 const liveSession = (): GovernanceConfig =>
   ({
@@ -37,6 +28,12 @@ const jsonResponse = (status: number, body: unknown): Response =>
     status,
     headers: { "Content-Type": "application/json" },
   });
+
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
 
 describe("session-api request bounds", () => {
   beforeEach(() => {
@@ -67,16 +64,11 @@ describe("session-api request bounds", () => {
 
       const seen: string[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
-        const url =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.toString()
-              : input.url;
+        const url = requestUrl(input);
         if (url.endsWith("/api/auth/cli/refresh")) {
-          const sent = JSON.parse(
-            typeof init?.body === "string" ? init.body : "{}",
-          ) as { refresh_token?: string };
+          const sent = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
+            refresh_token?: string;
+          };
           seen.push(sent.refresh_token ?? "");
           if (sent.refresh_token === "lw_rt_spent") {
             return jsonResponse(401, { error: "unauthorized" });
@@ -107,11 +99,10 @@ describe("session-api request bounds", () => {
       // A signal-respecting hang: resolves never, rejects on abort. The
       // production wrapper injects AbortSignal.timeout, so the reject path
       // is exactly what a black-holed socket produces.
+      const deadlineFailure = new Error("aborted by the request deadline");
       const hangingFetch: typeof fetch = (_input, init) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new Error("aborted by the request deadline")),
-          );
+          init?.signal?.addEventListener("abort", () => reject(deadlineFailure));
         });
 
       await expect(
@@ -119,7 +110,7 @@ describe("session-api request bounds", () => {
           fetchImpl: hangingFetch,
           timeoutMs: 25,
         }),
-      ).rejects.toThrow();
+      ).rejects.toBe(deadlineFailure);
     });
   });
 
@@ -130,9 +121,9 @@ describe("session-api request bounds", () => {
           project: { id: "p1", slug: "demo", name: "Demo" },
         });
 
-      await expect(
-        fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl }),
-      ).rejects.toThrow(SessionApiError);
+      await expect(fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl })).rejects.toThrow(
+        SessionApiError,
+      );
       await expect(
         fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl }),
       ).rejects.toMatchObject({ code: "malformed_response" });

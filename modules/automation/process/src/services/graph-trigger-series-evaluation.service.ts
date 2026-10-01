@@ -1,0 +1,149 @@
+import {
+  aggregateSeriesValues,
+  extractSeriesPoints,
+  isSeriesPercentageUnsupported,
+} from "@langwatch/analytics-contract";
+import type { GraphTriggerEvaluationResult } from "@langwatch/automation-contract";
+
+import { GRAPH_TRIGGER_MAX_RESULT_ROWS } from "../app/automation.members.ts";
+import type {
+  GraphEvaluationPlan,
+  GraphSeries,
+  GraphSeriesEvaluation,
+  TimeseriesResult,
+} from "../app/automation.members.ts";
+import { skippedGraphEvaluation } from "../rules/trigger-evaluator.rules.ts";
+
+/** ClickHouse's "too many rows or bytes", however the client spelled it. */
+function isTimeseriesResultTooLarge(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  if (code === 396 || code === "396") {
+    return true;
+  }
+
+  return (error instanceof Error ? error.message : String(error)).includes(
+    "TOO_MANY_ROWS_OR_BYTES",
+  );
+}
+
+/** The key analytics returns a series under, which the reader must rebuild to
+ *  find it in the result. */
+function graphSeriesName(series: GraphSeries, index: number): string {
+  const aggregation = series.aggregation === "terms" ? "cardinality" : series.aggregation;
+  if (series.pipeline) {
+    return `${index}/${series.metric}/${aggregation}/${series.pipeline.field}/${series.pipeline.aggregation}`;
+  }
+
+  if (series.key) {
+    return `${index}/${series.metric}/${aggregation}/${series.key}`;
+  }
+
+  return `${index}/${series.metric}/${aggregation}`;
+}
+
+export class GraphTriggerSeriesEvaluationService {
+  private constructor() {}
+
+  static create(): GraphTriggerSeriesEvaluationService {
+    return new GraphTriggerSeriesEvaluationService();
+  }
+
+  async evaluate(
+    plan: GraphEvaluationPlan,
+  ): Promise<GraphSeriesEvaluation | GraphTriggerEvaluationResult> {
+    const result = await this.read(plan);
+    if ("status" in result) {
+      return result;
+    }
+
+    return this.values(plan, result);
+  }
+
+  private async read(
+    plan: GraphEvaluationPlan,
+  ): Promise<TimeseriesResult | GraphTriggerEvaluationResult> {
+    try {
+      return (await plan.request.deps.analytics.getTimeseries(plan.timeseriesInput, {
+        maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+      })) as TimeseriesResult;
+    } catch (error) {
+      if (isSeriesPercentageUnsupported(error)) {
+        return this.percentageUnsupported(plan);
+      }
+      if (!isTimeseriesResultTooLarge(error)) {
+        throw error;
+      }
+
+      plan.request.deps.logger.error(
+        {
+          projectId: plan.request.projectId,
+          triggerId: plan.request.triggerId,
+          reason: plan.request.reason,
+          groupBy: plan.graph.groupBy,
+          timePeriodMinutes: plan.timePeriod,
+          maxResultRows: GRAPH_TRIGGER_MAX_RESULT_ROWS,
+        },
+        "graph trigger evaluation skipped: timeseries result exceeds the row ceiling",
+      );
+
+      return skippedGraphEvaluation({
+        ...plan.request,
+        detail: "timeseries result exceeds the row ceiling",
+        skipCode: "result_too_large",
+      });
+    }
+  }
+
+  /**
+   * A percentage of a per-entity measurement is refused by the query builder, and
+   * re-asking cannot change that: skip rather than redeliver forever. The series'
+   * metric rides in the log, since this is the one caller that knows which one.
+   */
+  private percentageUnsupported(plan: GraphEvaluationPlan): GraphTriggerEvaluationResult {
+    plan.request.deps.logger.error(
+      {
+        projectId: plan.request.projectId,
+        triggerId: plan.request.triggerId,
+        reason: plan.request.reason,
+        seriesName: plan.seriesName,
+        seriesMetric: plan.series.metric,
+        seriesAggregation: plan.series.aggregation,
+      },
+      "graph trigger evaluation skipped: series cannot be shown as a percentage",
+    );
+
+    return skippedGraphEvaluation({
+      ...plan.request,
+      detail: "series cannot be shown as a percentage",
+      skipCode: "series_percentage_unsupported",
+    });
+  }
+
+  private values(plan: GraphEvaluationPlan, result: TimeseriesResult): GraphSeriesEvaluation {
+    const key = graphSeriesName(plan.timeseriesInput.series[0]!, 0);
+    const currentPoints = extractSeriesPoints(result.currentPeriod, key, plan.graph.groupBy);
+    const previousPoints = extractSeriesPoints(result.previousPeriod, key, plan.graph.groupBy);
+
+    return {
+      currentPoints,
+      previousPoints,
+      currentValue: this.aggregate(currentPoints, plan, result.currentPeriod.length),
+      previousValue:
+        result.previousPeriod.length === 0
+          ? null
+          : this.aggregate(previousPoints, plan, result.previousPeriod.length),
+    };
+  }
+
+  private aggregate(
+    points: { value: number }[],
+    plan: GraphEvaluationPlan,
+    bucketCount: number,
+  ): number {
+    return aggregateSeriesValues(
+      points.map((point) => point.value),
+      plan.series.aggregation,
+      bucketCount,
+    );
+  }
+}

@@ -1,9 +1,11 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ProjectsApiService } from "@/client-sdk/services/projects/projects-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 export interface CreateProjectOptions {
   name: string;
@@ -14,13 +16,8 @@ export interface CreateProjectOptions {
 }
 
 /**
- * Returns the created project rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts).
- *
- * `data` is the raw project, which includes the one-time `serviceApiKey`. That
- * is the whole point of the create response — the server never returns the key
- * again — so both the human output and the previous `--format json` branch
- * emitted it in full, and a scripted caller needs it to be usable at all.
+ * Return created project with one-time serviceApiKey; server never returns
+ * this key again.
  */
 export const createProjectCommand = async (
   options: CreateProjectOptions,
@@ -70,7 +67,9 @@ export const createProjectCommand = async (
       data: project,
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  Save the service API key below NOW. It will not be shown again."));
+        console.log(
+          chalk.bold.yellow("⚠  Save the service API key below NOW. It will not be shown again."),
+        );
         console.log();
         console.log(`  ${chalk.green(project.serviceApiKey)}`);
         console.log();

@@ -1,10 +1,6 @@
 /**
- * `langwatch instant-eval status <id>`: where one run is, and optionally
- * waiting there until it is done.
- *
- * Renders its own resolved format because `--wait` follows the answer, the
- * same reason `run` does.
- *
+ * `langwatch instant-eval status <id>`: where one run is, optionally waiting until done. Renders
+ * its own format because `--wait` follows the answer.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -13,11 +9,7 @@ import chalk from "chalk";
 import type { InstantEvalRun } from "@/client-sdk/services/instant-evals";
 
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  printResult,
-  type RawOutputFlags,
-  resolveOutputOptions,
-} from "../../utils/output";
+import { printResult, type RawOutputFlags, resolveOutputOptions } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";

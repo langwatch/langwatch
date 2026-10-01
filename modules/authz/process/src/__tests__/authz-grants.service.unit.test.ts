@@ -1,0 +1,1103 @@
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import {
+  GRANT_EVENT_SOURCES,
+  GrantValidationError,
+  OffboardIncompleteError,
+} from "@langwatch/authz-contract";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import type { EventingAuthzLedgerAdapter } from "../eventing/authz-grant.store.ts";
+import { StubAuthzEpoch } from "../repositories/__tests__/support/authz-epoch.stub.ts";
+import { StubAuthzListingRepository } from "../repositories/__tests__/support/authz-listing.stub.ts";
+import { StubAuthzManagedGrantRepository } from "../repositories/__tests__/support/authz-managed-grant.stub.ts";
+import { makeReader } from "../repositories/__tests__/support/authz-read.stub.ts";
+import {
+  type AuthzGrantRepository,
+  BindingMissingError,
+  type BindingPrincipalWhere,
+  DuplicateBindingError,
+} from "../repositories/authz-grant.repository.ts";
+import { permissiveGrantGuards } from "../services/__tests__/support/grant-guards.stub.ts";
+import { AuthzGrantsService } from "../services/authz-grants.service.ts";
+import { AuthzService } from "../services/authz.service.ts";
+
+const ORG = "org-1";
+const OTHER_ORG = "org-other";
+const TEAM = "team-1";
+const PROJECT = "proj-1";
+
+type RepositoryStub = {
+  [K in keyof AuthzGrantRepository]: Mock;
+};
+
+type CompatibilityMethod = keyof Pick<
+  EventingAuthzLedgerAdapter,
+  | "attachBindings"
+  | "attachResourceGrant"
+  | "revokeResourceGrants"
+  | "changeBindingRole"
+  | "revokeBindings"
+  | "revokeBindingsWhere"
+  | "offboardMember"
+  | "defineRole"
+  | "deleteRole"
+>;
+
+type LedgerStub = Record<CompatibilityMethod, Mock>;
+
+const OFFBOARD_COUNTS = {
+  bindings: 2,
+  groupMemberships: 1,
+  legacyTeamMemberships: 1,
+  pendingInvites: 0,
+  organizationMembership: true,
+};
+
+function makeRepository(overrides: Partial<RepositoryStub> = {}): RepositoryStub {
+  return {
+    createBinding: vi.fn().mockResolvedValue(undefined),
+    updateBindingRole: vi.fn().mockResolvedValue(undefined),
+    deleteBinding: vi.fn().mockResolvedValue(undefined),
+    findBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: ORG }),
+    findCustomRole: vi
+      .fn()
+      .mockResolvedValue({ organizationId: ORG, permissions: ["traces:view"] }),
+    findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: ORG }),
+    findProjectLineage: vi.fn().mockResolvedValue(null),
+    replaceBinding: vi.fn().mockResolvedValue(undefined),
+    // The real adapter runs the deletes in a transaction and calls prove()
+    // with a transaction-bound reader; the stub mirrors that contract - a
+    // throw from prove() rejects the whole call, like a rollback.
+    offboardUser: vi.fn(async ({ prove }) => {
+      await prove(makeReader());
+      return OFFBOARD_COUNTS;
+    }),
+    findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue([]),
+    findDirectoryCausedChanges: vi.fn().mockResolvedValue([]),
+    findOwnedApiKeys: vi.fn().mockResolvedValue([]),
+    findPersonalTeams: vi.fn().mockResolvedValue([]),
+    ...overrides,
+  };
+}
+
+function makeLedger(overrides: Partial<LedgerStub> = {}): LedgerStub {
+  return {
+    attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
+    attachResourceGrant: vi.fn().mockResolvedValue(undefined),
+    revokeResourceGrants: vi.fn().mockResolvedValue(undefined),
+    changeBindingRole: vi.fn().mockResolvedValue(undefined),
+    revokeBindings: vi.fn().mockResolvedValue(undefined),
+    revokeBindingsWhere: vi.fn().mockResolvedValue(0),
+    offboardMember: vi.fn().mockResolvedValue(undefined),
+    defineRole: vi.fn().mockResolvedValue(undefined),
+    deleteRole: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
+const actor = { userId: "admin-1" };
+
+const WRITE_ACTOR = { type: "user", id: "admin-1" } as const;
+
+function makeService(repository: RepositoryStub, ledger: LedgerStub = makeLedger()) {
+  const epoch = new StubAuthzEpoch();
+  const service = AuthzGrantsService.create({
+    permissions: permissiveGrantGuards,
+    repository,
+    ledger,
+    epoch,
+    newBindingId: () => "rb_test_ksuid",
+    bindings: new StubAuthzManagedGrantRepository(),
+  });
+  const bumpEpoch = epoch.bump;
+  return { service, bumpEpoch, ledger };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("AuthzGrantsService.attach", () => {
+  describe("when attaching a built-in role at team scope", () => {
+    it("creates the binding row and bumps the org epoch", async () => {
+      const repository = makeRepository();
+      const { service, bumpEpoch } = makeService(repository);
+
+      const result = await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "VIEWER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(result.bindingId).toBe("rb_test_ksuid");
+      expect(repository.createBinding).toHaveBeenCalledWith({
+        row: {
+          bindingId: "rb_test_ksuid",
+          organizationId: ORG,
+          scopeType: "TEAM",
+          scopeId: TEAM,
+          role: "VIEWER",
+          customRoleId: null,
+          principal: { userId: "alice" },
+        },
+        actor: WRITE_ACTOR,
+        source: "grants-service",
+      });
+      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+
+  describe("when the custom role belongs to another organization", () => {
+    it("rejects the attach", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { customRoleId: "cr-foreign" },
+          where: { type: "organization", id: ORG },
+        }),
+      ).rejects.toBeInstanceOf(GrantValidationError);
+      expect(repository.createBinding).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the custom role lists a permission the registry never heard of", () => {
+    it("rejects the attach and names the offending strings", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({
+          organizationId: ORG,
+          permissions: ["traces:view", "traces:teleport"],
+        }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { customRoleId: "cr-typo" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        meta: { unknownPermissions: ["traces:teleport"] },
+      });
+      expect(repository.createBinding).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the custom role's payload is not a list at all", () => {
+    it("attaches, because a malformed payload grants nothing to validate", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({ organizationId: ORG, permissions: null }),
+      });
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { customRoleId: "cr-empty" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when the caller states where the grant came from", () => {
+    /** @scenario "A grant states which surface authored it" */
+    it("stamps that source onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "join-request" }),
+      );
+    });
+
+    /** Every vocabulary entry reaches the port unchanged: the seam is the
+     *  vocabulary's, not a private list of the two callers that exist today.
+     *  @scenario "A grant states which surface authored it" */
+    it("carries every source the vocabulary names", async () => {
+      for (const source of GRANT_EVENT_SOURCES) {
+        const repository = makeRepository();
+        const { service } = makeService(repository);
+
+        await service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+          source,
+        });
+
+        expect(repository.createBinding).toHaveBeenCalledWith(expect.objectContaining({ source }));
+      }
+    });
+  });
+
+  describe("when the caller states no source", () => {
+    /** @scenario "A grant nobody attributed is the grants service's own" */
+    it("attributes the grant to the grants service", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ source: "grants-service" }),
+      );
+    });
+  });
+
+  describe("when the caller is a surface rather than a person", () => {
+    /** The registry's name, never a hand-built `"system:..."` string: what
+     *  reaches the port is what `toLedgerActor` renders it as.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("stamps the registry's system principal onto the write", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "scim" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "scim",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+          source: "scim",
+        }),
+      );
+    });
+
+    /** @scenario "A write with no person behind it names the surface that made it" */
+    it("carries the join-requests principal the auto-approval path acts as", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor: { type: "system", name: "joinRequests" },
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+        source: "join-request",
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actor: { type: "system", id: SYSTEM_ACTORS.joinRequests },
+          source: "join-request",
+        }),
+      );
+    });
+
+    /** The raw-id shape every boundary already passes is untouched by the
+     *  widening — that is the whole constraint on this change.
+     *  @scenario "A write with no person behind it names the surface that made it" */
+    it("still records a person from the raw id shape", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.attach({
+        actor,
+        who: { type: "user", id: "alice" },
+        role: { builtin: "MEMBER" },
+        where: { type: "team", id: TEAM, organizationId: ORG },
+      });
+
+      expect(repository.createBinding).toHaveBeenCalledWith(
+        expect.objectContaining({ actor: WRITE_ACTOR }),
+      );
+    });
+  });
+
+  describe("when the team is not in the target organization", () => {
+    it("rejects the attach", async () => {
+      const repository = makeRepository({
+        findTeamOrganization: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "alice" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toBeInstanceOf(GrantValidationError);
+    });
+  });
+
+  describe("when the scope already holds an identical binding", () => {
+    /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
+    it("answers the REST contract's own conflict code, not a generic validation failure", async () => {
+      const repository = makeRepository({
+        createBinding: vi.fn().mockRejectedValue(new DuplicateBindingError()),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "user-1" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Attaching a duplicate role binding is rejected with a named error" */
+    it("matches the port signal by code, not by class identity", async () => {
+      // Not a `DuplicateBindingError` instance - e.g. what a port adapter
+      // reconstructs from a serialised error crossing a worker or a bundle
+      // boundary. `rethrowKnownWriteFailure` must still translate it.
+      const repository = makeRepository({
+        createBinding: vi.fn().mockRejectedValue({ code: "role_binding_already_exists" }),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+      await expect(
+        service.attach({
+          actor,
+          who: { type: "user", id: "user-1" },
+          role: { builtin: "MEMBER" },
+          where: { type: "team", id: TEAM, organizationId: ORG },
+        }),
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("AuthzGrantsService.revoke", () => {
+  describe("when revoking an existing binding", () => {
+    /** @scenario "Revoking a binding takes effect on the caller's next request" */
+    it("deletes the row and bumps the epoch so the next check recollects", async () => {
+      const repository = makeRepository();
+      const { service, bumpEpoch } = makeService(repository);
+      await service.revoke({ actor, bindingId: "rb-1", organizationId: ORG });
+      expect(repository.deleteBinding).toHaveBeenCalledWith({
+        bindingId: "rb-1",
+        organizationId: ORG,
+        actor: WRITE_ACTOR,
+      });
+      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+
+  describe("when the binding belongs to another organization", () => {
+    it("answers not-found rather than confirming it exists", async () => {
+      const repository = makeRepository({
+        findBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
+      expect(repository.deleteBinding).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the row disappears between the read and the delete", () => {
+    it("answers with the same not-found the pre-read produces", async () => {
+      const repository = makeRepository({
+        deleteBinding: vi.fn().mockRejectedValue(new BindingMissingError()),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+
+      await expect(
+        service.revoke({ actor, bindingId: "rb-1", organizationId: ORG }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("AuthzGrantsService.update", () => {
+  describe("when the role change collides with a sibling binding", () => {
+    it("answers the REST contract's own conflict code", async () => {
+      const repository = makeRepository({
+        updateBindingRole: vi.fn().mockRejectedValue(new DuplicateBindingError()),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { builtin: "MEMBER" },
+        }),
+      ).rejects.toMatchObject({
+        code: "role_binding_already_exists",
+        httpStatus: 409,
+      });
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when re-pointing at another organization's custom role", () => {
+    /** @scenario "A role binding can never reference another organization's custom role" */
+    it("rejects with the same tenancy rule as attach", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({ organizationId: OTHER_ORG, permissions: [] }),
+      });
+      const { service } = makeService(repository);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { customRoleId: "cr-foreign" },
+        }),
+      ).rejects.toMatchObject({ code: "grant_validation_failed" });
+      expect(repository.updateBindingRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when re-pointing at a custom role with an unknown permission", () => {
+    it("rejects with the same vocabulary rule as attach", async () => {
+      const repository = makeRepository({
+        findCustomRole: vi.fn().mockResolvedValue({
+          organizationId: ORG,
+          permissions: ["definitely:notreal"],
+        }),
+      });
+      const { service } = makeService(repository);
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { customRoleId: "cr-typo" },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        meta: { unknownPermissions: ["definitely:notreal"] },
+      });
+      expect(repository.updateBindingRole).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the binding belongs to another organization", () => {
+    it("answers not-found rather than confirming it exists", async () => {
+      const repository = makeRepository({
+        findBinding: vi.fn().mockResolvedValue({ id: "rb-1", organizationId: OTHER_ORG }),
+      });
+      const { service } = makeService(repository);
+
+      await expect(
+        service.update({
+          actor,
+          bindingId: "rb-1",
+          organizationId: ORG,
+          role: { builtin: "MEMBER" },
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_validation_failed",
+        message: "Role binding not found",
+      });
+      expect(repository.updateBindingRole).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("AuthzGrantsService.replace", () => {
+  describe("when narrowing an org grant to a team grant", () => {
+    /** @scenario "Replacing a grant is one atomic swap" */
+    it("hands the repository one swap carrying the actor", async () => {
+      const repository = makeRepository();
+      const { service, bumpEpoch } = makeService(repository);
+      const result = await service.replace({
+        actor,
+        who: { type: "user", id: "user-1" },
+        from: { type: "organization", id: ORG },
+        to: { type: "team", id: TEAM, organizationId: ORG },
+        role: { builtin: "MEMBER" },
+      });
+      expect(result.bindingId).toBe("rb_test_ksuid");
+      expect(repository.replaceBinding).toHaveBeenCalledTimes(1);
+      expect(repository.replaceBinding).toHaveBeenCalledWith({
+        deleteWhere: {
+          organizationId: ORG,
+          scopeType: "ORGANIZATION",
+          scopeId: ORG,
+          principal: { userId: "user-1" },
+        },
+        create: expect.objectContaining({
+          bindingId: "rb_test_ksuid",
+          scopeType: "TEAM",
+          scopeId: TEAM,
+          role: "MEMBER",
+          principal: { userId: "user-1" },
+        }),
+        actor: WRITE_ACTOR,
+      });
+      expect(repository.createBinding).not.toHaveBeenCalled();
+      expect(bumpEpoch).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("AuthzGrantsService.offboard", () => {
+  describe("when every grant source deletes cleanly", () => {
+    it("returns the removal counts, the manifest, and bumps the epoch", async () => {
+      const repository = makeRepository({
+        findOwnedApiKeys: vi.fn().mockResolvedValue([{ id: "key-1", name: "ci key" }]),
+        findPersonalTeams: vi.fn().mockResolvedValue([{ id: "team-p", name: "Dave's workspace" }]),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+
+      const result = await service.offboard({
+        actor,
+        userId: "dave",
+        organizationId: ORG,
+      });
+
+      expect(result.removed).toEqual(OFFBOARD_COUNTS);
+      expect(result.needsHumanDecision.ownedApiKeys).toEqual([{ id: "key-1", name: "ci key" }]);
+      expect(result.needsHumanDecision.personalTeams).toEqual([
+        { id: "team-p", name: "Dave's workspace" },
+      ]);
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          organizationId: ORG,
+          actor: WRITE_ACTOR,
+        }),
+      );
+      expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    });
+  });
+
+  describe("when a directory sync offboards the member", () => {
+    /** D08's de-enroll. The revocation says which surface removed the
+     *  member through its ACTOR — `grant_revoked` has no `source` field and
+     *  does not need one, because the offboarding fact already names the
+     *  surface here and the reason alongside it.
+     *  @scenario "A revocation names the surface that made it without a source of its own" */
+    it("hands the port the surface as the offboarding actor", async () => {
+      const repository = makeRepository();
+      const { service } = makeService(repository);
+
+      await service.offboard({
+        actor: { type: "system", name: "scim" },
+        userId: "dave",
+        organizationId: ORG,
+      });
+
+      expect(repository.offboardUser).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "dave",
+          actor: { type: "system", id: SYSTEM_ACTORS.scim },
+        }),
+      );
+    });
+  });
+
+  describe("when something still resolves after the deletes", () => {
+    it("throws from the proof and leaves storage untouched", async () => {
+      const repository = makeRepository({
+        // The transaction-bound reader still sees a binding - the proof
+        // must throw, and the adapter contract turns that into a rollback.
+        offboardUser: vi.fn(async ({ prove }) => {
+          await prove(
+            makeReader({
+              findUserBindings: vi.fn().mockResolvedValue([
+                {
+                  roleKey: "member",
+                  scopeType: "TEAM",
+                  scopeId: TEAM,
+                  viaGroupId: null,
+                },
+              ]),
+            }),
+          );
+          return OFFBOARD_COUNTS;
+        }),
+      });
+      const { service, bumpEpoch } = makeService(repository);
+
+      await expect(
+        service.offboard({ actor, userId: "dave", organizationId: ORG }),
+      ).rejects.toBeInstanceOf(OffboardIncompleteError);
+      expect(bumpEpoch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the offboarded user still owns a personal api key", () => {
+    /** @scenario "Offboarding a user removes every grant, with proof" */
+    it("resolves nothing through the key, because its owner now resolves nothing", async () => {
+      // The post-offboard world: the KEY's own binding survived the
+      // offboarding (nobody deleted the key), but its owner has nothing
+      // left, and the §9 ceiling is what closes the hole.
+      const authz = AuthzService.create({
+        // These suites exercise the engine path, which is what the absent
+        // gate used to default to.
+        isOnEngine: async () => true,
+        listing: new StubAuthzListingRepository(),
+        repository: makeReader({
+          findApiKeyOwner: vi.fn().mockResolvedValue({ userId: "dave" }),
+          findApiKeyBindings: vi.fn().mockResolvedValue([
+            {
+              roleKey: "admin",
+              scopeType: "PROJECT",
+              scopeId: PROJECT,
+              viaGroupId: null,
+            },
+          ]),
+        }),
+        bindings: new StubAuthzManagedGrantRepository(),
+      });
+
+      const decision = await authz.check({
+        principal: { type: "apiKey", id: "key-1" },
+        permission: "datasets:manage",
+        scope: {
+          type: "project",
+          id: PROJECT,
+          teamId: TEAM,
+          organizationId: ORG,
+        },
+      });
+
+      expect(decision.allowed).toBe(false);
+      expect(decision.denialReason).toBe("owner-ceiling");
+    });
+  });
+});
+
+type CompatibilityInputs = {
+  [M in CompatibilityMethod]: Parameters<AuthzGrantsService[M]>[0];
+};
+type CompatibilityCall = {
+  [M in CompatibilityMethod]: { method: M; input: CompatibilityInputs[M]; output: unknown };
+}[CompatibilityMethod];
+type CompatibilityInvokers = {
+  [M in CompatibilityMethod]: (input: CompatibilityInputs[M]) => Promise<unknown>;
+};
+
+function withoutCaller(input: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(input).filter(([key]) => key !== "caller"));
+}
+
+function invokeCompatibility<M extends CompatibilityMethod>(
+  service: AuthzGrantsService,
+  call: { method: M; input: CompatibilityInputs[M] },
+): Promise<unknown> {
+  const invokers: CompatibilityInvokers = {
+    attachBindings: (input) => service.attachBindings(input),
+    attachResourceGrant: (input) => service.attachResourceGrant(input),
+    revokeResourceGrants: (input) => service.revokeResourceGrants(input),
+    changeBindingRole: (input) => service.changeBindingRole(input),
+    revokeBindings: (input) => service.revokeBindings(input),
+    revokeBindingsWhere: (input) => service.revokeBindingsWhere(input),
+    offboardMember: (input) => service.offboardMember(input),
+    defineRole: (input) => service.defineRole(input),
+    deleteRole: (input) => service.deleteRole(input),
+  };
+  return invokers[call.method](call.input);
+}
+
+const COMPATIBILITY_CALLS: readonly CompatibilityCall[] = [
+  {
+    method: "attachBindings",
+    input: {
+      organizationId: ORG,
+      bindings: [
+        {
+          bindingId: "rb-ledger",
+          principal: { userId: "alice" },
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: TEAM,
+        },
+      ],
+      caller: { type: "system" },
+      actor: WRITE_ACTOR,
+      source: "read-through-mint",
+      onDuplicate: "skip",
+      commandId: "authzcmd-attach",
+      occurredAtMs: 123,
+      awaitProjection: false,
+    },
+    output: { attached: ["rb-ledger"], duplicates: ["rb-existing"] },
+  },
+  {
+    method: "attachResourceGrant",
+    input: {
+      organizationId: ORG,
+      grantId: "grant-resource",
+      projectId: PROJECT,
+      resource: {
+        token: "token",
+        permission: "traces:view",
+        kind: "trace",
+        expiresAtMs: 456,
+        maxViews: 3,
+        createdByUserId: "admin-1",
+      },
+      principal: { type: "project", id: PROJECT },
+      scopeId: "trace-1",
+      actor: WRITE_ACTOR,
+      commandId: "authzcmd-resource",
+    },
+    output: undefined,
+  },
+  {
+    method: "revokeResourceGrants",
+    input: {
+      organizationId: ORG,
+      grantIds: ["grant-resource"],
+      actor: WRITE_ACTOR,
+      reason: "link removed",
+    },
+    output: undefined,
+  },
+  {
+    method: "changeBindingRole",
+    input: {
+      organizationId: ORG,
+      bindingId: "rb-ledger",
+      role: "CUSTOM",
+      customRoleId: "role-ops",
+      caller: { type: "system" },
+      actor: WRITE_ACTOR,
+    },
+    output: undefined,
+  },
+  {
+    method: "revokeBindings",
+    input: {
+      organizationId: ORG,
+      bindingIds: ["rb-ledger"],
+      actor: WRITE_ACTOR,
+      reason: "access removed",
+    },
+    output: undefined,
+  },
+  {
+    method: "revokeBindingsWhere",
+    input: {
+      organizationId: ORG,
+      where: {
+        userId: "alice",
+        customRoleId: { in: ["role-ops"] },
+        scopeType: "TEAM",
+        scopeId: TEAM,
+        id: { notIn: ["rb-keep"] },
+      },
+      actor: WRITE_ACTOR,
+      reason: "role retired",
+    },
+    output: 2,
+  },
+  {
+    method: "offboardMember",
+    input: {
+      organizationId: ORG,
+      userId: "alice",
+      revokedGrantIds: ["rb-ledger"],
+      actor: WRITE_ACTOR,
+    },
+    output: undefined,
+  },
+  {
+    method: "defineRole",
+    input: {
+      organizationId: ORG,
+      roleId: "role-ops",
+      name: "Operator",
+      description: "Runs production",
+      permissions: ["traces:view"],
+      kind: "custom",
+      actor: WRITE_ACTOR,
+    },
+    output: undefined,
+  },
+  {
+    method: "deleteRole",
+    input: {
+      organizationId: ORG,
+      roleId: "role-ops",
+      actor: WRITE_ACTOR,
+      awaitProjection: false,
+    },
+    output: undefined,
+  },
+];
+
+describe("AuthzGrantsService compatibility operations", () => {
+  it.each(COMPATIBILITY_CALLS)("$method delegates its exact input and result", async (call) => {
+    const { method, input, output } = call;
+    const ledger = makeLedger({
+      [method]: vi.fn().mockResolvedValue(output),
+    });
+    const { service } = makeService(makeRepository(), ledger);
+    await expect(invokeCompatibility(service, call)).resolves.toBe(output);
+    expect(ledger[method]).toHaveBeenCalledOnce();
+    // The caller bounds the write inside authz; the ledger below the ceiling never sees it.
+    expect(ledger[method]).toHaveBeenCalledWith(withoutCaller(input));
+  });
+
+  it.each(COMPATIBILITY_CALLS)("$method preserves the adapter's exact error", async (call) => {
+    const { method } = call;
+    const error = Object.assign(new Error(`${method} failed`), {
+      code: `test_${method}`,
+    });
+    const ledger = makeLedger({
+      [method]: vi.fn().mockRejectedValue(error),
+    });
+    const { service } = makeService(makeRepository(), ledger);
+    const raised = await invokeCompatibility(service, call).catch((value) => value);
+    expect(raised).toBe(error);
+  });
+
+  it("keeps the high-level attach path on its existing validated repository flow", async () => {
+    const repository = makeRepository();
+    const { service, ledger, bumpEpoch } = makeService(repository);
+
+    await service.attach({
+      actor,
+      who: { type: "user", id: "alice" },
+      role: { builtin: "VIEWER" },
+      where: { type: "team", id: TEAM, organizationId: ORG },
+    });
+
+    expect(repository.createBinding).toHaveBeenCalledOnce();
+    expect(bumpEpoch).toHaveBeenCalledWith({ organizationId: ORG });
+    for (const operation of Object.values(ledger)) {
+      expect(operation).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("AuthzGrantsService.retireDirectoryGrants", () => {
+  const retire = {
+    organizationId: ORG,
+    userIds: ["alice", "bob"],
+    actor: { type: "user", id: "admin-1" },
+    reason: "directory access is supplied by group membership",
+  } as const;
+
+  it("revokes exactly the grants the directory wrote, and says how many", async () => {
+    const repository = makeRepository({
+      findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue(["rb-scim-1", "rb-scim-2"]),
+    });
+    const { service, ledger } = makeService(repository);
+
+    await expect(
+      service.retireDirectoryGrants({ ...retire, userIds: [...retire.userIds] }),
+    ).resolves.toBe(2);
+
+    expect(repository.findDirectoryOrganizationGrantIds).toHaveBeenCalledWith({
+      organizationId: ORG,
+      userIds: ["alice", "bob"],
+    });
+    expect(ledger.revokeBindings).toHaveBeenCalledWith({
+      organizationId: ORG,
+      bindingIds: ["rb-scim-1", "rb-scim-2"],
+      actor: retire.actor,
+      reason: retire.reason,
+    });
+  });
+
+  it("writes nothing when the directory wrote none of this organization's grants", async () => {
+    const repository = makeRepository({
+      findDirectoryOrganizationGrantIds: vi.fn().mockResolvedValue([]),
+    });
+    const { service, ledger } = makeService(repository);
+
+    await expect(
+      service.retireDirectoryGrants({ ...retire, userIds: [...retire.userIds] }),
+    ).resolves.toBe(0);
+    expect(ledger.revokeBindings).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing at all for an empty set of people", async () => {
+    const repository = makeRepository();
+    const { service, ledger } = makeService(repository);
+
+    await expect(service.retireDirectoryGrants({ ...retire, userIds: [] })).resolves.toBe(0);
+    expect(repository.findDirectoryOrganizationGrantIds).not.toHaveBeenCalled();
+    expect(ledger.revokeBindings).not.toHaveBeenCalled();
+  });
+});
+
+describe("BindingPrincipalWhere", () => {
+  it("rejects a value carrying two principals, even passed by reference", () => {
+    // Excess-property checks skip variables, so without the `?: never`
+    // exclusions this assignment would type-check and the adapter would
+    // write two principal columns onto one row.
+    const twoPrincipals = { userId: "user-1", groupId: "group-1" };
+    // @ts-expect-error exactly one principal per binding row
+    const rejected: BindingPrincipalWhere = twoPrincipals;
+    void rejected;
+
+    const user: BindingPrincipalWhere = { userId: "user-1" };
+    const group: BindingPrincipalWhere = { groupId: "group-1" };
+    const apiKey: BindingPrincipalWhere = { apiKeyId: "key-1" };
+    expect([user, group, apiKey]).toHaveLength(3);
+  });
+});
+
+describe("AuthzGrantsService central caller ceiling", () => {
+  const TEAM_ADMIN = {
+    bindingId: "rb-new",
+    principal: { userId: "mallory" },
+    role: "ADMIN",
+    customRoleId: null,
+    scopeType: "TEAM",
+    scopeId: TEAM,
+  } as const;
+
+  function ceilingService(missing: string[]) {
+    const ledger = makeLedger({
+      attachBindings: vi.fn().mockResolvedValue({ attached: ["rb-new"], duplicates: [] }),
+      changeBindingRole: vi.fn().mockResolvedValue(undefined),
+    });
+    const findPermissionsBeyondCaller = vi.fn(async () => missing);
+    const bindings = new StubAuthzManagedGrantRepository();
+    bindings.findBinding.mockResolvedValue({
+      id: "rb-existing",
+      organizationId: ORG,
+      userId: "mallory",
+      groupId: null,
+      apiKeyId: null,
+      role: "VIEWER",
+      customRoleId: null,
+      scopeType: "TEAM",
+      scopeId: TEAM,
+    });
+    const service = AuthzGrantsService.create({
+      permissions: { ...permissiveGrantGuards, findPermissionsBeyondCaller },
+      repository: makeRepository(),
+      ledger,
+      epoch: new StubAuthzEpoch(),
+      newBindingId: () => "rb_test_ksuid",
+      bindings,
+    });
+    return { service, ledger, findPermissionsBeyondCaller };
+  }
+
+  /** @scenario "Adding a team member with a role above the caller is refused" */
+  it("refuses an attach beyond what the caller holds and writes nothing", async () => {
+    const { service, ledger } = ceilingService(["team:manage"]);
+
+    await expect(
+      service.attachBindings({
+        organizationId: ORG,
+        bindings: [TEAM_ADMIN],
+        caller: { type: "user", id: "mallory" },
+        actor: WRITE_ACTOR,
+        onDuplicate: "attach",
+      }),
+    ).rejects.toMatchObject({
+      code: "grant_exceeds_caller_permissions",
+      meta: { missingPermissions: ["team:manage"] },
+    });
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Saving a team's members with a role above the caller is refused" */
+  it("refuses a role change beyond what the caller holds at the binding's scope", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService(["team:manage"]);
+
+    await expect(
+      service.changeBindingRole({
+        organizationId: ORG,
+        bindingId: "rb-existing",
+        role: "ADMIN",
+        customRoleId: null,
+        caller: { type: "user", id: "mallory" },
+        actor: WRITE_ACTOR,
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(findPermissionsBeyondCaller).toHaveBeenCalledWith(
+      expect.objectContaining({ scope: { type: "team", id: TEAM } }),
+    );
+    expect(ledger.changeBindingRole).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A grant write nobody answers for is refused" */
+  it("refuses an anonymous caller without asking what it holds", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService([]);
+
+    await expect(
+      service.attachBindings({
+        organizationId: ORG,
+        bindings: [TEAM_ADMIN],
+        caller: { type: "anonymous" },
+        actor: WRITE_ACTOR,
+        onDuplicate: "attach",
+      }),
+    ).rejects.toMatchObject({ code: "grant_exceeds_caller_permissions" });
+    expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
+    expect(ledger.attachBindings).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Granting at or below the caller's own level still succeeds" */
+  it("writes a grant the caller holds", async () => {
+    const { service, ledger } = ceilingService([]);
+
+    await service.attachBindings({
+      organizationId: ORG,
+      bindings: [TEAM_ADMIN],
+      caller: { type: "user", id: "alice" },
+      actor: WRITE_ACTOR,
+      onDuplicate: "attach",
+    });
+    expect(ledger.attachBindings).toHaveBeenCalledOnce();
+  });
+
+  /** @scenario "A write that follows from an act already authorized is not bounded by a caller" */
+  it("lets a system write through without asking", async () => {
+    const { service, ledger, findPermissionsBeyondCaller } = ceilingService(["team:manage"]);
+
+    await service.attachBindings({
+      organizationId: ORG,
+      bindings: [TEAM_ADMIN],
+      caller: { type: "system" },
+      actor: WRITE_ACTOR,
+      onDuplicate: "attach",
+    });
+    expect(findPermissionsBeyondCaller).not.toHaveBeenCalled();
+    expect(ledger.attachBindings).toHaveBeenCalledOnce();
+  });
+});

@@ -14,6 +14,7 @@ This recipe helps you evaluate agents that process images, audio, PDFs, or other
 ## Step 1: Identify Modalities
 
 Read the codebase to understand what your agent processes:
+
 - **Images**: classification, analysis, generation, OCR
 - **Audio**: transcription, voice agents, audio Q&A
 - **PDFs/Documents**: parsing, extraction, summarization
@@ -33,6 +34,7 @@ langwatch docs evaluations/evaluators/list         # Browse evaluator types
 ```
 
 For PDF evaluation specifically, reference the pattern from `sdks/python/examples/pdf_parsing_evaluation.ipynb`:
+
 - Download/load documents
 - Define extraction pipeline
 - Use LangWatch experiment SDK to evaluate extraction accuracy
@@ -40,7 +42,9 @@ For PDF evaluation specifically, reference the pattern from `sdks/python/example
 ## Step 3: Set Up Evaluation by Modality
 
 ### Image Evaluation
+
 LangWatch's LLM-as-judge evaluators can accept images. Create an evaluation that:
+
 1. Loads test images
 2. Runs the agent on each image
 3. Uses an LLM-as-judge evaluator to assess output quality
@@ -67,7 +71,9 @@ for idx, entry in experiment.loop(enumerate(image_dataset)):
 ```
 
 ### Audio Evaluation
+
 Use Scenario's audio testing patterns:
+
 - Audio-to-text: verify transcription accuracy
 - Audio-to-audio: verify voice agent responses
 
@@ -78,13 +84,16 @@ langwatch scenario-docs multimodal/audio-to-text
 ```
 
 ### PDF/Document Evaluation
+
 Follow the pattern from the PDF parsing evaluation example:
+
 1. Load documents (PDFs, CSVs, etc.)
 2. Define extraction/parsing pipeline
 3. Evaluate extraction accuracy against expected fields
 4. Use structured evaluation (exact match for fields, LLM judge for summaries)
 
 ### File Analysis
+
 For agents that process arbitrary files, read the file analysis guide:
 
 ```bash
@@ -94,6 +103,7 @@ langwatch scenario-docs multimodal/multimodal-files
 ## Step 4: Generate Domain-Specific Test Data
 
 For each modality, generate or collect test data that matches the agent's actual use case:
+
 - If it's a medical imaging agent → use relevant medical image samples
 - If it's a document parser → use real document types the agent encounters
 - If it's a voice assistant → record realistic voice prompts
@@ -103,6 +113,7 @@ For each modality, generate or collect test data that matches the agent's actual
 Run the evaluation, review results, fix issues, re-run until quality is acceptable.
 
 ## Common Mistakes
+
 - Do NOT evaluate multimodal agents with text-only metrics. Use image-aware judges
 - Do NOT skip testing with real file formats. Synthetic descriptions aren't enough
 - Do NOT forget to handle file loading errors in evaluations

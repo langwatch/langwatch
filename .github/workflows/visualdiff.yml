@@ -1,0 +1,309 @@
+name: visualdiff
+
+# Renders every route and flow in tools/visualdiff/visualdiff.yaml on origin/main
+# (base) and this PR (candidate) and reports every screen that differs. How it
+# boots on a runner, publishes and fails: tools/visualdiff/README.md, "Running
+# in CI". Findings are for review and never fail the job; only exit 2 (the run
+# itself broke) does, the same ladder as apidiff.yml.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# One run per PR: a newer push cancels the one still going.
+concurrency:
+  group: visualdiff-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+      heavy: ${{ steps.detect.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'apps/**'
+              - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
+              - 'dev/scripts/**'
+              - 'tools/visualdiff/**'
+              - 'tools/havenrun/**'
+              - 'cmd/visualdiff/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
+              - '*/go.mod'
+              - '*/go.sum'
+              - '.github/workflows/visualdiff.yml'
+
+  run:
+    needs: changes
+    # `heavy` is false on a draft, so a draft waits for ready_for_review.
+    if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      # Both stacks share these stores (-no-haven); visualdiff sets each stack's
+      # ports, origin and Redis index itself (tools/visualdiff/plan.go).
+      DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      REDIS_URL: "redis://localhost:6380"
+      # Nothing listens on either: both sides fail alike on NLP or evaluator calls.
+      LANGWATCH_NLP_SERVICE: "http://localhost:5563"
+      LANGEVALS_ENDPOINT: "http://localhost:5564"
+      NEXTAUTH_SECRET: "visualdiff-throwaway-nextauth-secret"
+      API_TOKEN_JWT_SECRET: "visualdiff-throwaway-jwt-secret"
+      LW_GATEWAY_INTERNAL_SECRET: "visualdiff-gateway-internal-secret-000000000000000000000000000000000000"
+      LW_GATEWAY_JWT_SECRET: "visualdiff-gateway-jwt-secret-00000000000000000000000000000000000000000"
+      LW_VIRTUAL_KEY_PEPPER: "visualdiff-virtual-key-pepper-00000000000000000000000000000000000000000"
+      SKIP_ENV_VALIDATION: "true"
+      OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
+      NODE_ENV: "development"
+      CI: "true"
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      # The seed hashes the project key with it and both stacks verify with it.
+      - name: Generate a throwaway CREDENTIALS_SECRET
+        run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      # visualdiff adds a worktree at origin/main itself, so the ref must exist.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      # Warms the pnpm store both worktree installs (--prefer-offline) draw on.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - uses: ./.github/actions/prepare-generated-files
+
+      - name: Install goose
+        run: bash .github/scripts/install-goose.sh
+
+      # The candidate's schema and seed, the state a developer's own stack is in:
+      # the base boots on it with its migrations skipped (README, "Running in CI").
+      - name: Migrate and seed the shared databases
+        run: |
+          pnpm prisma:migrate
+          pnpm clickhouse:migrate
+          pnpm prisma:seed
+
+      - name: Read the runner's Playwright version
+        id: playwright
+        run: echo "version=$(pnpm --silent --filter @langwatch/visual-diff-runner exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright's browsers
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ms-playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+
+      # A cached browser skips the download; the system libraries still install.
+      - name: Install Playwright's Chromium
+        run: pnpm --filter @langwatch/visual-diff-runner exec playwright install --with-deps chromium
+
+      - name: Run visualdiff
+        id: run
+        run: |
+          set +e
+          run_dir="$RUNNER_TEMP/visualdiff-run"
+          # Built, not `go run`, which reports every non-zero exit as 1.
+          go build -o "$RUNNER_TEMP/visualdiff" ./cmd/visualdiff || { echo "exit_code=2" >> "$GITHUB_OUTPUT"; exit 0; }
+          "$RUNNER_TEMP/visualdiff" run -no-haven -no-publish -no-baseline -agent \
+            -base origin/main -candidate HEAD -run-dir "$run_dir" -boot-timeout 20m
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "visualdiff exited $code (0 no findings, 1 findings, 2 the run could not complete)"
+          if [ "$code" = 2 ]; then
+            for log in "$run_dir"/logs/*.log; do
+              [ -f "$log" ] || continue
+              echo "::group::$(basename "$log"), last 150 lines"
+              tail -n 150 "$log"
+              echo "::endgroup::"
+            done
+          fi
+          exit 0
+
+      # report.html addresses its screenshots relative to itself, so shots/ rides along.
+      - name: Upload the report
+        id: upload
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visualdiff-report
+          path: |
+            ${{ runner.temp }}/visualdiff-run/run.log
+            ${{ runner.temp }}/visualdiff-run/summary.txt
+            ${{ runner.temp }}/visualdiff-run/findings.jsonl
+            ${{ runner.temp }}/visualdiff-run/report/
+            ${{ runner.temp }}/visualdiff-run/shots/
+            ${{ runner.temp }}/visualdiff-run/logs/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Write the job summary
+        if: ${{ !cancelled() }}
+        env:
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          run_dir="$RUNNER_TEMP/visualdiff-run"
+          case "$EXIT_CODE" in
+            0) headline="No findings" ;;
+            1) headline="Findings to review (they do not fail this job)" ;;
+            2) headline="The run could not complete" ;;
+            *) headline="visualdiff did not run: a step before it failed" ;;
+          esac
+          {
+            echo "## visualdiff: $headline"
+            echo
+            if [ -f "$run_dir/summary.txt" ]; then
+              echo '````text'
+              cat "$run_dir/summary.txt"
+              echo '````'
+            elif [ -f "$run_dir/run.log" ]; then
+              echo "No summary was written. The end of run.log:"
+              echo '````text'
+              tail -n 40 "$run_dir/run.log"
+              echo '````'
+            fi
+            if [ -n "$ARTIFACT_URL" ]; then
+              echo
+              echo "[Full report]($ARTIFACT_URL): unzip it and open report/enterprise/report.html."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Skip publishing on a fork
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          echo "publish: skipped, a fork's pull request gets a read-only token; the report is in the workflow's artifact"
+
+      # Edits the PR's one <!-- visualdiff:screens --> comment in place; a dispatch
+      # publishes to its branch's open PR, when there is one.
+      - name: Publish the screens to the pull request
+        id: publish
+        if: >-
+          !cancelled() && (steps.run.outputs.exit_code == '0' || steps.run.outputs.exit_code == '1')
+          && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          "$RUNNER_TEMP/visualdiff" publish -run-dir "$RUNNER_TEMP/visualdiff-run" \
+            -base origin/main -candidate HEAD -pr "$PR_NUMBER" -link "$ARTIFACT_URL"
+
+      # No screens went up (the run broke, nothing was selected, or the upload
+      # failed): the same marked comment says so, so a stale gallery never stays.
+      - name: Post the run's status in place of the screens
+        if: >-
+          !cancelled() && steps.publish.outcome != 'success' && github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          SUMMARY_FILE: ${{ runner.temp }}/visualdiff-run/summary.txt
+        with:
+          script: |
+            const fs = require("fs");
+            const MARKER = "<!-- visualdiff:screens -->";
+            const HEADLINES = {
+              "0": "no findings",
+              "1": "findings to review, no screens published",
+              "2": "the run could not complete",
+            };
+            const exitCode = process.env.EXIT_CODE ?? "";
+            const headline = HEADLINES[exitCode] ?? "did not run, a step before it failed";
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            let summary = "";
+            try {
+              summary = fs.readFileSync(process.env.SUMMARY_FILE, "utf8").split("\n").slice(0, 40).join("\n");
+            } catch {}
+            const lines = [MARKER, `### visualdiff: ${headline}`, ""];
+            lines.push(`Candidate \`${pr.head.sha.slice(0, 12)}\` · [workflow run](${runUrl})`, "");
+            if (summary) lines.push("````text", summary, "````", "");
+            if (process.env.ARTIFACT_URL) lines.push(`[Full report](${process.env.ARTIFACT_URL})`);
+            const body = lines.join("\n");
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr.number, per_page: 100,
+            });
+            const marked = comments.filter((c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER));
+            const existing = marked[marked.length - 1];
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              core.info(`Updated visualdiff comment ${existing.id} on PR #${pr.number}.`);
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              core.info(`Created the visualdiff comment on PR #${pr.number}.`);
+            }
+
+      - name: Fail when the run itself broke
+        if: ${{ !cancelled() && steps.run.outputs.exit_code != '0' && steps.run.outputs.exit_code != '1' }}
+        run: |
+          echo "::error::visualdiff exited '${{ steps.run.outputs.exit_code }}': the run could not complete, which is not a finding. See the step logs and the job summary."
+          exit 1

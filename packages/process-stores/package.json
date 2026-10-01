@@ -1,0 +1,64 @@
+{
+  "name": "@langwatch/process-stores",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The members a process hands its modules: the closed list, and the one build from parsed config.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./members": {
+      "types": "./dist/members.d.ts",
+      "default": "./src/members.ts"
+    },
+    "./pipelines": {
+      "types": "./dist/pipeline-selection.d.ts",
+      "default": "./src/pipeline-selection.ts"
+    },
+    "./config": {
+      "types": "./dist/config-owner.d.ts",
+      "default": "./src/config-owner.ts"
+    },
+    "./open": {
+      "types": "./dist/open-stores.d.ts",
+      "default": "./src/open-stores.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
+    "@azure/identity": "^4.13.1",
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

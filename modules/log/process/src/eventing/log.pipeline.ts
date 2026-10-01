@@ -1,0 +1,106 @@
+import {
+  type AppendStore,
+  defineAggregate,
+  defineEventingModule,
+  definePipeline,
+  type EventingSetup,
+  type Projection,
+  type RetentionPolicyResolver,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
+import {
+  type CanonicalLogRecord,
+  canonicalLogRecordReceivedEventSchema,
+  type LogProcessingEvent,
+  LOG_COMMAND_COALESCE_MAX_BATCH,
+  LOG_PROCESSING_PIPELINE_NAME,
+  type RecordCanonicalLogCommandData,
+} from "@langwatch/log-contract";
+
+import type { LogApp } from "../app/log.app.ts";
+import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
+import { CanonicalLogService } from "../services/canonical-log.service.ts";
+import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
+import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projection.ts";
+import { RecordCanonicalLogCommand } from "./log.intent.ts";
+
+export interface LogProcessingPipelineDeps {
+  canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;
+  logCommandShardCount: number;
+  /** Each tenant's retention, stamped on the log rows in place of the default (§9). */
+  retention?: RetentionPolicyResolver;
+}
+
+export interface LogProcessingAdapterOptions {
+  repository: CanonicalLogRecordAppendRepository;
+  defaultRetentionDays: number;
+  logCommandShardCount: number;
+  retention?: RetentionPolicyResolver;
+}
+
+export type LogProcessingPipeline = StaticPipelineDefinition<
+  LogProcessingEvent,
+  Record<string, Projection>,
+  { name: "recordLogRecord"; payload: RecordCanonicalLogCommandData }
+>;
+
+export function createLogProcessingPipeline(
+  deps: LogProcessingPipelineDeps,
+): LogProcessingPipeline {
+  let builder = definePipeline({
+    name: LOG_PROCESSING_PIPELINE_NAME,
+    aggregate: defineAggregate({ type: "log" }),
+  })
+    .withEvents([canonicalLogRecordReceivedEventSchema])
+    .withClickHouseMapProjection(
+      CanonicalLogStorageMapProjection.create({
+        store: deps.canonicalLogAppendStore,
+        shardCount: deps.logCommandShardCount,
+      }),
+    );
+
+  if (deps.retention) builder = builder.withRetention(deps.retention);
+
+  return builder
+    .withCommand("recordLogRecord", RecordCanonicalLogCommand, {
+      getGroupKey: (payload) =>
+        CanonicalLogService.logCommandGroupKey(payload.recordId, deps.logCommandShardCount),
+      // ADR-066 pillar 2: a shard funnels many records into one group, so a
+      // backed-up shard appends one tiny insert per record. Coalesce its queued
+      // records into one multi-row insert instead. Safe to fold: the handler
+      // derives its event from its own command alone and never reads back a
+      // same-batch append.
+      coalesceMaxBatch: LOG_COMMAND_COALESCE_MAX_BATCH,
+    })
+    .build();
+}
+
+export class LogProcessingAdapter {
+  private constructor(private readonly options: LogProcessingAdapterOptions) {}
+
+  static create(options: LogProcessingAdapterOptions): LogProcessingAdapter {
+    return new LogProcessingAdapter(options);
+  }
+
+  build(): LogProcessingPipeline {
+    return createLogProcessingPipeline({
+      canonicalLogAppendStore: CanonicalLogRecordStore.create(
+        this.options.repository,
+        this.options.defaultRetentionDays,
+      ),
+      logCommandShardCount: this.options.logCommandShardCount,
+      ...(this.options.retention === undefined ? {} : { retention: this.options.retention }),
+    });
+  }
+}
+
+/**
+ * The registration: the app builds the definition and the senders are bound back once built
+ * (ADR-144). A peer that reacts to a record declares its own peer subscriber on this event.
+ * @see modules/log/adrs/001-log-processing-boundary.md
+ */
+export const logEventing = defineEventingModule({
+  pipeline: LOG_PROCESSING_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<never, LogApp>) => app.eventingPipeline(),
+  connect: ({ app, commands }) => app.connectCommands(commands),
+});

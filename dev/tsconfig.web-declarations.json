@@ -1,0 +1,281 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "strict": true,
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": [
+      "node",
+      "react",
+      "react-dom",
+      "vite/client",
+      "vitest/globals",
+      "@testing-library/jest-dom/vitest"
+    ],
+    "rootDir": "..",
+    "outDir": ".cache/web-declarations",
+    "tsBuildInfoFile": ".cache/web-declarations/tsconfig.build.tsbuildinfo",
+    "customConditions": ["langwatch-declaration-source"],
+    "noUncheckedIndexedAccess": true,
+    "target": "es2023",
+    "verbatimModuleSyntax": true,
+    "resolveJsonModule": true
+  },
+  "include": [
+    "../modules/scenario/browser/src/**/*.ts",
+    "../modules/scenario/browser/src/**/*.tsx",
+    "../modules/scenario/browser/src/**/*.json",
+    "../modules/trace/browser/src/**/*.ts",
+    "../modules/trace/browser/src/**/*.tsx",
+    "../modules/trace/browser/src/**/*.json",
+    "../modules/langy/browser/src/**/*.ts",
+    "../modules/langy/browser/src/**/*.tsx",
+    "../modules/langy/browser/src/**/*.json",
+    "../modules/project/browser/src/**/*.ts",
+    "../modules/project/browser/src/**/*.tsx",
+    "../modules/project/browser/src/**/*.json",
+    "../modules/prompt/browser/src/**/*.ts",
+    "../modules/prompt/browser/src/**/*.tsx",
+    "../modules/prompt/browser/src/**/*.json",
+    "../modules/model-provider/browser/src/**/*.ts",
+    "../modules/model-provider/browser/src/**/*.tsx",
+    "../modules/model-provider/browser/src/**/*.json",
+    "../modules/workflow/browser/src/**/*.ts",
+    "../modules/workflow/browser/src/**/*.tsx",
+    "../modules/workflow/browser/src/**/*.json",
+    "../modules/dataset/browser/src/**/*.ts",
+    "../modules/dataset/browser/src/**/*.tsx",
+    "../modules/dataset/browser/src/**/*.json",
+    "../modules/experiment/browser/src/**/*.ts",
+    "../modules/experiment/browser/src/**/*.tsx",
+    "../modules/experiment/browser/src/**/*.json",
+    "../modules/evaluator/browser/src/**/*.ts",
+    "../modules/evaluator/browser/src/**/*.tsx",
+    "../modules/evaluator/browser/src/**/*.json",
+    "../modules/analytics/browser/src/**/*.ts",
+    "../modules/analytics/browser/src/**/*.tsx",
+    "../modules/analytics/browser/src/**/*.json"
+  ],
+  "files": [
+    "../modules/analytics/browser/src/__tests__/lwql-fixtures.ts",
+    "../modules/analytics/browser/src/testing.tsx",
+    "../packages/browser-trpc/src/workflow-api.ts"
+  ],
+  "exclude": [
+    "../modules/*/browser*/src/**/__tests__/**",
+    "../modules/*/browser*/src/**/__mocks__/**",
+    "../modules/*/browser*/src/**/tests/**",
+    "../modules/*/browser*/src/**/*.test.*",
+    "../modules/*/browser*/src/**/*.spec.*",
+    "../modules/*/browser*/src/**/*.stories.*",
+    "../modules/*/browser*/src/**/*.bench.*",
+    "../modules/*/browser*/src/**/__bench__/**",
+    "../modules/*/browser*/src/testing.ts",
+    "../modules/*/browser*/src/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/browser-trpc/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/analytics/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/authz/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/coding-agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/data-privacy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/github/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/navigation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/ops/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/organization/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/presence/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/presence/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/share/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/share/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/suite/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/suite/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/topic/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/redaction/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/annotation/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/authz/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/coding-agent/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/langy/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/model-provider/browser-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../modules/trace/browser-kit/tsconfig.build.json"
+    }
+  ],
+  "langwatchDeclarationGroup": {
+    "members": [
+      {
+        "directory": "../modules/scenario/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/trace/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/langy/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/project/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/prompt/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/model-provider/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/workflow/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/dataset/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/experiment/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/evaluator/browser",
+        "source": "src",
+        "output": "dist"
+      },
+      {
+        "directory": "../modules/analytics/browser",
+        "source": "src",
+        "output": "dist"
+      }
+    ]
+  }
+}

@@ -1,0 +1,199 @@
+/**
+ * The server half of `graphs.*`: a permission and a handler per procedure the
+ * contract already named. The alert a card's bell renders arrives from the
+ * application with its provider secrets already stripped.
+ */
+import { filterFieldsEnum } from "@langwatch/analytics-contract";
+import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { Trigger } from "@langwatch/automation-contract";
+import {
+  DashboardApi,
+  graphTrpc,
+  type Graph,
+  type GraphAlert,
+} from "@langwatch/dashboard-contract";
+import { z } from "zod";
+
+const graphPayload = z.record(z.string(), z.unknown());
+
+/** Compatibility shape: the old Prisma transport exposed the discriminator. */
+const legacyGraph = <T extends Graph>(graph: T) => ({ ...graph, kind: "builder" as const });
+
+/** Read-side hydration shape for the alert bell on the graph card header. */
+type AlertActionParams = {
+  members?: string[];
+  slackIntegrationId?: string;
+  slackChannelId?: string;
+  seriesName?: string;
+  threshold: number;
+  operator: string;
+  timePeriod: number;
+};
+
+export const graphTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof graphTrpc> =
+  defineTrpcRouter(DashboardApi, graphTrpc)
+    .procedure("create")
+    .withPermission("analytics:create")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.createGraph({
+          projectId: input.projectId,
+          name: input.name,
+          graph: graphPayload.parse(JSON.parse(input.graph)),
+          filters: input.filterParams?.filters ?? {},
+          ...(input.dashboardId === undefined ? {} : { dashboardId: input.dashboardId }),
+          layout: {
+            ...(input.gridColumn === undefined ? {} : { gridColumn: input.gridColumn }),
+            ...(input.gridRow === undefined ? {} : { gridRow: input.gridRow }),
+            ...(input.colSpan === undefined ? {} : { colSpan: input.colSpan }),
+            ...(input.rowSpan === undefined ? {} : { rowSpan: input.rowSpan }),
+          },
+        }),
+      ),
+    )
+
+    .procedure("getAll")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input }) => {
+      const { projectId, dashboardId } = input;
+      const graphs = await app.listGraphs({
+        projectId,
+        ...(dashboardId === undefined ? {} : { dashboardId }),
+      });
+
+      const triggers = await app.getAlertsForGraphs({
+        projectId,
+        customGraphIds: graphs.map((graph) => graph.id),
+      });
+      const triggerByGraphId = new Map(
+        triggers.flatMap((trigger) =>
+          trigger.customGraphId === null ? [] : [[trigger.customGraphId, trigger] as const],
+        ),
+      );
+
+      return graphs.map((graph) => ({
+        ...legacyGraph(graph),
+        trigger: triggerByGraphId.get(graph.id) ?? null,
+      }));
+    })
+
+    .procedure("delete")
+    .withPermission("analytics:delete")
+    .handle(async ({ app, input }) =>
+      legacyGraph(await app.deleteGraph({ projectId: input.projectId, graphId: input.id })),
+    )
+
+    .procedure("getById")
+    .withPermission("analytics:view")
+    .handle(async ({ app, input }) => {
+      const graph = await app.getGraph({ projectId: input.projectId, graphId: input.id });
+
+      const trigger = await app.findAlertForGraph({
+        customGraphId: input.id,
+        projectId: input.projectId,
+      });
+
+      const filters = knownFilters(graph.filters);
+
+      return {
+        ...legacyGraph(graph),
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        alert: trigger === undefined ? undefined : alertOf(trigger),
+      };
+    })
+
+    .procedure("updateById")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.updateGraph({
+          projectId: input.projectId,
+          graphId: input.graphId,
+          name: input.name,
+          graph: graphPayload.parse(JSON.parse(input.graph)),
+          filters: input.filterParams?.filters ?? {},
+        }),
+      ),
+    )
+
+    .procedure("updateLayout")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      legacyGraph(
+        await app.updateGraphLayout({
+          projectId: input.projectId,
+          graphId: input.graphId,
+          layout: {
+            gridColumn: input.gridColumn,
+            gridRow: input.gridRow,
+            colSpan: input.colSpan,
+            rowSpan: input.rowSpan,
+          },
+        }),
+      ),
+    )
+
+    .procedure("batchUpdateLayouts")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input }) =>
+      app.batchUpdateGraphLayouts({
+        projectId: input.projectId,
+        layouts: input.layouts.map((layout) => ({
+          graphId: layout.graphId,
+          layout: {
+            gridColumn: layout.gridColumn,
+            gridRow: layout.gridRow,
+            colSpan: layout.colSpan,
+            rowSpan: layout.rowSpan,
+          },
+        })),
+      }),
+    )
+    .build();
+
+/**
+ * The alert bell on a card header. The parameters are the ones the application
+ * allowed out: a threshold and a period are shown, the provider's own secrets
+ * are already gone.
+ */
+function alertOf(trigger: Trigger): GraphAlert {
+  const parameters = trigger.actionParams as AlertActionParams;
+
+  return {
+    enabled: true as const,
+    threshold: parameters.threshold,
+    operator: parameters.operator,
+    timePeriod: parameters.timePeriod,
+    seriesName: parameters.seriesName || "",
+    type: trigger.alertType,
+    action: trigger.action,
+    actionParams: {
+      members: parameters.members,
+      slackIntegrationId: parameters.slackIntegrationId,
+      slackChannelId: parameters.slackChannelId,
+      seriesName: parameters.seriesName,
+    },
+    triggerId: trigger.id,
+  };
+}
+
+/**
+ * The filters a stored graph names that this deployment still offers: a graph
+ * saved against a field the registry has since dropped is read back without
+ * it.
+ */
+function knownFilters(
+  filters: Graph["filters"],
+): Record<string, string[] | Record<string, string[]>> {
+  if (!filters || typeof filters !== "object") return {};
+
+  const known: Record<string, string[] | Record<string, string[]>> = {};
+  for (const [key, value] of Object.entries(filters)) {
+    const usable = Array.isArray(value) || (typeof value === "object" && value !== null);
+    if (filterFieldsEnum.validate(key) && usable) {
+      known[key] = value as string[] | Record<string, string[]>;
+    }
+  }
+
+  return known;
+}

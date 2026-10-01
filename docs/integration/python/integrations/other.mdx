@@ -69,28 +69,28 @@ When this code runs, the `LoggingInstrumentor` (managed by `langwatch.setup()`) 
 
 Many Python libraries, especially in the AI/ML space, are instrumented by community-driven OpenTelemetry projects. If you're looking for pre-built instrumentors, these are excellent places to start:
 
-*   **OpenInference (by Arize AI):** [https://github.com/Arize-ai/openinference](https://github.com/Arize-ai/openinference)
-    *   This project provides instrumentors for a wide range of AI/ML libraries and frameworks. Examples include:
-        *   OpenAI
-        *   Anthropic
-        *   LiteLLM
-        *   Haystack
-        *   LlamaIndex
-        *   LangChain
-        *   Groq
-        *   Google Gemini
-        *   And more (check their repository for the full list).
+- **OpenInference (by Arize AI):** [https://github.com/Arize-ai/openinference](https://github.com/Arize-ai/openinference)
+  - This project provides instrumentors for a wide range of AI/ML libraries and frameworks. Examples include:
+    - OpenAI
+    - Anthropic
+    - LiteLLM
+    - Haystack
+    - LlamaIndex
+    - LangChain
+    - Groq
+    - Google Gemini
+    - And more (check their repository for the full list).
 
-*   **OpenLLMetry (by Traceloop):** [https://github.com/traceloop/openllmetry](https://github.com/traceloop/openllmetry)
-    *   This project also offers a comprehensive suite of instrumentors for LLM applications and related tools. Examples include:
-        *   OpenAI
-        *   CrewAI
-        *   Haystack
-        *   LangChain
-        *   LlamaIndex
-        *   Pinecone
-        *   ChromaDB
-        *   And more (explore their repository for details).
+- **OpenLLMetry (by Traceloop):** [https://github.com/traceloop/openllmetry](https://github.com/traceloop/openllmetry)
+  - This project also offers a comprehensive suite of instrumentors for LLM applications and related tools. Examples include:
+    - OpenAI
+    - CrewAI
+    - Haystack
+    - LangChain
+    - LlamaIndex
+    - Pinecone
+    - ChromaDB
+    - And more (explore their repository for details).
 
 You can browse these repositories to find instrumentors for other libraries you might be using. If an instrumentor from these projects (or any other source) adheres to the `BaseInstrumentor` interface, you can integrate it with LangWatch using the `langwatch.setup(instrumentors=[...])` method described above.
 

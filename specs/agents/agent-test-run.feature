@@ -202,6 +202,12 @@ Feature: Test agent with one scripted run
       When "Test agent" is chosen from the card menu
       Then the refusal is shown with the registry's title and no raw message
 
+    @integration
+    Scenario: Voice and prompt agent cards do not offer Test agent
+      Given the agents page with a voice agent and a prompt agent
+      When either card's menu is opened
+      Then no "Test agent" item is offered
+
   Rule: The drawer test panel sends "ping" by default
 
     @integration

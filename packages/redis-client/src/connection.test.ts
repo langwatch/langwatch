@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const standaloneCalls: Array<[string, Record<string, unknown>]> = [];
-const clusterCalls: Array<[unknown, Record<string, unknown>]> = [];
+const standaloneCalls: [string, Record<string, unknown>][] = [];
+const clusterCalls: [unknown, Record<string, unknown>][] = [];
+const connectionsMade: FakeConnection[] = [];
 
 class FakeConnection {
   readonly handlers = new Map<string, (...args: unknown[]) => void>();
+  constructor() {
+    connectionsMade.push(this);
+  }
   on(event: string, handler: (...args: unknown[]) => void) {
     this.handlers.set(event, handler);
     return this;
@@ -33,7 +37,7 @@ vi.mock("ioredis", () => {
   return { default: FakeIORedis, Cluster: FakeCluster };
 });
 
-const { RedisConnectionService } = await import("./connection");
+const { RedisConnectionService } = await import("./connection.ts");
 
 function createLoggerSpy() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -43,6 +47,7 @@ describe("RedisConnectionService", () => {
   beforeEach(() => {
     standaloneCalls.length = 0;
     clusterCalls.length = 0;
+    connectionsMade.length = 0;
   });
 
   describe("given the module has only been imported", () => {
@@ -145,9 +150,7 @@ describe("RedisConnectionService", () => {
     });
 
     it("returns null without a URL, constructing nothing", () => {
-      expect(
-        new RedisConnectionService().connectStandalone({ url: void 0 }),
-      ).toBeNull();
+      expect(new RedisConnectionService().connectStandalone({ url: void 0 })).toBeNull();
       expect(standaloneCalls).toHaveLength(0);
     });
   });
@@ -162,30 +165,25 @@ describe("RedisConnectionService", () => {
       });
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]?.[1]).toContain(
-        "only supports database 0",
-      );
+      expect(logger.warn.mock.calls[0]?.[1]).toContain("only supports database 0");
     });
 
     it("reports connection lifecycle events", () => {
       const logger = createLoggerSpy();
 
-      const connection = new RedisConnectionService({ logger }).connect({
-        url: "redis://localhost:6379",
-      }) as unknown as FakeConnection;
+      new RedisConnectionService({ logger }).connect({ url: "redis://localhost:6379" });
+      expect(connectionsMade).toHaveLength(1);
+      const connection = connectionsMade[0];
 
-      connection.emit("ready");
+      connection?.emit("ready");
       expect(logger.info).toHaveBeenCalledWith(
         { mode: "standalone", db: 0 },
         "ready to accept commands",
       );
 
       const error = new Error("boom");
-      connection.emit("error", error);
-      expect(logger.error).toHaveBeenCalledWith(
-        { mode: "standalone", db: 0, error },
-        "error",
-      );
+      connection?.emit("error", error);
+      expect(logger.error).toHaveBeenCalledWith({ mode: "standalone", db: 0, error }, "error");
     });
 
     it("warns even when no connection is created", () => {
@@ -205,14 +203,12 @@ describe("RedisConnectionService", () => {
 
   describe("when a resolved configuration is supplied directly", () => {
     it("connects without re-resolving it", async () => {
-      const { RedisConfigService } = await import("./config");
+      const { RedisConfigService } = await import("./config.ts");
       const config = new RedisConfigService().resolve({
         url: "redis://localhost:6379",
       });
 
-      expect(
-        new RedisConnectionService().connectResolved({ config }),
-      ).not.toBeNull();
+      expect(new RedisConnectionService().connectResolved({ config })).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
     });
   });

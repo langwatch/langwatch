@@ -1,0 +1,13 @@
+import type { Evaluator } from "@langwatch/workflow-contract";
+import type { Node, NodeProps } from "@xyflow/react";
+import type { Ref } from "react";
+import { forwardRef } from "react";
+
+import { ComponentNode } from "./workflow-nodes.tsx";
+
+export const EvaluatorNode = forwardRef(function EvaluatorNode(
+  props: NodeProps<Node<Evaluator>>,
+  ref: Ref<HTMLDivElement>,
+) {
+  return <ComponentNode ref={ref} {...props} />;
+});

@@ -1,0 +1,50 @@
+import { z } from "zod";
+
+/**
+ * Shared version metadata schema for database-sourced prompts. `configId` is
+ * stored separately at the root level, not in metadata.
+ */
+export const versionMetadataSchema = z.object({
+  /** Database ID of the specific version */
+  versionId: z.string(),
+  /** Version number (incremental) */
+  versionNumber: z.number(),
+  /** When this version was created, as an ISO string. */
+  versionCreatedAt: z.string(),
+});
+
+export type VersionMetadata = z.infer<typeof versionMetadataSchema>;
+
+/**
+ * Converts version metadata from form format (Date) to node format (ISO string)
+ *
+ * Single Responsibility: Normalize versionCreatedAt field for node data storage
+ */
+export function versionMetadataToNodeFormat(metadata: VersionMetadata): {
+  versionId: string;
+  versionNumber: number;
+  versionCreatedAt: string;
+} {
+  return {
+    versionId: metadata.versionId,
+    versionNumber: metadata.versionNumber,
+    versionCreatedAt: metadata.versionCreatedAt,
+  };
+}
+
+/**
+ * Converts version metadata from node format (ISO string) to form format (Date)
+ *
+ * Single Responsibility: Normalize versionCreatedAt field for form state
+ */
+export function versionMetadataToFormFormat(metadata: {
+  versionId: string;
+  versionNumber: number;
+  versionCreatedAt: string;
+}): VersionMetadata {
+  return {
+    versionId: metadata.versionId,
+    versionNumber: metadata.versionNumber,
+    versionCreatedAt: metadata.versionCreatedAt,
+  };
+}

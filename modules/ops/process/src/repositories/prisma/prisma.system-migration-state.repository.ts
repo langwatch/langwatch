@@ -1,0 +1,200 @@
+import type { OpsMigrationOverview } from "@langwatch/ops-contract";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
+import type {
+  SystemMigrationStateRepository,
+  TenantMigrationRecord,
+  TenantMigrationStatus,
+} from "@langwatch/system-migrations";
+
+const TENANT_STATUSES: readonly TenantMigrationStatus[] = [
+  "migrated",
+  "finalized",
+  "parked",
+  "rolled_back",
+];
+
+function parseStatus(raw: string): TenantMigrationStatus {
+  const status = TENANT_STATUSES.find((candidate) => candidate === raw);
+  if (!status) {
+    throw new Error(`unknown system migration status stored: ${raw}`);
+  }
+  return status;
+}
+
+/** Per-(migration, tenant) state: runner's port + ops finders. No tenant FK
+ * on purpose; every query keys by migration name first. */
+export class PrismaSystemMigrationStateRepository implements SystemMigrationStateRepository {
+  static create({ prisma }: { prisma: PrismaClient }): PrismaSystemMigrationStateRepository {
+    return new PrismaSystemMigrationStateRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: PrismaClient) {}
+
+  async getRecord({
+    migrationName,
+    tenantId,
+  }: {
+    migrationName: string;
+    tenantId: string;
+  }): Promise<TenantMigrationRecord> {
+    const row = await this.prisma.systemMigrationTenantState.findUnique({
+      where: { migrationName_tenantId: { migrationName, tenantId } },
+    });
+    if (!row) throw new SystemMigrationRecordNotFoundError({ migrationName, tenantId });
+    return {
+      migrationName: row.migrationName,
+      tenantId: row.tenantId,
+      status: parseStatus(row.status),
+      report: row.report,
+    };
+  }
+
+  async upsertRecord(record: TenantMigrationRecord): Promise<void> {
+    // `undefined` would OMIT the column, leaving a previous parked tenant's
+    // error report attached to the finalized row that replaced it. The
+    // no-report case has to be written, and for a nullable Json column
+    // that means the DbNull sentinel rather than a bare null.
+    const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
+    // The transition's own business time, stamped by the writer. It is what the
+    // grants-ledger projection orders folded transitions against, and it has to be
+    // written here too: a direct write that left the column alone would let a
+    // replayed fact from last year overwrite the latch this call just set.
+    // `updatedAt` cannot serve - it moves for reasons that are not transitions.
+    const occurredAt = new Date();
+    await this.prisma.systemMigrationTenantState.upsert({
+      where: {
+        migrationName_tenantId: {
+          migrationName: record.migrationName,
+          tenantId: record.tenantId,
+        },
+      },
+      create: {
+        migrationName: record.migrationName,
+        tenantId: record.tenantId,
+        status: record.status,
+        report,
+        occurredAt,
+      },
+      update: { status: record.status, report, occurredAt },
+    });
+  }
+
+  /** Runner's compare-and-set: update guarded on status != rolled_back so
+   * operator's pin is never overwritten. */
+  async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
+    const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
+    const reportJson = record.report == null ? null : JSON.stringify(record.report);
+    const occurredAt = new Date();
+    // SQL, because a write parked on the pin's row lock must re-check the
+    // guard against the row the pin committed; `updateMany` does not.
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: keyed by (migrationName, tenantId); the tenant is the key itself.
+      UPDATE "SystemMigrationTenantState"
+         SET "status" = ${record.status},
+             "report" = ${reportJson}::jsonb,
+             "occurredAt" = ${occurredAt},
+             "updatedAt" = now()
+       WHERE "migrationName" = ${record.migrationName}
+         AND "tenantId" = ${record.tenantId}
+         AND "status" <> 'rolled_back'
+    `;
+    if (updated > 0) return true;
+    try {
+      await this.prisma.systemMigrationTenantState.create({
+        data: {
+          migrationName: record.migrationName,
+          tenantId: record.tenantId,
+          status: record.status,
+          report,
+          occurredAt,
+        },
+      });
+      return true;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        // The row exists and the guarded update matched nothing: the stored
+        // status is `rolled_back`, and the pin wins.
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Whether any tenant has finished this migration — the per-tenant gates'
+   * global short-circuit. `findFirst` stops at the first matching row rather
+   * than counting them all.
+   */
+  async hasFinalizedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
+    const row = await this.prisma.systemMigrationTenantState.findFirst({
+      where: { migrationName, status: "finalized" },
+      select: { tenantId: true },
+    });
+    return row !== null;
+  }
+
+  /**
+   * Whether a later pass could still move a tenant: `parked` and `migrated` are the two re-entrant
+   * statuses. The hourly re-drive asks this first, so a latched fleet pays one row read per wake.
+   */
+  async hasTenantAwaitingRedrive({
+    migrationNames,
+  }: {
+    migrationNames: readonly string[];
+  }): Promise<boolean> {
+    if (migrationNames.length === 0) return false;
+    const row = await this.prisma.systemMigrationTenantState.findFirst({
+      where: { migrationName: { in: [...migrationNames] }, status: { in: ["parked", "migrated"] } },
+      select: { tenantId: true },
+    });
+    return row !== null;
+  }
+
+  /** Ops rollup: how many tenants sit in each status for one migration. */
+  async findStatusCounts({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<Record<TenantMigrationStatus, number>> {
+    const grouped = await this.prisma.systemMigrationTenantState.groupBy({
+      by: ["status"],
+      where: { migrationName },
+      _count: { _all: true },
+    });
+    const counts: Record<TenantMigrationStatus, number> = {
+      migrated: 0,
+      finalized: 0,
+      parked: 0,
+      rolled_back: 0,
+    };
+    for (const row of grouped) {
+      counts[parseStatus(row.status)] = row._count._all;
+    }
+    return counts;
+  }
+
+  /** Ops drill-down: the tenants needing attention, newest movement first. */
+  async findRecordsByStatus({
+    migrationName,
+    statuses,
+    limit,
+  }: {
+    migrationName: string;
+    statuses: TenantMigrationStatus[];
+    limit: number;
+  }): Promise<OpsMigrationOverview["attention"]> {
+    const rows = await this.prisma.systemMigrationTenantState.findMany({
+      where: { migrationName, status: { in: statuses } },
+      orderBy: { updatedAt: "desc" },
+      take: limit,
+    });
+    return rows.map((row) => ({
+      migrationName: row.migrationName,
+      tenantId: row.tenantId,
+      status: parseStatus(row.status),
+      report: row.report,
+      updatedAt: row.updatedAt,
+    }));
+  }
+}

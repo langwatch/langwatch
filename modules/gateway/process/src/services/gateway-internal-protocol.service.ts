@@ -1,0 +1,716 @@
+import {
+  attributedUserBucketScopeId,
+  computeBucketPeriodFloorMs,
+  bucketScopeIdFor,
+  GATEWAY_INTERNAL_SPEND_COMMANDS,
+  type GatewayBudget,
+  type GatewayInternalCodexRefreshResult,
+  type GatewayInternalSpendCommandName,
+  type GatewayInternalSpendCommandRecord,
+  type GatewayGuardrailCheckInput,
+  type GatewayGuardrailCheckResult,
+  type GatewayInternalProtocol,
+  type GatewayRealtimeCorrelation,
+  type GatewayRealtimeRelease,
+  type GatewayRealtimeReservation,
+  type GatewayRealtimeReservationResult,
+  type GatewayRealtimeSessionUpdate,
+  type GatewayRealtimeUsageOutcome,
+  type GatewayRealtimeUsageReport,
+  isLicenseTokenShape,
+  registryHashForToken,
+  type GatewayLicenseTokenRefusal,
+  type GatewayLicenseTokenResolution,
+  type GatewayPricedSpend,
+  type GatewayPricedSpendResult,
+  type SpendUsage,
+  type GatewayInternalSpendSubmission,
+  type VirtualKeyWithScopes,
+  type GatewayVirtualKeyRecord,
+} from "@langwatch/gateway-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { nowInstant, Temporal, type Instant } from "@langwatch/time";
+
+import type {
+  GatewayBudgetSpend,
+  GatewayChangeEvents,
+  GatewaySpendRating,
+} from "../app/gateway.members.ts";
+import {
+  admitSpendWireSchema,
+  confirmSpendWireSchema,
+  failSpendWireSchema,
+} from "../eventing/gateway-spend-commands.process.ts";
+import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
+import { EMPTY_SPEND_USAGE } from "../rules/gateway-spend-projection.rules.ts";
+import type { GatewayConfigMaterialiserService } from "./gateway-config-materialisation.service.ts";
+import type { GatewayGuardrailEvaluationService } from "./gateway-guardrail-evaluation.service.ts";
+import type { GatewayJwtService } from "./gateway-jwt.service.ts";
+import {
+  GatewayRealtimeSessionService,
+  type GatewayRealtimeSessionCollaborators,
+} from "./gateway-realtime-session.service.ts";
+import type { VirtualKeyService } from "./virtual-key.service.ts";
+
+const asString = (value: unknown): string =>
+  typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+    ? String(value)
+    : "";
+
+const realtimeSessionService = GatewayRealtimeSessionService.create();
+const logger = createLogger("langwatch:gateway-internal");
+
+/** A named sender per command; undefined per name is a 503, not an assumed presence. */
+export interface GatewaySpendCommandSender {
+  sendBatch?: (payloads: unknown[]) => Promise<unknown>;
+  send: (payload: unknown) => Promise<unknown>;
+}
+
+/** The spend pipeline this process registered, where it registered one. */
+export type GatewayInternalSpendPipeline = Readonly<{
+  commands: Record<string, GatewaySpendCommandSender | undefined>;
+  rating: GatewaySpendRating;
+}>;
+
+/** Everything the internal control plane reaches that it does not own. */
+export type GatewayInternalProtocolMembers = Readonly<{
+  /** The SAME virtual-key service every other gateway door reads. */
+  virtualKeys: VirtualKeyService;
+  /** The project directory a key's trace destination is resolved through. */
+  projects: ProjectApi;
+  /** Mints the short-lived credential the data plane presents onward. */
+  jwt: GatewayJwtService | undefined;
+  /** The row reads no service on this package owns. */
+  store: GatewayInternalStoreRepository;
+  /** The durable revision feed the configuration long-poll walks. */
+  changes: GatewayChangeEvents;
+  /** Builds one key's warm-cache configuration bundle. */
+  config: GatewayConfigMaterialiserService;
+  /** Absent with no ClickHouse; the bucket read then reports zero spend, not an invented figure. */
+  budgetSpend: GatewayBudgetSpend | undefined;
+  /** Owns the Codex session a 401 on a Codex-backed provider is recovered through. */
+  modelProviders: Pick<ModelProviderApi, "refreshCodexForGateway">;
+  /** All-or-nothing; a guardrail that cannot verdict must refuse, never answer allow. */
+  guardrails: GatewayGuardrailEvaluationService;
+  /** Absent with no spend pipeline registered; /spend-commands then answers 503. */
+  spend: GatewayInternalSpendPipeline | undefined;
+  /** Absent with no spend confirmation path; a booked session would then never bill. */
+  realtimeSessions: GatewayRealtimeSessionCollaborators | undefined;
+}>;
+
+/** Callable boundary for the deployment-internal gateway protocol. */
+export class GatewayInternalProtocolService implements GatewayInternalProtocol {
+  #members: GatewayInternalProtocolMembers;
+
+  private constructor(members: GatewayInternalProtocolMembers) {
+    this.#members = members;
+  }
+
+  static create(members: GatewayInternalProtocolMembers): GatewayInternalProtocolService {
+    return new GatewayInternalProtocolService(members);
+  }
+
+  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null> {
+    return this.#members.virtualKeys.findBySecretInternal(secret);
+  }
+
+  /**
+   * The key a presented license token runs under, judged only on the facts
+   * licensing wrote onto it. A key with no bound install has not synced, and
+   * reads as a license not registered for hosted services.
+   */
+  async resolveLicenseToken(input: {
+    token: string;
+    instanceId: string | undefined;
+  }): Promise<GatewayLicenseTokenResolution> {
+    if (!isLicenseTokenShape(input.token)) return refuse("connect_license_token_malformed");
+    const instanceId = input.instanceId?.trim() ?? "";
+    if (instanceId === "") return refuse("connect_instance_required");
+
+    const licensed = await this.#members.virtualKeys.findByLicenseTokenHashInternal(
+      await registryHashForToken(input.token),
+    );
+    if (!licensed?.instanceId) return refuse("connect_license_not_registered");
+    if (licensed.key.status !== "ACTIVE") return refuse("connect_license_revoked");
+    const now = nowInstant();
+    if (licensed.expiresAt && Temporal.Instant.compare(licensed.expiresAt, now) <= 0) {
+      return refuse("connect_license_expired");
+    }
+    if (licensed.instanceId !== instanceId) return refuse("connect_wrong_instance");
+
+    const [notAfter] = [licensed.expiresAt, licensed.key.expiresAt]
+      .filter((end): end is Instant => end !== null)
+      .toSorted((left, right) => Temporal.Instant.compare(left, right));
+    return {
+      ok: true,
+      key: licensed.key,
+      ...(notAfter ? { notAfter } : {}),
+      connectServices: licensed.services,
+    };
+  }
+
+  findTraceDestination(projectId: string): Promise<{
+    id: string;
+    teamId: string;
+  } | null> {
+    return this.#members.projects.findTraceDestination(projectId);
+  }
+
+  signJwt(input: Parameters<GatewayJwtService["sign"]>[0]): {
+    jwt: string;
+    expiresAt: number;
+  } {
+    const jwt = this.#members.jwt;
+    if (!jwt) throw new Error("gateway JWT signing is unavailable in this deployment");
+
+    return jwt.sign(input);
+  }
+
+  touchVirtualKeyUsage(id: string): Promise<void> {
+    return this.#members.virtualKeys.touchUsage(id);
+  }
+
+  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> {
+    return this.#members.modelProviders.refreshCodexForGateway(input);
+  }
+
+  findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null> {
+    return this.#members.store.findVirtualKeyForConfig(id);
+  }
+
+  configVersionToken(
+    input: Parameters<GatewayConfigMaterialiserService["versionToken"]>[0],
+  ): Promise<string> {
+    return this.#members.config.versionToken(input);
+  }
+
+  materialiseConfig(
+    input: Parameters<GatewayConfigMaterialiserService["materialise"]>[0],
+  ): Promise<unknown> {
+    return this.#members.config.materialise(input);
+  }
+
+  listChanges(
+    organizationId: string,
+    since: bigint,
+    limit: number,
+  ): Promise<{
+    currentRevision: bigint;
+    events: {
+      kind: string;
+      virtualKeyId: string | null;
+      budgetId: string | null;
+      modelProviderId: string | null;
+      projectId: string | null;
+      revision: bigint;
+    }[];
+  }> {
+    return this.#members.changes.since(organizationId, since, limit);
+  }
+
+  currentRevision(organizationId: string): Promise<bigint> {
+    return this.#members.changes.currentRevision(organizationId);
+  }
+
+  async checkGuardrails(input: GatewayGuardrailCheckInput): Promise<GatewayGuardrailCheckResult> {
+    return { status: "evaluated", verdict: await this.#members.guardrails.check(input) } as const;
+  }
+
+  async budgetBucketSpend(input: { budgetId: string; endUserId: string }): Promise<
+    | {
+        status: "not_found";
+      }
+    | {
+        status: "available";
+        spentMicroUsd: number;
+        bucketScopeId: string | null;
+      }
+  > {
+    const budget = await this.#members.store.findBudget(input.budgetId);
+    if (!budget || budget.archivedAt || budget.scopeType !== "ATTRIBUTED_USER") {
+      return { status: "not_found" } as const;
+    }
+    if (!this.#members.budgetSpend) {
+      return { status: "available", spentMicroUsd: 0, bucketScopeId: null } as const;
+    }
+    const bucketScopeId = bucketScopeIdFor(
+      budget,
+      attributedUserBucketScopeId(budget.scopeId, input.endUserId),
+    );
+    const boundary = await this.#members.store.findBucketBoundary({
+      budgetId: budget.id,
+      bucketScopeId,
+    });
+    const spentMicroUsd = await bucketSpentMicroUsd({
+      store: this.#members.store,
+      budgetRepository: this.#members.budgetSpend,
+      budget,
+      bucketScopeId,
+      periodFloorMs: computeBucketPeriodFloorMs(budget, boundary?.periodStartedAt),
+    });
+    return { status: "available", spentMicroUsd, bucketScopeId } as const;
+  }
+
+  async submitSpendCommands(
+    records: GatewayInternalSpendCommandRecord[],
+  ): Promise<GatewayInternalSpendSubmission> {
+    const pipeline = this.#members.spend;
+    if (!pipeline) return { status: "unavailable" } as const;
+    const { perCommand, rejected } = groupSpendCommands(records, pipeline.rating);
+    await enrichAttributedCommands({
+      store: this.#members.store,
+      admits: perCommand.admitSpend,
+      outcomes: [...perCommand.confirmSpend, ...perCommand.failSpend],
+    });
+    const sent = await sendSpendCommands(pipeline.commands, perCommand);
+    if (!sent.sent) return { status: "unregistered", command: sent.unregistered } as const;
+    return { status: "accepted", accepted: records.length - rejected.length, rejected } as const;
+  }
+
+  /**
+   * Appends one outcome the caller priced itself. Straight onto the pipeline's
+   * `confirmSpend`, not through the drain path: that re-rates every outcome
+   * against the model registry, which holds no entry for a judgement.
+   */
+  async recordPricedSpend(input: GatewayPricedSpend): Promise<GatewayPricedSpendResult> {
+    const sender = this.#members.spend?.commands.confirmSpend;
+    if (!sender) return { status: "unavailable" } as const;
+    await sender.send(pricedSpendCommandData(input));
+
+    return { status: "recorded" } as const;
+  }
+
+  async reserveRealtimeSession(
+    input: GatewayRealtimeReservation,
+  ): Promise<GatewayRealtimeReservationResult> {
+    const collaborators = this.#members.realtimeSessions;
+    if (!collaborators) return { ok: false, reason: "unavailable" } as const;
+    return realtimeSessionService.reserveRealtimeSession({ collaborators, ...input });
+  }
+
+  async correlateRealtimeSession(
+    input: GatewayRealtimeCorrelation,
+  ): Promise<GatewayRealtimeSessionUpdate> {
+    const collaborators = this.#members.realtimeSessions;
+    if (!collaborators) return "unavailable" as const;
+    const correlated = await realtimeSessionService.correlateRealtimeSession({
+      collaborators,
+      ...input,
+    });
+    return correlated ? ("applied" as const) : ("not_found" as const);
+  }
+
+  async releaseRealtimeSession(
+    input: GatewayRealtimeRelease,
+  ): Promise<GatewayRealtimeSessionUpdate> {
+    const collaborators = this.#members.realtimeSessions;
+    if (!collaborators) return "unavailable" as const;
+    const released = await realtimeSessionService.releaseRealtimeSession({
+      collaborators,
+      ...input,
+    });
+    return released ? ("applied" as const) : ("not_found" as const);
+  }
+
+  async reportRealtimeSessionUsage(
+    input: GatewayRealtimeUsageReport,
+  ): Promise<GatewayRealtimeUsageOutcome> {
+    const collaborators = this.#members.realtimeSessions;
+    if (!collaborators) return "unavailable" as const;
+    return realtimeSessionService.reportRealtimeSessionUsage({ collaborators, ...input });
+  }
+}
+
+// ── attributed-user bucket spend ────────────────────────────────────────
+
+/**
+ * Per-bucket spend for ATTRIBUTED_USER templates. Per-user cardinality is
+ * unbounded, so the gateway resolves and caches the request's own bucket here,
+ * not the whole template.
+ */
+async function bucketSpentMicroUsd(params: {
+  store: GatewayInternalStoreRepository;
+  budgetRepository: GatewayBudgetSpend;
+  budget: GatewayBudget;
+  bucketScopeId: string;
+  periodFloorMs: number | undefined;
+}): Promise<number> {
+  const projectIds = await params.store.findProjectIdsForOrganization(params.budget.organizationId);
+  if (projectIds.length === 0) return 0;
+
+  const spends = await params.budgetRepository.getSpendForTargetsAcrossTenants(projectIds, [
+    {
+      budgetId: params.budget.id,
+      scope: params.budget.scopeType,
+      scopeId: params.bucketScopeId,
+      window: params.budget.window,
+      match: "exact",
+      periodFloorMs: params.periodFloorMs,
+    },
+  ]);
+  const spentUsd = Number.parseFloat(spends[0]?.spentUsd ?? "0") || 0;
+
+  return Math.round(spentUsd * 1_000_000);
+}
+
+// ── spend command ingest (spend-command spine) ──────────────────────────
+
+const SPEND_COMMAND_SCHEMAS = {
+  admitSpend: admitSpendWireSchema,
+  confirmSpend: confirmSpendWireSchema,
+  failSpend: failSpendWireSchema,
+} as const;
+
+interface SpendCommandReject {
+  code: string;
+  message: string;
+  issues?: unknown[];
+}
+
+/**
+ * The single seam that prices an outcome. The wire carries quantities, never
+ * money, so the server rates once here and every downstream reader copies the
+ * figure, not a moving catalog.
+ */
+function pricedOutcomeData(
+  data: Record<string, unknown> & {
+    model: string;
+    usage: SpendUsage;
+    rate_version?: string;
+  },
+  rating: GatewaySpendRating,
+): Record<string, unknown> {
+  const rated = rating.rate({
+    model: data.model,
+    usage: data.usage,
+    rateVersion: data.rate_version,
+  });
+
+  return { ...data, cost_nano_usd: rated.costNanoUsd, rate_version: rated.rateVersion };
+}
+
+/**
+ * The internal command data one wire record maps to, or why it cannot be
+ * accepted. `project_id` on the wire is the internal `tenantId`; only admits
+ * carry the pod identity the gap detector reads.
+ */
+function toSpendCommandData(
+  record: GatewayInternalSpendCommandRecord,
+  rating: GatewaySpendRating,
+): { ok: true; data: Record<string, unknown> } | { ok: false; reject: SpendCommandReject } {
+  const wire = record.payload;
+  const projectId = wire.project_id;
+  if (typeof projectId !== "string" || projectId.length === 0) {
+    return {
+      ok: false,
+      reject: {
+        code: "missing_project_id",
+        message: "spend command record rejected: missing project_id",
+      },
+    };
+  }
+
+  const { project_id: _projectId, ...rest } = wire;
+  const mapped: Record<string, unknown> =
+    record.command === "admitSpend"
+      ? { ...rest, tenantId: projectId, pod_id: record.pod_id, pod_seq: record.pod_seq }
+      : { ...rest, tenantId: projectId };
+  const validated = SPEND_COMMAND_SCHEMAS[record.command].safeParse(mapped);
+  if (!validated.success) {
+    return {
+      ok: false,
+      reject: {
+        code: "invalid_payload",
+        message: "spend command record rejected",
+        issues: validated.error.issues.slice(0, 3),
+      },
+    };
+  }
+
+  const data: Record<string, unknown> = validated.data;
+  if (record.command === "admitSpend") {
+    return { ok: true, data };
+  }
+
+  const outcome =
+    record.command === "confirmSpend"
+      ? confirmSpendWireSchema.parse(mapped)
+      : failSpendWireSchema.parse(mapped);
+
+  return {
+    ok: true,
+    data: pricedOutcomeData(
+      {
+        ...outcome,
+        usage: outcome.usage ?? {},
+      },
+      rating,
+    ),
+  };
+}
+
+/**
+ * The spine's confirmed-outcome shape for a self-priced outcome: no admission
+ * in front of it, no virtual key and no provider, and the price and its stamp
+ * exactly as the caller resolved them.
+ */
+function pricedSpendCommandData(input: GatewayPricedSpend): Record<string, unknown> {
+  return {
+    gateway_request_id: input.requestId,
+    occurred_at: input.occurredAt,
+    tenantId: input.projectId,
+    model: input.model,
+    model_provider_id: "",
+    usage: { ...EMPTY_SPEND_USAGE, input_tokens: input.inputTokens },
+    rate_version: input.rateVersion,
+    duration_ms: 0,
+    organization_id: input.organizationId,
+    virtual_key_id: input.virtualKeyId ?? "",
+    end_user_id: "",
+    trace_id: "",
+    request_type: input.requestType,
+    labels: [],
+    metadata: input.metadata ?? "",
+    admitted_at: 0,
+    cost_nano_usd: input.costNanoUsd,
+    principal_user_id: "",
+    team_id: input.teamId,
+  };
+}
+
+/**
+ * The wire fields that identify a rejected record, so the log line can be
+ * reconciled against the gateway's own. Read defensively: a record is only
+ * rejected because its payload did not hold up.
+ */
+function rejectedRecordIdentity(
+  record: GatewayInternalSpendCommandRecord,
+): Record<string, string | null> {
+  const wireString = (key: string): string | null => {
+    const value = record.payload[key];
+
+    return typeof value === "string" && value.length > 0 ? value : null;
+  };
+
+  return { gatewayRequestId: wireString("gateway_request_id"), tenantId: wireString("project_id") };
+}
+
+/**
+ * Group the batch by command, reporting unacceptable records by index. Every
+ * reject path logs: a silent per-record drop looks like a healthy 200 from the
+ * emitter's side and loses billing records.
+ */
+function groupSpendCommands(
+  records: GatewayInternalSpendCommandRecord[],
+  rating: GatewaySpendRating,
+): {
+  perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]>;
+  rejected: { index: number; code: string }[];
+} {
+  const perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]> = {
+    admitSpend: [],
+    confirmSpend: [],
+    failSpend: [],
+  };
+  const rejected: { index: number; code: string }[] = [];
+
+  records.forEach((record, index) => {
+    const mapped = toSpendCommandData(record, rating);
+    if (!mapped.ok) {
+      rejected.push({ index, code: mapped.reject.code });
+      // Error, not warn: the drainer reads a 200 and acks the segment, so this
+      // line is the only trace the record ever existed. It names the request
+      // because "a record was rejected" cannot be reconciled against anything.
+      logger.error(
+        {
+          command: record.command,
+          index,
+          code: mapped.reject.code,
+          ...rejectedRecordIdentity(record),
+          ...(mapped.reject.issues ? { issues: mapped.reject.issues } : {}),
+        },
+        mapped.reject.message,
+      );
+
+      return;
+    }
+    perCommand[record.command].push(mapped.data);
+  });
+
+  return { perCommand, rejected };
+}
+
+/**
+ * How stale `lastUsedAt` has to be before a drain batch advances it. Admin
+ * oversight reads the column on minute scale, so writing it per request would
+ * buy nothing.
+ */
+const VIRTUAL_KEY_TOUCH_THROTTLE_MS = 60_000;
+
+/** The key row an admission is attributed against. */
+type AttributionVirtualKey = {
+  id: string;
+  organizationId: string;
+  principalUserId: string | null;
+  lastUsedAt: Instant | null;
+};
+
+/**
+ * The ids an attributed record was validated with. Required on an admission, so
+ * those reads are total; an outcome from a build that predates
+ * attribution-on-outcome carries empty strings instead.
+ */
+function attributedIdentity(command: Record<string, unknown>): {
+  gatewayRequestId: string;
+  virtualKeyId: string;
+  projectId: string;
+  organizationId: string;
+} {
+  return {
+    gatewayRequestId: asString(command.gateway_request_id),
+    virtualKeyId: asString(command.virtual_key_id),
+    projectId: asString(command.tenantId),
+    organizationId: asString(command.organization_id),
+  };
+}
+
+/** Best effort: oversight, not enforcement, so a failure must not retry already-billed records. */
+async function touchAdmittedVirtualKeys(
+  store: GatewayInternalStoreRepository,
+  virtualKeys: AttributionVirtualKey[],
+  now: Instant,
+): Promise<void> {
+  const staleIds = virtualKeys
+    .filter(
+      (vk) =>
+        !vk.lastUsedAt ||
+        now.epochMilliseconds - vk.lastUsedAt.epochMilliseconds > VIRTUAL_KEY_TOUCH_THROTTLE_MS,
+    )
+    .map((vk) => vk.id);
+  if (staleIds.length === 0) return;
+
+  // The failure is swallowed by the adapter and logged there, for the reason
+  // its own docblock gives: this column is oversight, and failing a batch of
+  // billing records over it would cost the drainer a retry of records that
+  // already appended.
+  await store.touchVirtualKeysLastUsed({ virtualKeyIds: staleIds, now });
+}
+
+/**
+ * Joins every admission to attribution the gateway cannot see, via two
+ * batched reads. A missing key/team degrades to empty attribution (logged);
+ * a Prisma failure 500s so the drainer retries — nothing is silently dropped.
+ */
+function reportAttributionGaps({
+  identity,
+  key,
+  teamId,
+}: {
+  identity: ReturnType<typeof attributedIdentity>;
+  key: AttributionVirtualKey | undefined;
+  teamId: string;
+}): void {
+  if (!key) {
+    logger.error(
+      identity,
+      "spend admission names a virtual key that no longer exists: principal and group budgets will not see this request",
+    );
+  } else if (key.organizationId !== identity.organizationId) {
+    logger.error(
+      { ...identity, keyOrganizationId: key.organizationId },
+      "spend admission names a virtual key from another organization",
+    );
+  }
+  if (!teamId) {
+    logger.error(
+      identity,
+      "spend admission names a project with no team: team budgets will not see this request",
+    );
+  }
+}
+
+async function enrichAttributedCommands({
+  store,
+  admits,
+  outcomes,
+}: {
+  store: GatewayInternalStoreRepository;
+  admits: Record<string, unknown>[];
+  outcomes: Record<string, unknown>[];
+}): Promise<void> {
+  // An outcome from a build predating attribution-on-outcome names no key, so
+  // there is nothing to join against — those requests keep the admit-time join
+  // in the consuming process managers (outcome_carries_attribution tells them to
+  // do exactly that), so skipping here is the correct no-op. Silent by design:
+  // one line per record through a fleet roll says nothing actionable.
+  const attributableOutcomes = outcomes.filter(
+    (outcome) => asString(outcome.virtual_key_id) !== "",
+  );
+  const commands = [...admits, ...attributableOutcomes];
+  if (commands.length === 0) return;
+
+  const identities = commands.map(attributedIdentity);
+  const [virtualKeys, projects] = await Promise.all([
+    store.findVirtualKeysForAttribution([...new Set(identities.map((i) => i.virtualKeyId))]),
+    store.findProjectTeams([...new Set(identities.map((i) => i.projectId))]),
+  ]);
+  const keyById = new Map(virtualKeys.map((vk) => [vk.id, vk]));
+  const teamIdByProject = new Map(projects.map((p) => [p.id, p.teamId]));
+
+  commands.forEach((command, index) => {
+    const identity = identities[index]!;
+    const key = keyById.get(identity.virtualKeyId);
+    const teamId = teamIdByProject.get(identity.projectId) ?? "";
+    // Only the admission reports these. An outcome names the same key and the
+    // same project, so reporting both would say everything twice.
+    if (index < admits.length) {
+      reportAttributionGaps({ identity, key, teamId });
+    }
+    command.principal_user_id = key?.principalUserId ?? "";
+    command.team_id = teamId;
+  });
+
+  // Admission is what marks a key used. An outcome is the same request arriving
+  // a second time, so touching on both would double the writes to say the same
+  // thing.
+  const admittedKeyIds = new Set(identities.slice(0, admits.length).map((i) => i.virtualKeyId));
+  await touchAdmittedVirtualKeys(
+    store,
+    virtualKeys.filter((vk) => admittedKeyIds.has(vk.id)),
+    nowInstant(),
+  );
+}
+
+/**
+ * Hand each command's group to the pipeline, preferring the batched sender where
+ * the command exposes one. Answers the command whose sender is missing, which is
+ * a registration bug the caller reports as a 503.
+ */
+async function sendSpendCommands(
+  commands: Record<string, GatewaySpendCommandSender | undefined>,
+  perCommand: Record<GatewayInternalSpendCommandName, Record<string, unknown>[]>,
+): Promise<{ sent: true } | { sent: false; unregistered: GatewayInternalSpendCommandName }> {
+  for (const name of GATEWAY_INTERNAL_SPEND_COMMANDS) {
+    const batch = perCommand[name];
+    if (batch.length === 0) continue;
+
+    const sender = commands[name];
+    if (!sender) return { sent: false, unregistered: name };
+
+    if (sender.sendBatch) {
+      await sender.sendBatch(batch);
+      continue;
+    }
+    for (const payloadItem of batch) {
+      await sender.send(payloadItem);
+    }
+  }
+
+  return { sent: true };
+}
+
+function refuse(code: GatewayLicenseTokenRefusal): GatewayLicenseTokenResolution {
+  return { ok: false, code };
+}

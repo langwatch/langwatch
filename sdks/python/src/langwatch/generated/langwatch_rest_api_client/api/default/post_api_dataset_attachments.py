@@ -31,7 +31,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/dataset/attachments",
+        "url": "/api/v1/dataset/attachments",
         "params": params,
     }
 

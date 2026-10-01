@@ -1,5 +1,6 @@
-import { REQUEST_CAUSE_FIELD } from "../constants";
-import type { Logger } from "../logger";
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
+import type { Logger } from "../logger.ts";
+import type { RequestAttribution } from "./trafficAttribution.ts";
 
 /**
  * Common request logging data structure.
@@ -11,6 +12,12 @@ export interface RequestLogData {
   duration: number;
   userAgent: string | null;
   error?: unknown;
+  /**
+   * Traffic attribution (endpoint class + client source), flattened onto the
+   * log line. These fields plus the tenant the logging context stamps are
+   * what the usage dashboards slice by.
+   */
+  attribution?: RequestAttribution;
   /** Additional context to include in log */
   extra?: Record<string, unknown>;
 }
@@ -36,15 +43,10 @@ export function getStatusCodeFromError(error: unknown): number {
 }
 
 /**
- * Determines log level based on HTTP status code.
- * - 404: 'info' (not found is a normal response, not a warning)
- * - 4xx: 'warn' (client errors - expected, handled)
- * - 5xx: 'error' (server errors - unexpected, needs attention)
- * - Others: 'info' (success or redirects)
+ * Log level by HTTP status: 404 is `info` (a normal response, not a
+ * warning), other 4xx are `warn`, 5xx `error`, everything else `info`.
  */
-export function getLogLevelFromStatusCode(
-  statusCode: number,
-): "info" | "warn" | "error" {
+export function getLogLevelFromStatusCode(statusCode: number): "info" | "warn" | "error" {
   if (statusCode >= 500) return "error";
   if (statusCode === 404) return "info";
   if (statusCode >= 400) return "warn";
@@ -56,25 +58,20 @@ export function getLogLevelFromStatusCode(
  * + `fault`) so this package doesn't import the HandledError class. Returns
  * undefined for unhandled errors.
  */
-export function handledFaultOf(
-  error: unknown,
-): "customer" | "platform" | "provider" | undefined {
+export function handledFaultOf(error: unknown): "customer" | "platform" | "provider" | undefined {
   if (!error || typeof error !== "object") return undefined;
   const e = error as Record<string, unknown>;
   if (typeof e.code !== "string" || typeof e.httpStatus !== "number") {
     return undefined;
   }
   const fault = e.fault;
-  return fault === "customer" || fault === "platform" || fault === "provider"
-    ? fault
-    : undefined;
+  return fault === "customer" || fault === "platform" || fault === "provider" ? fault : undefined;
 }
 
 /**
- * Request log level, fault-aware: a handled error logs by fault attribution —
- * `customer` → warn (expected; spike-watched), `platform`/`provider` → error
- * (incident). Unhandled errors stay status-based. This is the same rule the
- * tRPC logger applies, so all boundaries agree.
+ * Request log level, fault-aware: a handled error logs by fault —
+ * `customer` warns (expected, spike-watched), `platform`/`provider` errors
+ * (incident); unhandled stays status-based. Same rule the tRPC logger applies.
  */
 export function getLogLevelForRequest(
   error: unknown,
@@ -94,13 +91,8 @@ export function getLogLevelForRequest(
 const UNCAUSED_SERVER_ERROR = "UncausedServerError";
 
 /**
- * Attaches the cause under the field its level allows, plus the handled
- * attribution when the error carries one.
- *
- * At error level the field keeps its name — the record IS a failure, and every
- * 5xx dashboard slices on the `error_*` metadata the serializer derives from
- * it. Only the levels where that name would misrepresent the record are
- * re-keyed.
+ * Attaches the cause under the field its level allows: error-level uses "error",
+ * others use {@link REQUEST_CAUSE_FIELD}.
  */
 function attachCause({
   logData,
@@ -141,32 +133,17 @@ function requestLogMessage({
   level: "info" | "warn" | "error";
 }): string {
   if (error) return "error handling request";
-  return level === "error"
-    ? "request failed without a cause attached"
-    : "request handled";
+  return level === "error" ? "request failed without a cause attached" : "request handled";
 }
 
 /**
- * The convention {@link REQUEST_CAUSE_FIELD} belongs to matches
- * `VENDOR_CAUSE_FIELD` and `RETRY_CAUSE_FIELD` in
- * `@langwatch/clickhouse-client`, so all three agree.
- *
- * What it does NOT fix, despite what those two modules claim: prod Loki's
- * `detected_level`. Measured 2026-08-07 — Loki 3.3 reads the level by parsing
- * the LOG LINE as JSON, and our lines are not JSON. fluent-bit promotes these
- * fields to structured metadata and ships the bare message as the line, so Loki
- * never sees this field at all and falls back to scanning the message text for
- * "error" / "warn". `"error handling request"` contains the word, which is what
- * promoted 129k handled 402s a day. Renaming a field the parser cannot reach
- * changes nothing there; the fix is `discover_log_levels: false` on the Loki
- * side, and `severity_text` as the only level anything queries.
- *
- * Logs an HTTP request with appropriate level based on status code.
- * Uses error level for 5xx, warn for 4xx, info for success.
+ * Logs an HTTP request with appropriate level based on status code (5xx=error,
+ * 4xx=warn, success=info).
  */
 export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   const logData: Record<string, unknown> = {
     ...data.extra,
+    ...data.attribution,
     method: data.method,
     url: data.url,
     statusCode: data.statusCode,
@@ -179,15 +156,7 @@ export function logHttpRequest(logger: Logger, data: RequestLogData): void {
   if (data.error) {
     attachCause({ logData, error: data.error, level });
   } else if (level === "error") {
-    // A route can answer 5xx by RETURNING the response rather than throwing, so
-    // nothing reaches the middleware to attach. The status still forces error
-    // level, and the record then read `request handled` with no cause on it —
-    // indistinguishable from a success unless you happened to read statusCode.
-    //
-    // Production logged 12,367 of these in a single hour on 2026-08-13, every
-    // one a 500, and between them they said nothing about what had failed.
-    // Naming the shape is the whole fix: it cannot be diagnosed from here, but
-    // it can be found, counted, and traced back to a route.
+    // Route returned 5xx without throwing: name it so it can be found and traced.
     logData.errorType = UNCAUSED_SERVER_ERROR;
   }
 

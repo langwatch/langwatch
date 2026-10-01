@@ -5,7 +5,7 @@ import time
 import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback, truncate_object_recursively
 from langwatch.utils.utils import safe_get
@@ -199,8 +199,8 @@ class LangWatchDSPy:
         try:
             with create_client(timeout=60) as client:
                 response = client.post(
-                    f"{langwatch.get_endpoint()}/api/experiment/init",
-                    headers=build_auth_headers(langwatch.get_api_key() or ""),
+                    f"{langwatch.get_endpoint()}/api/v1/experiment/init",
+                    headers=build_request_headers(langwatch.get_api_key() or ""),
                     json={
                         "experiment_slug": slug or experiment,
                         "experiment_type": "DSPY",
@@ -409,9 +409,9 @@ class LangWatchDSPy:
         ]
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/dspy/log_steps",
+                f"{langwatch.get_endpoint()}/api/v1/dspy/log_steps",
                 headers={
-                    **build_auth_headers(langwatch.get_api_key() or ""),
+                    **build_request_headers(langwatch.get_api_key() or ""),
                     "Content-Type": "application/json",
                 },
                 content=json.dumps(data),

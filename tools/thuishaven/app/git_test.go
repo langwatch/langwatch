@@ -26,6 +26,8 @@ func (f *gitTestHygiene) PruneGitWorktrees(string)                        {}
 func (f *gitTestHygiene) RemoveWorktree(string, string) error             { return nil }
 func (f *gitTestHygiene) LastActivity(string) (time.Time, bool)           { return time.Time{}, false }
 func (f *gitTestHygiene) UpstreamGone(string, string) bool                { return false }
+func (f *gitTestHygiene) MergedIntoMain(string, string) bool              { return false }
+func (f *gitTestHygiene) LastTouched(string) (time.Time, bool)            { return time.Time{}, false }
 
 // @scenario "Opening the git UI for another stack by slug"
 // @scenario "Unknown target is rejected with the available choices"

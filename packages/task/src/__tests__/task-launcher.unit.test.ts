@@ -1,0 +1,143 @@
+import type { Logger } from "@langwatch/observability";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import { TaskCatalogue } from "../task-catalogue.ts";
+import { TaskHost } from "../task-host.ts";
+import { runTask } from "../task-launcher.ts";
+import { TaskInfrastructureUnavailableError } from "../task.errors.ts";
+import { Task } from "../task.ts";
+
+/** A minimal fake — the launcher only ever calls `.info` and `.error`. */
+function silentLogger() {
+  return { info: vi.fn<Logger["info"]>(), error: vi.fn<Logger["error"]>() };
+}
+
+class RecordingTask extends Task {
+  readonly name = "webhook-signature-vectors";
+  readonly description = "records the args it was called with";
+  receivedArgs: readonly string[] | undefined;
+
+  async run({ args }: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
+    this.receivedArgs = args;
+  }
+}
+
+class ThrowingTask extends Task {
+  readonly name = "explodes";
+  readonly description = "always throws";
+  async run(): Promise<void> {
+    throw new Error("boom");
+  }
+}
+
+describe("runTask", () => {
+  describe("given a catalogue that registers a task named webhook-signature-vectors", () => {
+    /** @scenario "A task runs by name with its arguments" */
+    it("runs the named task with its arguments and reports success", async () => {
+      const task = new RecordingTask();
+      const catalogue = TaskCatalogue.create({ tasks: [task] });
+      const close = vi.fn().mockResolvedValue(undefined);
+      const logger = silentLogger();
+
+      const code = await runTask({
+        catalogue,
+        argv: ["webhook-signature-vectors", "--dry-run"],
+        close,
+        logger,
+      });
+
+      expect(code).toBe(0);
+      expect(task.receivedArgs).toEqual(["--dry-run"]);
+      expect(logger.info).toHaveBeenCalledWith(
+        { task: "webhook-signature-vectors" },
+        "task starting",
+      );
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ task: "webhook-signature-vectors" }),
+        "task finished",
+      );
+      expect(close).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a catalogue that registers one or more tasks", () => {
+    let catalogue: TaskCatalogue;
+    let close: Mock<() => Promise<void>>;
+    let logger: ReturnType<typeof silentLogger>;
+
+    beforeEach(() => {
+      catalogue = TaskCatalogue.create({ tasks: [new RecordingTask()] });
+      close = vi.fn().mockResolvedValue(undefined);
+      logger = silentLogger();
+    });
+
+    /** @scenario "An unknown task name lists the available names and exits non-zero" */
+    it("lists the available names and exits non-zero for an unknown name", async () => {
+      const code = await runTask({ catalogue, argv: ["nonexistent"], close, logger });
+
+      expect(code).not.toBe(0);
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          task: "nonexistent",
+          availableNames: ["webhook-signature-vectors"],
+        }),
+        expect.any(String),
+      );
+      expect(close).toHaveBeenCalledOnce();
+    });
+
+    it("lists the available names and exits non-zero when no name is given", async () => {
+      const code = await runTask({ catalogue, argv: [], close, logger });
+
+      expect(code).not.toBe(0);
+      expect(logger.error).toHaveBeenCalledWith(
+        { availableNames: ["webhook-signature-vectors"] },
+        expect.any(String),
+      );
+    });
+  });
+
+  describe("given a catalogue that registers a task whose run method throws", () => {
+    /** @scenario "A task that throws exits non-zero with one logged failure line and closes the host" */
+    it("logs exactly one failure line, exits non-zero, and still awaits close", async () => {
+      const catalogue = TaskCatalogue.create({ tasks: [new ThrowingTask()] });
+      const close = vi.fn().mockResolvedValue(undefined);
+      const logger = silentLogger();
+
+      const code = await runTask({ catalogue, argv: ["explodes"], close, logger });
+
+      expect(code).not.toBe(0);
+      expect(logger.error).toHaveBeenCalledTimes(1);
+      expect(close).toHaveBeenCalledOnce();
+    });
+  });
+});
+
+class NoClickhouseHost extends TaskHost<{ name: string }> {
+  readonly prisma = undefined;
+  readonly clickhouse = undefined;
+  readonly redis = undefined;
+  readonly objectStorage = undefined;
+  readonly config = { name: "test" };
+}
+
+describe("TaskHost", () => {
+  describe("given a TaskHost composed without a ClickHouse handle", () => {
+    /** @scenario "A task whose infrastructure handle is absent refuses by name" */
+    it("refuses requireClickhouse with a named, non-stack-trace HandledError", () => {
+      const host = new NoClickhouseHost();
+      let caught: unknown;
+      try {
+        host.requireClickhouse();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(TaskInfrastructureUnavailableError);
+      expect((caught as TaskInfrastructureUnavailableError).code).toBe(
+        "task_infrastructure_unavailable",
+      );
+      expect((caught as TaskInfrastructureUnavailableError).message).toContain("ClickHouse");
+    });
+  });
+});

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -18,6 +19,18 @@ const DefaultLocalAPIKey = "sk-lw-local-development-key"
 // "always the same locally" contract as DefaultLocalAPIKey.
 const DefaultLangyInternalSecret = "langy-local-development-secret"
 
+// LWQLClickHousePassword and LWQLPostgresReaderPassword are LangWatchQL's
+// local-only passwords: fixed like PostgresRolePassword, since every stack on
+// the shared servers converges the same lwql_ro role.
+const (
+	LWQLClickHousePassword     = "langwatch-lwql-local"
+	LWQLPostgresReaderPassword = "langwatch-lwql-reader-local"
+)
+
+// ColimaHostAddress is how a container in the colima (Lima) VM reaches the Mac;
+// Lima forwards it to the Mac's localhost, where brew Postgres listens.
+const ColimaHostAddress = "host.lima.internal"
+
 // DefaultRetentionDays is the platform retention default haven pins for a dev
 // stack: one week, so an unseeded worktree's ClickHouse stays tiny and whole
 // weekly partitions drop cleanly (the partition key is toYearWeek, so retention
@@ -25,7 +38,9 @@ const DefaultLangyInternalSecret = "langy-local-development-secret"
 // which the control plane reads ONLY outside production — it fails loud if that
 // var is ever set in prod, where the default is fixed. A seeded DB overrides
 // this with a two-year, partition-aligned RetentionPolicy so the seeded history
-// survives (see the seed:retention step).
+// survives. NOTHING DOES THAT TODAY: the step that pinned it (seed:retention)
+// went with the platform application, and no shipped preset loads backdated
+// data that would need it. Restore both together — see db.go's seedPreset.
 const DefaultRetentionDays = 7
 
 // svc looks a service up by name; a zero value is fine for the string formatting
@@ -39,12 +54,12 @@ func (s Stack) svc(name string) Service {
 	return Service{}
 }
 
-// OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs +
-// ports. These are (a) written to platform/app/.env.portless — the overlay every TS
-// entry point loads last with override:true so it beats anything pinned in .env —
-// and (b) injected directly into each supervised child. Deriving them from the
-// Stack (which already holds every URL/port) keeps this the single source of
-// truth with no file round-trip.
+// OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs
+// + ports. They are injected directly into the environment of every child haven
+// starts, and printed by `haven env` for a shell — nothing writes them to a
+// file. Deriving them from the Stack (which already holds every URL/port) keeps
+// this the single source of truth, and keeping them in memory means a checkout
+// never holds a stale copy of a stack that has since come down.
 func (s Stack) OverlayEnv() []string {
 	app, gw, nlp, langy := s.svc("app"), s.svc("gateway"), s.svc("nlp"), s.svc("langyagent")
 	// The API is same-origin with the app: the browser (and any agent) uses one
@@ -66,8 +81,14 @@ func (s Stack) OverlayEnv() []string {
 	env := []string{
 		"LANGWATCH_PORTLESS=1",
 		"LANGWATCH_SLUG=" + s.Slug,
+		// The app's development badge names the stack instead of reading "DEV".
+		"DEV_INDICATOR_LABEL=" + s.Slug,
 		fmt.Sprintf("LANGWATCH_APP_PORT=%d", app.Port),
 		fmt.Sprintf("LANGWATCH_API_PORT=%d", s.APIPort),
+		// The api application's own name for the port it binds
+		// (packages/process-server/src/config.ts), as WORKER_METRICS_PORT is the
+		// worker's. The line above is main's monolith spelling, which it never reads.
+		fmt.Sprintf("API_PORT=%d", s.APIPort),
 		fmt.Sprintf("LANGWATCH_GATEWAY_PORT=%d", gw.Port),
 		fmt.Sprintf("LANGWATCH_NLP_PORT=%d", nlp.Port),
 		fmt.Sprintf("WORKER_METRICS_PORT=%d", s.WorkerMetricsPort),
@@ -84,18 +105,19 @@ func (s Stack) OverlayEnv() []string {
 		// on Node trusting the portless CA.
 		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
-		// Pretty, human-readable console logging for the Go services (clog reads
-		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
-		// is always a human at the console, so the dev lanes should read like prose,
-		// not JSON. Haven-dev only — this overlay never exists in prod, where the Go
-		// services keep their JSON default. The collector still receives structured
-		// records regardless of the console format (clog tees the two).
-		"LOG_FORMAT=pretty",
+		// The shared structured format on every lane, dev included
+		// (dev/docs/best_practices/dev-log-format.md). Haven is always a human at
+		// the console, and it is haven that renders for them — one renderer over
+		// eight identical streams, instead of eight pretty consoles that each
+		// invent their own clock and level column. `LOG_FORMAT=pretty` is still
+		// there for a lane run bare in its own terminal.
+		"LOG_FORMAT=json",
 		// A tiny default retention for the dev stack: an unseeded worktree keeps a
 		// week of data so ClickHouse stays small and whole weekly partitions drop
 		// cleanly. Haven-dev only — the control plane fails loud if this var is set
-		// in prod, where the platform default is fixed. Seeding overrides it with a
-		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
+		// in prod, where the platform default is fixed. Nothing raises it: the
+		// seed:retention step that did went with the platform application, and no
+		// shipped preset loads data old enough to need it (see db.go).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or
@@ -121,6 +143,22 @@ func (s Stack) OverlayEnv() []string {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
 	}
+	// The design system's Storybook. The ui lane frames it at /design-system and
+	// starts one itself on the first visit unless something is already listening
+	// on the port it derives — so naming haven's port here is what makes the two
+	// agree: the lane haven supervises IS the listener the route finds, instead
+	// of a second Storybook building the same stories on a different port.
+	// Emitted only when there is a Storybook to point at (a local lane, or a
+	// baseline stack's), so a worktree that never selected it keeps today's
+	// start-on-first-visit behavior untouched.
+	if sb := s.svc(DesignSystemService); sb.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
+	}
+	// The evaluator service, when this stack runs one (or falls back to a
+	// baseline's). Without it the app keeps .env's value, where nothing listens.
+	if lev := s.svc(LangevalsService); lev.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGEVALS_ENDPOINT=http://127.0.0.1:%d", lev.Port))
+	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
 	// HAVEN_SEED_LANGWATCH_API_KEY, never LANGWATCH_API_KEY: the latter is the langwatch
@@ -137,7 +175,24 @@ func (s Stack) OverlayEnv() []string {
 	if s.DisableGoogleDLP {
 		env = append(env, "LANGWATCH_DISABLE_GOOGLE_DLP=true")
 	}
-	// The rest of the static seeded identity (see prisma/seed.ts's header comment
+	// The monolith's env parse knows no "memory" classifier and would refuse to
+	// boot on it, so only a modular checkout is given the stand-in judge.
+	if s.MockInstantEvalJudge && !s.Layout.IsMonolith() {
+		env = append(env, "INSTANT_EVAL_CLASSIFIER=memory")
+	}
+	// An untrusted checkout gets a private Nx cache and no daemon, so nothing it
+	// computes reaches the cache trusted worktrees share (see Stack.NxPrivateDir).
+	if s.NxPrivateDir != "" {
+		env = append(env,
+			"NX_CACHE_DIRECTORY="+s.NxPrivateDir+"/cache",
+			"NX_WORKSPACE_DATA_DIRECTORY="+s.NxPrivateDir+"/workspace-data",
+			"NX_DAEMON=false",
+		)
+	}
+	if s.VoiceSocketPort != 0 {
+		env = append(env, fmt.Sprintf("VOICE_WS_PORT=%d", s.VoiceSocketPort))
+	}
+	// The rest of the static seeded identity (see storage-seed.ts's header comment
 	// for the full rationale) — same story: fixed values so any worktree or agent
 	// can log in / authenticate without rediscovering them.
 	env = append(env,
@@ -147,7 +202,7 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
 		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
 		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as admin@haven.localhost gets a normal user, not a platform admin.
+		// as DefaultAdminEmail gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback
@@ -201,12 +256,29 @@ func (s Stack) OverlayEnv() []string {
 		env = append(env, fmt.Sprintf("DATABASE_URL=postgresql://%s:%s@127.0.0.1:%d/%s",
 			PostgresRole, PostgresRolePassword, s.PostgresPort, s.PostgresDatabase))
 	}
+	// LangWatchQL: with both passwords set, lwql-provision (start:prepare:db)
+	// provisions the restricted query identity. The ClickHouse user is per stack,
+	// because provisioning replaces it with this database's grants; lwql_ro and
+	// its password are server-wide, so the passwords are fixed, not per stack.
+	if s.ClickHouseHTTPPort != 0 && s.ClickHouseDatabase != "" && s.PostgresPort != 0 && s.PostgresDatabase != "" {
+		env = append(env,
+			"LWQL_CLICKHOUSE_USER="+s.ClickHouseDatabase+"_lwql",
+			"LWQL_CLICKHOUSE_PASSWORD="+LWQLClickHousePassword,
+			"LWQL_POSTGRES_READER_PASSWORD="+LWQLPostgresReaderPassword,
+			// ClickHouse runs in the VM, where DATABASE_URL's 127.0.0.1 is the VM itself.
+			"LWQL_POSTGRES_HOST="+ColimaHostAddress,
+			// No config store renders the access model here (ClickHouseUsersConfig grants
+			// the SQL rights instead), so the app writes it, named collection included.
+			"LWQL_ACCESS_MODEL_MODE=sql",
+		)
+	}
 	// Redis needs no per-slug database — REDIS_DB_INDEX above already partitions
 	// worktrees by DB index on the one shared server.
 	if s.RedisPort != 0 {
 		env = append(env, fmt.Sprintf("REDIS_URL=redis://127.0.0.1:%d", s.RedisPort))
 	}
 	env = append(env, s.observabilityEnv()...)
+	env = append(env, NodeOptionsEnvFromProcess())
 	return env
 }
 
@@ -225,7 +297,7 @@ func (s Stack) OverlayEnv() []string {
 // lost, just relocated.
 func (s Stack) observabilityEnv() []string {
 	if s.ObservabilityOTLPPort == 0 {
-		return nil
+		return TelemetryOffEnv()
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
 	env := []string{
@@ -270,15 +342,214 @@ func (s Stack) observabilityEnv() []string {
 	return env
 }
 
-// OverlayFile renders the .env.portless file body (header + OverlayEnv).
-func (s Stack) OverlayFile() string {
-	var b strings.Builder
-	b.WriteString("# --- generated by haven (thuishaven) — do not edit ---\n")
-	b.WriteString(fmt.Sprintf("# Portless hostname routing for the %q stack (worktree: %s).\n", s.Slug, s.WorktreeDir))
-	b.WriteString("# Loaded last with override:true so these win over anything pinned in .env.\n")
-	for _, line := range s.OverlayEnv() {
-		b.WriteString(line)
-		b.WriteByte('\n')
+// LaneEnv is the line that tells one supervised child which lane it is. It is
+// the same signal dev/scripts/lane.sh sets for the plain `pnpm dev` path
+// (LANGWATCH_LANE) and that the Makefile's `service`/`service-watch` targets
+// check before piping a Go service's own JSON through their own copy of
+// dev/scripts/log-render.mjs (Makefile:141): a renderer is already in front of
+// every lane haven supervises, so a nested one must not run too, or the same
+// line prints twice - once rendered by the launcher script, once by haven.
+// Every child gets it, not only the Go lanes that read it today, so the
+// invariant holds for whatever a future recipe checks.
+func LaneEnv(lane string) string {
+	return "LANGWATCH_LANE=" + lane
+}
+
+// MailProviderEnvVars are the env keys that mean a developer chose where mail
+// goes: a named EMAIL_PROVIDER, an SMTP endpoint, or SES switched on. Any one
+// set means haven injects nothing. A bare SENDGRID_API_KEY or RESEND_API_KEY
+// is a credential, not a choice (often a copied template line), and haven's
+// EMAIL_PROVIDER=smtp outranks it, so local mail stays on the machine.
+var MailProviderEnvVars = []string{
+	"EMAIL_PROVIDER", "SMTP_URL", "SMTP_HOST", "USE_AWS_SES",
+}
+
+// HasEmailProviderConfigured reports whether resolved — the environment the
+// app process will actually see, already merged with its own precedence —
+// names an email provider. resolved is a plain map so callers build it once
+// (process env layered over the worktree's .env) and this stays pure and
+// trivially testable with a literal fixture.
+func HasEmailProviderConfigured(resolved map[string]string) bool {
+	for _, key := range MailProviderEnvVars {
+		if resolved[key] != "" {
+			return true
+		}
 	}
-	return b.String()
+	return false
+}
+
+// MailSMTPEnv is the SMTP override that routes the app's outgoing mail at the
+// local sink, or nil when the developer already configured a provider (see
+// HasEmailProviderConfigured) — the sink still catches whatever is addressed
+// to it directly, but haven injects nothing over a deliberate choice.
+func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
+	if HasEmailProviderConfigured(resolved) {
+		return nil
+	}
+	return []string{
+		"EMAIL_PROVIDER=smtp",
+		"SMTP_HOST=127.0.0.1",
+		fmt.Sprintf("SMTP_PORT=%d", smtpPort),
+		"SMTP_SECURE=false",
+	}
+}
+
+// StorageProviderEnvVars are the env keys that mean a developer chose where
+// objects go: a named backend, a bucket, an endpoint, or a filesystem root.
+// Any one set means haven points nothing at storagesim.
+var StorageProviderEnvVars = []string{
+	"STORED_OBJECTS_BACKEND", "S3_BUCKET_NAME", "S3_ENDPOINT", "LANGWATCH_LOCAL_STORAGE_PATH",
+}
+
+// StorageS3Env points the product's S3 object storage at storagesim's haven
+// route (endpoint), path-style (the product's default with an endpoint) under dummy
+// credentials, or nil when the developer already chose object storage. The
+// proxy forwards the Host header untouched, so presigned URLs verify.
+func StorageS3Env(resolved map[string]string, endpoint string) []string {
+	for _, key := range StorageProviderEnvVars {
+		if resolved[key] != "" {
+			return nil
+		}
+	}
+	return []string{
+		"STORED_OBJECTS_BACKEND=s3",
+		"S3_BUCKET_NAME=langwatch",
+		"S3_ENDPOINT=" + endpoint,
+		"S3_ACCESS_KEY_ID=storagesim",
+		"S3_SECRET_ACCESS_KEY=storagesim",
+	}
+}
+
+// VoiceProviderEnv points the product's ElevenLabs provider at voicesim on
+// port, or nil when the developer already named ELEVENLABS_BASE_URL. The
+// storage seed stores the base URL on the ElevenLabs provider row, under a
+// dummy key when none is set. VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1 is the
+// product's dev switch that lets a loopback voice host through; haven sets it
+// only here, beside the voicesim URL. OPENAI_BASE_URL is deliberately not set:
+// the product has no audio-only OpenAI seam, and it would move every model call.
+func VoiceProviderEnv(resolved map[string]string, port int) []string {
+	if resolved["ELEVENLABS_BASE_URL"] != "" {
+		return nil
+	}
+	env := []string{
+		fmt.Sprintf("ELEVENLABS_BASE_URL=http://127.0.0.1:%d", port),
+		VoiceLoopbackSwitch + "=1",
+	}
+	// The ElevenLabs credential probe goes to voicesim too; see LLMProviderEnv.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
+	if resolved["ELEVENLABS_API_KEY"] == "" {
+		env = append(env, "ELEVENLABS_API_KEY=voicesim")
+	}
+	return env
+}
+
+// VoiceLoopbackSwitch is the product's dev-only switch (packages/config
+// deployment-facts.ts) admitting a loopback ElevenLabs host such as voicesim.
+const VoiceLoopbackSwitch = "VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS"
+
+// AnalyticsProviderEnv points the product's PostHog (server and browser) and
+// nurturing's Customer.io client at analyticssim's haven route, with dummy keys
+// when none is set so both actually send. A host .env already names is left
+// alone. POSTHOG_HOST is the routed URL because posthog-js calls it from the page.
+func AnalyticsProviderEnv(resolved map[string]string, endpoint string) []string {
+	var env []string
+	for _, p := range []struct{ key, keyValue, host, hostValue string }{
+		{"POSTHOG_KEY", "phc_analyticssim", "POSTHOG_HOST", endpoint},
+		{"CUSTOMER_IO_API_KEY", "analyticssim", "CUSTOMER_IO_BASE_URL", endpoint + "/v1"},
+	} {
+		if resolved[p.host] != "" {
+			continue
+		}
+		env = append(env, p.host+"="+p.hostValue)
+		if resolved[p.key] == "" {
+			env = append(env, p.key+"="+p.keyValue)
+		}
+	}
+	return env
+}
+
+// llmProbeProviders are the providers whose credential probe the model-provider
+// module aims at the API root named by <PROVIDER>_BASE_URL. They get the base URL
+// only: a dummy key would seed an organization-level row for each one.
+var llmProbeProviders = []string{"DEEPSEEK_BASE_URL", "XAI_BASE_URL", "CEREBRAS_BASE_URL", "GROQ_BASE_URL", "GEMINI_BASE_URL"}
+
+// LLMProviderEnv points the product's OpenAI and Anthropic providers at llmsim
+// on port: the base URL the seed, the gateway and LiteLLM read, plus a dummy
+// key when none is set. DeepSeek, xAI, Cerebras, Groq and Gemini get a base URL
+// alone, which only their credential probe reads. A provider whose base URL .env
+// already names is left alone (see specs/setup/haven-llmsim.feature). The gateway
+// appends /v1 itself.
+func LLMProviderEnv(resolved map[string]string, port int) []string {
+	base := fmt.Sprintf("http://127.0.0.1:%d", port)
+	var env []string
+	for _, name := range llmProbeProviders {
+		if resolved[name] == "" {
+			env = append(env, name+"="+base+"/v1")
+		}
+	}
+	// A deployment that blocks local calls (every SaaS-shaped stack) would refuse the
+	// loopback probe; naming the loopback host admits the sims. Dev stacks only.
+	if resolved["ALLOWED_PROXY_HOSTS"] == "" {
+		env = append(env, "ALLOWED_PROXY_HOSTS=127.0.0.1")
+	}
+	for _, p := range []struct{ key, url, value string }{
+		{"OPENAI_API_KEY", "OPENAI_BASE_URL", base + "/v1"},
+		{"ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", base},
+	} {
+		if resolved[p.url] != "" {
+			continue
+		}
+		env = append(env, p.url+"="+p.value)
+		if resolved[p.key] == "" {
+			env = append(env, p.key+"=llmsim")
+		}
+	}
+	return env
+}
+
+// EnvMap turns KEY=VALUE lines into a map, for callers that need to look a
+// value up or render the set as an object rather than replay it into a child.
+func EnvMap(lines []string) map[string]string {
+	m := make(map[string]string, len(lines))
+	for _, line := range lines {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		m[key] = value
+	}
+	return m
+}
+
+// PostgresLaneConnectionLimit caps one Node lane's pool: ui, api and worker
+// each default to ten, which three stacks turn into the server's whole 100.
+const PostgresLaneConnectionLimit = 4
+
+// LaneDatabaseEnv names the lane on its Postgres connections (application_name,
+// so pg_stat_activity can attribute them) and bounds its pool. A DATABASE_URL
+// that already states either is left alone; a URL that does not parse is too.
+func LaneDatabaseEnv(env []string, lane string) []string {
+	out := append([]string{}, env...)
+	for i, kv := range out {
+		raw, ok := strings.CutPrefix(kv, "DATABASE_URL=")
+		if !ok {
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil {
+			return out
+		}
+		q := u.Query()
+		if !q.Has("application_name") {
+			q.Set("application_name", lane)
+		}
+		if !q.Has("connection_limit") {
+			q.Set("connection_limit", fmt.Sprint(PostgresLaneConnectionLimit))
+		}
+		u.RawQuery = q.Encode()
+		out[i] = "DATABASE_URL=" + u.String()
+	}
+	return out
 }

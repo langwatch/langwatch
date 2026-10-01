@@ -1,0 +1,83 @@
+// biome-ignore lint/suspicious/noEmptyBlockStatements: empty blocks are deliberate.
+
+import type { UiInviteMemberDrawerProps } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import type React from "react";
+
+import { api } from "../../behavior/organization-api.ts";
+import { useDrawer } from "../../behavior/use-drawer.ts";
+import { useInviteActions } from "../../behavior/use-invite-actions.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { AddMembersForm } from "./add-members-form.tsx";
+
+/** Invite drawer: stable deep-link from members page, command bar, or inline box. */
+export function InviteMemberDrawer({
+  open = true,
+  initialEmail = "",
+}: UiInviteMemberDrawerProps): React.ReactElement | null {
+  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { closeDrawer } = useDrawer();
+  const queryClient = api.useUtils();
+  const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY ?? false;
+
+  const activePlan = api.plan.getActivePlan.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization },
+  );
+
+  const isAdmin = hasPermission("organization:manage");
+  const teamOptions = (organization?.teams ?? []).map((team) => ({
+    label: team.name,
+    value: team.id,
+  }));
+
+  const { onSubmit, isSubmitting } = useInviteActions({
+    organizationId: organization?.id ?? "",
+    hasEmailProvider,
+    // Created invite links stay reachable via the invites table's row actions;
+    // the drawer's job is to create and close, not to host the link list.
+    onInviteCreated: () => {},
+    onClose: closeDrawer,
+    refetchInvites: () => void queryClient.invite.getOrganizationPendingInvites.invalidate(),
+    pricingModel: (organization as { pricingModel?: string } | undefined)?.pricingModel,
+    activePlanFree: activePlan.data?.free ?? true,
+    activePlanType: activePlan.data?.type ?? "",
+    activePlanSource: activePlan.data?.planSource,
+  });
+
+  return (
+    <Drawer.Root
+      open={open}
+      placement="end"
+      size="lg"
+      onOpenChange={({ open: isOpen }) => {
+        if (!isOpen) closeDrawer();
+      }}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <Drawer.Title textStyle="lg" fontWeight="semibold">
+            Add members
+          </Drawer.Title>
+          <Drawer.CloseTrigger onClick={closeDrawer} />
+        </Drawer.Header>
+        <Drawer.Body>
+          {organization && (
+            <AddMembersForm
+              teamOptions={teamOptions}
+              organizationId={organization.id}
+              onSubmit={onSubmit}
+              isLoading={isSubmitting}
+              hasEmailProvider={hasEmailProvider}
+              onClose={closeDrawer}
+              isInviterAdmin={isAdmin}
+              initialEmails={initialEmail}
+            />
+          )}
+        </Drawer.Body>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}

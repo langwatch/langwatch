@@ -1,0 +1,68 @@
+{
+  "name": "@langwatch/tasks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "One-shot database migrations and provisioning, run in command-line order.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/main.ts",
+  "types": "./src/main.ts",
+  "exports": {
+    ".": {
+      "types": "./src/main.ts",
+      "default": "./src/main.ts"
+    }
+  },
+  "scripts": {
+    "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "typecheck": "tsc -b tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/analytics-process": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-process": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/data-privacy-process": "workspace:*",
+    "@langwatch/enterprise-license-signing": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/identity-process": "workspace:*",
+    "@langwatch/installed-server-modules": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/ops-process": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/process-server": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/system-migrations": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "bcrypt": "catalog:",
+    "prisma": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "@langwatch/vitest-config": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@types/bcrypt": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

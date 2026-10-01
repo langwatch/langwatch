@@ -1,0 +1,6 @@
+# Nested agent worktrees carry their own package.json files and a full
+# node_modules; they are separate checkouts, never projects of this graph.
+.claude/worktrees
+.venv
+.bin
+dev/tests/agentic-e2e/fixtures

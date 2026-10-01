@@ -1,19 +1,8 @@
 /**
- * The launcher against fake CLIs: where it looks, in what order, what it hands
- * over, and that it exits zero whatever it found.
- *
- * Each fake CLI records the argv it was run with into a probe file, so the
- * assertions are about what was RUN rather than about the launcher's source.
- * The recorded location and the PATH entry are two different fakes, which is
- * what makes the order observable.
- *
- * Every case runs with an explicitly constructed environment rather than an
- * extension of this process's own: these tests are frequently run FROM a
- * coding agent, whose `CLAUDECODE` would defeat the misattribution case and
- * whose `HOME` would put the developer's own config in front of the scratch
- * one.
- *
- * Spec: specs/ai-governance/agent-plugin/plugin-package.feature
+ * The launcher against fake CLIs that record their argv, so the order and hand-over are observable;
+ * it always exits zero. Each case builds its environment from scratch, free of `CLAUDECODE` and
+ * `HOME`.
+ * @see specs/ai-governance/agent-plugin/plugin-package.feature
  */
 
 import { spawn } from "node:child_process";
@@ -32,12 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-const launcher = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "scripts",
-  "launch.mjs",
-);
+const launcher = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "launch.mjs");
 
 interface LauncherRun {
   exitCode: number | null;
@@ -91,10 +75,7 @@ const fakePathCli = (): string => {
   const bin = join(scratch, "bin");
   mkdirSync(bin, { recursive: true });
   const script = join(bin, "langwatch");
-  writeFileSync(
-    script,
-    `#!/bin/sh\nprintf '{"via":"path","argv":"%s"}' "$*" > "${probe}"\n`,
-  );
+  writeFileSync(script, `#!/bin/sh\nprintf '{"via":"path","argv":"%s"}' "$*" > "${probe}"\n`);
   chmodSync(script, 0o755);
   return bin;
 };
@@ -113,11 +94,8 @@ const readProbe = (): { via: string; argv: string | string[]; stdin?: string } |
     : null;
 
 /**
- * Run the launcher the way hooks.json does, minus the shell: `node
- * launch.mjs <hook>`, the payload on stdin, an environment built from
- * scratch. `PATH` carries only what the case put there: node's own directory
- * would do, except that a global npm install puts `langwatch` right beside
- * node, which is the one thing these cases must not find by accident.
+ * Runs the launcher as hooks.json does, minus the shell, with a scratch environment. `PATH` holds
+ * only what the case put there, since a global npm install puts `langwatch` beside node.
  */
 const runLauncher = ({
   hook,

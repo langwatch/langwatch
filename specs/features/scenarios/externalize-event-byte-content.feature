@@ -1,3 +1,7 @@
+# Historical characterization while product- and platform-owned scenarios are
+# split to their long-term owners. Generic Stored Objects architecture is owned
+# by modules/stored-object and this file is not a competing authority.
+@deprecated
 Feature: Externalize event byte content to stored_objects
   As a platform operator and SDK consumer
   I want byte content (audio, images, PDFs) in scenario events stored out-of-band
@@ -80,13 +84,6 @@ Feature: Externalize event byte content to stored_objects
     When the URI is minted for the local filesystem backend
     Then the URI matches file:///<root>/<projectId>/<sha256>
 
-  @unit
-  Scenario: Same content from the same project yields the same URI
-    Given two PUTs of identical bytes within the same project
-    When the URI is computed for each
-    Then both URIs are identical
-    And the second PUT is idempotent at the storage layer
-
   # ---------------------------------------------------------------
   # Event ingest (AC7, AC8, AC9)
   # ---------------------------------------------------------------
@@ -99,22 +96,6 @@ Feature: Externalize event byte content to stored_objects
     And a stored_objects row is inserted with the new id and media type
     And the event payload is rewritten so the file part carries id and mediaType instead of data
     And the stored bytes can be retrieved via GET /api/files/:id
-
-  @integration
-  Scenario: Duplicate content within a project reuses the existing stored_objects id
-    Given a project that has already stored a file with sha256 S
-    When a new event arrives carrying inline bytes with the same sha256 S
-    Then no new stored_objects row is written
-    And the event payload references the existing id
-    And the storage backend is not asked to PUT again
-
-  @integration
-  Scenario: Stored object id is deterministic so concurrent ingest of the same content collapses cleanly
-    Given two pods receive the same event payload concurrently
-    When both extract the inline bytes
-    Then both compute the same stored_objects id from (project_id, sha256)
-    And ReplacingMergeTree collapses the duplicate inserts to a single row
-    And every event that references the id remains resolvable
 
   @integration
   Scenario: Storage put failure aborts the entire event with a 5xx and no partial state
@@ -211,12 +192,6 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @integration
-  Scenario: Stored objects rows are tenant-tagged so a future project-purge can cascade
-    Given a stored_objects row is written during event ingest
-    Then the row carries the project_id of the ingesting project
-    And the row's storage URI is namespaced under the same project_id
-
-  @integration
   Scenario: No automatic retention, time-based GC, or orphan reaping runs
     Given a stored_objects row that has not been referenced for any length of time
     When the system runs its scheduled jobs
@@ -225,15 +200,6 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
   # Code structure (AC17)
   # ---------------------------------------------------------------
-
-  @unit
-  Scenario: StoredObjectsService exposes storeFromBytes, getById, headById, deleteOwnedBy
-    Given the StoredObjectsService class
-    Then it exposes storeFromBytes
-    And it exposes getById
-    And it exposes headById
-    And it exposes deleteOwnedBy
-    And it depends on StoredObjectsRepository and the storage registry as interfaces
 
   @unit
   Scenario: Multi-replica install with dataplane on does NOT create the local-FS PVC, even when localFilesystem.enabled defaults to true
@@ -300,22 +266,16 @@ Feature: Externalize event byte content to stored_objects
   # ---------------------------------------------------------------
 
   @integration
-  Scenario: OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id
+  Scenario: OpenTelemetry spans wrap reads via /api/files/:id
     Given OpenTelemetry tracing is enabled
-    When an event with inline file content is ingested
-    Then a span named for stored-object extraction is recorded
     When the file is fetched via GET /api/files/:id
     Then a span for the file read is recorded
 
   @integration
-  Scenario: Prometheus metrics emit for ingest, dedup, write and read failures, and size distribution
+  Scenario: Prometheus counts a storage read failure on the legacy index
     Given the metrics endpoint is scraped
-    When events with file parts are ingested and files are fetched
-    Then the counter stored_object_extract_total{purpose} increases
-    And the counter stored_object_dedup_hit_total{purpose} increases on dedup hits
-    And the counter stored_object_write_failures_total{purpose} increases on storage write failure
-    And the counter stored_object_read_failures_total increases on storage read failure
-    And the histogram stored_object_size_bytes{purpose} observes the byte size
+    When a legacy index read reaches the storage backend and it fails for anything but a 404
+    Then the counter stored_object_read_failures_total increases
 
   @integration
   Scenario: Ingest logs list every stored_objects id extracted for an event
@@ -537,33 +497,18 @@ Feature: Externalize event byte content to stored_objects
     Then no credentials field is passed (partial pair would crash the SDK with an empty-string-credentials error)
     And the SDK default credential provider chain is allowed to resolve auth instead
 
-  @integration
-  Scenario: DB insert failure after a successful storage PUT triggers compensating storage delete
-    Given the storage driver accepts the PUT
-    But the stored_objects row insert fails
-    When the service surfaces the error
-    Then a compensating delete is invoked on the storage URI
-    And when that delete succeeds no orphaned bytes remain at the storage URI
-    And when that delete itself fails the service still surfaces the original DB error without throwing the delete error
-
-  @integration
-  Scenario: ClickHouse insert errors surface synchronously to the caller
-    Given the stored_objects repository inserts a row
-    When the ClickHouse insert returns an error
-    Then the service rejects with the underlying error
-    And the storage object has not been left in place
-
   # ---------------------------------------------------------------
   # Read path — auth modes and not_found vs missing (AC27, AC28, AC29)
   # ---------------------------------------------------------------
 
   @integration
-  Scenario: GET /api/files/:id authenticates a browser via session cookie when no API key header is present
+  Scenario: GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only
+    # Alex, 2026-09-30: REST is the API key's and tRPC the session's; the UI reads media through tRPC.
     Given a stored_objects row with id F exists for project A
     And the caller has an active session cookie for a user with scenarios:view on project A
     When the caller GETs /api/files/F with the cookie and no API key header
-    Then the response is 200
-    And the bytes stream back unchanged
+    Then the response is 401
+    And no bytes are streamed
 
   @integration
   Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
@@ -582,9 +527,9 @@ Feature: Externalize event byte content to stored_objects
     And the project membership check is never run
 
   @integration
-  Scenario: GET /api/files/:id resolves the owning project from the row id before applying the membership check
+  Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
     Given a stored_objects row with id F exists for project A
-    And the caller has an active session for a user in project B but not project A
+    And the caller presents an API key for project B
     When the caller GETs /api/files/F
     Then the response is 403
     And the bytes are not streamed
@@ -788,15 +733,6 @@ Feature: Externalize event byte content to stored_objects
     And the dataset's contentLayout flips to chunked
     And reading the dataset back returns the original rows
 
-  @integration
-  Scenario: Scenario media round-trips through Azure Blob when azure is the configured backend
-    Given STORED_OBJECTS_BACKEND is azure against an Azurite emulator
-    And the Azurite emulator uses path-style addressing
-    When an event with an inline media attachment is ingested
-    Then the bytes are stored via the AzureBlobDriver with a correctly signed path-style request
-    And the stored_objects row persists an azure-blob storage URI
-    And GET /api/files/:id streams the bytes back through the registry
-
   @unit
   Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
     Given the chart's app.dataplane.providers block
@@ -817,18 +753,6 @@ Feature: Externalize event byte content to stored_objects
     Given the .env.example file and the self-hosting environment-variables docs
     Then the AZURE_BLOB_* keys are documented as live write configuration, no longer deferred
     And AZURE_BLOB_CONTAINER and STORED_OBJECTS_BACKEND are listed with the explicit-toggle rationale
-
-  # ---------------------------------------------------------------
-  # Project-delete cascade (AC38)
-  # ---------------------------------------------------------------
-
-  @integration
-  Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
-    Given a project with N stored_objects rows across several owners
-    When the platform's project-delete handler invokes deleteOwnedBy for that project
-    Then every stored_objects row for the project is deleted from ClickHouse
-    And every byte object at the corresponding storage URIs is deleted from the storage backend
-    And subsequent GET /api/files/:id for any of those ids returns 404 with status not_found
 
   # ---------------------------------------------------------------
   # UI playback contract (AC39) — drives onLoadedData/onCanPlay correctness
@@ -852,10 +776,7 @@ Feature: Externalize event byte content to stored_objects
   # AC5  "Registry dispatches by URI scheme; both drivers always registered" -> Scenario: Storage registry dispatches by URI scheme
   #                                                                          -> Scenario: Both drivers remain available for reads regardless of which scheme new URIs use
   # AC6  "Content-addressed URI layout; same sha256 + project = same URI"    -> Scenario: Minted URI is content-addressed under projectId and sha256
-  #                                                                          -> Scenario: Same content from the same project yields the same URI
   # AC7  "Ingest decodes, sha256, dedup probe, mint/reuse id, rewrite part"  -> Scenario: Inline file part is externalized and the event payload is rewritten by id
-  #                                                                          -> Scenario: Duplicate content within a project reuses the existing stored_objects id
-  #                                                                          -> Scenario: Stored object id is deterministic so concurrent ingest of the same content collapses cleanly
   # AC8  "5xx on storage put failure; no partial state"                      -> Scenario: Storage put failure aborts the entire event with a 5xx and no partial state
   # AC9  "50MB body limit; 413 before extraction"                            -> Scenario: Event POST rejects bodies larger than 50MB with 413 before extraction
   # AC10 "GET /api/files/:id read path with 200/404/502 contract"            -> Scenario: GET /api/files/:id streams the bytes for an existing row
@@ -866,12 +787,10 @@ Feature: Externalize event byte content to stored_objects
   # AC13 "UI renders new id shape; old inline shape still renders"           -> Scenario: Trace timeline renders the new file id shape as an inline media tag
   #                                                                          -> Scenario: Trace timeline still renders legacy inline base64 file shapes unchanged
   # AC14 "Missing badge placeholder when GET returns status missing"         -> Scenario: Trace timeline shows a missing badge when the byte content is no longer retrievable
-  # AC15 "Rows carry project_id; future purge handler cascades"              -> Scenario: Stored objects rows are tenant-tagged so a future project-purge can cascade
   # AC16 "No automatic retention, GC, or orphan reaping"                     -> Scenario: No automatic retention, time-based GC, or orphan reaping runs
-  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: StoredObjectsService exposes storeFromBytes, getById, deleteOwnedBy
-  #                                                                          -> Scenario: Route handlers delegate to the service and never touch the repository directly
-  # AC18 "OpenTelemetry spans on ingest extraction and on file reads"        -> Scenario: OpenTelemetry spans wrap extraction during ingest and reads via /api/files/:id
-  # AC19 "Counter/histogram metrics for extract, dedup, failures, size"      -> Scenario: Prometheus metrics emit for ingest, dedup, write and read failures, and size distribution
+  # AC17 "Layered route -> service -> (repo | storage) with Zod data"       -> Scenario: Route handlers delegate to the service and never touch the repository directly
+  # AC18 "OpenTelemetry spans on file reads"                                -> Scenario: OpenTelemetry spans wrap reads via /api/files/:id
+  # AC19 "Counter for storage read failures"                                 -> Scenario: Prometheus counts a storage read failure on the legacy index
   # AC20 "Event-ingest logs list per-event stored_objects.id values"         -> Scenario: Ingest logs list every stored_objects id extracted for an event
   # AC21 "Integration suite covers full ingest/read/cascade contract"        -> Scenario: Integration suite covers every documented ingest and read shape
   # AC22 "Local FS driver atomic PUT regression"                             -> Scenario: Local filesystem driver write is atomic under interruption
@@ -879,12 +798,10 @@ Feature: Externalize event byte content to stored_objects
   # AC24 "Degraded passthrough on unrecognised content-part shape"           -> Scenario: Content parts with an unrecognised shape cause the message to pass through unchanged
   # AC25 "Binary part variant in AG-UI content union"                        -> Scenario: Binary part variant with inline data is externalized to id and url
   #                                                                          -> Scenario: Binary part variant rejects parts that carry data plus an explicit id or url
-  # AC26 "Compensating storage cleanup on DB insert failure"                 -> Scenario: DB insert failure after a successful storage PUT triggers compensating storage delete
-  #                                                                          -> Scenario: ClickHouse insert errors surface synchronously to the caller
-  # AC27 "Dual-auth on /api/files/:id (session cookie OR API key)"          -> Scenario: GET /api/files/:id authenticates a browser via session cookie when no API key header is present
+  # AC27 "Key-only auth on /api/files/:id (Alex, 2026-09-30)"               -> Scenario: GET /api/files/:id refuses a session cookie, since REST authenticates with API keys only
   #                                                                          -> Scenario: GET /api/files/:id authenticates via API key header when no session cookie is present
   # AC28 "404 not_found is distinct from 404 missing"                        -> Scenario: GET /api/files/:id returns 404 with status not_found when no row exists for the id
-  # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before applying the membership check
+  # AC29 "Cross-tenant id->project resolve runs before auth gate"            -> Scenario: GET /api/files/:id resolves the owning project from the row id before pinning the key to it
   #                                                                          -> Scenario: Cross-tenant owner lookup fans out to every ClickHouse instance
   #                                                                          -> Scenario: Cross-tenant owner lookup isolates failures across instances
   #                                                                          -> Scenario: Cross-tenant owner lookup signals transient unavailability when no hit and any instance failed
@@ -909,11 +826,9 @@ Feature: Externalize event byte content to stored_objects
   #                                                                          -> Scenario: Legacy S3 surfaces keep working during an S3-to-Azure migration
   #                                                                          -> Scenario: Datasets round-trip through Azure Blob when azure is the configured backend
   #                                                                          -> Scenario: The dataset-content backfill task migrates a postgres-layout dataset onto azure
-  #                                                                          -> Scenario: Scenario media round-trips through Azure Blob when azure is the configured backend
   #                                                                          -> Scenario: Helm chart exposes an azureBlob dataplane provider mirroring awsS3
   #                                                                          -> Scenario: Selecting the azureBlob provider satisfies the multi-replica shared-storage guard
   #                                                                          -> Scenario: .env.example and self-hosting docs describe the Azure stored-objects backend
-  # AC38 "Project-delete cascade removes rows AND bytes"                     -> Scenario: When a project is deleted, deleteOwnedBy removes both the stored_objects rows and the underlying bytes
   # AC39 "MediaPart playback contract (onLoadedData / non-zero duration)"    -> Scenario: MediaPart audio playback reports a non-zero duration once the browser has decoded the media
   # AC40 "S3 client supports every production credential mode"               -> Scenario: S3 client uses explicit credentials when env keys are present
   #                                                                          -> Scenario: S3 client forwards sessionToken when set so SSO/STS credentials work

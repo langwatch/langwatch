@@ -401,7 +401,7 @@ Feature: Credential Validation
     And I am told what to check
     And I am not shown an internal error code
 
-  @integration
+  @unit
   Scenario: An unreachable provider is not recorded as our own failure
     Given the base URL I entered never answers
     When validation runs

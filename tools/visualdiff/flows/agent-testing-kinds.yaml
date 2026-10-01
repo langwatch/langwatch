@@ -1,0 +1,314 @@
+# Agent testing across agent kinds: run a scenario against a code and a workflow agent, a
+# suite of several scenarios. Handles are main's own (run dialog,
+# case rows, verdict panel). Tunnel agents are not scripted: the devTunnel marker is written by
+# `langwatch agent dev`, the UI cannot create one, and agents-dev-tunnel.yaml (apidiff) proves it.
+# The voice agent's run needs an ElevenLabs agent; agents.yaml proves its create and reload.
+# Deferred: sim-scenario-ai-draft-saves needs release_ui_agent_testing_v2_enabled off. The AI draft
+# lives on the scenario library, which main redirects to Agent Testing while the flag the check
+# stack forces on is set; Agent Testing's case modal has no AI draft on either side.
+flows:
+  - id: sim-run-scenario-code-agent
+    title: Create a code agent, run one scenario against it and read its verdict
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-code
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-code-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-code-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-run
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-code-agent-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: expect
+        with:
+          testId: run-verdict-panel
+          timeout: "240000"
+      - action: expect
+        with:
+          count: '[data-testid="run-verdict-status-passed"], [data-testid="run-verdict-status-failed"]'
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-{uid}
+
+  - id: sim-run-scenario-workflow-agent
+    title: Create a workflow agent, run one scenario against it and read its verdict
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-workflow
+      - action: expect
+        with:
+          testId: agent-name-input
+          timeout: "30000"
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-wf-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          url: /studio/
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-wf-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-{uid}
+      - action: click
+        with:
+          testId: case-row-vd-scenario-{uid}-run
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-wf-agent-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: expect
+        with:
+          testId: run-verdict-panel
+          timeout: "240000"
+      - action: expect
+        with:
+          count: '[data-testid="run-verdict-status-passed"], [data-testid="run-verdict-status-failed"]'
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-run-{uid}
+
+  - id: sim-suite-two-scenarios-results
+    title: Build a suite of two scenarios, run it and read both results
+    steps:
+      - action: go
+        with:
+          path: /{slug}/agents
+      - action: click
+        with:
+          text: New Agent
+      - action: click
+        with:
+          testId: agent-type-http
+      - action: fill
+        with:
+          testId: agent-name-input
+          value: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: url-input
+          value: https://example.com/vd-agent-{uid}
+      - action: click
+        with:
+          testId: save-agent-button
+      - action: expect
+        with:
+          api: /api/agents
+          contains: vd-agent-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          text: New Test Suite
+      - action: fill
+        with:
+          label: Test suite name
+          value: vd-suite-{uid}
+      - action: click
+        with:
+          testId: suite-name-confirm
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-a-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Answers the customer politely
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-a-{uid}
+      - action: click
+        with:
+          text: New scenario
+      - action: fill
+        with:
+          label: Title
+          value: vd-scenario-b-{uid}
+      - action: fill
+        with:
+          label: Situation
+          value: A customer asks the agent where their refund is.
+      - action: fill
+        with:
+          label: Criteria
+          value: Offers a next step
+      - action: click
+        with:
+          testId: case-modal-save
+      - action: expect
+        with:
+          testId: case-row-vd-scenario-b-{uid}
+      - action: go
+        with:
+          path: /{slug}/agent-testing
+      - action: click
+        with:
+          testId: suite-rail-item-vd-suite-{uid}
+      - action: expect
+        with:
+          testIdPrefix: case-row-vd-scenario-
+          min: "2"
+      - action: click
+        with:
+          text: Run suite
+      - action: click
+        with:
+          selector: '[data-testid^="run-dialog-agent-"]'
+          text: vd-agent-{uid}
+      - action: fill
+        with:
+          testId: run-dialog-name
+          value: vd-suite-run-{uid}
+      - action: click
+        with:
+          testId: run-dialog-run
+      - action: go
+        with:
+          path: /{slug}/agent-testing/results
+      - action: click
+        with:
+          text: vd-suite-run-{uid}
+      - action: expect
+        with:
+          testId: agent-testing-run-plan-detail
+      - action: expect
+        with:
+          testIdPrefix: run-result-row-
+          min: "2"
+          timeout: "60000"
+      - action: click
+        with:
+          testIdPrefix: run-result-row-
+      - action: expect
+        with:
+          testId: run-verdict-panel
+          timeout: "240000"

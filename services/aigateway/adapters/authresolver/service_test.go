@@ -67,7 +67,7 @@ func (f *fakeResolver) FetchConfig(_ context.Context, _, _ string) (domain.Confi
 // changeKindEnumRe pulls the body out of the control plane's enum block.
 var changeKindEnumRe = regexp.MustCompile(`(?s)enum GatewayChangeEventKind \{(.*?)\}`)
 
-// repoRoot walks up from the test's directory to the module root, so a test
+// repoRoot walks up from the test's directory to the repository root (go.work), so a test
 // can read a control-plane file without a relative path that breaks the
 // moment either side moves.
 func repoRoot(t *testing.T) string {
@@ -75,11 +75,11 @@ func repoRoot(t *testing.T) string {
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	for {
-		if _, statErr := os.Stat(filepath.Join(dir, "go.mod")); statErr == nil {
+		if _, statErr := os.Stat(filepath.Join(dir, "go.work")); statErr == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		require.NotEqual(t, dir, parent, "no go.mod above the test directory")
+		require.NotEqual(t, dir, parent, "no go.work above the test directory")
 		dir = parent
 	}
 }
@@ -90,7 +90,7 @@ func repoRoot(t *testing.T) string {
 // upstream fail a test instead of arriving as a production warning.
 func changeKindsFromSchema(t *testing.T) []string {
 	t.Helper()
-	body, err := os.ReadFile(filepath.Join(repoRoot(t), "platform", "app", "prisma", "schema.prisma"))
+	body, err := os.ReadFile(filepath.Join(repoRoot(t), "packages", "prisma-client", "prisma", "schema.prisma"))
 	require.NoError(t, err)
 	block := changeKindEnumRe.FindSubmatch(body)
 	require.NotNil(t, block, "GatewayChangeEventKind is not in schema.prisma; this test is looking in the wrong place")

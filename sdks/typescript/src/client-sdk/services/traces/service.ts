@@ -1,17 +1,12 @@
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
-import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
+
 import { tracer } from "./tracing";
+import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
 
 /**
- * Service for managing trace resources via the Langwatch API.
- * Constructor creates a proxy that wraps the service and traces all methods.
- *
- * Responsibilities:
- * - Retrieving trace data
- * - Error handling with contextual information
- *
- * All methods return trace response objects directly.
+ * Service for managing trace resources via the Langwatch API. Constructor creates a proxy
+ * that wraps the service and traces all methods.
  */
 export class TracesService {
   private config: InternalConfig;
@@ -22,47 +17,35 @@ export class TracesService {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
-    return createTracingProxy(
-      this as TracesService,
-      tracer,
-    );
+    return createTracingProxy(this as TracesService, tracer);
   }
 
   /**
-   * Handles API errors by throwing a TracesError with operation context.
+   * Handles API errors by throwing a TracesError with operation context. @throws
    * @param operation Description of the operation being performed.
    * @param error The error object returned from the API client.
-   * @throws {TracesError}
    */
-  private handleApiError(operation: string, error: any): never {
-    const errorMessage =
+  private handleApiError(operation: string, error: unknown): never {
+    const errorMessage = displayOf(
       typeof error === "string"
         ? error
-        : error?.error ?? error?.message ?? "Unknown error occurred";
+        : (propertyOf(error, "error") ?? propertyOf(error, "message") ?? "Unknown error occurred"),
+    );
     const message = `Failed to ${operation}: ${errorMessage}`;
 
-    throw new TracesError(
-      message,
-      operation,
-      error,
-    );
+    throw new TracesError(message, operation, error);
   }
 
   /**
-   * Retrieves a trace by its ID.
    * @param traceId The trace's unique identifier.
    * @param params Optional parameters for the request.
    * @returns The trace response object.
-   * @throws {TracesError} If the API call fails.
    */
-  async get(
-    traceId: string,
-    params?: GetTraceParams,
-  ): Promise<GetTraceResponse> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/trace/{id}", {
+  async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
+    const { data, error } = await this.config.langwatchApiClient.GET("/api/v1/traces/{traceId}", {
       params: {
         path: {
-          id: traceId,
+          traceId,
         },
       },
       query: params,
@@ -72,6 +55,18 @@ export class TracesService {
       this.handleApiError("get trace", error);
     }
 
-    return data;
+    return data as GetTraceResponse;
   }
+}
+
+function propertyOf(value: unknown, key: string): unknown {
+  if (value === null || value === undefined) return undefined;
+  return Reflect.get(Object(value), key);
+}
+
+function displayOf(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint")
+    return String(value);
+  return JSON.stringify(value) ?? String(value);
 }

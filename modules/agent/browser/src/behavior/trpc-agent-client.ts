@@ -1,0 +1,110 @@
+/**
+ * `AgentClient` over the `rpc` capability: the by-path dispatcher is what a
+ * host mount may reach for, never a hand-written transport, so this projects
+ * it into the domain-shaped client the Agents screen was written against.
+ */
+
+import {
+  agentCascadeArchiveSchema,
+  agentCopyCreatedSchema,
+  agentCopySchema,
+  agentHistoryEntrySchema,
+  agentPushToCopiesSchema,
+  agentSchema,
+  agentSyncFromSourceSchema,
+  agentWithFieldsSchema,
+  relatedAgentEntitiesSchema,
+  type AgentApiAgentInput,
+  type CreateAgentCommand,
+  type UpdateAgentCommand,
+} from "@langwatch/agent-contract";
+import type { UiRpc } from "@langwatch/browser-host/capabilities";
+import { Temporal, toDate } from "@langwatch/time";
+
+import type {
+  AgentClient,
+  AgentCopiesInput,
+  AgentCopyInput,
+  AgentHistoryInput,
+  AgentPushToCopiesInput,
+  AgentSyncFromSourceInput,
+} from "../model/agent-client.ts";
+
+const agentCopiesSchema = agentCopySchema.array();
+
+const WIRE_DATE_KEYS = ["archivedAt", "createdAt", "updatedAt", "lastSeenAt"] as const;
+
+/** This transport carries plain JSON, so a row's dates arrive as ISO strings. */
+function withDates(output: unknown): unknown {
+  if (typeof output !== "object" || output === null || Array.isArray(output)) return output;
+  const row: Record<string, unknown> = { ...output };
+  for (const key of WIRE_DATE_KEYS) {
+    const value = row[key];
+    if (typeof value === "string") row[key] = toDate(Temporal.Instant.from(value));
+  }
+  return row;
+}
+const agentHistoryEntriesSchema = agentHistoryEntrySchema.array();
+
+export class TrpcAgentClient implements AgentClient {
+  static create(rpc: UiRpc): TrpcAgentClient {
+    return new TrpcAgentClient(rpc);
+  }
+
+  private constructor(private readonly rpc: UiRpc) {}
+
+  async getById(input: AgentApiAgentInput) {
+    const output = await this.rpc.query("agents.getById", input);
+    return agentWithFieldsSchema.parse(withDates(output));
+  }
+
+  async create(input: CreateAgentCommand) {
+    const output = await this.rpc.mutate("agents.create", input);
+    return agentWithFieldsSchema.parse(withDates(output));
+  }
+
+  async update(input: UpdateAgentCommand) {
+    const output = await this.rpc.mutate("agents.update", input);
+    return agentWithFieldsSchema.parse(withDates(output));
+  }
+
+  async relatedEntities(input: AgentApiAgentInput) {
+    const output = await this.rpc.query("agents.getRelatedEntities", input);
+    return relatedAgentEntitiesSchema.parse(output);
+  }
+
+  async cascadeArchive(input: AgentApiAgentInput) {
+    const output = await this.rpc.mutate("agents.cascadeArchive", input);
+    return agentCascadeArchiveSchema.parse(output);
+  }
+
+  async archive(input: AgentApiAgentInput) {
+    const output = await this.rpc.mutate("agents.delete", input);
+    return agentSchema.parse(withDates(output));
+  }
+
+  async getCopies(input: AgentCopiesInput) {
+    const output = await this.rpc.query("agents.getCopies", input);
+    return agentCopiesSchema.parse(output);
+  }
+
+  async copy(input: AgentCopyInput) {
+    const output = await this.rpc.mutate("agents.copy", input);
+    return agentCopyCreatedSchema.parse(output);
+  }
+
+  async pushToCopies(input: AgentPushToCopiesInput) {
+    const output = await this.rpc.mutate("agents.pushToCopies", input);
+    return agentPushToCopiesSchema.parse(output);
+  }
+
+  async syncFromSource(input: AgentSyncFromSourceInput) {
+    const output = await this.rpc.mutate("agents.syncFromSource", input);
+    return agentSyncFromSourceSchema.parse(output);
+  }
+
+  async getHistory(input: AgentHistoryInput) {
+    const output = await this.rpc.query("agents.getHistory", input);
+    return agentHistoryEntriesSchema.parse(Array.isArray(output) ? output.map(withDates) : output);
+  }
+}

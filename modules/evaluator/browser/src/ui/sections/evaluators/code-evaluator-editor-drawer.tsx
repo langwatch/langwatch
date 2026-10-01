@@ -1,0 +1,421 @@
+import type { UiCodeEvaluatorEditorDrawerProps } from "@langwatch/browser-host/drawer";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/browser-host/drawer";
+import { showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import {
+  type CodeEvaluatorConfig,
+  codeEvaluatorOutputFields,
+  defaultCodeEvaluatorConfig,
+} from "@langwatch/evaluator-contract";
+import {
+  type FieldMapping as UIFieldMapping,
+  type Variable,
+  VariablesSection,
+} from "@langwatch/prompt-browser-kit";
+import { rewriteCodeSignature, renderSourceTypeIcon } from "@langwatch/workflow-browser-kit";
+import { useEffect, useRef, useState } from "react";
+import { LuArrowLeft } from "react-icons/lu";
+
+import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
+import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
+import {
+  CodeEvaluatorEditor,
+  type CodeEvaluatorField,
+  validCodeEvaluatorFields,
+} from "../../blocks/code-evaluator-editor.tsx";
+import { EvaluatorCodeEditor } from "./evaluator-code-editor.tsx";
+import { EvaluatorGateSection, type EvaluatorMappingsConfig } from "./evaluator-editor-shared.tsx";
+
+type EditableField = CodeEvaluatorField;
+
+export type CodeEvaluatorEditorDrawerProps = UiCodeEvaluatorEditorDrawerProps;
+
+function seedFromSavedEvaluator(
+  data: { name: string; config: unknown },
+  setters: {
+    setName: (name: string) => void;
+    setCode: (code: string) => void;
+    setInputs: (inputs: EditableField[]) => void;
+  },
+) {
+  const config = data.config as Partial<CodeEvaluatorConfig> | null;
+  setters.setName(data.name);
+  if (config?.code) setters.setCode(config.code);
+  if (config?.inputs?.length) setters.setInputs(config.inputs.map((f) => ({ ...f })));
+}
+
+function withMapping(
+  prev: Record<string, UIFieldMapping>,
+  identifier: string,
+  mapping: UIFieldMapping | undefined,
+): Record<string, UIFieldMapping> {
+  const next = { ...prev };
+  if (mapping) next[identifier] = mapping;
+  else delete next[identifier];
+  return next;
+}
+
+/** Flow callbacks take precedence over the prop; with none, the drawer closes. */
+function handOffSaved({
+  evaluator,
+  onSave: propOnSave,
+  closeDrawer,
+}: {
+  evaluator: { id: string; name: string };
+  onSave: CodeEvaluatorEditorDrawerProps["onSave"];
+  closeDrawer: () => void;
+}) {
+  const onSave =
+    getFlowCallbacks("codeEvaluatorEditor")?.onSave ??
+    getFlowCallbacks("evaluatorEditor")?.onSave ??
+    propOnSave;
+  if (!onSave) {
+    closeDrawer();
+    return;
+  }
+  (onSave as (evaluator: { id: string; name: string }) => void)({
+    id: evaluator.id,
+    name: evaluator.name,
+  });
+}
+
+/** Why the button is disabled, so it explains itself; silent while saving or loading. */
+function saveAvailability({
+  name,
+  code,
+  inputs,
+  busy,
+  isEditing,
+}: {
+  name: string;
+  code: string;
+  inputs: EditableField[];
+  busy: boolean;
+  isEditing: boolean;
+}) {
+  const hasName = !!name.trim();
+  const hasCode = code.trim() !== "";
+  const hasInput = validCodeEvaluatorFields(inputs).length > 0;
+  return {
+    canSave: hasName && hasCode && hasInput && !busy,
+    disabledReason: busy
+      ? null
+      : codeEvaluatorDisabledReason({ hasName, hasCode, hasInput, isEditing }),
+  };
+}
+
+/** Form state and the create/update mutation behind the drawer; no JSX in here. */
+function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const { closeDrawer } = useDrawer();
+  const drawerParams = useDrawerParams();
+  const complexProps = getComplexProps();
+  const utils = evaluatorApi.useUtils();
+
+  const evaluatorId =
+    props.evaluatorId ??
+    drawerParams.evaluatorId ??
+    (complexProps.evaluatorId as string | undefined);
+  const isEditing = !!evaluatorId;
+
+  const mappingsConfig =
+    props.mappingsConfig ?? (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+  const onMappingChange =
+    props.onMappingChange ?? getFlowCallbacks("codeEvaluatorEditor")?.onMappingChange;
+
+  const isOpen = props.open !== false && props.open !== undefined;
+
+  const [name, setName] = useState("");
+  const [code, setCode] = useState(defaultCodeEvaluatorConfig.code);
+  const [inputs, setInputs] = useState<EditableField[]>(
+    defaultCodeEvaluatorConfig.inputs.map((f) => ({ ...f })),
+  );
+  const [mappings, setMappings] = useState<Record<string, UIFieldMapping>>(
+    mappingsConfig?.initialMappings ?? {},
+  );
+
+  const evaluatorQuery = evaluatorApi.evaluators.getById.useQuery(
+    { id: evaluatorId ?? "", projectId: project?.id ?? "" },
+    { enabled: isEditing && !!project?.id && isOpen },
+  );
+
+  // Seed the form from the saved evaluator once per id (not on refetch).
+  const seededForRef = useRef<string | null>(null);
+  useEffect(() => {
+    const data = evaluatorQuery.data;
+    if (!data || seededForRef.current === data.id) return;
+    seededForRef.current = data.id;
+    seedFromSavedEvaluator(data, { setName, setCode, setInputs });
+  }, [evaluatorQuery.data]);
+
+  // Keep the Python __call__ signature in sync with the declared inputs, the
+  // same way the studio code node does, so adding or removing an input field
+  // rewrites the entrypoint and the saved evaluator never calls it with an
+  // unexpected keyword. Only the signature line changes; the body is kept.
+  const setInputsAndSyncCode = (next: EditableField[]) => {
+    setInputs(next);
+    const valid = validCodeEvaluatorFields(next);
+    if (valid.length > 0) {
+      setCode((current) => rewriteCodeSignature(current, valid));
+    }
+  };
+
+  const handleMappingChange = (identifier: string, mapping: UIFieldMapping | undefined) => {
+    setMappings((prev) => withMapping(prev, identifier, mapping));
+    onMappingChange?.(identifier, mapping);
+  };
+
+  const finishSave = (evaluator: { id: string; name: string }) => {
+    void utils.evaluators.getAll.invalidate({ projectId: project?.id ?? "" });
+    if (isEditing) {
+      void utils.evaluators.getById.invalidate({
+        id: evaluator.id,
+        projectId: project?.id ?? "",
+      });
+    }
+    toaster.create({
+      title: isEditing ? "Code evaluator saved" : "Code evaluator created",
+      type: "success",
+    });
+    handOffSaved({ evaluator, onSave: props.onSave, closeDrawer });
+  };
+
+  const createMutation = evaluatorApi.evaluators.create.useMutation({
+    onSuccess: finishSave,
+    onError: (error) =>
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't create code evaluator",
+      }),
+  });
+
+  const updateMutation = evaluatorApi.evaluators.update.useMutation({
+    onSuccess: finishSave,
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
+  });
+
+  const handleSave = () => {
+    if (!project?.id || !name.trim()) return;
+    const config: CodeEvaluatorConfig = {
+      code,
+      inputs: validCodeEvaluatorFields(inputs),
+      outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })),
+    };
+    if (isEditing) {
+      updateMutation.mutate({
+        id: evaluatorId,
+        projectId: project.id,
+        type: "code",
+        name: name.trim(),
+        config,
+      });
+    } else {
+      createMutation.mutate({
+        projectId: project.id,
+        name: name.trim(),
+        type: "code",
+        config,
+      });
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isLoadingEvaluator = isEditing && evaluatorQuery.isLoading;
+  const { canSave, disabledReason } = saveAvailability({
+    name,
+    code,
+    inputs,
+    busy: isPending || isLoadingEvaluator,
+    isEditing,
+  });
+
+  return {
+    name,
+    setName,
+    code,
+    setCode,
+    inputs,
+    setInputs: setInputsAndSyncCode,
+    mappings,
+    handleMappingChange,
+    mappingsConfig,
+    showMappings: !!(mappingsConfig && onMappingChange),
+    isEditing,
+    isLoadingEvaluator,
+    handleSave,
+    canSave,
+    disabledReason,
+    isPending,
+  };
+}
+
+type CodeEvaluatorFormState = ReturnType<typeof useCodeEvaluatorForm>;
+
+/**
+ * Creates or edits a custom CODE evaluator: a Python code block with its inputs and outputs,
+ * exactly like the studio code component, stored on the evaluator itself (no workflow record).
+ */
+export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps) {
+  const { closeDrawer, canGoBack, goBack } = useDrawer();
+  const form = useCodeEvaluatorForm(props);
+  const isOpen = props.open !== false && props.open !== undefined;
+  const showDisabledReason = !props.onRemove && !!form.disabledReason;
+  const showFooterSpacer = !props.onRemove && !form.disabledReason;
+
+  return (
+    <Drawer.Root
+      open={isOpen}
+      onOpenChange={({ open }) => {
+        if (!open) {
+          props.onClose?.();
+          closeDrawer();
+        }
+      }}
+      size="lg"
+      closeOnInteractOutside={false}
+      modal={false}
+    >
+      <Drawer.Content bg="bg">
+        <Drawer.CloseTrigger />
+        <EditorHeader canGoBack={canGoBack} goBack={goBack} isEditing={form.isEditing} />
+        <Drawer.Body display="flex" flexDirection="column" gap={4}>
+          {form.isLoadingEvaluator ? (
+            <HStack justify="center" paddingY={8}>
+              <Spinner size="md" />
+            </HStack>
+          ) : (
+            <CodeEvaluatorFormFields form={form} />
+          )}
+          {props.gate && (
+            <EvaluatorGateSection
+              gate={props.gate}
+              required={props.gate.required}
+              onRequiredChange={props.onRequiredChange}
+            />
+          )}
+        </Drawer.Body>
+        <Drawer.Footer borderTopWidth="1px" borderColor="border">
+          <HStack width="full" justify="space-between" gap={3}>
+            {props.onRemove && (
+              <Button
+                variant="ghost"
+                colorPalette="red"
+                onClick={props.onRemove}
+                data-testid="evaluator-remove-button"
+              >
+                Remove evaluator
+              </Button>
+            )}
+            {showDisabledReason && (
+              <Text fontSize="sm" color="fg.muted" data-testid="code-evaluator-disabled-reason">
+                {form.disabledReason}
+              </Text>
+            )}
+            {showFooterSpacer && <Box />}
+            <Button
+              colorPalette="blue"
+              onClick={form.handleSave}
+              disabled={!form.canSave}
+              loading={form.isPending}
+              data-testid="save-code-evaluator"
+            >
+              {form.isEditing ? "Save changes" : "Create evaluator"}
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
+function EditorHeader({
+  canGoBack,
+  goBack,
+  isEditing,
+}: {
+  canGoBack: boolean;
+  goBack: () => void;
+  isEditing: boolean;
+}) {
+  return (
+    <Drawer.Header>
+      <HStack gap={2}>
+        {canGoBack && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={goBack}
+            padding={1}
+            minWidth="auto"
+            data-testid="back-button"
+          >
+            <LuArrowLeft size={20} />
+          </Button>
+        )}
+        <Drawer.Title>{isEditing ? "Edit Code Evaluator" : "New Code Evaluator"}</Drawer.Title>
+      </HStack>
+    </Drawer.Header>
+  );
+}
+
+function CodeEvaluatorFormFields({ form }: { form: CodeEvaluatorFormState }) {
+  // Read once, so the mapping renderer below closes over a value rather than a
+  // property the compiler has to re-check inside the callback.
+  const mappingsConfig = form.showMappings ? form.mappingsConfig : void 0;
+
+  return (
+    <CodeEvaluatorEditor
+      name={form.name}
+      code={form.code}
+      inputs={form.inputs}
+      onNameChange={form.setName}
+      onInputsChange={form.setInputs}
+      renderCodeEditor={({ code, inputs, outputs }) => (
+        <EvaluatorCodeEditor
+          code={code}
+          setCode={form.setCode}
+          onClose={() => void 0}
+          language="python"
+          technologies={["python"]}
+          inputs={inputs}
+          outputs={outputs}
+        />
+      )}
+      renderInputMappings={
+        mappingsConfig
+          ? ({ inputs, onInputsChange }) => (
+              <VariablesSection
+                renderSourceIcon={renderSourceTypeIcon}
+                title="Inputs"
+                variables={inputs.map((field) => ({
+                  identifier: field.identifier,
+                  type: field.type as Variable["type"],
+                }))}
+                onChange={(variables) =>
+                  onInputsChange(
+                    variables.map((variable) => ({
+                      identifier: variable.identifier,
+                      type: variable.type,
+                    })),
+                  )
+                }
+                showMappings
+                mappings={form.mappings}
+                onMappingChange={form.handleMappingChange}
+                availableSources={mappingsConfig.availableSources}
+                canAddRemove
+              />
+            )
+          : void 0
+      }
+    />
+  );
+}

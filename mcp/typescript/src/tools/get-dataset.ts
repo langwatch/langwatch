@@ -1,27 +1,22 @@
 import {
   getDataset as apiGetDataset,
   type DatasetDetailResponse,
-} from "../langwatch-api-datasets.js";
-import { escapeMarkdown } from "../utils/escape-markdown.js";
+} from "../langwatch-api-datasets.ts";
+import { escapeMarkdown } from "../utils/escape-markdown.ts";
 
 /**
  * Formats a dataset detail response into AI-readable markdown.
  *
  * Exported for unit testing.
  */
-export function formatDatasetResponse(
-  dataset: DatasetDetailResponse,
-): string {
+export function formatDatasetResponse(dataset: DatasetDetailResponse): string {
   const lines: string[] = [];
   lines.push(`# Dataset: ${escapeMarkdown(dataset.name)}\n`);
   lines.push(`**Slug**: ${escapeMarkdown(dataset.slug)}`);
   lines.push(`**ID**: ${escapeMarkdown(dataset.id)}`);
 
   // Column table
-  if (
-    Array.isArray(dataset.columnTypes) &&
-    dataset.columnTypes.length > 0
-  ) {
+  if (Array.isArray(dataset.columnTypes) && dataset.columnTypes.length > 0) {
     lines.push("\n## Columns\n");
     lines.push("| Name | Type |");
     lines.push("|------|------|");
@@ -34,7 +29,9 @@ export function formatDatasetResponse(
   if (Array.isArray(dataset.data) && dataset.data.length > 0) {
     lines.push(`\n## Records (${dataset.data.length} shown)\n`);
     for (const record of dataset.data) {
-      lines.push(`**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`);
+      lines.push(
+        `**${escapeMarkdown(record.id)}**: ${escapeMarkdown(JSON.stringify(record.entry))}`,
+      );
     }
   } else {
     lines.push("\nNo records in this dataset.");
@@ -44,10 +41,8 @@ export function formatDatasetResponse(
 }
 
 /**
- * Handles the platform_get_dataset MCP tool invocation.
- *
- * Retrieves a specific dataset by slug or ID and formats it as
- * AI-readable markdown or raw JSON.
+ * Handles the platform_get_dataset MCP tool: retrieves a dataset by
+ * slug or ID and formats it as AI-readable markdown or raw JSON.
  */
 export async function handleGetDataset(params: {
   slugOrId: string;

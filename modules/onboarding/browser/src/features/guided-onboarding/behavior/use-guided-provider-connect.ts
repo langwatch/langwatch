@@ -1,0 +1,69 @@
+/**
+ * The provider takeover step's own writes: records the connection once the
+ * shared credential form has saved a row (pointing Langy's own role at the
+ * picked or typed model first, same as upstream), or records a skip.
+ */
+import type { GuidedProvider } from "@langwatch/onboarding-browser-kit";
+import { useCallback } from "react";
+
+import { onboardingApi } from "../../../behavior/onboarding-api.ts";
+
+export interface GuidedConnectedProvider {
+  provider: string;
+  model: string;
+}
+
+type StoredProviderRow = {
+  models: string[] | null;
+  customModels: { modelId: string }[];
+};
+
+/** The model a just-saved row carries: a picked chat model, or the one typed in manually. */
+function connectedModel(row: StoredProviderRow | undefined): string {
+  return row?.customModels?.[0]?.modelId ?? row?.models?.[0] ?? "";
+}
+
+export function useGuidedProviderConnect({
+  organizationId,
+  projectId,
+  onConnected,
+}: {
+  organizationId: string;
+  projectId: string | undefined;
+  onConnected: (connected: GuidedConnectedProvider) => void;
+}) {
+  const { refetch } = onboardingApi.modelProvider.getAllForProjectForFrontend.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: Boolean(projectId) },
+  );
+  const recordProvider = onboardingApi.onboarding.recordProvider.useMutation();
+  const recordProviderSkipped = onboardingApi.onboarding.recordProviderSkipped.useMutation();
+  const setRoleAssignment = onboardingApi.modelProvider.setRoleAssignmentForScope.useMutation();
+
+  const onSaved = useCallback(
+    async (provider: GuidedProvider, saved: { chatModel?: string }) => {
+      const refetched = await refetch();
+      const model = saved.chatModel ?? connectedModel(refetched.data?.[provider.registryKey]);
+      await setRoleAssignment.mutateAsync({
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        role: "LANGY",
+        model: `${provider.registryKey}/${model}`,
+      });
+      await recordProvider.mutateAsync({
+        organizationId,
+        provider: provider.registryKey,
+        model,
+      });
+      onConnected({ provider: provider.registryKey, model });
+    },
+    [refetch, setRoleAssignment, recordProvider, organizationId, onConnected],
+  );
+
+  const skip = useCallback(
+    () => recordProviderSkipped.mutateAsync({ organizationId }),
+    [recordProviderSkipped, organizationId],
+  );
+
+  return { onSaved, skip, isSaving: recordProvider.isPending };
+}

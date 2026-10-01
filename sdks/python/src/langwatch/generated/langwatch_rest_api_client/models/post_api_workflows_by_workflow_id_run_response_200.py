@@ -24,9 +24,8 @@ T = TypeVar("T", bound="PostApiWorkflowsByWorkflowIdRunResponse200")
 class PostApiWorkflowsByWorkflowIdRunResponse200:
     """
     Attributes:
-        status (PostApiWorkflowsByWorkflowIdRunResponse200Status): Execution state the run finished in
-        result (None | PostApiWorkflowsByWorkflowIdRunResponse200ResultType0 | Unset): The workflow's output fields,
-            named as the workflow names them
+        status (PostApiWorkflowsByWorkflowIdRunResponse200Status):
+        result (None | PostApiWorkflowsByWorkflowIdRunResponse200ResultType0 | Unset):
     """
 
     status: PostApiWorkflowsByWorkflowIdRunResponse200Status

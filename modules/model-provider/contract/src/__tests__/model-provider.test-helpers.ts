@@ -1,0 +1,33 @@
+/**
+ * Shared test factories for the custom-model display-name test files.
+ * Centralizes `makeProvider` so every file building provider-row fixtures
+ * derives them from one definition rather than copies that can drift apart.
+ */
+import type {
+  CustomModelDisplayNameRow,
+  ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
+
+/**
+ * Builds a `MaybeStoredModelProvider` fixture with every optional column
+ * nulled and the row enabled, so a test spells out only the fields whose
+ * effect it means to exercise.
+ */
+export const makeProvider = (
+  overrides: Partial<MaybeStoredModelProvider> & { provider: string },
+): MaybeStoredModelProvider => ({
+  enabled: true,
+  customKeys: null,
+  models: null,
+  embeddingsModels: null,
+  customModels: null,
+  customEmbeddingsModels: null,
+  deploymentMapping: null,
+  extraHeaders: null,
+  ...overrides,
+});
+
+/** A row as stored JSON may hold it: the label builder reads these columns defensively. */
+export const storedRow = (
+  overrides: Partial<CustomModelDisplayNameRow> & { provider: string },
+): CustomModelDisplayNameRow => ({ enabled: true, ...overrides });

@@ -24,17 +24,14 @@ export function defaultGeminiSettingsPath(): string {
 }
 
 function stripJsoncComments(s: string): string {
-  return s
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 export function warnIfGeminiOAuthSelected(
   options: GeminiSettingsPreflightOptions = {},
 ): GeminiSettingsPreflightResult {
   const filePath = options.filePath ?? defaultGeminiSettingsPath();
-  const writeLine =
-    options.writeLine ?? ((line: string) => process.stderr.write(line + "\n"));
+  const writeLine = options.writeLine ?? ((line: string) => process.stderr.write(line + "\n"));
 
   if (!fs.existsSync(filePath)) {
     return { action: "no-settings", warned: false };
@@ -58,11 +55,11 @@ export function warnIfGeminiOAuthSelected(
 
   if (selectedType === "gemini-oauth") {
     writeLine(
-      "warning: ~/.gemini/settings.json has security.auth.selectedType=\"gemini-oauth\". " +
+      'warning: ~/.gemini/settings.json has security.auth.selectedType="gemini-oauth". ' +
         "gemini-cli 0.46 will use cached OAuth and ignore GOOGLE_API_KEY / GEMINI_API_KEY, " +
         "so this `langwatch gemini` call will bypass the gateway. " +
         "To route through langwatch: edit ~/.gemini/settings.json and set " +
-        "security.auth.selectedType to \"gemini-api-key\".",
+        'security.auth.selectedType to "gemini-api-key".',
     );
     return { action: "oauth-selected", warned: true };
   }

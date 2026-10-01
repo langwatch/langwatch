@@ -5,18 +5,24 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.get_api_secrets_response_200_item import GetApiSecretsResponse200Item
-from ...models.get_api_secrets_response_400 import GetApiSecretsResponse400
-from ...models.get_api_secrets_response_401 import GetApiSecretsResponse401
-from ...models.get_api_secrets_response_422 import GetApiSecretsResponse422
-from ...models.get_api_secrets_response_500 import GetApiSecretsResponse500
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, safe_http_status
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    project_id: str,
+) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    params["projectId"] = project_id
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/secrets",
+        "url": "/api/v1/secrets",
+        "params": params,
     }
 
     return _kwargs
@@ -24,14 +30,7 @@ def _get_kwargs() -> dict[str, Any]:
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-    | None
-):
+) -> list[GetApiSecretsResponse200Item] | None:
     if response.status_code == 200:
         response_200 = []
         _response_200 = response.json()
@@ -42,26 +41,6 @@ def _parse_response(
 
         return response_200
 
-    if response.status_code == 400:
-        response_400 = GetApiSecretsResponse400.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 401:
-        response_401 = GetApiSecretsResponse401.from_dict(response.json())
-
-        return response_401
-
-    if response.status_code == 422:
-        response_422 = GetApiSecretsResponse422.from_dict(response.json())
-
-        return response_422
-
-    if response.status_code == 500:
-        response_500 = GetApiSecretsResponse500.from_dict(response.json())
-
-        return response_500
-
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
     else:
@@ -70,13 +49,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-]:
+) -> Response[list[GetApiSecretsResponse200Item]]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -91,24 +64,27 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-]:
-    """List all secrets for the project (values are never returned)
+    project_id: str,
+) -> Response[list[GetApiSecretsResponse200Item]]:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiSecretsResponse400 | GetApiSecretsResponse401 | GetApiSecretsResponse422 | GetApiSecretsResponse500 | list[GetApiSecretsResponse200Item]]
+        Response[list[GetApiSecretsResponse200Item]]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        project_id=project_id,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -120,50 +96,54 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-    | None
-):
-    """List all secrets for the project (values are never returned)
+    project_id: str,
+) -> list[GetApiSecretsResponse200Item] | None:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiSecretsResponse400 | GetApiSecretsResponse401 | GetApiSecretsResponse422 | GetApiSecretsResponse500 | list[GetApiSecretsResponse200Item]
+        list[GetApiSecretsResponse200Item]
     """
 
     return sync_detailed(
         client=client,
+        project_id=project_id,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-) -> Response[
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-]:
-    """List all secrets for the project (values are never returned)
+    project_id: str,
+) -> Response[list[GetApiSecretsResponse200Item]]:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiSecretsResponse400 | GetApiSecretsResponse401 | GetApiSecretsResponse422 | GetApiSecretsResponse500 | list[GetApiSecretsResponse200Item]]
+        Response[list[GetApiSecretsResponse200Item]]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        project_id=project_id,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -173,26 +153,27 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-) -> (
-    GetApiSecretsResponse400
-    | GetApiSecretsResponse401
-    | GetApiSecretsResponse422
-    | GetApiSecretsResponse500
-    | list[GetApiSecretsResponse200Item]
-    | None
-):
-    """List all secrets for the project (values are never returned)
+    project_id: str,
+) -> list[GetApiSecretsResponse200Item] | None:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiSecretsResponse400 | GetApiSecretsResponse401 | GetApiSecretsResponse422 | GetApiSecretsResponse500 | list[GetApiSecretsResponse200Item]
+        list[GetApiSecretsResponse200Item]
     """
 
     return (
         await asyncio_detailed(
             client=client,
+            project_id=project_id,
         )
     ).parsed

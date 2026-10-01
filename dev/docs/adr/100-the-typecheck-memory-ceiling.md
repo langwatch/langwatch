@@ -16,7 +16,7 @@ Sampled cold at four ceilings, the resident working set never left the
 2.3–3.5 GB band while the footprint tracked whatever it was allowed:
 
 | `GOMEMLIMIT` | max RSS | peak footprint |
-|--------------|---------|----------------|
+| ------------ | ------- | -------------- |
 | 9 GiB        | 2.29 GB | 9.08 GB        |
 | 6 GiB        | 2.26 GB | 6.57 GB        |
 | 5 GiB        | 3.10 GB | 7.77 GB        |
@@ -114,14 +114,14 @@ true by accident of the runner's kernel.
 What was measured, on the 18 GiB / 11-core machine described above, so a later
 reader does not have to trust a PR link:
 
-| | uncapped, red machine | pressured shape |
-|---|---|---|
-| `GOMEMLIMIT` | 6 GiB (the clamp) | 3 GiB (the floor) |
-| `GOMAXPROCS` | unset, 11 cores | 5 |
-| peak footprint | 7.26 GB | not comparable, see below |
-| max RSS | 1.9 GB | about 1 to 2 GB |
-| wall / user / system | 331 s / 80 s / 162 s | not established |
-| peak CPU | ~2.8 of 11 cores | not sampled |
+|                      | uncapped, red machine | pressured shape           |
+| -------------------- | --------------------- | ------------------------- |
+| `GOMEMLIMIT`         | 6 GiB (the clamp)     | 3 GiB (the floor)         |
+| `GOMAXPROCS`         | unset, 11 cores       | 5                         |
+| peak footprint       | 7.26 GB               | not comparable, see below |
+| max RSS              | 1.9 GB                | about 1 to 2 GB           |
+| wall / user / system | 331 s / 80 s / 162 s  | not established           |
+| peak CPU             | ~2.8 of 11 cores      | not sampled               |
 
 The pressured column is thinner on purpose. `--explain` resolved
 `pressure=red gomemlimit=3GiB gomaxprocs=5`, and this PR's own `typecheck:tests`
@@ -143,6 +143,64 @@ per-process swap steering, and `taskpolicy -b` (background QoS) was measured
 starving a typecheck to 0.3 to 4% CPU for eight minutes on a pressured machine,
 because background priority deprioritizes the page-ins it needs to make progress
 at all.
+
+## Amendment: what the peak actually is, and three settings that halve it (2026-09-23)
+
+Measured cold on a copy-on-write clone of the tree, so no worktree's build info
+was touched. No single project needs more than ~1.6 GB; the peak is the build
+orchestrator's. A heap profile at the end of a one-builder `tsc -b` shows
+1.35 GB live, 609 MB of it in the build's own `parseCache`: `tsc -b` keeps
+every file it has parsed until the process exits, so the live heap grows with
+every unique file the build reads. The resident set runs 2-3x that live heap
+(collector headroom), and each concurrent project adds its checkers on top.
+
+| Full cold build, 411 projects                         | Peak RSS   | Wall                          |
+| ----------------------------------------------------- | ---------- | ----------------------------- |
+| defaults (4 checkers, default builders)               | 5.9 GB     | 183 s                         |
+| one process, 1 checker, 4 builders, `GOMEMLIMIT=2GiB` | 3.6 GB     | 241 s (collects continuously) |
+| three processes, same settings                        | **3.1 GB** | **186 s**                     |
+
+On the api closure alone: 4 builders x 4 checkers 5.6 GB; 1 checker 3.5 GB;
+plus `GOMEMLIMIT=2GiB` 2.1 GB at +30% wall. `GOGC=50` did less (2.9 GB).
+
+So the root `typecheck` runs three `tsc -b` processes in sequence — the api
+closure, the ui closure, then the solution, which finds both built — each under
+`GOMEMLIMIT=2GiB` with 4 builders, and `checkers: 1` moved into
+`tsconfig.base.json` so every run gets it. Each process frees its parse cache
+on exit. The later runs find shared projects up to date; a project that fails
+is reported by each run that reaches it. This ceiling is set by the script,
+so it holds in CI and outside `haven slot run`, and it wins over
+`CheckGoMemLimit`, which is unchanged: that clamp also governs golangci-lint,
+which was not measured.
+
+Two changes to what gets parsed were tried the same day and measured worse or
+flat, so neither landed:
+
+- **The Prisma client out of `prisma-client`'s build project.** Its 15 MB of
+  generated `.ts` is parsed by its build and again as 15 MB of emitted `.d.ts`
+  by every consumer. Moved into a source-only package reached through
+  `node_modules`, so every program read the generated source once: the api
+  closure went from 2.1 GB / 45 s to 2.85 GB / 56 s (two runs each, same load),
+  and the full build's peak did not move. External `.ts` costs more than the
+  double parse it replaces.
+- **Erasing Zod classes from tRPC contract members** (`withInput`/`withOutput`
+  storing a named `ZodType<Output, Input>` interface). `agent.trpc.d.ts` went
+  342 → 329 KB and the full build's peak and output did not move: the bulk of
+  an inflated declaration is the data shapes repeated per member, not the Zod
+  wrappers around them. A bare `z.ZodType<O, I>` doubled the file, because
+  its defaulted internals parameter is printed with both types again.
+
+This also rules against one type-check program per application for memory: a
+single source program over the api closure is 5x faster than the graph but
+peaks at 4.5 GB (1 checker) to 8.3 GB (4), and the whole tree as one program
+passed 16.4 GB before it was killed.
+
+## Amendment: one process again (2026-09-29)
+
+The three-process split is gone: the root `typecheck` is one
+`GOMEMLIMIT=2GiB tsc -b --builders 1`, because a surprising script cost more
+than it saved. One builder stands in for the split as the RAM lever (four
+builders in one process thrashed, see above); not yet measured.
 
 ## References
 

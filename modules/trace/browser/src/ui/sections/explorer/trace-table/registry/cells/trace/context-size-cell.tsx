@@ -1,0 +1,45 @@
+import { Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatTokens } from "@langwatch/trace-browser-kit";
+
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import type { CellDef } from "../../types.ts";
+
+/**
+ * How full the context window already was when the trace's first model call ran.
+ */
+const EXPLANATION = "Context carried into this trace's first model call.";
+
+function ContextSizeText({ row }: { row: TraceListItem }) {
+  const tokens = row.contextSizeTokens ?? 0;
+  if (tokens <= 0) return <MonoCell>{"—"}</MonoCell>;
+  return (
+    <Tooltip content={EXPLANATION} positioning={{ placement: "top" }}>
+      <MonoCell>{formatTokens(tokens)}</MonoCell>
+    </Tooltip>
+  );
+}
+
+export const ContextSizeCell = {
+  id: "contextSize",
+  label: "Context Size",
+  render: ({ row }) => <ContextSizeText row={row} />,
+  renderComfortable: ({ row }) => {
+    const tokens = row.contextSizeTokens ?? 0;
+    if (tokens <= 0) {
+      return (
+        <Text textStyle="sm" color="fg.muted" textAlign="right">
+          {"—"}
+        </Text>
+      );
+    }
+    return (
+      <Tooltip content={EXPLANATION} positioning={{ placement: "top" }}>
+        <Text textStyle="sm" color="fg.muted" textAlign="right">
+          {formatTokens(tokens)}
+        </Text>
+      </Tooltip>
+    );
+  },
+} as const satisfies CellDef<TraceListItem>;

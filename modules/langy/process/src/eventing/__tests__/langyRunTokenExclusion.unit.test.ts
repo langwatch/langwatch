@@ -1,0 +1,112 @@
+/**
+ * SECURITY invariant (see the Langy server frame-auth capability): the per-conversation `runToken`
+ * is the HMAC key that authenticates the worker's stream.
+ */
+
+import type { StateProjectionStore } from "@langwatch/eventing";
+import { createTenantId } from "@langwatch/eventing";
+import {
+  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_EVENT_VERSIONS,
+  type LangyConversationStateData,
+  type LangyConversationTurnData,
+} from "@langwatch/langy-contract";
+import { describe, expect, it } from "vitest";
+
+import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
+import { LangyConversationStateFoldProjection } from "../langy-conversation-state.projection.ts";
+import { LangyConversationTurnFoldProjection } from "../langy-conversation-turn.projection.ts";
+
+const TENANT = createTenantId("project-1");
+const CONVERSATION = "conv-1";
+const TURN = "turn-1";
+const RUN_TOKEN = "rt-super-secret-never-show-the-client";
+
+type EventBody<E = LangyConversationProcessingEvent> = E extends LangyConversationProcessingEvent
+  ? Pick<E, "type" | "version" | "data">
+  : never;
+
+function event(body: EventBody, occurredAt: number): LangyConversationProcessingEvent {
+  return {
+    id: `event-${occurredAt}`,
+    aggregateId: CONVERSATION,
+    aggregateType: "langy_conversation",
+    tenantId: TENANT,
+    createdAt: occurredAt,
+    occurredAt,
+    ...body,
+  };
+}
+
+const stateStore: StateProjectionStore<LangyConversationStateData> = {
+  store: async () => {},
+  get: async () => ({ kind: "empty" as const }),
+};
+const turnStore: StateProjectionStore<LangyConversationTurnData> = {
+  store: async () => {},
+  get: async () => ({ kind: "empty" as const }),
+};
+
+const hasRunTokenKey = (o: object) => Object.keys(o).some((k) => /run.?token/i.test(k));
+
+describe("runToken projection exclusion", () => {
+  describe("given a conversation created with a runToken", () => {
+    const startedEvent = event(
+      {
+        type: LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED,
+        version: LANGY_CONVERSATION_EVENT_VERSIONS.CONVERSATION_STARTED,
+        data: { conversationId: CONVERSATION, userId: "alice", runToken: RUN_TOKEN },
+      },
+      1000,
+    );
+
+    it("keeps the token on the server-only state fold", () => {
+      const state = new LangyConversationStateFoldProjection({
+        store: stateStore,
+      });
+      const doc = state.apply(state.init(), startedEvent);
+      expect(doc.RunToken).toBe(RUN_TOKEN);
+    });
+
+    it("never lands the token on the turn (render) document, across a full turn", () => {
+      const turn = new LangyConversationTurnFoldProjection({
+        store: turnStore,
+      });
+      let doc = turn.init();
+      // Drive the render doc through a realistic lifecycle. None of these carry
+      // the runToken — the turn fold has no field for it — but assert on the
+      // serialised doc so a future leak (a stray field, a spread of state) fails.
+      for (const e of [
+        event(
+          {
+            type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_TURN_ACCEPTED,
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_TURN_ACCEPTED,
+            data: { conversationId: CONVERSATION, turnId: TURN },
+          },
+          2000,
+        ),
+        event(
+          {
+            type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
+            version: LANGY_CONVERSATION_EVENT_VERSIONS.AGENT_RESPONDED,
+            data: {
+              conversationId: CONVERSATION,
+              turnId: TURN,
+              messageId: "m1",
+              role: "assistant",
+              parts: [{ type: "text", text: "hi" }],
+              outcome: "completed",
+              error: null,
+            },
+          },
+          3000,
+        ),
+      ]) {
+        doc = turn.apply(doc, e);
+      }
+
+      expect(hasRunTokenKey(doc)).toBe(false);
+      expect(JSON.stringify(doc)).not.toContain(RUN_TOKEN);
+    });
+  });
+});

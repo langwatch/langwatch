@@ -1,0 +1,779 @@
+# Experiments: the list, a workbench, a run's results and two runs compared. Selectors are ones main and the
+# branch share (run-item-<id>, compare-button, run-checkbox-<id>, exit-compare-button, toggle-charts-button,
+# dataset-tab-<id>, row text). Runs are posted as an SDK would (experiment/init then batch/log_results),
+# so those flows call no model; the runnable-state flows further down run a prompt target through llmsim.
+# Results land through the event pipeline, so the first read of them waits up to 30 seconds. Unrun.
+flows:
+  - id: experiment-workbench-open-and-list
+    title: Open a new experiment's workbench and find it in the list
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expwb-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+      - action: expect
+        with:
+          text: "vd-expwb-{uid}"
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: "vd-expwb-{uid}"
+          role: row
+          name: "vd-expwb-{uid}"
+      - action: expect
+        with:
+          api: /api/experiments/{expSlug}
+          contains: "vd-expwb-{uid}"
+
+  - id: experiment-results-open
+    title: Open a batch run's results from the experiment list and read its rows
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expres-{uid}
+          experiment_name: vd-expres-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-a-{uid}
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 0
+              passed: false
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: "{expSlug}"
+          role: row
+          name: "{expSlug}"
+      - action: click
+        with:
+          text: "{expSlug}"
+      - action: expect
+        with:
+          url: /experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-a-{uid}
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd question alpha
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd question beta
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          text: vd question beta
+          timeout: "20000"
+
+  - id: experiment-runs-compare
+    title: Post two runs of one experiment, compare them and leave comparison
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expcmp-{uid}
+          experiment_name: vd-expcmp-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-a-{uid}
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 0
+              passed: false
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-b-{uid}
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry:
+                question: vd question alpha
+              predicted:
+                answer: vd answer alpha two
+              cost: 0.001
+              duration: 90
+            - index: 1
+              entry:
+                question: vd question beta
+              predicted:
+                answer: vd answer beta two
+              cost: 0.002
+              duration: 100
+          evaluations:
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 0
+              score: 1
+              passed: true
+            - evaluator: vd-exact
+              name: Exact match
+              status: processed
+              index: 1
+              score: 1
+              passed: true
+          timestamps:
+            created_at: 1790726460000
+            finished_at: 1790726465000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-a-{uid}
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: run-item-vd-run-b-{uid}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: compare-button
+      - action: expect
+        with:
+          testId: exit-compare-button
+      - action: click
+        with:
+          testId: run-checkbox-vd-run-a-{uid}
+      - action: expect
+        with:
+          testIdPrefix: run-checkbox-
+          min: "2"
+      - action: expect
+        with:
+          testId: toggle-charts-button
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd question alpha
+          timeout: "20000"
+      - action: click
+        with:
+          testId: exit-compare-button
+      - action: expect
+        with:
+          testId: compare-button
+
+  # Flows below run a saved prompt target against the stack's llmsim (`haven up +llm`); they need a
+  # project whose OpenAI provider answers. Rows carry their own text so no flow reads a model reply.
+  - id: experiment-run-saved-and-results
+    title: Start a saved experiment over REST and read its finished run in the results page
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-exprun-{uid}
+          state: &runnableState
+            name: vd-exprun-{uid}
+            datasets:
+              - id: test-data
+                name: Test Data
+                type: inline
+                inline:
+                  columns: &runnableColumns
+                    - { id: input, name: input, type: string }
+                  records:
+                    input: [vd row alpha, vd row beta, vd row gamma]
+                columns: *runnableColumns
+            activeDatasetId: test-data
+            evaluators: []
+            targets:
+              - id: target-1
+                type: prompt
+                localPromptConfig:
+                  llm: { model: openai/gpt-4o-mini }
+                  messages:
+                    - {
+                        role: user,
+                        content: "Repeat the input back exactly and nothing else: {{input}}",
+                      }
+                  inputs: [{ identifier: input, type: str }]
+                  outputs: [{ identifier: output, type: str }]
+                inputs: [{ identifier: input, type: str }]
+                outputs: [{ identifier: output, type: str }]
+                mappings:
+                  test-data:
+                    input:
+                      { type: source, source: dataset, sourceId: test-data, sourceField: input }
+        as:
+          expSlug: slug
+      - post: /api/experiments/{expSlug}/run
+        body: {}
+        as:
+          runId: runId
+    steps:
+      - action: expect
+        with:
+          api: /api/experiments/runs/{runId}
+          contains: '"status":"completed"'
+          timeout: "90000"
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-{runId}
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd row alpha
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/experiments/runs?experimentSlug={expSlug}
+          contains: "{runId}"
+
+  - id: experiment-workbench-run-from-ui
+    title: Press Run in the workbench, watch the cell finish and find the run recorded
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expui-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expui-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testIdPrefix: latency-
+          min: "3"
+          timeout: "90000"
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/experiments/runs?experimentSlug={expSlug}
+          contains: runId
+          timeout: "30000"
+
+  - id: experiment-workbench-abort-running-run
+    title: Stop a run that is still going and find it recorded as stopped
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expabort-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expabort-{uid}
+            concurrency: 1
+            datasets:
+              - id: test-data
+                name: Test Data
+                type: inline
+                inline:
+                  columns: *runnableColumns
+                  records:
+                    input:
+                      [
+                        vd row 00,
+                        vd row 01,
+                        vd row 02,
+                        vd row 03,
+                        vd row 04,
+                        vd row 05,
+                        vd row 06,
+                        vd row 07,
+                        vd row 08,
+                        vd row 09,
+                        vd row 10,
+                        vd row 11,
+                        vd row 12,
+                        vd row 13,
+                        vd row 14,
+                        vd row 15,
+                        vd row 16,
+                        vd row 17,
+                        vd row 18,
+                        vd row 19,
+                        vd row 20,
+                        vd row 21,
+                        vd row 22,
+                        vd row 23,
+                        vd row 24,
+                        vd row 25,
+                        vd row 26,
+                        vd row 27,
+                        vd row 28,
+                        vd row 29,
+                        vd row 30,
+                        vd row 31,
+                        vd row 32,
+                        vd row 33,
+                        vd row 34,
+                        vd row 35,
+                        vd row 36,
+                        vd row 37,
+                        vd row 38,
+                        vd row 39,
+                      ]
+                columns: *runnableColumns
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Stop
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/experiments/runs?experimentSlug={expSlug}
+          contains: '"stoppedAt":1'
+          timeout: "30000"
+
+  - id: experiment-v3-runs-compare
+    title: Start two runs of one saved experiment and compare them side by side
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expcmp3-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expcmp3-{uid}
+        as:
+          expSlug: slug
+      - post: /api/experiments/{expSlug}/run
+        body: {}
+        as:
+          runA: runId
+      - post: /api/experiments/{expSlug}/run
+        body: {}
+        as:
+          runB: runId
+    steps:
+      - action: expect
+        with:
+          api: /api/experiments/runs/{runB}
+          contains: '"status":"completed"'
+          timeout: "90000"
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-{runA}
+          timeout: "30000"
+      - action: expect
+        with:
+          testId: run-item-{runB}
+          timeout: "30000"
+      - action: click
+        with:
+          testId: compare-button
+      - action: expect
+        with:
+          testId: exit-compare-button
+      - action: click
+        with:
+          testId: run-checkbox-{runA}
+      - action: expect
+        with:
+          testIdPrefix: run-checkbox-
+          min: "2"
+      - action: expect
+        with:
+          text: vd row alpha
+          timeout: "20000"
+      - action: click
+        with:
+          testId: exit-compare-button
+      - action: expect
+        with:
+          testId: compare-button
+
+  - id: experiment-optimize-prompt-menu
+    title: Open a prompt target's menu in the workbench and find the optimise entry
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expopt-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expopt-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: target-header-button
+      - action: expect
+        with:
+          testId: target-optimize-menu-item
+          timeout: "15000"
+
+  # Workbench states the prod comparison could not judge. Chips, popovers and summaries carry no test
+  # ids on main, so they are found by their text. Evaluator results come from lingua/language_detection
+  # through langevals (`haven up +langevals +llm`); without it the chip ends in an error status.
+  - id: experiment-workbench-prompt-and-evaluator-chips
+    title: Open a workbench holding a prompt and an evaluator and find the target header, the evaluator chip and Run
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-chipev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/experiments
+        body:
+          name: vd-expchip-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expchip-{uid}
+            evaluators:
+              - id: evaluator-1
+                evaluatorType: lingua/language_detection
+                dbEvaluatorId: "{evaluatorId}"
+                inputs: [{ identifier: output, type: str }]
+                mappings:
+                  test-data:
+                    target-1:
+                      output:
+                        { type: source, source: target, sourceId: target-1, sourceField: output }
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: expect
+        with:
+          testId: target-header-button
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd-chipev-{uid}
+          min: "3"
+      - action: expect
+        with:
+          text: vd row alpha
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+
+  - id: experiment-workbench-evaluator-chip-result-popover
+    title: Run the workbench, open a row's evaluator chip and read its result with Rerun, Run on all rows, Edit Configuration and Remove
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-popev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/experiments
+        body:
+          name: vd-exppop-{uid}
+          state:
+            <<: *runnableState
+            name: vd-exppop-{uid}
+            evaluators:
+              - id: evaluator-1
+                evaluatorType: lingua/language_detection
+                dbEvaluatorId: "{evaluatorId}"
+                inputs: [{ identifier: output, type: str }]
+                mappings:
+                  test-data:
+                    target-1:
+                      output:
+                        { type: source, source: target, sourceId: target-1, sourceField: output }
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testIdPrefix: latency-
+          min: "3"
+          timeout: "90000"
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "60000"
+      - action: click
+        with:
+          selector: 'button:has-text("vd-popev-{uid}")'
+      - action: expect
+        with:
+          text: /^Status:$/
+          timeout: "30000"
+      - action: expect
+        with:
+          text: /^Processed$/
+      - action: expect
+        with:
+          text: /^Rerun$/
+      - action: expect
+        with:
+          text: /^Run on all rows$/
+      - action: expect
+        with:
+          text: /^Edit Configuration$/
+      - action: expect
+        with:
+          text: /^Remove from Workbench$/
+
+  - id: experiment-workbench-target-summary-popover
+    title: Run the workbench, hover the target's summary and read its rows, latency and execution time
+    setup:
+      - post: /api/experiments
+        body:
+          name: vd-expsum-{uid}
+          state:
+            <<: *runnableState
+            name: vd-expsum-{uid}
+        as:
+          expSlug: slug
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/workbench/{expSlug}
+      - action: click
+        with:
+          testId: run-evaluation-button
+      - action: expect
+        with:
+          testIdPrefix: latency-
+          min: "3"
+          timeout: "90000"
+      - action: expect
+        with:
+          testId: run-evaluation-button
+          hasText: Run
+          timeout: "60000"
+      - action: hover
+        with:
+          selector: 'text=/^3\/3$/'
+      - action: expect
+        with:
+          text: /^Rows$/
+      - action: expect
+        with:
+          text: /^Avg Latency$/
+      - action: expect
+        with:
+          text: /^Execution Time$/
+
+  - id: experiment-results-page-run-summary
+    title: Open an SDK experiment's results and read its run, evaluator column, answers and the compare and export controls
+    setup:
+      - post: /api/experiment/init
+        body:
+          experiment_slug: vd-expsdk-{uid}
+          experiment_name: vd-expsdk-{uid}
+          experiment_type: BATCH_EVALUATION_V2
+        as:
+          expSlug: slug
+      - post: /api/evaluations/batch/log_results
+        body:
+          experiment_slug: "{expSlug}"
+          run_id: vd-run-sdk
+          progress: 2
+          total: 2
+          dataset:
+            - index: 0
+              entry: { question: vd sdk question alpha }
+              predicted: { answer: vd sdk answer alpha }
+              cost: 0.001
+              duration: 120
+            - index: 1
+              entry: { question: vd sdk question beta }
+              predicted: { answer: vd sdk answer beta }
+              cost: 0.002
+              duration: 140
+          evaluations:
+            - {
+                evaluator: vd-exact,
+                name: Exact match,
+                status: processed,
+                index: 0,
+                score: 1,
+                passed: true,
+              }
+            - {
+                evaluator: vd-exact,
+                name: Exact match,
+                status: processed,
+                index: 1,
+                score: 0,
+                passed: false,
+              }
+          timestamps:
+            created_at: 1790726400000
+            finished_at: 1790726405000
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments/{expSlug}
+      - action: expect
+        with:
+          testId: run-item-vd-run-sdk
+          timeout: "30000"
+      - action: expect
+        with:
+          text: vd sdk answer alpha
+          timeout: "20000"
+      - action: expect
+        with:
+          text: vd sdk answer beta
+      - action: expect
+        with:
+          text: Exact match
+      - action: expect
+        with:
+          text: Export to CSV
+      - action: expect
+        with:
+          testId: compare-button
+
+  # The New Experiment button saves the browser's initial state (three sample rows in an inline dataset)
+  # and the workbench then loads it back, so the rows seen here survived save and load; main keeps them.
+  - id: experiment-create-from-button-shows-sample-rows
+    title: Create an experiment from the New Experiment button and see the inline dataset's sample rows after it loads
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          testId: experiment-new-open
+      - action: click
+        with:
+          testId: experiment-new-create
+      - action: expect
+        with:
+          url: /experiments/workbench/
+          timeout: "30000"
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          min: "1"
+          timeout: "20000"
+      - action: expect
+        with:
+          text: billing information
+          timeout: "20000"

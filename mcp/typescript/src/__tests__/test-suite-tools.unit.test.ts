@@ -1,13 +1,11 @@
 /**
- * Digests of the test suite tools, and the test suite fields the scenario
- * tools carry so an agent can file a scenario in a suite and read a suite
- * back.
- *
+ * Digests of the test suite tools and the suite fields scenario tools
+ * carry, so an agent can file a scenario in a suite and read one back.
  * @see specs/mcp-server/test-suite-tools.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../langwatch-api-test-suites.js", () => ({
+vi.mock("../langwatch-api-test-suites.ts", () => ({
   listTestSuites: vi.fn(),
   createTestSuite: vi.fn(),
   getTestSuite: vi.fn(),
@@ -17,19 +15,19 @@ vi.mock("../langwatch-api-test-suites.js", () => ({
   runTestSuite: vi.fn(),
 }));
 
-vi.mock("../langwatch-api-scenarios.js", () => ({
+vi.mock("../langwatch-api-scenarios.ts", () => ({
   listScenarios: vi.fn(),
   createScenario: vi.fn(),
   updateScenario: vi.fn(),
 }));
 
+import type { RunPlanRunResult } from "../langwatch-api-run-plans.ts";
 import {
   createScenario,
   listScenarios,
   updateScenario,
   type ScenarioSummary,
-} from "../langwatch-api-scenarios.js";
-import type { RunPlanRunResult } from "../langwatch-api-run-plans.js";
+} from "../langwatch-api-scenarios.ts";
 import {
   archiveTestSuite,
   createTestSuite,
@@ -39,18 +37,17 @@ import {
   runTestSuite,
   updateTestSuite,
   type TestSuite,
-} from "../langwatch-api-test-suites.js";
-
-import { handleArchiveTestSuite } from "../tools/archive-test-suite.js";
-import { handleCreateScenario } from "../tools/create-scenario.js";
-import { handleCreateTestSuite } from "../tools/create-test-suite.js";
-import { handleGetTestSuite } from "../tools/get-test-suite.js";
-import { handleListScenarios } from "../tools/list-scenarios.js";
-import { handleListTestSuites } from "../tools/list-test-suites.js";
-import { handleRenameTestSuite } from "../tools/rename-test-suite.js";
-import { handleRunTestSuite } from "../tools/run-test-suite.js";
-import { handleUpdateScenario } from "../tools/update-scenario.js";
-import { handleUpdateTestSuite } from "../tools/update-test-suite.js";
+} from "../langwatch-api-test-suites.ts";
+import { handleArchiveTestSuite } from "../tools/archive-test-suite.ts";
+import { handleCreateScenario } from "../tools/create-scenario.ts";
+import { handleCreateTestSuite } from "../tools/create-test-suite.ts";
+import { handleGetTestSuite } from "../tools/get-test-suite.ts";
+import { handleListScenarios } from "../tools/list-scenarios.ts";
+import { handleListTestSuites } from "../tools/list-test-suites.ts";
+import { handleRenameTestSuite } from "../tools/rename-test-suite.ts";
+import { handleRunTestSuite } from "../tools/run-test-suite.ts";
+import { handleUpdateScenario } from "../tools/update-scenario.ts";
+import { handleUpdateTestSuite } from "../tools/update-test-suite.ts";
 
 const mockListTestSuites = vi.mocked(listTestSuites);
 const mockCreateTestSuite = vi.mocked(createTestSuite);
@@ -72,8 +69,7 @@ const sampleSuite: TestSuite = {
   archivedAt: null,
   createdAt: "2024-01-01T00:00:00Z",
   updatedAt: "2024-01-02T00:00:00Z",
-  platformUrl:
-    "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const sampleScenario: ScenarioSummary = {
@@ -229,9 +225,7 @@ describe("handleRenameTestSuite()", () => {
         name: "Checkout v2",
       });
 
-      expect(result).toContain(
-        'Test suite suite_abc123 is now named "Checkout v2".',
-      );
+      expect(result).toContain('Test suite suite_abc123 is now named "Checkout v2".');
     });
   });
 });
@@ -254,9 +248,7 @@ describe("handleArchiveTestSuite()", () => {
     });
 
     it("says the scenarios filed in it are archived with it", () => {
-      expect(result).toContain(
-        "the scenarios filed in it are archived with it",
-      );
+      expect(result).toContain("the scenarios filed in it are archived with it");
     });
   });
 });
@@ -273,8 +265,7 @@ describe("handleRunTestSuite()", () => {
       runPlanId: "plan_abc123",
       planName: "Checkout Support Bot",
       created: true,
-      platformUrl:
-        "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
+      platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
     };
 
     let result: string;
@@ -289,9 +280,7 @@ describe("handleRunTestSuite()", () => {
 
     /** @scenario "Agent runs a test suite against a target" */
     it("names the run plan the run created or joined", () => {
-      expect(result).toContain(
-        'Run plan "Checkout Support Bot" created and started.',
-      );
+      expect(result).toContain('Run plan "Checkout Support Bot" created and started.');
     });
 
     it("includes the batch run id and the job count", () => {
@@ -413,9 +402,7 @@ describe("handleListScenarios() with a testSuiteId", () => {
 
       const result = await handleListScenarios({ testSuiteId: "suite_abc123" });
 
-      expect(result).toContain(
-        "No scenarios found in test suite suite_abc123.",
-      );
+      expect(result).toContain("No scenarios found in test suite suite_abc123.");
     });
   });
 
@@ -488,9 +475,7 @@ describe("handleCreateTestSuite()", () => {
       const result = await handleCreateTestSuite({
         name: "Case lookups",
         fields: [goldenSqlField],
-        evaluators: [
-          { evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings },
-        ],
+        evaluators: [{ evaluatorId: "evaluator_sql", mappings: sqlAttachment.mappings }],
       });
 
       expect(result).toContain("- golden_sql (text)");
@@ -539,7 +524,12 @@ describe("handleUpdateTestSuite()", () => {
       await handleUpdateTestSuite({
         id: "suite_abc123",
         evaluators: [
-          { id: "att_sql", evaluatorId: "evaluator_sql", required: false, mappings: sqlAttachment.mappings },
+          {
+            id: "att_sql",
+            evaluatorId: "evaluator_sql",
+            required: false,
+            mappings: sqlAttachment.mappings,
+          },
         ],
       });
 
@@ -555,7 +545,10 @@ describe("handleUpdateTestSuite()", () => {
     it("confirms the new state, with each evaluator's gate and mappings", async () => {
       const result = await handleUpdateTestSuite({ id: "suite_abc123", name: "Case lookups v2" });
 
-      expect(mockUpdateTestSuite).toHaveBeenCalledWith({ id: "suite_abc123", name: "Case lookups v2" });
+      expect(mockUpdateTestSuite).toHaveBeenCalledWith({
+        id: "suite_abc123",
+        name: "Case lookups v2",
+      });
       expect(result).toContain('Test suite "Case lookups v2" updated.');
       expect(result).toContain("- golden_sql (text)");
       expect(result).toContain("evaluator_sql (reports only, attachment att_sql)");

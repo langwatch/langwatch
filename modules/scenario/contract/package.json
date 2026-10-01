@@ -1,0 +1,47 @@
+{
+  "name": "@langwatch/scenario-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Scenario feature contracts and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ag-ui/core": "~0.0.57",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/scenario": "catalog:",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "liquidjs": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

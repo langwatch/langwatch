@@ -1,8 +1,7 @@
-import json
 from typing import Optional, cast
+from langevals_core.tool_calls import read_tool_call_arguments
 from langevals_core.litellm_patch import azure_api_version
 from langevals_core.base_evaluator import (
-    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -12,9 +11,9 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from langevals_core.image_support import build_content_parts
+from langevals_core.token_budget import fit_judge_content
 from pydantic import Field
 import litellm
-from litellm import Choices, Message
 from litellm.files.main import ModelResponse
 from litellm.cost_calculator import completion_cost
 import dspy
@@ -56,27 +55,27 @@ class CustomLLMScoreEvaluator(
         if not entry.input and not entry.output and not entry.contexts:
             return EvaluationResultSkipped(details="No content to evaluate")
 
-        content = build_content_parts(
+        system_prompt = self.settings.prompt + ". Always output a valid json for the function call"
+        fitted = fit_judge_content(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            reserved_texts=[system_prompt, self.settings.prompt],
             input=entry.input,
             output=entry.output,
             contexts=entry.contexts,
+        )
+        if isinstance(fitted, EvaluationResultSkipped):
+            return fitted
+
+        content = build_content_parts(
+            input=fitted.input,
+            output=fitted.output,
+            contexts=fitted.contexts,
             task=self.settings.prompt,
         )
-
-        # Token counting uses the plain-text version for estimation
         content_text = content if isinstance(content, str) else " ".join(
             p["text"] for p in content if p.get("type") == "text"  # type: ignore
         )
-        total_tokens = len(
-            litellm.encode(  # type: ignore
-                model=self.settings.model, text=f"{self.settings.prompt} {content_text}"
-            )
-        )
-        max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
-        if total_tokens > max_tokens:
-            return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"
-            )
 
         cost = None
 
@@ -100,8 +99,7 @@ class CustomLLMScoreEvaluator(
                 messages=[
                     {
                         "role": "system",
-                        "content": self.settings.prompt
-                        + ". Always output a valid json for the function call",
+                        "content": system_prompt,
                     },
                     {
                         "role": "user",
@@ -118,7 +116,7 @@ class CustomLLMScoreEvaluator(
                                 "properties": {
                                     "reasoning": {
                                         "type": "string",
-                                        "description": "use this field to break down the task and explain your reasoning in multiple sub-scores, using it to combine into a final score",
+                                        "description": "A short justification, written before the score: the parts of the task, the evidence in the content for each (quote the values or name the tool result), and how they combine into the final score",
                                     },
                                     "final_score": {
                                         "type": "number",
@@ -127,7 +125,7 @@ class CustomLLMScoreEvaluator(
                                 },
                                 "required": ["reasoning", "final_score"],
                             },
-                            "description": "use this function to write your thoughts on the reasoning, then decide on the final score with this json structure",
+                            "description": "Record the evaluation: a short justification that cites the evidence in the content, then the final score.",
                         },
                     },
                 ],
@@ -135,14 +133,16 @@ class CustomLLMScoreEvaluator(
             )
 
             response = cast(ModelResponse, response)
-            choice = cast(Choices, response.choices[0])
-            arguments = json.loads(
-                cast(Message, choice.message).tool_calls[0].function.arguments  # type: ignore
+            arguments = read_tool_call_arguments(
+                response,
+                "evaluation",
+                required=["reasoning", "final_score"],
+                model=self.settings.model,
             )
             cost = completion_cost(completion_response=response)
 
         return CustomLLMScoreResult(
             score=arguments["final_score"],
-            details=arguments["reasoning"],
+            details=fitted.with_note(arguments["reasoning"]),
             cost=Money(amount=cost, currency="USD") if cost else None,
         )

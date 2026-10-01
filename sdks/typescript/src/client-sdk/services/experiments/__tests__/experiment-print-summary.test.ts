@@ -1,35 +1,32 @@
 /**
- * Unit tests for Experiment.printSummary() — parity with ExperimentRunResult.printSummary.
- *
- * We don't construct a full Experiment (private constructor); instead we exercise the
- * formatter by invoking printSummary on a subclass-bridge that bypasses init. We use
- * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
- * the cumulative arrays without going through the network.
+ * Unit tests for Experiment.printSummary(), which delegates to
+ * printExperimentSummary — parity with ExperimentRunResult.printSummary.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
-import { Experiment } from "../experiment";
-import type { BatchEntry, EvaluationResult } from "../types";
+
+import { printExperimentSummary } from "../experiment-summary";
+import type { BatchEntry, ExperimentEvaluationResult } from "../types";
 
 function buildExperimentFixture(init: {
-  evaluations?: EvaluationResult[];
+  evaluations?: ExperimentEvaluationResult[];
   entries?: BatchEntry[];
   runUrl?: string;
   runId?: string;
-}): Experiment {
-  // Bypass the private constructor by creating an instance from the prototype.
-  const exp = Object.create(Experiment.prototype) as Experiment;
-  Object.assign(exp, {
-    name: "ci-quality-check",
-    runId: init.runId ?? "run_abc",
-    experimentSlug: "ci-quality-check",
-    cumulativeEvaluations: init.evaluations ?? [],
-    cumulativeEntries: init.entries ?? [],
-    runUrl: init.runUrl ?? "https://app.langwatch.ai/runs/xyz",
-  });
-  return exp;
+}): { printSummary: (exitOnFailure?: boolean) => void } {
+  return {
+    printSummary: (exitOnFailure = true) =>
+      printExperimentSummary({
+        runId: init.runId ?? "run_abc",
+        runUrl: init.runUrl ?? "https://app.langwatch.ai/runs/xyz",
+        createdAtMs: Date.now(),
+        evaluations: init.evaluations ?? [],
+        entries: init.entries ?? [],
+        exitOnFailure,
+      }),
+  };
 }
 
-function evaluation(overrides: Partial<EvaluationResult>): EvaluationResult {
+function evaluation(overrides: Partial<ExperimentEvaluationResult>): ExperimentEvaluationResult {
   return {
     name: "faithfulness",
     evaluator: "ragas/faithfulness",
@@ -72,10 +69,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary does not exit when all evaluations passed */
     it("prints the run id, 100% pass rate, and does not exit", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: true, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: true, index: 1 })],
       });
 
       exp.printSummary();
@@ -93,10 +87,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary exits with code 1 when any evaluation failed and exitOnFailure is true */
     it("prints the failure count and calls process.exit(1)", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: false, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: false, index: 1 })],
       });
 
       exp.printSummary();
@@ -110,9 +101,7 @@ describe("Experiment.printSummary", () => {
     /** @scenario printSummary does not exit when exitOnFailure is false even with failures */
     it("prints the failure count but does not exit", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: false }),
-        ],
+        evaluations: [evaluation({ passed: false })],
       });
 
       exp.printSummary(false);
@@ -162,18 +151,16 @@ describe("Experiment.printSummary", () => {
       // simulating an explicit log() call outside a withTarget() block.
       const exp = buildExperimentFixture({
         evaluations: [
-          evaluation({ passed: true, target_id: "gpt-4o" }),
-          evaluation({ passed: false, target_id: "gpt-4o", index: 1 }),
+          evaluation({ passed: true, target_id: "gpt-5-mini" }),
+          evaluation({ passed: false, target_id: "gpt-5-mini", index: 1 }),
         ],
-        entries: [
-          { index: 0, entry: null, duration: 100, error: null, trace_id: "t1" },
-        ],
+        entries: [{ index: 0, entry: null, duration: 100, error: null, trace_id: "t1" }],
       });
 
       exp.printSummary(false);
 
       const out = output();
-      expect(out).toContain("gpt-4o");
+      expect(out).toContain("gpt-5-mini");
       expect(out).toContain("1 passed, 1 failed");
     });
   });
@@ -181,10 +168,7 @@ describe("Experiment.printSummary", () => {
   describe("when the run has failures", () => {
     it("reports Status: FAILED (not COMPLETED)", () => {
       const exp = buildExperimentFixture({
-        evaluations: [
-          evaluation({ passed: true }),
-          evaluation({ passed: false, index: 1 }),
-        ],
+        evaluations: [evaluation({ passed: true }), evaluation({ passed: false, index: 1 })],
       });
 
       exp.printSummary(false);
@@ -241,8 +225,8 @@ describe("Experiment.printSummary", () => {
     it("sums evaluator costs into totalCost and per-target cost", () => {
       const exp = buildExperimentFixture({
         evaluations: [
-          evaluation({ passed: true, cost: 0.0012, target_id: "gpt-4o" }),
-          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-4o", index: 1 }),
+          evaluation({ passed: true, cost: 0.0012, target_id: "gpt-5-mini" }),
+          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-5-mini", index: 1 }),
         ],
       });
 

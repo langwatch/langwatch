@@ -29,7 +29,10 @@ langwatch instant-eval run "the customer sounds frustrated" --target threads --l
 The command prints the LangWatchQL statement it wrote for you, then a progress line that updates in place, then the headline and the first twenty matches. Press Ctrl-C to stop watching: the run keeps going and the command prints the line that reads it back later.
 
 <Frame caption="The first run over 100 conversations: the statement it wrote, the progress line, then the headline with 32 matches in about 8 seconds and the first 20 of them.">
-  <img src="/images/instant-evals/cli-run.png" alt="Terminal output of an Instant Eval run over 100 conversations" />
+  <img
+    src="/images/instant-evals/cli-run.png"
+    alt="Terminal output of an Instant Eval run over 100 conversations"
+  />
 </Frame>
 
 ## What comes back
@@ -76,13 +79,20 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 
 <CardGroup cols={3}>
   <Card title="The CLI" icon="terminal" href="/features/instant-evals/cli">
-    `langwatch instant-eval run` waits for the run and prints the matches. Every flag and subcommand.
+    `langwatch instant-eval run` waits for the run and prints the matches. Every flag and
+    subcommand.
   </Card>
-  <Card title="The REST API" icon="plug" href="/api-reference/instant-evals/running-an-instant-eval">
-    `POST /api/v1/instant-evals` answers 202 with a queued run. Poll it, page through its results, sample and cancel it.
+  <Card
+    title="The REST API"
+    icon="plug"
+    href="/api-reference/instant-evals/running-an-instant-eval"
+  >
+    `POST /api/v1/instant-evals` answers 202 with a queued run. Poll it, page through its results,
+    sample and cancel it.
   </Card>
   <Card title="Langy" icon="comments" href="/langy/chat">
-    Ask the question in the chat panel. Langy runs `langwatch instant-eval` in its sandbox and reads the matches back to you.
+    Ask the question in the chat panel. Langy runs `langwatch instant-eval` in its sandbox and reads
+    the matches back to you.
   </Card>
 </CardGroup>
 
@@ -90,15 +100,18 @@ The [Questions](/features/instant-evals/questions) page covers criteria, thresho
 
 <CardGroup cols={2}>
   <Card title="Questions" icon="circle-question" href="/features/instant-evals/questions">
-    Yes or no, criteria, thresholds, scores, categories, several questions at once, and a questions file.
+    Yes or no, criteria, thresholds, scores, categories, several questions at once, and a questions
+    file.
   </Card>
   <Card title="Targets and statements" icon="code" href="/features/instant-evals/targets">
-    What one row is, the time window, the trace filter, the statement each target writes, and writing your own.
+    What one row is, the time window, the trace filter, the statement each target writes, and
+    writing your own.
   </Card>
   <Card title="Results" icon="table-list" href="/features/instant-evals/results">
     Paging through verdicts, sampling the judged text, and the `judgments` dataset in LangWatchQL.
   </Card>
   <Card title="Limits and cost" icon="gauge" href="/features/instant-evals/limits-and-cost">
-    Row caps, the question cap, the text budget, speed, the rate per token, the free budget and billing.
+    Row caps, the question cap, the text budget, speed, the rate per token, the free budget and
+    billing.
   </Card>
 </CardGroup>

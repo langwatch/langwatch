@@ -1,0 +1,493 @@
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import {
+  Button,
+  Field,
+  HStack,
+  Input,
+  Separator,
+  Spacer,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useEffect, useMemo, useState } from "react";
+
+import { api } from "../../../../behavior/gateway-api.ts";
+import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
+import {
+  useOrganizationTeamProject,
+  useCurrentUser,
+} from "../../../../behavior/gateway-session.ts";
+import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
+import {
+  buildScopeHierarchy,
+  firstEligibleDefaultModel,
+  type OrgModelProvider,
+  resolveEligible,
+} from "../../model/eligible-model-providers.ts";
+import {
+  expiryFieldErrorFrom,
+  expiryIncompleteReason,
+  resolveExpiresAt,
+} from "../../model/virtual-key-expiration.ts";
+import {
+  TAGS_CSV_MAX_LENGTH,
+  VK_TAGS_FIELD_DESCRIPTION,
+  parseTagsCsv,
+  tagsBeyondLimitsNotice,
+} from "../../model/virtual-key-tags-field.ts";
+import {
+  ownershipIncompleteReason,
+  ownershipToScopes,
+  ownershipTraceProjectId,
+  type VirtualKeyOwnership,
+  VirtualKeyOwnershipSection,
+} from "../blocks/virtual-key-ownership-section.tsx";
+import {
+  ALL_PROVIDERS,
+  type ProviderAccessValue,
+  providerAccessInvalidReason,
+  providerAccessToConfig,
+  VirtualKeyProviderAccessSection,
+} from "../blocks/virtual-key-provider-access-section.tsx";
+import {
+  NEVER_EXPIRES,
+  VirtualKeyExpirationSection,
+  type VirtualKeyExpirationValue,
+} from "../elements/virtual-key-expiration-section.tsx";
+import {
+  ROUTING_NONE,
+  VirtualKeyRoutingSection,
+  type VirtualKeyRoutingValue,
+} from "../elements/virtual-key-routing-section.tsx";
+import {
+  budgetInvalidReason,
+  EMPTY_BUDGET,
+  VirtualKeyBudgetSection,
+  type VirtualKeyBudgetValue,
+} from "./virtual-key-budget-section.tsx";
+
+type VirtualKeyCreateDrawerProps = {
+  organizationId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (result: { id: string; name: string; secret: string; model?: string }) => void;
+};
+
+/** On first open, own the key by the current project; a no-op seed keeps the state's identity. */
+function seededOwnership(
+  prev: VirtualKeyOwnership,
+  input: {
+    projectId: string | undefined;
+    availableProjects: readonly { id: string }[];
+    availableTeams: readonly { id: string }[];
+  },
+): VirtualKeyOwnership {
+  if (prev.projectId ?? prev.teamId) return prev;
+  const seedProject = input.projectId ?? input.availableProjects[0]?.id ?? null;
+  const seedTeam = input.availableTeams.length === 1 ? (input.availableTeams[0]?.id ?? null) : null;
+  if (prev.projectId === seedProject && prev.teamId === seedTeam) {
+    return prev;
+  }
+  return { ...prev, projectId: seedProject, teamId: seedTeam };
+}
+
+/** The first thing that keeps the key from being issued yet, in the order the form reads. */
+function cannotIssueReasonFor(input: {
+  name: string;
+  ownership: VirtualKeyOwnership;
+  personalProjectId: string | null;
+  budget: VirtualKeyBudgetValue;
+  providersLoading: boolean;
+  providerAccess: ProviderAccessValue;
+  eligible: ReturnType<typeof resolveEligible>;
+  expiration: VirtualKeyExpirationValue;
+  expiresAt: ReturnType<typeof resolveExpiresAt>;
+}): ReturnType<typeof expiryIncompleteReason> | string {
+  if (!input.name) return "Name is required.";
+  const ownershipReason = ownershipIncompleteReason(input.ownership, {
+    personalProjectId: input.personalProjectId,
+  });
+  if (ownershipReason) return ownershipReason;
+  const budgetReason = budgetInvalidReason(input.budget);
+  if (budgetReason) return budgetReason;
+  // An explicit provider selection cannot be validated against a list
+  // that has not arrived; creating now would persist an allowlist
+  // filtered against nothing.
+  if (input.providersLoading) {
+    return "Loading providers…";
+  }
+  const providerReason = providerAccessInvalidReason(input.providerAccess, input.eligible);
+  if (providerReason) return providerReason;
+  return expiryIncompleteReason({ preset: input.expiration.preset, expiresAt: input.expiresAt });
+}
+
+type CreateVirtualKeyInput = Parameters<
+  ReturnType<typeof api.virtualKeys.create.useMutation>["mutateAsync"]
+>[0];
+
+/** The form as the create call takes it: blanks left out, the budget only when a limit is set. */
+function createVirtualKeyInput(form: {
+  organizationId: string;
+  name: string;
+  description: string;
+  tagsCsv: string;
+  ownership: VirtualKeyOwnership;
+  currentUserId: string | undefined;
+  scopes: CreateVirtualKeyInput["scopes"];
+  routing: VirtualKeyRoutingValue;
+  expiresAt: ReturnType<typeof resolveExpiresAt>;
+  budget: VirtualKeyBudgetValue;
+  access: ReturnType<typeof providerAccessToConfig>;
+}): CreateVirtualKeyInput {
+  const tags = parseTagsCsv(form.tagsCsv);
+  return {
+    organizationId: form.organizationId,
+    name: form.name,
+    description: form.description || undefined,
+    principalUserId: form.ownership.kind === "PERSONAL" ? (form.currentUserId ?? null) : null,
+    scopes: form.scopes,
+    traceProjectId: ownershipTraceProjectId(form.ownership),
+    routingMode: form.routing.mode,
+    routingPolicyId: form.routing.mode === "POLICY" ? form.routing.policyId : null,
+    ...(form.expiresAt ? { expiresAt: form.expiresAt } : {}),
+    budget: form.budget.limitUsd.trim()
+      ? {
+          limitUsd: form.budget.limitUsd.trim(),
+          window: form.budget.window,
+        }
+      : null,
+    config: {
+      providersAllowed: form.access.providersAllowed,
+      modelsAllowed: form.access.modelsAllowed,
+      ...(tags.length > 0 ? { metadata: { tags } } : {}),
+    },
+  };
+}
+
+export function VirtualKeyCreateDrawer({
+  organizationId,
+  open,
+  onOpenChange,
+  onCreated,
+}: VirtualKeyCreateDrawerProps) {
+  const toaster = useGatewayToaster();
+  const { organization, project, hasPermission } = useOrganizationTeamProject();
+  const currentUser = useCurrentUser();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsCsv, setTagsCsv] = useState("");
+  const [ownership, setOwnership] = useState<VirtualKeyOwnership>({
+    kind: "PROJECT",
+    projectId: null,
+    teamId: null,
+    traceProjectId: null,
+  });
+  const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
+  const [providerAccess, setProviderAccess] = useState<ProviderAccessValue>(ALL_PROVIDERS);
+  const [routing, setRouting] = useState<VirtualKeyRoutingValue>(ROUTING_NONE);
+  const [expiration, setExpiration] = useState<VirtualKeyExpirationValue>(NEVER_EXPIRES);
+  const [expiryFieldError, setExpiryFieldError] = useState<string | null>(null);
+
+  const canCreateShared = hasPermission("virtualKeys:manage");
+
+  const availableTeams = useMemo(
+    () => organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? [],
+    [organization?.teams],
+  );
+  const availableProjects = useMemo(
+    () =>
+      organization?.teams?.flatMap((t) =>
+        t.projects.map((p) => ({
+          id: p.id,
+          name: `${p.name} · ${t.name}`,
+          teamId: t.id,
+        })),
+      ) ?? [],
+    [organization?.teams],
+  );
+
+  // Seed ownership with the project the user is currently in (the
+  // default shape of a key) the first time the drawer opens. The trace
+  // project of an org- or team-owned key is deliberately NOT seeded:
+  // where a shared key's traces and costs land is an explicit choice.
+  useEffect(() => {
+    if (!open) return;
+    setOwnership((prev) =>
+      seededOwnership(prev, { projectId: project?.id, availableProjects, availableTeams }),
+    );
+  }, [open, project?.id, availableProjects, availableTeams]);
+
+  const utils = api.useUtils();
+  const createMutation = api.virtualKeys.create.useMutation({
+    onSuccess: async () => {
+      await utils.virtualKeys.list.invalidate({ organizationId });
+    },
+  });
+  const orgProvidersQuery = api.modelProvider.listAllForOrganizationForFrontend.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId },
+  );
+  const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId },
+  );
+  // Lazily provisions the caller's personal workspace, so Personal
+  // ownership works even for users who predate personal workspaces.
+  const personalContextQuery = api.user.personalContext.useQuery(
+    { organizationId },
+    { enabled: open && !!organizationId && ownership.kind === "PERSONAL" },
+  );
+  const personalProjectId = personalContextQuery.data?.workspace.project.id ?? null;
+
+  const providers = useMemo(
+    (): OrgModelProvider[] => orgProvidersQuery.data ?? [],
+    [orgProvidersQuery.data],
+  );
+  const policies = (policiesQuery.data ?? []) as {
+    id: string;
+    name: string;
+  }[];
+  const tagsNotice = tagsBeyondLimitsNotice(tagsCsv);
+
+  const ownershipCtx = {
+    organizationId,
+    organizationName: organization?.name,
+    availableTeams,
+    availableProjects,
+    personalProjectId,
+  };
+
+  const scopes = useMemo(
+    () => ownershipToScopes(ownership, { organizationId, personalProjectId }) ?? [],
+    [ownership, organizationId, personalProjectId],
+  );
+  const eligible = useMemo(
+    () =>
+      resolveEligible({
+        scopes,
+        providers,
+        hierarchy: buildScopeHierarchy(availableProjects, organizationId),
+      }),
+    [scopes, providers, availableProjects, organizationId],
+  );
+
+  // Resolved on every render rather than at submit, because the block
+  // states the date back to the reader as they pick it.
+  const expiresAt = resolveExpiresAt({
+    preset: expiration.preset,
+    customDate: expiration.customDate,
+  });
+
+  const reset = () => {
+    setName("");
+    setDescription("");
+    setTagsCsv("");
+    setOwnership({
+      kind: "PROJECT",
+      projectId: null,
+      teamId: null,
+      traceProjectId: null,
+    });
+    setBudget(EMPTY_BUDGET);
+    setProviderAccess(ALL_PROVIDERS);
+    setRouting(ROUTING_NONE);
+    setExpiration(NEVER_EXPIRES);
+    setExpiryFieldError(null);
+  };
+
+  const handleClose = () => {
+    if (createMutation.isPending) return;
+    reset();
+    onOpenChange(false);
+  };
+
+  const cannotIssueReason = cannotIssueReasonFor({
+    name,
+    ownership,
+    personalProjectId,
+    budget,
+    providersLoading: orgProvidersQuery.isLoading,
+    providerAccess,
+    eligible,
+    expiration,
+    expiresAt,
+  });
+
+  const handleSubmit = async () => {
+    if (cannotIssueReason) {
+      toaster.create({ title: cannotIssueReason, type: "error" });
+      return;
+    }
+    setExpiryFieldError(null);
+    try {
+      const result = await createMutation.mutateAsync(
+        createVirtualKeyInput({
+          organizationId,
+          name,
+          description,
+          tagsCsv,
+          ownership,
+          currentUserId: currentUser?.id,
+          scopes,
+          routing,
+          expiresAt,
+          budget,
+          access: providerAccessToConfig(providerAccess, eligible),
+        }),
+      );
+      onCreated({
+        id: result.virtualKey.id,
+        name: result.virtualKey.name,
+        secret: result.secret,
+        model: firstEligibleDefaultModel({
+          scopes,
+          providers,
+          availableProjects,
+          organizationId,
+        }),
+      });
+      reset();
+      onOpenChange(false);
+    } catch (error) {
+      // A rejected date belongs on the field the reader is still looking
+      // at; everything else has nowhere better to go than the toast.
+      const expiryError = expiryFieldErrorFrom(error);
+      if (expiryError) {
+        setExpiryFieldError(expiryError);
+        return;
+      }
+      toaster.create({
+        title: humanizeGatewayError(error, "Failed to create virtual key"),
+        type: "error",
+      });
+    }
+  };
+
+  return (
+    <Drawer.Root open={open} onOpenChange={() => handleClose()} placement="end" size="md">
+      <Drawer.Content bg="bg">
+        <Drawer.Header>
+          <Drawer.Title>New virtual key</Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={4}>
+            <Field.Root required>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the organization."
+                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
+                />
+              </Field.Label>
+              <Input
+                data-testid="gateway-virtual-key-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. codex-prod"
+                maxLength={128}
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Description</Field.Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional. Shown in the list."
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>
+                Tags
+                <FieldInfoTooltip
+                  description={VK_TAGS_FIELD_DESCRIPTION}
+                  docHref="/ai-gateway/cache-control#cache-rules"
+                  testId="vk-tags-info"
+                />
+              </Field.Label>
+              <Input
+                value={tagsCsv}
+                onChange={(e) => setTagsCsv(e.target.value)}
+                placeholder="e.g. tier=enterprise, team=ml"
+                maxLength={TAGS_CSV_MAX_LENGTH}
+              />
+              {tagsNotice && <Field.HelperText color="orange.600">{tagsNotice}</Field.HelperText>}
+            </Field.Root>
+
+            <Separator />
+            <VirtualKeyOwnershipSection
+              value={ownership}
+              onChange={setOwnership}
+              ctx={ownershipCtx}
+              canCreateShared={canCreateShared}
+            />
+
+            <Separator />
+            <VirtualKeyBudgetSection
+              value={budget}
+              onChange={setBudget}
+              organizationId={organizationId}
+              scopes={scopes}
+              principalUserId={ownership.kind === "PERSONAL" ? (currentUser?.id ?? null) : null}
+            />
+
+            <Separator />
+            <VirtualKeyProviderAccessSection
+              value={providerAccess}
+              onChange={setProviderAccess}
+              scopes={scopes}
+              organizationId={organizationId}
+              organizationName={organization?.name}
+              availableTeams={availableTeams}
+              availableProjects={availableProjects}
+              providers={providers}
+              isLoading={orgProvidersQuery.isLoading}
+            />
+
+            <Separator />
+            <VirtualKeyRoutingSection value={routing} onChange={setRouting} policies={policies} />
+
+            <Separator />
+            <VirtualKeyExpirationSection
+              value={expiration}
+              onChange={setExpiration}
+              fieldError={expiryFieldError}
+            />
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack width="full">
+            {cannotIssueReason && (
+              <Text fontSize="xs" color="fg.muted">
+                {cannotIssueReason}
+              </Text>
+            )}
+            <Spacer />
+            <Button variant="ghost" onClick={handleClose} disabled={createMutation.isPending}>
+              Cancel
+            </Button>
+            {cannotIssueReason ? (
+              <Tooltip content={cannotIssueReason}>
+                <Button colorPalette="orange" disabled>
+                  Create
+                </Button>
+              </Tooltip>
+            ) : (
+              <Button
+                colorPalette="orange"
+                data-testid="gateway-virtual-key-create-submit"
+                onClick={handleSubmit}
+                loading={createMutation.isPending}
+              >
+                Create
+              </Button>
+            )}
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}

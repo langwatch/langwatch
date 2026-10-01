@@ -1,15 +1,15 @@
 import chalk from "chalk";
+
 import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Schedules one scripted scenario run against the agent and returns its ids:
- * the user sends "ping", the agent answers, and the run succeeds when the
- * answer arrives. The project gains no scenario, run plan or test suite.
- *
+ * Schedules one scripted scenario run against the agent: sends "ping",
+ * succeeds when the agent answers. Creates no scenario, run plan or suite.
  * @see specs/agents/agent-test-run.feature
  */
 export const testAgentCommand = async (id: string): Promise<CommandResult | void> => {

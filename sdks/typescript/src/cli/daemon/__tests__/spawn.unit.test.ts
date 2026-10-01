@@ -1,24 +1,20 @@
 /**
- * The spawned daemon's boot environment becomes the BASELINE every request
- * resets to (execution.ts applyWindow), so it must be a known-safe set — never
- * the spawner's full shell env, which would leak one project's variables into
- * every other caller's requests.
+ * The spawned daemon's boot env becomes the BASELINE every request resets
+ * to (execution.ts applyWindow) -- never the spawner's full shell env, which
+ * would leak one project's variables into every other caller's requests.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const spawnMock = vi.hoisted(() =>
-  vi.fn(
-    (
-      _file: string,
-      _args: string[],
-      _options: { env: Record<string, string> },
-    ) => ({ unref: vi.fn(), on: vi.fn() }),
-  ),
+  vi.fn((_file: string, _args: string[], _options: { env: Record<string, string> }) => ({
+    unref: vi.fn(),
+    on: vi.fn(),
+  })),
 );
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 
-import { spawnDaemon } from "../spawn";
 import type { DaemonIdentity } from "../identity";
+import { spawnDaemon } from "../spawn";
 
 const identity: DaemonIdentity = {
   fingerprint: "f".repeat(64),

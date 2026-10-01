@@ -1,0 +1,292 @@
+import {
+  type BackfillIdentifierRow,
+  emptyIdentityHeads,
+  type IdentifierFact,
+  type IdentityHeads,
+  IdentityIdentifierNotFoundError,
+  IdentityVerificationInvalidError,
+} from "@langwatch/identity-contract";
+import { Temporal } from "@langwatch/time";
+import type { Instant } from "@langwatch/time";
+import { UserNotFoundError } from "@langwatch/user-contract";
+
+import type {
+  BackfillAccountRow,
+  BackfillUserRow,
+  IdentityBackfillRepository,
+} from "../identity-backfill.repository.ts";
+import type { IdentityHeadsRepository } from "../identity-heads.repository.ts";
+import type {
+  AbandonedNewborn,
+  IdentityNewbornRepository,
+} from "../identity-newborn.repository.ts";
+import type {
+  IdentifierReservationHolder,
+  IdentityReservationRepository,
+} from "../identity-reservations.repository.ts";
+import type { IdentityUsersRepository } from "../identity-users.repository.ts";
+import type {
+  IdentityVerificationRecord,
+  IdentityVerificationRepository,
+} from "../identity-verification.repository.ts";
+import type { MemoryIdentityStore } from "./memory.identity.store.ts";
+
+const ACTIVE_STATES = new Set(["VERIFIED", "PRIMARY"]);
+
+/** The heads twin: reads over the identifiers and users the store holds. */
+export class MemoryIdentityHeadsRepository implements IdentityHeadsRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityHeadsRepository {
+    return new MemoryIdentityHeadsRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async getUserHashKey(args: { userId: string }): Promise<{ userHashKey: string | null }> {
+    const row = this.store.findUserRow(args);
+    if (!row) throw new UserNotFoundError(args.userId);
+    return { userHashKey: row.userHashKey ?? null };
+  }
+
+  /**
+   * The in-memory store folds synchronously, so a user the store knows has
+   * folded: there is no staging lane here for a provisional row to outrun.
+   */
+  async hasFolded(args: { userId: string }): Promise<boolean> {
+    return this.store.findUserRow(args) !== null;
+  }
+
+  async findHeads(args: { userId: string }): Promise<IdentityHeads> {
+    const heads = emptyIdentityHeads({ userId: args.userId });
+    for (const fact of this.store.findIdentifiersForUser(args)) {
+      heads.identifiers[fact.identifierId] = fact;
+    }
+
+    return heads;
+  }
+
+  async getActiveIdentifierByValue(args: {
+    normalizedValue: string;
+  }): Promise<{ userId: string; identifierId: string }> {
+    const match = [...this.store.identifiers.values()].find(
+      (fact) => fact.value === args.normalizedValue && ACTIVE_STATES.has(fact.state),
+    );
+
+    if (!match) throw new IdentityIdentifierNotFoundError(`nobody holds ${args.normalizedValue}`);
+    return { userId: match.userId, identifierId: match.identifierId };
+  }
+
+  async getIdentifier(args: { userId: string; identifierId: string }): Promise<IdentifierFact> {
+    const fact = this.store.identifiers.get(args.identifierId);
+    if (!fact || fact.userId !== args.userId) {
+      throw new IdentityIdentifierNotFoundError(
+        `${args.userId} holds no identifier ${args.identifierId}`,
+      );
+    }
+    return fact;
+  }
+
+  async getIdentifierIdForAccount(args: {
+    userId: string;
+    accountId: string;
+    providerId: string;
+  }): Promise<string> {
+    const own = this.store.findIdentifiersForUser(args);
+    const byAccount = own.find((fact) => fact.accountId === args.accountId);
+    if (byAccount) return byAccount.identifierId;
+
+    // The Prisma row's fallback: exactly one live identifier on the verbatim
+    // provider id, never a guess between two.
+    const onProvider = own.filter(
+      (fact) => fact.providerId === args.providerId && ACTIVE_STATES.has(fact.state),
+    );
+
+    const [only, ...others] = onProvider;
+    if (!only || others.length > 0) {
+      throw new IdentityIdentifierNotFoundError(
+        `no single identifier mirrors account ${args.accountId}`,
+      );
+    }
+    return only.identifierId;
+  }
+}
+
+/** The `User` twin: the hash-key mint and the two `User.email` reads. */
+export class MemoryIdentityUsersRepository implements IdentityUsersRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityUsersRepository {
+    return new MemoryIdentityUsersRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async storeUserHashKeyIfMissing(args: { userId: string; userHashKey: string }): Promise<void> {
+    const row = this.store.findUserRow(args);
+    if (!row || row.userHashKey !== null) return;
+    row.userHashKey = args.userHashKey;
+  }
+
+  async getUserEmail(args: { userId: string }): Promise<{ email: string | null }> {
+    const row = this.store.findUserRow(args);
+    if (!row) throw new UserNotFoundError(args.userId);
+    return { email: row.email ?? null };
+  }
+
+  async findAddressStanding(args: { userId: string }): Promise<{
+    email: string | null;
+    emailVerified: boolean;
+    holders: number;
+  } | null> {
+    const row = this.store.findUserRow(args);
+    if (!row) return null;
+    const wanted = (row.email ?? "").toLowerCase();
+    const holders = row.email
+      ? [...this.store.users.values()].filter(
+          (candidate) => (candidate.email ?? "").toLowerCase() === wanted,
+        ).length
+      : 0;
+    return { email: row.email ?? null, emailVerified: row.emailVerified, holders };
+  }
+
+  async findUserIdsByEmail(args: { normalizedValue: string }): Promise<string[]> {
+    const wanted = args.normalizedValue.toLowerCase();
+    return [...this.store.users.values()]
+      .filter((candidate) => (candidate.email ?? "").toLowerCase() === wanted)
+      .map((row) => row.id);
+  }
+}
+
+/** The newborn twin: the claim latch and the abandoned sweep. */
+export class MemoryIdentityNewbornRepository implements IdentityNewbornRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityNewbornRepository {
+    return new MemoryIdentityNewbornRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async claim(args: { userId: string }): Promise<void> {
+    this.store.newbornClaims.set(args.userId, Temporal.Now.instant());
+  }
+
+  async hasUserAtPinnedId(args: { userId: string }): Promise<boolean> {
+    return this.store.findUserRow(args) !== null;
+  }
+
+  async commitNewborn(args: {
+    userId: string;
+    user: Record<string, unknown>;
+  }): Promise<Record<string, unknown>> {
+    const row = this.store.findUserRow(args);
+    if (row) row.payload = args.user;
+    this.store.newbornClaims.delete(args.userId);
+
+    return args.user;
+  }
+
+  async findAbandoned(args: { olderThan: Instant; limit: number }): Promise<AbandonedNewborn[]> {
+    return [...this.store.newbornClaims.entries()]
+      .filter(([, claimedAt]) => Temporal.Instant.compare(claimedAt, args.olderThan) <= 0)
+      .slice(0, args.limit)
+      .map(([userId, claimedAt]) => ({ userId, claimedAt }));
+  }
+
+  async releaseClaim(args: { userId: string }): Promise<void> {
+    this.store.newbornClaims.delete(args.userId);
+  }
+}
+
+/** The reservation twin: first claim on a normalized value wins. */
+export class MemoryIdentityReservationRepository implements IdentityReservationRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityReservationRepository {
+    return new MemoryIdentityReservationRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async claim(args: {
+    normalizedValue: string;
+    userId: string;
+    identifierId: string;
+    commandId: string;
+  }): Promise<IdentifierReservationHolder> {
+    const held = this.store.reservations.get(args.normalizedValue);
+    if (held) return held;
+    this.store.reservations.set(args.normalizedValue, args);
+
+    return args;
+  }
+
+  async release(args: {
+    userId: string;
+    holdingIdentifierIds: readonly string[];
+  }): Promise<number> {
+    let released = 0;
+    for (const [value, holder] of this.store.reservations.entries()) {
+      const held = holder.userId === args.userId;
+      if (!held || !args.holdingIdentifierIds.includes(holder.identifierId)) continue;
+      this.store.reservations.delete(value);
+      released += 1;
+    }
+
+    return released;
+  }
+
+  async reapOrphans(): Promise<number> {
+    return 0;
+  }
+}
+
+/** The verification twin: one live record per identifier, consumed once. */
+export class MemoryIdentityVerificationRepository implements IdentityVerificationRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityVerificationRepository {
+    return new MemoryIdentityVerificationRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async replaceForIdentifier(record: IdentityVerificationRecord): Promise<void> {
+    this.store.verifications.set(record.identifierId, record);
+  }
+
+  async getByIdentifierId(args: { identifierId: string }): Promise<IdentityVerificationRecord> {
+    const record = this.store.verifications.get(args.identifierId);
+    if (!record) throw new IdentityVerificationInvalidError();
+    return record;
+  }
+
+  async consume(args: { identifierId: string; verificationId: string }): Promise<boolean> {
+    const record = this.store.verifications.get(args.identifierId);
+    if (!record || record.verificationId !== args.verificationId) return false;
+    this.store.verifications.delete(args.identifierId);
+
+    return true;
+  }
+}
+
+/** The backfill twin: the three reads the plan is built from. */
+export class MemoryIdentityBackfillRepository implements IdentityBackfillRepository {
+  static create(store: MemoryIdentityStore): MemoryIdentityBackfillRepository {
+    return new MemoryIdentityBackfillRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryIdentityStore) {}
+
+  async getUser(args: { userId: string }): Promise<BackfillUserRow> {
+    const row = this.store.findUserRow(args);
+    if (!row) throw new UserNotFoundError(args.userId);
+
+    return {
+      id: row.id,
+      email: row.email,
+      emailVerified: row.emailVerified,
+      createdAtMs: row.createdAtMs,
+      userHashKey: row.userHashKey,
+    };
+  }
+
+  async findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]> {
+    return this.store.accounts.get(args.userId) ?? [];
+  }
+
+  async findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]> {
+    return this.store.backfillIdentifiers.get(args.userId) ?? [];
+  }
+}

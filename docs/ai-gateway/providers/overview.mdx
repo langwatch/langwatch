@@ -9,13 +9,19 @@ sidebarTitle: Overview
 A provider credential is a row under **Settings > Model Providers**. The row belongs to an organization, a team or a project, and every virtual key whose scope can see the row can dispatch through it. The same rows serve evaluators, the playground and the rest of LangWatch.
 
 <Frame caption="Settings > Model Providers, the Add Model Provider menu.">
-  <img src="/images/ai-gateway/model-providers-add-menu.png" alt="The Model Providers page with the Add Model Provider menu open, listing every provider" />
+  <img
+    src="/images/ai-gateway/model-providers-add-menu.png"
+    alt="The Model Providers page with the Add Model Provider menu open, listing every provider"
+  />
 </Frame>
 
 Each row has a **Name**, the credential fields listed below, optional extra headers, a **Routing handle** and an **Advanced (Gateway)** section with a fallback priority, a provider config JSON, and requests per minute, tokens per minute and requests per day fields. The gateway does not enforce those three; they are recorded on the row only. Cap traffic with the requests per minute and requests per day settings on a virtual key. See [Rate limits](/ai-gateway/rate-limits).
 
 <Frame caption="Advanced (Gateway) on a Bedrock row: fallback priority and provider config.">
-  <img src="/images/ai-gateway/model-provider-advanced-gateway.png" alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded" />
+  <img
+    src="/images/ai-gateway/model-provider-advanced-gateway.png"
+    alt="The Bedrock provider drawer with the Advanced (Gateway) section expanded"
+  />
 </Frame>
 
 See [Model providers](/platform/model-providers) for the row itself and [Fallback chains](/ai-gateway/providers/fallback-chains) for the order the gateway tries rows in.
@@ -24,39 +30,39 @@ See [Model providers](/platform/model-providers) for the row itself and [Fallbac
 
 Model names are `provider/model`. The provider segment is the id in the first column. See [Model naming](/ai-gateway/model-naming).
 
-| Provider | Id | Credential | Endpoints served |
-|---|---|---|---|
-| [OpenAI](/ai-gateway/providers/openai) | `openai` | API key, optional base URL | Chat, Responses, Messages, embeddings, images, speech, transcription, realtime, models |
-| [Anthropic](/ai-gateway/providers/anthropic) | `anthropic` | API key, optional base URL | Messages, Chat, models |
-| [Azure OpenAI](/ai-gateway/providers/azure-openai) | `azure` | API key, endpoint, API version | Chat, Responses, Messages, embeddings, models |
-| [AWS Bedrock](/ai-gateway/providers/bedrock) | `bedrock` | Access key id, secret access key, region | Chat, Messages, embeddings, models |
-| [Google Vertex AI](/ai-gateway/providers/vertex) | `vertex` | Service account JSON, project, location | Chat, Messages, embeddings, images, Gemini native, models |
-| [Google Gemini](/ai-gateway/providers/gemini) | `gemini` | API key, optional project and location | Chat, Messages, embeddings, images, Gemini native, models |
-| [xAI](/ai-gateway/providers/xai) | `xai` | API key | Chat, Messages, models |
-| [Groq](/ai-gateway/providers/groq) | `groq` | API key | Chat, Messages, models |
-| [Cerebras](/ai-gateway/providers/cerebras) | `cerebras` | API key | Chat, Messages, models |
-| [DeepSeek](/ai-gateway/providers/deepseek) | `deepseek` | API key | Chat, Messages, models |
-| [Voyage AI](/ai-gateway/providers/voyage) | `voyage` | API key | Embeddings only |
-| [ElevenLabs](/ai-gateway/providers/elevenlabs) | `elevenlabs` | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native |
-| [OpenAI account](/ai-gateway/providers/openai-account) | `openai_codex` | Sign in with a ChatGPT account | Responses, Messages |
-| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | `custom` | Base URL, optional API key | Chat, Messages, embeddings |
+| Provider                                                                   | Id             | Credential                                    | Endpoints served                                                                       |
+| -------------------------------------------------------------------------- | -------------- | --------------------------------------------- | -------------------------------------------------------------------------------------- |
+| [OpenAI](/ai-gateway/providers/openai)                                     | `openai`       | API key, optional base URL                    | Chat, Responses, Messages, embeddings, images, speech, transcription, realtime, models |
+| [Anthropic](/ai-gateway/providers/anthropic)                               | `anthropic`    | API key, optional base URL                    | Messages, Chat, models                                                                 |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai)                         | `azure`        | API key, endpoint, API version                | Chat, Responses, Messages, embeddings, models                                          |
+| [AWS Bedrock](/ai-gateway/providers/bedrock)                               | `bedrock`      | Access key id, secret access key, region      | Chat, Messages, embeddings, models                                                     |
+| [Google Vertex AI](/ai-gateway/providers/vertex)                           | `vertex`       | Service account JSON, project, location       | Chat, Messages, embeddings, images, Gemini native, models                              |
+| [Google Gemini](/ai-gateway/providers/gemini)                              | `gemini`       | API key, optional project and location        | Chat, Messages, embeddings, images, Gemini native, models                              |
+| [xAI](/ai-gateway/providers/xai)                                           | `xai`          | API key                                       | Chat, Messages, models                                                                 |
+| [Groq](/ai-gateway/providers/groq)                                         | `groq`         | API key                                       | Chat, Messages, models                                                                 |
+| [Cerebras](/ai-gateway/providers/cerebras)                                 | `cerebras`     | API key                                       | Chat, Messages, models                                                                 |
+| [DeepSeek](/ai-gateway/providers/deepseek)                                 | `deepseek`     | API key                                       | Chat, Messages, models                                                                 |
+| [Voyage AI](/ai-gateway/providers/voyage)                                  | `voyage`       | API key                                       | Embeddings only                                                                        |
+| [ElevenLabs](/ai-gateway/providers/elevenlabs)                             | `elevenlabs`   | API key, optional base URL and webhook secret | Speech, transcription, ElevenLabs native                                               |
+| [OpenAI account](/ai-gateway/providers/openai-account)                     | `openai_codex` | Sign in with a ChatGPT account                | Responses, Messages                                                                    |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | `custom`       | Base URL, optional API key                    | Chat, Messages, embeddings                                                             |
 
 The provider ids `azure_openai`, `aws_bedrock`, `vertex_ai`, `google_vertex` and `google_gemini` are accepted as aliases of `azure`, `bedrock`, `vertex` and `gemini`.
 
 ## What each endpoint family means
 
-| Family | Route | Note |
-|---|---|---|
-| Chat | `POST /v1/chat/completions` | OpenAI wire format. The gateway translates for providers with another native format. |
-| Responses | `POST /v1/responses` | OpenAI Responses API. OpenAI, Azure OpenAI and the OpenAI account provider. |
-| Messages | `POST /v1/messages` | Anthropic wire format. Forwarded as is to Anthropic, translated for the others. |
-| Embeddings | `POST /v1/embeddings` | OpenAI wire format. |
-| Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions` | OpenAI and ElevenLabs. |
-| Images | `POST /v1/images/generations`, `POST /v1/images/edits` | A direct OpenAI, Google Gemini or Google Vertex AI credential. Both are non-streaming. See [Images](/ai-gateway/api/images). |
-| Realtime | `POST /v1/realtime/client_secrets` | OpenAI only. |
-| Gemini native | `/v1beta/*` | The Google GenAI SDKs. Gemini and Vertex AI. |
-| ElevenLabs native | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs. |
-| Models | `GET /v1/models` | Lists the models the key can call, as bare names without a provider prefix. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
+| Family                | Route                                                           | Note                                                                                                                                                       |
+| --------------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat                  | `POST /v1/chat/completions`                                     | OpenAI wire format. The gateway translates for providers with another native format.                                                                       |
+| Responses             | `POST /v1/responses`                                            | OpenAI Responses API. OpenAI, Azure OpenAI and the OpenAI account provider.                                                                                |
+| Messages              | `POST /v1/messages`                                             | Anthropic wire format. Forwarded as is to Anthropic, translated for the others.                                                                            |
+| Embeddings            | `POST /v1/embeddings`                                           | OpenAI wire format.                                                                                                                                        |
+| Speech, transcription | `POST /v1/audio/speech`, `POST /v1/audio/transcriptions`        | OpenAI and ElevenLabs.                                                                                                                                     |
+| Images                | `POST /v1/images/generations`, `POST /v1/images/edits`          | A direct OpenAI, Google Gemini or Google Vertex AI credential. Both are non-streaming. See [Images](/ai-gateway/api/images).                               |
+| Realtime              | `POST /v1/realtime/client_secrets`                              | OpenAI only.                                                                                                                                               |
+| Gemini native         | `/v1beta/*`                                                     | The Google GenAI SDKs. Gemini and Vertex AI.                                                                                                               |
+| ElevenLabs native     | `POST /v1/text-to-speech/{voice_id}`, `POST /v1/speech-to-text` | The ElevenLabs SDKs.                                                                                                                                       |
+| Models                | `GET /v1/models`                                                | Lists the models the key can call, as bare names without a provider prefix. Azure OpenAI, Bedrock and Vertex AI list the models you configured on the row. |
 
 A request to an endpoint the provider does not serve gets the provider's own error back. For example, `POST /v1/embeddings` with an Anthropic model returns Anthropic's rejection.
 
@@ -65,5 +71,7 @@ A request to an endpoint the provider does not serve gets the provider's own err
 Create one row per account, region or endpoint, for example an Azure OpenAI row per Azure resource. Give each row a **Routing handle**, for example `eu`, and pin a request to that row with `eu/gpt-5-mini`. A routing policy orders the rows a key tries. See [Routing policies](/ai-gateway/governance/routing-policies).
 
 <Note>
-**Also check:** [Model naming](/ai-gateway/model-naming) for how a model name selects a provider, and [Fallback chains](/ai-gateway/providers/fallback-chains) for what happens when a provider fails.
+  **Also check:** [Model naming](/ai-gateway/model-naming) for how a model name selects a provider,
+  and [Fallback chains](/ai-gateway/providers/fallback-chains) for what happens when a provider
+  fails.
 </Note>

@@ -11,8 +11,9 @@ from ..models.patch_api_monitors_by_id_body_level import PatchApiMonitorsByIdBod
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.patch_api_monitors_by_id_body_mappings_type_0 import PatchApiMonitorsByIdBodyMappingsType0
+    from ..models.patch_api_monitors_by_id_body_mappings import PatchApiMonitorsByIdBodyMappings
     from ..models.patch_api_monitors_by_id_body_parameters import PatchApiMonitorsByIdBodyParameters
+    from ..models.patch_api_monitors_by_id_body_preconditions_item import PatchApiMonitorsByIdBodyPreconditionsItem
 
 
 T = TypeVar("T", bound="PatchApiMonitorsByIdBody")
@@ -22,26 +23,26 @@ T = TypeVar("T", bound="PatchApiMonitorsByIdBody")
 class PatchApiMonitorsByIdBody:
     """
     Attributes:
+        mappings (PatchApiMonitorsByIdBodyMappings):
         name (str | Unset):
         enabled (bool | Unset):
         check_type (str | Unset):
         execution_mode (PatchApiMonitorsByIdBodyExecutionMode | Unset):
-        preconditions (list[Any] | Unset):
+        preconditions (list[PatchApiMonitorsByIdBodyPreconditionsItem] | Unset):
         parameters (PatchApiMonitorsByIdBodyParameters | Unset):
-        mappings (None | PatchApiMonitorsByIdBodyMappingsType0 | Unset):
         sample (float | Unset):
         evaluator_id (None | str | Unset):
         level (PatchApiMonitorsByIdBodyLevel | Unset):
         thread_idle_timeout (int | None | Unset):
     """
 
+    mappings: PatchApiMonitorsByIdBodyMappings
     name: str | Unset = UNSET
     enabled: bool | Unset = UNSET
     check_type: str | Unset = UNSET
     execution_mode: PatchApiMonitorsByIdBodyExecutionMode | Unset = UNSET
-    preconditions: list[Any] | Unset = UNSET
+    preconditions: list[PatchApiMonitorsByIdBodyPreconditionsItem] | Unset = UNSET
     parameters: PatchApiMonitorsByIdBodyParameters | Unset = UNSET
-    mappings: None | PatchApiMonitorsByIdBodyMappingsType0 | Unset = UNSET
     sample: float | Unset = UNSET
     evaluator_id: None | str | Unset = UNSET
     level: PatchApiMonitorsByIdBodyLevel | Unset = UNSET
@@ -49,7 +50,7 @@ class PatchApiMonitorsByIdBody:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.patch_api_monitors_by_id_body_mappings_type_0 import PatchApiMonitorsByIdBodyMappingsType0
+        mappings = self.mappings.to_dict()
 
         name = self.name
 
@@ -61,21 +62,16 @@ class PatchApiMonitorsByIdBody:
         if not isinstance(self.execution_mode, Unset):
             execution_mode = self.execution_mode.value
 
-        preconditions: list[Any] | Unset = UNSET
+        preconditions: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.preconditions, Unset):
-            preconditions = self.preconditions
+            preconditions = []
+            for preconditions_item_data in self.preconditions:
+                preconditions_item = preconditions_item_data.to_dict()
+                preconditions.append(preconditions_item)
 
         parameters: dict[str, Any] | Unset = UNSET
         if not isinstance(self.parameters, Unset):
             parameters = self.parameters.to_dict()
-
-        mappings: dict[str, Any] | None | Unset
-        if isinstance(self.mappings, Unset):
-            mappings = UNSET
-        elif isinstance(self.mappings, PatchApiMonitorsByIdBodyMappingsType0):
-            mappings = self.mappings.to_dict()
-        else:
-            mappings = self.mappings
 
         sample = self.sample
 
@@ -97,7 +93,11 @@ class PatchApiMonitorsByIdBody:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
+        field_dict.update(
+            {
+                "mappings": mappings,
+            }
+        )
         if name is not UNSET:
             field_dict["name"] = name
         if enabled is not UNSET:
@@ -110,8 +110,6 @@ class PatchApiMonitorsByIdBody:
             field_dict["preconditions"] = preconditions
         if parameters is not UNSET:
             field_dict["parameters"] = parameters
-        if mappings is not UNSET:
-            field_dict["mappings"] = mappings
         if sample is not UNSET:
             field_dict["sample"] = sample
         if evaluator_id is not UNSET:
@@ -125,10 +123,13 @@ class PatchApiMonitorsByIdBody:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.patch_api_monitors_by_id_body_mappings_type_0 import PatchApiMonitorsByIdBodyMappingsType0
+        from ..models.patch_api_monitors_by_id_body_mappings import PatchApiMonitorsByIdBodyMappings
         from ..models.patch_api_monitors_by_id_body_parameters import PatchApiMonitorsByIdBodyParameters
+        from ..models.patch_api_monitors_by_id_body_preconditions_item import PatchApiMonitorsByIdBodyPreconditionsItem
 
         d = dict(src_dict)
+        mappings = PatchApiMonitorsByIdBodyMappings.from_dict(d.pop("mappings"))
+
         name = d.pop("name", UNSET)
 
         enabled = d.pop("enabled", UNSET)
@@ -142,7 +143,14 @@ class PatchApiMonitorsByIdBody:
         else:
             execution_mode = PatchApiMonitorsByIdBodyExecutionMode(_execution_mode)
 
-        preconditions = cast(list[Any], d.pop("preconditions", UNSET))
+        _preconditions = d.pop("preconditions", UNSET)
+        preconditions: list[PatchApiMonitorsByIdBodyPreconditionsItem] | Unset = UNSET
+        if _preconditions is not UNSET:
+            preconditions = []
+            for preconditions_item_data in _preconditions:
+                preconditions_item = PatchApiMonitorsByIdBodyPreconditionsItem.from_dict(preconditions_item_data)
+
+                preconditions.append(preconditions_item)
 
         _parameters = d.pop("parameters", UNSET)
         parameters: PatchApiMonitorsByIdBodyParameters | Unset
@@ -150,23 +158,6 @@ class PatchApiMonitorsByIdBody:
             parameters = UNSET
         else:
             parameters = PatchApiMonitorsByIdBodyParameters.from_dict(_parameters)
-
-        def _parse_mappings(data: object) -> None | PatchApiMonitorsByIdBodyMappingsType0 | Unset:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                mappings_type_0 = PatchApiMonitorsByIdBodyMappingsType0.from_dict(data)
-
-                return mappings_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(None | PatchApiMonitorsByIdBodyMappingsType0 | Unset, data)
-
-        mappings = _parse_mappings(d.pop("mappings", UNSET))
 
         sample = d.pop("sample", UNSET)
 
@@ -196,13 +187,13 @@ class PatchApiMonitorsByIdBody:
         thread_idle_timeout = _parse_thread_idle_timeout(d.pop("threadIdleTimeout", UNSET))
 
         patch_api_monitors_by_id_body = cls(
+            mappings=mappings,
             name=name,
             enabled=enabled,
             check_type=check_type,
             execution_mode=execution_mode,
             preconditions=preconditions,
             parameters=parameters,
-            mappings=mappings,
             sample=sample,
             evaluator_id=evaluator_id,
             level=level,

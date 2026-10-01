@@ -39,7 +39,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/evaluations/{evaluator}/evaluate".format(
+        "url": "/api/v1/evaluations/{evaluator}/evaluate".format(
             evaluator=quote(str(evaluator), safe=""),
         ),
     }

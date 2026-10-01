@@ -1,21 +1,17 @@
 /**
- * Finding the Langy conversation that asked for this folder, and approving it.
- *
- * The CLI signs in with the device session, lists the control requests the
- * user has open, and asks in the terminal. Approving posts what the CLI knows
- * about the folder and receives the Langy session key the socket connects
- * with. With nothing open it waits, so the order of the two steps, the ask in
- * the chat and the command here, does not matter.
- *
- * @see specs/typescript-sdk/cli-langy-share-control.feature
+ * Finding the Langy conversation that asked for this folder, and approving
+ * it: posts what the CLI knows and receives the session key the socket
+ * connects with. With nothing open it waits.
  */
 
 import { execFileSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+
 import chalk from "chalk";
 import prompts from "prompts";
+
 import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
@@ -27,21 +23,9 @@ import {
   resolvePersonCredentials,
 } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
-import {
-  askBox,
-  createStdinKeySource,
-  type BoxCard,
-  type KeySource,
-} from "./approval";
+import { askBox, createStdinKeySource, type BoxCard, type KeySource } from "./approval";
 import { LocalCallFailure } from "./errors";
-import {
-  askedAgo,
-  consoleWriter,
-  noticeRows,
-  terminalWidth,
-  wrapWords,
-  type UiWriter,
-} from "./ui";
+import { askedAgo, consoleWriter, noticeRows, terminalWidth, wrapWords, type UiWriter } from "./ui";
 
 /** How often the CLI looks again while it waits for a request. */
 export const REQUEST_POLL_INTERVAL_MS = 5_000;
@@ -131,17 +115,14 @@ function readText(file: string): string {
 }
 
 /**
- * uv owns a Python folder when its lock file is there, when `pyproject.toml`
- * carries a `[tool.uv]` table, or when the virtual environment was made by
- * uv: its `pyvenv.cfg` carries a `uv = <version>` line. The last one matters
- * most, because a venv uv made has no pip in it, so every pip spelling fails
- * there while `uv add` works.
+ * uv owns a Python folder when its lock file is there, `pyproject.toml` has `[tool.uv]`, or
+ * `pyvenv.cfg` has a `uv =` line. The last matters most: a uv venv has no pip, so only `uv add`
+ * works.
  */
 function uvOwns(root: string): boolean {
   if (fs.existsSync(path.join(root, "uv.lock"))) return true;
-  if (/^\[tool\.uv[\].]/m.test(readText(path.join(root, "pyproject.toml")))) {
-    return true;
-  }
+  const pyproject = readText(path.join(root, "pyproject.toml"));
+  if (/^\[tool\.uv[\].]/m.test(pyproject)) return true;
   return /^uv\s*=/m.test(readText(path.join(root, ".venv", "pyvenv.cfg")));
 }
 
@@ -149,7 +130,7 @@ export function packageManagerOf(root: string): string | undefined {
   // uv wins over every other signal: a folder with a JS lockfile beside its
   // Python project still installs the Python package through uv.
   if (uvOwns(root)) return "uv";
-  const lockfiles: Array<[string, string]> = [
+  const lockfiles: [string, string][] = [
     ["pnpm-lock.yaml", "pnpm"],
     ["yarn.lock", "yarn"],
     ["bun.lockb", "bun"],
@@ -162,7 +143,8 @@ export function packageManagerOf(root: string): string | undefined {
     ["Cargo.lock", "cargo"],
   ];
   for (const [file, manager] of lockfiles) {
-    if (fs.existsSync(path.join(root, file))) return manager;
+    const lockfilePath = path.join(root, file);
+    if (fs.existsSync(lockfilePath)) return manager;
   }
   return undefined;
 }
@@ -174,22 +156,14 @@ export function packageManagerOf(root: string): string | undefined {
  */
 export function describeWorkspace(root: string): WorkspaceInfo {
   // rev-parse fails the same way when git is missing and when the folder is
-  // not a repository; only with git present does the failure say "not a repository".
+  // not a repository; only with git present does the failure say so.
   const gitPresent = quiet("git", ["--version"], root) !== null;
   const isRepository =
-    gitPresent &&
-    quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
-  const branch = isRepository
-    ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root)
-    : null;
-  const remote = isRepository
-    ? quiet("git", ["remote", "get-url", "origin"], root)
-    : null;
-  const status = isRepository
-    ? quiet("git", ["status", "--porcelain"], root)
-    : null;
-  const python =
-    quiet("python3", ["--version"], root) ?? quiet("python", ["--version"], root);
+    gitPresent && quiet("git", ["rev-parse", "--is-inside-work-tree"], root) === "true";
+  const branch = isRepository ? quiet("git", ["rev-parse", "--abbrev-ref", "HEAD"], root) : null;
+  const remote = isRepository ? quiet("git", ["remote", "get-url", "origin"], root) : null;
+  const status = isRepository ? quiet("git", ["status", "--porcelain"], root) : null;
+  const python = quiet("python3", ["--version"], root) ?? quiet("python", ["--version"], root);
   const manager = packageManagerOf(root);
   return {
     root,
@@ -217,10 +191,7 @@ export function isGitRepository(root: string): boolean {
 
 export interface ControlApi {
   list: () => Promise<ControlRequest[]>;
-  approve: (input: {
-    requestId: string;
-    workspace: WorkspaceInfo;
-  }) => Promise<ApprovedControl>;
+  approve: (input: { requestId: string; workspace: WorkspaceInfo }) => Promise<ApprovedControl>;
   cancel: (input: { requestId: string }) => Promise<void>;
 }
 
@@ -346,21 +317,9 @@ export type PersonCredentials = {
 };
 
 /**
- * The credentials the command acts with: the device login on this machine,
- * and only that. A control request is addressed to the person who asked, and
- * a `LANGWATCH_API_KEY`, in the folder's .env or in the shell, names no
- * person the command line can see, so it is never read here and the folder's
- * .env is never written.
- *
- * With no login, or with one that cannot be used (the server refuses it, it
- * holds no login key, or `isAccepted` says the platform turned its key down),
- * the device login runs right away and the login is read again. The login is
- * the standard flow, called rather than repeated. A sign-in that still leaves
- * no usable login ends the command with `SIGN_IN_FAILED_MESSAGE`.
- *
- * A login made against another address than the one the command targets ends
- * the command before any key is read: the key stays with the address that
- * issued it, and replacing the machine's login is the person's call.
+ * The command's credentials: the device login only, never `LANGWATCH_API_KEY`, which names no
+ * person. An unusable login runs the device login once; a login made against another address ends
+ * the command.
  */
 export async function ensureSignedIn({
   login,
@@ -381,23 +340,7 @@ export async function ensureSignedIn({
   const hadLogin = hasDeviceSession();
   let credentials = await usableLogin();
   if (!credentials) {
-    console.log(
-      chalk.gray(
-        hadLogin
-          ? "The login on this machine can no longer be used. Signing in again."
-          : "No login on this machine yet. Signing in first.",
-      ),
-    );
-    try {
-      await login({ device: true });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message.trim() : "";
-      throw new ShareControlError(
-        reason === ""
-          ? SIGN_IN_FAILED_MESSAGE
-          : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
-      );
-    }
+    await signInAgain({ login, hadLogin });
     credentials = await usableLogin();
     if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
   }
@@ -405,17 +348,38 @@ export async function ensureSignedIn({
   return {
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
-    ...(credentials.projectId === undefined
-      ? {}
-      : { projectId: credentials.projectId }),
+    ...(credentials.projectId === undefined ? {} : { projectId: credentials.projectId }),
   };
+}
+
+async function signInAgain({
+  login,
+  hadLogin,
+}: {
+  login: (options: { device: boolean }) => Promise<void>;
+  hadLogin: boolean;
+}): Promise<void> {
+  console.log(
+    chalk.gray(
+      hadLogin
+        ? "The login on this machine can no longer be used. Signing in again."
+        : "No login on this machine yet. Signing in first.",
+    ),
+  );
+  try {
+    await login({ device: true });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.trim() : "";
+    throw new ShareControlError(
+      reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
+    );
+  }
 }
 
 /**
  * The one line that says who the command acts as: the person and their
- * organization, as the login recorded them. A request is addressed to the
- * person and answered on the request's own project, so no project and no
- * --project belong in this line.
+ * organization, as the login recorded them. A request is answered on its own
+ * project, so no project and no --project belong in this line.
  */
 const nonEmpty = (value: string | undefined): string | undefined => {
   const trimmed = value?.trim();
@@ -438,41 +402,34 @@ export function loginLine(): string {
   return "Using your login.";
 }
 
-const requestTitle = (
-  request: ControlRequest,
-  root: string,
-  now: number = Date.now(),
-): string =>
+const requestTitle = (request: ControlRequest, root: string, now: number = Date.now()): string =>
   `Langy session "${request.conversationTitle}" (project ${request.projectName}, ${askedAgo(request.createdAt, now)}) is requesting control over ${root}`;
 
 /**
- * One row per conversation, newest first.
- *
- * The same chat can raise the card again, and a request the developer never
- * answered stays open for its fifteen minutes. Two rows with the same title
- * only make the developer guess, so the older one is dropped and the newest
- * one stands for the conversation.
+ * One row per conversation, newest first: the same chat can raise the card
+ * again, and two rows with the same title only make the developer guess.
  */
-export function collapseByConversation(
-  requests: ControlRequest[],
-): ControlRequest[] {
+export function collapseByConversation(requests: ControlRequest[]): ControlRequest[] {
   const newest = new Map<string, ControlRequest>();
   for (const request of requests) {
     const held = newest.get(request.conversationId);
-    if (!held || Date.parse(request.createdAt) > Date.parse(held.createdAt)) {
+    if (!held) {
       newest.set(request.conversationId, request);
+    } else {
+      const requestCreatedAt = Date.parse(request.createdAt);
+      const heldCreatedAt = Date.parse(held.createdAt);
+      if (requestCreatedAt > heldCreatedAt) {
+        newest.set(request.conversationId, request);
+      }
     }
   }
-  return [...newest.values()].sort(
+  return [...newest.values()].toSorted(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
 }
 
 /** What one row of the picker reads under its title. */
-export function requestRowDescription(
-  request: ControlRequest,
-  now: number = Date.now(),
-): string {
+export function requestRowDescription(request: ControlRequest, now: number = Date.now()): string {
   return `project ${request.projectName}, ${askedAgo(request.createdAt, now)}`;
 }
 
@@ -487,8 +444,7 @@ export const shareRequestTitle = (root: string): string =>
   `Langy wants to work in ${path.basename(root)}`;
 
 /** The footer of a box that asks for this folder. */
-const REQUEST_HINT =
-  "Enter or a number to answer · ↑↓ to choose · Esc to leave the request open";
+const REQUEST_HINT = "Enter or a number to answer · ↑↓ to choose · Esc to leave the request open";
 
 /** What the terminal says when the developer answered nothing. */
 const LEFT_OPEN_NOTICE =
@@ -542,13 +498,8 @@ export function requestPickerCard({
 
 /**
  * Shows the open requests and asks what to do. One request offers to share
- * the folder and to cancel; several become a picker over their titles and
- * projects first.
- *
- * The question is drawn in the same boxed idiom as the permission selector,
- * and settles into one notice, so the first screen of the session reads like
- * every screen after it. Off a terminal there is nothing to draw on, so the
- * question stays the list the prompts package renders.
+ * the folder and to cancel; several become a picker over titles and
+ * projects. Drawn in the same boxed idiom as the permission selector.
  */
 export async function chooseRequest({
   requests,
@@ -660,10 +611,7 @@ async function chooseWithPrompts({
   console.log("");
   // The question is the one thing the developer has to read before they
   // answer, so it wraps where the words end rather than where the column does.
-  for (const line of wrapWords(
-    requestTitle(request, root, now),
-    terminalWidth(),
-  )) {
+  for (const line of wrapWords(requestTitle(request, root, now), terminalWidth())) {
     console.log(line);
   }
   const answer = await ask({
@@ -723,9 +671,7 @@ export const asShareControlError = (error: unknown): ShareControlError =>
   error instanceof ShareControlError
     ? error
     : new ShareControlError(
-        error instanceof LocalCallFailure || error instanceof Error
-          ? error.message
-          : String(error),
+        error instanceof LocalCallFailure || error instanceof Error ? error.message : String(error),
       );
 
 /**

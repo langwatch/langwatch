@@ -6,18 +6,23 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
+
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// Drawn from haven's one palette (adapters/havenui) rather than declared
+// again here. styleLive and styleGood were already the same colour twice
+// over, which is what a second copy of a palette does to it.
 var (
-	accent     = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim   = lipgloss.NewStyle().Faint(true)
-	styleSel   = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleLive  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleWarn  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
-	styleGood  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleGone  = lipgloss.NewStyle().Foreground(lipgloss.Color("213"))
+	accent     = havenui.Accent
+	styleTitle = havenui.Title
+	styleDim   = havenui.Muted
+	styleSel   = havenui.Selected
+	styleLive  = havenui.Good
+	styleWarn  = havenui.Warn
+	styleGood  = havenui.Good
+	styleGone  = havenui.Absent
 )
 
 var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
@@ -31,6 +36,11 @@ var spinnerFrames = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "�
 func (m model) View() string {
 	if m.mode == modeDeleting || m.mode == modeDone {
 		return clampLines(m.renderDeleteScreen(), m.width)
+	}
+	// The confirmation is its own screen, not a footer: it is the last thing seen
+	// before real data goes, so it gets the whole terminal to say what will go.
+	if m.mode == modeConfirm {
+		return clampLines(m.renderConfirmScreen(), m.width)
 	}
 	header := m.renderHeader()
 	footer := m.renderFooter()
@@ -62,7 +72,7 @@ func (m model) scrollCap() int {
 func (m model) renderHeader() string {
 	sel := m.countSelected()
 	n := len(m.rows)
-	parts := []string{fmt.Sprintf("%d worktree(s)", n)}
+	parts := []string{m.actions.Kind.Count(len(m.rows))}
 	if m.metaCount < n {
 		parts = append(parts, fmt.Sprintf("reading %d/%d", m.metaCount, n))
 	}
@@ -77,12 +87,21 @@ func (m model) renderHeader() string {
 	}
 
 	var b strings.Builder
-	b.WriteString(styleTitle.Render(" ⌂ haven prune "))
+	b.WriteString(styleTitle.Render(m.title()))
 	b.WriteString(styleDim.Render("  " + strings.Join(parts, " · ")))
 	b.WriteString("\n")
 	b.WriteString(styleDim.Render(" " + strings.Repeat("─", m.divider())))
 	b.WriteString("\n\n")
 	return b.String()
+}
+
+// title names the one kind this picker reclaims, so the screen can never be read
+// as acting on the other one.
+func (m model) title() string {
+	if m.actions.Kind.Plural == "" {
+		return " ⌂ haven clean "
+	}
+	return " ⌂ haven clean — " + m.actions.Kind.Plural + " "
 }
 
 func (m model) divider() int {
@@ -101,7 +120,7 @@ func (m model) divider() int {
 func (m model) renderList(budget int) string {
 	n := len(m.order)
 	if n == 0 {
-		return styleDim.Render("  no worktrees found") + "\n"
+		return styleDim.Render("  nothing to clean") + "\n"
 	}
 	clipped := n > budget
 	rowBudget := budget
@@ -176,6 +195,8 @@ func (m model) renderRow(pos int, r Row) string {
 func (m model) facts(r Row) string {
 	if !r.Deletable {
 		switch {
+		case r.Kind == KindJob:
+			return "held back · " + r.Reason
 		case r.IsPrimary:
 			return "primary · protected"
 		case r.IsCurrent:
@@ -187,9 +208,9 @@ func (m model) facts(r Row) string {
 	if !r.MetaKnown {
 		return spinnerFrames[m.spin%len(spinnerFrames)] + " scanning…"
 	}
-	idle := "idle ?"
+	idle := ageLabel(r) + " ?"
 	if r.StaleKnown {
-		idle = "idle " + domain.HumanAge(r.StaleFor)
+		idle = ageLabel(r) + " " + domain.HumanAge(r.StaleFor)
 	}
 	size := styleDim.Render("   …")
 	if r.SizeKnown {
@@ -208,28 +229,20 @@ func (m model) facts(r Row) string {
 	if r.OriginGone {
 		parts = append(parts, styleGone.Render("origin-gone"))
 	}
+	if r.Reason != "" {
+		parts = append(parts, styleGone.Render(r.Reason))
+	}
 	return strings.Join(parts, "  ")
 }
 
 func (m model) renderFooter() string {
 	var b strings.Builder
-	if m.mode == modeConfirm {
-		n := m.countSelected()
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  Delete %d worktree(s) — stops their stacks, drops their databases, removes their", n)))
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  directories (uncommitted changes included). Reclaims ~%s.", domain.HumanBytes(m.selectedBytes()))))
-		b.WriteString("\n")
-		b.WriteString(styleWarn.Render(fmt.Sprintf("  type %q to confirm: %s▏", confirmWord, m.confirm)))
-		b.WriteString("\n")
-		return b.String()
-	}
 	b.WriteString("\n")
 	b.WriteString(m.renderDetail())
 	if m.anyDeletable() {
 		b.WriteString(styleDim.Render("  ↑↓ move · space toggle · a all · n none · s sort · enter delete · q quit"))
 	} else {
-		b.WriteString(styleDim.Render("  no other worktrees to prune · q quit"))
+		b.WriteString(styleDim.Render("  no other " + m.actions.Kind.Plural + " to prune · q quit"))
 	}
 	b.WriteString("\n")
 	if m.actions.SharedNote != "" {
@@ -252,7 +265,7 @@ func (m model) renderDetail() string {
 	b.WriteString("\n")
 	switch {
 	case !r.Deletable:
-		b.WriteString(styleDim.Render("  protected — never deleted by prune"))
+		b.WriteString(styleDim.Render("  " + protectedNote(r)))
 	case r.MetaKnown:
 		b.WriteString(styleDim.Render("  reclaims: " + reclaimDetail(r)))
 	default:

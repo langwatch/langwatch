@@ -1,15 +1,11 @@
 /**
- * Basic Evaluation Example
- *
- * This example demonstrates how to run a simple batch evaluation
- * with custom metrics using the LangWatch TypeScript SDK.
- *
- * Run with: npm start
+ * Basic Evaluation Example: runs a simple batch evaluation with custom
+ * metrics using the LangWatch SDK. Run with: npm start
  */
 
 import "dotenv/config";
-import { LangWatch } from "langwatch";
 import { trace } from "@opentelemetry/api";
+import { LangWatch } from "langwatch";
 
 // Check for required environment variables
 if (!process.env.LANGWATCH_API_KEY) {
@@ -97,7 +93,7 @@ const main = async () => {
         score: isCorrect ? 1.0 : 0.0,
       });
     },
-    { concurrency: 2 }
+    { concurrency: 2 },
   );
 
   console.log("\n✅ Evaluation complete! Check the LangWatch UI for results.");

@@ -187,6 +187,18 @@ Feature: Agent management
       | Code Agent     | code     | Create a Python code executor  |
       | Workflow Agent | workflow | Use an existing workflow       |
 
+  Scenario: The new agent flow offers a Voice Agent while the flag is on
+    Given the release_voice_agents_enabled flag is on
+    When the AgentTypeSelectorDrawer opens
+    Then I see a "Voice Agent" option between "HTTP Agent" and "Code Agent"
+    When I select "Voice Agent"
+    Then the AgentVoiceEditorDrawer opens
+
+  Scenario: The new agent flow hides the Voice Agent while the flag is off
+    Given the release_voice_agents_enabled flag is off
+    When the AgentTypeSelectorDrawer opens
+    Then I do not see a "Voice Agent" option
+
   Scenario: Selecting type navigates to appropriate editor
     Given the AgentTypeSelectorDrawer is open
     When I select "Code Agent"
@@ -217,3 +229,23 @@ Feature: Agent management
     Given the WorkflowSelectorDrawer is open
     When I click "+ New Workflow"
     Then I am navigated to /[project]/workflows page
+
+  # The pre-fix repair, main's scripts/backfill-agent-audit-log-ids.ts, ported
+  # onto the task launcher. Records written before the create and copy actions
+  # recorded the generated id are invisible in the history drawer.
+
+  @unit
+  Scenario: The audit-log backfill fills in the agent id of a pre-fix record
+    Given an agents.create audit log with no agent id in its arguments
+    And exactly one agent created in that project within the matching window
+    When the backfill runs and is told to execute
+    Then the audit log carries that agent's id
+    And a copy record is matched by the agent it was copied from, not by position
+
+  @unit
+  Scenario: The audit-log backfill leaves an ambiguous record untouched
+    Given an audit log whose window matches more than one agent
+    Or an audit log with no project
+    When the backfill runs
+    Then that record is skipped and counted
+    And nothing is written, because a guessed id is worse than a missing one

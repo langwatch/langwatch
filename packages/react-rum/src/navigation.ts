@@ -1,19 +1,10 @@
 /**
- * Navigation spans: an in-app route change as a unit of work.
- *
- * Document load is one span at the start of a visit; everything after it is a
- * client-side navigation the browser never tells anyone about. Without this,
- * the calls a page makes on arrival are orphan traces with no statement of what
- * the user was doing, and "opening the traces page is slow" has nothing to
- * measure it against.
- *
- * Router-agnostic on purpose: the router lives in the application, so the
- * application drives this — begin when the router starts navigating, name the
- * route once it commits, settle when the new page has had its chance to fetch.
- *
- * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
+ * Navigation spans: an in-app route change as a unit of work, without which a page's post-load
+ * calls are orphan traces with nothing to measure "the traces page is slow" against. Router-
+ * agnostic on purpose. See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
+import { nowInstant } from "@langwatch/time";
 import {
   type Context,
   ROOT_CONTEXT,
@@ -22,22 +13,19 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import {
-  ATTR_HTTP_ROUTE,
-  ATTR_URL_PATH,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
 
 import {
   ATTR_NAVIGATION_FROM_PATH,
   ATTR_NAVIGATION_SUPERSEDED,
   ATTR_NAVIGATION_TYPE,
   RUM_INSTRUMENTATION_NAME,
-} from "./constants";
+} from "./constants.ts";
 import {
   clearAmbientContext,
   resetAmbientContextForTesting,
   setAmbientContext,
-} from "./navigationContextManager";
+} from "./navigationContextManager.ts";
 
 /** How the navigation was resolved, for telling a lazy route from an instant one. */
 export type NavigationType = "resolved" | "instant";
@@ -45,16 +33,8 @@ export type NavigationType = "resolved" | "instant";
 export interface NavigationSpanHandle {
   /**
    * Marks the moment the new route is on screen, naming the span for it.
-   *
-   * Separate from {@link NavigationSpanHandle.end} because the two answer
-   * different questions. The span's *duration* should be what the user waited
-   * — click to page — so it is measured to here. Its life as the ambient
-   * parent has to run a little longer, because the page dispatches its first
-   * fetches immediately after this.
-   *
-   * The route pattern arrives here rather than at the start because it is only
-   * knowable once the router has matched it: while the navigation is in flight
-   * the application still holds the previous route's params.
+   * Separate from {@link NavigationSpanHandle.end} since the span's
+   * *duration* is the user's wait; `route` arrives here, once the router has matched it.
    */
   commit({ route }: { route?: string }): void;
   /** Records that the navigation failed rather than completed. */
@@ -74,11 +54,8 @@ let inFlight: { span: Span; context: Context } | undefined;
 
 /**
  * Begins a navigation span and publishes it as the ambient parent for the
- * fetches the navigation triggers.
- *
- * A navigation started while another is in flight supersedes it: the tab is
- * going somewhere else, and the first navigation's outcome is no longer
- * something anyone waits for.
+ * fetches the navigation triggers. A navigation started while another is in
+ * flight supersedes it — the tab is going elsewhere, so the first's outcome is moot.
  */
 export function startNavigationSpan({
   toPath,
@@ -127,13 +104,14 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
   return {
     commit({ route }: { route?: string }) {
       try {
-        committedAt ??= Date.now();
+        committedAt ??= nowInstant().epochMilliseconds;
         if (route) {
           span.updateName(navigationName(route));
           span.setAttribute(ATTR_HTTP_ROUTE, route);
         }
       } catch {
-        // Best effort; the span keeps the name and duration it would have had.
+        // Best effort: the span keeps the name and duration it would have had.
+        return;
       }
     },
     fail(error: unknown) {
@@ -143,7 +121,8 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
           message: error instanceof Error ? error.message : String(error),
         });
       } catch {
-        // Best effort.
+        // Best effort: the span keeps whatever status it already carried.
+        return;
       }
     },
     end() {
@@ -155,7 +134,9 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
         clearAmbientContext(spanContext);
         span.end(committedAt);
       } catch {
-        // Best effort.
+        // Best effort: an unclosed span expires on the exporter's own terms
+        // rather than taking the navigation down with it.
+        return;
       }
     },
   };

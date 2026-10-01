@@ -142,7 +142,7 @@ class DatasetApiService:
         page: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """GET /api/dataset -- list datasets for the project."""
+        """GET /api/v1/dataset -- list datasets for the project."""
         with _tracer.start_as_current_span("dataset.list_datasets"):
             params: Dict[str, Any] = {}
             if page is not None:
@@ -150,7 +150,7 @@ class DatasetApiService:
             if limit is not None:
                 params["limit"] = limit
 
-            response = self._http().get("/api/dataset", params=params)
+            response = self._http().get("/api/v1/dataset", params=params)
             _raise_for_api_status(response, operation="list_datasets")
             return response.json()
 
@@ -160,13 +160,13 @@ class DatasetApiService:
         name: str,
         columns: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """POST /api/dataset -- create a new dataset."""
+        """POST /api/v1/dataset -- create a new dataset."""
         with _tracer.start_as_current_span("dataset.create_dataset"):
             body: Dict[str, Any] = {"name": name}
             if columns is not None:
                 body["columnTypes"] = columns
 
-            response = self._http().post("/api/dataset", json=body)
+            response = self._http().post("/api/v1/dataset", json=body)
             _raise_for_api_status(response, operation="create_dataset")
             return response.json()
 
@@ -176,13 +176,13 @@ class DatasetApiService:
         *,
         tracer: Optional[trace.Tracer] = None,
     ) -> Dict[str, Any]:
-        """GET /api/dataset/{slugOrId} -- get a dataset with its entries."""
+        """GET /api/v1/dataset/{slugOrId} -- get a dataset with its entries."""
         active_tracer = tracer or _tracer
         with active_tracer.start_as_current_span("dataset.get_dataset") as span:
             span.set_attribute("inputs.slug_or_id", slug_or_id)
 
             quoted = self._quote(slug_or_id)
-            response = self._http().get(f"/api/dataset/{quoted}")
+            response = self._http().get(f"/api/v1/dataset/{quoted}")
             _raise_for_api_status(response, operation="get_dataset")
             return response.json()
 
@@ -193,7 +193,7 @@ class DatasetApiService:
         name: Optional[str] = None,
         columns: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
-        """PATCH /api/dataset/{slugOrId} -- update dataset metadata."""
+        """PATCH /api/v1/dataset/{slugOrId} -- update dataset metadata."""
         with _tracer.start_as_current_span("dataset.update_dataset"):
             body: Dict[str, Any] = {}
             if name is not None:
@@ -202,15 +202,15 @@ class DatasetApiService:
                 body["columnTypes"] = columns
 
             quoted = self._quote(slug_or_id)
-            response = self._http().patch(f"/api/dataset/{quoted}", json=body)
+            response = self._http().patch(f"/api/v1/dataset/{quoted}", json=body)
             _raise_for_api_status(response, operation="update_dataset")
             return response.json()
 
     def delete_dataset(self, slug_or_id: str) -> None:
-        """DELETE /api/dataset/{slugOrId} -- archive a dataset."""
+        """DELETE /api/v1/dataset/{slugOrId} -- archive a dataset."""
         with _tracer.start_as_current_span("dataset.delete_dataset"):
             quoted = self._quote(slug_or_id)
-            response = self._http().delete(f"/api/dataset/{quoted}")
+            response = self._http().delete(f"/api/v1/dataset/{quoted}")
             _raise_for_api_status(response, operation="delete_dataset")
 
     # ── records ─────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ class DatasetApiService:
         page: Optional[int] = None,
         limit: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """GET /api/dataset/{slugOrId}/records -- list records with pagination."""
+        """GET /api/v1/dataset/{slugOrId}/records -- list records with pagination."""
         with _tracer.start_as_current_span("dataset.list_records"):
             params: Dict[str, Any] = {}
             if page is not None:
@@ -232,7 +232,7 @@ class DatasetApiService:
 
             quoted = self._quote(slug_or_id)
             response = self._http().get(
-                f"/api/dataset/{quoted}/records", params=params
+                f"/api/v1/dataset/{quoted}/records", params=params
             )
             _raise_for_api_status(response, operation="list_records")
             return response.json()
@@ -243,7 +243,7 @@ class DatasetApiService:
         *,
         entries: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
-        """POST /api/dataset/{slugOrId}/records -- batch-create records.
+        """POST /api/v1/dataset/{slugOrId}/records -- batch-create records.
 
         Returns:
             List of created record dicts, each containing id, entry, and createdAt.
@@ -253,7 +253,7 @@ class DatasetApiService:
 
             quoted = self._quote(slug_or_id)
             response = self._http().post(
-                f"/api/dataset/{quoted}/records", json=body
+                f"/api/v1/dataset/{quoted}/records", json=body
             )
             _raise_for_api_status(response, operation="create_records")
             data = response.json()
@@ -266,14 +266,14 @@ class DatasetApiService:
         *,
         entry: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """PATCH /api/dataset/{slugOrId}/records/{recordId} -- update a single record."""
+        """PATCH /api/v1/dataset/{slugOrId}/records/{recordId} -- update a single record."""
         with _tracer.start_as_current_span("dataset.update_record"):
             body: Dict[str, Any] = {"entry": entry}
 
             quoted_slug = self._quote(slug_or_id)
             quoted_record = self._quote(record_id)
             response = self._http().patch(
-                f"/api/dataset/{quoted_slug}/records/{quoted_record}", json=body
+                f"/api/v1/dataset/{quoted_slug}/records/{quoted_record}", json=body
             )
             _raise_for_api_status(response, operation="update_record")
             return response.json()
@@ -284,7 +284,7 @@ class DatasetApiService:
         *,
         record_ids: List[str],
     ) -> int:
-        """DELETE /api/dataset/{slugOrId}/records -- batch-delete records.
+        """DELETE /api/v1/dataset/{slugOrId}/records -- batch-delete records.
 
         Returns:
             The number of records deleted.
@@ -295,7 +295,7 @@ class DatasetApiService:
             quoted = self._quote(slug_or_id)
             response = self._http().request(
                 "DELETE",
-                f"/api/dataset/{quoted}/records",
+                f"/api/v1/dataset/{quoted}/records",
                 json=body,
             )
             _raise_for_api_status(response, operation="delete_records")
@@ -310,12 +310,12 @@ class DatasetApiService:
         *,
         file_path: str,
     ) -> Dict[str, Any]:
-        """POST /api/dataset/{slugOrId}/upload -- upload a file to an existing dataset."""
+        """POST /api/v1/dataset/{slugOrId}/upload -- upload a file to an existing dataset."""
         with _tracer.start_as_current_span("dataset.upload_to_existing"):
             quoted = self._quote(slug_or_id)
             with open(file_path, "rb") as f:
                 response = self._http().post(
-                    f"/api/dataset/{quoted}/upload",
+                    f"/api/v1/dataset/{quoted}/upload",
                     files={"file": (os.path.basename(file_path), f)},
                 )
             _raise_for_api_status(response, operation="upload_to_existing")
@@ -327,11 +327,11 @@ class DatasetApiService:
         name: str,
         file_path: str,
     ) -> Dict[str, Any]:
-        """POST /api/dataset/upload -- create a new dataset from a file."""
+        """POST /api/v1/dataset/upload -- create a new dataset from a file."""
         with _tracer.start_as_current_span("dataset.create_from_file"):
             with open(file_path, "rb") as f:
                 response = self._http().post(
-                    "/api/dataset/upload",
+                    "/api/v1/dataset/upload",
                     data={"name": name},
                     files={"file": (os.path.basename(file_path), f)},
                 )

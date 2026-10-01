@@ -33,24 +33,24 @@ curl https://gateway.langwatch.ai/v1/audio/speech \
 The response body is the audio bytes, with no JSON envelope. `Content-Type` follows `response_format`:
 
 | `response_format` | `Content-Type` |
-|---|---|
-| `mp3` (default) | `audio/mpeg` |
-| `opus` | `audio/ogg` |
-| `aac` | `audio/aac` |
-| `flac` | `audio/flac` |
-| `wav` | `audio/wav` |
-| `pcm` | `audio/pcm` |
+| ----------------- | -------------- |
+| `mp3` (default)   | `audio/mpeg`   |
+| `opus`            | `audio/ogg`    |
+| `aac`             | `audio/aac`    |
+| `flac`            | `audio/flac`   |
+| `wav`             | `audio/wav`    |
+| `pcm`             | `audio/pcm`    |
 
 For an ElevenLabs model, put the ElevenLabs voice id in `voice`. `pcm` on ElevenLabs is requested as `pcm_24000`, which matches OpenAI's raw PCM16 at 24 kHz.
 
 ### Parameters the gateway changes or refuses
 
-| Parameter | What the gateway does |
-|---|---|
-| `model` | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
-| `input` | Required. Missing: `400 bad_request`. |
-| `voice`, `instructions`, `response_format`, `speed` | Forwarded. |
-| Every other field | Not forwarded. |
+| Parameter                                           | What the gateway does                                                                                                                           |
+| --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`                                             | Resolved through the key's aliases, allowlist and routing policy. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
+| `input`                                             | Required. Missing: `400 bad_request`.                                                                                                           |
+| `voice`, `instructions`, `response_format`, `speed` | Forwarded.                                                                                                                                      |
+| Every other field                                   | Not forwarded.                                                                                                                                  |
 
 ## Transcription
 
@@ -62,19 +62,19 @@ curl https://gateway.langwatch.ai/v1/audio/transcriptions \
 ```
 
 ```json
-{"text": "Hello from the gateway."}
+{ "text": "Hello from the gateway." }
 ```
 
 The response is JSON with `text`, plus the duration or token usage the provider reports.
 
 ### Parameters the gateway changes or refuses
 
-| Form part | What the gateway does |
-|---|---|
-| `file` | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
-| `model` | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist. |
-| `language`, `prompt`, `response_format`, `temperature` | Forwarded. |
-| Every other part | Not forwarded. |
+| Form part                                              | What the gateway does                                                                                                                                                                                            |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `file`                                                 | Required. Missing: `400 bad_request`. The whole upload is capped at 26 MB, which is OpenAI's 25 MB audio limit plus the multipart framing; over the cap: `413 payload_too_large`, before any provider is called. |
+| `model`                                                | Required, as a form part. Missing: `400 missing_model`. Resolved through the key's aliases and allowlist.                                                                                                        |
+| `language`, `prompt`, `response_format`, `temperature` | Forwarded.                                                                                                                                                                                                       |
+| Every other part                                       | Not forwarded.                                                                                                                                                                                                   |
 
 ## Request and response headers
 
@@ -90,9 +90,9 @@ Neither route streams. The audio bytes and the transcript are returned complete.
 
 Providers that report token usage fill the standard `gen_ai.usage.*` token attributes on the trace. Character-priced synthesis and duration-priced transcription are measured by two attributes:
 
-| Attribute | Meaning |
-|---|---|
-| `gen_ai.usage.input_chars` | Characters synthesized by a text-to-speech call. |
+| Attribute                    | Meaning                                                |
+| ---------------------------- | ------------------------------------------------------ |
+| `gen_ai.usage.input_chars`   | Characters synthesized by a text-to-speech call.       |
 | `gen_ai.usage.audio_seconds` | Seconds of audio transcribed by a speech-to-text call. |
 
 ## Errors

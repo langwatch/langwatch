@@ -10,10 +10,10 @@ from ..models.post_api_suites_response_201_kind import PostApiSuitesResponse201K
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
-    from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
-    from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
-    from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
+    from ..models.post_api_suites_response_201_scope_type_0_type_0 import PostApiSuitesResponse201ScopeType0Type0
+    from ..models.post_api_suites_response_201_scope_type_0_type_1 import PostApiSuitesResponse201ScopeType0Type1
+    from ..models.post_api_suites_response_201_scope_type_0_type_2 import PostApiSuitesResponse201ScopeType0Type2
+    from ..models.post_api_suites_response_201_scope_type_0_type_3 import PostApiSuitesResponse201ScopeType0Type3
     from ..models.post_api_suites_response_201_targets_item import PostApiSuitesResponse201TargetsItem
 
 
@@ -37,11 +37,8 @@ class PostApiSuitesResponse201:
         platform_url (str):
         kind (PostApiSuitesResponse201Kind | Unset): custom is a hand-assembled run plan; folder is a test suite that
             groups scenarios filed into it. Absent on servers that predate test suites.
-        scope (None | PostApiSuitesResponse201ScopeType0 | PostApiSuitesResponse201ScopeType1 |
-            PostApiSuitesResponse201ScopeType2 | PostApiSuitesResponse201ScopeType3 | Unset): What the run plan covers: all
-            (every active scenario), folders (the scenarios filed in the named test suites), labels (the scenarios carrying
-            any of the labels), or cases (the scenarioIds below). A dynamic scope is resolved again at every run, so a
-            scenario written later runs without editing the plan.
+        scope (None | PostApiSuitesResponse201ScopeType0Type0 | PostApiSuitesResponse201ScopeType0Type1 |
+            PostApiSuitesResponse201ScopeType0Type2 | PostApiSuitesResponse201ScopeType0Type3 | Unset):
     """
 
     id: str
@@ -58,19 +55,19 @@ class PostApiSuitesResponse201:
     kind: PostApiSuitesResponse201Kind | Unset = UNSET
     scope: (
         None
-        | PostApiSuitesResponse201ScopeType0
-        | PostApiSuitesResponse201ScopeType1
-        | PostApiSuitesResponse201ScopeType2
-        | PostApiSuitesResponse201ScopeType3
+        | PostApiSuitesResponse201ScopeType0Type0
+        | PostApiSuitesResponse201ScopeType0Type1
+        | PostApiSuitesResponse201ScopeType0Type2
+        | PostApiSuitesResponse201ScopeType0Type3
         | Unset
     ) = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
-        from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
-        from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
-        from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
+        from ..models.post_api_suites_response_201_scope_type_0_type_0 import PostApiSuitesResponse201ScopeType0Type0
+        from ..models.post_api_suites_response_201_scope_type_0_type_1 import PostApiSuitesResponse201ScopeType0Type1
+        from ..models.post_api_suites_response_201_scope_type_0_type_2 import PostApiSuitesResponse201ScopeType0Type2
+        from ..models.post_api_suites_response_201_scope_type_0_type_3 import PostApiSuitesResponse201ScopeType0Type3
 
         id = self.id
 
@@ -105,13 +102,13 @@ class PostApiSuitesResponse201:
         scope: dict[str, Any] | None | Unset
         if isinstance(self.scope, Unset):
             scope = UNSET
-        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0):
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0Type0):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType1):
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0Type1):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType2):
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0Type2):
             scope = self.scope.to_dict()
-        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType3):
+        elif isinstance(self.scope, PostApiSuitesResponse201ScopeType0Type3):
             scope = self.scope.to_dict()
         else:
             scope = self.scope
@@ -142,10 +139,10 @@ class PostApiSuitesResponse201:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_suites_response_201_scope_type_0 import PostApiSuitesResponse201ScopeType0
-        from ..models.post_api_suites_response_201_scope_type_1 import PostApiSuitesResponse201ScopeType1
-        from ..models.post_api_suites_response_201_scope_type_2 import PostApiSuitesResponse201ScopeType2
-        from ..models.post_api_suites_response_201_scope_type_3 import PostApiSuitesResponse201ScopeType3
+        from ..models.post_api_suites_response_201_scope_type_0_type_0 import PostApiSuitesResponse201ScopeType0Type0
+        from ..models.post_api_suites_response_201_scope_type_0_type_1 import PostApiSuitesResponse201ScopeType0Type1
+        from ..models.post_api_suites_response_201_scope_type_0_type_2 import PostApiSuitesResponse201ScopeType0Type2
+        from ..models.post_api_suites_response_201_scope_type_0_type_3 import PostApiSuitesResponse201ScopeType0Type3
         from ..models.post_api_suites_response_201_targets_item import PostApiSuitesResponse201TargetsItem
 
         d = dict(src_dict)
@@ -192,10 +189,10 @@ class PostApiSuitesResponse201:
             data: object,
         ) -> (
             None
-            | PostApiSuitesResponse201ScopeType0
-            | PostApiSuitesResponse201ScopeType1
-            | PostApiSuitesResponse201ScopeType2
-            | PostApiSuitesResponse201ScopeType3
+            | PostApiSuitesResponse201ScopeType0Type0
+            | PostApiSuitesResponse201ScopeType0Type1
+            | PostApiSuitesResponse201ScopeType0Type2
+            | PostApiSuitesResponse201ScopeType0Type3
             | Unset
         ):
             if data is None:
@@ -205,41 +202,41 @@ class PostApiSuitesResponse201:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_0 = PostApiSuitesResponse201ScopeType0.from_dict(data)
+                scope_type_0_type_0 = PostApiSuitesResponse201ScopeType0Type0.from_dict(data)
 
-                return scope_type_0
+                return scope_type_0_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_1 = PostApiSuitesResponse201ScopeType1.from_dict(data)
+                scope_type_0_type_1 = PostApiSuitesResponse201ScopeType0Type1.from_dict(data)
 
-                return scope_type_1
+                return scope_type_0_type_1
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_2 = PostApiSuitesResponse201ScopeType2.from_dict(data)
+                scope_type_0_type_2 = PostApiSuitesResponse201ScopeType0Type2.from_dict(data)
 
-                return scope_type_2
+                return scope_type_0_type_2
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                scope_type_3 = PostApiSuitesResponse201ScopeType3.from_dict(data)
+                scope_type_0_type_3 = PostApiSuitesResponse201ScopeType0Type3.from_dict(data)
 
-                return scope_type_3
+                return scope_type_0_type_3
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
             return cast(
                 None
-                | PostApiSuitesResponse201ScopeType0
-                | PostApiSuitesResponse201ScopeType1
-                | PostApiSuitesResponse201ScopeType2
-                | PostApiSuitesResponse201ScopeType3
+                | PostApiSuitesResponse201ScopeType0Type0
+                | PostApiSuitesResponse201ScopeType0Type1
+                | PostApiSuitesResponse201ScopeType0Type2
+                | PostApiSuitesResponse201ScopeType0Type3
                 | Unset,
                 data,
             )

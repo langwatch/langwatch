@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../langwatch-api.js", () => ({ makeRequest: vi.fn() }));
 
-import { makeRequest } from "../langwatch-api.js";
+import { makeRequest } from "../langwatch-api.ts";
 import {
   createTrigger,
   getTrigger,
   listTriggerFires,
   testFireTrigger,
   updateTrigger,
-} from "../langwatch-api-triggers.js";
+} from "../langwatch-api-triggers.ts";
 import {
   actionParamsSchema,
   reportSchema,
@@ -17,10 +17,10 @@ import {
   TRIGGER_FILTER_QUERY_DESCRIPTION,
   TRIGGER_FILTERS_DESCRIPTION,
   validateActionParamsForAction,
-} from "../schemas/triggers.js";
-import { handleCreateTrigger } from "../tools/create-trigger.js";
-import { handleListTriggerFires } from "../tools/list-trigger-fires.js";
-import { handleListTriggers } from "../tools/list-triggers.js";
+} from "../schemas/triggers.ts";
+import { handleCreateTrigger } from "../tools/create-trigger.ts";
+import { handleListTriggerFires } from "../tools/list-trigger-fires.ts";
+import { handleListTriggers } from "../tools/list-triggers.ts";
 
 const request = vi.mocked(makeRequest);
 
@@ -65,7 +65,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           action: "SEND_SLACK_MESSAGE",
           actionParams: {
@@ -94,7 +94,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           report: {
             source: { kind: "dashboard", dashboardId: "dashboard_1" },
@@ -132,7 +132,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "PATCH",
-        "/api/triggers/trigger-1",
+        "/api/v1/triggers/trigger-1",
         expect.objectContaining({
           report: expect.objectContaining({
             schedule: { cron: "0 8 * * *", timezone: "UTC" },
@@ -308,7 +308,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "PATCH",
-        "/api/triggers/trigger-1",
+        "/api/v1/triggers/trigger-1",
         expect.objectContaining({
           actionParams: { slackWebhook: "[redacted]", slackChannelId: "C123" },
         }),
@@ -332,7 +332,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       });
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers/trigger-1/test-fire",
+        "/api/v1/triggers/trigger-1/test-fire",
       );
     });
 
@@ -352,7 +352,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       ).toHaveLength(1);
       expect(request).toHaveBeenCalledWith(
         "GET",
-        "/api/triggers/trigger-1/fires?limit=5",
+        "/api/v1/triggers/trigger-1/fires?limit=5",
       );
     });
   });
@@ -371,7 +371,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(isError).toBeUndefined();
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           actionParams: {},
           filters: { "traces.error": ["true"] },
@@ -390,7 +390,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
         }),
@@ -443,7 +443,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(content[0]?.text).toContain("Kind: ALERT");
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           customGraphId: "graph_1",
           graphAlert: expect.objectContaining({ threshold: 2000 }),
@@ -525,7 +525,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "GET",
-        "/api/triggers/trigger-1/fires?limit=1&cursor=cursor-2",
+        "/api/v1/triggers/trigger-1/fires?limit=1&cursor=cursor-2",
       );
       expect(JSON.parse(text)).toMatchObject({ nextCursor: "cursor-3" });
     });

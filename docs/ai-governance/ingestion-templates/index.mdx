@@ -3,7 +3,6 @@ title: Ingestion Templates
 description: Connect Claude Code, Cursor, and other tool-specific telemetry to your personal LangWatch workspace with a write-only ingestion key, traces auto-shaped via platform-published OTTL transforms.
 ---
 
-
 ## What an ingestion template is
 
 > **Status:** v1, push-mode templates only. OAuth-redirect and pull-mode (S3, API) shapes are reserved for a future iteration.
@@ -50,7 +49,7 @@ That's an Ingestion Template:
   spans natively, so no transform is needed for the common case. **Org admins can clone
   a platform-default template into an org-authored template** and author OTTL via the
   OttlEditor at `/governance/inventory?tab=catalog → Ingestion Templates → Clone to
-  customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
+customise → Edit OTTL`, to adapt a template to their org's upstream-tool quirks (an
   internal IDE wrapper, a custom Cursor build, etc). Platform rows are read-only:
   admins click **Clone to customise** which calls
   `ingestionTemplates.cloneFromPlatform`, then **Edit OTTL** on the new org-authored
@@ -92,8 +91,8 @@ fourth is for ad-hoc/custom telemetry.
 ### Step 2: install the Claude Code template
 
 Click **Install** on the Claude Code tile. A drawer slides in headed
-**Connect Claude Code, auto-shaped**, with the subcopy *"Traces normalized into
-gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."*
+**Connect Claude Code, auto-shaped**, with the subcopy _"Traces normalized into
+gen_ai.\* canonical. Cost/tokens/model populated automatically by the receiver."_
 
 ![Install drawer, Connect Claude Code](/images/ai-governance/post-bypass/11-claude-code-install-drawer.png)
 
@@ -115,8 +114,8 @@ Copy the snippet, then click **Mark installed**. The tile flips to a green-check
 with a **View traces →** deep-link.
 
 <Note>
-The key is shown one-time. If you lose it, **rotate** the ingestion key from the tile to
-mint a new one. The previous key is revoked immediately when you rotate (hard-cut v1).
+  The key is shown one-time. If you lose it, **rotate** the ingestion key from the tile to mint a
+  new one. The previous key is revoked immediately when you rotate (hard-cut v1).
 </Note>
 
 ### Step 3: fire your first Claude Code action
@@ -170,7 +169,7 @@ An `IngestionTemplate` row has:
   canonical spans natively, there is nothing to reshape for the common case. **Org
   admins can fork a platform-default template into an org-authored template and author
   OTTL via the OttlEditor** in `/governance/inventory?tab=catalog → Ingestion
-  Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
+Templates → Edit OTTL`. Forking lets the admin adapt a template to their org's
   upstream-tool quirks (an internal IDE wrapper, a custom Cursor build, a corporate
   Claude Code variant) without filing a request for a platform change.
 - `organizationId`, `NULL` for platform-published templates (visible everywhere); set
@@ -179,11 +178,11 @@ An `IngestionTemplate` row has:
 
 ### credentialSchema shapes
 
-| schema           | what the install drawer captures               | covers v1                          |
-|------------------|------------------------------------------------|------------------------------------|
-| `null`           | nothing, drawer auto-mints the ingestion key   | claude_code, cursor, claude_cowork, raw_otlp_advanced |
-| `static_api_key` | one labeled API key field                      | (deferred to v1.1+)                |
-| `agent_id`       | a labeled agent-identifier text input          | (deferred to v1.1+)                |
+| schema           | what the install drawer captures             | covers v1                                             |
+| ---------------- | -------------------------------------------- | ----------------------------------------------------- |
+| `null`           | nothing, drawer auto-mints the ingestion key | claude_code, cursor, claude_cowork, raw_otlp_advanced |
+| `static_api_key` | one labeled API key field                    | (deferred to v1.1+)                                   |
+| `agent_id`       | a labeled agent-identifier text input        | (deferred to v1.1+)                                   |
 
 `oauth_redirect` and `s3_bucket` are reserved for a future iteration, those require
 upstream OAuth refresh, polling, watermark infrastructure that isn't in the v1 push-only
@@ -278,10 +277,10 @@ as you emit them.
 
 ### When to choose Raw OTLP vs a template
 
-| You should pick                             | When                                                                                  |
-|---------------------------------------------|---------------------------------------------------------------------------------------|
-| Claude Code, Cursor, Claude cowork tile   | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.   |
-| Raw OTLP (advanced)                         | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
+| You should pick                         | When                                                                                                                        |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code, Cursor, Claude cowork tile | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.                                         |
+| Raw OTLP (advanced)                     | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
 
 You can also surface the same endpoint + token from `/me/settings → Personal OTLP Endpoint`
 without going through the catalog tile.
@@ -348,12 +347,12 @@ under cross-user isolation and forge attempts against both protected lists.
 State-change rows only, per-trace activity is tracked via the ingestion key's
 `lastUsedAt`, not via audit volume.
 
-| Event                                                       | When fires                                                |
-|-------------------------------------------------------------|-----------------------------------------------------------|
-| `gateway.ingestion_key.minted`                              | User installs a template (mints an ingestion key) via the catalog tile |
-| `gateway.ingestion_key.revoked`                             | User uninstalls / rotates an ingestion key                |
-| `gateway.template_ottl_protected_field_attempt`             | Template OTTL tried to rewrite a protected attribution / provenance field |
-| `gateway.ingestion_template.updated`                        | (v2 surface) Admin edits a template's OTTL                |
+| Event                                           | When fires                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------- |
+| `gateway.ingestion_key.minted`                  | User installs a template (mints an ingestion key) via the catalog tile    |
+| `gateway.ingestion_key.revoked`                 | User uninstalls / rotates an ingestion key                                |
+| `gateway.template_ottl_protected_field_attempt` | Template OTTL tried to rewrite a protected attribution / provenance field |
+| `gateway.ingestion_template.updated`            | (v2 surface) Admin edits a template's OTTL                                |
 
 All state-change rows mirror to the `governance_ocsf_events` ClickHouse table for
 SOC2, ISO27001 evidence collection.
@@ -387,8 +386,8 @@ rotation lands in a future iteration if SOC2 review requests.)
 ### Can my org admin see my personal-workspace traces?
 
 No, not via this feature. Personal-project traces are scoped to your personal project; the
-  admin's drill-in path (governance dashboards) requires the explicit drill-in flow
-  described in the governance dashboard docs and is logged + persistent-banner'd.
+admin's drill-in path (governance dashboards) requires the explicit drill-in flow
+described in the governance dashboard docs and is logged + persistent-banner'd.
 Templates do not change that.
 
 ### What if my tool isn't in the catalog?

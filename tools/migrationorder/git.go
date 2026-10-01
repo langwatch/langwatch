@@ -19,7 +19,10 @@ type Repo struct {
 // Ordering is judged against the tip of baseRef rather than the merge base: a
 // branch is stale exactly when the base branch has moved ahead of it, so the
 // merge base would be blind to the failure this check exists to catch.
-func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
+//
+// releasedRefs name release lines besides baseRef; their entries are history
+// (see Input.Released).
+func (r Repo) Inputs(ctx context.Context, baseRef string, releasedRefs ...string) ([]Input, error) {
 	mergeBase, err := r.git(ctx, "merge-base", baseRef, "HEAD")
 	if err != nil {
 		return nil, err
@@ -28,32 +31,150 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 
 	inputs := make([]Input, 0, len(Sets))
 	for _, set := range Sets {
-		base, err := r.entriesAtAny(ctx, baseRef, set)
+		in, err := r.input(ctx, set, comparedRefs{base: baseRef, mergeBase: mergeBase, released: releasedRefs})
 		if err != nil {
 			return nil, err
 		}
-		head, err := r.entriesAt(ctx, "HEAD", set.Directory)
-		if err != nil {
-			return nil, err
-		}
-		forked, err := r.entriesAtAny(ctx, mergeBase, set)
-		if err != nil {
-			return nil, err
-		}
-		touched, err := r.touchedSince(ctx, baseRef, set.Directory)
-		if err != nil {
-			return nil, err
-		}
-		inputs = append(inputs, Input{
-			Set:       set,
-			BaseRef:   baseRef,
-			Base:      base,
-			Head:      head,
-			MergeBase: forked,
-			Touched:   touched,
-		})
+		inputs = append(inputs, in)
 	}
 	return inputs, nil
+}
+
+// comparedRefs are the refs one check run reads a migration set at.
+type comparedRefs struct {
+	base      string
+	mergeBase string
+	released  []string
+}
+
+// input reads one migration set at every ref the check compares.
+func (r Repo) input(ctx context.Context, set Set, refs comparedRefs) (Input, error) {
+	in := Input{Set: set, BaseRef: refs.base}
+	var err error
+	if in.Base, err = r.entriesAtAny(ctx, refs.base, set); err != nil {
+		return Input{}, err
+	}
+	if in.Head, err = r.entriesAt(ctx, "HEAD", set.Directory); err != nil {
+		return Input{}, err
+	}
+	if in.MergeBase, err = r.entriesAtAny(ctx, refs.mergeBase, set); err != nil {
+		return Input{}, err
+	}
+	if in.Touched, err = r.touchedSince(ctx, refs.base, set.Directory); err != nil {
+		return Input{}, err
+	}
+	if in.Released, err = r.releasedEntries(ctx, set, refs.released); err != nil {
+		return Input{}, err
+	}
+	if in.Misplaced, err = r.misplacedEntries(ctx, set); err != nil {
+		return Input{}, err
+	}
+	if in.Diverged, err = r.divergedPorts(ctx, in, refs.released); err != nil {
+		return Input{}, err
+	}
+	return in, nil
+}
+
+// releasedEntries reads the set's entries on every release line.
+func (r Repo) releasedEntries(ctx context.Context, set Set, refs []string) ([]string, error) {
+	var released []string
+	for _, ref := range refs {
+		entries, err := r.entriesAtAny(ctx, ref, set)
+		if err != nil {
+			return nil, err
+		}
+		released = append(released, entries...)
+	}
+	return released, nil
+}
+
+// divergedPorts compares every released entry the branch head carries, and the
+// base branch does not, with each release line's copy of it, wherever that copy
+// lives there: the set's directory or one it previously lived at. Git object ids
+// stand for the contents, a blob for a ClickHouse file and a tree for a Prisma
+// directory.
+func (r Repo) divergedPorts(ctx context.Context, in Input, refs []string) ([]Divergence, error) {
+	var diverged []Divergence
+	for _, entry := range portedEntries(in) {
+		divergence, found, err := r.divergence(ctx, port{set: in.Set, entry: entry}, refs)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			diverged = append(diverged, divergence)
+		}
+	}
+	return diverged, nil
+}
+
+// port is one released migration the branch head carries.
+type port struct {
+	set   Set
+	entry string
+}
+
+// divergence reports the first release line whose copy of p differs from the
+// branch head's.
+func (r Repo) divergence(ctx context.Context, p port, refs []string) (Divergence, bool, error) {
+	head, err := r.objectID(ctx, "HEAD", p.set.Directory+"/"+p.entry)
+	if err != nil {
+		return Divergence{}, false, err
+	}
+	for _, ref := range refs {
+		path, released, err := r.releasedCopy(ctx, ref, p)
+		if err != nil {
+			return Divergence{}, false, err
+		}
+		if path != "" && released != head {
+			return Divergence{Entry: p.entry, Ref: ref, Path: path}, true, nil
+		}
+	}
+	return Divergence{}, false, nil
+}
+
+// releasedCopy finds p on ref under the set's directory or a previous one,
+// returning its path and object id, or an empty path when ref lacks it.
+func (r Repo) releasedCopy(ctx context.Context, ref string, p port) (string, string, error) {
+	for _, directory := range slices.Concat([]string{p.set.Directory}, p.set.PreviousDirectories) {
+		entries, err := r.entriesAt(ctx, ref, directory)
+		if err != nil {
+			return "", "", err
+		}
+		if !slices.Contains(entries, p.entry) {
+			continue
+		}
+		path := directory + "/" + p.entry
+		id, err := r.objectID(ctx, ref, path)
+		if err != nil {
+			return "", "", err
+		}
+		return path, id, nil
+	}
+	return "", "", nil
+}
+
+func (r Repo) objectID(ctx context.Context, ref, path string) (string, error) {
+	out, err := r.git(ctx, "rev-parse", "--verify", "--end-of-options", ref+":"+path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+// misplacedEntries lists the entries under the set's forbidden roots at HEAD,
+// as repository-relative paths.
+func (r Repo) misplacedEntries(ctx context.Context, set Set) ([]string, error) {
+	var misplaced []string
+	for _, directory := range set.ForbiddenDirectories {
+		entries, err := r.entriesAt(ctx, "HEAD", directory)
+		if err != nil {
+			return nil, err
+		}
+		for _, entry := range entries {
+			misplaced = append(misplaced, directory+"/"+entry)
+		}
+	}
+	return misplaced, nil
 }
 
 // entriesAtAny reads the set's entries at ref from its current directory and

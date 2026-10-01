@@ -38,19 +38,20 @@ class PostApiPromptsResponse200:
         version (float):
         created_at (str):
         prompt (str):
-        messages (list[PostApiPromptsResponse200MessagesItem]):
-        inputs (list[PostApiPromptsResponse200InputsItem]):
         outputs (list[PostApiPromptsResponse200OutputsItem]):
         model (str):
-        tags (list[PostApiPromptsResponse200TagsItem]):
-        parameters (PostApiPromptsResponse200Parameters):
         author_id (None | str | Unset):
         commit_message (None | str | Unset):
+        messages (list[PostApiPromptsResponse200MessagesItem] | Unset):
+        inputs (list[PostApiPromptsResponse200InputsItem] | Unset):
         temperature (float | Unset):
         max_tokens (float | Unset):
         demonstrations (PostApiPromptsResponse200Demonstrations | Unset):
         prompting_technique (PostApiPromptsResponse200PromptingTechnique | Unset):
         response_format (PostApiPromptsResponse200ResponseFormat | Unset):
+        tags (list[PostApiPromptsResponse200TagsItem] | Unset):
+        parameters (PostApiPromptsResponse200Parameters | Unset):
+        platform_url (str | Unset):
     """
 
     id: str
@@ -64,19 +65,20 @@ class PostApiPromptsResponse200:
     version: float
     created_at: str
     prompt: str
-    messages: list[PostApiPromptsResponse200MessagesItem]
-    inputs: list[PostApiPromptsResponse200InputsItem]
     outputs: list[PostApiPromptsResponse200OutputsItem]
     model: str
-    tags: list[PostApiPromptsResponse200TagsItem]
-    parameters: PostApiPromptsResponse200Parameters
     author_id: None | str | Unset = UNSET
     commit_message: None | str | Unset = UNSET
+    messages: list[PostApiPromptsResponse200MessagesItem] | Unset = UNSET
+    inputs: list[PostApiPromptsResponse200InputsItem] | Unset = UNSET
     temperature: float | Unset = UNSET
     max_tokens: float | Unset = UNSET
     demonstrations: PostApiPromptsResponse200Demonstrations | Unset = UNSET
     prompting_technique: PostApiPromptsResponse200PromptingTechnique | Unset = UNSET
     response_format: PostApiPromptsResponse200ResponseFormat | Unset = UNSET
+    tags: list[PostApiPromptsResponse200TagsItem] | Unset = UNSET
+    parameters: PostApiPromptsResponse200Parameters | Unset = UNSET
+    platform_url: str | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -103,29 +105,12 @@ class PostApiPromptsResponse200:
 
         prompt = self.prompt
 
-        messages = []
-        for messages_item_data in self.messages:
-            messages_item = messages_item_data.to_dict()
-            messages.append(messages_item)
-
-        inputs = []
-        for inputs_item_data in self.inputs:
-            inputs_item = inputs_item_data.to_dict()
-            inputs.append(inputs_item)
-
         outputs = []
         for outputs_item_data in self.outputs:
             outputs_item = outputs_item_data.to_dict()
             outputs.append(outputs_item)
 
         model = self.model
-
-        tags = []
-        for tags_item_data in self.tags:
-            tags_item = tags_item_data.to_dict()
-            tags.append(tags_item)
-
-        parameters = self.parameters.to_dict()
 
         author_id: None | str | Unset
         if isinstance(self.author_id, Unset):
@@ -138,6 +123,20 @@ class PostApiPromptsResponse200:
             commit_message = UNSET
         else:
             commit_message = self.commit_message
+
+        messages: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.messages, Unset):
+            messages = []
+            for messages_item_data in self.messages:
+                messages_item = messages_item_data.to_dict()
+                messages.append(messages_item)
+
+        inputs: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.inputs, Unset):
+            inputs = []
+            for inputs_item_data in self.inputs:
+                inputs_item = inputs_item_data.to_dict()
+                inputs.append(inputs_item)
 
         temperature = self.temperature
 
@@ -155,6 +154,19 @@ class PostApiPromptsResponse200:
         if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
 
+        tags: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = []
+            for tags_item_data in self.tags:
+                tags_item = tags_item_data.to_dict()
+                tags.append(tags_item)
+
+        parameters: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.parameters, Unset):
+            parameters = self.parameters.to_dict()
+
+        platform_url = self.platform_url
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -170,18 +182,18 @@ class PostApiPromptsResponse200:
                 "version": version,
                 "createdAt": created_at,
                 "prompt": prompt,
-                "messages": messages,
-                "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
-                "tags": tags,
-                "parameters": parameters,
             }
         )
         if author_id is not UNSET:
             field_dict["authorId"] = author_id
         if commit_message is not UNSET:
             field_dict["commitMessage"] = commit_message
+        if messages is not UNSET:
+            field_dict["messages"] = messages
+        if inputs is not UNSET:
+            field_dict["inputs"] = inputs
         if temperature is not UNSET:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
@@ -192,6 +204,12 @@ class PostApiPromptsResponse200:
             field_dict["promptingTechnique"] = prompting_technique
         if response_format is not UNSET:
             field_dict["responseFormat"] = response_format
+        if tags is not UNSET:
+            field_dict["tags"] = tags
+        if parameters is not UNSET:
+            field_dict["parameters"] = parameters
+        if platform_url is not UNSET:
+            field_dict["platformUrl"] = platform_url
 
         return field_dict
 
@@ -236,20 +254,6 @@ class PostApiPromptsResponse200:
 
         prompt = d.pop("prompt")
 
-        messages = []
-        _messages = d.pop("messages")
-        for messages_item_data in _messages:
-            messages_item = PostApiPromptsResponse200MessagesItem.from_dict(messages_item_data)
-
-            messages.append(messages_item)
-
-        inputs = []
-        _inputs = d.pop("inputs")
-        for inputs_item_data in _inputs:
-            inputs_item = PostApiPromptsResponse200InputsItem.from_dict(inputs_item_data)
-
-            inputs.append(inputs_item)
-
         outputs = []
         _outputs = d.pop("outputs")
         for outputs_item_data in _outputs:
@@ -258,15 +262,6 @@ class PostApiPromptsResponse200:
             outputs.append(outputs_item)
 
         model = d.pop("model")
-
-        tags = []
-        _tags = d.pop("tags")
-        for tags_item_data in _tags:
-            tags_item = PostApiPromptsResponse200TagsItem.from_dict(tags_item_data)
-
-            tags.append(tags_item)
-
-        parameters = PostApiPromptsResponse200Parameters.from_dict(d.pop("parameters"))
 
         def _parse_author_id(data: object) -> None | str | Unset:
             if data is None:
@@ -285,6 +280,24 @@ class PostApiPromptsResponse200:
             return cast(None | str | Unset, data)
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
+
+        _messages = d.pop("messages", UNSET)
+        messages: list[PostApiPromptsResponse200MessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = PostApiPromptsResponse200MessagesItem.from_dict(messages_item_data)
+
+                messages.append(messages_item)
+
+        _inputs = d.pop("inputs", UNSET)
+        inputs: list[PostApiPromptsResponse200InputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = PostApiPromptsResponse200InputsItem.from_dict(inputs_item_data)
+
+                inputs.append(inputs_item)
 
         temperature = d.pop("temperature", UNSET)
 
@@ -311,6 +324,24 @@ class PostApiPromptsResponse200:
         else:
             response_format = PostApiPromptsResponse200ResponseFormat.from_dict(_response_format)
 
+        _tags = d.pop("tags", UNSET)
+        tags: list[PostApiPromptsResponse200TagsItem] | Unset = UNSET
+        if _tags is not UNSET:
+            tags = []
+            for tags_item_data in _tags:
+                tags_item = PostApiPromptsResponse200TagsItem.from_dict(tags_item_data)
+
+                tags.append(tags_item)
+
+        _parameters = d.pop("parameters", UNSET)
+        parameters: PostApiPromptsResponse200Parameters | Unset
+        if isinstance(_parameters, Unset):
+            parameters = UNSET
+        else:
+            parameters = PostApiPromptsResponse200Parameters.from_dict(_parameters)
+
+        platform_url = d.pop("platformUrl", UNSET)
+
         post_api_prompts_response_200 = cls(
             id=id,
             handle=handle,
@@ -323,19 +354,20 @@ class PostApiPromptsResponse200:
             version=version,
             created_at=created_at,
             prompt=prompt,
-            messages=messages,
-            inputs=inputs,
             outputs=outputs,
             model=model,
-            tags=tags,
-            parameters=parameters,
             author_id=author_id,
             commit_message=commit_message,
+            messages=messages,
+            inputs=inputs,
             temperature=temperature,
             max_tokens=max_tokens,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
             response_format=response_format,
+            tags=tags,
+            parameters=parameters,
+            platform_url=platform_url,
         )
 
         post_api_prompts_response_200.additional_properties = d

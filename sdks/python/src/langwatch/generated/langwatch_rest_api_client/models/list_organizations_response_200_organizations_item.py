@@ -8,8 +8,6 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 from dateutil.parser import isoparse
 
-from ..types import UNSET, Unset
-
 T = TypeVar("T", bound="ListOrganizationsResponse200OrganizationsItem")
 
 
@@ -17,16 +15,16 @@ T = TypeVar("T", bound="ListOrganizationsResponse200OrganizationsItem")
 class ListOrganizationsResponse200OrganizationsItem:
     """
     Attributes:
-        id (str | Unset):
-        name (str | Unset):
-        slug (str | Unset):
-        created_at (datetime.datetime | Unset):
+        id (str):
+        name (str):
+        slug (str):
+        created_at (datetime.datetime):
     """
 
-    id: str | Unset = UNSET
-    name: str | Unset = UNSET
-    slug: str | Unset = UNSET
-    created_at: datetime.datetime | Unset = UNSET
+    id: str
+    name: str
+    slug: str
+    created_at: datetime.datetime
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,39 +34,31 @@ class ListOrganizationsResponse200OrganizationsItem:
 
         slug = self.slug
 
-        created_at: str | Unset = UNSET
-        if not isinstance(self.created_at, Unset):
-            created_at = self.created_at.isoformat()
+        created_at = self.created_at.isoformat()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if id is not UNSET:
-            field_dict["id"] = id
-        if name is not UNSET:
-            field_dict["name"] = name
-        if slug is not UNSET:
-            field_dict["slug"] = slug
-        if created_at is not UNSET:
-            field_dict["createdAt"] = created_at
+        field_dict.update(
+            {
+                "id": id,
+                "name": name,
+                "slug": slug,
+                "createdAt": created_at,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        id = d.pop("id", UNSET)
+        id = d.pop("id")
 
-        name = d.pop("name", UNSET)
+        name = d.pop("name")
 
-        slug = d.pop("slug", UNSET)
+        slug = d.pop("slug")
 
-        _created_at = d.pop("createdAt", UNSET)
-        created_at: datetime.datetime | Unset
-        if isinstance(_created_at, Unset):
-            created_at = UNSET
-        else:
-            created_at = isoparse(_created_at)
+        created_at = isoparse(d.pop("createdAt"))
 
         list_organizations_response_200_organizations_item = cls(
             id=id,

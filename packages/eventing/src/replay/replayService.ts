@@ -1,0 +1,180 @@
+import type { RetentionPolicyResolver } from "../runtime.types.ts";
+import { discoverProjectionAggregates } from "./replayDiscovery.ts";
+import { runFoldMapReplay } from "./replayEngine.ts";
+import type { ReplayEventSource } from "./replayEventSource.ts";
+import type { ReplayLogWriter } from "./replayLog.ts";
+import { nullLog } from "./replayLog.ts";
+import { cleanupAll, hasPreviousRun } from "./replayMarkers.ts";
+import type { ReplayRedis } from "./replayRedis.ts";
+import { replayStateProjection } from "./replayStatePath.ts";
+import type {
+  DiscoveryResult,
+  RegisteredFoldProjection,
+  ReplayCallbacks,
+  ReplayConfig,
+  ReplayContext,
+  ReplayResult,
+} from "./types.ts";
+
+interface ReplayTotals {
+  aggregatesReplayed: number;
+  totalEvents: number;
+  batchErrors: number;
+  firstError: string | undefined;
+}
+
+/** Fold one lane's result into the run's totals, keeping the first error. */
+function accumulate(totals: ReplayTotals, result: ReplayResult): void {
+  totals.aggregatesReplayed += result.aggregatesReplayed;
+  totals.totalEvents += result.totalEvents;
+  totals.batchErrors += result.batchErrors;
+  if (!totals.firstError && result.firstError) {
+    totals.firstError = result.firstError;
+  }
+}
+
+/**
+ * Orchestrates projection replays: fold/map via runFoldMapReplay,
+ * state via replayStateProjection.
+ */
+export class ReplayService {
+  /** Shared dependencies handed to the path implementations. */
+  private readonly ctx: ReplayContext;
+
+  constructor(deps: {
+    eventSource: ReplayEventSource;
+    redis: ReplayRedis;
+    /**
+     * Resolves per-tenant retention so replay-rebuilt rows honour the
+     * tenant's policy. Optional — absent, stores fall back to the platform
+     * default, matching pre-existing behaviour.
+     */
+    retentionPolicyResolver?: RetentionPolicyResolver;
+  }) {
+    this.ctx = {
+      redis: deps.redis,
+      eventSource: deps.eventSource,
+      accumulatorOpts: { retentionResolver: deps.retentionPolicyResolver },
+    };
+  }
+
+  async discover({
+    projection,
+    since,
+    tenantId,
+  }: {
+    projection: RegisteredFoldProjection;
+    since: string;
+    tenantId?: string;
+  }): Promise<DiscoveryResult> {
+    return discoverProjectionAggregates({
+      eventSource: this.ctx.eventSource,
+      eventTypes: projection.definition.eventTypes,
+      since,
+      tenantId,
+    });
+  }
+
+  async replay(
+    config: ReplayConfig,
+    callbacks?: ReplayCallbacks & { log?: ReplayLogWriter },
+  ): Promise<ReplayResult> {
+    const mapProjections = config.mapProjections ?? [];
+    const totals: ReplayTotals = {
+      aggregatesReplayed: 0,
+      totalEvents: 0,
+      batchErrors: 0,
+      firstError: undefined,
+    };
+
+    // Fold + map projections: the shared batch engine, one event load per
+    // batch across every selected projection.
+    if (config.projections.length > 0 || mapProjections.length > 0) {
+      const result = await runFoldMapReplay({
+        ctx: this.ctx,
+        config: { ...config, stateProjections: [] },
+        callbacks,
+      });
+      accumulate(totals, result);
+    }
+
+    if (totals.batchErrors === 0) {
+      await this.replayStateLane({ config, callbacks, totals });
+    }
+
+    return {
+      aggregatesReplayed: totals.aggregatesReplayed,
+      totalEvents: totals.totalEvents,
+      batchErrors: totals.batchErrors,
+      firstError: totals.firstError,
+    };
+  }
+
+  /**
+   * State-projection lane: pause and drain each Postgres projection queue,
+   * then rebuild its Postgres rows deterministically from canonical events.
+   */
+  private async replayStateLane({
+    config,
+    callbacks,
+    totals,
+  }: {
+    config: ReplayConfig;
+    callbacks?: ReplayCallbacks & { log?: ReplayLogWriter };
+    totals: ReplayTotals;
+  }): Promise<void> {
+    const mapProjections = config.mapProjections ?? [];
+    const stateProjections = config.stateProjections ?? [];
+    const totalProjections =
+      config.projections.length + mapProjections.length + stateProjections.length;
+    const log = callbacks?.log ?? nullLog;
+
+    for (let si = 0; si < stateProjections.length; si++) {
+      const projection = stateProjections[si]!;
+      const result = await replayStateProjection({
+        ctx: this.ctx,
+        projection,
+        projectionIndex: config.projections.length + mapProjections.length + si,
+        totalProjections,
+        tenantIds: config.tenantIds,
+        aggregateIds: config.aggregateIds,
+        since: config.since,
+        batchSize: config.batchSize ?? 5000,
+        aggregateBatchSize: config.aggregateBatchSize ?? 1000,
+        dryRun: config.dryRun ?? false,
+        log,
+        onProgress: callbacks?.onProgress,
+        onBatchComplete: callbacks?.onBatchComplete,
+      });
+
+      accumulate(totals, result);
+      if (result.batchErrors > 0) return;
+    }
+  }
+
+  /**
+   * Run only the fold/map engine. Kept for callers that select fold and map
+   * projections explicitly; throws if the config carries state projections.
+   */
+  async replayOptimized(
+    config: ReplayConfig,
+    callbacks?: ReplayCallbacks & { log?: ReplayLogWriter },
+  ): Promise<ReplayResult> {
+    return runFoldMapReplay({ ctx: this.ctx, config, callbacks });
+  }
+
+  /**
+   * Drop the projection's replay markers: the completed set and in-flight
+   * cutoff hash. Calling it before a run forces a rebuild from scratch, since
+   * the completed set is what makes discovery skip already-finished aggregates.
+   */
+  async cleanup(projectionName: string): Promise<void> {
+    await cleanupAll({ redis: this.ctx.redis, projectionName });
+  }
+
+  async checkPreviousRun(
+    projectionName: string,
+  ): Promise<{ completedCount: number; markerCount: number }> {
+    return hasPreviousRun({ redis: this.ctx.redis, projectionName });
+  }
+}

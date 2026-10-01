@@ -1,0 +1,37 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2023"],
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "types": ["node", "vitest/globals"],
+
+    "rootDir": ".",
+
+    "outDir": "dist/typecheck"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+
+  "references": [
+    {
+      "path": "tsconfig.declarations.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system-internal/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
+    }
+  ]
+}

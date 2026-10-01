@@ -1,0 +1,457 @@
+import { agentSchema, connectedAgentSelectability } from "@langwatch/agent-contract";
+import type { Agent, AgentReferenceState, AgentApi } from "@langwatch/agent-contract";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { RunActor, ScenarioApi } from "@langwatch/scenario-contract";
+import {
+  InvalidTargetReferencesError,
+  type RunPlanConfigInput,
+  type Suite,
+} from "@langwatch/suite-contract";
+/**
+ * @vitest-environment node
+ * @see specs/agents/connected-agents.feature
+ */
+import { describe, expect, it, vi } from "vitest";
+
+import type { SuiteExecution } from "../../app/suite.app.ts";
+import type { SuiteRepository } from "../../repositories/suite.repository.ts";
+import { ConnectedTargetService } from "../connected-target.service.ts";
+import { SuiteService } from "../suite.service.ts";
+
+const projectId = "project_1";
+
+type ConnectedAgentFixture = {
+  id: string;
+  name: string;
+  environment: string;
+  ownerUserId: string | null;
+  type?: "connected" | "http";
+  lastSeenAt?: Date;
+};
+
+function baseSuite(overrides: Partial<Suite> = {}): Suite {
+  return {
+    id: "suite_1",
+    projectId,
+    name: "Support",
+    slug: "support",
+    kind: "run_plan",
+    description: null,
+    scenarioIds: [],
+    scope: { mode: "scenarios" },
+    targets: [],
+    repeatCount: 1,
+    labels: [],
+    simulatorModel: null,
+    judgeModel: null,
+    archivedAt: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  };
+}
+
+/** A connected agent as the agent contract reads it back. */
+function connectedAgent(agent: {
+  id: string;
+  name: string;
+  environment: string | null;
+  ownerUserId: string | null;
+}): Agent {
+  return agentSchema.parse({
+    id: agent.id,
+    projectId,
+    name: agent.name,
+    type: "connected",
+    workflowId: null,
+    copiedFromAgentId: null,
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    environment: agent.environment,
+    ownerUserId: agent.ownerUserId,
+    config: { sdk: { name: "langwatch", version: "1.0.0", language: "python" } },
+  });
+}
+
+/** An AgentApi fixture backed by a small registry of connected agents. */
+function connectedAgentApi(agents: ConnectedAgentFixture[]): AgentApi {
+  const byId = new Map(agents.map((agent) => [agent.id, agent]));
+  return createApiFixture<AgentApi>({
+    getReferenceStates: vi.fn(async (input: { ids: string[] }): Promise<AgentReferenceState[]> =>
+      input.ids
+        .map((id) => byId.get(id))
+        .filter((agent): agent is ConnectedAgentFixture => agent !== undefined)
+        .map((agent) => ({
+          id: agent.id,
+          name: agent.name,
+          type: agent.type ?? ("connected" as const),
+          archivedAt: null,
+          ownerUserId: agent.ownerUserId,
+          lastSeenAt: agent.lastSeenAt ?? new Date(),
+        })),
+    ),
+    getConnectedByName: vi.fn(async (input: { name: string }): Promise<Agent[]> =>
+      agents
+        .filter((agent) => agent.name === input.name)
+        .map((agent) => connectedAgent({ ...agent, environment: agent.environment })),
+    ),
+    getConnectedByNameAndEnvironment: vi.fn(
+      async (input: { name: string; environment: string }): Promise<Agent[]> =>
+        agents
+          .filter((agent) => agent.name === input.name && agent.environment === input.environment)
+          .map((agent) => connectedAgent({ ...agent, environment: null })),
+    ),
+    ownersOf: vi.fn(async (subjects: readonly { ownerUserId: string | null }[]) => {
+      const owners = new Map<string, { userId: string; name: string | null }>();
+      for (const subject of subjects) {
+        if (subject.ownerUserId === "user_owner") {
+          owners.set("user_owner", { userId: "user_owner", name: "Owner Person" });
+        }
+      }
+      return owners;
+    }),
+  });
+}
+
+function buildService(agents: AgentApi) {
+  const execute = vi.fn(async (input: Parameters<SuiteExecution["execute"]>[0]) => ({
+    batchRunId: "batch_1",
+    setId: `suiteset_${input.suiteId}`,
+    jobCount: input.activeScenarioIds.length * input.activeTargets.length,
+    skippedArchived: input.skippedArchived,
+    items: [],
+  }));
+  const repository = createApiFixture<SuiteRepository>({
+    resolveScopeMembership: async () => [],
+    findPlanIdsByName: async () => [],
+    findPlanEvaluators: async () => [],
+    findOrCreatePlanByName: async ({
+      id,
+      projectId: pid,
+      name,
+      scope,
+      targets,
+    }: {
+      id: string;
+      projectId: string;
+      name: string;
+      scope: Suite["scope"];
+      targets: Suite["targets"];
+    }) => ({
+      suite: baseSuite({ id, projectId: pid, name, scope, targets }),
+      created: true,
+    }),
+  });
+  const scenarios = createApiFixture<ScenarioApi>({
+    list: async () => [],
+    listTestSuites: async () => [],
+    resolveRunParametersForScenarios: vi.fn(async () => []),
+    getReferenceStates: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({ id, archivedAt: null })),
+    ),
+    getRunConfigs: vi.fn(async ({ ids }: { ids: string[] }) =>
+      ids.map((id) => ({
+        id,
+        name: id,
+        version: 1,
+        situation: "A customer asks for a refund",
+        criteria: [],
+        parameters: null,
+      })),
+    ),
+  });
+  const execution = createApiFixture<SuiteExecution>({ execute });
+
+  const service = SuiteService.create({
+    repository,
+    scenarios,
+    agents,
+    prompts: createApiFixture<PromptApi>({}),
+    evaluators: createApiFixture<EvaluatorApi>({}),
+    execution,
+    generateId: () => "suite_generated",
+  });
+  return { service, execute };
+}
+
+function runAgainst({
+  service,
+  referenceId,
+  actor,
+}: {
+  service: SuiteService;
+  referenceId: string;
+  actor?: RunActor;
+}) {
+  const config: RunPlanConfigInput = {
+    scope: { mode: "scenarios" },
+    scenarioIds: ["scenario_1"],
+    targets: [{ type: "connected", referenceId }],
+  };
+  return service.runPlan({
+    projectId,
+    organizationId: "org_1",
+    name: "Support run",
+    config,
+    idempotencyKey: "idem_1",
+    ...(actor ? { actor } : {}),
+  });
+}
+
+const owner: RunActor = { id: "user_owner", label: "user" };
+const teammate: RunActor = { id: "user_teammate", label: "user" };
+
+describe("running against a personal development agent", () => {
+  describe("when a teammate starts the run", () => {
+    /** @scenario "A teammate cannot target another person's personal agent" */
+    it("refuses the run with agent_owner_only, naming the owner, and schedules nothing", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const failure = await runAgainst({
+        service,
+        referenceId: "agent_support",
+        actor: teammate,
+      }).catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "agent_owner_only",
+        httpStatus: 403,
+        meta: {
+          agentId: "agent_support",
+          ownerUserId: owner.id,
+          ownerName: "Owner Person",
+        },
+      });
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the owner starts the run", () => {
+    /** @scenario "The owner can target their own personal agent" */
+    it("schedules the run", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const result = await runAgainst({ service, referenceId: "agent_support", actor: owner });
+
+      expect(result.jobCount).toBe(1);
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when no person is behind the run", () => {
+    /** @scenario "A legacy project key can never target a personal agent" */
+    it("refuses the run with agent_owner_only", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const failure = await runAgainst({ service, referenceId: "agent_support" }).catch(
+        (error: unknown) => error,
+      );
+
+      expect(failure).toMatchObject({ code: "agent_owner_only" });
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the agent is scoped to a host instead of a person", () => {
+    /** @scenario "A host-scoped development agent is runnable by the team" */
+    it("schedules a teammate's run", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_support",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: null,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const result = await runAgainst({ service, referenceId: "agent_support", actor: teammate });
+
+      expect(result.jobCount).toBe(1);
+      expect(execute).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("addressing a connected agent by name and environment", () => {
+  describe("when a shared agent of that name exists in that environment", () => {
+    /** @scenario "A run can address a connected agent by name and environment" */
+    it("resolves the target to the agent's id", async () => {
+      const agents = connectedAgentApi([
+        { id: "agent_prod", name: "support-agent", environment: "production", ownerUserId: null },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      await runAgainst({ service, referenceId: "support-agent@production", actor: teammate });
+
+      expect(execute).toHaveBeenCalledTimes(1);
+      const call = execute.mock.calls[0]?.[0];
+      expect(call?.activeTargets).toEqual([{ type: "connected", referenceId: "agent_prod" }]);
+    });
+  });
+
+  describe("when no agent of that name exists in that environment", () => {
+    /** @scenario "A name and environment that match no agent are refused" */
+    it("refuses the run as an invalid target reference", async () => {
+      const agents = connectedAgentApi([
+        { id: "agent_prod", name: "support-agent", environment: "production", ownerUserId: null },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const failure = await runAgainst({
+        service,
+        referenceId: "ghost@production",
+        actor: teammate,
+      }).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(InvalidTargetReferencesError);
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("addressing another person's personal agent by name and environment", () => {
+  describe("when it is the only agent of that name in that environment", () => {
+    /** @scenario "A name and environment naming only another person's personal agent is refused as owner-only" */
+    it("refuses the run as owner-only, naming the owner, for a teammate and for no actor", async () => {
+      const agents = connectedAgentApi([
+        {
+          id: "agent_theirs",
+          name: "support-agent",
+          environment: "development",
+          ownerUserId: owner.id,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const asTeammate = await runAgainst({
+        service,
+        referenceId: "support-agent@development",
+        actor: teammate,
+      }).catch((error: unknown) => error);
+      const withoutActor = await runAgainst({
+        service,
+        referenceId: "support-agent@development",
+      }).catch((error: unknown) => error);
+
+      for (const failure of [asTeammate, withoutActor]) {
+        expect(failure).toMatchObject({
+          code: "agent_owner_only",
+          meta: { agentId: "agent_theirs", ownerUserId: owner.id, ownerName: "Owner Person" },
+        });
+      }
+      expect(execute).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a connected target unseen for thirty one days", () => {
+  describe("when the suite run is triggered", () => {
+    /** @scenario "A connected agent unseen for thirty days is refused as a run target" */
+    it("skips it the way it skips an archived target", async () => {
+      const unseenAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000);
+      const agents = connectedAgentApi([
+        {
+          id: "agent_1",
+          name: "agent_1",
+          environment: "production",
+          ownerUserId: null,
+          type: "http",
+        },
+        {
+          id: "agent_unseen",
+          name: "unseen-agent",
+          environment: "production",
+          ownerUserId: null,
+          lastSeenAt: unseenAt,
+        },
+      ]);
+      const { service, execute } = buildService(agents);
+
+      const config: RunPlanConfigInput = {
+        scope: { mode: "scenarios" },
+        scenarioIds: ["scenario_1"],
+        targets: [
+          { type: "http", referenceId: "agent_1" },
+          { type: "connected", referenceId: "agent_unseen" },
+        ],
+      };
+      const result = await service.runPlan({
+        projectId,
+        organizationId: "org_1",
+        name: "Support run",
+        config,
+        idempotencyKey: "idem_1",
+        actor: teammate,
+      });
+
+      expect(result.jobCount).toBe(1);
+      expect(execute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          activeTargets: [{ type: "http", referenceId: "agent_1" }],
+          skippedArchived: expect.objectContaining({
+            targets: ["agent_unseen"],
+          }),
+        }),
+      );
+    });
+  });
+});
+
+describe("given the listing mark and the run refusal read the same agents", () => {
+  /** @scenario "The listing mark and the run refusal read one rule" */
+  it("refuses exactly the agents the listing marks as not selectable", async () => {
+    const agents = [
+      { id: "a_1", name: "shared", type: "connected", ownerUserId: null },
+      { id: "a_2", name: "mine", type: "connected", ownerUserId: "u_1" },
+      { id: "a_3", name: "theirs", type: "connected", ownerUserId: "u_2" },
+    ];
+    const owners = { findNamesByIds: async () => new Map([["u_2", "Ana"]]) };
+    const actor: RunActor = { id: "u_1", label: "user" };
+
+    for (const agent of agents) {
+      const marked = connectedAgentSelectability({
+        ownerUserId: agent.ownerUserId,
+        viewerUserId: actor.id,
+      }).selectable;
+      const refused = await ConnectedTargetService.create({
+        agents: createApiFixture<AgentApi>(),
+        owners,
+      })
+        .assertConnectedAgentsRunnable({ agents: [agent], actor })
+        .then(
+          () => false,
+          () => true,
+        );
+
+      expect(refused).toBe(!marked);
+    }
+  });
+});

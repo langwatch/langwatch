@@ -3,7 +3,7 @@
 // full customer IdP — an OIDC provider, a SAML identity provider, a SCIM 2.0
 // user store — plus DNS and HTTP endpoints for exercising domain verification.
 // Nothing here is production code: every tenant's users, secrets and keys are
-// synthetic, held in memory, and reset at boot.
+// synthetic. IDPSIM_DATA_DIR optionally keeps their state across restarts.
 package idpsim
 
 import (

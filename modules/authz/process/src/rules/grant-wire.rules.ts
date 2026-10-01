@@ -1,0 +1,155 @@
+// How a binding row reads as a grant on `/api/grants`, and how a list pages. Pure.
+import {
+  GRANT_CURSOR_PATTERN,
+  builtInRoleIdSchema,
+  type AuthzManagedOrganizationBinding,
+  type BuiltInRoleId,
+  type Grant,
+  type GrantListQuery,
+  type GrantPage,
+  type GrantScopeType,
+  type GrantScopeTier,
+  type TeamUserRole,
+} from "@langwatch/authz-contract";
+
+const BUILT_IN_ROLE: Readonly<Record<BuiltInRoleId, { role: TeamUserRole; name: string }>> = {
+  admin: { role: "ADMIN", name: "Admin" },
+  member: { role: "MEMBER", name: "Member" },
+  viewer: { role: "VIEWER", name: "Viewer" },
+};
+
+const SCOPE_TYPE: Readonly<Record<GrantScopeType, GrantScopeTier>> = {
+  organization: "ORGANIZATION",
+  team: "TEAM",
+  project: "PROJECT",
+};
+
+const WIRE_SCOPE_TYPE: Readonly<Record<GrantScopeTier, GrantScopeType>> = {
+  ORGANIZATION: "organization",
+  TEAM: "team",
+  PROJECT: "project",
+};
+
+export function storedScopeType(scopeType: GrantScopeType): GrantScopeTier {
+  return SCOPE_TYPE[scopeType];
+}
+
+/** A role id as the ledger stores it: a built-in role, or CUSTOM naming the custom role. */
+export function storedRole(roleId: string): { role: TeamUserRole; customRoleId: string | null } {
+  const builtIn = builtInRoleIdSchema.safeParse(roleId);
+  if (builtIn.success) return { role: BUILT_IN_ROLE[builtIn.data].role, customRoleId: null };
+
+  return { role: "CUSTOM", customRoleId: roleId };
+}
+
+const BUILT_IN_ID: Readonly<Record<Exclude<TeamUserRole, "CUSTOM">, BuiltInRoleId>> = {
+  ADMIN: "admin",
+  MEMBER: "member",
+  VIEWER: "viewer",
+};
+
+function principalOf(row: AuthzManagedOrganizationBinding): Grant["principal"] {
+  if (row.userId) return { type: "user", id: row.userId, name: row.userName ?? row.userEmail };
+  if (row.groupId) return { type: "group", id: row.groupId, name: row.groupName };
+
+  return { type: "apiKey", id: row.apiKeyId ?? "", name: row.apiKeyName };
+}
+
+function roleOf(row: AuthzManagedOrganizationBinding): Grant["role"] {
+  if (row.role !== "CUSTOM" && !row.customRoleId) {
+    const id = BUILT_IN_ID[row.role];
+    return { id, name: BUILT_IN_ROLE[id].name, builtIn: true };
+  }
+
+  return { id: row.customRoleId ?? "", name: row.customRoleName, builtIn: false };
+}
+
+export function grantWire({
+  row,
+  nowMs,
+}: {
+  row: AuthzManagedOrganizationBinding;
+  nowMs: number;
+}): Grant {
+  const expiresAt = row.expiresAt ?? null;
+
+  return {
+    id: row.id,
+    principal: principalOf(row),
+    role: roleOf(row),
+    scope: { type: WIRE_SCOPE_TYPE[row.scopeType], id: row.scopeId, name: row.scopeName },
+    status: expiresAt && expiresAt.getTime() <= nowMs ? "expired" : "active",
+    expiresAt,
+    createdAt: row.createdAt,
+  };
+}
+
+export function matchesGrantQuery({
+  grant,
+  query,
+}: {
+  grant: Grant;
+  query: GrantListQuery;
+}): boolean {
+  return (
+    (query.principalType === undefined || grant.principal.type === query.principalType) &&
+    (query.principalId === undefined || grant.principal.id === query.principalId) &&
+    (query.roleId === undefined || grant.role.id === query.roleId) &&
+    (query.scopeType === undefined || grant.scope.type === query.scopeType) &&
+    (query.scopeId === undefined || grant.scope.id === query.scopeId) &&
+    (query.status === undefined || grant.status === query.status)
+  );
+}
+
+type Position = Readonly<{ createdAtMs: number; id: string }>;
+
+function positionOf(grant: Grant): Position {
+  return { createdAtMs: grant.createdAt.getTime(), id: grant.id };
+}
+
+function compareAscending(a: Position, b: Position): number {
+  if (a.createdAtMs !== b.createdAtMs) return a.createdAtMs - b.createdAtMs;
+  if (a.id === b.id) return 0;
+
+  return a.id > b.id ? 1 : -1;
+}
+
+export function encodeGrantCursor(position: Position): string {
+  return `${position.createdAtMs}.${Buffer.from(position.id, "utf8").toString("base64url")}`;
+}
+
+/** The position a cursor names; a string the list never issued names none. */
+export function findCursorPosition(cursor: string): Position[] {
+  if (!GRANT_CURSOR_PATTERN.test(cursor)) return [];
+  const [createdAtMs = "", encodedId = ""] = cursor.split(".");
+
+  return [
+    { createdAtMs: Number(createdAtMs), id: Buffer.from(encodedId, "base64url").toString("utf8") },
+  ];
+}
+
+/** Oldest first unless `order` says newest; ties by id, so a page boundary never moves. */
+export function pageGrants({
+  grants,
+  query,
+  after,
+}: {
+  grants: readonly Grant[];
+  query: GrantListQuery;
+  after: Position | undefined;
+}): GrantPage {
+  const direction = query.order === "newest" ? -1 : 1;
+  const ordered = grants
+    .filter((grant) => matchesGrantQuery({ grant, query }))
+    .filter(
+      (grant) => after === undefined || direction * compareAscending(positionOf(grant), after) > 0,
+    )
+    .toSorted((a, b) => direction * compareAscending(positionOf(a), positionOf(b)));
+  const page = ordered.slice(0, query.limit);
+  const last = page.at(-1);
+
+  return {
+    grants: page,
+    nextCursor: ordered.length > query.limit && last ? encodeGrantCursor(positionOf(last)) : null,
+  };
+}

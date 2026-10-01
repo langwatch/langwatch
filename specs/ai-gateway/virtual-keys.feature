@@ -12,7 +12,7 @@ Feature: AI Gateway — Virtual Keys
   # (3) Integration-level VK-config persistence (fallback chain,
   #     trigger conditions, model aliases, ModelProvider linkage) —
   #     could bind once a tRPC router integration test is added under
-  #     platform/app/src/server/api/routers/__tests__/.
+  #     [gone] src/server/api/routers/__tests__/.
   # All aspirational pending those harnesses.
 
   As a LangWatch user with gateway permissions
@@ -612,3 +612,15 @@ Feature: AI Gateway — Virtual Keys
     # The allowlist says what the key may hold; the policy decides what
     # dispatch actually tries. A provider in one and not the other is worth
     # seeing before a request fails over to nothing.
+
+  # The key row carries the hashed secret, the previous secret and the window
+  # that older secret stays valid in. Any read of it that is written outside the
+  # gateway feature is a read with no rule about those columns attached, however
+  # narrow the columns it happens to name today.
+  @integration
+  Scenario: Virtual key rows are read only through the gateway feature
+    Given a page of spend rows naming keys by identifier
+    When the labels for those keys are resolved
+    Then the read is issued by the gateway's own key repository
+    And it is fenced by the organization that owns the keys
+    And a page naming no keys asks the table nothing

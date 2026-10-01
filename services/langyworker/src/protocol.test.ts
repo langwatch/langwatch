@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   MAX_FIELD_BYTES,
   TRUNCATION_MARKER,
@@ -13,7 +14,13 @@ describe("parseCommand", () => {
     it("parses turnId, prompt and the optional fields", () => {
       expect(
         parseCommand('{"type":"turn","turnId":"t1","prompt":"hi","system":"s","resumeToken":"r"}'),
-      ).toEqual({ type: "turn", turnId: "t1", prompt: "hi", system: "s", resumeToken: "r" });
+      ).toEqual({
+        type: "turn",
+        turnId: "t1",
+        prompt: "hi",
+        system: "s",
+        resumeToken: "r",
+      });
     });
 
     it("omits optional fields that are absent", () => {
@@ -84,7 +91,10 @@ describe("boundJsonValue", () => {
   });
 
   it("replaces oversized values with a truncated marked string", () => {
-    const bounded = boundJsonValue({ value: { big: "x".repeat(MAX_FIELD_BYTES) }, maxBytes: 1024 });
+    const bounded = boundJsonValue({
+      value: { big: "x".repeat(MAX_FIELD_BYTES) },
+      maxBytes: 1024,
+    });
     expect(typeof bounded).toBe("string");
     expect((bounded as string).endsWith(TRUNCATION_MARKER)).toBe(true);
     expect(Buffer.byteLength(bounded as string, "utf8")).toBeLessThanOrEqual(1024);

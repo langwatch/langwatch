@@ -1,0 +1,105 @@
+import { Button, Text } from "@langwatch/design-system/primitives";
+import type { JoinLookupDecision } from "@langwatch/identity-contract";
+import { useEffect } from "react";
+
+import {
+  type JoinableOrganization,
+  resolveJoinBeforeCreate,
+} from "../../model/join-before-create.ts";
+import { AuthCard } from "../elements/auth-card.tsx";
+
+/** Offer to join existing organization before creating workspace; joining leads. */
+export function JoinBeforeCreateInterstitial({
+  verifiedEmail,
+  verified = true,
+  lookup,
+  pendingOrganizationId,
+  onJoinOrganization,
+  onCreateWorkspace,
+  onAlreadyJoined,
+}: {
+  verifiedEmail: string;
+  /** Whether the address has been proved. Defaults true: every caller today
+   *  renders this step only after verification, and the flag exists so the
+   *  decision can state that rather than assume it. */
+  verified?: boolean;
+  /** What the server answered for this address. Absent while in flight, and
+   *  whenever the flag is off — both render nothing. */
+  lookup?: JoinLookupDecision;
+  pendingOrganizationId?: string | null;
+  onJoinOrganization: (organization: JoinableOrganization) => void;
+  onCreateWorkspace: () => void;
+  /** Called when the domain admitted them automatically: they are already a
+   *  member, so sign-up skips both the offer and workspace creation. */
+  onAlreadyJoined?: (organization: JoinableOrganization) => void;
+}) {
+  const decision = resolveJoinBeforeCreate({
+    verifiedEmail,
+    verified,
+    lookup,
+    pendingOrganizationId,
+  });
+  const nothingToOffer = decision.outcome === "create_workspace";
+  const joinedAutomatically = decision.outcome === "already_joined" ? decision.organization : null;
+
+  useEffect(() => {
+    if (nothingToOffer) onCreateWorkspace();
+  }, [nothingToOffer, onCreateWorkspace]);
+
+  useEffect(() => {
+    if (joinedAutomatically) onAlreadyJoined?.(joinedAutomatically);
+  }, [joinedAutomatically, onAlreadyJoined]);
+
+  // Both of these render nothing at all. "Nothing to offer" carries on to
+  // workspace creation exactly as sign-up did before this step existed;
+  // "already joined" skips the step entirely, because there is no choice left
+  // to make.
+  if (decision.outcome === "create_workspace") return null;
+  if (decision.outcome === "already_joined") return null;
+
+  if (decision.outcome === "awaiting_approval") {
+    return (
+      <AuthCard title="Your request is waiting">
+        <Text data-testid="join-before-create">
+          Your request to join {decision.organization.name} is waiting for one of their
+          administrators. We will email you either way.
+        </Text>
+        <Button variant="outline" width="full" onClick={onCreateWorkspace}>
+          Create a new organization anyway
+        </Button>
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard title="Join your colleagues">
+      <Text data-testid="join-before-create">
+        Your colleagues are already on LangWatch. Join them instead of starting a separate
+        workspace.
+      </Text>
+      {decision.organizations.map((organization) => (
+        <Button
+          key={organization.id}
+          colorPalette="orange"
+          width="full"
+          onClick={() => onJoinOrganization(organization)}
+        >
+          Join {organization.name} ({colleagues(organization.colleagueCount)})
+        </Button>
+      ))}
+      <Button variant="outline" width="full" onClick={onCreateWorkspace}>
+        Create a new organization
+      </Button>
+    </AuthCard>
+  );
+}
+
+/**
+ * The count as a stranger may read it: rounded upstream, and spelled out here
+ * rather than abbreviated. "12 colleagues" says what it means; "12 coll." asks
+ * the reader to guess.
+ */
+function colleagues(count: number): string {
+  if (count <= 0) return "your team";
+  return `${count}+ ${count === 1 ? "colleague" : "colleagues"}`;
+}

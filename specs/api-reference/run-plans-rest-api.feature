@@ -15,7 +15,9 @@ Feature: The run plans REST API
   #   DELETE /api/v1/run-plans/{id}      archive a run plan
   #
   # The family authenticates with a project API key and publishes its routes
-  # under the dated version 2026-08-27, the bare alias, and latest.
+  # under /api/v1 only: it carries its version in its base path, so it is one
+  # of the four families the /api-and-/api/v1 twinning leaves alone — there is
+  # no bare alias and no dated segment to answer on.
 
   Scenario: Listing run plans leaves out archived plans
     Given the project holds one active run plan and one archived run plan
@@ -40,6 +42,22 @@ Feature: The run plans REST API
     Given the project holds a test suite
     When I read that test suite id through the run plans route
     Then the response is 404 with the code suite_not_found
+
+  Scenario: Reading a run plan answers the plan's own evaluators
+    Given the project holds a run plan with one evaluator attached to it
+    When I read that run plan
+    Then the response lists that evaluator with its mappings
+    And listing the run plans answers the same evaluator on that plan
+
+  Scenario: A run plan links into Agent Testing when the project reads it
+    Given the project reads the Agent Testing interface
+    When I read a run plan
+    Then its platformUrl opens /agent-testing/results/<slug> under the project
+
+  Scenario: A run plan links into the Simulations pages otherwise
+    Given the project does not read the Agent Testing interface
+    When I list the run plans
+    Then each platformUrl opens /simulations/run-plans/<slug> under the project
 
   Scenario: Running a configuration creates the run plan its name resolves
     Given the project holds one scenario and one agent
@@ -87,6 +105,24 @@ Feature: The run plans REST API
     # and the run expands it at execution time. See
     # specs/scenarios/simulation-run-model-resolution.feature.
 
+  # The idempotency key is the only handle a caller holds across attempts: the
+  # batch run id is the platform's answer, not the caller's input. A run's
+  # identity is therefore derived from the key and the configuration it names.
+  # See specs/suites/suite-run-retry-safety.feature.
+
+  Scenario: Retrying a run with the same idempotency key joins the run already started
+    Given the project holds one scenario and one agent
+    And a run has been started under the name "Nightly" with an idempotency key
+    When I run the same configuration again under that same key
+    Then the response carries the batch run id the first call answered
+    And the response carries the scenario run ids the first call answered
+
+  Scenario: Running the same configuration without an idempotency key starts its own run
+    Given the project holds one scenario and one agent
+    And a run has been started under the name "Nightly" with no idempotency key
+    When I run the same configuration again with no idempotency key
+    Then the response carries a different batch run id
+
   Scenario: Running a stored run plan again runs the configuration it holds
     Given the project holds a run plan over one scenario and one agent
     When I run that run plan by its id
@@ -103,10 +139,12 @@ Feature: The run plans REST API
     Then the response reports the plan as archived
     And the run plan is no longer listed
 
-  Scenario: A dated run plans path and the bare alias both answer
+  Scenario: The run plans family answers only under /api/v1
     Given the project holds one run plan
-    When I list the run plans through the dated path 2026-08-27
-    Then the list matches the one the bare alias returns
+    When I list the run plans at /api/v1/run-plans
+    Then the list is returned
+    And the bare alias /api/run-plans answers 404
+    And the dated path /api/v1/run-plans/2026-08-27 answers 404
 
   Scenario: An unknown run plans version segment answers 404
     When I list the run plans through the version segment 2020-01-01

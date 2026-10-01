@@ -246,30 +246,38 @@ Feature: Member Limit Enforcement with License
   # ============================================================================
 
   @unit @unimplemented
-  Scenario: Add members button is always clickable when admin
+  Scenario: Invite people button is always clickable when admin
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
     And I am authenticated as an admin of the organization
     When I view the members page
-    Then the "Add members" button is enabled
-    And the "Add members" button is not visually disabled
+    Then the "Invite people" button is enabled
+    And the "Invite people" button is not visually disabled
 
   @unit @unimplemented
   Scenario: Clicking Add members at limit shows upgrade modal
     Given the organization has a license with maxMembers 3
     And the organization has 3 members (at limit)
     And I am authenticated as an admin of the organization
-    When I click the "Add members" button
+    When I click the "Invite people" button
     Then an upgrade modal is displayed
     And the modal shows "team members: 3 / 3"
     And the modal includes an upgrade call-to-action
+
+  @integration
+  Scenario: The upgrade modal opening is counted with what stopped the action
+    Given the organization has a license with maxMembers 5
+    And the organization has 5 members (at limit)
+    When I click the "Invite people" button
+    Then an upgrade modal is displayed
+    And one event is emitted naming the limit that stopped the action
 
   @unit @unimplemented
   Scenario: Clicking Add members when allowed opens add members form
     Given the organization has a license with maxMembers 5
     And the organization has 3 members (under limit)
     And I am authenticated as an admin of the organization
-    When I click the "Add members" button
+    When I click the "Invite people" button
     Then the add members dialog is displayed
     And no upgrade modal is shown
 
@@ -278,7 +286,7 @@ Feature: Member Limit Enforcement with License
     Given the organization has a license with maxMembers 5
     And I am authenticated as a non-admin member of the organization
     When I view the members page
-    Then the "Add members" button is disabled
+    Then the "Invite people" button is disabled
     And the button has tooltip "You need admin privileges to add members"
 
   # ============================================================================
@@ -308,6 +316,48 @@ Feature: Member Limit Enforcement with License
     When I change "viewer-role" to include manage permissions
     Then the request fails with FORBIDDEN
     And the error message contains "member limit reached"
+
+  # ============================================================================
+  # Limit reads (licenseEnforcement.*, answered by organization)
+  # ============================================================================
+
+  @integration
+  Scenario: The members limit read answers the seats taken and the plan's allowance
+    Given the organization has 2 Full Members and 1 Lite Member
+    And the organization's plan allows 5 members
+    When the members limit is read
+    Then the answer is allowed with current 2 and max 5 for "members"
+
+  @unit
+  Scenario: Any member may read the members limit
+    Given I hold organization:view in the organization
+    When I read the members limit
+    Then I am answered allowed, current, max and the limit type
+
+  @unit
+  Scenario: Every enforced limit is answered at once, keyed by limit type
+    When every limit is read
+    Then the answer is keyed "members" and "membersLite"
+
+  @unit
+  Scenario: A blocked pre-check raises a limit notice once the server agrees
+    Given the organization has used every member seat
+    When a client reports its pre-check blocked somebody
+    Then a limit notice is raised with the current and max counts
+
+  @unit
+  Scenario: A fabricated blocked report raises nothing
+    Given the organization has a free member seat
+    When a client reports its pre-check blocked somebody
+    Then no limit notice is raised
+
+  @unit
+  Scenario: A limit notice that fails is reported, never thrown
+    Given the organization has used every member seat
+    And the limit notice cannot be sent
+    When a client reports its pre-check blocked somebody
+    Then the report succeeds
+    And the failure is reported to the error channel
 
   # ============================================================================
   # Role Change Type Detection (Unit)

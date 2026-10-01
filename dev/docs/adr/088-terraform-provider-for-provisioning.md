@@ -24,18 +24,18 @@ This ADR records that framing and what it already decided, so the next person ad
 
 The mapping is deliberately boring. One provider resource, one API family, no aggregate resources that would have to be assembled from several calls:
 
-| Provider resource | API family | Note |
-|---|---|---|
-| `langwatch_organization` | `POST /api/organizations` | Self-hosted only, instance administrator credential |
-| `langwatch_project` | `/api/projects` | Already existed |
-| `langwatch_team` | `/api/teams` | Already existed |
-| `langwatch_group` | `/api/groups` | Access groups, including the ones SCIM owns |
-| `langwatch_custom_role` | `/api/roles` | |
-| `langwatch_role_binding` | `/api/role-bindings` | User, group or API key principal |
-| `langwatch_api_key` | `/api/api-keys` | |
-| `langwatch_scim_token` | `/api/scim-tokens` | |
-| `langwatch_organization_member` | `/api/organization/members` | Manages someone already in the organization |
-| `langwatch_organization_invite` | `/api/organization/invites` | The only way somebody new arrives |
+| Provider resource               | API family                  | Note                                                |
+| ------------------------------- | --------------------------- | --------------------------------------------------- |
+| `langwatch_organization`        | `POST /api/organizations`   | Self-hosted only, instance administrator credential |
+| `langwatch_project`             | `/api/projects`             | Already existed                                     |
+| `langwatch_team`                | `/api/teams`                | Already existed                                     |
+| `langwatch_group`               | `/api/groups`               | Access groups, including the ones SCIM owns         |
+| `langwatch_custom_role`         | `/api/roles`                |                                                     |
+| `langwatch_role_binding`        | `/api/role-bindings`        | User, group or API key principal                    |
+| `langwatch_api_key`             | `/api/api-keys`             |                                                     |
+| `langwatch_scim_token`          | `/api/scim-tokens`          |                                                     |
+| `langwatch_organization_member` | `/api/organization/members` | Manages someone already in the organization         |
+| `langwatch_organization_invite` | `/api/organization/invites` | The only way somebody new arrives                   |
 
 Two of those pairs are worth stating out loud. A member and an invite are separate resources because they are separate lifecycles: an invite is created and either accepted or revoked, and a membership only exists once a human accepted something. Modelling them as one resource would mean a provider blocking on a person's inbox, which is not a thing a plan can wait for.
 

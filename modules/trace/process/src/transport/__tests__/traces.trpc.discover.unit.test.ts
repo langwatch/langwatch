@@ -1,0 +1,155 @@
+/**
+ * @vitest-environment node
+ * The sidebar's one facet read: the cached discovery while no query is active,
+ * the filtered counts as soon as one is.
+ * @see specs/traces-v2/search.feature
+ */
+import { createApiFixture } from "@langwatch/api-fixture";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import type { TraceApi } from "@langwatch/trace-contract";
+import { initTRPC } from "@trpc/server";
+import { describe, expect, it, vi } from "vitest";
+
+import { tracesTrpcTransport } from "../traces.trpc.ts";
+
+type TestContext = { actor: { id: string } };
+
+const PROJECT_ID = "project-1";
+const TIME_RANGE = { from: 1_000, to: 2_000, live: true };
+const FACET = {
+  key: "status",
+  kind: "categorical" as const,
+  label: "Status",
+  group: "trace" as const,
+  topValues: [{ value: "error", count: 4 }],
+  totalDistinct: 1,
+};
+
+function harness() {
+  const readDiscover = vi.fn<TraceApi["readDiscover"]>(async () => ({
+    facets: [FACET],
+    pending: true,
+  }));
+  const readFilteredFacets = vi.fn<TraceApi["readFilteredFacets"]>(async () => ({
+    facets: [FACET],
+    pending: false,
+  }));
+  const findExplorerEvalRuns = vi.fn<TraceApi["findExplorerEvalRuns"]>(async () => []);
+  const readDiscoverForQuery = vi.fn<TraceApi["readDiscoverForQuery"]>(async () => ({
+    facets: [FACET],
+    pending: false,
+  }));
+  const readFacetValues = vi.fn<TraceApi["readFacetValues"]>(async () => ({
+    values: [{ value: "error", count: 4 }],
+    totalDistinct: 1,
+  }));
+  const updateTraceMetadata = vi.fn<TraceApi["updateTraceMetadata"]>(async () => {});
+  const app = createApiFixture<TraceApi>({
+    readDiscoverForQuery,
+    readDiscover,
+    readFilteredFacets,
+    findExplorerEvalRuns,
+    readFacetValues,
+    updateTraceMetadata,
+  });
+
+  const trpc = initTRPC.context<TestContext>().create();
+  const members: TrpcRuntimeMembers<TestContext> = {
+    identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
+    authorization: {
+      forRequest: () => ({
+        getDecision: async () => ({ permitted: true, organizationRole: null }),
+        getProjectAnyDecision: async () => ({ permitted: true, organizationRole: null }),
+        checkScopeLineage: async () => ({ kind: "consistent" }),
+      }),
+    },
+    denials: {
+      membershipDisabled: () => new Error("membership disabled"),
+      liteMemberRestricted: () => new Error("lite member"),
+    },
+    audit: { record: async () => {}, redact: ({ args }) => args, exempt: () => false },
+    errors: {
+      report: () => {},
+      asError: (failure) => (failure instanceof Error ? failure : new Error(String(failure))),
+      translate: () => undefined,
+    },
+  };
+  const router = createTrpcRuntime<TestContext>({
+    root: trpc,
+    procedure: trpc.procedure,
+    members,
+  }).mount(tracesTrpcTransport, () => app);
+
+  return {
+    caller: router.createCaller({ actor: { id: "reader-1" } }),
+    readDiscover,
+    readDiscoverForQuery,
+    readFilteredFacets,
+    updateTraceMetadata,
+  };
+}
+
+describe("given the sidebar's facet read", () => {
+  describe("when it asks with or without a query", () => {
+    it("hands the request to the app's discover read and answers its payload", async () => {
+      const { caller, readDiscoverForQuery } = harness();
+
+      await expect(
+        caller.discover({ projectId: PROJECT_ID, timeRange: TIME_RANGE, query: "status:error" }),
+      ).resolves.toEqual({ facets: [FACET], pending: false });
+      expect(readDiscoverForQuery).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        timeRange: TIME_RANGE,
+        query: "status:error",
+        evalRuns: undefined,
+      });
+    });
+  });
+});
+
+describe("given main's `facets` procedure", () => {
+  describe("when a caller reads the counts with no query", () => {
+    it("counts under an empty query", async () => {
+      const { caller, readDiscover, readFilteredFacets } = harness();
+
+      await expect(
+        caller.facets({ projectId: PROJECT_ID, timeRange: TIME_RANGE }),
+      ).resolves.toEqual({ facets: [FACET], pending: false });
+      expect(readFilteredFacets).toHaveBeenCalledWith(expect.objectContaining({ query: "" }));
+      expect(readDiscover).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("given a facet drilldown", () => {
+  describe("when the sidebar pages one facet's values", () => {
+    it("answers the values the read resolved", async () => {
+      const { caller } = harness();
+
+      await expect(
+        caller.facetValues({ projectId: PROJECT_ID, timeRange: TIME_RANGE, facetKey: "status" }),
+      ).resolves.toEqual({ values: [{ value: "error", count: 4 }], totalDistinct: 1 });
+    });
+  });
+});
+
+describe("given main's `changeMetadata` procedure", () => {
+  describe("when a caller changes a trace's metadata", () => {
+    it("records the metadata and answers the trace id", async () => {
+      const { caller, updateTraceMetadata } = harness();
+
+      await expect(
+        caller.changeMetadata({
+          projectId: PROJECT_ID,
+          traceId: "trace-1",
+          metadata: { customer_id: "c-1" },
+        }),
+      ).resolves.toEqual({ traceId: "trace-1" });
+      expect(updateTraceMetadata).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        traceId: "trace-1",
+        metadata: { customer_id: "c-1" },
+      });
+    });
+  });
+});

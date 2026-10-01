@@ -1,0 +1,63 @@
+import type {
+  CategoricalFacetResult,
+  DiscreteFacetResult,
+  TraceListRepositoryPage,
+  TraceListRepository,
+  BatchedFacetResult,
+} from "@langwatch/trace-contract";
+
+export class MemoryNullTraceListRepository implements TraceListRepository {
+  private constructor() {}
+
+  static create(): MemoryNullTraceListRepository {
+    return new MemoryNullTraceListRepository();
+  }
+
+  async listAll(): Promise<TraceListRepositoryPage> {
+    return { rows: [], totalHits: 0 };
+  }
+
+  async findCount(): Promise<number> {
+    return 0;
+  }
+
+  async findTraceIds(): Promise<string[]> {
+    return [];
+  }
+
+  async findDistinctValues(): Promise<string[]> {
+    return [];
+  }
+
+  async findCategoricalFacet(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+
+  async findCategoricalFacetRaw(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+
+  async findRangeStatsForTable(): Promise<{ min: number; max: number }> {
+    return { min: 0, max: 0 };
+  }
+
+  async findDiscreteValues(): Promise<DiscreteFacetResult> {
+    return { values: [], distinctCount: 0 };
+  }
+
+  async findBatchedFacets(): Promise<BatchedFacetResult> {
+    return { categoricals: {}, ranges: {} };
+  }
+
+  async findAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+
+  async findEventAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+
+  async findSpanAttributeValues(): Promise<CategoricalFacetResult> {
+    return { values: [], totalDistinct: 0 };
+  }
+}

@@ -96,7 +96,7 @@ func TestGuardSeedTargets(t *testing.T) {
 
 	t.Run("given only local dotenv values and no process overrides", func(t *testing.T) {
 		t.Run("when guarded, it passes", func(t *testing.T) {
-			if err := GuardSeedTargets(local, none); err != nil {
+			if err := GuardSeedTargets(nil, local, none); err != nil {
 				t.Fatalf("local targets should pass, got %v", err)
 			}
 		})
@@ -110,7 +110,7 @@ func TestGuardSeedTargets(t *testing.T) {
 				}
 				return ""
 			}
-			if err := GuardSeedTargets(local, getenv); err == nil {
+			if err := GuardSeedTargets(nil, local, getenv); err == nil {
 				t.Fatal("expected the process-env production URL to be refused")
 			}
 		})
@@ -119,7 +119,7 @@ func TestGuardSeedTargets(t *testing.T) {
 	t.Run("given a stray production DATABASE_URL in dotenv with no process override", func(t *testing.T) {
 		t.Run("when guarded, it refuses", func(t *testing.T) {
 			env := map[string]string{"DATABASE_URL": "postgresql://prisma:prisma@10.1.2.3:5432/langwatch"}
-			if err := GuardSeedTargets(env, none); err == nil {
+			if err := GuardSeedTargets(nil, env, none); err == nil {
 				t.Fatal("expected a non-local dotenv URL to be refused")
 			}
 		})

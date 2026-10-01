@@ -1,0 +1,573 @@
+# Auth beyond sign-in and sign-out: a wrong password is refused and leaves the visitor
+# signed out, and a password-reset mail carries a live link. Both run in a fresh cookieless
+# context. The shared account is never reset or re-passworded (that signs every other device
+# out), so those flows run on an account they sign up or invite themselves. Sign-up, the
+# dead-link resend, the browser-session revoke, sign-out-everywhere on a password change, the
+# SSO refusal screens and the CLI device-login pages follow. `{actor}` and `{actorPassword}`
+# are the run's own sign-in account.
+# Not scripted: a real SSO redirect (needs an operator-approved verified-domain connection
+# beside the idpsim tenant) and passkey ceremonies. The CLI's poll is in apidiff
+# (auth-cli-approval.yaml, organization.yaml auth-cli-*).
+flows:
+  - id: auth-wrong-password-refused
+    title: A wrong password is refused and the visitor stays signed out
+    steps:
+      - action: go
+        with:
+          path: /auth/signin
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: "{actor}"
+          anonymous: "true"
+      - action: click
+        with:
+          text: Continue
+          optional: "true"
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Password
+          value: not-the-password-{uid}
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*(sign in|log in)\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: signin-failure
+          anonymous: "true"
+      - action: go
+        with:
+          path: /{slug}/traces
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /auth/signin
+          anonymous: "true"
+
+  - id: auth-password-reset-link-opens
+    title: A reset request mails a link that opens the choose-a-password form
+    steps:
+      - action: go
+        with:
+          path: /auth/forgot-password
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: "{actor}"
+          anonymous: "true"
+      - action: click
+        with:
+          text: Send reset link
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          anonymous: "true"
+      - action: mail
+        with:
+          to: "{actor}"
+          subject: password
+      - action: go
+        with:
+          path: "{mailLink}"
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Choose a new password
+          anonymous: "true"
+
+  - id: auth-signup-verified-account-then-password-reset
+    title: Sign up through the mailed link, then reset that account's password and stay signed in
+    steps:
+      - action: go
+        with:
+          path: /auth/signup
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: vd-auth-{uid}@mail.langwatch.localhost
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*continue\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          anonymous: "true"
+      - action: mail
+        with:
+          to: vd-auth-{uid}@mail.langwatch.localhost
+          subject: Confirm your email
+          as: confirmLink
+      - action: go
+        with:
+          path: "{confirmLink}"
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verified-address
+          timeout: "20000"
+          anonymous: "true"
+      - action: fill
+        with:
+          selector: input[name="password"]
+          value: Vd!Signup-{uid}-Zq7
+          anonymous: "true"
+      - action: fill
+        with:
+          selector: input[name="confirmPassword"]
+          value: Vd!Signup-{uid}-Zq7
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*create account\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /\/(onboarding|auth\/join)/
+          timeout: "20000"
+          anonymous: "true"
+      - action: go
+        with:
+          path: /auth/forgot-password
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: vd-auth-{uid}@mail.langwatch.localhost
+          anonymous: "true"
+      - action: click
+        with:
+          text: Send reset link
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          anonymous: "true"
+      - action: mail
+        with:
+          to: vd-auth-{uid}@mail.langwatch.localhost
+          subject: password
+          as: resetLink
+      - action: go
+        with:
+          path: "{resetLink}"
+          anonymous: "true"
+      - action: fill
+        with:
+          selector: input[name="password"]
+          value: Vd!Reset-{uid}-Kp4
+          anonymous: "true"
+      - action: fill
+        with:
+          selector: input[name="confirmPassword"]
+          value: Vd!Reset-{uid}-Kp4
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*reset password\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Password updated
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: reset-sign-in
+          anonymous: "true"
+
+  - id: auth-signup-existing-address-welcome-back
+    title: Signing up with an address that already has an account says welcome back and sends no mail
+    steps:
+      - action: go
+        with:
+          path: /auth/signup
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: "{actor}"
+          anonymous: "true"
+      - action: click
+        with:
+          text: /^\s*continue\s*$/i
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Welcome back
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          equals: "0"
+          anonymous: "true"
+
+  - id: auth-verify-email-landing
+    title: The verification landing spends nothing, and a link cut short says so
+    steps:
+      - action: go
+        with:
+          path: /auth/verify-email?token=vd-{uid}
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verify-email-landing
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Opening this link on its own does not confirm anything
+          anonymous: "true"
+      - action: go
+        with:
+          path: /auth/verify-email
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verify-email-incomplete
+          anonymous: "true"
+
+  - id: auth-signup-dead-link-resend
+    title: A dead sign-up link offers a new one, and the new link's mail arrives
+    steps:
+      - action: go
+        with:
+          path: /auth/signup?verify=vd-dead-{uid}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Send a new link
+          timeout: "20000"
+          anonymous: "true"
+      - action: fill
+        with:
+          field: Email
+          value: vd-dead-{uid}@mail.langwatch.localhost
+          anonymous: "true"
+      - action: click
+        with:
+          text: Send a new link
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: verification-sent
+          timeout: "20000"
+          anonymous: "true"
+      - action: mail
+        with:
+          to: vd-dead-{uid}@mail.langwatch.localhost
+          subject: Confirm your email
+
+  - id: auth-sso-refusal-page
+    title: An organisation-only sign-in refusal names the sign-in to use and keeps its reference, and an unknown code is never echoed
+    steps:
+      - action: go
+        with:
+          path: /auth/error?error=SSO_REQUIRED_BY_ORGANIZATION&trace=vd-{uid}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Use your organization's sign-in
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          testId: sign-in-error-trace
+          hasText: vd-{uid}
+          anonymous: "true"
+      - action: go
+        with:
+          path: /auth/error?error=vd-unknown-{uid}
+          anonymous: "true"
+      - action: expect
+        with:
+          text: Something went wrong signing you in
+          timeout: "20000"
+          anonymous: "true"
+      - action: expect
+        with:
+          text: vd-unknown-{uid}
+          equals: "0"
+          anonymous: "true"
+
+  - id: auth-sso-settings-overview
+    title: The organisation's Authentication settings open on the sign-in overview
+    steps:
+      - action: go
+        with:
+          path: /settings/authentication
+      - action: expect
+        with:
+          text: Manage sign-in, provisioning, and security policies
+          timeout: "20000"
+      - action: expect
+        with:
+          url: /settings/authentication
+
+  - id: auth-sessions-list-and-revoke
+    title: A second browser's sign-in is listed under Profile, and signing it out ends that browser
+    serial: true
+    steps:
+      - action: signIn
+        with:
+          anonymous: "true"
+      - action: go
+        with:
+          path: /{slug}/traces
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /traces
+          timeout: "20000"
+          anonymous: "true"
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          text: Where you are signed in
+          timeout: "20000"
+      - action: expect
+        with:
+          text: This browser
+      - action: click
+        with:
+          text: /^\s*sign out\s*$/i
+      - action: expect
+        with:
+          text: Signed that browser out
+      - action: go
+        with:
+          path: /settings/profile
+      - action: expect
+        with:
+          text: This browser
+      - action: go
+        with:
+          path: /{slug}/traces
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: "true"
+
+  - id: cli-login-approve
+    title: The device-login page shows the code, asks to confirm it, then approves the CLI
+    steps:
+      - action: request
+        with:
+          path: /api/auth/cli/device-code
+          body: "{}"
+          field: user_code
+          as: userCode
+      - action: go
+        with:
+          path: /cli/auth?user_code={userCode}
+      - action: expect
+        with:
+          text: Authorize the LangWatch CLI
+          timeout: "20000"
+      - action: expect
+        with:
+          text: "{userCode}"
+      - action: click
+        with:
+          text: /^\s*confirm\s*$/i
+      - action: click
+        with:
+          text: /^\s*approve\s*$/i
+      - action: expect
+        with:
+          text: You're signed in!
+          timeout: "20000"
+
+  - id: cli-login-deny
+    title: Denying a device login shows the refusal and leaves no approve button
+    steps:
+      - action: request
+        with:
+          path: /api/auth/cli/device-code
+          body: "{}"
+          field: user_code
+          as: userCode
+      - action: go
+        with:
+          path: /cli/auth?user_code={userCode}
+      - action: expect
+        with:
+          text: "{userCode}"
+          timeout: "20000"
+      - action: click
+        with:
+          text: /^\s*deny\s*$/i
+      - action: expect
+        with:
+          text: Authorization denied
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /^\s*(confirm|approve)\s*$/i
+          equals: "0"
+
+  - id: cli-login-code-refusals
+    title: The device-login page tells no code and an unknown code apart
+    steps:
+      - action: go
+        with:
+          path: /cli/auth
+      - action: expect
+        with:
+          text: No code provided
+          timeout: "20000"
+      - action: go
+        with:
+          path: /cli/auth?user_code=NOPE-{uid}
+      - action: expect
+        with:
+          text: was not recognised
+          timeout: "20000"
+
+  - id: cli-login-signed-out-goes-to-sign-in
+    title: A signed-out visitor opening a device-login link is sent to sign in
+    setup:
+      - post: /api/auth/cli/device-code
+        body: {}
+        as:
+          userCode: user_code
+    steps:
+      - action: go
+        with:
+          path: /cli/auth?user_code={userCode}
+          anonymous: "true"
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: "true"
+
+  # Sign-out everywhere: a credential write ends every other session. The account is a real
+  # invitee (never the shared admin), signed in in two cookieless browsers; the one that
+  # changes its password stays in, the other is sent to sign in. Removing the member ends it.
+  - id: auth-password-change-signs-out-other-browsers
+    title: Changing your password signs every other browser out and keeps this one
+    serial: true
+    steps:
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          text: Invite people
+      - action: fill
+        with:
+          field: "alice@example.com, bob@example.com"
+          value: "vd-pw-{uid}@mail.langwatch.localhost"
+      - action: click
+        with:
+          text: /^\s*(Send|Create) invites\s*$/
+      - action: mail
+        with:
+          to: vd-pw-{uid}@mail.langwatch.localhost
+          as: inviteLink
+      - action: acceptInvite
+        with:
+          link: "{inviteLink}"
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          name: vd-pw-{uid}
+      - action: signIn
+        with:
+          anonymous: browser-b
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: signIn
+        with:
+          anonymous: browser-c
+          email: vd-pw-{uid}@mail.langwatch.localhost
+          password: "{actorPassword}"
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-c
+      - action: click
+        with:
+          text: Not now
+          optional: "true"
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: Where you are signed in
+          timeout: "20000"
+          anonymous: browser-c
+      - action: click
+        with:
+          testId: password-action
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^Current Password$/i
+          value: "{actorPassword}"
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^New Password$/i
+          value: Vd!Change-{uid}-Xr9
+          anonymous: browser-c
+      - action: fill
+        with:
+          field: /^Confirm New Password$/i
+          value: Vd!Change-{uid}-Xr9
+          anonymous: browser-c
+      - action: click
+        with:
+          text: /^\s*change password\s*$/i
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: Password changed successfully
+          timeout: "20000"
+          anonymous: browser-c
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-b
+      - action: expect
+        with:
+          url: /auth/signin
+          timeout: "20000"
+          anonymous: browser-b
+      - action: go
+        with:
+          path: /settings/profile
+          anonymous: browser-c
+      - action: expect
+        with:
+          text: This browser
+          timeout: "20000"
+          anonymous: browser-c
+      - action: go
+        with:
+          path: /settings/directory
+      - action: click
+        with:
+          label: Actions for vd-pw-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Delete|Remove from organization)\s*$/
+      - action: go
+        with:
+          path: /settings/directory
+      - action: expect
+        with:
+          text: vd-pw-{uid}
+          equals: "0"

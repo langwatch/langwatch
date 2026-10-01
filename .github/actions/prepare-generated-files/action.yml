@@ -1,11 +1,14 @@
 name: Prepare generated files
 description: >-
-  Runs platform/app's `start:prepare:files`, reusing a cached result when none
-  of its inputs changed.
+  Runs the repository root's `start:prepare:files`, reusing a cached result when
+  none of its inputs changed.
 
-# `start:prepare:files` is a chain of seven generators — the AI-gateway secrets
-# check, the langevals evaluator types, the Prisma client, the TypeScript SDK
-# build, the MCP server build, the langy skill catalogue and the task registry.
+# `start:prepare:files` is a chain of four generators — the langevals evaluator
+# types, the Prisma client, the langy skill catalogue and the setup-skill
+# bodies. `ensure:built` then builds the workspace packages that resolve a
+# bundle rather than their own source: the TypeScript SDK (whose prebuild also
+# writes the gitignored src/internal/generated files), the MCP server, ksuid
+# and mail.
 # It costs 30-35s and every test, build and check job in this workflow pays it.
 # Across the shards that was several runner-minutes per push spent regenerating
 # byte-identical output from byte-identical committed inputs.
@@ -28,36 +31,53 @@ description: >-
 runs:
   using: composite
   steps:
+    # Every job that prepares files also runs nx (ensure:built, lint:types).
+    - uses: ./.github/actions/nx-cache
+
     - name: Restore generated files
       id: cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         # Everything `start:prepare:files` writes. The Prisma client is NOT in
-        # node_modules: this schema sets `output = "../src/generated/prisma"`,
-        # and the app imports it as `~/generated/prisma/client`.
+        # node_modules: @langwatch/prisma-client owns its generated source.
         path: |
-          platform/app/src/generated/prisma
-          platform/app/src/server/evaluations/evaluators.generated.ts
-          platform/app/src/tasks.generated.ts
-          platform/app/src/shared/langy/langySkills.generated.json
+          packages/prisma-client/src/generated
+          modules/evaluator/contract/src/evaluators.generated.ts
+          modules/langy/browser/src/model/shared/langy/langySkills.generated.json
+          modules/langy/process/src/rules/setup-skill-bodies.rules.ts
           sdks/typescript/dist
+          sdks/typescript/src/internal/generated
           mcp/typescript/dist
+          packages/ksuid/dist
+          packages/mail/dist
         key: >-
           ${{ runner.os }}-prepared-files-${{ hashFiles(
             'pnpm-lock.yaml',
-            'platform/app/prisma/schema.prisma',
-            'platform/app/prisma/schema/**',
-            'platform/app/package.json',
-            'platform/app/scripts/generate-task-registry.mjs',
-            'platform/app/scripts/generate-langy-skills.ts',
-            'platform/app/scripts/build-mcp-server.sh',
-            'platform/app/src/tasks/**',
+            'packages/prisma-client/prisma/schema.prisma',
+            'packages/prisma-client/prisma/schema/**',
+            'packages/prisma-client/package.json',
+            'package.json',
+            'modules/langy/browser/scripts/generate-langy-skills.ts',
+            'modules/langy/process/scripts/generate-setup-skill-bodies.ts',
             'services/langevals/ts-integration/evaluators.generated.ts',
             'sdks/typescript/src/**',
             'sdks/typescript/package.json',
             'sdks/typescript/tsup.config.ts',
+            'sdks/typescript/copy-types.sh',
+            'sdks/typescript/scripts/**',
+            'feature-map.json',
+            'specs/api-reference/openapi-document.json',
+            'modules/evaluator/contract/src/evaluators.native.ts',
+            'modules/model-provider/contract/src/catalog/model-catalog.json',
+            'modules/scenario/contract/src/suite-fields.ts',
+            'modules/trace/contract/src/trace-format.schemas.ts',
+            'packages/redaction/src/**',
             'mcp/typescript/src/**',
             'mcp/typescript/package.json',
+            'packages/ksuid/src/**',
+            'packages/ksuid/package.json',
+            'packages/mail/src/**',
+            'packages/mail/package.json',
             'infra/docker/Dockerfile.langyagent',
             'skills/**/SKILL.md'
           ) }}
@@ -65,8 +85,12 @@ runs:
     - name: Generate files
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      working-directory: platform/app
-      run: pnpm start:prepare:files
+      # `ensure:built` is the same hook the dev lanes run before they start, so
+      # the SDK and MCP bundles are produced by one mechanism rather than by a
+      # build step spelled out again here. It is scoped to the miss: a restored
+      # `dist` predates the checkout that wrote `src`, so on a hit the staleness
+      # comparison would rebuild exactly what the cache just handed back.
+      run: pnpm start:prepare:files && pnpm ensure:built
 
     # A cache hit is only useful if it actually produced the files. A key that
     # silently stops covering a new generator would otherwise hand every job a

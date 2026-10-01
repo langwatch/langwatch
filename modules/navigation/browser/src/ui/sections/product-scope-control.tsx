@@ -1,0 +1,186 @@
+/**
+ * Product-native scope in top bar. Groups from useProjectPickItems (host's
+ * workspace graph), with a per-team "New Project" entry. Spec:
+ * specs/navigation/product-switcher-navigation.feature
+ */
+
+import { Menu } from "@langwatch/design-system/menu";
+import { Badge, Box, Button, HStack, Portal, Text } from "@langwatch/design-system/primitives";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
+
+import { useProjectPickGroups } from "../../behavior/use-project-pick-groups.ts";
+import { useNavigationHost } from "../../model/navigation-host.ts";
+import type { ProductId } from "../../model/products.ts";
+import type { ProjectPickGroup } from "../../model/project-pick-items.ts";
+import { ProjectSwitcherCombobox } from "../blocks/project-switcher-combobox.tsx";
+import { NavigationLink } from "../elements/navigation-link.tsx";
+import { ProjectAvatar } from "../elements/project-avatar.tsx";
+
+function ScopeDivider() {
+  return (
+    <Box width="1px" height="20px" background="border.emphasized" marginX={1} flexShrink={0} />
+  );
+}
+
+/**
+ * The Me scope: the signed-in user with a Personal badge. Not a picker,
+ * there is nothing to switch to inside the personal plane.
+ */
+function MeScopeChip() {
+  const name = useNavigationHost().currentUser()?.name;
+  if (!name) return null;
+  return (
+    <>
+      <ScopeDivider />
+      <HStack gap={2} paddingX={1.5} minWidth={0}>
+        <Text fontSize="13px" whiteSpace="nowrap">
+          {name}
+        </Text>
+        <Badge variant="outline" fontSize="10px" color="fg.muted" borderRadius="md">
+          Personal
+        </Badge>
+      </HStack>
+    </>
+  );
+}
+
+/**
+ * Above this many projects the plain menu turns into a searchable
+ * combobox: the list no longer fits a screen, so finding beats reading.
+ */
+const PROJECT_SEARCH_THRESHOLD = 8;
+
+/**
+ * The LLM Ops scope: the current project as a chip, opening a menu of the
+ * organization's projects (plus a per-team create entry). Organization
+ * choice lives in its own control, so this menu stays within the current one.
+ */
+function ProjectScopeMenu() {
+  const host = useNavigationHost();
+  const organization = host.organization();
+  const project = host.project();
+  const groups = useProjectPickGroups();
+
+  if (!organization || !project) return null;
+
+  const onCreateProjectForTeam = ({ teamId, orgId }: { teamId: string; orgId: string }) =>
+    host.openDrawer("createProject", {
+      navigateOnCreate: "true",
+      defaultTeamId: teamId,
+      organizationId: orgId,
+    });
+
+  const projectCount = groups.reduce((count, group) => count + group.projects.length, 0);
+  const showTeamHeaders = groups.length > 1;
+
+  return (
+    <>
+      <ScopeDivider />
+      {projectCount > PROJECT_SEARCH_THRESHOLD ? (
+        <ProjectSwitcherCombobox
+          groups={groups}
+          currentProjectId={project.id}
+          currentProjectName={project.name}
+          showTeamHeaders={showTeamHeaders}
+          onCreateProjectForTeam={onCreateProjectForTeam}
+        />
+      ) : (
+        <ProjectMenu
+          groups={groups}
+          currentProjectId={project.id}
+          currentProjectName={project.name}
+          showTeamHeaders={showTeamHeaders}
+          onCreateProjectForTeam={onCreateProjectForTeam}
+        />
+      )}
+    </>
+  );
+}
+
+/** The plain project menu, for a list short enough to read whole. */
+function ProjectMenu({
+  groups,
+  currentProjectId,
+  currentProjectName,
+  showTeamHeaders,
+  onCreateProjectForTeam,
+}: {
+  groups: ProjectPickGroup[];
+  currentProjectId: string;
+  currentProjectName: string;
+  showTeamHeaders: boolean;
+  onCreateProjectForTeam: ({ teamId, orgId }: { teamId: string; orgId: string }) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button
+          variant="ghost"
+          aria-label="Switch project"
+          data-testid="navigation-project-switcher"
+          data-tour="project-switcher"
+          fontSize="13px"
+          fontWeight="normal"
+          paddingX={2}
+          height="32px"
+          color="fg"
+          gap={2}
+          _hover={{ backgroundColor: "bg.muted" }}
+        >
+          <ProjectAvatar name={currentProjectName} />
+          <Text whiteSpace="nowrap">{currentProjectName}</Text>
+          <ChevronsUpDown size={12} color="var(--chakra-colors-fg-muted)" />
+        </Button>
+      </Menu.Trigger>
+      <Portal>
+        <Menu.Content minWidth="240px">
+          {groups.map(({ team, projects: teamProjects }) => (
+            <Menu.ItemGroup key={team.teamId} title={showTeamHeaders ? team.label : "Projects"}>
+              {teamProjects.map((candidate) => (
+                <Menu.Item
+                  key={candidate.projectId}
+                  value={candidate.projectId}
+                  fontSize="13px"
+                  asChild
+                >
+                  <NavigationLink href={candidate.href} _hover={{ textDecoration: "none" }}>
+                    <HStack gap={2} width="full">
+                      <ProjectAvatar name={candidate.label} />
+                      <Text flex={1}>{candidate.label}</Text>
+                      {candidate.projectId === currentProjectId && (
+                        <Check size={13} aria-label="Current project" />
+                      )}
+                    </HStack>
+                  </NavigationLink>
+                </Menu.Item>
+              ))}
+              {team.canCreateProject && (
+                <Menu.Item
+                  value={`new-project-${team.teamId}`}
+                  data-testid="navigation-project-new"
+                  fontSize="13px"
+                  onClick={() => onCreateProjectForTeam({ teamId: team.teamId, orgId: team.orgId })}
+                >
+                  <Plus size={13} /> New Project
+                </Menu.Item>
+              )}
+            </Menu.ItemGroup>
+          ))}
+        </Menu.Content>
+      </Portal>
+    </Menu.Root>
+  );
+}
+
+/**
+ * The product-native scope in the top bar: LLM Ops shows the project chip,
+ * Me shows a Personal badge, and organization-wide products (Gateway,
+ * Governance) show nothing — the organization control already says it all.
+ */
+export function ProductScopeControl({ activeProductId }: { activeProductId: ProductId | null }) {
+  // Each scope renders its own leading divider, so a scope that has
+  // nothing to show leaves no separator behind it.
+  if (activeProductId === "llm-ops") return <ProjectScopeMenu />;
+  if (activeProductId === "me") return <MeScopeChip />;
+  return null;
+}

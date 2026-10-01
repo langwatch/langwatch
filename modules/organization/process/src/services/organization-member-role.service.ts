@@ -1,0 +1,434 @@
+/**
+ * Changing what a member may do: enabling and disabling a seat, and the cascading role update
+ * across the organization and its teams.
+ */
+import { GrantScopeTier, type AuthzGrantCaller } from "@langwatch/authz-contract";
+import {
+  TeamRoleUpdateRejectedError,
+  OrganizationUserRole,
+  type TeamUserRole,
+  CannotDisableSelfError,
+  MemberSeatLimitReachedError,
+  PersonalWorkspaceNotManagedHereError,
+} from "@langwatch/organization-contract";
+
+import {
+  type OrganizationGrantCache,
+  type OrganizationPromptSeed,
+  type OrganizationSeatLicense,
+  type OrganizationSessionRevocation,
+  type OrganizationPlanUser,
+} from "../app/organization.members.ts";
+import type {
+  OrganizationMembershipRepository,
+  UpdateMemberRoleResult,
+} from "../repositories/organization-membership.repository.ts";
+import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
+import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
+import {
+  EffectiveTeamRoleUpdatesService,
+  type EffectiveTeamRoleUpdate,
+} from "./compute-effective-team-role-updates.service.ts";
+import type {
+  OrganizationGrantCeilingService,
+  OrganizationIntendedGrant,
+} from "./organization-grant-ceiling.service.ts";
+
+/**
+ * The union of permissions granted by the custom roles behind these team bindings, empty
+ * when none apply. Feeds seat classification, which treats a member whose custom
+ * roles grant only view permissions as a Lite Member.
+ */
+async function findCustomRolePermissionGrants({
+  repository,
+  organizationId,
+  currentTeamBindings,
+}: {
+  repository: OrganizationMembershipRepository;
+  organizationId: string;
+  currentTeamBindings: { customRoleId: string | null }[];
+}): Promise<string[]> {
+  const customRoleIds = currentTeamBindings
+    .map((binding) => binding.customRoleId)
+    .filter((id): id is string => !!id);
+  if (customRoleIds.length === 0) {
+    return [];
+  }
+
+  const permissionsPerRole = await repository.findCustomRolePermissions({
+    organizationId,
+    customRoleIds,
+  });
+  const allPermissions: string[] = [];
+  for (const permissions of permissionsPerRole) {
+    // `permissions` is a Json column, so the row decides the shape, not the
+    // type: read it defensively the way every other permission reader does.
+    if (Array.isArray(permissions)) {
+      allPermissions.push(
+        ...permissions.filter((permission): permission is string => typeof permission === "string"),
+      );
+    }
+  }
+
+  return allPermissions;
+}
+
+type OrganizationMemberRoleDependencies = {
+  repository: OrganizationMembershipRepository;
+  prompts: OrganizationPromptSeed;
+  seats: OrganizationSeatLicense;
+  sessions: OrganizationSessionRevocation;
+  grantCache: OrganizationGrantCache;
+  ceiling: Pick<OrganizationGrantCeilingService, "assertWithinCaller">;
+};
+
+export class OrganizationMemberRoleService {
+  static create(dependencies: OrganizationMemberRoleDependencies): OrganizationMemberRoleService {
+    return new OrganizationMemberRoleService(dependencies);
+  }
+
+  private constructor(private readonly dependencies: OrganizationMemberRoleDependencies) {}
+
+  private get repo(): OrganizationMembershipRepository {
+    return this.dependencies.repository;
+  }
+
+  async setMemberDisabled(params: {
+    organizationId: string;
+    userId: string;
+    disabled: boolean;
+    /** The user the credential acts as; null (a service key) skips the self-guard. */
+    actingUser?: OrganizationPlanUser | null;
+  }): Promise<void> {
+    const { organizationId, userId, disabled, actingUser } = params;
+
+    if (disabled && actingUser?.id != null && actingUser.id === userId) {
+      throw new CannotDisableSelfError();
+    }
+
+    await this.repo.getMembership({ organizationId, userId });
+
+    if (!disabled) {
+      const result = await this.dependencies.seats.checkLimit({
+        organizationId,
+        resource: "members",
+        user: actingUser ?? undefined,
+      });
+      if (!result.allowed) {
+        throw new MemberSeatLimitReachedError({
+          meta: { limitType: result.limitType, current: result.current, max: result.max },
+        });
+      }
+    }
+
+    await this.repo.setMemberDisabled({ organizationId, userId, disabled });
+
+    if (disabled) {
+      // Revoking the seat has to revoke the live session too, or the person
+      // keeps working until their token happens to expire. Through the
+      // canonical Auth service: it clears the Better Auth session cache as
+      // well as the rows, which is the half a plain delete misses.
+      await this.dependencies.sessions.revokeAllBrowserSessions({ userId });
+    }
+
+    // Disabling is a plain column write, not a grant write, so nothing else
+    // retires the authorization snapshots cached for this organization. An
+    // admin who has just revoked someone's access must not have to wait for a
+    // cache to age out before it is true, and re-enabling must not leave the
+    // person locked out for the same window.
+    await this.dependencies.grantCache.invalidateOrganization({ organizationId });
+  }
+
+  /**
+   * Main's seat guard on a Lite Member's team-role change (organization.ts:699-730): moving
+   * them off a custom role that granted more than viewing costs a Lite Member seat.
+   */
+  async assertTeamRoleChangeWithinSeatLimits(params: {
+    organizationId: string;
+    teamId: string;
+    userId: string;
+  }): Promise<void> {
+    const { organizationId, teamId, userId } = params;
+    const currentTeamBindings = await this.repo.findTeamGrants({
+      organizationId,
+      userId,
+      teamIds: [teamId],
+    });
+    const grantedPermissions = await findCustomRolePermissionGrants({
+      repository: this.repo,
+      organizationId,
+      currentTeamBindings,
+    });
+
+    await this.dependencies.seats.assertRoleChangeAllowed({
+      organizationId,
+      currentRole: "EXTERNAL",
+      userPermissions: grantedPermissions.length > 0 ? grantedPermissions : undefined,
+      role: "EXTERNAL",
+    });
+  }
+
+  /**
+   * The full member-role-change orchestration: personal-workspace assertion, shared-team scoping,
+   * seat classification, the Enterprise gate for custom roles, then the cascading role update.
+   */
+  async changeMemberRole(params: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    teamRoleUpdates?: {
+      teamId: string;
+      userId: string;
+      role: string;
+      customRoleId?: string;
+    }[];
+    /** Null when the actor is a service credential; self checks never match. */
+    currentUserId: string | null;
+    /** Whose holdings bound the grants the change writes. */
+    caller: AuthzGrantCaller;
+    planUser?: OrganizationPlanUser;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
+
+    const currentMember = await this.repo.getMembership({ organizationId, userId });
+    // A caller who names a personal workspace outright is told so. Without
+    // this the shared-teams-only set below would answer "that team is not in
+    // the organization", which is both wrong and no help.
+    const [personalTeam] = await this.repo.findPersonalTeamsInScopes({
+      scopes: (teamRoleUpdates ?? []).map((update) => ({
+        scopeType: GrantScopeTier.TEAM,
+        scopeId: update.teamId,
+      })),
+    });
+    if (personalTeam) {
+      throw new PersonalWorkspaceNotManagedHereError(personalTeam.name);
+    }
+
+    // Only the teams the organization shares. A seat decision is about the
+    // person, so it applies to the teams they work in with other people and
+    // leaves the workspace that is only theirs alone. Including it would ask
+    // the organization to demote a team's last admin, which is refused, and
+    // the whole role change would go down with the refusal.
+    const organizationTeamIds = await this.repo.findSharedTeamIds({ organizationId });
+
+    const currentTeamBindings = await this.repo.findTeamGrants({
+      organizationId,
+      userId,
+      teamIds: organizationTeamIds,
+    });
+
+    const currentMemberships = currentTeamBindings.map((binding) => ({
+      teamId: binding.scopeId,
+      role: binding.role,
+    }));
+
+    const grantedPermissions = await findCustomRolePermissionGrants({
+      repository: this.repo,
+      organizationId,
+      currentTeamBindings,
+    });
+    const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
+    const effectiveTeamRoleUpdates = this.effectiveTeamRoleUpdatesOf({
+      userId,
+      role,
+      teamRoleUpdates,
+      currentMemberships,
+      organizationTeamIds,
+    });
+
+    // Asked before anything is written, seat corrections included: the seat commits first.
+    await this.dependencies.ceiling.assertWithinCaller({
+      organizationId,
+      caller,
+      grants: [
+        ...(role === OrganizationUserRole.EXTERNAL
+          ? []
+          : [
+              {
+                role: ORGANIZATION_TO_TEAM_ROLE_MAP[role],
+                scopeType: GrantScopeTier.ORGANIZATION,
+                scopeId: organizationId,
+              },
+            ]),
+        ...effectiveTeamRoleUpdates.map((update) =>
+          intendedTeamGrant({
+            teamId: update.teamId,
+            role: update.role,
+            customRoleId: update.customRoleId,
+          }),
+        ),
+      ],
+    });
+
+    await this.dependencies.seats.assertRoleChangeAllowed({
+      organizationId,
+      currentRole: currentMember.role,
+      userPermissions,
+      role,
+      user: params.planUser,
+    });
+
+    return this.repo.updateMemberRole({
+      organizationId,
+      userId,
+      role,
+      effectiveTeamRoleUpdates,
+      currentUserId,
+      caller,
+    });
+  }
+
+  /**
+   * Updates a member's organization role and cascades effective team role
+   * changes. Computes effective team role updates from the requested updates and
+   * current memberships.
+   */
+  async updateMemberRole(params: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    teamRoleUpdates?: {
+      teamId: string;
+      userId: string;
+      role: string;
+      customRoleId?: string;
+    }[];
+    currentMemberships: { teamId: string; role: TeamUserRole }[];
+    organizationTeamIds: string[];
+    currentUserId: string | null;
+    caller: AuthzGrantCaller;
+  }): Promise<UpdateMemberRoleResult> {
+    const { organizationId, userId, role, currentUserId, caller } = params;
+
+    return this.repo.updateMemberRole({
+      organizationId,
+      userId,
+      role,
+      effectiveTeamRoleUpdates: this.effectiveTeamRoleUpdatesOf(params),
+      currentUserId,
+      caller,
+    });
+  }
+
+  /** The team-role changes a role change makes: the requested ones, plus any seat corrections. */
+  private effectiveTeamRoleUpdatesOf({
+    userId,
+    role,
+    teamRoleUpdates,
+    currentMemberships,
+    organizationTeamIds,
+  }: {
+    userId: string;
+    role: OrganizationUserRole;
+    teamRoleUpdates?: { teamId: string; userId: string; role: string; customRoleId?: string }[];
+    currentMemberships: { teamId: string; role: TeamUserRole }[];
+    organizationTeamIds: string[];
+  }): EffectiveTeamRoleUpdate[] {
+    const organizationTeamIdSet = new Set(organizationTeamIds);
+
+    const requestedTeamRoleUpdates = (teamRoleUpdates ?? []).reduce<
+      { teamId: string; role: TeamRoleValue; customRoleId?: string }[]
+    >((acc, update) => {
+      if (update.userId !== userId) {
+        throw new TeamRoleUpdateRejectedError("Team role update user must match target member", {
+          userId,
+        });
+      }
+
+      if (!organizationTeamIdSet.has(update.teamId)) {
+        throw new TeamRoleUpdateRejectedError("Team role update must belong to the organization", {
+          userId,
+        });
+      }
+
+      acc.push({
+        teamId: update.teamId,
+        role: update.role as TeamRoleValue,
+        customRoleId: update.customRoleId,
+      });
+
+      return acc;
+    }, []);
+
+    return EffectiveTeamRoleUpdatesService.create().computeEffectiveTeamRoleUpdates({
+      requestedTeamRoleUpdates,
+      currentMemberships,
+      newOrganizationRole: role,
+    });
+  }
+
+  /**
+   * Updates a team member's role. The repository decides the change under one transaction —
+   * the last-admin guard included — and emits the grant it resolves to once that has
+   * committed, since grants are ledger facts and cannot ride a database transaction.
+   */
+  async updateTeamMemberRole(params: {
+    teamId: string;
+    userId: string;
+    role: string;
+    customRoleId?: string;
+    currentUserId: string;
+    /** The team's organization, resolved by the caller of this door. */
+    organizationId: string;
+    caller: AuthzGrantCaller;
+  }): Promise<void> {
+    const { teamId, userId, role, customRoleId, currentUserId, organizationId, caller } = params;
+    await this.dependencies.ceiling.assertWithinCaller({
+      organizationId,
+      caller,
+      grants: [intendedTeamGrant({ teamId, role, customRoleId })],
+    });
+
+    if (isCustomRole(role)) {
+      if (!customRoleId) {
+        throw new TeamRoleUpdateRejectedError("customRoleId is required when using a custom role", {
+          userId,
+        });
+      }
+
+      await this.repo.updateTeamMemberRole({
+        teamId,
+        userId,
+        role: role as TeamUserRole,
+        customRoleId,
+        currentUserId,
+        caller,
+      });
+    } else {
+      await this.repo.updateTeamMemberRole({
+        teamId,
+        userId,
+        role: role as TeamUserRole,
+        customRoleId: undefined,
+        currentUserId,
+        caller,
+      });
+    }
+  }
+
+  /**
+   * Returns paginated, enriched audit log entries for an organization.
+   */
+}
+
+/** The team grant a requested role resolves to: a built-in role, or `custom:<id>` with its id. */
+function intendedTeamGrant({
+  teamId,
+  role,
+  customRoleId,
+}: {
+  teamId: string;
+  role: string;
+  customRoleId?: string;
+}): OrganizationIntendedGrant {
+  if (role === "ADMIN" || role === "MEMBER" || role === "VIEWER") {
+    return { role, scopeType: GrantScopeTier.TEAM, scopeId: teamId };
+  }
+  return {
+    role: "CUSTOM",
+    customRoleId: customRoleId ?? null,
+    scopeType: GrantScopeTier.TEAM,
+    scopeId: teamId,
+  };
+}

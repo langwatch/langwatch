@@ -10,7 +10,7 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
   # append that differs from it, and the identity pipeline's is user_identity,
   # tenanted by the user. The vocabulary is still identity's - the events are
   # lw.identity.connection_*, the facts live in @langwatch/identity and the
-  # guards in @langwatch/identity-server. Only the storage partition is
+  # guards in @langwatch/identity-process. Only the storage partition is
   # separate.
   #
   #   DRAFT → CLAIMED → APPROVED → VERIFICATION_PENDING → VERIFIED → ACTIVE
@@ -387,6 +387,14 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
   # of the two decides differs BY ORGANIZATION -- and a switch thrown for
   # everybody could only ever have been wrong for somebody.
   @unit
+  # ── Routing flip ───────────────────────────────────────────────────────
+
+  # There is no fleet-wide flip, and the staged flag that was going to carry
+  # one was designed out rather than built. Routing asks the connection
+  # projection first and falls back to the columns per organization, so which
+  # of the two decides differs BY ORGANIZATION -- and a switch thrown for
+  # everybody could only ever have been wrong for somebody.
+  @unit
   Scenario: Which routing decides is asked per organization, never set fleet-wide
     Given "acme"'s connection decides its sign-in and "globex" has none
     When a staff member edits the legacy single sign-on strings
@@ -394,8 +402,8 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And it is still accepted for "globex", whose strings still decide
 
   @unit
-  Scenario: After the flip, the strings stop being written
-    Given the connection routing flag is enforced
+  Scenario: Once a connection decides, the strings stop being written
+    Given an organization whose connection decides its sign-in
     When SSO configuration changes
     Then only connection commands change it
     And the legacy string columns are derived, no longer written
@@ -406,6 +414,13 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     When they change the connection
     Then the change is a guarded command with the actor recorded
     And no raw table edit exists on the surface
+
+  @unit
+  Scenario: The back office commands through the pipeline's own connection service
+    Given a process composing the connection pipeline
+    When it also asks the pipeline for the connection write surface
+    Then it is handed the same service the pipeline itself commands through
+    And the operator's commands run the same guards and the same break-glass budget
 
   # --- The issuer is an address we will dial -------------------------------
   #
@@ -421,6 +436,108 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the connection is not registered
     And they are told to give the issuer URL their provider publishes
     And nothing in the answer describes our network back to them
+
+  # D05: the way back in, and its expiry. Activation's precondition stops
+  # being "this deployment still has a local door somewhere" and becomes "a
+  # named person can get in on Monday" — the only failure that cannot be
+  # recovered from inside the product.
+
+  @unit
+  Scenario: A way back in is granted to a named person with an end date
+    Given an organization whose sign-in is about to belong to an identity provider
+    When an administrator grants somebody a way back in
+    Then the grant records who holds it apart from who granted it
+    And the organization satisfies activation's break-glass precondition
+
+  @unit
+  Scenario: A way back in is never open-ended
+    Given an administrator granting a way back in
+    When the end date is in the past or further out than ninety days
+    Then the grant is refused with sso_break_glass_expiry_out_of_range
+    And nothing is written
+    And the same refusal applies to a renewal that would reach past the window
+
+  @unit
+  Scenario: A way back in names somebody who could actually use it
+    Given a person who is not an administrator, or who holds no password
+    When they are named as the holder of a way back in
+    Then the grant is refused with sso_break_glass_holder_ineligible
+    And standing is asked before the key, so the second question is skipped
+
+  @unit
+  Scenario: Renewing a way back in leaves the date it previously ended readable
+    Given a live way back in
+    When an administrator renews it to a later date
+    Then a new binding is written naming the one it replaced
+    And the replaced binding keeps its own end date and is marked superseded
+    And only one of them is live
+
+  @unit
+  Scenario: The last way back in cannot be revoked while a connection is live
+    Given an organization with an ACTIVE connection and one live way back in
+    When an administrator revokes it
+    Then the revocation is refused with sso_break_glass_last_way_in
+    But once somebody else holds one the revocation succeeds
+    And the revoked row survives with its end written on it
+
+  @unit
+  Scenario: A way back in that is ending is warned about once per mark
+    Given a way back in that ends in five days
+    When the expiry sweep runs
+    Then the warning names the days actually left rather than the mark that tripped
+    And a second sweep the same day says nothing
+
+  # ── Who a connection admits, in three answers ──────────────────────────
+  #
+  # The question used to be a boolean, and its default forbade provisioning,
+  # so a person signing in through their own organization's identity provider
+  # was authenticated and then handed a brand new workspace of their own.
+  # Nobody chose that: it was a default nobody surfaced. The answer is now one
+  # of three — the arrivals join, they wait for approval, or they are turned
+  # away — and which one it is is recorded as itself.
+
+  @unit
+  Scenario: A registered connection carries the arrival answer registration stated
+    Given a connection registered with an answer for who it admits
+    When the connection is read back
+    Then it carries the answer registration stated
+    And nobody has decided it yet, because registering is not deciding
+
+  @unit
+  Scenario: A connection nobody has answered for turns arrivals away
+    Given a connection whose history carries no answer
+    When anything asks who it admits
+    Then arrivals are turned away
+    And that is the default, so nobody is admitted by an answer nobody gave
+
+  @unit
+  Scenario: The middle answer is recorded as itself, not as a boolean either side of it
+    Given a verified connection nobody has answered for
+    When an administrator says arrivals wait for approval
+    Then the recorded answer is that they wait
+    And the moment it was decided is recorded with it
+
+  @unit
+  Scenario: Confirming the same arrival answer twice records nothing, and changing it records a decision
+    Given a connection whose administrator has said arrivals join
+    When they say so again
+    Then nothing is recorded, because nothing changed
+    But when they say arrivals are turned away instead
+    Then that answer is recorded with the moment it was decided
+
+  @unit
+  Scenario: Saying it out loud is a fact even where the behaviour is the same
+    Given a connection nobody has answered for, which turns arrivals away
+    When the administrator chooses to turn arrivals away
+    Then the decision is recorded
+    And it is no longer waiting to be decided
+
+  @unit
+  Scenario: A torn-down connection refuses an arrival decision by name
+    Given a connection that has been torn down
+    When an administrator says who it admits
+    Then it is refused with sso_connection_invalid_transition
+    And nothing about the dead connection changed
 
   # --- Except where somebody has vouched for the address --------------------
   #

@@ -22,10 +22,8 @@ T = TypeVar("T", bound="PostApiAnalyticsResponse200")
 class PostApiAnalyticsResponse200:
     """
     Attributes:
-        current_period (list[PostApiAnalyticsResponse200CurrentPeriodItem]): One row per time bucket over the requested
-            range
-        previous_period (list[PostApiAnalyticsResponse200PreviousPeriodItem]): The same range shifted back by its own
-            length, for comparison
+        current_period (list[PostApiAnalyticsResponse200CurrentPeriodItem]):
+        previous_period (list[PostApiAnalyticsResponse200PreviousPeriodItem]):
     """
 
     current_period: list[PostApiAnalyticsResponse200CurrentPeriodItem]

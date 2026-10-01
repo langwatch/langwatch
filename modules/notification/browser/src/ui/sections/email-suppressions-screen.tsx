@@ -1,0 +1,150 @@
+/**
+ * Who has unsubscribed from a project's notifications. Removing a row RESUMES
+ * DELIVERY, so it sits behind `triggers:manage` while the page itself opens on
+ * `triggers:view`. The settings frame is applied by whoever serves the address.
+ */
+
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Badge,
+  Button,
+  Card,
+  Skeleton,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { MailX, Trash2 } from "lucide-react";
+
+import { notificationApi } from "../../behavior/notification-api.ts";
+import {
+  EMAIL_SUPPRESSIONS_MANAGE_PERMISSION,
+  useNotificationHost,
+} from "../../model/notification-host.ts";
+import { readableDate } from "../../model/readable-date.ts";
+
+export default function EmailSuppressionsScreen() {
+  const host = useNotificationHost();
+  const project = host.project();
+  if (!project) return null;
+  return (
+    <EmailSuppressionsPage
+      projectId={project.id}
+      canManage={host.hasPermission(EMAIL_SUPPRESSIONS_MANAGE_PERMISSION)}
+    />
+  );
+}
+
+function EmailSuppressionsPage({
+  projectId,
+  canManage,
+}: {
+  projectId: string;
+  canManage: boolean;
+}) {
+  const host = useNotificationHost();
+  const utils = notificationApi.useUtils();
+  const suppressions = notificationApi.emailSuppression.getAll.useQuery({ projectId });
+  const remove = notificationApi.emailSuppression.remove.useMutation({
+    onSuccess: async () => {
+      await utils.emailSuppression.getAll.invalidate({ projectId });
+      host.succeeded({ title: "Suppression removed" });
+    },
+    onError: (error) => {
+      host.failed({ error, fallbackTitle: "Could not remove suppression" });
+    },
+  });
+
+  /** One region, four outcomes: still loading, failed, empty, or the list. */
+  function suppressionsBody() {
+    if (suppressions.isLoading) {
+      return <Skeleton width="full" height="120px" />;
+    }
+
+    if (suppressions.isError) {
+      return (
+        <VStack align="center" gap={3} padding={8}>
+          <Text color="fg.error">Could not load suppressions. Please try again.</Text>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => void suppressions.refetch()}
+            loading={suppressions.isRefetching}
+          >
+            Retry
+          </Button>
+        </VStack>
+      );
+    }
+
+    if (!suppressions.data || suppressions.data.length === 0) {
+      return (
+        <NoDataInfoBlock
+          title="No suppressions yet"
+          description="When a recipient unsubscribes from a notification, they appear here."
+          icon={<MailX />}
+        />
+      );
+    }
+
+    return (
+      <Table.Root size="sm">
+        <Table.Header>
+          <Table.Row>
+            <Table.ColumnHeader>Email</Table.ColumnHeader>
+            <Table.ColumnHeader>Scope</Table.ColumnHeader>
+            <Table.ColumnHeader>Date</Table.ColumnHeader>
+            <Table.ColumnHeader />
+          </Table.Row>
+        </Table.Header>
+        <Table.Body>
+          {suppressions.data.map((row) => (
+            <Table.Row key={row.id}>
+              <Table.Cell>{row.email}</Table.Cell>
+              <Table.Cell>
+                {row.triggerId == null ? (
+                  <Badge colorPalette="red">All notifications</Badge>
+                ) : (
+                  <Badge colorPalette="gray">{row.triggerName ?? "Notification"}</Badge>
+                )}
+              </Table.Cell>
+              <Table.Cell>{readableDate(row.createdAt).toLocaleDateString()}</Table.Cell>
+              <Table.Cell textAlign="end">
+                {canManage && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    loading={remove.isPending && remove.variables?.id === row.id}
+                    onClick={() => remove.mutate({ projectId, id: row.id })}
+                    aria-label="Remove suppression"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                )}
+              </Table.Cell>
+            </Table.Row>
+          ))}
+        </Table.Body>
+      </Table.Root>
+    );
+  }
+
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Email Suppressions</PageLayout.Heading>
+      </PageLayout.Header>
+      <VStack gap={6} width="full" align="start" paddingTop={4}>
+        <Text color="fg.muted">
+          Recipients who unsubscribed from this project&apos;s trigger notifications. Removing an
+          entry resumes delivery to that address.
+        </Text>
+
+        <Card.Root width="full">
+          <Card.Body>{suppressionsBody()}</Card.Body>
+        </Card.Root>
+      </VStack>
+    </>
+  );
+}

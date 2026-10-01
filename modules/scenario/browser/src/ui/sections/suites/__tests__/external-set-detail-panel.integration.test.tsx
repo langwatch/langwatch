@@ -1,0 +1,146 @@
+/**
+ * Integration tests for ExternalSetDetailPanel: a run row opens the drawer
+ * rather than navigating to a page of its own.
+ * @vitest-environment jsdom
+ * @see specs/features/suites/suite-bugfixes-1956.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const mockOpenDrawer = vi.hoisted(() => vi.fn());
+const mockRouterPush = vi.hoisted(() => vi.fn());
+const mockRunDataQuery = vi.hoisted(() => vi.fn());
+
+vi.mock("posthog-js", () => ({
+  default: { capture: vi.fn() },
+}));
+
+vi.mock("@langwatch/trace-browser-kit", async () => {
+  const actual = await vi.importActual<typeof traceBrowserKitModule>(
+    "@langwatch/trace-browser-kit",
+  );
+  return {
+    ...actual,
+    usePageVisibility: () => true,
+    useSSESubscription: vi.fn(() => ({
+      connectionState: "disconnected",
+      isConnected: false,
+      isConnecting: false,
+      hasError: false,
+      isDisconnected: true,
+      retryCount: 0,
+      lastData: undefined,
+      lastError: undefined,
+    })),
+  };
+});
+
+vi.mock("@langwatch/browser-host/drawer", () => ({
+  useDrawer: () => ({
+    openDrawer: mockOpenDrawer,
+    closeDrawer: vi.fn(),
+    goBack: vi.fn(),
+    canGoBack: false,
+    setFlowCallbacks: vi.fn(),
+    getFlowCallbacks: vi.fn(),
+  }),
+  useDrawerParams: () => ({}),
+}));
+
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj_1", slug: "test-project" },
+    hasAnyPermission: () => true,
+    isLoading: false,
+  }),
+}));
+
+vi.mock("@langwatch/browser-host/use-router", () => ({
+  useRouter: () => ({ push: mockRouterPush, query: {}, isReady: true }),
+}));
+
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
+  api: {
+    useUtils: () => ({
+      scenarios: {
+        getSuiteRunData: { invalidate: vi.fn() },
+        getRunState: { invalidate: vi.fn(), prefetch: vi.fn(), setData: vi.fn() },
+        getScenarioSetBatchHistory: { invalidate: vi.fn() },
+      },
+    }),
+    scenarios: {
+      getSuiteRunData: { useQuery: mockRunDataQuery },
+      getSuiteRunFreshness: { useQuery: vi.fn(() => ({ data: undefined })) },
+      getAll: { useQuery: () => ({ data: undefined, isLoading: false, error: null }) },
+      cancelJob: { useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })) },
+      cancelBatchRun: { useMutation: vi.fn(() => ({ mutate: vi.fn(), isPending: false })) },
+      onSimulationUpdate: {},
+    },
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+    prompts: { getAllPromptsForProject: { useQuery: () => ({ data: [] }) } },
+    export: { onScenarioRunExportProgress: { useSubscription: vi.fn() } },
+  },
+}));
+
+import type * as traceBrowserKitModule from "@langwatch/trace-browser-kit";
+
+import { ExternalSetDetailPanel } from "../external-set-detail-panel.tsx";
+
+const Wrapper = ({ children }: { children: React.ReactNode }) => (
+  <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
+);
+
+const period = {
+  startDate: Temporal.Instant.from("2025-01-01T00:00:00Z"),
+  endDate: Temporal.Instant.from("2025-01-31T00:00:00Z"),
+};
+
+describe("<ExternalSetDetailPanel/>", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("given an external set with one run", () => {
+    describe("when the run row is clicked", () => {
+      /** @scenario "Clicking a run in external set detail opens the drawer" */
+      it("opens the drawer instead of navigating to a new page", () => {
+        mockRunDataQuery.mockReturnValue({
+          data: {
+            runs: [
+              {
+                batchRunId: "batch_1",
+                scenarioRunId: "run_1",
+                scenarioId: "scen_1",
+                status: "SUCCESS",
+                timestamp: Date.now(),
+                results: null,
+                messages: [],
+                name: "Test Scenario",
+                description: null,
+                durationInMs: 100,
+              },
+            ],
+            scenarioSetIds: {},
+            hasMore: false,
+          },
+          isLoading: false,
+          error: null,
+        });
+
+        render(<ExternalSetDetailPanel scenarioSetId="ext-set-1" period={period} />, {
+          wrapper: Wrapper,
+        });
+
+        fireEvent.click(screen.getByLabelText(/View details for/));
+
+        expect(mockOpenDrawer).toHaveBeenCalledWith("scenarioRunDetail", {
+          urlParams: { scenarioRunId: "run_1" },
+        });
+        expect(mockRouterPush).not.toHaveBeenCalled();
+      });
+    });
+  });
+});

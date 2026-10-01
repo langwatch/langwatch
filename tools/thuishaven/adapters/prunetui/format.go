@@ -9,11 +9,34 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// ageLabel names the time column for what it measures: how long a worktree has
+// sat idle, and how long ago a job last did anything.
+func ageLabel(r Row) string {
+	if r.Kind == KindJob {
+		return "age"
+	}
+	return "idle"
+}
+
+// protectedNote says why a row cannot be ticked, in terms of its kind — a job
+// held out of reach is a different refusal from a protected checkout.
+func protectedNote(r Row) string {
+	if r.Kind == KindJob {
+		return "held back — pass --include-recent to reclaim a job this recent"
+	}
+	return "protected — never deleted by prune"
+}
+
 // displayName is a worktree's label (slug, else directory basename); dbChips are
 // its owned-database chips. Both delegate to the shared domain formatters so the
 // picker and the non-interactive report label worktrees identically.
-func displayName(r Row) string { return domain.SlugOrBase(r.Slug, r.Dir) }
-func dbChips(r Row) string     { return domain.DBChips(r.HasCHDB, r.HasPGDB) }
+func displayName(r Row) string {
+	if r.Kind == KindJob {
+		return domain.SlugOrBase(r.Branch, r.Dir)
+	}
+	return domain.SlugOrBase(r.Slug, r.Dir)
+}
+func dbChips(r Row) string { return domain.DBChips(r.HasCHDB, r.HasPGDB) }
 
 // pathPreview shortens a worktree path to its last two segments, so the inline
 // preview shows where it lives without the full absolute path.
@@ -44,6 +67,12 @@ func reclaimDetail(r Row) string {
 	}
 	if r.OriginGone {
 		parts = append(parts, "branch merged + deleted upstream")
+	}
+	if r.Reason != "" {
+		parts = append(parts, r.Reason)
+	}
+	if r.Kind == KindJob {
+		parts = append(parts, "record kept: "+strings.Join(domain.JobRecordFiles, ", "))
 	}
 	return strings.Join(parts, " · ")
 }

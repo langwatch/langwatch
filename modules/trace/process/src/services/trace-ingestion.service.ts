@@ -1,0 +1,432 @@
+import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+import {
+  instrumentationScopeSchema,
+  resourceSchema,
+  SPAN_MAX_PAST_MS,
+  spanSchema,
+  type OtlpInstrumentationScope,
+  type OtlpResource,
+  type OtlpSpan,
+  type PIIRedactionLevel,
+  type RecordSpanCommandData,
+} from "@langwatch/trace-contract";
+import { SpanKind as ApiSpanKind, type Span as OtelSpan } from "@opentelemetry/api";
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import { getLangWatchTracer } from "langwatch";
+
+import type { TraceSpanDedupRepository } from "../repositories/trace-span-dedup.repository.ts";
+import {
+  codexHelperThreadMarkersOf,
+  stampCodexHelperThread,
+  type ScopedSpans,
+} from "../rules/codex-helper-thread.rules.ts";
+import { storableSpanTimesOf, type UnstorableSpanTime } from "../rules/storable-span-time.rules.ts";
+import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
+import { TraceIngestionMetricsService } from "./trace-ingestion-metrics.service.ts";
+
+export type SpanIngestionStatus = "collected" | "dropped" | "deduped" | "failed" | "filtered";
+
+export type SpanIngestionResult = {
+  status: SpanIngestionStatus;
+  error?: string;
+};
+
+export type TraceRequestCollectionResult = {
+  rejectedSpans: number;
+  /**
+   * The dispatch failures within `rejectedSpans`: transient, so a durable-cursor caller retries.
+   */
+  ingestionFailures: number;
+  /** Only the dispatch failures' messages, without the drop reasons `errorMessage` carries. */
+  ingestionFailureMessage: string;
+  errorMessage: string;
+};
+
+/** The Trace pipeline's one named command handoff. */
+export abstract class TraceIngressCommand {
+  abstract recordSpan(data: RecordSpanCommandData): Promise<void>;
+}
+
+/** Optional edge/blob preparation, composed by the application when enabled. */
+export abstract class TraceIngressPayload {
+  abstract prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData>;
+}
+
+/**
+ * The outcome of every span in one export request. Only `dropped` and
+ * `failed` are a rejection — `filtered`/`deduped` are declined on purpose —
+ * and the transport turns `rejectedSpans` into the sender's HTTP answer.
+ */
+class SpanIngestionTally {
+  private readonly counts: Record<SpanIngestionStatus, number> = {
+    collected: 0,
+    dropped: 0,
+    deduped: 0,
+    failed: 0,
+    filtered: 0,
+  };
+  private readonly errors: string[] = [];
+  private readonly failureErrors: string[] = [];
+
+  record(result: SpanIngestionResult): void {
+    this.counts[result.status]++;
+    if (result.status === "failed" && result.error) {
+      this.failureErrors.push(result.error);
+    }
+    if (result.error) {
+      this.errors.push(result.error);
+    }
+  }
+
+  describeOn(otelSpanRef: OtelSpan): void {
+    otelSpanRef.setAttribute("spans.ingestion.successes", this.counts.collected);
+    otelSpanRef.setAttribute("spans.ingestion.failures", this.counts.failed);
+    otelSpanRef.setAttribute("spans.ingestion.drops", this.counts.dropped);
+    otelSpanRef.setAttribute("spans.ingestion.deduped", this.counts.deduped);
+    otelSpanRef.setAttribute("spans.ingestion.filtered", this.counts.filtered);
+  }
+
+  outcomes(): Readonly<Record<SpanIngestionStatus, number>> {
+    return this.counts;
+  }
+
+  collectionResult(): TraceRequestCollectionResult {
+    return {
+      rejectedSpans: this.counts.dropped + this.counts.failed,
+      ingestionFailures: this.counts.failed,
+      ingestionFailureMessage: this.failureErrors.join("; "),
+      errorMessage: this.errors.join("; "),
+    };
+  }
+}
+
+/**
+ * The coding-agent contract, holding only what the ingest path reads: no
+ * store, no session lookup.
+ */
+export type CodingAgentIngestFilter = Pick<CodingAgentApi, "shouldFilterSpan">;
+
+/** What the producer is told, naming the field it has to fix. */
+function unstorableSpanTimeMessage({ field }: UnstorableSpanTime): string {
+  return field === "startTimeUnixMs"
+    ? "span start time is not a valid timestamp"
+    : "span end time is not a valid timestamp";
+}
+
+/**
+ * Process-wide Trace receiver. Transport keeps auth and HTTP response mapping;
+ * this service owns raw OTLP trace traversal, validation, filtering, dedup and
+ * the handoff to the Trace command pipeline.
+ */
+export class TraceIngestionService {
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.span-ingestion");
+  private readonly logger = createLogger("langwatch:trace-processing:span-ingestion");
+  private readonly outcomeMetrics = TraceIngestionMetricsService.create();
+
+  private constructor(
+    private readonly codingAgents: CodingAgentIngestFilter,
+    private readonly codingAgentSpanFilterEnabled: boolean,
+    private readonly collection: TraceSpanCollectionService,
+  ) {}
+
+  static create(options: {
+    codingAgents: CodingAgentIngestFilter;
+    codingAgentSpanFilterEnabled: boolean;
+    dedup: TraceSpanDedupRepository;
+    commands: TraceIngressCommand;
+    payloads?: TraceIngressPayload;
+  }): TraceIngestionService {
+    return new TraceIngestionService(
+      options.codingAgents,
+      options.codingAgentSpanFilterEnabled,
+      TraceSpanCollectionService.create({
+        dedup: options.dedup,
+        commands: options.commands,
+        ...(options.payloads ? { payloads: options.payloads } : {}),
+      }),
+    );
+  }
+
+  async handleOtlpTraceRequest(
+    tenantId: string,
+    traceRequest: IExportTraceServiceRequest,
+    piiRedactionLevel: PIIRedactionLevel,
+  ): Promise<TraceRequestCollectionResult> {
+    return this.tracer.withActiveSpan(
+      "TraceIngestionService.handleOtlpTraceRequest",
+      {
+        kind: ApiSpanKind.PRODUCER,
+        attributes: {
+          "tenant.id": tenantId,
+          trace_request_count: traceRequest.resourceSpans?.length ?? 0,
+        },
+      },
+      async (otelSpanRef) => {
+        const tally = new SpanIngestionTally();
+        // A codex helper's request span names its thread only through a child in the same
+        // export, so the join runs over the whole request before any span is processed.
+        const helperThreads = codexHelperThreadMarkersOf({
+          scopes: scopedSpansOf(traceRequest),
+        });
+
+        for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+          const resource = this.parseResource(resourceSpan?.resource, tenantId);
+
+          for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+            const scope = this.parseScope(scopeSpan?.scope, tenantId);
+
+            for (const candidate of scopeSpan?.spans ?? []) {
+              tally.record(
+                await this.processSpan({
+                  tenantId,
+                  otelSpan: candidate,
+                  resource,
+                  scope,
+                  piiRedactionLevel,
+                  otelSpanRef,
+                  helperThreads,
+                }),
+              );
+            }
+          }
+        }
+
+        tally.describeOn(otelSpanRef);
+        this.outcomeMetrics.record(tally.outcomes());
+
+        return tally.collectionResult();
+      },
+    );
+  }
+
+  /**
+   * A resource or scope we cannot read is logged and treated as absent — the
+   * spans underneath it are still the sender's data, and dropping a whole
+   * batch over a malformed envelope loses more than it protects.
+   */
+  private parseResource(candidate: unknown, tenantId: string): OtlpResource | null {
+    const result = resourceSchema.safeParse(candidate);
+    if (!result.success) {
+      this.logger.error({ result, tenantId }, "Error parsing OTLP resource");
+    }
+
+    return result.data ?? null;
+  }
+
+  private parseScope(candidate: unknown, tenantId: string): OtlpInstrumentationScope | null {
+    const result = instrumentationScopeSchema.safeParse(candidate);
+    if (!result.success) {
+      this.logger.error({ result, tenantId }, "Error parsing OTLP scope");
+    }
+
+    return result.data ?? null;
+  }
+
+  /**
+   * One already-normalized span, collected. Kept on this class because the
+   * OTLP request path and the REST tracked-event path both reach it by name;
+   * the work itself belongs to {@link TraceSpanCollectionService}.
+   */
+  ingestNormalizedSpan(input: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef?: OtelSpan;
+  }): Promise<SpanIngestionResult> {
+    return this.collection.ingestNormalizedSpan(input);
+  }
+
+  private async processSpan(input: {
+    tenantId: string;
+    otelSpan: unknown;
+    resource: OtlpResource | null;
+    scope: OtlpInstrumentationScope | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+    /** Codex helper threads by request span id; absent, nothing is stamped. */
+    helperThreads?: Map<string, string>;
+  }): Promise<SpanIngestionResult> {
+    const spanParseResult = spanSchema.safeParse(input.otelSpan);
+    if (!spanParseResult.success) {
+      this.logger.warn(
+        { result: spanParseResult, tenantId: input.tenantId },
+        "Error parsing OTLP span, dropping",
+      );
+
+      return {
+        status: "dropped",
+        error: `span validation failed: ${spanParseResult.error.message}`,
+      };
+    }
+
+    // A time storage cannot hold is refused at the door: minted into a record id
+    // after the append it throws permanently on a retrying lane. One span's problem.
+    const decoded = storableSpanTimesOf(spanParseResult.data);
+    if ("unstorable" in decoded) {
+      return { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) };
+    }
+    const { startTimeUnixMs } = decoded.times;
+
+    if (startTimeUnixMs < nowInstant().epochMilliseconds - SPAN_MAX_PAST_MS) {
+      return { status: "dropped", error: "span start time is more than 31 days in the past" };
+    }
+
+    // The stamp is the admission: it is applied before the filter reads the span.
+    const helperThreadId = input.helperThreads?.get(
+      OtlpTraceRequestService.normalizeOtlpId(spanParseResult.data.spanId),
+    );
+    const span =
+      helperThreadId === undefined
+        ? spanParseResult.data
+        : stampCodexHelperThread({ span: spanParseResult.data, threadId: helperThreadId });
+
+    const isFilteredCodingAgentSpan =
+      this.codingAgentSpanFilterEnabled &&
+      this.codingAgents.shouldFilterSpan({
+        scopeName: input.scope?.name,
+        spanName: span.name,
+        attributeKeys: span.attributes.map((attribute) => attribute.key),
+      });
+    if (isFilteredCodingAgentSpan) {
+      return { status: "filtered" };
+    }
+
+    return this.ingestNormalizedSpan({
+      tenantId: input.tenantId,
+      span: this.withHexIds(span),
+      resource: input.resource,
+      instrumentationScope: input.scope,
+      piiRedactionLevel: input.piiRedactionLevel,
+      otelSpanRef: input.otelSpanRef,
+    });
+  }
+
+  /**
+   * Ids arrive as raw bytes over protobuf and as hex over JSON; dedup and
+   * the pipeline want one of them.
+   */
+  private withHexIds(span: OtlpSpan): OtlpSpan {
+    const hex = OtlpTraceRequestService.normalizeOtlpId;
+
+    return {
+      ...span,
+      traceId: hex(span.traceId),
+      spanId: hex(span.spanId),
+      parentSpanId: span.parentSpanId ? hex(span.parentSpanId) : span.parentSpanId,
+      links: span.links.map((link) => ({
+        ...link,
+        traceId: hex(link.traceId),
+        spanId: hex(link.spanId),
+      })),
+    };
+  }
+}
+
+/**
+ * The span-collection half of ingestion: dedup, payload prep, command
+ * handoff. Split from {@link TraceIngestionService} at the worker conversion,
+ * since its coding-agent span filter is unreachable from a worker's path.
+ */
+export class TraceSpanCollectionService {
+  private readonly logger = createLogger("langwatch:trace-processing:span-collection");
+
+  private constructor(
+    private readonly options: {
+      dedup: TraceSpanDedupRepository;
+      commands: TraceIngressCommand;
+      payloads?: TraceIngressPayload;
+    },
+  ) {}
+
+  static create(options: {
+    dedup: TraceSpanDedupRepository;
+    commands: TraceIngressCommand;
+    payloads?: TraceIngressPayload;
+  }): TraceSpanCollectionService {
+    return new TraceSpanCollectionService(options);
+  }
+
+  async ingestNormalizedSpan(input: {
+    tenantId: string;
+    span: OtlpSpan;
+    resource: OtlpResource | null;
+    instrumentationScope: OtlpInstrumentationScope | null;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef?: OtelSpan;
+  }): Promise<SpanIngestionResult> {
+    let lockAcquired = false;
+
+    try {
+      const claim = await this.options.dedup.claimProcessing({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
+      if (claim.outcome === "held") {
+        return { status: "deduped" };
+      }
+
+      lockAcquired = claim.outcome === "acquired";
+
+      const commandData: RecordSpanCommandData = {
+        tenantId: input.tenantId,
+        span: input.span,
+        resource: input.resource,
+        instrumentationScope: input.instrumentationScope,
+        piiRedactionLevel: input.piiRedactionLevel,
+        occurredAt: nowInstant().epochMilliseconds,
+      };
+      const prepared = this.options.payloads
+        ? await this.options.payloads.prepare(commandData)
+        : commandData;
+
+      await this.options.commands.recordSpan(prepared);
+      await this.options.dedup.confirmProcessed({
+        tenantId: input.tenantId,
+        traceId: input.span.traceId,
+        spanId: input.span.spanId,
+      });
+
+      return { status: "collected" };
+    } catch (error) {
+      if (lockAcquired) {
+        await this.options.dedup.releaseOnFailure({
+          tenantId: input.tenantId,
+          traceId: input.span.traceId,
+          spanId: input.span.spanId,
+        });
+      }
+
+      input.otelSpanRef?.addEvent("span_ingestion_error", {
+        "error.message": error instanceof Error ? error.message : String(error),
+        "tenant.id": input.tenantId,
+      });
+      this.logger.error(
+        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
+        "Error dispatching span to the trace processing pipeline",
+      );
+
+      return {
+        status: "failed",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+}
+
+/** Every scope entry of the request with its parsed spans, for the helper-thread join. */
+function scopedSpansOf(traceRequest: IExportTraceServiceRequest): ScopedSpans[] {
+  return (traceRequest.resourceSpans ?? []).flatMap((resourceSpan) =>
+    (resourceSpan?.scopeSpans ?? []).map((scopeSpan) => ({
+      scopeName: scopeSpan?.scope?.name,
+      spans: (scopeSpan?.spans ?? []).flatMap((candidate) => {
+        const parsed = spanSchema.safeParse(candidate);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    })),
+  );
+}

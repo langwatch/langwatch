@@ -1,0 +1,75 @@
+import isDeepEqual from "fast-deep-equal";
+import debounce from "lodash-es/debounce";
+import { temporal } from "zundo";
+import { create } from "zustand";
+
+// Keep the public hook and its pure state helpers on one browser package
+// surface; app transport code composes around this hook.
+export {
+  getWorkflow,
+  initialDSL,
+  initialState,
+  removeInvalidDecorations,
+  removeInvalidEdges,
+  type SocketStatus,
+  type State,
+  serializeWorkflow,
+  store,
+  updateCodeClassName,
+  updateInputFields,
+  updateOutputFields,
+  type WorkflowStore,
+} from "./workflow-store.ts";
+
+import { store, type WorkflowStore } from "./workflow-store.ts";
+
+export const _useWorkflowStore = create<WorkflowStore>()(
+  temporal(store, {
+    handleSet: (handleSet) => {
+      return debounce<typeof handleSet>(
+        (pastState: WorkflowStore) => {
+          if (pastState.nodes.some((node) => node.dragging)) {
+            return;
+          }
+          handleSet(pastState);
+        },
+
+        // Debounce history to avoid multiple undo entries when state changes rapidly.
+        100,
+        { leading: true, trailing: false },
+      );
+    },
+    equality: (pastState, currentState) => {
+      const partialize = (state: WorkflowStore) => {
+        const state_ = {
+          name: state.name,
+          icon: state.icon,
+          description: state.description,
+          version: undefined,
+          edges: state.edges.map((edge) => {
+            const edge_ = { ...edge };
+            delete edge_.selected;
+            return edge_;
+          }),
+          nodes: state.nodes.map((node) => {
+            const node_ = { ...node, data: { ...node.data } };
+            delete node_.selected;
+            delete node_.data.execution_state;
+            return node_;
+          }),
+        };
+        return state_;
+      };
+      return isDeepEqual(partialize(pastState), partialize(currentState));
+    },
+  }),
+);
+
+type UseWorkflowStoreType = typeof _useWorkflowStore;
+
+export const useWorkflowStore = ((...args: Parameters<UseWorkflowStoreType>) => {
+  const selector = args[0] ?? ((state) => state);
+  const equalityFn = args[1];
+
+  return _useWorkflowStore(selector, equalityFn);
+}) as UseWorkflowStoreType;

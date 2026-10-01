@@ -1,19 +1,16 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+
 /**
  * `langwatch config set daemon off` — the persistent daemon opt-out — and the
  * per-key validation around it. Driven against a real (temporary) config file
  * via LANGWATCH_CLI_CONFIG, the override the file lookup already honours.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
-import {
-  configGetCommand,
-  configListCommand,
-  configSetCommand,
-} from "../config";
 import { loadConfig } from "../../utils/governance/config";
+import { configGetCommand, configListCommand, configSetCommand } from "../config";
 
 describe("config commands", () => {
   let dir: string;
@@ -29,11 +26,9 @@ describe("config commands", () => {
     process.env.LANGWATCH_CLI_CONFIG = configFile;
     logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    exitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation((() => {
-        throw new Error("process.exit called");
-      }) as never);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {
+      throw new Error("process.exit called");
+    }) as never);
   });
 
   afterEach(() => {
@@ -43,7 +38,7 @@ describe("config commands", () => {
     vi.restoreAllMocks();
   });
 
-  describe("set daemon", () => {
+  describe("when calling configSetCommand for daemon", () => {
     it("persists the opt-out", async () => {
       await configSetCommand("daemon", "off");
 
@@ -57,22 +52,18 @@ describe("config commands", () => {
     });
 
     it("rejects anything but on/off, writing nothing", async () => {
-      await expect(configSetCommand("daemon", "maybe")).rejects.toThrow(
-        "process.exit called",
-      );
+      await expect(configSetCommand("daemon", "maybe")).rejects.toThrow("process.exit called");
 
       expect(exitSpy).toHaveBeenCalledWith(1);
       expect(fs.existsSync(configFile)).toBe(false);
     });
   });
 
-  describe("get daemon", () => {
+  describe("when calling configGetCommand for daemon", () => {
     let writeSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      writeSpy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+      writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     });
 
     it("defaults to on when nothing was persisted", async () => {
@@ -91,7 +82,7 @@ describe("config commands", () => {
     });
   });
 
-  describe("list", () => {
+  describe("configListCommand()", () => {
     it("shows the daemon setting", async () => {
       await configSetCommand("daemon", "off");
       logSpy.mockClear();
@@ -103,7 +94,7 @@ describe("config commands", () => {
     });
   });
 
-  describe("the url keys", () => {
+  describe("given a URL key", () => {
     it("still validate their values as URLs", async () => {
       await expect(configSetCommand("endpoint", "not a url")).rejects.toThrow(
         "process.exit called",

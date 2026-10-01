@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // runPlay is `haven play [pr]`: run a PR in a throwaway sandbox with its own
@@ -129,10 +130,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	// plain streaming; Ctrl-C (or the driver killing us) ends it and the
 	// deferred teardown still destroys everything.
 	if d.isAgent || !stdoutIsTTY() {
-		sandbox := app.PlaySandbox{
-			Number: pr.Number, Checkout: checkout,
-			LwDir: filepath.Join(checkout, "platform", "app"), Preset: preset,
-		}
+		sandbox := app.PlaySandbox{Number: pr.Number, Checkout: checkout, Preset: preset}
 		if err := d.orch.PlayLaunch(ctx, sandbox); err != nil && ctx.Err() == nil {
 			return err
 		}
@@ -149,7 +147,8 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	if err := app.WritePlayRecord(havenHome(), rec); err != nil {
 		return fmt.Errorf("recording the sandbox launcher: %w", err)
 	}
-	if err := runPlayViewer(ctx, rec.Slug, d.sessionActions(rec.Slug)); err != nil {
+	logDir, logPath := domain.StackLogPaths(rec.Checkout, rec.Slug)
+	if err := runPlayViewer(ctx, rec.Slug, logPath, logDir, d.sessionActions(rec.Slug)); err != nil {
 		return err
 	}
 	return teardown()
@@ -213,7 +212,7 @@ type playChild struct {
 // fields so the child can never be pointed at a different sandbox than the one
 // teardown will destroy.
 func startPlayLaunch(rec app.PlayRecord, preset string) (playChild, error) {
-	logPath := stackLogPath(rec.Slug)
+	logPath := stackLogPath(rec.Checkout, rec.Slug)
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return playChild{}, err
 	}
@@ -275,6 +274,6 @@ func runPlayLaunchCmd(ctx context.Context, d deps, inv invocation) error {
 		preset = inv.args[1]
 	}
 	return d.orch.PlayLaunch(ctx, app.PlaySandbox{
-		Number: number, Checkout: d.worktree, LwDir: d.lwDir, Preset: preset,
+		Number: number, Checkout: d.worktree, Preset: preset,
 	})
 }

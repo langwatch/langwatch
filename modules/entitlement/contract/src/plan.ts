@@ -1,0 +1,43 @@
+import {
+  planDispatchCeilingsShape,
+  planPricesShape,
+  planSeatsAndVolumeShape,
+} from "@langwatch/plans";
+import { z } from "zod";
+
+export const planSourceSchema = z.enum(["license", "subscription", "free"]);
+
+export const moneyByCurrencySchema = z.object({
+  USD: z.number(),
+  EUR: z.number(),
+});
+
+export const planSchema = z.object({
+  planSource: planSourceSchema,
+  type: z.string(),
+  name: z.string(),
+  free: z.boolean(),
+  visibilityDays: z.number().nullable().optional(),
+  trialDays: z.number().optional(),
+  daysSinceCreation: z.number().optional(),
+  overrideAddingLimitations: z.boolean().optional(),
+  ...planSeatsAndVolumeShape,
+  webhookEndpointsEnabled: z.boolean().optional(),
+  ...planDispatchCeilingsShape,
+  usageUnit: z.string().optional(),
+  ...planPricesShape,
+});
+
+export type PlanSource = z.infer<typeof planSourceSchema>;
+export type MoneyByCurrency = z.infer<typeof moneyByCurrencySchema>;
+export type Plan = z.infer<typeof planSchema>;
+
+/** Compatibility name while existing consumers migrate to `Plan`. */
+export type PlanInfo = Plan;
+
+/**
+ * How an organization is billed, restated from the Postgres enum
+ * `PricingModel`: a portable contract cannot depend on the generated client.
+ */
+export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
+export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];

@@ -8,7 +8,7 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
 - a **SAML identity provider** — metadata and an SSO endpoint that signs
   assertions for any service provider's request (permissive by design)
 - a **SCIM 2.0 directory** — Users/Groups CRUD + PATCH behind a deterministic
-  bearer token, plus a connection to a real SCIM service provider it *pushes*
+  bearer token, plus a connection to a real SCIM service provider it _pushes_
   its directory at and reads back (the Okta/Entra role, aimed at the app's SCIM
   endpoints)
 - a fake **domain owner** — `acme<n>.test` pre-seeded with a DNS TXT record
@@ -16,7 +16,11 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
   domain-verification testing. The app-side verification feature is greenfield;
   both proofs are ready for it.
 
-Everything is in-memory and reset at boot. Nothing here is production code.
+Haven persists each stack's simulator under `~/.langwatch/portless/idp/<slug>/`.
+Registered applications, users, groups, provisioning credentials, domain proofs,
+and signing keys survive `haven up -f`, service restarts, and stop/start cycles.
+Direct runs persist when `IDPSIM_DATA_DIR` is set; otherwise they start in memory.
+Nothing here is production code.
 
 ## Running
 
@@ -31,29 +35,60 @@ IDPSIM_TENANTS=20 make service svc=idpsim   # a wider range
 
 Under haven the lane is **on by default** in every stack (`haven up -idp`
 turns it off for a worktree), routed at `idp.<slug>.langwatch.localhost`.
+Both `haven up` and `haven idp` use the simulator bundled into Haven, so the
+checkout does not need this package or a Go toolchain to launch the simulator.
+The stack's `idp` link on the Haven web dashboard opens its browser page.
+Standalone `haven idp` keeps its separate state under
+`~/.langwatch/portless/idp-standalone/`. Both paths follow `LANGWATCH_PORTLESS_HOME` when set.
+Changes are saved atomically before the simulator acknowledges them. Invalid
+state files stop startup instead of silently resetting the directory. Explicit
+directory resets and deletions are saved too; login codes and access tokens
+remain temporary and are discarded on restart.
 
 Open `/` for the tenant list, and `/t/<n>/` for a tenant's own page: register
 an application, copy the values the setup wizard asks for, see its users, and
 watch a live feed of everything it serves or refuses. `GET /control/state` is
-the same as JSON.
+the same as JSON. The provider list can be searched by number or domain.
+Tenant pages have tabs for set-up, provisioning, domain, users and activity
+(the tab is in the address, so `/t/1/#activity` links straight to it). Filter
+activity by outcome or text, and pause/resume updates while inspecting a
+request. Connection errors are visible and retried.
+
+### The console
+
+The pages are `apps/idpsim-web`, a React app built by Vite into `web/dist` and
+embedded in this binary (ADR-160); the simulator renders no HTML of its own.
+Build it with `pnpm --filter @langwatch/idpsim-web build` before building the
+Go binary; a binary built without it answers every page with one line naming
+that command. The app reads `/api` (JSON, refusals as `{title, detail, hint}`
+with a 4xx status) and the activity feed at `/control/t/<n>/activity`. The
+authorize endpoint and a refused redirect serve the same bundle, so their
+status line is unchanged. `pnpm --filter @langwatch/idpsim-web dev` proxies to
+a simulator on `IDPSIM_URL` (default `http://127.0.0.1:5565`) for work on the
+console itself.
+
+The project terminal viewer has an `idp` tab with searchable tenant summaries;
+Enter opens the chosen tenant in the browser. `haven idp --json` reads those
+summaries for the current stack, and `--stack <slug>` selects another stack.
+This read-only mode does not start a standalone simulator.
 
 ## Registering an application
 
 LangWatch's single sign-on setup shows you a redirect address ending in
-`{connection}` — the real id only exists *after* you register the connection,
+`{connection}` — the real id only exists _after_ you register the connection,
 which you cannot do until the identity provider is set up. Paste the address
 into the tenant page exactly as shown: a `{placeholder}` segment here matches
 whichever id turns up, so the circle breaks and you never have to come back.
 
-Registering hands back the three values the wizard's *Then tell us about it*
+Registering hands back the three values the wizard's _Then tell us about it_
 step asks for, under the same names:
 
-| Wizard field   | Where it comes from                     |
-| -------------- | --------------------------------------- |
-| Name           | whatever you called the application      |
-| Issuer address | the tenant's base address, `…/t/<n>`     |
-| Client id      | minted at registration                   |
-| Client secret  | minted at registration                   |
+| Wizard field   | Where it comes from                  |
+| -------------- | ------------------------------------ |
+| Name           | whatever you called the application  |
+| Issuer address | the tenant's base address, `…/t/<n>` |
+| Client id      | minted at registration               |
+| Client secret  | minted at registration               |
 
 For the SAML half the tenant page carries the sign-in address, entity id and a
 copyable signing certificate, plus a link to the metadata document if you would
@@ -81,14 +116,16 @@ outcome and a plain-language reason — which is usually the fastest way to find
 out whether a login even reached the identity provider, and what it objected to
 if it did.
 
-| Variable          | Default                  | Meaning                                    |
-| ----------------- | ------------------------ | ------------------------------------------ |
-| `SERVER_ADDR`     | `:5565`                  | HTTP listen address                        |
-| `IDPSIM_BASE_URL` | `http://localhost:5565`  | External base for issuer/metadata URLs     |
-| `IDPSIM_TENANTS`  | `3`                      | Tenant range size (1–100)                  |
-| `IDPSIM_DNS_ADDR` | `:15353`                 | Verification DNS UDP listener; `off` disables |
+| Variable          | Default                 | Meaning                                        |
+| ----------------- | ----------------------- | ---------------------------------------------- |
+| `SERVER_ADDR`     | `:5565`                 | HTTP listen address                            |
+| `IDPSIM_BASE_URL` | `http://localhost:5565` | External base for issuer/metadata URLs         |
+| `IDPSIM_TENANTS`  | `3`                     | Tenant range size (1–100)                      |
+| `IDPSIM_DNS_ADDR` | `:15353`                | Verification DNS UDP listener; `off` disables  |
+| `IDPSIM_DATA_DIR` | empty                   | Persistent state directory; empty is in memory |
 
-Under haven the lane gets `SERVER_ADDR` and `IDPSIM_BASE_URL` injected, and
+Under haven the lane gets its listener addresses, `IDPSIM_BASE_URL`, and
+`IDPSIM_DATA_DIR` injected, and
 worktrees running (or falling back to) the lane see `LANGWATCH_IDPSIM_URL` in
 their overlay.
 
@@ -104,8 +141,9 @@ OIDC_CLIENT_ID=anything                   # idpsim accepts any client
 OIDC_CLIENT_SECRET=anything
 ```
 
-The authorize endpoint serves an account picker; add `login_hint=<email>` for
-a zero-click login in automated tests. Seeded users per tenant:
+The authorize endpoint serves an account picker, each account a link back into
+the same request with the hint filled in; add `login_hint=<email>` for a
+zero-click login in automated tests. Seeded users per tenant:
 `admin@acme<n>.test` and `member@acme<n>.test`.
 
 To exercise the app's Auth0-brokered-SAML handling (`samlp|` subjects,
@@ -128,7 +166,7 @@ Open a tenant page, fill in LangWatch's SCIM address and token under
 **Provision into LangWatch**, and you get two presses:
 
 - **Sync the difference** — reads what LangWatch holds and sends only what
-  changed. This is the one to use; see *Large directories* below.
+  changed. This is the one to use; see _Large directories_ below.
 - **Push everything** — every user then every group as a SCIM create, carrying
   that token, with seeded member ids mapped onto the ids LangWatch minted.
   Right exactly once, and all conflicts afterwards.
@@ -153,7 +191,7 @@ for a caller that would rather not connect first, and `DELETE
 putting the seeded users back is not a reason to forget where they were going.
 
 Two SCIM tokens live on the tenant page and they point opposite ways. The one
-under *Directory and domain* is the way **in** — it guards the tenant's own
+under _Directory and domain_ is the way **in** — it guards the tenant's own
 SCIM server at `/t/<n>/scim/v2`, for testing the client side of provisioning —
 and the one you paste is the way **out**. Pasting the first where the second
 belongs is refused rather than left to fail as an unauthorized push.
@@ -166,25 +204,25 @@ receiving side pages its lists, whether a deactivation reaches the membership
 table, what a thousand joiners does to the screen an administrator is reading.
 Those only appear at scale.
 
-**Directory at scale** on the tenant page has two forms and three verbs:
+**Directory at scale** on the tenant page's provisioning tab has two forms and three verbs:
 
 - **Generate** — how many people, across how many groups. The admin and member
   you sign in as are kept, and growing keeps everybody already there, so a
   second generate at a larger size adds joiners rather than replacing the
   organization. Same numbers, same people, every time: the generator is seeded.
 - **Churn** — one round of what happens to a real directory between syncs.
-  *Join*, *Leave*, *Deactivate*, *Reactivate*, *Rename* and *Regroup*, in
+  _Join_, _Leave_, _Deactivate_, _Reactivate_, _Rename_ and _Regroup_, in
   counts rather than percentages.
 - **Sync the difference** — reads what LangWatch holds and sends only what
   changed.
 
 ### Why sync rather than push
 
-*Push everything* sends each user as a SCIM create, which is right exactly once
+_Push everything_ sends each user as a SCIM create, which is right exactly once
 and all conflicts afterwards — so "what does the directory do when two hundred
 people are deactivated" could not be asked at all.
 
-*Sync* reconciles. It reads the receiving side's own account of what it holds,
+_Sync_ reconciles. It reads the receiving side's own account of what it holds,
 matches it against the tenant's directory the way a real provider does, and
 sends the difference: creates for arrivals, `PUT`s for changes, a `PATCH` on
 `active` for departures. Running it twice with nothing changed sends nothing,
@@ -229,12 +267,12 @@ curl -X POST $SIM/control/t/1/scim-sync
 `scim-sync` takes its options in the query string, because the body is already
 spoken for by the optional inline target:
 
-| Option | Default | What it does |
-| --- | --- | --- |
-| `mode` | `deactivate` | `delete` removes a departed record outright instead of suspending it. |
-| `concurrency` | `8` | Requests in flight at once, capped at 64. |
-| `groups` | off | Send group membership too — the slower half. |
-| `dryRun` | off | Work out the difference and send nothing. |
+| Option        | Default      | What it does                                                          |
+| ------------- | ------------ | --------------------------------------------------------------------- |
+| `mode`        | `deactivate` | `delete` removes a departed record outright instead of suspending it. |
+| `concurrency` | `8`          | Requests in flight at once, capped at 64.                             |
+| `groups`      | off          | Send group membership too — the slower half.                          |
+| `dryRun`      | off          | Work out the difference and send nothing.                             |
 
 Every run reports `elapsed`, `elapsedMs` and `requestsPerSec`, so "how long
 does 5,000 take" has an answer rather than an impression. Failures are counted

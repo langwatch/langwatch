@@ -1,0 +1,80 @@
+import { ScenarioExecutionService as ScenarioExecutionServiceContract } from "@langwatch/scenario-contract";
+import type {
+  ScenarioAgentInstance,
+  ScenarioExecutionJob,
+  ScenarioExecutionPrefetchInput,
+  ScenarioExecutionPrefetchResult,
+  ScenarioExecutionPreparation,
+  ScenarioUnsuccessfulExecutionInput,
+  SimulationService,
+} from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
+
+import type { CancellationPublisher, ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
+import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
+
+export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
+  static create(options: {
+    pool: ScenarioExecutionPool;
+    cancellations: CancellationPublisher;
+    prefetcher: ScenarioExecutionPrefetcherService;
+    failures: ScenarioFailureHandlerService;
+    simulations: SimulationService;
+  }): ScenarioExecutionService {
+    return new ScenarioExecutionService(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      pool: ScenarioExecutionPool;
+      cancellations: CancellationPublisher;
+      prefetcher: ScenarioExecutionPrefetcherService;
+      failures: ScenarioFailureHandlerService;
+      simulations: SimulationService;
+    },
+  ) {
+    super();
+  }
+
+  async submit(input: ScenarioExecutionJob): Promise<void> {
+    this.options.pool.submit(input);
+  }
+
+  async cancel(input: { projectId: string; scenarioRunId: string }): Promise<void> {
+    await this.options.cancellations.publish(input);
+  }
+
+  prefetch(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> {
+    return this.options.prefetcher.prefetch(input);
+  }
+
+  prepare(input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation {
+    return this.options.prefetcher.prepare(input);
+  }
+
+  finishUnsuccessfulRun(input: ScenarioUnsuccessfulExecutionInput): Promise<void> {
+    return this.options.failures.finishUnsuccessfulRun(input);
+  }
+
+  recordAgentInstance(input: {
+    projectId: string;
+    scenarioRunId: string;
+    agentInstance: ScenarioAgentInstance;
+  }): Promise<void> {
+    return this.options.simulations.recordAgentInstance({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      agentInstance: input.agentInstance,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
+
+  recordCutAtLimit(input: { projectId: string; scenarioRunId: string }): Promise<void> {
+    return this.options.simulations.recordCutAtLimit({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
+}

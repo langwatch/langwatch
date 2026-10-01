@@ -1,0 +1,1413 @@
+import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { useRouter } from "@langwatch/browser-host/use-router";
+import type {
+  DatasetColumns,
+  DatasetConfirmColumns,
+  DatasetRecordEntry,
+  InMemoryDataset,
+} from "@langwatch/dataset-contract";
+import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import {
+  Alert,
+  Box,
+  Button,
+  HStack,
+  Spacer,
+  Spinner,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { createLogger } from "@langwatch/observability/browser";
+import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";
+import { nowInstant } from "@langwatch/time";
+import { CheckCircle, FileText, Trash2, X, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  formatFileSize,
+  jsonToCSV as papaparseJsonToCSV,
+  readString as papaparseReadString,
+  useCSVReader,
+  usePapaParse,
+} from "react-papaparse";
+
+import { datasetApi } from "../../../behavior/dataset-api.ts";
+import { PresignedUploadFailedError } from "../../../behavior/stored-object-upload.ts";
+import { useDatasetImportTransport } from "../../../behavior/use-stored-object-upload.ts";
+import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
+import { readableDate } from "../../../model/readable-date.ts";
+import { getSafeColumnName } from "../../../model/reserved-columns.ts";
+import {
+  DROPZONE_DOTTED_STYLE,
+  DropzonePrompt,
+  dropzoneSurfaceProps,
+  RAINBOW_TEXT_CSS,
+} from "../../elements/dataset-dropzone-styles.tsx";
+import {
+  type AddDatasetDrawerProps,
+  AddOrEditDatasetDrawer,
+} from "./add-or-edit-dataset-drawer.tsx";
+
+const logger = createLogger("UploadCSVDrawer");
+
+function PreparingRowAction({
+  isFailed,
+  isReady,
+  isRetrying,
+  onRetry,
+  onViewDataset,
+}: {
+  isFailed: boolean;
+  isReady: boolean;
+  isRetrying: boolean;
+  onRetry: () => void;
+  onViewDataset: () => void;
+}) {
+  if (isFailed) {
+    return (
+      <Button size="sm" colorPalette="red" variant="outline" loading={isRetrying} onClick={onRetry}>
+        Retry
+      </Button>
+    );
+  }
+  if (!isReady) return null;
+
+  return (
+    <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
+      View dataset
+    </Button>
+  );
+}
+
+/** Cancel aborts the upload AND clears the file, so the dropzone expands back in. */
+function SelectedFileAction({
+  isUploading,
+  onCancel,
+  onClearFile,
+}: {
+  isUploading: boolean;
+  onCancel?: () => void;
+  onClearFile: () => void;
+}) {
+  if (!isUploading) return <RemoveFileButton onRemove={onClearFile} />;
+  if (!onCancel) return null;
+
+  return (
+    <CancelUploadButton
+      onCancel={() => {
+        onCancel();
+        onClearFile();
+      }}
+    />
+  );
+}
+
+export function UploadCSVDrawer({
+  isOpen: isOpen_,
+  onClose: onClose_,
+  onSuccess,
+  onCreateFromScratch,
+  enableDirectUpload = true,
+}: {
+  isOpen?: boolean;
+  onClose?: () => void;
+  onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
+  onCreateFromScratch?: () => void;
+  /**
+   * When true (default), upload streams the raw file directly to object
+   * storage. Hosts needing columns synchronously (the workflow dataset
+   * picker) pass false for the in-browser-parse drawer flow instead.
+   */
+  enableDirectUpload?: boolean;
+}) {
+  const { closeDrawer } = useDrawer();
+  const { project } = useOrganizationTeamProject();
+  const router = useRouter();
+  const onClose = onClose_ ?? closeDrawer;
+  const isOpen = isOpen_ ?? true;
+
+  const addDatasetDrawer = useDisclosure();
+  const [localIsOpen, setLocalIsOpen] = useState(isOpen);
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(undefined);
+  // Confirm-columns step (ADR-032 v19): when the form requests it, hold the
+  // parsed columns + the resume callback and render the confirm drawer. Null
+  // when no confirm is in progress (so the drawer — and its hooks — only mount
+  // while confirming).
+  const [columnConfirm, setColumnConfirm] = useState<{
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: { name: string; columnTypes: DatasetColumns }) => void;
+  } | null>(null);
+  // Direct-upload (ADR-032 D4) processing stays IN this drawer: once the raw
+  // file is streamed + finalized, the dataset normalizes server-side. We hold
+  // its id and poll its status here instead of navigating to the dataset page,
+  // so the whole async flow is observable without leaving the drawer.
+  const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(null);
+
+  const uploadCSVData = () => {
+    setLocalIsOpen(false);
+    addDatasetDrawer.onOpen();
+  };
+
+  const handleClose = () => {
+    setProcessingDatasetId(null);
+    onClose();
+  };
+
+  useEffect(() => {
+    setLocalIsOpen(isOpen);
+    if (!isOpen) {
+      setUploadedDataset(undefined);
+      setProcessingDatasetId(null);
+      addDatasetDrawer.onClose();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  return (
+    <>
+      <Drawer.Root open={localIsOpen} onOpenChange={({ open }) => !open && handleClose()} size="xl">
+        <Drawer.Content bg="bg">
+          <Drawer.CloseTrigger />
+          <Drawer.Header>
+            <Drawer.Title>Upload CSV</Drawer.Title>
+          </Drawer.Header>
+          <Drawer.Body>
+            {processingDatasetId && project ? (
+              <DatasetUploadProcessing
+                projectId={project.id}
+                datasetId={processingDatasetId}
+                onReady={(dataset) => {
+                  onSuccess({
+                    datasetId: dataset.id,
+                    name: dataset.name,
+                    columnTypes: (dataset.columnTypes ?? {}) as DatasetColumns,
+                  });
+                }}
+                onViewDataset={() => {
+                  const datasetId = processingDatasetId;
+                  handleClose();
+                  if (project) {
+                    void router.push(`/${project.slug}/datasets/${datasetId}`);
+                  }
+                }}
+              />
+            ) : (
+              <UploadCSVForm
+                setUploadedDataset={setUploadedDataset}
+                uploadedDataset={uploadedDataset}
+                uploadCSVData={uploadCSVData}
+                onCreateFromScratch={onCreateFromScratch}
+                enableDirectUpload={enableDirectUpload}
+                onClose={onClose}
+                onDirectUploadComplete={setProcessingDatasetId}
+                requestColumnConfirm={setColumnConfirm}
+              />
+            )}
+          </Drawer.Body>
+        </Drawer.Content>
+      </Drawer.Root>
+      <AddOrEditDatasetDrawer
+        datasetToSave={uploadedDataset}
+        open={addDatasetDrawer.open}
+        onClose={() => {
+          addDatasetDrawer.onClose();
+          onClose();
+        }}
+        onSuccess={(params) => {
+          onSuccess(params);
+          onClose();
+        }}
+      />
+      {/* Confirm-columns step for the direct path (ADR-032 v19): rename + retype
+          the file's columns before the upload starts. localOnly so it never
+          writes the DB itself — on Apply it returns the confirmed schema to the
+          form (via onConfirmed), which then runs the direct upload. isColumnsLocked
+          hides add/remove so the confirmed columns stay positionally aligned
+          with the file the normalize job parses. */}
+      {columnConfirm && (
+        <AddOrEditDatasetDrawer
+          open
+          localOnly
+          isColumnsLocked
+          datasetToSave={{
+            name: columnConfirm.proposedName,
+            columnTypes: columnConfirm.columns,
+          }}
+          onClose={() => setColumnConfirm(null)}
+          onSuccess={({ name, columnTypes }) => {
+            const { onConfirmed } = columnConfirm;
+            setColumnConfirm(null);
+            onConfirmed({ name, columnTypes });
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * In-drawer view for the async tail of a direct upload (ADR-032 D4): polls
+ * processing / ready / failed status without leaving the drawer. On ready it
+ * notifies the host; navigating to the dataset stays an explicit user action.
+ */
+export function DatasetUploadProcessing({
+  projectId,
+  datasetId,
+  onReady,
+  onViewDataset,
+}: {
+  projectId: string;
+  datasetId: string;
+  onReady: (dataset: { id: string; name: string; columnTypes: unknown }) => void;
+  onViewDataset: () => void;
+}) {
+  const [isRetrying, setIsRetrying] = useState(false);
+  const retryNormalize = datasetApi.dataset.retryNormalize.useMutation();
+  const datasetQuery = datasetApi.dataset.getById.useQuery(
+    { projectId, datasetId },
+    {
+      enabled: !!projectId && !!datasetId,
+      // Poll only while preparing, then stop — same contract as the dataset
+      // page. `finalizeUpload` always flips the row to "processing" before
+      // normalize runs, so "ready" is only ever reached once normalize has
+      // finished; we don't second-guess it (a degenerate columnless dataset is
+      // still terminally ready, not an endless spinner).
+      refetchInterval: (query) => {
+        const status = query.state.data?.status;
+        const isPreparing = status === "processing" || status === "uploading";
+
+        return isPreparing ? 3000 : false;
+      },
+    },
+  );
+
+  const data = datasetQuery.data;
+  // `getById` (findFirst, archivedAt: null) returns null for a missing/archived
+  // dataset — a terminal state, NOT "still preparing" (else the spinner hangs
+  // forever, since refetchInterval also stops on null).
+  const datasetGone = datasetQuery.isFetched && data == null;
+  const isFailed = data?.status === "failed";
+  const isReady = data?.status === "ready";
+  const isProcessing = !datasetGone && !isFailed && !isReady;
+
+  useEffect(() => {
+    if (isReady && data) {
+      onReady({ id: data.id, name: data.name, columnTypes: data.columnTypes });
+    }
+    // Fire once on the transition to ready; onReady just refreshes the list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady]);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    try {
+      await retryNormalize.mutateAsync({ projectId, datasetId });
+      await datasetQuery.refetch();
+    } catch (error) {
+      showErrorToast({
+        error,
+        fallbackTitle: "Couldn't prepare your dataset",
+      });
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  const hasFailed = isFailed || datasetGone;
+  const readyStatus: DatasetFileStatus = isReady ? "ready" : "uploading";
+  const rowStatus: DatasetFileStatus = hasFailed ? "error" : readyStatus;
+
+  const preparingLabel = isProcessing
+    ? "Preparing your dataset, this can take a few minutes"
+    : undefined;
+  const failureMessage = isFailed
+    ? (data?.statusError ?? "Something went wrong while processing your file. You can retry.")
+    : undefined;
+
+  // Same row treatment as the dropzone, so the upload → prepare → ready flow
+  // reads as one continuous file row rather than swapping to a banner.
+  return (
+    <VStack width="full" align="stretch" gap={4}>
+      <DatasetFileRow
+        name={data?.name ?? "Your dataset"}
+        status={rowStatus}
+        metaLabel={isReady ? "Ready" : preparingLabel}
+        message={datasetGone ? "This dataset is no longer available." : failureMessage}
+        action={
+          <PreparingRowAction
+            isFailed={isFailed}
+            isReady={isReady}
+            isRetrying={isRetrying}
+            onRetry={() => void handleRetry()}
+            onViewDataset={onViewDataset}
+          />
+        }
+      />
+    </VStack>
+  );
+}
+
+export function InlineUploadCSVForm({
+  onSuccess,
+}: {
+  onSuccess: NonNullable<AddDatasetDrawerProps["onSuccess"]>;
+}) {
+  const addDatasetDrawer = useDisclosure();
+  const [uploadedDataset, setUploadedDataset] = useState<InMemoryDataset | undefined>(undefined);
+
+  return (
+    <>
+      <UploadCSVForm
+        setUploadedDataset={setUploadedDataset}
+        uploadedDataset={uploadedDataset}
+        uploadCSVData={addDatasetDrawer.onOpen}
+        disabled={addDatasetDrawer.open}
+      />
+      <AddOrEditDatasetDrawer
+        datasetToSave={uploadedDataset}
+        open={addDatasetDrawer.open}
+        onClose={() => {
+          addDatasetDrawer.onClose();
+        }}
+        onSuccess={(params) => {
+          onSuccess(params);
+        }}
+      />
+    </>
+  );
+}
+
+/** A name from the file's own name, bumped when taken; "New Dataset" when it has none. */
+async function proposeDatasetName({
+  filename,
+  findNextName,
+}: {
+  filename: string;
+  findNextName: (proposedName: string) => Promise<string>;
+}): Promise<string> {
+  const fromFile = filename.split(".")[0] || "New Dataset";
+  try {
+    return await findNextName(fromFile);
+  } catch (error) {
+    logger.error({ error }, "Failed to get valid name");
+    return fromFile;
+  }
+}
+
+/**
+ * The rejected-PUT fallback: parse the file in the browser, guarded on `MAX_FILE_SIZE_BYTES`
+ * (over it, stop with a message; the CORS detail stays in the log).
+ */
+async function fallbackParseOf({
+  file,
+  proposeName,
+}: {
+  file: File;
+  proposeName: (filename: string) => Promise<string>;
+}): Promise<
+  | { kind: "too-large"; message: string }
+  | { kind: "parsed"; dataset: InMemoryDataset }
+  | { kind: "failed"; message: string }
+> {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return {
+      kind: "too-large",
+      message:
+        "We couldn't upload your file to storage. Please try again, or contact your administrator if the problem persists.",
+    };
+  }
+  try {
+    const rows = await parseFileToRows(file);
+    return { kind: "parsed", dataset: buildDatasetFromRows(rows, await proposeName(file.name)) };
+  } catch (error) {
+    logger.error({ error }, "Fallback parse of dataset file failed");
+    return {
+      kind: "failed",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Something went wrong reading your file. Please try again.",
+    };
+  }
+}
+
+/** A finalized upload: the host takes over in the drawer, or the reader is sent to the dataset. */
+function announceUploaded({
+  datasetId,
+  onDirectUploadComplete,
+  onClose,
+  openDataset,
+}: {
+  datasetId: string;
+  onDirectUploadComplete: ((datasetId: string) => void) | undefined;
+  onClose: (() => void) | undefined;
+  openDataset: (datasetId: string) => void;
+}): void {
+  if (onDirectUploadComplete) {
+    onDirectUploadComplete(datasetId);
+    return;
+  }
+  toaster.create({ title: "Preparing your dataset", type: "success" });
+  onClose?.();
+  openDataset(datasetId);
+}
+
+/**
+ * A failed direct upload: a cancel is silent; a refused storage PUT (almost always a missing
+ * bucket CORS rule) is logged for operators and falls back to the in-browser parse.
+ */
+async function recoverFromDirectUploadFailure({
+  error,
+  signal,
+  file,
+  projectId,
+  fallBack,
+  showFailure,
+}: {
+  error: unknown;
+  signal: AbortSignal;
+  file: File;
+  projectId: string;
+  fallBack: (file: File) => Promise<void>;
+  showFailure: (message: string) => void;
+}): Promise<void> {
+  const failure = directUploadFailureOf(error, signal);
+  if (failure === "aborted") return;
+  if (failure === "presigned-rejected") {
+    logger.error(
+      { error, fileSizeBytes: file.size, projectId },
+      "Direct-to-storage upload failed: presigned PUT rejected (likely a missing bucket CORS rule or storage connectivity). Falling back to in-browser parse.",
+    );
+    await fallBack(file);
+    return;
+  }
+  logger.error({ error }, "Direct dataset upload failed");
+  showFailure(describeError({ error, fallbackTitle: "Something went wrong uploading your file" }));
+}
+
+/** Why a direct upload stopped: the caller cancelled, the storage PUT was refused, or it failed. */
+function directUploadFailureOf(
+  error: unknown,
+  signal: AbortSignal,
+): "aborted" | "presigned-rejected" | "failed" {
+  if ((error instanceof Error && error.name === "AbortError") || signal.aborted) return "aborted";
+  if (error instanceof PresignedUploadFailedError) return "presigned-rejected";
+  return "failed";
+}
+
+/**
+ * Whether Upload is ready, and the file-level error shown inline on the file's row. The direct
+ * path streams the raw file and waits for the header parse; only the fallback parse-and-drawer
+ * flow is bound by the in-browser row limit.
+ */
+function uploadReadinessOf(input: {
+  enableDirectUpload: boolean;
+  hasRawFile: boolean;
+  isParsingHeader: boolean;
+  uploadedDataset: InMemoryDataset | undefined;
+  sizeError: string | null;
+}): { canUpload: boolean; fileError: string | undefined } {
+  if (input.enableDirectUpload) {
+    return {
+      canUpload: input.hasRawFile && !input.isParsingHeader,
+      fileError: input.sizeError ?? undefined,
+    };
+  }
+  const rowCount = input.uploadedDataset?.datasetRecords.length ?? 0;
+  if (rowCount > MAX_ROWS_LIMIT) {
+    return {
+      canUpload: false,
+      fileError: `Sorry, the max number of rows accepted for datasets is currently ${MAX_ROWS_LIMIT} rows. Please reduce the number of rows or contact support.`,
+    };
+  }
+  return { canUpload: rowCount > 0, fileError: input.sizeError ?? undefined };
+}
+
+/**
+ * Reads a picked file's header and proposes a name for the confirm step. Best-effort: an
+ * unreadable header skips the confirm step. A parse for a since-replaced file is discarded.
+ */
+async function readHeaderForConfirm({
+  file,
+  proposeName,
+  isCurrent,
+  onParsed,
+  onSettled,
+}: {
+  file: File;
+  proposeName: (filename: string) => Promise<string>;
+  isCurrent: () => boolean;
+  onParsed: (parsed: { columns: DatasetConfirmColumns | null; name: string }) => void;
+  onSettled: () => void;
+}): Promise<void> {
+  try {
+    const [columns, name] = await Promise.all([parseHeaderColumns(file), proposeName(file.name)]);
+    if (isCurrent()) onParsed({ columns, name });
+  } catch (error) {
+    logger.error({ error }, "Failed to parse dataset header columns");
+  } finally {
+    if (isCurrent()) onSettled();
+  }
+}
+
+export function UploadCSVForm({
+  setUploadedDataset,
+  uploadedDataset,
+  onCreateFromScratch,
+  uploadCSVData,
+  disabled,
+  enableDirectUpload = false,
+  onClose,
+  onDirectUploadComplete,
+  requestColumnConfirm,
+}: {
+  setUploadedDataset: (dataset: InMemoryDataset | undefined) => void;
+  uploadedDataset: InMemoryDataset | undefined;
+  onCreateFromScratch?: () => void;
+  uploadCSVData: () => void;
+  disabled?: boolean;
+  /** When true, "Upload" streams the raw file to storage; the host then shows
+   *  processing in the drawer. Falls back to the parse-and-drawer flow if
+   *  storage is off. */
+  enableDirectUpload?: boolean;
+  onClose?: () => void;
+  /** Called with the new dataset id once a direct upload is finalized, so the
+   *  host (UploadCSVDrawer) takes over and shows processing IN the drawer.
+   *  When omitted, the direct path navigates to the dataset page instead. */
+  onDirectUploadComplete?: (datasetId: string) => void;
+  /** Host-provided confirm-columns step (ADR-032 v19). When set, the direct
+   *  path hands the parsed header columns to the host before uploading; the host
+   *  shows the confirm drawer and calls `onConfirmed` with the final name +
+   *  columnTypes. When omitted (standalone form), the upload runs without a
+   *  confirm step (normalize derives all-`string`). */
+  requestColumnConfirm?: (params: {
+    columns: DatasetColumns;
+    proposedName: string;
+    onConfirmed: (confirmed: { name: string; columnTypes: DatasetColumns }) => void;
+  }) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id;
+  const trpcUtils = datasetApi.useUtils();
+  const router = useRouter();
+  const importTransport = useDatasetImportTransport();
+
+  // The raw file from the dropzone. The direct-upload path streams this as-is
+  // (no in-browser parse, so it never OOMs on big files and the columns are
+  // derived server-side by normalize). The parsed `uploadedDataset` is only
+  // used by the fallback (no-storage) flow.
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  // Confirm-columns step (ADR-032 v19, direct path only): the columns parsed
+  // from the file's header (null when the header couldn't be read → upload
+  // without a confirm step) and the proposed dataset name. The host renders the
+  // confirm drawer (see `requestColumnConfirm`); the user corrects names + types
+  // before the upload starts.
+  const [parsedColumns, setParsedColumns] = useState<DatasetConfirmColumns | null>(null);
+  const [proposedName, setProposedName] = useState<string>("");
+  // The header parse runs async on file pick; Upload must wait for it so a fast
+  // click can't bypass the confirm step. A monotonic token discards a stale
+  // parse (from a since-removed/replaced file) so it never overwrites the
+  // current file's columns.
+  const [isParsingHeader, setIsParsingHeader] = useState(false);
+  const parseHeaderTokenRef = useRef(0);
+  // System/drawer-level failure (storage not writable, upload failed) → top
+  // alert. File-level validation (too large / over the row limit) → inline on
+  // the file's row (sizeError + overRowLimitForFallback below).
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [sizeError, setSizeError] = useState<string | null>(null);
+  // Abort handle for the in-flight PUT; no dataset exists until it is confirmed.
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Closing the drawer mid-upload unmounts this form — abort the in-flight PUT
+  // so it doesn't silently create a dataset behind the user's back. The ref is
+  // nulled the instant the upload is confirmed, so this aborts only a genuinely
+  // in-flight stream. No-op (ref null) on a normal close or the processing handoff.
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
+
+  const proposeValidName = (filename: string): Promise<string> =>
+    proposeDatasetName({
+      filename,
+      findNextName: (proposedName) =>
+        projectId
+          ? trpcUtils.dataset.findNextName.fetch({ projectId, proposedName })
+          : Promise.resolve(proposedName),
+    });
+
+  const handleUploadAccepted = async (results: { data: string[][]; acceptedFile: File }) => {
+    const { data, acceptedFile } = results;
+    setRawFile(acceptedFile);
+    setUploadError(null);
+
+    const validName = await proposeValidName(acceptedFile.name);
+    setUploadedDataset(buildDatasetFromRows(data, validName));
+  };
+
+  /** The confirmed columns, bound to the file's headers by position, as the drawer lists them. */
+  const toConfirmColumns = (
+    columns: DatasetColumns | undefined,
+  ): DatasetConfirmColumns | undefined =>
+    columns?.map((column, index) => ({
+      name: column.name,
+      type: column.type,
+      sourceHeader: parsedColumns?.[index]?.sourceHeader ?? column.name,
+    }));
+
+  /**
+   * Upload by reference (ADR-158): the file goes to storage under the
+   * `dataset_import` purpose, then the dataset is created from it and prepared
+   * in the background. A rejected cross-origin PUT falls back to the in-browser parse.
+   */
+  const handleUpload = async (confirmed?: { name: string; columnTypes: DatasetColumns }) => {
+    const canUploadDirectly = enableDirectUpload && rawFile && projectId && project;
+    if (!canUploadDirectly) {
+      uploadCSVData();
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadError(null);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    try {
+      const name =
+        confirmed?.name ?? uploadedDataset?.name ?? (await proposeValidName(rawFile.name));
+      const reference = await importTransport.uploadStoredObject({
+        projectId,
+        purpose: DATASET_IMPORT_PURPOSE,
+        file: rawFile,
+        signal: controller.signal,
+      });
+      controller.signal.throwIfAborted();
+      abortControllerRef.current = null;
+      const { datasetId } = await importTransport.createFromStoredObject({
+        projectId,
+        name,
+        storedObjectId: reference.id,
+        columnTypes: toConfirmColumns(confirmed?.columnTypes),
+      });
+
+      setIsUploading(false);
+      announceUploaded({
+        datasetId,
+        onDirectUploadComplete,
+        onClose,
+        openDataset: (id) => void router.push(`/${project.slug}/datasets/${id}`),
+      });
+    } catch (error) {
+      await recoverFromDirectUploadFailure({
+        error,
+        signal: controller.signal,
+        file: rawFile,
+        projectId,
+        fallBack: runFallbackParseAndDrawer,
+        showFailure: (message) => {
+          // System error → top alert; clear any file-level error so the two never
+          // render the shared `upload-error` testid at once.
+          setSizeError(null);
+          setUploadError(message);
+          setIsUploading(false);
+        },
+      });
+    }
+  };
+
+  /** Cancel an in-flight upload: abort the streaming PUT. */
+  const handleCancelUpload = () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setIsUploading(false);
+  };
+
+  /**
+   * Rejected-PUT fallback only. Guarded on `MAX_FILE_SIZE_BYTES`: over the
+   * limit, stop with a message instead of parsing; CORS detail stays in the log.
+   */
+  const runFallbackParseAndDrawer = async (file: File) => {
+    const outcome = await fallbackParseOf({ file, proposeName: proposeValidName });
+    setIsUploading(false);
+    if (outcome.kind === "parsed") {
+      setUploadedDataset(outcome.dataset);
+      uploadCSVData();
+      return;
+    }
+    // A file-level error goes inline on the row, a system error in the top alert; never both.
+    setSizeError(outcome.kind === "too-large" ? outcome.message : null);
+    setUploadError(outcome.kind === "failed" ? outcome.message : null);
+  };
+
+  /**
+   * With a parseable header and a host confirm drawer, hand the parsed
+   * columns to the host first (ADR-032 v19); its `onConfirmed` resumes
+   * `handleUpload`. Otherwise upload straight away.
+   */
+  const handleUploadClick = () => {
+    const confirmsColumnsFirst =
+      enableDirectUpload && rawFile && parsedColumns && requestColumnConfirm;
+    if (confirmsColumnsFirst) {
+      requestColumnConfirm({
+        columns: parsedColumns,
+        proposedName,
+        onConfirmed: (confirmed) => void handleUpload(confirmed),
+      });
+      return;
+    }
+    void handleUpload();
+  };
+
+  const { canUpload, fileError } = uploadReadinessOf({
+    enableDirectUpload,
+    hasRawFile: !!rawFile,
+    isParsingHeader,
+    uploadedDataset,
+    sizeError,
+  });
+
+  return (
+    <VStack width="full" align="start" gap={4}>
+      {uploadError && (
+        <Alert.Root status="error" width="full">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description data-testid="upload-error">{uploadError}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      <CSVReaderComponent
+        // Direct path: capture only the raw File (no parse). Fallback/picker
+        // path: parse immediately for synchronous columns/records.
+        parse={!enableDirectUpload}
+        uploadStatus={isUploading && enableDirectUpload ? "uploading" : undefined}
+        fileError={fileError}
+        onCancel={handleCancelUpload}
+        onUploadAccepted={handleUploadAccepted}
+        onRawFile={(file) => {
+          setRawFile(file);
+          setUploadError(null);
+          setSizeError(null);
+          setParsedColumns(null);
+          // Bump the token so any in-flight parse from a previous file is
+          // discarded when it resolves (no stale overwrite).
+          const token = ++parseHeaderTokenRef.current;
+          // Read just the header (bounded slice) so the confirm step can show
+          // the columns. Best-effort: an unreadable header proceeds without
+          // confirm. Upload stays disabled (`isParsingHeader`) until this
+          // settles, only when a confirm host is wired.
+          if (file && enableDirectUpload && requestColumnConfirm) {
+            setIsParsingHeader(true);
+            void readHeaderForConfirm({
+              file,
+              proposeName: proposeValidName,
+              isCurrent: () => parseHeaderTokenRef.current === token,
+              onParsed: ({ columns, name }) => {
+                setParsedColumns(columns);
+                setProposedName(name);
+              },
+              onSettled: () => setIsParsingHeader(false),
+            });
+          }
+        }}
+        onUploadRemoved={() => {
+          setUploadedDataset(undefined);
+          setRawFile(null);
+          setUploadError(null);
+          setSizeError(null);
+          setParsedColumns(null);
+          // Invalidate any in-flight parse and clear the pending state.
+          parseHeaderTokenRef.current++;
+          setIsParsingHeader(false);
+        }}
+      />
+      <HStack width="full" align="end">
+        {onCreateFromScratch && (
+          <Button
+            variant="plain"
+            colorPalette="gray"
+            fontWeight="normal"
+            color="blue.700"
+            onClick={onCreateFromScratch}
+            disabled={isUploading}
+          >
+            Skip, create empty dataset
+          </Button>
+        )}
+        <Spacer />
+        <Button
+          colorPalette="blue"
+          loading={isUploading}
+          loadingText="Uploading"
+          disabled={!!disabled || isUploading || !canUpload}
+          onClick={handleUploadClick}
+        >
+          Upload
+        </Button>
+      </HStack>
+    </VStack>
+  );
+}
+
+export function CSVReaderComponent({
+  onUploadAccepted,
+  onUploadRemoved,
+  onRawFile,
+  parse = true,
+  uploadStatus,
+  fileError,
+  onCancel,
+  children,
+}: {
+  onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void | Promise<void>;
+  onUploadRemoved?: () => void;
+  /**
+   * Raw-file callback for the no-parse path: receives the dropped `File` (or
+   * `null` on removal) WITHOUT any in-browser parse. Required when `parse` is
+   * false; ignored otherwise.
+   */
+  onRawFile?: (file: File | null) => void;
+  /**
+   * When false, the dropzone captures only the raw `File` (never runs
+   * PapaParse), so a multi-GB file can't OOM the browser (ADR-032 D4). The
+   * default (true) is the parse-and-emit behaviour older callers rely on.
+   */
+  parse?: boolean;
+  /** "uploading" while the no-parse raw file streams to storage. */
+  uploadStatus?: "uploading";
+  /** File-level validation/upload message; renders the file row in an error state. */
+  fileError?: string;
+  /** Cancels an in-flight upload (no-parse path). Shows the X cancel control. */
+  onCancel?: () => void;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
+}) {
+  if (!parse) {
+    return (
+      <RawFileDropzone
+        onRawFile={onRawFile}
+        onUploadRemoved={onUploadRemoved}
+        uploadStatus={uploadStatus}
+        fileError={fileError}
+        onCancel={onCancel}
+      >
+        {children}
+      </RawFileDropzone>
+    );
+  }
+
+  return (
+    <ParsingCSVReader
+      onUploadAccepted={onUploadAccepted}
+      onUploadRemoved={onUploadRemoved}
+      fileError={fileError}
+    >
+      {children}
+    </ParsingCSVReader>
+  );
+}
+
+/**
+ * Parse-and-emit dropzone: PapaParse (plus a JSON/JSONL→CSV pre-parse) so
+ * callers get `{ data, acceptedFile }` synchronously. Not used on the
+ * direct-upload path (`RawFileDropzone`) — this is what OOMs on big files.
+ */
+function ParsingCSVReader({
+  onUploadAccepted,
+  onUploadRemoved,
+  fileError,
+  children,
+}: {
+  onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void | Promise<void>;
+  onUploadRemoved?: () => void;
+  fileError?: string;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
+}) {
+  const { CSVReader } = useCSVReader();
+  const [zoneHover, setZoneHover] = useState(false);
+  const [acceptedFile, setAcceptedFile] = useState<File | null>(null);
+  const [results, setResults] = useState<{ data: string[][] } | null>(null);
+  const { readString } = usePapaParse();
+
+  useEffect(() => {
+    if (acceptedFile && results) {
+      void onUploadAccepted({ ...results, acceptedFile });
+    } else if (!acceptedFile) {
+      onUploadRemoved?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acceptedFile, results]);
+
+  return (
+    <CSVReader
+      accept=".csv,.json,.jsonl"
+      config={{
+        // Every well-formed CSV ends with a newline; without this the final
+        // line parses as [""] and uploads as an empty record
+        skipEmptyLines: "greedy",
+      }}
+      onUploadAccepted={async (results: { data: string[][] }, file: File) => {
+        const isJsonUpload = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
+        if (isJsonUpload) {
+          try {
+            readString(jsonFileTextToCSV(await file.text()), {
+              skipEmptyLines: "greedy",
+              complete: (results) => {
+                setResults({ data: results.data as string[][] });
+              },
+            });
+          } catch (error) {
+            console.error("error", error);
+            toaster.create({
+              title: "Error",
+              description: "Failed to parse JSON file",
+              type: "error",
+            });
+          }
+        } else {
+          setResults(results);
+          setZoneHover(false);
+        }
+      }}
+      onDragOver={(event: DragEvent) => {
+        event.preventDefault();
+        setZoneHover(true);
+      }}
+      onDragLeave={(event: DragEvent) => {
+        event.preventDefault();
+        setZoneHover(false);
+      }}
+    >
+      {({
+        getRootProps,
+        acceptedFile,
+        ProgressBar,
+        getRemoveFileProps,
+      }: {
+        getRootProps: () => Record<string, unknown>;
+        acceptedFile: File | null;
+        ProgressBar: React.ComponentType;
+        getRemoveFileProps: () => Record<string, unknown>;
+        Remove: React.ComponentType;
+      }) => {
+        return (
+          <>
+            <CSVReaderBox
+              acceptedFile={acceptedFile}
+              setAcceptedFile={setAcceptedFile}
+              zoneHover={zoneHover}
+              fileError={fileError}
+              getRootProps={getRootProps}
+              getRemoveFileProps={getRemoveFileProps}
+              ProgressBar={ProgressBar}
+            />
+            {children ? children(acceptedFile !== null) : null}{" "}
+            {/* Pass boolean indicating if file is accepted to render prop */}
+          </>
+        );
+      }}
+    </CSVReader>
+  );
+}
+
+/**
+ * Build an in-memory dataset from already-parsed CSV rows, renaming
+ * reserved/colliding columns and toasting the rename.
+ */
+function buildDatasetFromRows(data: string[][], name: string): InMemoryDataset {
+  const originalColumnNames = data[0] ?? [];
+  const existingNames = new Set<string>();
+  const columns: DatasetColumns = originalColumnNames.map((col: string) => {
+    const safeColumnName = getSafeColumnName(col, existingNames);
+
+    // Add the safe name to the set to prevent future collisions
+    existingNames.add(safeColumnName);
+
+    // If this column name was changed, show a warning to the user
+    if (safeColumnName !== col) {
+      toaster.create({
+        title: "Column Renamed",
+        description: `Column "${col}" is reserved or conflicts with existing columns and has been renamed to "${safeColumnName}"`,
+        type: "warning",
+      });
+    }
+
+    return {
+      name: safeColumnName,
+      type: "string" as const,
+    };
+  });
+
+  const now = nowInstant().epochMilliseconds;
+  const records: DatasetRecordEntry[] = data.slice(1).map((row: string[], index: number) => ({
+    id: `${now}-${index}`,
+    ...Object.fromEntries(row.map((col, i) => [columns[i]?.name, col])),
+  }));
+
+  return { datasetRecords: records, columnTypes: columns, name };
+}
+
+/**
+ * Parse a raw CSV/JSON/JSONL file into header+body rows, for the no-storage
+ * fallback only. Mirrors `ParsingCSVReader`'s JSON/JSONL handling.
+ */
+async function parseFileToRows(file: File): Promise<string[][]> {
+  const isJson = file.name.endsWith(".jsonl") || file.name.endsWith(".json");
+  const csvString = isJson ? jsonFileTextToCSV(await file.text()) : await file.text();
+
+  return new Promise<string[][]>((resolve, reject) => {
+    papaparseReadString<string[]>(csvString, {
+      skipEmptyLines: "greedy",
+      complete: (results) => resolve(results.data),
+      error: (error: Error) => reject(error),
+    });
+  });
+}
+
+/** Convert raw JSON or JSONL text into CSV text (header + rows). */
+function jsonFileTextToCSV(contents: string): string {
+  let jsonContents: object[];
+  try {
+    jsonContents = JSON.parse(contents);
+  } catch {
+    // Not valid JSON; treat as JSONL (one object per line).
+    jsonContents = JSON.parse(
+      "[" +
+        contents
+          .trim()
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .join(", ") +
+        "]",
+    );
+  }
+  return jsonToCSV(jsonContents);
+}
+
+function jsonToCSV(jsonContents: object[]): string {
+  const stringifiedNestedValues = jsonContents.map((item) => {
+    return Object.fromEntries(
+      Object.entries(item).map(([key, value]) => {
+        if (value && typeof value === "object") {
+          return [key, JSON.stringify(value)];
+        }
+        return [key, value];
+      }),
+    );
+  });
+  const columns = new Set(stringifiedNestedValues.flatMap((item) => Object.keys(item)));
+
+  return papaparseJsonToCSV(stringifiedNestedValues, {
+    columns: Array.from(columns),
+  });
+}
+
+type DatasetFileStatus = "selected" | "uploading" | "ready" | "error";
+
+function DatasetFileStatusIcon({ status }: { status: DatasetFileStatus }) {
+  if (status === "uploading") return <Spinner size="sm" color="blue.500" />;
+  if (status === "ready")
+    return (
+      <Box color="green.500" display="flex">
+        <CheckCircle size={20} />
+      </Box>
+    );
+  if (status === "error")
+    return (
+      <Box color="red.500" display="flex">
+        <XCircle size={20} />
+      </Box>
+    );
+  return (
+    <Box color="fg.muted" display="flex">
+      <FileText size={20} />
+    </Box>
+  );
+}
+
+/**
+ * A file presented as a status row (Image #5): status icon, file name, a
+ * "size · meta" sub-line, and a trailing action slot (remove, cancel, …). The
+ * error state turns the row red and shows the message in place of the meta.
+ */
+function DatasetFileRow({
+  name,
+  sizeLabel,
+  metaLabel,
+  status,
+  message,
+  action,
+}: {
+  name: string;
+  sizeLabel?: string;
+  metaLabel?: string;
+  status: DatasetFileStatus;
+  message?: string;
+  action?: React.ReactNode;
+}) {
+  const isError = status === "error";
+  const isUploading = status === "uploading";
+  const meta = message ?? metaLabel;
+  return (
+    <HStack
+      width="full"
+      gap={3}
+      padding={3}
+      borderWidth="1px"
+      borderRadius="lg"
+      borderColor={isError ? "red.400" : "border"}
+      bg="bg"
+    >
+      <DatasetFileStatusIcon status={status} />
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <Text
+          fontWeight="medium"
+          truncate
+          maxWidth="full"
+          // The name sweeps a rainbow gradient while uploading — the "loading" tell.
+          css={isUploading ? RAINBOW_TEXT_CSS : undefined}
+        >
+          {name}
+        </Text>
+        {(sizeLabel ?? meta) && (
+          <HStack gap={2} fontSize="xs" color="fg.muted">
+            {sizeLabel && <Text>{sizeLabel}</Text>}
+            {sizeLabel && meta && <Text color="border">|</Text>}
+            {meta && (
+              <Text
+                color={isError ? "red.500" : "fg.muted"}
+                data-testid={isError ? "upload-error" : undefined}
+              >
+                {meta}
+              </Text>
+            )}
+          </HStack>
+        )}
+      </VStack>
+      {action}
+    </HStack>
+  );
+}
+
+/** Trash-style remove control for a file row. */
+function RemoveFileButton({ onRemove }: { onRemove: () => void }) {
+  return (
+    <Box
+      as="button"
+      color="fg.muted"
+      display="flex"
+      _hover={{ color: "red.500" }}
+      aria-label="Remove file"
+      onClick={(event: React.MouseEvent) => {
+        // Prevent a wrapping label from re-opening the file picker on remove.
+        event.preventDefault();
+        event.stopPropagation();
+        onRemove();
+      }}
+    >
+      <Trash2 size={18} />
+    </Box>
+  );
+}
+
+/** X control shown in place of the trash while an upload is in flight. */
+function CancelUploadButton({ onCancel }: { onCancel: () => void }) {
+  return (
+    <Box
+      as="button"
+      color="fg.muted"
+      display="flex"
+      _hover={{ color: "red.500" }}
+      aria-label="Cancel upload"
+      onClick={(event: React.MouseEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onCancel();
+      }}
+    >
+      <X size={18} />
+    </Box>
+  );
+}
+
+function CSVReaderBox({
+  acceptedFile,
+  setAcceptedFile,
+  zoneHover,
+  fileError,
+  getRootProps,
+  getRemoveFileProps,
+  ProgressBar,
+}: {
+  acceptedFile: File | null;
+  setAcceptedFile: (file: File | null) => void;
+  zoneHover: boolean;
+  /** File-level validation message (e.g. over the row limit); turns the row red. */
+  fileError?: string;
+  getRootProps: () => Record<string, unknown>;
+  getRemoveFileProps: () => Record<string, unknown>;
+  ProgressBar: React.ComponentType;
+}) {
+  useEffect(() => {
+    setAcceptedFile(acceptedFile);
+  }, [acceptedFile, setAcceptedFile]);
+
+  return (
+    <VStack width="full" gap={0} align="stretch">
+      {/* Single-file flow: the drag-and-drop container collapses once a file is
+          chosen and expands back when it's removed. */}
+      <Box
+        display="grid"
+        gridTemplateRows={acceptedFile ? "0fr" : "1fr"}
+        opacity={acceptedFile ? 0 : 1}
+        transition="grid-template-rows 0.35s ease, opacity 0.3s ease"
+      >
+        <Box overflow="hidden">
+          <Box
+            {...getRootProps()}
+            {...dropzoneSurfaceProps(zoneHover)}
+            style={DROPZONE_DOTTED_STYLE}
+          >
+            <DropzonePrompt />
+          </Box>
+        </Box>
+      </Box>
+      {acceptedFile && (
+        <DatasetFileRow
+          name={acceptedFile.name}
+          sizeLabel={formatFileSize(acceptedFile.size)}
+          status={fileError ? "error" : "selected"}
+          message={fileError}
+          action={
+            <Box
+              as="button"
+              color="fg.muted"
+              display="flex"
+              _hover={{ color: "red.500" }}
+              aria-label="Remove file"
+              {...getRemoveFileProps()}
+            >
+              <Trash2 size={18} />
+            </Box>
+          }
+        />
+      )}
+      <ProgressBar />
+    </VStack>
+  );
+}
+
+/**
+ * No-parse dropzone for the direct-upload happy path (ADR-032 D4): captures
+ * the raw `File` via a native input + drag handlers, never PapaParse. Its
+ * name seeds the dataset name; columns are derived server-side by normalize.
+ */
+function RawFileDropzone({
+  onRawFile,
+  onUploadRemoved,
+  uploadStatus,
+  fileError,
+  onCancel,
+  children,
+}: {
+  onRawFile?: (file: File | null) => void;
+  onUploadRemoved?: () => void;
+  /** Set to "uploading" while the raw file streams to storage. */
+  uploadStatus?: "uploading";
+  /** File-level validation/upload message; turns the row red. */
+  fileError?: string;
+  /** Cancels the in-flight upload; shows the X cancel control while uploading. */
+  onCancel?: () => void;
+  children?: (hasAcceptedFile: boolean) => React.ReactNode;
+}) {
+  const [zoneHover, setZoneHover] = useState(false);
+  const [acceptedFile, setAcceptedFile] = useState<File | null>(null);
+
+  const setFile = (file: File | null) => {
+    setAcceptedFile(file);
+    if (file) {
+      onRawFile?.(file);
+    } else {
+      onRawFile?.(null);
+      onUploadRemoved?.();
+    }
+  };
+
+  const isUploading = uploadStatus === "uploading";
+  const uploadingStatus: DatasetFileStatus = isUploading ? "uploading" : "selected";
+  const rowStatus: DatasetFileStatus = fileError ? "error" : uploadingStatus;
+
+  return (
+    <VStack width="full" gap={0} align="stretch">
+      {/* Single-file flow: the drag-and-drop container smoothly collapses once a
+          file is chosen and expands back when it's removed or cancelled. The
+          grid 1fr→0fr trick animates the height without measuring it. */}
+      <Box
+        display="grid"
+        gridTemplateRows={acceptedFile ? "0fr" : "1fr"}
+        opacity={acceptedFile ? 0 : 1}
+        transition="grid-template-rows 0.35s ease, opacity 0.3s ease"
+      >
+        <Box overflow="hidden">
+          <Box
+            as="label"
+            {...dropzoneSurfaceProps(zoneHover)}
+            style={DROPZONE_DOTTED_STYLE}
+            display="block"
+            // Observable drag-active state (the highlight itself is CSS-only).
+            data-active={zoneHover ? "true" : "false"}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setZoneHover(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setZoneHover(false);
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              setZoneHover(false);
+              const file = event.dataTransfer?.files?.[0] ?? null;
+              if (file) setFile(file);
+            }}
+          >
+            <input
+              type="file"
+              accept=".csv,.json,.jsonl"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0] ?? null;
+                if (file) setFile(file);
+                // Reset the native value so re-picking the SAME file after a
+                // remove still fires `change` (otherwise the unchanged value
+                // suppresses it and Upload stays disabled).
+                event.target.value = "";
+              }}
+            />
+            <DropzonePrompt />
+          </Box>
+        </Box>
+      </Box>
+      {acceptedFile && (
+        <DatasetFileRow
+          name={acceptedFile.name}
+          sizeLabel={formatFileSize(acceptedFile.size)}
+          metaLabel={readableDate(acceptedFile.lastModified).toLocaleDateString()}
+          status={rowStatus}
+          message={fileError}
+          action={
+            <SelectedFileAction
+              isUploading={isUploading}
+              onCancel={onCancel}
+              onClearFile={() => setFile(null)}
+            />
+          }
+        />
+      )}
+      {children ? children(acceptedFile !== null) : null}
+    </VStack>
+  );
+}

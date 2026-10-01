@@ -177,6 +177,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Members and Teams](https://langwatch.ai/docs/platform/members-and-teams.md): Invite people to your organization, put them on teams, give them a role per team or per project, and remove their access.
 - [Access Control (RBAC)](https://langwatch.ai/docs/platform/rbac.md): Roles, permissions, custom roles and role bindings: who can do what in an organization, a team or a project.
+- [Roles & access](https://langwatch.ai/docs/platform/roles-and-access.md): Roles say what you may do; grants say who holds a role, and where. How the two fit together, and why you cannot grant more than you hold.
 - [Single sign-on and provisioning](https://langwatch.ai/docs/platform/sso.md): Set up your identity provider, directory provisioning and sign-in policies in LangWatch.
 - [Move to your own identity provider](https://langwatch.ai/docs/platform/sso-update.md): Replace the single sign-on LangWatch set up for your organization with a connection you run yourself, without interrupting anybody's sign-in.
 - [API Keys](https://langwatch.ai/docs/platform/api-keys.md): Create and manage API keys in LangWatch. Use personal keys for development and AI assistants, or service keys for CI/CD and automation.
@@ -219,7 +220,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Overview
 
 - [Getting Started](https://langwatch.ai/docs/integration/overview.md): LangWatch integrates with all major LLM providers, frameworks, and tools. See our complete list of integrations below.
-- [Choosing the right OTel endpoint](https://langwatch.ai/docs/observability/trace-vs-activity-ingestion.md): LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
+- [Choosing the right OTel endpoint](https://langwatch.ai/docs/observability/trace-vs-activity-ingestion.md): LangWatch exposes two OpenTelemetry-shaped URLs. They share the same internal pipeline; the split is auth + routing convenience. Trace ingestion (`/api/otel/v1/traces`) authenticates as a project; governance ingestion (`/api/v1/ingest/otel/:sourceId`) authenticates as an IngestionSource the org admin authored. Both land in the same trace store, distinguished by origin metadata.
 
 ## SDKs
 
@@ -580,7 +581,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Programmatic surfaces
 
-- [Governance REST API](https://langwatch.ai/docs/ai-governance/api.md): Hono-mounted REST/JSON API at /api/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
+- [Governance REST API](https://langwatch.ai/docs/ai-governance/api.md): Hono-mounted REST/JSON API at /api/v1/governance/* with an auto-generated OpenAPI spec consumed by the TypeScript and Python SDKs. Every governance feature exposes the same CRUD verb set, sharing one service-layer source of truth with the dashboard tRPC procedures, no duplicated business logic, identical RBAC enforcement.
 - [Governance CLI](https://langwatch.ai/docs/ai-governance/cli.md): langwatch governance <resource> <verb>, a thin shell over the governance REST API for agentic workflows. Same auth as the rest of the CLI, same RBAC, same audit-row emission. Tagged with surface=cli for incident response.
 - [Governance MCP server](https://langwatch.ai/docs/ai-governance/mcp.md): An MCP server exposing every governance resource × verb as a tool under the governance_ namespace. Same RBAC, same audit emission, same service-layer source of truth as the REST API and CLI, built so an agent (Claude Code, Codex, Cursor) can fully set up governance via tool calls.
 
@@ -748,9 +749,9 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Get trace details](https://langwatch.ai/docs/api-reference/traces/get-trace.md)
 - [Get Transcript](https://langwatch.ai/docs/api-reference/traces/get-transcript.md)
 - [Update trace metadata](https://langwatch.ai/docs/api-reference/traces/update-trace-metadata.md)
-- [Create public path for single trace](https://langwatch.ai/docs/api-reference/traces/create-public-trace-path.md)
-- [Delete an existing public path for a trace](https://langwatch.ai/docs/api-reference/traces/delete-public-trace-path.md)
-- [Projection DSL & field catalog](https://langwatch.ai/docs/api-reference/traces/projection-dsl.md): Declare exactly which trace fields to return from POST /api/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out.
+- [Returns a public path for a trace](https://langwatch.ai/docs/api-reference/traces/action-share.md)
+- [Deletes a public path for a trace](https://langwatch.ai/docs/api-reference/traces/action-unshare.md)
+- [Projection DSL & field catalog](https://langwatch.ai/docs/api-reference/traces/projection-dsl.md): Declare exactly which trace fields to return from POST /api/v1/traces/search — including nested events, annotations, and evaluations — so a daily ETL becomes one paginated loop instead of a per-trace fan-out.
 
 ## Datasets
 
@@ -758,7 +759,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List all non-archived datasets for the project](https://langwatch.ai/docs/api-reference/datasets/list-dataset.md)
 - [Create a new dataset](https://langwatch.ai/docs/api-reference/datasets/create-dataset.md)
 - [Create Attachments](https://langwatch.ai/docs/api-reference/datasets/create-attachments.md)
-- [Start a direct browser→S3 dataset upload](https://langwatch.ai/docs/api-reference/datasets/create-direct-upload.md)
 - [Evaluate a dataset](https://langwatch.ai/docs/api-reference/datasets/evaluate-a-dataset.md)
 - [Create a new dataset from an uploaded file](https://langwatch.ai/docs/api-reference/datasets/create-upload.md)
 - [List entries of a dataset](https://langwatch.ai/docs/api-reference/datasets/get-entries.md)
@@ -766,15 +766,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List records for a dataset](https://langwatch.ai/docs/api-reference/datasets/get-records.md)
 - [Update a dataset by its slug or id](https://langwatch.ai/docs/api-reference/datasets/update-dataset.md)
 - [Update or create a record in a dataset](https://langwatch.ai/docs/api-reference/datasets/update-records.md)
-- [Update Staging](https://langwatch.ai/docs/api-reference/datasets/update-staging.md)
 - [Add dataset entries programmatically using the LangWatch API to build evaluation sets for LLM testing and agent validation.](https://langwatch.ai/docs/api-reference/datasets/post-dataset-entries.md)
 - [Create records in a dataset in batch](https://langwatch.ai/docs/api-reference/datasets/action-records.md)
 - [Upload a file](https://langwatch.ai/docs/api-reference/datasets/action-upload.md)
-- [Create Finalize](https://langwatch.ai/docs/api-reference/datasets/action-finalize.md)
-- [Retry normalization of a failed or stuck dataset](https://langwatch.ai/docs/api-reference/datasets/action-retry.md)
 - [Archive a dataset](https://langwatch.ai/docs/api-reference/datasets/delete-dataset.md)
 - [Delete records from a dataset by IDs](https://langwatch.ai/docs/api-reference/datasets/delete-records.md)
-- [Delete Direct Upload](https://langwatch.ai/docs/api-reference/datasets/delete-direct-upload.md)
 
 ## Evaluators
 
@@ -922,7 +918,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Overview](https://langwatch.ai/docs/api-reference/simulation-runs/overview.md): Query simulation run results. List runs, get batch summaries, and retrieve individual run details.
 - [List Simulation Runs](https://langwatch.ai/docs/api-reference/simulation-runs/list-simulation-runs.md)
-- [List batch summaries for a scenario set](https://langwatch.ai/docs/api-reference/simulation-runs/list-list.md)
+- [List batch summaries for a scenario set](https://langwatch.ai/docs/api-reference/simulation-runs/get-list-list.md)
 - [Get a single simulation run by its ID](https://langwatch.ai/docs/api-reference/simulation-runs/get-simulation-runs.md)
 - [Get Batches](https://langwatch.ai/docs/api-reference/simulation-runs/get-batches.md)
 
@@ -959,7 +955,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 ## Suites
 
-- [Overview](https://langwatch.ai/docs/api-reference/suites/overview.md): Deprecated. The /api/suites family is a frozen alias. New integrations use Run Plans and Test Suites.
+- [Overview](https://langwatch.ai/docs/api-reference/suites/overview.md): Deprecated. The /api/v1/suites family is a frozen alias. New integrations use Run Plans and Test Suites.
 - [List all non-archived suites](https://langwatch.ai/docs/api-reference/suites/list-suites.md)
 - [Create a new suite](https://langwatch.ai/docs/api-reference/suites/create-suites.md)
 - [Get a suite](https://langwatch.ai/docs/api-reference/suites/get-suites.md)
@@ -1009,7 +1005,6 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 
 - [Overview](https://langwatch.ai/docs/api-reference/events/overview.md): Record customer events against a trace or thread, so behaviour like a thumbs-up, a conversion or a refund sits alongside the trace that produced it.
 - [Record a user event](https://langwatch.ai/docs/api-reference/events/create-track.md)
-- [Track an event (legacy path)](https://langwatch.ai/docs/api-reference/events/track-an-event-legacy-path.md)
 
 ## Workflows
 
@@ -1029,7 +1024,7 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [List Dashboards](https://langwatch.ai/docs/api-reference/dashboards/list-dashboards.md)
 - [Create a new dashboard](https://langwatch.ai/docs/api-reference/dashboards/create-dashboards.md)
 - [Get a dashboard by its id, including its graphs](https://langwatch.ai/docs/api-reference/dashboards/get-dashboards.md)
-- [Reorder dashboards](https://langwatch.ai/docs/api-reference/dashboards/update-reorder.md)
+- [Update Reorder](https://langwatch.ai/docs/api-reference/dashboards/put-update-reorder-reorder.md)
 - [Rename a dashboard](https://langwatch.ai/docs/api-reference/dashboards/update-dashboards.md)
 - [Delete a dashboard and its graphs](https://langwatch.ai/docs/api-reference/dashboards/delete-dashboards.md)
 
@@ -1059,11 +1054,11 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 ## Secrets
 
 - [Overview](https://langwatch.ai/docs/api-reference/secrets/overview.md): Manage project secrets used for external integrations. Values are encrypted at rest and never returned in API responses.
-- [List all secrets for the project](https://langwatch.ai/docs/api-reference/secrets/list-secrets.md)
-- [Create a new project secret](https://langwatch.ai/docs/api-reference/secrets/create-secrets.md)
-- [Get a secret by its ID](https://langwatch.ai/docs/api-reference/secrets/get-secrets.md)
-- [Update a secret's value](https://langwatch.ai/docs/api-reference/secrets/update-secrets.md)
-- [Delete a secret](https://langwatch.ai/docs/api-reference/secrets/delete-secrets.md)
+- [List project secrets](https://langwatch.ai/docs/api-reference/secrets/list-project-secrets.md)
+- [Create a project secret](https://langwatch.ai/docs/api-reference/secrets/create-a-project-secret.md)
+- [Get project-secret metadata](https://langwatch.ai/docs/api-reference/secrets/get-project-secret-metadata.md)
+- [Replace a project secret value](https://langwatch.ai/docs/api-reference/secrets/replace-a-project-secret-value.md)
+- [Delete a project secret](https://langwatch.ai/docs/api-reference/secrets/delete-a-project-secret.md)
 
 ## Agent Cache
 
@@ -1150,9 +1145,13 @@ For agents: if anything in these docs is wrong, confusing, or fails when you try
 - [Update role](https://langwatch.ai/docs/api-reference/roles/update-role.md)
 - [Delete role](https://langwatch.ai/docs/api-reference/roles/delete-role.md)
 
+## Grants
+
+- [Overview](https://langwatch.ai/docs/api-reference/grants/overview.md): Grant a built-in or custom role to a user, a group or an API key at the organization, a team or a project. Grants replace role bindings.
+
 ## Role Bindings
 
-- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
+- [Overview](https://langwatch.ai/docs/api-reference/role-bindings/overview.md): Deprecated: use the Grants API. Grant a role to one principal, a user, a group or an API key, at one scope: the organization, a team, or a single project.
 - [List role bindings](https://langwatch.ai/docs/api-reference/role-bindings/list-role-bindings.md)
 - [Create role binding](https://langwatch.ai/docs/api-reference/role-bindings/create-role-binding.md)
 - [Update role binding](https://langwatch.ai/docs/api-reference/role-bindings/update-role-binding.md)

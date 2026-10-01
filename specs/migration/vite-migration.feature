@@ -157,6 +157,12 @@ Feature: Next.js to Vite Migration
 
   # --- Build & Deployment ---
 
+  @unit
+  Scenario: The Vite config loads the way the dev and build scripts load it
+    Given the config imports workspace packages whose relative imports carry no extension
+    When Vite loads the config file with the loader the package scripts name
+    Then the config resolves without a module resolution error
+
   Scenario: Vite dev server starts successfully
     When I run the dev server
     Then the server starts on the configured port

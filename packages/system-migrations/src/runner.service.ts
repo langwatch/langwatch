@@ -1,9 +1,17 @@
 import { createLogger } from "@langwatch/observability";
-import type { MigrationLeaseRepository } from "./lease.repository";
-import type { SystemMigrationStateRepository } from "./state.repository";
-import type { SystemMigration } from "./system-migration";
-import type { TenantSource } from "./tenant-source";
-import { isTerminalTenantStatus, type MigrationPassSummary } from "./types";
+
+import type { MigrationLeaseRepository } from "./lease.repository.ts";
+import {
+  SystemMigrationRecordNotFoundError,
+  type SystemMigrationStateRepository,
+} from "./state.repository.ts";
+import type { SystemMigration } from "./system-migration.ts";
+import type { TenantSource } from "./tenant-source.ts";
+import {
+  isTerminalTenantStatus,
+  type MigrationPassSummary,
+  type TenantMigrationRecord,
+} from "./types.ts";
 
 const logger = createLogger("langwatch:system-migrations");
 
@@ -14,24 +22,15 @@ const TENANT_CLAIM_PREFIX = "tenant:";
 const DEFAULT_LEASE_TTL_MS = 60_000;
 /** Renew well inside the TTL so one slow round trip cannot drop the claim. */
 const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
-/** How many organizations one pass works at once. Each is its own claim,
- *  its own migrations, its own convergence waits - so one large
- *  organization's import never holds the rest of the fleet behind it. The
- *  per-tenant work is light (the fold queue does the heavy lifting), so
- *  the bound exists to cap claim heartbeats and convergence polls, not
- *  throughput. */
+/** How many organizations one pass works at once: caps claim heartbeats and
+ *  convergence polls, not throughput - each tenant's own claim keeps one
+ *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
 
 /**
- * Which (tenant, migration) pairs a pass may touch. The app composes this:
- * self-hosted installations answer true for every tenant (migration just
- * happens, in the background, no configuration); cloud answers from the
- * migration's own `enrolledAutomatically` declaration, and for a migration
- * that has not made it, from the per-migration enrollments operators have
- * written, read fresh each pass. A pair outside the cohort is skipped
- * without even a state record - "not started" and "not in the cohort yet"
- * are the same pending state, which is what lets a rollout widen later, and
- * what lets each migration pace independently of the others.
+ * Which (tenant, migration) pairs a pass may touch, read fresh each pass. A
+ * pair outside the cohort gets no state record - "not started" and "not in
+ * the cohort yet" are the same pending state, so a rollout can widen later.
  */
 export type MigrationCohort = (args: {
   tenantId: string;
@@ -53,20 +52,9 @@ export type SystemMigrationRunnerDeps = {
 };
 
 /**
- * Drives every registered migration over every cohort tenant, several
- * tenants at a time. Coordination is per ORGANIZATION, not per process:
- * each tenant is claimed under its own lease before any work, so any number
- * of processes (booting workers, an operator's targeted run) share the fleet
- * instead of standing down behind one fleet-wide driver - a tenant already
- * claimed elsewhere is simply left to its claim holder.
- *
- * Level-triggered: every pass re-attempts held and parked tenants, so a
- * tenant whose blocker was fixed heals itself with no manual state change,
- * and a pass that dies anywhere simply happens again. One `runPass` is one
- * sweep and nothing more - a tenant generally needs several, because a pass
- * cannot observe its own events. Driving passes until the fleet stops moving
- * is the CALLER's job, and `MigrationPassSummary.advanced` is the field that
- * tells it when to stop.
+ * Drives every registered migration over every cohort tenant, each claimed
+ * under its own lease so any number of processes share the fleet.
+ * Level-triggered: passes run until `MigrationPassSummary.advanced` stops.
  */
 export class SystemMigrationRunnerService {
   constructor(private readonly deps: SystemMigrationRunnerDeps) {}
@@ -163,10 +151,9 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * One tenant, under its own claim. A tenant claimed by another process is
-   * left to that process - its pass is running the very same migrations -
-   * and one this pass claims runs its migrations in registration order,
-   * heartbeat-renewed for as long as they take.
+   * One tenant, under its own claim. A tenant claimed elsewhere is left to
+   * that process; one this pass claims runs its migrations in registration
+   * order, heartbeat-renewed for as long as they take.
    */
   private async driveTenant({
     tenantId,
@@ -220,11 +207,9 @@ export class SystemMigrationRunnerService {
   }
 
   /**
-   * Keeps one tenant's claim alive while its migrations run. A renewal that
-   * comes back false means another driver has legitimately taken the tenant
-   * over, which this pass reads as "stop at this tenant's next migration" -
-   * never as corruption, since every migration is idempotent. Other tenants
-   * are unaffected: each holds its own claim.
+   * A renewal that comes back false means another driver has legitimately
+   * taken the tenant over - read as "stop at this tenant's next migration",
+   * never as corruption, since every migration is idempotent.
    */
   private startClaimHeartbeat(claimName: string): {
     claimLost: () => boolean;
@@ -259,10 +244,9 @@ export class SystemMigrationRunnerService {
     summary: MigrationPassSummary;
   }): Promise<void> {
     const { state } = this.deps;
-    const existing = await state.findRecord({
-      migrationName: migration.name,
-      tenantId,
-    });
+    const existing = await state
+      .getRecord({ migrationName: migration.name, tenantId })
+      .catch(undefinedWhenNotFound);
     // Terminal states (`isTerminalTenantStatus`): `finalized` is the
     // one-way latch, and `rolled_back` is the operator's pin holding a
     // tenant on its legacy path. Re-running either would undo the
@@ -321,42 +305,65 @@ export class SystemMigrationRunnerService {
       // unchanged) and the next pass tries again. One broken tenant must
       // not stop the fleet.
       summary.parked += 1;
-      try {
-        // The same compare-and-set as the outcome write: a `parked` row that
-        // replaced an operator's `rolled_back` pin would be retried on the
-        // next pass and re-finalized, undoing the rollback. A refused park
-        // costs nothing - the pin already keeps the tenant off every later
-        // pass.
-        const parkWritten = await state.upsertRecordUnlessRolledBack({
-          migrationName: migration.name,
-          tenantId,
-          status: "parked",
-          report: {
-            kind: "error",
-            message: error instanceof Error ? error.message : String(error),
-          },
-        });
-        // Newly parked is a transition; a tenant parked again for the same
-        // reason is not, or a permanently broken tenant would keep a
-        // convergence loop running forever.
-        if (parkWritten && existing?.status !== "parked") {
-          summary.advanced += 1;
-        }
-      } catch (parkError) {
-        // Recording the park is itself a write, so the very failure most
-        // likely to park a tenant - the state store being unreachable - is
-        // the one that would throw here and take the rest of the fleet down
-        // with it. An unrecorded park costs nothing the next pass cannot
-        // rebuild: the tenant is still pending, and it is tried again.
-        logger.error(
-          { error: parkError, migration: migration.name, tenantId },
-          "could not record a parked tenant; continuing the pass",
-        );
-      }
+      await recordParkedTenant({ state, migration, tenantId, existing, error, summary });
       logger.error(
         { error, migration: migration.name, tenantId },
         "tenant migration parked on error",
       );
     }
   }
+}
+
+async function recordParkedTenant({
+  state,
+  migration,
+  tenantId,
+  existing,
+  error,
+  summary,
+}: {
+  state: SystemMigrationStateRepository;
+  migration: SystemMigration;
+  tenantId: string;
+  existing: TenantMigrationRecord | undefined;
+  error: unknown;
+  summary: MigrationPassSummary;
+}): Promise<void> {
+  try {
+    // The same compare-and-set as the outcome write: a `parked` row that
+    // replaced an operator's `rolled_back` pin would be retried on the
+    // next pass and re-finalized, undoing the rollback. A refused park
+    // costs nothing - the pin already keeps the tenant off every later
+    // pass.
+    const parkWritten = await state.upsertRecordUnlessRolledBack({
+      migrationName: migration.name,
+      tenantId,
+      status: "parked",
+      report: {
+        kind: "error",
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
+    // Newly parked is a transition; a tenant parked again for the same
+    // reason is not, or a permanently broken tenant would keep a
+    // convergence loop running forever.
+    if (parkWritten && existing?.status !== "parked") {
+      summary.advanced += 1;
+    }
+  } catch (parkError) {
+    // Recording the park is itself a write, so the very failure most
+    // likely to park a tenant - the state store being unreachable - is
+    // the one that would throw here and take the rest of the fleet down
+    // with it. An unrecorded park costs nothing the next pass cannot
+    // rebuild: the tenant is still pending, and it is tried again.
+    logger.error(
+      { error: parkError, migration: migration.name, tenantId },
+      "could not record a parked tenant; continuing the pass",
+    );
+  }
+}
+
+function undefinedWhenNotFound(error: unknown): undefined {
+  if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
+  throw error;
 }

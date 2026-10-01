@@ -1,0 +1,945 @@
+import type {
+  GovernanceIngestionSource,
+  NormalizedPullEvent,
+  PulledUsageObservedEventData,
+  PullResult,
+} from "@langwatch/enterprise-governance-contract";
+import type {
+  InternalProject,
+  InternalProjectQuery,
+  ProjectWithTeam,
+} from "@langwatch/project-contract";
+import { type Instant, Temporal } from "@langwatch/time";
+import { describe, expect, it, vi } from "vitest";
+
+import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
+import {
+  type GovernanceEncryptor,
+  type GovernanceOcsfEventSink,
+  type GovernanceTraceIngestionClient,
+  type GovernanceTraceRequest,
+  type GovernanceOcsfEventInput,
+  type IngestionPullDiagnosticsSink,
+  type IngestionPullSourceReader,
+  type PulledUsageDispatcher,
+  type PulledUsageEntitlements,
+  type PulledUsageRateReader,
+} from "../../app/governance.members.ts";
+import type { UnpricedUsageWindow } from "../../repositories/ingestion-source.repository.ts";
+import type { ErasureSuppressionCheck } from "../../rules/erasure-suppression.rules.ts";
+import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
+import {
+  IngestionPullDeadlineExceededError,
+  IngestionPullWorkerConfiguration,
+  IngestionPullWorkerService,
+} from "../ingestion-pull-worker.service.ts";
+import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
+import { PullerRegistryService } from "../puller-registry.service.ts";
+
+function ingestionSource(
+  overrides: Partial<GovernanceIngestionSource> = {},
+): GovernanceIngestionSource {
+  return {
+    id: "source-1",
+    organizationId: "org-1",
+    teamId: null,
+    sourceType: "http_custom",
+    name: "Custom",
+    description: null,
+    ingestSecretHash: "hash",
+    parserConfig: { adapter: "test", credentials: { token: "plain" } },
+    pollerCursor: null,
+    errorCount: 0,
+    pullSchedule: "* * * * *",
+    status: "active",
+    lastEventAt: null,
+    archivedAt: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    createdById: "user-1",
+    ...overrides,
+  };
+}
+
+function pulledUsageEvent(overrides: Partial<NormalizedPullEvent> = {}): NormalizedPullEvent {
+  return {
+    source_event_id: "usage:2026-08-24:workspace-1",
+    event_timestamp: "2026-08-24T09:00:00.000Z",
+    actor: "alex@example.com",
+    action: "invoke",
+    target: "model",
+    cost_usd: "0",
+    tokens_input: 1,
+    tokens_output: 2,
+    raw_payload: "{}",
+    extra: {
+      pulled_usage: {
+        costBasis: "computed",
+        dimensions: { workspaceId: "workspace-1" },
+      },
+    },
+    ...overrides,
+  };
+}
+
+class FakeSources implements IngestionPullSourceReader {
+  constructor(private readonly source: GovernanceIngestionSource | null) {}
+
+  async findById(): Promise<GovernanceIngestionSource | null> {
+    return this.source;
+  }
+}
+
+class FakeProjects extends TestProjectApi {
+  constructor(private readonly traceDestinationProject: ProjectWithTeam | null = null) {
+    super();
+  }
+
+  findInternal = async (_input: InternalProjectQuery): Promise<InternalProject | null> => null;
+
+  ensureInternal = async (_input: InternalProjectQuery): Promise<InternalProject> => ({
+    id: "gov-project",
+    name: "Governance (internal)",
+    slug: "governance-org",
+    teamId: "team",
+    kind: "internal_governance",
+    archivedAtMs: null,
+    traceSharingEnabled: false,
+  });
+
+  findWithTeam = async (): Promise<ProjectWithTeam | null> => this.traceDestinationProject;
+}
+
+class FakeSink implements GovernanceOcsfEventSink {
+  insertEvent = vi.fn(async (_input: GovernanceOcsfEventInput) => {});
+}
+class FakeEntitlement implements PulledUsageEntitlements {
+  readonly calls = vi.fn();
+
+  constructor(private readonly outcome: boolean | Error = false) {}
+
+  async isEnabled(): Promise<boolean> {
+    this.calls();
+    if (this.outcome instanceof Error) throw this.outcome;
+    return this.outcome;
+  }
+}
+
+class RecordingPulledUsage implements PulledUsageDispatcher {
+  readonly records = vi.fn(
+    async (
+      _input: PulledUsageObservedEventData & {
+        tenantId: string;
+        occurredAt: number;
+      },
+    ) => {},
+  );
+
+  async recordPulledUsage(
+    input: PulledUsageObservedEventData & { tenantId: string; occurredAt: number },
+  ): Promise<void> {
+    await this.records(input);
+  }
+}
+
+class FakeDiagnostics implements IngestionPullDiagnosticsSink {
+  info = vi.fn();
+  warn = vi.fn();
+  error = vi.fn();
+  capture = vi.fn();
+}
+
+class FakeTraceIngestion implements GovernanceTraceIngestionClient {
+  ingest = vi.fn(async (_input: { projectId: string; request: GovernanceTraceRequest }) => ({
+    rejectedSpans: 0,
+    ingestionFailures: 0,
+  }));
+}
+
+class IdentityEncryption implements GovernanceEncryptor {
+  encrypt(value: string): string {
+    return value;
+  }
+  decrypt(value: string): string {
+    return value;
+  }
+}
+
+class FakeRates implements PulledUsageRateReader {
+  rate(): { costNanoUsd: number; rateVersion: string } {
+    return { costNanoUsd: 0, rateVersion: "test" };
+  }
+}
+
+function worker(input: {
+  runOnce: () => Promise<PullResult>;
+  deadlineMs?: number;
+  source?: GovernanceIngestionSource | null;
+  entitlement?: boolean | Error;
+  traceDestination?: ProjectWithTeam | null;
+  traceIngestion?: GovernanceTraceIngestionClient;
+  erased?: string[];
+  discover?: (events: NormalizedPullEvent[]) => Promise<{ discovered: number }>;
+  runIdentityMatch?: () => Promise<void>;
+  unpricedWindow?: UnpricedUsageWindow;
+}) {
+  const registry = PullerRegistryService.create();
+  registry.register({
+    id: "test",
+    validateConfig: (config) => config,
+    runOnce: input.runOnce,
+  });
+  const sink = new FakeSink();
+  const entitlement = new FakeEntitlement(input.entitlement);
+  const diagnostics = new FakeDiagnostics();
+  const erased = new Set(input.erased ?? []);
+  const suppression: ErasureSuppressionCheck = {
+    isSuppressed: (identifier) => erased.has(identifier),
+    isEmpty: erased.size === 0,
+  };
+  const discover = vi.fn(input.discover ?? (async () => ({ discovered: 0 })));
+  const identityMatch = vi.fn(input.runIdentityMatch ?? (async () => undefined));
+  const departmentSync = vi.fn(async (_input: { events: NormalizedPullEvent[] }) => ({
+    assigned: 0,
+  }));
+  const unpricedWindows = {
+    getUnpricedUsageWindow: vi.fn(
+      async (): Promise<UnpricedUsageWindow> =>
+        input.unpricedWindow ?? { since: null, through: null },
+    ),
+    updateUnpricedUsageWindow: vi.fn(async (_id: string, _window: UnpricedUsageWindow) => {}),
+  };
+  const service = IngestionPullWorkerService.create({
+    sources: new FakeSources(input.source === undefined ? ingestionSource() : input.source),
+    registry,
+    credentials: IngestionCredentialsService.create(new IdentityEncryption()),
+    projects: new FakeProjects(input.traceDestination),
+    sink,
+    usageEntitlement: entitlement,
+    usageRecords: PulledUsageRecordService.create(
+      PulledUsagePricingService.create(new FakeRates()),
+    ),
+    suppression: { loadForProvider: async () => suppression },
+    discovery: { recordFromPulledEvents: async ({ events }) => discover(events) },
+    identityMatch: { runFor: identityMatch },
+    unpricedWindows,
+    departmentSync: { applyDirectoryEvents: departmentSync },
+    diagnostics,
+    traceIngestion: input.traceIngestion,
+    configuration: IngestionPullWorkerConfiguration.create({
+      deadlineMs: input.deadlineMs,
+    }),
+    now: () => Date.parse("2026-08-24T10:00:00.000Z"),
+  });
+  return {
+    service,
+    sink,
+    entitlement,
+    diagnostics,
+    discover,
+    identityMatch,
+    unpricedWindows,
+    departmentSync,
+  };
+}
+
+function traceDestination(organizationId = "org-1"): ProjectWithTeam {
+  const createdAt = new Date(0);
+  return {
+    id: "trace-project",
+    name: "Trace project",
+    slug: "trace-project",
+    apiKey: "api-key",
+    lwqlKey: "lwql-key",
+    teamId: "trace-team",
+    language: "other",
+    framework: "other",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt,
+    updatedAt: createdAt,
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "trace-team",
+      name: "Trace team",
+      slug: "trace-team",
+      organizationId,
+      createdAt,
+      updatedAt: createdAt,
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  };
+}
+
+function genieConversationEvent(
+  actor = "analyst@example.com",
+  id = "message-1",
+): NormalizedPullEvent {
+  return {
+    source_event_id: id,
+    event_timestamp: "2026-08-24T09:00:00.000Z",
+    actor,
+    action: "genie_query",
+    target: "Sales",
+    cost_usd: "0",
+    tokens_input: 0,
+    tokens_output: 0,
+    raw_payload: JSON.stringify({
+      message_id: id,
+      conversation_id: `conversation-${id}`,
+      content: `Which region sold most, asks ${actor}?`,
+      status: "COMPLETED",
+      created_timestamp: 1_756_036_800,
+      attachments: [{ text: { content: "EMEA", purpose: "ANSWER" } }],
+    }),
+    extra: { conversationId: `conversation-${id}`, messageId: id },
+  };
+}
+
+describe("IngestionPullWorkerService", () => {
+  it("writes stable OCSF rows and returns the adapter cursor", async () => {
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [
+          {
+            source_event_id: "event-1",
+            event_timestamp: "2026-08-24T09:00:00.000Z",
+            actor: "alex@example.com",
+            action: "invoke",
+            target: "model",
+            cost_usd: "0",
+            tokens_input: 1,
+            tokens_output: 2,
+            raw_payload: "{}",
+          },
+        ],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+      nextCursor: "next",
+      eventCount: 1,
+    });
+    expect(sink.insertEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "gov-project",
+        eventId: "http_custom:source-1:event-1",
+        traceId: "pull:http_custom:source-1:event-1",
+        actorEmail: "alex@example.com",
+      }),
+    );
+
+    const [row] = sink.insertEvent.mock.calls[0]!;
+    expect(JSON.parse(row.rawOcsfJson)).toMatchObject({
+      class_uid: 6003,
+      category_uid: 6,
+      activity_id: 6,
+      metadata: {
+        extension: {
+          source_type: "http_custom",
+          source_id: "source-1",
+          raw_event: "{}",
+        },
+      },
+    });
+  });
+
+  it("cuts off an uncooperative adapter without advancing the cursor", async () => {
+    const { service, sink } = worker({
+      runOnce: () => new Promise<PullResult>(() => {}),
+      deadlineMs: 5,
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toBeInstanceOf(
+      IngestionPullDeadlineExceededError,
+    );
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+  });
+
+  it("keeps collected events when an adapter reports errors after advancing", async () => {
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "after-unreadable-row",
+        errorCount: 1,
+      }),
+    });
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "before-unreadable-row" }),
+    ).resolves.toMatchObject({
+      nextCursor: "after-unreadable-row",
+      eventCount: 1,
+    });
+    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails without writing when an adapter reports errors and makes no progress", async () => {
+    const { service, sink } = worker({
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "held",
+        errorCount: 1,
+      }),
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
+      "reported 1 error",
+    );
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+  });
+
+  it("routes conversations through the trace port under the destination project", async () => {
+    const traceIngestion = new FakeTraceIngestion();
+    const { service } = worker({
+      source: ingestionSource({
+        sourceType: "databricks_genie",
+        traceProjectId: "trace-project",
+      }),
+      traceDestination: traceDestination(),
+      traceIngestion,
+      runOnce: async () => ({
+        events: [genieConversationEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(traceIngestion.ingest).toHaveBeenCalledWith({
+      projectId: "trace-project",
+      request: expect.objectContaining({
+        resourceSpans: expect.any(Array),
+      }),
+    });
+  });
+
+  it("does not route conversations into another organization's project", async () => {
+    const traceIngestion = new FakeTraceIngestion();
+    const { service, diagnostics } = worker({
+      source: ingestionSource({
+        sourceType: "databricks_genie",
+        traceProjectId: "trace-project",
+      }),
+      traceDestination: traceDestination("another-org"),
+      traceIngestion,
+      runOnce: async () => ({
+        events: [genieConversationEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(traceIngestion.ingest).not.toHaveBeenCalled();
+    expect(diagnostics.warn).toHaveBeenCalledWith(
+      expect.stringContaining("another organization"),
+      expect.objectContaining({ traceProjectId: "trace-project" }),
+    );
+  });
+
+  it("keeps the audit path and priced usage on the same durable retry boundary", async () => {
+    const { service, sink, entitlement } = worker({
+      entitlement: true,
+      runOnce: async () => ({
+        events: [pulledUsageEvent(), pulledUsageEvent({ source_event_id: "usage:two" })],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+    const usage = new RecordingPulledUsage();
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
+    ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
+
+    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(usage.records).toHaveBeenCalledTimes(2);
+    expect(entitlement.calls).toHaveBeenCalledTimes(1);
+
+    const [first, second] = usage.records.mock.calls.map(([record]) => record);
+    expect(first).toMatchObject({
+      tenantId: "gov-project",
+      organizationId: "org-1",
+      teamId: null,
+      projectId: "gov-project",
+      occurredAt: Date.parse("2026-08-24T09:00:00.000Z"),
+    });
+    expect(second?.observedAtMs).toBe(first?.observedAtMs);
+  });
+
+  it("does not advance past a durable pulled-usage append failure", async () => {
+    const { service, sink } = worker({
+      entitlement: true,
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+    const usage = new RecordingPulledUsage();
+    usage.records.mockRejectedValueOnce(new Error("event store unavailable"));
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
+    ).rejects.toThrow("event store unavailable");
+    expect(sink.insertEvent).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed when the pulled-usage entitlement cannot be resolved", async () => {
+    const { service, sink } = worker({
+      entitlement: new Error("entitlement unavailable"),
+      runOnce: async () => ({
+        events: [pulledUsageEvent()],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+    const usage = new RecordingPulledUsage();
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
+    ).rejects.toThrow("entitlement unavailable");
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(usage.records).not.toHaveBeenCalled();
+  });
+
+  it("keeps an unmappable usage item audit-only without wedging the cursor", async () => {
+    const { service, sink, diagnostics } = worker({
+      entitlement: true,
+      runOnce: async () => ({
+        events: [
+          pulledUsageEvent({ event_timestamp: "not-a-timestamp" }),
+          pulledUsageEvent({ source_event_id: "usage:good" }),
+        ],
+        cursor: "next",
+        errorCount: 0,
+      }),
+    });
+    const usage = new RecordingPulledUsage();
+
+    await expect(
+      service.run({ sourceId: "source-1", cursor: "held", pulledUsage: usage }),
+    ).resolves.toMatchObject({ nextCursor: "next", eventCount: 2 });
+    expect(sink.insertEvent).toHaveBeenCalledTimes(2);
+    expect(usage.records).toHaveBeenCalledTimes(1);
+    expect(diagnostics.error).toHaveBeenCalledWith(
+      expect.stringContaining("could not map"),
+      expect.objectContaining({ sourceEventId: "usage:2026-08-24:workspace-1" }),
+    );
+  });
+});
+
+describe("IngestionPullWorkerService run report", () => {
+  const event = {
+    source_event_id: "event-1",
+    event_timestamp: "2026-08-24T09:00:00.000Z",
+    actor: "alex@example.com",
+    action: "invoke",
+    target: "model",
+    cost_usd: "0",
+    tokens_input: 1,
+    tokens_output: 2,
+    raw_payload: "{}",
+  };
+
+  describe("given a paused source", () => {
+    it("reports a complete run that read through to nowhere, cursor untouched", async () => {
+      const { service } = worker({
+        source: ingestionSource({ status: "paused" }),
+        runOnce: async () => ({ events: [], cursor: "never", errorCount: 0 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: "held" })).resolves.toEqual({
+        nextCursor: "held",
+        eventCount: 0,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: null,
+      });
+    });
+  });
+
+  describe("given a complete run that emitted events", () => {
+    it("reads through to the newest event, not the clock", async () => {
+      const { service } = worker({
+        runOnce: async () => ({ events: [event], cursor: "next", errorCount: 0 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+        nextCursor: "next",
+        eventCount: 1,
+        errorCount: 0,
+        completeness: "complete",
+        readThroughAt: Date.parse("2026-08-24T09:00:00.000Z"),
+      });
+    });
+  });
+
+  describe("given a truncated run that banked an unread page and emitted nothing", () => {
+    it("carries the truncation and the unread page, reading through to nowhere", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [],
+          cursor: "next",
+          errorCount: 0,
+          completeness: "truncated",
+          unreadPage: true,
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toEqual({
+        nextCursor: "next",
+        eventCount: 0,
+        errorCount: 0,
+        completeness: "truncated",
+        unreadPage: true,
+        readThroughAt: null,
+      });
+    });
+  });
+
+  describe("given an event stamped without an offset", () => {
+    it("reads the stamp in UTC, as main did, rather than skipping it", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [{ ...event, event_timestamp: "2026-08-24T09:15:00" }],
+          cursor: "next",
+          errorCount: 0,
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+        readThroughAt: Date.parse("2026-08-24T09:15:00.000Z"),
+      });
+    });
+  });
+
+  describe("given an adapter that states how far it read", () => {
+    it("takes the adapter's statement over the events", async () => {
+      const { service } = worker({
+        runOnce: async () => ({
+          events: [event],
+          cursor: "next",
+          errorCount: 0,
+          readThroughAt: "2026-08-24T09:30:00.000Z",
+        }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+        readThroughAt: Date.parse("2026-08-24T09:30:00.000Z"),
+      });
+    });
+  });
+
+  describe("given errors and a cursor that went back to null", () => {
+    it("fails the run, since a null cursor is no advance", async () => {
+      const { service } = worker({
+        runOnce: async () => ({ events: [], cursor: null, errorCount: 2 }),
+      });
+      await expect(service.run({ sourceId: "source-1", cursor: "held" })).rejects.toThrow(
+        "reported 2 error(s)",
+      );
+    });
+  });
+});
+
+const ERASED = "leaver@acme.example";
+const STAYS = "analyst@acme.example";
+
+function genieWorker(input: Omit<Parameters<typeof worker>[0], "runOnce"> & { actors: string[] }) {
+  const traceIngestion = new FakeTraceIngestion();
+  const built = worker({
+    ...input,
+    source: ingestionSource({ sourceType: "databricks_genie", traceProjectId: "trace-project" }),
+    traceDestination: traceDestination(),
+    traceIngestion,
+    runOnce: async () => ({
+      events: input.actors.map((actor, index) => genieConversationEvent(actor, `message-${index}`)),
+      cursor: "next",
+      errorCount: 0,
+    }),
+  });
+  const exported = () => JSON.stringify(traceIngestion.ingest.mock.calls);
+  return { ...built, traceIngestion, exported };
+}
+
+describe("given a pull carrying an event that names an erased person", () => {
+  describe("when the run reaches the customer's trace project", () => {
+    /** @scenario "An erased person's conversations stop being exported" */
+    it("exports nothing, rather than republishing the conversation", async () => {
+      const { service, traceIngestion, sink } = genieWorker({ erased: [ERASED], actors: [ERASED] });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(traceIngestion.ingest).not.toHaveBeenCalled();
+      expect(sink.insertEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the batch also carries somebody who was not erased", () => {
+    /** @scenario "Suppression removes only the erased person from the export" */
+    it("exports the other conversation and leaves the erased address out of it", async () => {
+      const { service, traceIngestion, exported, diagnostics } = genieWorker({
+        erased: [ERASED],
+        actors: [ERASED, STAYS],
+      });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(traceIngestion.ingest).toHaveBeenCalledTimes(1);
+      expect(exported()).toContain(STAYS);
+      expect(exported()).not.toContain(ERASED);
+      expect(diagnostics.info).toHaveBeenCalledWith(
+        "skipped pulled events naming an erased identifier",
+        { ingestionSourceId: "source-1", suppressedCount: 1 },
+      );
+    });
+
+    /** @scenario "An erased identifier is never re-discovered" */
+    it("discovers the other person and never the erased identifier", async () => {
+      const { service, discover } = genieWorker({ erased: [ERASED], actors: [ERASED, STAYS] });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(discover).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(discover.mock.calls)).toContain(STAYS);
+      expect(JSON.stringify(discover.mock.calls)).not.toContain(ERASED);
+    });
+  });
+});
+
+describe("given a directory listing that names an erased person", () => {
+  /** @scenario "An erased identifier in the directory is skipped entirely" */
+  it("neither discovers them nor lets their department row through", async () => {
+    const { service, discover, departmentSync, sink } = worker({
+      erased: [ERASED],
+      runOnce: async () => ({
+        events: [
+          {
+            source_event_id: "msgraph_directory:erased:2026-08-20",
+            event_timestamp: "2026-08-20T10:00:00.000Z",
+            actor: ERASED,
+            action: "directory_report",
+            target: "Finance",
+            cost_usd: "0",
+            tokens_input: 0,
+            tokens_output: 0,
+            raw_payload: JSON.stringify({ id: ERASED, department: "Finance" }),
+            extra: { department: "Finance", displayName: "Leaver" },
+          },
+        ],
+        cursor: null,
+        errorCount: 0,
+      }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(sink.insertEvent).not.toHaveBeenCalled();
+    expect(JSON.stringify(discover.mock.calls)).not.toContain(ERASED);
+    expect(JSON.stringify(departmentSync.mock.calls)).not.toContain(ERASED);
+  });
+});
+
+describe("given a pull where person discovery itself breaks", () => {
+  /** @scenario "Discovery failing does not cost the run its events" */
+  it("still writes the audit row and exports the conversation", async () => {
+    const { service, sink, traceIngestion, identityMatch, diagnostics } = genieWorker({
+      actors: [STAYS],
+      discover: async () => {
+        throw new Error("relation does not exist");
+      },
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(sink.insertEvent).toHaveBeenCalled();
+    expect(traceIngestion.ingest).toHaveBeenCalledTimes(1);
+    expect(identityMatch).not.toHaveBeenCalled();
+    expect(diagnostics.error).toHaveBeenCalledWith(
+      "could not record discovered people; the pulled events are still delivered",
+      { ingestionSourceId: "source-1", error: "relation does not exist" },
+    );
+  });
+});
+
+describe("given a pull where nobody has been erased", () => {
+  describe("when the run reaches the customer's trace project", () => {
+    it("exports the conversation exactly as it did before erasure existed", async () => {
+      const { service, traceIngestion, exported } = genieWorker({ actors: [STAYS] });
+
+      await service.run({ sourceId: "source-1", cursor: null });
+
+      expect(traceIngestion.ingest).toHaveBeenCalledTimes(1);
+      expect(exported()).toContain(STAYS);
+    });
+  });
+});
+
+describe("given a pull that discovers people", () => {
+  it("runs the identity match pass for the source's organization", async () => {
+    const { service, identityMatch } = genieWorker({
+      actors: [STAYS],
+      discover: async () => ({ discovered: 1 }),
+    });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(identityMatch).toHaveBeenCalledWith({ organizationId: "org-1" });
+  });
+
+  it("keeps the run when the identity match pass fails", async () => {
+    const { service, diagnostics } = genieWorker({
+      actors: [STAYS],
+      discover: async () => ({ discovered: 1 }),
+      runIdentityMatch: async () => {
+        throw new Error("scorer down");
+      },
+    });
+
+    await expect(service.run({ sourceId: "source-1", cursor: null })).resolves.toMatchObject({
+      eventCount: 1,
+    });
+    expect(diagnostics.error).toHaveBeenCalledWith(
+      "identity match pass failed; the discovered people are kept and the next pull retries",
+      { ingestionSourceId: "source-1", error: "scorer down" },
+    );
+  });
+
+  it("skips the identity match pass when nobody new was discovered", async () => {
+    const { service, identityMatch } = genieWorker({ actors: [STAYS] });
+
+    await service.run({ sourceId: "source-1", cursor: null });
+
+    expect(identityMatch).not.toHaveBeenCalled();
+  });
+});
+
+const DAY_1 = "2026-08-20T00:00:00.000Z";
+const DAY_2 = "2026-08-22T00:00:00.000Z";
+const DAY_3 = "2026-08-24T00:00:00.000Z";
+
+function instant(iso: string): Instant {
+  return Temporal.Instant.from(iso);
+}
+
+async function pullDays(input: {
+  days: string[];
+  recording: boolean;
+  window?: UnpricedUsageWindow;
+  completeness?: "complete" | "truncated";
+  priced?: boolean;
+}) {
+  const built = worker({
+    entitlement: input.recording,
+    unpricedWindow: input.window,
+    runOnce: async () => ({
+      events: input.days.map((day, index) =>
+        input.priced === false
+          ? genieConversationEvent(STAYS, `message-${index}`)
+          : pulledUsageEvent({ source_event_id: `usage:${index}`, event_timestamp: day }),
+      ),
+      cursor: "next",
+      errorCount: 0,
+      ...(input.completeness ? { completeness: input.completeness } : {}),
+    }),
+  });
+  const usage = new RecordingPulledUsage();
+  await built.service.run({ sourceId: "source-1", cursor: null, pulledUsage: usage });
+  return { ...built, usage, writes: built.unpricedWindows.updateUnpricedUsageWindow.mock.calls };
+}
+
+describe("the window a pull read but was not allowed to price", () => {
+  describe("given this organization is not recording pulled cost", () => {
+    /** @scenario "A day read without recording cost is remembered as unpriced" */
+    it("records the day whose spend it dropped, so the day is not read as free", async () => {
+      const { usage, writes } = await pullDays({ days: [DAY_2], recording: false });
+
+      expect(usage.records).not.toHaveBeenCalled();
+      expect(writes).toEqual([["source-1", { since: instant(DAY_2), through: instant(DAY_2) }]]);
+    });
+
+    /** @scenario "The unpriced window spans the first lost day to the last" */
+    it("spans the window from the first dropped day to the last", async () => {
+      const { writes } = await pullDays({ days: [DAY_3, DAY_1, DAY_2], recording: false });
+
+      expect(writes).toEqual([["source-1", { since: instant(DAY_1), through: instant(DAY_3) }]]);
+    });
+
+    /** @scenario "A later loss never shrinks an earlier one" */
+    it("keeps the earlier loss when a later run drops a later day", async () => {
+      const window = { since: instant(DAY_1), through: instant(DAY_1) };
+      const { writes } = await pullDays({ days: [DAY_3], recording: false, window });
+
+      expect(writes).toEqual([["source-1", { since: instant(DAY_1), through: instant(DAY_3) }]]);
+    });
+
+    /** @scenario "A day that never carried a price is not remembered as lost" */
+    it("claims no loss for a day that never carried a price", async () => {
+      const { writes } = await pullDays({ days: [DAY_2], recording: false, priced: false });
+
+      expect(writes).toEqual([]);
+    });
+  });
+
+  describe("given this organization is recording pulled cost", () => {
+    const window = { since: instant(DAY_2), through: instant(DAY_3) };
+
+    /** @scenario "Recording cost normally remembers no loss" */
+    it("records no window, because nothing was dropped", async () => {
+      const { usage, writes } = await pullDays({ days: [DAY_2], recording: true });
+
+      expect(usage.records).toHaveBeenCalledTimes(1);
+      expect(writes).toEqual([]);
+    });
+
+    /** @scenario "Reading back across the whole window clears it" */
+    it("forgets the window once a re-read reaches back across all of it", async () => {
+      const { writes } = await pullDays({ days: [DAY_1, DAY_3], recording: true, window });
+
+      expect(writes).toEqual([["source-1", { since: null, through: null }]]);
+    });
+
+    /** @scenario "A re-read that starts inside the window leaves it alone" */
+    it("keeps the window when the re-read starts inside it, because half a repair is not one", async () => {
+      const { writes } = await pullDays({ days: [DAY_3], recording: true, window });
+
+      expect(writes).toEqual([]);
+    });
+
+    /** @scenario "A cost read that stopped before its end leaves the window alone" */
+    it("keeps the window when the read that reached back was cut short", async () => {
+      const { writes, diagnostics } = await pullDays({
+        days: [DAY_1],
+        recording: true,
+        window,
+        completeness: "truncated",
+      });
+
+      expect(writes).toEqual([]);
+      expect(diagnostics.info).toHaveBeenCalledWith(
+        "a re-read reached back across the unpriced window but stopped short of its end; the window is kept",
+        { ingestionSourceId: "source-1" },
+      );
+    });
+  });
+});

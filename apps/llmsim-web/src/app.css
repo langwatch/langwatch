@@ -1,0 +1,28 @@
+/* Layout glue only; every value is a kit token (packages/design-system-internal/README.md). */
+
+.llm-row {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.llm-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+
+.llm-detail,
+.llm-settings {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+
+.llm-settings {
+  max-width: 32rem;
+}
+
+.llm-muted {
+  color: var(--ink-500);
+}

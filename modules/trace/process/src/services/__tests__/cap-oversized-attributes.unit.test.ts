@@ -1,0 +1,548 @@
+import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "../../rules/trace-payload-cap.rules.ts";
+import { TraceAttributeCapService } from "../trace-attribute-cap.service.ts";
+
+const traceAttributeCapService = TraceAttributeCapService.create();
+
+function makeSpan(attributes: OtlpSpan["attributes"]): OtlpSpan {
+  return {
+    traceId: "trace-1",
+    spanId: "span-1",
+    name: "test-span",
+    kind: 1,
+    startTimeUnixNano: { low: 0, high: 0 },
+    endTimeUnixNano: { low: 1_000_000, high: 0 },
+    attributes,
+    events: [],
+    links: [],
+    status: { message: null, code: null },
+    droppedAttributesCount: 0,
+    droppedEventsCount: 0,
+    droppedLinksCount: 0,
+  };
+}
+
+/** Builds a `data:image/png;base64,...` URL whose byte size exceeds the cap. */
+function oversizedDataUrl(): string {
+  const payload = "A".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1024);
+  return `data:image/png;base64,${payload}`;
+}
+
+describe("capOversizedAttributes", () => {
+  /** @scenario "An oversized inline image is still replaced entirely" */
+  it("caps an oversized base64 data-url attribute and names the mime type", () => {
+    const url = oversizedDataUrl();
+    const span = makeSpan([{ key: "langwatch.input", value: { stringValue: url } }]);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    const value = span.attributes[0]!.value.stringValue!;
+    expect(value).not.toContain("AAAA");
+    expect(value).toMatch(/^\[truncated: \d+ bytes, image\/png\]$/);
+    // Placeholder must be tiny, not multi-MB.
+    expect(value.length).toBeLessThan(64);
+  });
+
+  it("leaves a normal small span completely unchanged", () => {
+    const span = makeSpan([
+      { key: "langwatch.input", value: { stringValue: "hello world" } },
+      {
+        key: "langwatch.output",
+        value: {
+          stringValue: JSON.stringify({ role: "assistant", content: "hi" }),
+        },
+      },
+    ]);
+    const before = structuredClone(span.attributes);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(0);
+    expect(span.attributes).toEqual(before);
+  });
+
+  it("caps oversized strings nested inside arrayValue and kvlistValue", () => {
+    const big = "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const span = makeSpan([
+      {
+        key: "langwatch.params",
+        value: {
+          kvlistValue: {
+            values: [
+              { key: "image", value: { stringValue: big } },
+              { key: "small", value: { stringValue: "ok" } },
+            ],
+          },
+        },
+      },
+      {
+        key: "langwatch.input",
+        value: {
+          arrayValue: {
+            values: [{ stringValue: big }, { stringValue: "fine" }],
+          },
+        },
+      },
+    ]);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(2);
+    const kv = span.attributes[0]!.value.kvlistValue!.values;
+    expect(kv[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+    expect(kv[1]!.value.stringValue).toBe("ok");
+    const arr = span.attributes[1]!.value.arrayValue!.values;
+    expect(arr[0]!.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+    expect(arr[1]!.stringValue).toBe("fine");
+  });
+
+  it("caps oversized bytesValue payloads", () => {
+    const span = makeSpan([
+      {
+        key: "langwatch.input",
+        value: {
+          bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+        },
+      },
+    ]);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    expect(span.attributes[0]!.value.bytesValue).toBeNull();
+    expect(span.attributes[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+  });
+
+  it("caps oversized values in events, links, and the resource", () => {
+    const big = "y".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const span = makeSpan([]);
+    span.events = [
+      {
+        timeUnixNano: { low: 0, high: 0 },
+        name: "evt",
+        attributes: [{ key: "big", value: { stringValue: big } }],
+      },
+    ];
+    span.links = [
+      {
+        traceId: "t",
+        spanId: "s",
+        attributes: [{ key: "big", value: { stringValue: big } }],
+        droppedAttributesCount: 0,
+      },
+    ];
+    const resource: OtlpResource = {
+      attributes: [{ key: "big", value: { stringValue: big } }],
+    };
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, resource);
+
+    expect(cappedCount).toBe(3);
+  });
+
+  it("does not throw on malformed attribute shapes", () => {
+    const span = makeSpan([{ key: "weird", value: null as never }, undefined as never]);
+
+    expect(() => traceAttributeCapService.capOversizedAttributes(span, null)).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// valueExceeds
+// ---------------------------------------------------------------------------
+
+describe("capOversizedAttributes with copilot content-capture payloads", () => {
+  // Copilot CLI (ADR-039) ships prompt/response content on span-EVENT
+  // attributes (gen_ai.input/output.messages) when content capture is
+  // on, with no documented client-side size cap — the span path's
+  // per-value guard is the only ceiling.
+
+  /** @scenario An oversized content value on a span event is capped at ingestion */
+  it("caps an oversized gen_ai content value on a span event and keeps the span intact", () => {
+    const big = "m".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const span = makeSpan([{ key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } }]);
+    span.events = [
+      {
+        timeUnixNano: { low: 0, high: 0 },
+        name: "gen_ai.content",
+        attributes: [{ key: "gen_ai.input.messages", value: { stringValue: big } }],
+      },
+    ];
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    const eventAttr = span.events[0]!.attributes[0]!;
+    expect(eventAttr.value.stringValue).toMatch(/^\[truncated: \d+ bytes/);
+    // The span itself (model attr) is untouched.
+    expect(span.attributes[0]!.value.stringValue).toBe("gpt-5-mini");
+  });
+
+  /** @scenario A long session of content-carrying spans ingests without unbounded accumulation */
+  it("caps every span of a long content-carrying session independently", () => {
+    // The CH-merge OOM vector is accumulation across many spans, not one
+    // big value — every span in a 100-span session must come out of the
+    // guard individually bounded so the fold's input has a hard ceiling.
+    const big = "n".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    const spans = Array.from({ length: 100 }, (_, i) => {
+      const span = makeSpan([{ key: "gen_ai.output.messages", value: { stringValue: big } }]);
+      span.spanId = `span-${i}`;
+      return span;
+    });
+
+    let totalCapped = 0;
+    for (const span of spans) {
+      totalCapped += traceAttributeCapService.capOversizedAttributes(span, null);
+    }
+
+    expect(totalCapped).toBe(100);
+    for (const span of spans) {
+      const value = span.attributes[0]!.value.stringValue!;
+      expect(value.length).toBeLessThan(64);
+    }
+  });
+});
+
+describe("valueExceeds", () => {
+  describe("given a stringValue", () => {
+    describe("when the string exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the string is exactly at the limit", () => {
+      it("returns false", () => {
+        const value = {
+          stringValue: "a".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the string is small", () => {
+      it("returns false", () => {
+        const value = { stringValue: "hello" };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a bytesValue", () => {
+    describe("when the Uint8Array exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
+      });
+    });
+
+    describe("when the Uint8Array is exactly at the limit", () => {
+      it("returns false", () => {
+        const value = {
+          bytesValue: new Uint8Array(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a value nested inside arrayValue", () => {
+    describe("when a nested stringValue exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          arrayValue: {
+            values: [
+              { stringValue: "small" },
+              {
+                stringValue: "x".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+              },
+            ],
+          },
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
+      });
+    });
+
+    describe("when all nested stringValues are small", () => {
+      it("returns false", () => {
+        const value = {
+          arrayValue: {
+            values: [{ stringValue: "a" }, { stringValue: "b" }],
+          },
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given a value nested inside kvlistValue", () => {
+    describe("when a nested entry value exceeds maxBytes", () => {
+      it("returns true", () => {
+        const value = {
+          kvlistValue: {
+            values: [
+              { key: "small", value: { stringValue: "ok" } },
+              {
+                key: "big",
+                value: {
+                  stringValue: "z".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1),
+                },
+              },
+            ],
+          },
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(true);
+      });
+    });
+
+    describe("when all nested entry values are small", () => {
+      it("returns false", () => {
+        const value = {
+          kvlistValue: {
+            values: [
+              { key: "a", value: { stringValue: "alpha" } },
+              { key: "b", value: { stringValue: "beta" } },
+            ],
+          },
+        };
+        expect(
+          traceAttributeCapService.valueExceeds(value, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+        ).toBe(false);
+      });
+    });
+  });
+
+  describe("given null or undefined", () => {
+    it("returns false for null", () => {
+      expect(traceAttributeCapService.valueExceeds(null, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES)).toBe(
+        false,
+      );
+    });
+
+    it("returns false for undefined", () => {
+      expect(
+        traceAttributeCapService.valueExceeds(undefined, DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES),
+      ).toBe(false);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasOversizedAttribute
+// ---------------------------------------------------------------------------
+
+describe("hasOversizedAttribute", () => {
+  const big = "b".repeat(DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES + 1);
+  const small = "small";
+
+  describe("given a span with all small attributes and no resource", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns false", () => {
+        const span = makeSpan([{ key: "custom.attr", value: { stringValue: small } }]);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(false);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value in span.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([{ key: "custom.attr", value: { stringValue: big } }]);
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value only in span.events[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.events = [
+          {
+            timeUnixNano: { low: 0, high: 0 },
+            name: "evt",
+            attributes: [{ key: "event.attr", value: { stringValue: big } }],
+          },
+        ];
+
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value only in span.links[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.links = [
+          {
+            traceId: "t",
+            spanId: "s",
+            attributes: [{ key: "link.attr", value: { stringValue: big } }],
+            droppedAttributesCount: 0,
+          },
+        ];
+
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with all small span attributes but an oversized value in resource.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([{ key: "custom.small", value: { stringValue: small } }]);
+        const resource: OtlpResource = {
+          attributes: [{ key: "service.name", value: { stringValue: big } }],
+        };
+
+        expect(traceAttributeCapService.hasOversizedAttribute(span, resource)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value nested inside an arrayValue in span.attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([
+          {
+            key: "nested.attr",
+            value: {
+              arrayValue: {
+                values: [{ stringValue: "small" }, { stringValue: big }],
+              },
+            },
+          },
+        ]);
+
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given a span with an oversized value nested inside a kvlistValue in span.events[].attributes", () => {
+    describe("when hasOversizedAttribute is called", () => {
+      it("returns true", () => {
+        const span = makeSpan([]);
+        span.events = [
+          {
+            timeUnixNano: { low: 0, high: 0 },
+            name: "evt",
+            attributes: [
+              {
+                key: "nested.kv",
+                value: {
+                  kvlistValue: {
+                    values: [{ key: "inner", value: { stringValue: big } }],
+                  },
+                },
+              },
+            ],
+          },
+        ];
+
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(true);
+      });
+    });
+  });
+
+  describe("given null as resource", () => {
+    describe("when hasOversizedAttribute is called with all-small span", () => {
+      it("returns false without throwing", () => {
+        const span = makeSpan([{ key: "a", value: { stringValue: "x" } }]);
+        expect(() => traceAttributeCapService.hasOversizedAttribute(span, null)).not.toThrow();
+        expect(traceAttributeCapService.hasOversizedAttribute(span, null)).toBe(false);
+      });
+    });
+  });
+});
+
+describe("capOversizedAttributes on a message history", () => {
+  const maxBytes = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES;
+  /** A long conversation as a model call records it: system prompt, turns, latest question. */
+  function history({ turns, lastBytes = 40 }: { turns: number; lastBytes?: number }) {
+    const messages: { role: string; parts: { type: string; content: string }[] }[] = [
+      { role: "system", parts: [{ type: "text", content: "You are the booking copilot." }] },
+      {
+        role: "user",
+        parts: [{ type: "text", content: "FIRST: quote cottage C-114 for week 42." }],
+      },
+    ];
+    for (let i = 0; i < turns; i++) {
+      messages.push(
+        {
+          role: "assistant",
+          parts: [{ type: "text", content: `reply ${i} ${"x".repeat(2_000)}` }],
+        },
+        { role: "user", parts: [{ type: "text", content: `question ${i}` }] },
+      );
+    }
+    messages.push({
+      role: "user",
+      parts: [{ type: "text", content: `LATEST ${"y".repeat(lastBytes)}` }],
+    });
+    return messages;
+  }
+
+  /** @scenario "An oversized message history drops whole messages from its middle" */
+  it("keeps the system prompt, the first user message and the latest messages, and counts the rest", () => {
+    const messages = history({ turns: 400 });
+    const span = makeSpan([
+      { key: "gen_ai.input.messages", value: { stringValue: JSON.stringify(messages) } },
+    ]);
+
+    const cappedCount = traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(cappedCount).toBe(1);
+    const value = span.attributes[0]!.value.stringValue!;
+    expect(Buffer.byteLength(value)).toBeLessThanOrEqual(maxBytes);
+    const kept = JSON.parse(value) as typeof messages;
+    expect(kept[0]!.parts[0]!.content).toBe("You are the booking copilot.");
+    expect(kept[1]!.parts[0]!.content).toContain("FIRST");
+    expect(kept[2]!.role).toBe("system");
+    expect(kept[2]!.parts[0]!.content).toMatch(
+      /^\[\d+ messages omitted to fit the \d+-byte attribute cap\]$/,
+    );
+    expect(kept.at(-1)!.parts[0]!.content).toContain("LATEST");
+    const dropped = Number(/\[(\d+) messages/.exec(kept[2]!.parts[0]!.content)![1]);
+    expect(dropped + kept.length - 1).toBe(messages.length);
+  });
+
+  /** @scenario "A message history whose latest message alone is over the cap falls back to the placeholder" */
+  it("falls back to the byte-count placeholder when the latest message alone is over the cap", () => {
+    const span = makeSpan([
+      {
+        key: "gen_ai.input.messages",
+        value: { stringValue: JSON.stringify(history({ turns: 2, lastBytes: maxBytes + 10 })) },
+      },
+    ]);
+
+    traceAttributeCapService.capOversizedAttributes(span, null);
+
+    expect(span.attributes[0]!.value.stringValue).toMatch(/^\[truncated: \d+ bytes\]$/);
+  });
+});

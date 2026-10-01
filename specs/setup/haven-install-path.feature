@@ -2,19 +2,28 @@ Feature: haven install offers to put the Go bin dir on PATH
   `make haven install` runs `go install ./cmd/haven`, which drops the binary
   in the Go bin dir (GOBIN, or GOPATH/bin). If that dir is not on PATH, the
   freshly installed `haven` command doesn't work and the "run 'haven ...'
-  directly" promise is broken. The install target should notice and offer to
-  fix it, instead of leaving the user to diagnose a command-not-found.
+  directly" promise is broken at the exact moment it is made. The install
+  should notice and offer to fix it, instead of leaving the developer to
+  diagnose a command-not-found.
 
-  # Behavior lives in dev/scripts/haven-install-path.sh, invoked by the
-  # `make haven install` branch in dev/haven.mk after `go install`.
-  # Bound by dev/scripts/__tests__/haven-install-path.unit.bats.
+  # Being able to RUN haven is the one prerequisite the catalogue in
+  # specs/setup/haven-install-prerequisites.feature cannot express, so
+  # `haven install` reports it first and this is its spec.
+  #
+  # Behaviour was a bash script (dev/scripts/haven-install-path.sh) run by the
+  # Makefile between two Go programs, which is why `make haven install` read
+  # as three tools taking turns. It now lives in haven itself:
+  # domain/havenpath.go decides, app/havenpath.go touches the machine,
+  # cmd/installpath.go asks. Bound by the Go tests beside each.
 
   @unit
   Scenario: Go bin dir already on PATH
     Given the Go bin dir is already on PATH
     When I run "make haven install"
-    Then it confirms where haven was installed
-    And no PATH change is offered
+    Then no PATH change is offered
+    # Nor a line confirming it: the absence of a complaint is the
+    # confirmation, and a report that congratulates you on every run is one
+    # you stop reading.
 
   @unit
   Scenario: Go bin dir missing from PATH, user accepts

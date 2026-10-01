@@ -170,6 +170,13 @@ Feature: Handled errors — what the customer actually reads
     But when it is absent, or of an unexpected type
     Then the description falls back rather than rendering the raw value
 
+  @unit @bdd @handled-errors @presentation
+  Scenario: The refusal names the reserved parameter the caller actually supplied
+    Given a lwql_reserved_parameter_supplied error whose meta names the parameters actually supplied
+    When it is surfaced to a customer
+    Then the description names exactly the parameters that were supplied
+    And it does not name a reserved parameter the request never sent
+
   @unit @integration @bdd @handled-errors @presentation
   Scenario: An unhandled failure says nothing, but stays traceable
     Given a procedure fails with an unhandled error

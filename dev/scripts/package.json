@@ -1,0 +1,11 @@
+{
+  "name": "@langwatch/dev-scripts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The repository's own scripts, run by path from their shell and package.json callers.",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@langwatch/scenario-child": "workspace:*"
+  }
+}

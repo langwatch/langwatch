@@ -1,0 +1,37 @@
+{
+  "name": "@langwatch/visual-diff-runner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Playwright capture half of visualdiff: drives the same routes and flows on two running stacks and reports every screenshot, console error, failed request and pixel diff as JSON lines.",
+  "type": "module",
+  "exports": {
+    "./capture": "./src/capture.ts",
+    "./protocol": "./src/protocol.ts",
+    "./sign-in": "./src/sign-in.ts",
+    "./schedule": "./src/schedule.ts",
+    "./module-load": "./src/module-load.ts",
+    "./settle": "./src/settle.ts",
+    "./flows/actions": "./src/flows/actions.ts",
+    "./flows/context": "./src/flows/context.ts",
+    "./flows/primitives": "./src/flows/primitives.ts",
+    "./flows/registry": "./src/flows/registry.ts"
+  },
+  "scripts": {
+    "capture": "node --experimental-transform-types src/main.ts",
+    "preflight": "node --experimental-transform-types src/preflight.ts",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright": "catalog:",
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

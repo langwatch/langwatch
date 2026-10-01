@@ -1,4 +1,4 @@
-import { listProjects as apiListProjects } from "../langwatch-api-projects.js";
+import { listProjects as apiListProjects } from "../langwatch-api-projects.ts";
 
 export async function handleListProjects(params?: {
   page?: number;
@@ -33,9 +33,7 @@ export async function handleListProjects(params?: {
     );
   }
 
-  lines.push(
-    "> Use `platform_get_project` with the ID to see full project details.",
-  );
+  lines.push("> Use `platform_get_project` with the ID to see full project details.");
 
   return lines.join("\n");
 }

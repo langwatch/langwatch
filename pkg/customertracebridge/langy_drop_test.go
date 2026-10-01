@@ -10,8 +10,8 @@ import (
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 // exportedTraceIDs decodes every captured body into the hex trace ids of the
@@ -48,7 +48,7 @@ func hexTraceID(id []byte) string {
 
 // emitWith runs one BeginSpan/EndSpan cycle with an optional inbound
 // traceparent, against a plain (mirror-off) emitter, and flushes.
-func emitWith(t *testing.T, traceparent string, params domain.AITraceParams) *capturingIngest {
+func emitWith(t *testing.T, traceparent string, params aitrace.AITraceParams) *capturingIngest {
 	t.Helper()
 	ingest := startCapturingIngest(t)
 
@@ -68,7 +68,7 @@ func emitWith(t *testing.T, traceparent string, params domain.AITraceParams) *ca
 	if traceparent != "" {
 		ctx = WithTraceParent(ctx, traceparent)
 	}
-	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", domain.RequestTypeChat)
+	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", aitrace.RequestTypeChat)
 	e.EndSpan(spanCtx, params)
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 	return ingest
@@ -80,7 +80,7 @@ func emitWith(t *testing.T, traceparent string, params domain.AITraceParams) *ca
 // Ordinary gateway traffic (playground, customer API keys, no mirror tier)
 // keeps its standalone root: that trace is the only one such traffic has.
 func TestEndSpan_LangyStandaloneDuplicateIsDropped(t *testing.T) {
-	langyParams := func() domain.AITraceParams {
+	langyParams := func() aitrace.AITraceParams {
 		p := baseParams()
 		p.MirrorTier = mirrorTierContent
 		return p

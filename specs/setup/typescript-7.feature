@@ -13,19 +13,49 @@ Feature: TypeScript 7 is the compiler
   ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
 
   @unit
+  Scenario: Production and full checks stay two configurations, and only one runs as the check
+    Given API, worker, and UI each keep a production TypeScript configuration and a full one that adds tests
+    When either configuration checks an application
+    Then the production configuration's diagnostics exclude test directories and colocated test files
+    And the full configuration's diagnostics include them
+    And a test file imported by production code is still checked under the production configuration
+    But only the full configuration runs as the application's own typecheck script
+
+  @unit
+  Scenario: A package's adopted dependencies are checked before its own source
+    Given a package's TypeScript project references its adopted workspace dependencies
+    When the package is typechecked
+    Then its dependencies are built and their declarations refreshed first
+    And the package resolves their public entries to declarations rather than implementation source
+    And invalid arguments against a dependency still produce type errors
+    But a failed dependency build stops the package's own check
+
+  @unit
   Scenario: The compiler API is only reached through its unstable export
     Given a file that needs a TypeScript AST
     When it imports the compiler
     Then it takes the AST types and predicates from the unstable export
     And no file value-imports the root `typescript` module
+    But a package held on 6 may, because there the root export is the compiler
 
   @unit
   Scenario: Every workspace package builds against one compiler major
     Given the workspace installs from a single root
     Then every package declares TypeScript 7
-    But the two packages that publish bundled declarations stay on 6
-    # tsup's `dts: true` bundles through the old programmatic compiler API,
-    # which 7 does not expose. Held deliberately, not by omission.
+    But the packages that drive the old programmatic compiler API stay on 6
+    # Two of them publish bundled declarations through tsup's `dts: true`; the
+    # third is the architecture linter, a synchronous CLI over the whole tree
+    # that uses a program, a printer and a scanner 7 does not expose. Held
+    # deliberately, not by omission — and held as a library only: they
+    # typecheck with 7, as the next scenario requires.
+
+  @unit
+  Scenario: A package held on 6 still typechecks with 7
+    Given a package that declares TypeScript 6 for its build or its runtime
+    When its typecheck script runs
+    Then the workspace's TypeScript 7 compiler checks it, not the package's own
+    # Its references reach build projects the root solution builds too; two
+    # compilers over one build info each mark the other's output stale.
 
   @unit
   Scenario: The superseded preview compiler is gone
@@ -48,21 +78,24 @@ Feature: TypeScript 7 is the compiler
     # several snippets would otherwise judge every one of them by the first.
 
   @unit
-  Scenario: The whole repository is typechecked as one program
-    Given every test file imports the application code it tests
-    When a contributor typechecks everything
-    Then the application files are checked once, not once for each project
-    # Two projects run back to back checked the app's files twice, which cost
-    # 35.1M type instantiations against 18.9M for the single program.
+  Scenario: Every package tsconfig extends the shared root base
+    Given the workspace declares one root tsconfig with the compiler options every package shares
+    When a package's own tsconfig.json is read
+    Then its "extends" field points at the shared root base
+    And the package layers only its own paths and overrides on top
 
   @unit
-  Scenario: The combined project checks every file the split projects checked
-    Given an application project and a tests project that each cover part of the repository
-    When one project replaces both
-    Then no file that was checked before is left unchecked
+  Scenario: Every package sets incremental with its own build info file
+    Given a package tsconfig extends the shared root base
+    When the package is typechecked
+    Then its tsconfig declares "incremental": true
+    And its "tsBuildInfoFile" is scoped to that package under node_modules/.cache/tsbuildinfo
+    # A shared or missing path lets packages clobber each other's cache, or
+    # forces every typecheck to start cold.
 
   @unit
-  Scenario: Checking one project does not cool another
-    Given a contributor checks more than one of the projects
-    Then each keeps what it learned
-    And no run makes another start from cold again
+  Scenario: Checking one package does not invalidate another's cache
+    Given two packages each declare their own tsBuildInfoFile
+    When one package is typechecked
+    Then the other package's cached build info file is untouched
+    And that other package's next typecheck starts warm, not cold

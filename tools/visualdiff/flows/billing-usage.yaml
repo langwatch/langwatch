@@ -1,0 +1,49 @@
+# Usage and plan flows beyond webhooks-billing.yaml (lane green-billing-usage). Labels come from
+# main's settings/usage.tsx and plans/PlansComparisonPage.tsx. Not scripted, and why: the seat-limit
+# upgrade modal (needs an organisation with a small plan, and the shared one holds 100 seats and
+# more), and the invoices block (only drawn for an organisation with a Stripe customer, which no
+# stack here has and no Stripe twin exists to give one).
+flows:
+  - id: usage-page-heading-and-plan-card
+    title: The usage page carries its heading, its subtitle and one resource card that names the plan or deployment
+    steps:
+      - action: go
+        with:
+          path: /settings/usage
+      - action: expect
+        with:
+          text: Monitor your resource consumption and plan limits
+          timeout: "20000"
+      - action: expect
+        with:
+          text: /Current usage versus|Current resource usage|Current usage on this deployment/
+      - action: expect
+        with:
+          text: Unable to load resource limits
+          equals: "0"
+
+  - id: plans-page-has-the-three-columns
+    title: The plans page draws the Free, Growth and Enterprise columns under its comparison heading
+    steps:
+      - action: go
+        with:
+          path: /settings/plans
+      - action: expect
+        with:
+          text: Compare plans and choose the right tier for your organization.
+          timeout: "20000"
+      - action: expect
+        with:
+          testId: plan-column-free
+      - action: expect
+        with:
+          testId: plan-column-growth
+      - action: expect
+        with:
+          testId: plan-column-enterprise
+      - action: expect
+        with:
+          text: /Contact Sales|^\s*Current\s*$/
+      - action: expect
+        with:
+          text: /Upgrade Now|Add Members/

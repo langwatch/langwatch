@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiTraceIdShareResponse200")
 
@@ -15,29 +13,41 @@ T = TypeVar("T", bound="PostApiTraceIdShareResponse200")
 class PostApiTraceIdShareResponse200:
     """
     Attributes:
-        path (str | Unset):
+        status (Literal['success']):
+        path (str):
     """
 
-    path: str | Unset = UNSET
+    status: Literal["success"]
+    path: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        status = self.status
+
         path = self.path
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if path is not UNSET:
-            field_dict["path"] = path
+        field_dict.update(
+            {
+                "status": status,
+                "path": path,
+            }
+        )
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        path = d.pop("path", UNSET)
+        status = cast(Literal["success"], d.pop("status"))
+        if status != "success":
+            raise ValueError(f"status must match const 'success', got '{status}'")
+
+        path = d.pop("path")
 
         post_api_trace_id_share_response_200 = cls(
+            status=status,
             path=path,
         )
 

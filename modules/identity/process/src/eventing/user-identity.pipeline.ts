@@ -1,0 +1,252 @@
+import {
+  defineAggregate,
+  definePipeline,
+  type Projection,
+  type RegisteredCommand,
+  type StateProjectionStore,
+  type StaticPipelineDefinition,
+  defineEventingModule,
+  type EventingSetup,
+} from "@langwatch/eventing";
+import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
+
+import type { IdentityApp } from "../app/identity.app.ts";
+import type { IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
+import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { CryptoIdentifierIdentityService } from "../services/crypto-identifier-identity.service.ts";
+import { IdentityGuardsService } from "../services/identity-guards.service.ts";
+import { LinkProposalGuardsService } from "../services/link-proposal-guards.service.ts";
+import { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import { AttachIdentifierCommand } from "./attach-identifier.intent.ts";
+import { ConfirmLinkCommand, RejectLinkCommand } from "./decide-link.intent.ts";
+import { DetachIdentifierCommand } from "./detach-identifier.intent.ts";
+import { EraseUserCommand } from "./erase-user.intent.ts";
+import {
+  type IdentityEvent,
+  type IdentityFoldState,
+  IdentityStateFoldProjection,
+  identifierAttachedEventSchema,
+  identifierVerifiedEventSchema,
+  identifierDeadEndedEventSchema,
+  primaryChangedEventSchema,
+  identifierDetachedEventSchema,
+  userErasedEventSchema,
+  linkProposedEventSchema,
+  linkConfirmedEventSchema,
+  linkRejectedEventSchema,
+} from "./identity-state.projection.ts";
+import { MarkPrimaryCommand } from "./mark-primary.intent.ts";
+import {
+  MfaEnrollmentStateFoldProjection,
+  type MfaEvent,
+  type MfaFoldState,
+  mfaEnrolledEventSchema,
+  mfaConfirmedEventSchema,
+  mfaEnrollmentExpiredEventSchema,
+  mfaDisabledEventSchema,
+  backupCodeConsumedEventSchema,
+  backupCodesRegeneratedEventSchema,
+  mfaVerificationFailedEventSchema,
+} from "./mfa-enrollment-state.projection.ts";
+import {
+  ConfirmMfaCommand,
+  ConsumeBackupCodeCommand,
+  DisableMfaCommand,
+  EnrollMfaCommand,
+  ExpireMfaEnrollmentCommand,
+  RecordMfaVerificationFailureCommand,
+  RegenerateBackupCodesCommand,
+} from "./mfa.intent.ts";
+import { ProposeLinkCommand } from "./propose-link.intent.ts";
+import { VerifyIdentifierCommand } from "./verify-identifier.intent.ts";
+
+export interface IdentityPipelineDeps {
+  identityProjectionStore: StateProjectionStore<IdentityFoldState>;
+  /** The guards every command handler runs — `@langwatch/identity-process`'s
+   *  IdentityGuardsService over the app's heads repository, the same instance shape
+   *  the calling path uses. */
+  identityGuards: IdentityGuardsService;
+  /** Deciding a waiting sign-in, over the person's proposals as the log folds them. */
+  linkProposalGuards: LinkProposalGuardsService;
+  /** The `MfaEnrollment` head + cursor (D06), folded on this same pipeline. */
+  mfaProjectionStore: StateProjectionStore<MfaFoldState>;
+  /** The two-step verification guards, over the same person's state. */
+  mfaGuards: MfaGuardsService;
+}
+
+/**
+ * The identity pipeline (ADR-101, D01). One aggregate per user; commands and
+ * two-step verification (D06) share it, since a person's identifier and
+ * two-step commands must serialise against each other.
+ */
+export type IdentityPipeline = StaticPipelineDefinition<
+  IdentityEvent | MfaEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+>;
+
+export function defineIdentityPipeline(deps: IdentityPipelineDeps): IdentityPipeline {
+  return definePipeline({
+    name: IDENTITY_PIPELINE_NAME,
+    aggregate: defineAggregate({
+      type: USER_IDENTITY_AGGREGATE_TYPE,
+    }),
+  })
+    .withEvents([
+      identifierAttachedEventSchema,
+      identifierVerifiedEventSchema,
+      identifierDeadEndedEventSchema,
+      primaryChangedEventSchema,
+      identifierDetachedEventSchema,
+      userErasedEventSchema,
+      linkProposedEventSchema,
+      linkConfirmedEventSchema,
+      linkRejectedEventSchema,
+      mfaEnrolledEventSchema,
+      mfaConfirmedEventSchema,
+      mfaEnrollmentExpiredEventSchema,
+      mfaDisabledEventSchema,
+      backupCodeConsumedEventSchema,
+      backupCodesRegeneratedEventSchema,
+      mfaVerificationFailedEventSchema,
+    ])
+    .withPostgresProjection(
+      new IdentityStateFoldProjection({
+        store: deps.identityProjectionStore,
+      }),
+    )
+    .withCommandInstance({
+      name: "attachIdentifier",
+      handlerClass: AttachIdentifierCommand,
+      instance: new AttachIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "verifyIdentifier",
+      handlerClass: VerifyIdentifierCommand,
+      instance: new VerifyIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "markPrimary",
+      handlerClass: MarkPrimaryCommand,
+      instance: new MarkPrimaryCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "detachIdentifier",
+      handlerClass: DetachIdentifierCommand,
+      instance: new DetachIdentifierCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "eraseUser",
+      handlerClass: EraseUserCommand,
+      instance: new EraseUserCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "proposeLink",
+      handlerClass: ProposeLinkCommand,
+      instance: new ProposeLinkCommand(deps.identityGuards),
+    })
+    .withCommandInstance({
+      name: "confirmLink",
+      handlerClass: ConfirmLinkCommand,
+      instance: new ConfirmLinkCommand(deps.linkProposalGuards),
+    })
+    .withCommandInstance({
+      name: "rejectLink",
+      handlerClass: RejectLinkCommand,
+      instance: new RejectLinkCommand(deps.linkProposalGuards),
+    })
+    .withPostgresProjection(
+      new MfaEnrollmentStateFoldProjection({
+        store: deps.mfaProjectionStore,
+      }),
+    )
+    .withCommandInstance({
+      name: "enrollMfa",
+      handlerClass: EnrollMfaCommand,
+      instance: new EnrollMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "confirmMfa",
+      handlerClass: ConfirmMfaCommand,
+      instance: new ConfirmMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "expireMfaEnrollment",
+      handlerClass: ExpireMfaEnrollmentCommand,
+      instance: new ExpireMfaEnrollmentCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "disableMfa",
+      handlerClass: DisableMfaCommand,
+      instance: new DisableMfaCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "consumeBackupCode",
+      handlerClass: ConsumeBackupCodeCommand,
+      instance: new ConsumeBackupCodeCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "regenerateBackupCodes",
+      handlerClass: RegenerateBackupCodesCommand,
+      instance: new RegenerateBackupCodesCommand(deps.mfaGuards),
+    })
+    .withCommandInstance({
+      name: "recordMfaVerificationFailure",
+      handlerClass: RecordMfaVerificationFailureCommand,
+      instance: new RecordMfaVerificationFailureCommand(deps.mfaGuards),
+    })
+    .build();
+}
+
+/** The two guard instances, and the ONE address lock they claim through (ADR-116 §6). */
+export type IdentityGuardsComposition = {
+  identityGuards: IdentityGuardsService;
+  mfaGuards: MfaGuardsService;
+  reservations: IdentityReservationRepository;
+};
+
+export type IdentityGuardRepositories = Pick<
+  IdentityRepositories,
+  "heads" | "users" | "reservations" | "mfaEnrollment"
+>;
+
+export function composeIdentityGuards(
+  repositories: IdentityGuardRepositories,
+): IdentityGuardsComposition {
+  return {
+    identityGuards: IdentityGuardsService.create({
+      heads: repositories.heads,
+      users: repositories.users,
+      reservations: repositories.reservations,
+      identifiers: CryptoIdentifierIdentityService.create(),
+    }),
+    mfaGuards: MfaGuardsService.create(repositories.mfaEnrollment),
+    reservations: repositories.reservations,
+  };
+}
+
+/** The identity pipeline a draining process runs, over the module's own rows. */
+export function composeIdentityPipeline({
+  repositories,
+}: {
+  repositories: IdentityGuardRepositories &
+    Pick<IdentityRepositories, "identityProjection" | "mfaProjection" | "identityHistory">;
+}): IdentityPipeline {
+  const { identityGuards, mfaGuards } = composeIdentityGuards(repositories);
+  return defineIdentityPipeline({
+    identityProjectionStore: repositories.identityProjection,
+    identityGuards,
+    linkProposalGuards: LinkProposalGuardsService.create({
+      proposals: repositories.identityHistory,
+    }),
+    mfaProjectionStore: repositories.mfaProjection,
+    mfaGuards,
+  });
+}
+
+export const identityPipelineEventing = defineEventingModule({
+  pipeline: IDENTITY_PIPELINE_NAME,
+  build: ({ app }: EventingSetup<IdentityRepositories, IdentityApp>) => app.identityPipeline(),
+  connect: ({ app, commands }) =>
+    app.connectPipeline({ pipeline: IDENTITY_PIPELINE_NAME, commands }),
+});

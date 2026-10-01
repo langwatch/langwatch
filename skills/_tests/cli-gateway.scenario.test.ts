@@ -1,16 +1,18 @@
-import scenario from "@langwatch/scenario";
 import fs from "fs";
-import { describe, it, expect } from "vitest";
-import dotenv from "dotenv";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
+
 import { openai } from "@ai-sdk/openai";
+import scenario from "@langwatch/scenario";
+import dotenv from "dotenv";
+import { describe, it, expect } from "vitest";
+
 import {
   createClaudeCodeAgent,
   setupLocalCli,
   SKILL_TESTS_SET_ID,
-} from "./helpers/claude-code-adapter";
+} from "./helpers/claude-code-adapter.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,9 +28,7 @@ describe("LangWatch AI Gateway CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses CLI to mint, list, rotate, and revoke a virtual key",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-vk-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-vk-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -79,13 +79,8 @@ Workflow to exercise (in order):
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+virtual-keys\s+list/);
@@ -103,9 +98,7 @@ Workflow to exercise (in order):
   it.skipIf(isCI)(
     "agent uses CLI to create a budget with a project scope and archive it",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-budget-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-budget-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -148,18 +141,11 @@ Workflow:
           }),
         ],
         script: [
-          scenario.user(
-            "Read CLAUDE.md and follow the workflow via Bash. No MCP tools.",
-          ),
+          scenario.user("Read CLAUDE.md and follow the workflow via Bash. No MCP tools."),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+gateway-budgets\s+create/);
@@ -177,9 +163,7 @@ Workflow:
   it.skipIf(isCI)(
     "agent discovers gateway CLI surface via --help",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-gateway-help-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-gateway-help-"));
 
       fs.writeFileSync(path.join(tempFolder, ".env"), gatewayEnv);
       setupLocalCli(tempFolder);
@@ -224,13 +208,8 @@ Your goal: report back which top-level command groups are available and what the
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/virtual-keys.*--help|--help.*virtual-keys/);

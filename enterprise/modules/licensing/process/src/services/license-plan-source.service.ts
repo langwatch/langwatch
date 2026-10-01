@@ -1,0 +1,69 @@
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
+import {
+  UNLIMITED_PLAN,
+  mapToPlanInfo,
+  type PlanInfo,
+} from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
+
+import type { OrganizationLicense } from "../app/licensing.members.ts";
+
+/** An organization that no longer exists holds no licence: plan reads answer unlicensed. */
+const unlicensedWhenMissing = (error: unknown): { licenseKey: null } => {
+  if (HandledError.isHandled(error) && error.code === "organization_not_found")
+    return { licenseKey: null };
+  throw error;
+};
+
+export type LicensePlanSourceOptions = {
+  /** Where the organization's activated licence key is read from. */
+  licenses: OrganizationLicense;
+  /** How a key is parsed, verified and dated. */
+  cryptography: LicenseCryptography;
+};
+
+/**
+ * What a signed licence entitles one organization to, in each deployment mode.
+ *     signature ONLY (ADR-027: once a customer, never blocked). A term that
+ */
+export class LicensePlanSourceService {
+  static create(options: LicensePlanSourceOptions): LicensePlanSourceService {
+    return new LicensePlanSourceService(options.licenses, options.cryptography);
+  }
+
+  private constructor(
+    private readonly licenses: OrganizationLicense,
+    private readonly cryptography: LicenseCryptography,
+  ) {}
+
+  /** The Cloud reading: signature AND term, so a lapsed contract steps aside. */
+  async getActivePlan(organizationId: string): Promise<PlanInfo> {
+    const { licenseKey } = await this.licenses
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
+    if (!licenseKey) {
+      return UNLIMITED_PLAN;
+    }
+
+    const result = this.cryptography.validateLicense({ licenseKey });
+
+    return result.valid ? result.planInfo : UNLIMITED_PLAN;
+  }
+
+  /** The self-hosted reading: signature only, so a lapsed licence still holds. */
+  async getSelfHostedPlan(organizationId: string): Promise<PlanInfo> {
+    const { licenseKey } = await this.licenses
+      .getOrganizationLicense(organizationId)
+      .catch(unlicensedWhenMissing);
+    if (!licenseKey) {
+      return UNLIMITED_PLAN;
+    }
+
+    const signedLicense = this.cryptography.parseLicenseKey(licenseKey);
+    if (!signedLicense || !this.cryptography.verifySignature(signedLicense)) {
+      return UNLIMITED_PLAN;
+    }
+
+    return mapToPlanInfo(signedLicense.data);
+  }
+}

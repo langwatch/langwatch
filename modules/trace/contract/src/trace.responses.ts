@@ -1,0 +1,189 @@
+/**
+ * What the trace feature's tRPC transports answer, stated once in the
+ * contract via `withOutput` rather than implied by a handler's return.
+ */
+import { Temporal } from "@langwatch/time";
+import { z } from "zod";
+
+import { derivedTraceEventSchema } from "./trace-derived-event.ts";
+import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
+import { evaluationRunDataSchema } from "./trace-evaluation.schemas.ts";
+import {
+  chatMessageSchema,
+  errorCaptureSchema,
+  langWatchSpanSchema,
+  spanMetricsSchema,
+  spanTimestampsSchema,
+} from "./trace-format.schemas.ts";
+import { traceListPageSchema, traceListViewItemSchema } from "./trace-list-view.ts";
+import {
+  sessionGroupCodingAgentDtoSchema,
+  sessionGroupDtoSchema,
+  sessionGroupsResultSchema,
+} from "./trace-session-group.ts";
+import { traceEventRollupSchema, traceLogRecordDtoSchema } from "./trace-span-read-model.ts";
+import { spanDetailSchema, spanLangwatchSignalsSchema } from "./trace-view.contract.ts";
+import { spanTreeNodeSchema } from "./trace.ts";
+
+const traceEditOverlayAuthorSchema = z
+  .object({ id: z.string(), name: z.string().nullable(), image: z.string().nullable() })
+  .strict();
+
+/** One trace's stored correction, as every reader of it receives it. */
+export const traceEditOverlayDtoSchema = z
+  .object({
+    traceId: z.string(),
+    patch: traceEditOverlayPatchSchema,
+    createdBy: traceEditOverlayAuthorSchema.nullable(),
+    updatedBy: traceEditOverlayAuthorSchema.nullable(),
+    createdAt: z.instanceof(Temporal.Instant),
+    updatedAt: z.instanceof(Temporal.Instant),
+  })
+  .strict();
+
+/** `getByTraceId`: no correction stored yet answers `null`, not a 404. */
+export const traceEditOverlayOrNullSchema = traceEditOverlayDtoSchema.nullable();
+
+/** One trace's spans, in the waterfall order the application resolved. */
+export const spansForTraceSchema = z.array(langWatchSpanSchema);
+
+/** One LLM span reshaped for the prompt studio. */
+export const promptStudioSpanSchema = z
+  .object({
+    spanId: z.string(),
+    traceId: z.string(),
+    spanName: z.string().nullable(),
+    messages: z.array(chatMessageSchema),
+    llmConfig: z
+      .object({
+        model: z.string().nullable(),
+        systemPrompt: chatMessageSchema.shape.content,
+        temperature: z.number().nullable(),
+        maxTokens: z.number().nullable(),
+        topP: z.number().nullable(),
+        frequencyPenalty: z.number().nullable(),
+        presencePenalty: z.number().nullable(),
+        seed: z.number().nullable(),
+        topK: z.number().nullable(),
+        minP: z.number().nullable(),
+        repetitionPenalty: z.number().nullable(),
+        reasoning: z.string().nullable(),
+        verbosity: z.string().nullable(),
+        litellmParams: z.record(z.string(), z.unknown()),
+      })
+      .strict(),
+    vendor: z.string().nullable(),
+    error: errorCaptureSchema.nullable(),
+    timestamps: spanTimestampsSchema.optional(),
+    metrics: spanMetricsSchema.nullable(),
+    promptHandle: z.string().nullable(),
+    promptVersionNumber: z.number().nullable(),
+    promptTag: z.string().nullable(),
+    promptVariables: z.record(z.string(), z.string()).nullable(),
+  })
+  .strict();
+
+// ---------------------------------------------------------------------------
+// The trace explorer (`traces.*`)
+// ---------------------------------------------------------------------------
+
+/**
+ * The read-time redaction flags every content-carrying payload leaves with.
+ * Written once here because six of the explorer's answers carry them and a
+ * seventh would otherwise state them slightly differently.
+ */
+const redactionFlagsShape = {
+  inputRedacted: z.boolean(),
+  outputRedacted: z.boolean(),
+  inputVisibleTo: z.string().nullable(),
+  outputVisibleTo: z.string().nullable(),
+} as const;
+
+/** `list`: one page of the grid, redacted for the viewer. */
+export const tracesListPageSchema = z.object({
+  ...traceListPageSchema.shape,
+  items: z.array(z.object({ ...traceListViewItemSchema.shape, ...redactionFlagsShape })),
+});
+
+/** `sessions`: one page of the Sessions lens, cost- and title-gated. */
+export const tracesSessionsPageSchema = z.object({
+  ...sessionGroupsResultSchema.shape,
+  sessions: z.array(
+    z.object({
+      ...sessionGroupDtoSchema.shape,
+      ...redactionFlagsShape,
+      codingAgent: z
+        .object({
+          ...sessionGroupCodingAgentDtoSchema.shape,
+          titleRedacted: z.boolean().optional(),
+        })
+        .nullable(),
+    }),
+  ),
+});
+
+/** `listEvents`: the events column's rollups, keyed by trace id. */
+export const tracesListEventsSchema = z.record(z.string(), traceEventRollupSchema);
+
+/** `newCount`: how many traces arrived since the grid last painted. */
+export const tracesNewCountSchema = z.object({ count: z.number() });
+
+/** `suggest`: the typeahead's values for one field. */
+export const tracesSuggestSchema = z.object({ values: z.array(z.string()) });
+
+/** `conversationContext`: the turns either side of the open trace. */
+export const tracesConversationContextSchema = z.object({
+  conversationId: z.string(),
+  turns: z.array(
+    z.object({
+      traceId: z.string(),
+      timestamp: z.number(),
+      name: z.string(),
+      rootSpanType: z.string().nullable(),
+      status: z.enum(["ok", "error", "warning"]),
+      input: z.string().nullable(),
+      output: z.string().nullable(),
+      ...redactionFlagsShape,
+      totalTokens: z.number(),
+      totalCost: z.number().nullable(),
+    }),
+  ),
+  total: z.number(),
+});
+export type TracesConversationContext = z.infer<typeof tracesConversationContextSchema>;
+
+/** `changeName`: the trace and the name it now carries. */
+export const tracesChangedNameSchema = z.object({ traceId: z.string(), newName: z.string() });
+
+/** `changeMetadata`: the trace whose reserved metadata was written. */
+export const tracesChangedMetadataSchema = z.object({ traceId: z.string() });
+
+/** `spansPaginated`: one page of a trace's full spans, protections applied. */
+export const tracesSpansPageSchema = z.object({
+  spans: z.array(langWatchSpanSchema),
+  total: z.number(),
+});
+
+/** `spansDelta`: the spans of a live trace newer than a start-time mark. */
+export const tracesSpansDeltaSchema = z.array(langWatchSpanSchema);
+
+/** `evals`: the evaluation runs recorded against one trace. */
+export const tracesEvaluationRunsSchema = z.array(evaluationRunDataSchema);
+
+/** `onDiscoverUpdate`: one `discover_updated` signal, as the browser reads it. */
+export const tracesDiscoverUpdateSchema = z.unknown();
+
+/** `spanTree` / `spanTreeDelta`: waterfall nodes, per-span spend gated. */
+export const tracesSpanTreeNodesSchema = z.array(spanTreeNodeSchema);
+
+/** `spanLangwatchSignals`: the instrumentation badges, per span. */
+export const tracesSpanLangwatchSignalsSchema = z.array(spanLangwatchSignalsSchema);
+
+/** `spansFull`: every span of a trace, mapped and redacted. */
+export const tracesSpanDetailsSchema = z.array(spanDetailSchema);
+
+/** `traceEvents`: the drawer's timeline, protections applied. */
+export const tracesTraceEventsSchema = z.array(derivedTraceEventSchema);
+
+/** `traceLogs`: the trace's correlated log records, visibility-gated. */
+export const tracesTraceLogsSchema = z.array(traceLogRecordDtoSchema);

@@ -4,11 +4,9 @@
  * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 
-import { describe, expect, it } from "vitest";
-import type {
-  BashOutput,
-  LocalCall,
-} from "../../../../agent/local-control-protocol";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import type { BashOutput, LocalCall } from "../../../../agent/local-control-protocol";
 import {
   callHeadline,
   conversationLink,
@@ -57,10 +55,9 @@ const ESC = String.fromCharCode(27);
 const ERASE = new RegExp(`^${ESC}\\[(\\d+)A${ESC}\\[0J`);
 
 /**
- * A terminal that keeps the rows that are on it.
- *
- * The real writer is driven, rather than a copy of its rules, so the row
- * counting and the cursor movement are what the test reads back.
+ * A terminal that keeps the rows that are on it. The real writer is driven,
+ * not a copy of its rules, so row counting and cursor movement are what the
+ * test reads back.
  */
 function fakeTty() {
   const rows: string[] = [];
@@ -177,9 +174,9 @@ describe("shorten", () => {
 describe("shortReason", () => {
   describe("when the failure text runs over several lines", () => {
     it("keeps only the first line", () => {
-      expect(
-        shortReason("old text not found\n\n--- README.md ---\nline one\nline two"),
-      ).toBe("old text not found");
+      expect(shortReason("old text not found\n\n--- README.md ---\nline one\nline two")).toBe(
+        "old text not found",
+      );
     });
   });
 
@@ -194,7 +191,7 @@ describe("shortReason", () => {
 });
 
 describe("the headline one call produces", () => {
-  const headlines: Array<[string, LocalCall, string]> = [
+  const headlines: [string, LocalCall, string][] = [
     ["a command", bashCall("uv run pytest"), "Bash(uv run pytest)"],
     [
       "a read",
@@ -225,11 +222,7 @@ describe("the headline one call produces", () => {
       { ...envelope, tool: "local_find", params: { pattern: "**/*.py" } },
       "Find(**/*.py)",
     ],
-    [
-      "a listing",
-      { ...envelope, tool: "local_ls", params: {} },
-      "List(.)",
-    ],
+    ["a listing", { ...envelope, tool: "local_ls", params: {} }, "List(.)"],
   ];
 
   for (const [what, call, expected] of headlines) {
@@ -243,15 +236,13 @@ describe("the headline one call produces", () => {
 
   describe("when the command is longer than one line", () => {
     it("cuts it back", () => {
-      expect(
-        callHeadline(bashCall(`echo ${"word ".repeat(40)}`)).length,
-      ).toBeLessThanOrEqual(68);
+      expect(callHeadline(bashCall(`echo ${"word ".repeat(40)}`)).length).toBeLessThanOrEqual(68);
     });
   });
 });
 
 describe("the result of a file call", () => {
-  const cases: Array<[string, LocalCall, string, string]> = [
+  const cases: [string, LocalCall, string, string][] = [
     [
       "a read",
       { ...envelope, tool: "local_read", params: { path: "a.py" } },
@@ -324,9 +315,10 @@ describe("the result of a file call", () => {
 
   describe("when an edit only adds lines", () => {
     it("counts what went in and what came out", () => {
-      expect(
-        editCounts([{ oldText: "one\ntwo", newText: "one\nmiddle\ntwo" }]),
-      ).toEqual({ added: 1, removed: 0 });
+      expect(editCounts([{ oldText: "one\ntwo", newText: "one\nmiddle\ntwo" }])).toEqual({
+        added: 1,
+        removed: 0,
+      });
     });
   });
 
@@ -355,10 +347,7 @@ describe("the transcript one call produces", () => {
       ui.call(call);
       ui.callResult({ call, text: "1\tprint('hi')" });
 
-      expect(writer.lines).toEqual([
-        "⏺ Read(app/main.py)",
-        "  ⎿  Read 1 line",
-      ]);
+      expect(writer.lines).toEqual(["⏺ Read(app/main.py)", "  ⎿  Read 1 line"]);
     });
   });
 
@@ -370,9 +359,7 @@ describe("the transcript one call produces", () => {
         message: `old text not found\nThe file holds:\n${"a".repeat(400)}`,
       });
 
-      expect(writer.lines).toEqual([
-        "  ⎿  Failed: old text not found",
-      ]);
+      expect(writer.lines).toEqual(["  ⎿  Failed: old text not found"]);
     });
   });
 
@@ -440,9 +427,7 @@ describe("the transcript one call produces", () => {
     /** @scenario "A long command result keeps its last lines and counts the rest" */
     it("keeps the last eight and counts the rest", () => {
       const writer = recordingWriter();
-      const output = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join(
-        "\n",
-      );
+      const output = Array.from({ length: 40 }, (_, i) => `line ${i + 1}`).join("\n");
 
       createUi(writer).callOutcome({
         call: bashCall("pnpm test"),
@@ -525,7 +510,7 @@ describe("the line a running command draws", () => {
     });
   });
 
-  const elapsed: Array<[number, string]> = [
+  const elapsed: [number, string][] = [
     [0, "0s"],
     [12_400, "12s"],
     [59_999, "59s"],
@@ -559,7 +544,7 @@ describe("holding the transcript", () => {
 });
 
 describe("the line a settled answer produces", () => {
-  const cases: Array<[string, Parameters<typeof settledLine>[0], string]> = [
+  const cases: [string, Parameters<typeof settledLine>[0], string][] = [
     [
       "a session grant from the terminal",
       { decision: "allow_pattern", patterns: ["uv run"] },
@@ -590,11 +575,7 @@ describe("the line a settled answer produces", () => {
       { decision: "allow_pattern", patterns: ["uv run"], source: "panel" },
       'Allowed "uv run" for this session on the card in LangWatch',
     ],
-    [
-      "a wait that ran out",
-      { decision: "expired" },
-      "No answer arrived, so the call was dropped",
-    ],
+    ["a wait that ran out", { decision: "expired" }, "No answer arrived, so the call was dropped"],
   ];
 
   for (const [what, input, expected] of cases) {
@@ -667,9 +648,7 @@ describe("when there is no selector on this screen", () => {
     expect(asked).toContain("git push");
     expect(asked).toContain("Answer on the card in LangWatch.");
     expect(asked).not.toContain("langyConversation");
-    expect(
-      writer.lines.filter((line) => line.includes("langyConversation")).length,
-    ).toBe(1);
+    expect(writer.lines.filter((line) => line.includes("langyConversation")).length).toBe(1);
   });
 });
 
@@ -710,21 +689,25 @@ describe("the notice that says the folder connected", () => {
       "⏺ Bash(pnpm test)",
       "  ⎿  2 passed in 3.1s",
     ]);
-    expect(
-      writer.lines.filter((line) => line.includes("langyConversation")),
-    ).toHaveLength(1);
-    expect(
-      writer.lines.filter((line) => line.includes("Permission questions")),
-    ).toHaveLength(1);
+    expect(writer.lines.filter((line) => line.includes("langyConversation"))).toHaveLength(1);
+    expect(writer.lines.filter((line) => line.includes("Permission questions"))).toHaveLength(1);
   });
 });
 
 describe("given a question and a running command on the same screen", () => {
+  let tty: ReturnType<typeof fakeTty>;
+  let writer: ReturnType<typeof createConsoleWriter>;
+  let ui: ReturnType<typeof createUi>;
+
+  beforeEach(() => {
+    tty = fakeTty();
+    writer = createConsoleWriter(tty.stream);
+    ui = createUi(writer);
+  });
+
   /** @scenario "A question on the screen survives a command that finishes under it" */
   it("keeps the question on the screen and prints the result after the answer", () => {
-    const { stream, rows } = fakeTty();
-    const writer = createConsoleWriter(stream);
-    const ui = createUi(writer);
+    const { rows } = tty;
     const call = bashCall("pnpm test");
 
     ui.call(call);
@@ -734,11 +717,7 @@ describe("given a question and a running command on the same screen", () => {
     // The question takes the bottom of the screen while the command runs.
     writer.draw?.(["╭─ question ─╮", "│ answer me │", "╰───────────╯"], "box");
     ui.hold();
-    expect(rows.slice(-3)).toEqual([
-      "╭─ question ─╮",
-      "│ answer me │",
-      "╰───────────╯",
-    ]);
+    expect(rows.slice(-3)).toEqual(["╭─ question ─╮", "│ answer me │", "╰───────────╯"]);
 
     // The command finishes under it: the spinner erases its own row and no
     // more, and the result waits for the answer.
@@ -747,11 +726,7 @@ describe("given a question and a running command on the same screen", () => {
       call,
       output: bashOutput({ stdout: "2 passed in 3.1s" }),
     });
-    expect(rows.slice(-3)).toEqual([
-      "╭─ question ─╮",
-      "│ answer me │",
-      "╰───────────╯",
-    ]);
+    expect(rows.slice(-3)).toEqual(["╭─ question ─╮", "│ answer me │", "╰───────────╯"]);
 
     writer.erase?.("box");
     ui.release();
@@ -760,9 +735,7 @@ describe("given a question and a running command on the same screen", () => {
   });
 
   it("draws no spinner while the question owns the screen", () => {
-    const { stream, rows } = fakeTty();
-    const writer = createConsoleWriter(stream);
-    const ui = createUi(writer);
+    const { rows } = tty;
 
     writer.draw?.(["│ answer me │"], "box");
     const stop = ui.startRunning();
@@ -787,17 +760,14 @@ describe("when the conversation title is wider than the terminal", () => {
 
     const words = "Instrument traces with LangWatch";
     expect(writer.lines.join(" ").replace(/\s+/g, " ")).toContain(words);
-    for (const line of writer.lines) {
-      // A single word wider than the terminal keeps its own line, and only
-      // such a line may be longer than the terminal.
-      if (line.trim().split(" ").length > 1) {
-        expect(line.length).toBeLessThanOrEqual(40);
-      }
+    // A single word wider than the terminal keeps its own line, and only
+    // such a line may be longer than the terminal.
+    const wrappedLines = writer.lines.filter((line) => line.trim().split(" ").length > 1);
+    for (const line of wrappedLines) {
+      expect(line.length).toBeLessThanOrEqual(40);
     }
     // The link is one word, so it keeps its own line rather than being cut.
-    expect(writer.lines).toContainEqual(
-      "     http://localhost:5570/acme?langyConversation=conv_1",
-    );
+    expect(writer.lines).toContainEqual("     http://localhost:5570/acme?langyConversation=conv_1");
   });
 });
 

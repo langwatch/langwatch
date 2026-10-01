@@ -1,0 +1,257 @@
+import { Dialog } from "@langwatch/design-system/dialog";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import {
+  Badge,
+  Box,
+  Button,
+  createListCollection,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Select } from "@langwatch/design-system/select";
+import { Search, X } from "lucide-react";
+import { useState } from "react";
+
+import { api } from "../../behavior/organization-api.ts";
+import { useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { RandomColorAvatar } from "../elements/random-color-avatar.tsx";
+import {
+  GrantInputRow,
+  type PendingGrant,
+  roleBadgeColor,
+  scopeTypeLabel,
+} from "./group-grant-input-row.tsx";
+
+export function CreateGroupDialog({
+  organizationId,
+  open,
+  onClose,
+}: {
+  organizationId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const showErrorToast = useShowErrorToast();
+  const queryClient = api.useUtils();
+  const [name, setName] = useState("");
+  const [pendingGrants, setPendingGrants] = useState<PendingGrant[]>([]);
+  const [pendingMemberIds, setPendingMemberIds] = useState<string[]>([]);
+  const [addMemberId, setAddMemberId] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
+
+  const orgMembers = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId },
+    { enabled: open },
+  );
+
+  const createGroup = api.group.create.useMutation();
+
+  function reset() {
+    setName("");
+    setPendingGrants([]);
+    setPendingMemberIds([]);
+    setAddMemberId("");
+    setMemberSearch("");
+  }
+
+  async function handleCreate() {
+    if (!name.trim()) return;
+    try {
+      await createGroup.mutateAsync({
+        organizationId,
+        name: name.trim(),
+        grants: pendingGrants.map((b) => ({
+          role: b.role,
+          customRoleId: b.customRoleId,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        })),
+        memberIds: pendingMemberIds,
+      });
+      void queryClient.group.listAll.invalidate();
+      reset();
+      onClose();
+    } catch (e) {
+      showErrorToast({ error: e, fallbackTitle: "Couldn't create the group" });
+    }
+  }
+
+  const allAvailableMembers = (orgMembers.data?.members ?? [])
+    .filter((m) => !pendingMemberIds.includes(m.userId))
+    .map((m) => ({
+      label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+      value: m.userId,
+    }))
+    .toSorted((a, b) => a.label.localeCompare(b.label));
+  const availableMemberItems = memberSearch
+    ? allAvailableMembers.filter((m) => m.label.toLowerCase().includes(memberSearch.toLowerCase()))
+    : allAvailableMembers;
+  const availableMemberCollection = createListCollection({
+    items: availableMemberItems,
+  });
+
+  return (
+    <Dialog.Root
+      open={open}
+      onOpenChange={(e) => {
+        if (!e.open) {
+          reset();
+          onClose();
+        }
+      }}
+      size="lg"
+    >
+      <Dialog.Content bg="bg" maxHeight="90vh" overflowY="auto">
+        <Dialog.Header>
+          <Dialog.Title>Create group</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body pb={6}>
+          <VStack gap={5} align="stretch">
+            <Input
+              placeholder="Group name"
+              data-testid="groups-create-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+
+            {/* Grants */}
+            <Box>
+              <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                Access
+              </Text>
+              {pendingGrants.length > 0 && (
+                <VStack gap={2} align="stretch" mb={2}>
+                  {pendingGrants.map((b, i) => (
+                    <HStack key={i} px={3} py={2} bg="bg.muted" borderRadius="md" fontSize="sm">
+                      <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+                        {b.customRoleName ?? b.role}
+                      </Badge>
+                      <Text color="fg.muted">on</Text>
+                      <Badge colorPalette="purple" size="sm">
+                        {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId}
+                      </Badge>
+                      <Spacer />
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        color="fg.muted"
+                        aria-label={`Remove ${b.customRoleName ?? b.role} access on ${b.scopeName ?? b.scopeId}`}
+                        onClick={() => setPendingGrants((prev) => prev.filter((_, j) => j !== i))}
+                      >
+                        <X size={14} />
+                      </Button>
+                    </HStack>
+                  ))}
+                </VStack>
+              )}
+              <GrantInputRow
+                organizationId={organizationId}
+                onAdd={(b) => setPendingGrants((prev) => [...prev, b])}
+              />
+            </Box>
+
+            {/* Members */}
+            <Box>
+              <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                Members
+              </Text>
+              {pendingMemberIds.length > 0 && (
+                <VStack gap={1} align="stretch" mb={2}>
+                  {pendingMemberIds.map((userId) => {
+                    const member = orgMembers.data?.members.find((m) => m.userId === userId);
+                    return (
+                      <HStack key={userId} py={1} fontSize="sm">
+                        <RandomColorAvatar
+                          name={member?.user.name ?? member?.user.email ?? "?"}
+                          image={member?.user.image}
+                          size="xs"
+                        />
+                        <Text flex={1}>{member?.user.name ?? member?.user.email ?? userId}</Text>
+                        <Button
+                          size="xs"
+                          variant="ghost"
+                          color="fg.muted"
+                          aria-label={`Remove ${member?.user.name ?? member?.user.email ?? userId} from group`}
+                          onClick={() =>
+                            setPendingMemberIds((prev) => prev.filter((id) => id !== userId))
+                          }
+                        >
+                          <X size={14} />
+                        </Button>
+                      </HStack>
+                    );
+                  })}
+                </VStack>
+              )}
+              <HStack gap={2} mt={2}>
+                <Select.Root
+                  collection={availableMemberCollection}
+                  value={addMemberId ? [addMemberId] : []}
+                  onValueChange={(e) => {
+                    const uid = e.value[0];
+                    if (uid) {
+                      setPendingMemberIds((prev) => [...prev, uid]);
+                      setAddMemberId("");
+                    }
+                  }}
+                  size="sm"
+                  flex={1}
+                >
+                  <Select.Trigger>
+                    <Select.ValueText placeholder="Add member..." />
+                  </Select.Trigger>
+                  <Select.Content>
+                    <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+                      <InputGroup
+                        startElement={<Search size={14} />}
+                        startOffset="2px"
+                        width="full"
+                      >
+                        <Input
+                          size="sm"
+                          placeholder="Search members..."
+                          value={memberSearch}
+                          onChange={(e) => setMemberSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </InputGroup>
+                    </Box>
+                    {availableMemberItems.map((item) => (
+                      <Select.Item key={item.value} item={item}>
+                        {item.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              </HStack>
+            </Box>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button
+            variant="outline"
+            onClick={() => {
+              reset();
+              onClose();
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            colorPalette="blue"
+            data-testid="groups-create-submit"
+            disabled={!name.trim()}
+            loading={createGroup.isPending}
+            onClick={() => void handleCreate()}
+          >
+            Create group
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}

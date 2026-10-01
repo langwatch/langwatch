@@ -146,14 +146,14 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then both tokens authorize trace writes into her personal workspace
     And neither key is revoked by the other
 
-  @integration @ingest-api-key @issue @personal @session
+  @integration @ingest-api-key @issue @personal @session @unimplemented
   Scenario: A key minted by a CLI session is parented to that session's login key
     Given jane holds a device session whose login key is K
     When the CLI mints a personal key for "claude_code"
     Then the new key's parentApiKeyId is K
     And its device label is the same normalized label the login key carries
 
-  @integration @ingest-api-key @issue @personal @session
+  @integration @ingest-api-key @issue @personal @session @unimplemented
   Scenario: A mint from a session whose login key is revoked is refused as signed out
     Given jane holds a device session whose login key was revoked
     When the CLI mints a personal key for "claude_code"
@@ -161,7 +161,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     And no ingestion key is created
     # The CLI reads a 401 here as "sign in again", which is the repair.
 
-  @integration @ingest-api-key @issue @personal @session @compatibility
+  @integration @ingest-api-key @issue @personal @session @compatibility @unimplemented
   Scenario: A session from before login keys existed still mints
     Given jane holds a device session whose record names no login key
     When the CLI mints a personal key for "opencode"
@@ -174,13 +174,18 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
 
   @unit @ingest-api-key @issue @personal @session
   Scenario: A key minted as its session is being retired does not outlive it
+    Given a key minted under a login session
+    When that session is retired, even while the mint is still writing its key
+    Then the key does not authorize a trace write
+    # Resolution refuses any key whose login key is revoked or expired, so a
+    # key that slipped in during the retirement cascade is dead on arrival.
+
+  @unit @ingest-api-key @issue @personal @session
+  Scenario: A mint that races its session's retirement cleans up the key it wrote
     Given a login key that is live when the mint checks it
     When the session is retired while that mint is still writing its key
     Then the new key is revoked with cause "session"
     And the mint answers signed out
-    # The cascade revokes the login key before it lists the children, so a
-    # second look at the parent after the row exists leaves the key nowhere
-    # to hide: this read sees the revoke, or the listing behind it sees the row.
 
   # ---------------------------------------------------------------------------
   # A personal key lives and dies with its CLI session
@@ -229,7 +234,7 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
   Scenario: A re-login from the same device retires the keys of the session it replaces
     Given a device that signs in again under the same label
     When the previous login key is replaced
-    Then the ingest keys parented to it are revoked with cause "rotation"
+    Then the ingest keys parented to it are retired and stop authorizing trace writes
     And the new session starts with none
 
   @integration @ingest-api-key @session @expiry
@@ -288,53 +293,95 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     Then the login key is still revoked and the caller is not told of a failure
     And the failure is logged
 
-  # The CLI is not the only door to a personal key. Connecting a source from
-  # the /me tile, and the MCP mint an agent calls, reach the same workspace.
-  # They have no session to parent a key to, so they mint only for sources a
-  # published template names and no CLI wrapper covers; a key for a wrapped
-  # tool comes from the CLI on the machine that runs it, and nowhere else.
-
-  @integration @ingest-api-key @issue @personal @create-only
-  Scenario: Connecting a template source from the personal tile adds a key
-    Given a published template names source type "claude_cowork"
-    And jane already connected "claude_cowork" from her personal ingest tile
-    When she connects it again
-    Then both tokens authorize trace writes into her personal workspace
-    And neither key is revoked by the other
+  # The CLI is not the only door to a personal key: the MCP mint an agent
+  # calls reaches the same workspace. It has no session to parent a key to,
+  # so it mints only for sources a published template names and no CLI
+  # wrapper covers, and minting adds a key rather than replacing one.
 
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: An agent minting a template source through MCP adds a key
     Given a published template names source type "claude_cowork"
-    And jane already connected "claude_cowork" from her personal ingest tile
+    And jane already holds a personal ingestion key for "claude_cowork"
     When an agent mints a personal key for "claude_cowork" through the MCP tool
     Then both tokens authorize trace writes into her personal workspace
     And neither key is revoked by the other
 
-  @integration @ingest-api-key @issue @personal
-  Scenario: The tile and the MCP mint refuse a tool the CLI wraps
-    When jane connects "claude_code" from her personal ingest tile
-    Then the request is refused with code "ingestion_key_source_not_allowed"
-    When an agent mints a personal key for "claude_code" through the MCP tool
-    Then the request is refused the same way
-    And no ingestion key is created
+  @integration @ingest-api-key @revoke @personal @unimplemented
+  Scenario: An agent revokes one of the caller's keys through MCP
+    Given an agent minted a personal ingestion key through the MCP tool
+    When the agent revokes that key through MCP
+    Then the token no longer authorizes trace writes
+    And the key is gone from the caller's key list
+    And revoking it again is not an error
 
   @unit @ingest-api-key @issue @personal
-  Scenario: A mint outside a CLI session accepts only a template-named source
-    Given a personal mint from the tile or the MCP tool
-    When it names a source type no published template names
-    Then no key is created
-    And a source type a published template names is minted
+  Scenario: The MCP mint refuses a tool the CLI wraps
+    When an agent mints a personal key for "claude_code" through the MCP tool
+    Then the request is refused with code "ingestion_key_source_not_allowed"
+    And no ingestion key is created
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: An agent revokes one of the caller's own keys through the MCP tool
+    Given jane holds a personal ingestion key
+    When an agent revokes that key by its api_key_id through the MCP tool
+    Then the key is revoked with cause "user"
+    And the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Revoking an already revoked key through the MCP tool is not an error
+    Given jane's personal ingestion key is already revoked
+    When an agent revokes that key through the MCP tool
+    Then the tool answers that the key was revoked
+
+  @unit @ingest-api-key @revoke @personal
+  Scenario: Another person's key answers not found through the MCP tool
+    Given john holds a personal ingestion key
+    When an agent acting for jane revokes john's key through the MCP tool
+    Then the request is refused with code "ingestion_key_not_found"
+    And john's key is not revoked
+
+  # Main audits each door's mint, rotate and revoke, tagging the call surface.
+  # A CLI session's mint writes no row.
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A door's install, rotate and revoke each record main's audit row
+    When a door installs, rotates and revokes one of jane's keys
+    Then the audit log records "ingestionKey.mint", "ingestionKey.rotate" and "ingestionKey.revoke"
+    And each row carries the key id and the door's surface
+    And the mint and rotate rows carry the source type, the rotate row the revoked count
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The web door's install, rotate and revoke audit rows carry the trpc surface
+    When jane installs, rotates and revokes a key from the web app
+    Then each operation is handed the surface "trpc"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: The MCP door's mint and revoke audit rows carry the mcp surface
+    When an agent mints and then revokes a key through the MCP tools
+    Then the "ingestionKey.mint" and "ingestionKey.revoke" rows carry the surface "mcp"
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A failed mint audit write does not fail the mint
+    Given the audit log cannot be written
+    When a door installs a key
+    Then the minted token is still answered
+
+  @unit @ingest-api-key @audit @personal
+  Scenario: A revoke answers only once its audit row is written
+    Given the audit log cannot be written
+    When a door revokes one of jane's keys
+    Then the key is revoked
+    And the revoke is refused
 
   @integration @ingest-api-key @issue @personal @create-only
   Scenario: A personal key is minted only for a tool the CLI wraps
     Given jane holds a device session
     When the CLI POSTs a personal mint for a source type no wrapped tool stamps
-    Then the response status is 400
-    And no ingestion key is created under that source type
+    Then the mint is refused and no ingestion key is created under that source type
 
-  # A person can retire one key, or every key of one source across machines.
-  # Rotating a template source from the tile is the second followed by a
-  # fresh mint: the person pastes the new token wherever the old one was.
+  # A person can retire one of their keys, and a rotation replaces a prior
+  # key with a fresh mint: the person pastes the new token wherever the old
+  # one was.
 
   @integration @ingest-api-key @revoke @personal
   Scenario: A person revokes one of their own ingestion keys
@@ -350,14 +397,6 @@ Feature: AI Gateway Governance — Ingest API Key Lifecycle
     When jane tries to revoke it
     Then the request is refused with code "ingestion_key_not_found"
     And ben's key still authorizes trace writes
-
-  @integration @ingest-api-key @rotate @personal
-  Scenario: Rotating a template source from the tile revokes every key for it and says how many
-    Given jane's personal workspace holds three live "claude_cowork" keys
-    When she rotates "claude_cowork" from her personal ingest tile
-    Then the answer says three keys were revoked and names their machines
-    And the rotated key is the only live one
-    And none of the previous tokens authorize trace writes
 
   @integration @ingest-api-key @rotate @personal
   Scenario: Rotate says how many keys it revokes and which machines hold them

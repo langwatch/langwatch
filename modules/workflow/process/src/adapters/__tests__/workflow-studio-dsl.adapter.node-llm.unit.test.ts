@@ -1,0 +1,139 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import { parseStudioWorkflow, type StudioWorkflow } from "@langwatch/workflow-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { ModelProviderWorkflowStudioDslService } from "../../services/workflow-studio-dsl.service.ts";
+
+function signatureNode(llmValue: unknown) {
+  return {
+    id: "sig-1",
+    type: "signature",
+    position: { x: 0, y: 0 },
+    data: {
+      name: "Signature",
+      parameters: [{ identifier: "llm", type: "llm", value: llmValue }],
+    },
+  };
+}
+
+function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
+  return parseStudioWorkflow({
+    spec_version: "1.5",
+    workflow_id: "wf-1",
+    name: "Test",
+    icon: "🧩",
+    description: "",
+    version: "1",
+    template_adapter: "default",
+    enable_tracing: true,
+    nodes: [signatureNode(undefined)],
+    edges: [],
+    state: {},
+    ...overrides,
+  });
+}
+
+function buildAdapter(resolveModelForFeature: ModelProviderApi["resolveModelForFeature"]) {
+  const modelProviders = createApiFixture<ModelProviderApi>({ resolveModelForFeature });
+  return ModelProviderWorkflowStudioDslService.create({ modelProviders });
+}
+
+function resolvedModel(
+  model: string,
+): Awaited<ReturnType<ModelProviderApi["resolveModelForFeature"]>> {
+  return {
+    model,
+    source: "role_default",
+    scope: "project",
+    feature: {
+      key: "workflows.create_default",
+      role: "DEFAULT",
+      displayName: "Workflow default",
+      description: "Default model for new workflows",
+    },
+  };
+}
+
+describe("ModelProviderWorkflowStudioDslService materializing node LLM configs", () => {
+  describe("given a fresh install with no default model configured anywhere", () => {
+    /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */
+    it("fills the modelless LLM node with the registry flagship", async () => {
+      const resolveModelForFeature = vi.fn(async () => {
+        throw new ModelNotConfiguredError({
+          featureKey: "workflows.create_default",
+          role: "DEFAULT",
+          featureDisplayName: "Workflow default",
+          projectId: "project-1",
+        });
+      });
+      const adapter = buildAdapter(resolveModelForFeature);
+
+      const prepared = await adapter.prepare({ projectId: "project-1", dsl: buildDsl() });
+
+      const llmParam = prepared.nodes[0]!.data.parameters!.find((p) => p.type === "llm")!;
+      const model = (llmParam.value as { model?: string } | undefined)?.model;
+      expect(model).toBeTruthy();
+      expect(model).not.toBe("");
+    });
+  });
+
+  describe("given a configured default model for the project", () => {
+    /** @scenario Creating a workflow uses the configured default model when one is set */
+    it("fills the modelless LLM node with the cascade-resolved model", async () => {
+      const resolveModelForFeature = vi.fn(async () =>
+        resolvedModel("anthropic/claude-haiku-4-5-20251001"),
+      );
+      const adapter = buildAdapter(resolveModelForFeature);
+
+      const prepared = await adapter.prepare({ projectId: "project-1", dsl: buildDsl() });
+
+      const llmParam = prepared.nodes[0]!.data.parameters!.find((p) => p.type === "llm")!;
+      expect((llmParam.value as { model?: string }).model).toBe(
+        "anthropic/claude-haiku-4-5-20251001",
+      );
+      expect(resolveModelForFeature).toHaveBeenCalledWith({
+        projectId: "project-1",
+        featureKey: "workflows.create_default",
+      });
+    });
+  });
+
+  describe("given a payload from an older client carrying a workflow-wide default_llm", () => {
+    /** @scenario A workflow created by an older client keeps its old workflow-wide model */
+    it("folds the legacy default_llm into the modelless node and drops the field", async () => {
+      const resolveModelForFeature = vi.fn();
+      const adapter = buildAdapter(resolveModelForFeature);
+
+      const prepared = await adapter.prepare({
+        projectId: "project-1",
+        dsl: buildDsl({
+          default_llm: { model: "openai/gpt-5-mini", max_tokens: 256 },
+        }),
+      });
+
+      const llmParam = prepared.nodes[0]!.data.parameters!.find((p) => p.type === "llm")!;
+      expect(llmParam.value).toEqual({ model: "openai/gpt-5-mini", max_tokens: 256 });
+      expect("default_llm" in prepared).toBe(false);
+      // The legacy field satisfied the fill, so the cascade is never consulted.
+      expect(resolveModelForFeature).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an LLM node that already carries an explicit model", () => {
+    /** @scenario An explicit node-owned model is never rewritten */
+    it("keeps the explicit model untouched", async () => {
+      const resolveModelForFeature = vi.fn(async () => resolvedModel("openai/gpt-5-mini"));
+      const adapter = buildAdapter(resolveModelForFeature);
+
+      const prepared = await adapter.prepare({
+        projectId: "project-1",
+        dsl: buildDsl({ nodes: [signatureNode({ model: "gemini/gemini-2.5-flash" })] }),
+      });
+
+      const llmParam = prepared.nodes[0]!.data.parameters!.find((p) => p.type === "llm")!;
+      expect((llmParam.value as { model?: string }).model).toBe("gemini/gemini-2.5-flash");
+      expect(resolveModelForFeature).not.toHaveBeenCalled();
+    });
+  });
+});

@@ -1,0 +1,31 @@
+{
+  "name": "@langwatch/analyticssim-web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The analytics simulator's console (PostHog and Customer.io records): a React bundle built by Vite into services/analyticssim/web/dist and served by that Go process (ADR-160).",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/design-system-internal": "workspace:*",
+    "@langwatch/sim-console": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "jsdom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

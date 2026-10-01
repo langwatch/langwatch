@@ -1,0 +1,135 @@
+# CV3: prompts seeded through the API, so the flows start from the list row and prove the save,
+# version and restore reads without the create dialog. Handles end in {uid}.
+flows:
+  - id: cv3-prompt-seeded-opens-and-saves-second-version
+    title: Open an API-made prompt from the list, edit it and commit a second version the API lists
+    setup:
+      - post: /api/prompts
+        body:
+          handle: vd-cv3p-{uid}
+          prompt: "You are the seeded prompt."
+          model: openai/gpt-4o-mini
+          messages:
+            - role: user
+              content: hello
+        as:
+          promptHandle: handle
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          text: /^{promptHandle}$/
+          timeout: "30000"
+      - action: click
+        with:
+          text: /^{promptHandle}$/
+      - action: expect
+        with:
+          testId: save-prompt-button
+          timeout: "20000"
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "You are the edited prompt {uid}."
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "edited {uid}"
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: /api/prompts/{promptHandle}/versions
+          min: "2"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/prompts/{promptHandle}
+          field: version
+          equals: "2"
+
+  - id: cv3-prompt-seeded-restore-first-version
+    title: Restore version one of an API-made prompt from its history and read the restored text back as version three
+    setup:
+      - post: /api/prompts
+        body:
+          handle: vd-cv3r-{uid}
+          prompt: "cv3 first {uid}"
+          model: openai/gpt-4o-mini
+          messages:
+            - role: user
+              content: hello
+        as:
+          promptHandle: handle
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/prompts"
+      - action: expect
+        with:
+          text: /^{promptHandle}$/
+          timeout: "30000"
+      - action: click
+        with:
+          text: /^{promptHandle}$/
+      - action: fill
+        with:
+          field: "Enter your prompt..."
+          value: "cv3 second {uid}"
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "second {uid}"
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: /api/prompts/{promptHandle}/versions
+          min: "2"
+          timeout: "20000"
+      - action: click
+        with:
+          testId: version-history-button
+      - action: click
+        with:
+          testId: restore-version-button-1
+      - action: click
+        with:
+          testId: save-prompt-button
+      - action: expect
+        with:
+          text: Save Version
+      - action: fill
+        with:
+          field: "Enter a description for this version"
+          value: "restored {uid}"
+      - action: click
+        with:
+          text: /^Update to v/
+      - action: expect
+        with:
+          api: /api/prompts/{promptHandle}
+          field: version
+          equals: "3"
+          timeout: "20000"
+      - action: expect
+        with:
+          api: /api/prompts/{promptHandle}
+          field: prompt
+          equals: "cv3 first {uid}"

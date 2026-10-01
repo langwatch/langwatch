@@ -1,6 +1,10 @@
 package domain
 
-import "time"
+import (
+	"strconv"
+	"strings"
+	"time"
+)
 
 // RunKind is what sort of heavy work is asking for a slot. It matters because
 // only one of them can be narrowed.
@@ -179,3 +183,33 @@ func NarrowedWorkers(fullWidth, inFlight int) int {
 // by an empty pool would hand back full width and leave Amber with no observable
 // effect at all.
 func PressureWidth(fullWidth int) int { return max(fullWidth/2, 1) }
+
+// unitTestRAMPerWorker budgets one GiB per vitest worker - a resident Node
+// process, not free to spawn by core count alone.
+const unitTestRAMPerWorker = uint64(1) << 30
+
+// UnitTestFullWidth is the worker count a narrowed unit run divides among the
+// runs in flight (NarrowedWorkers), and where that number came from - mirroring
+// ResolveCheckSlots: it is one machine-wide setting rather than a per-worktree
+// one, because the runs it divides among are themselves counted machine-wide.
+//
+// override is HAVEN_TEST_WORKERS, read the same way HAVEN_TYPECHECK_SLOTS is: a
+// parseable positive integer wins outright, named by its own source so
+// `haven slot explain` can say why. Unset (or unparseable, which is treated the
+// same as unset rather than fatal - a typo must not silently zero the width),
+// it is derived from the machine: half the cores, which is already what the
+// repository's vitest configs ask for with maxWorkers: "50%", bounded by memory
+// the same way TypecheckSlots bounds a compiler run.
+func UnitTestFullWidth(totalRAMBytes uint64, numCPU int, override string) (int, string) {
+	if raw := strings.TrimSpace(override); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed, "HAVEN_TEST_WORKERS"
+		}
+	}
+	byCPU := max(numCPU/2, 1)
+	if totalRAMBytes == 0 {
+		return byCPU, "machine"
+	}
+	byMemory := max(int(totalRAMBytes/unitTestRAMPerWorker), 1)
+	return max(1, min(byCPU, byMemory)), "machine"
+}

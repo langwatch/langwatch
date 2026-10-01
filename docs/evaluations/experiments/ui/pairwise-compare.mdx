@@ -139,14 +139,14 @@ The card shows the candidates ranked by score, up to four bars, with a headline 
 
 The headline is one of:
 
-| Headline | What it means |
-|----------|---------------|
-| **Ship `<candidate>`** | The run separates the leader from every other candidate: the gap to each of them is bigger than the uncertainty in that gap. |
+| Headline                                                     | What it means                                                                                                                                                                  |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Ship `<candidate>`**                                       | The run separates the leader from every other candidate: the gap to each of them is bigger than the uncertainty in that gap.                                                   |
 | **Ship `<candidate>`, not separated on quality, N% cheaper** | Two or more candidates are too close to separate on quality, and this one costs at least 10% less per row than the leader. Cost is only used when enough rows recorded a cost. |
-| **Ship `<candidate>`, top of the ranking and N% cheaper** | The leader is also the cheapest of the candidates it ties with. |
-| **Too close to call** | The top candidates are too close for this run to tell apart. Decide on cost, latency or simplicity, or run more rows. |
-| **Not enough overlap to rank these** | Some candidates were never judged against each other, directly or through a shared opponent. Run again so every candidate answers the same rows. |
-| **No ranking yet** | The run has not resolved enough comparisons to order the candidates. |
+| **Ship `<candidate>`, top of the ranking and N% cheaper**    | The leader is also the cheapest of the candidates it ties with.                                                                                                                |
+| **Too close to call**                                        | The top candidates are too close for this run to tell apart. Decide on cost, latency or simplicity, or run more rows.                                                          |
+| **Not enough overlap to rank these**                         | Some candidates were never judged against each other, directly or through a shared opponent. Run again so every candidate answers the same rows.                               |
+| **No ranking yet**                                           | The run has not resolved enough comparisons to order the candidates.                                                                                                           |
 
 Under the headline, each candidate has a bar with its score and a shaded band for the 95% confidence interval. Candidates the run cannot separate from the top scorer are marked **tied for first**. A candidate that never won or never lost has no fitted score and is marked **not scoreable**.
 
@@ -154,16 +154,16 @@ Under the headline, each candidate has a bar with its score and a shaded band fo
 
 This section reports every check either way, so you can tell a check that passed from a check that never ran. Green is fine, orange needs action, grey is a measurement for you to judge.
 
-| Check | What it reports |
-|-------|-----------------|
-| Enough comparisons | Every candidate needs at least 30 matchups for a stable score. Below that, run more rows. |
-| Every candidate both won and lost | A candidate that swept or was swept has no score that fits and is excluded from the ranking. |
-| Everything is on one scale | Whether every candidate is linked to the rest through wins and losses, directly or through a chain of shared opponents. The leaderboard only orders candidates that share comparisons. When the run splits into groups it never connected, scores compare only inside a group. Across groups the run keeps only the direction, and only where one group beat the other and was never beaten back; candidates in groups that never met cannot be ranked against each other, and the size of any gap across groups is not measured. |
-| Rows the judge would not call | How many rows produced no verdict because the two passes disagreed. Above 25% of the rows, change the judge model or the prompt; more rows will not settle it. |
-| Ranking settled | Whether the fit converged on a stable answer. |
-| How much this run settled | How many candidate pairs the run separated, out of all pairs, and how many comparisons that is based on. |
-| Answer length | How the leader's average answer length compares to the rest of the field. Judges tend to favour longer answers, so check whether the extra length does real work. |
-| Judge independence | Whether the judge model shares a model family with a candidate. A judge tends to rate its own family's output higher. The judge named is the one that judged this run, even if you changed the evaluator's model afterwards. |
+| Check                             | What it reports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enough comparisons                | Every candidate needs at least 30 matchups for a stable score. Below that, run more rows.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Every candidate both won and lost | A candidate that swept or was swept has no score that fits and is excluded from the ranking.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Everything is on one scale        | Whether every candidate is linked to the rest through wins and losses, directly or through a chain of shared opponents. The leaderboard only orders candidates that share comparisons. When the run splits into groups it never connected, scores compare only inside a group. Across groups the run keeps only the direction, and only where one group beat the other and was never beaten back; candidates in groups that never met cannot be ranked against each other, and the size of any gap across groups is not measured. |
+| Rows the judge would not call     | How many rows produced no verdict because the two passes disagreed. Above 25% of the rows, change the judge model or the prompt; more rows will not settle it.                                                                                                                                                                                                                                                                                                                                                                    |
+| Ranking settled                   | Whether the fit converged on a stable answer.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| How much this run settled         | How many candidate pairs the run separated, out of all pairs, and how many comparisons that is based on.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Answer length                     | How the leader's average answer length compares to the rest of the field. Judges tend to favour longer answers, so check whether the extra length does real work.                                                                                                                                                                                                                                                                                                                                                                 |
+| Judge independence                | Whether the judge model shares a model family with a candidate. A judge tends to rate its own family's output higher. The judge named is the one that judged this run, even if you changed the evaluator's model afterwards.                                                                                                                                                                                                                                                                                                      |
 
 ### 3. What is it costing you, and why did it win?
 
@@ -179,17 +179,17 @@ With an N-way judge, every verdict covers all candidates together, so each row o
 
 ## Settings
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `model` | `openai/gpt-5-mini` | The judge model. |
-| `temperature` | `0.0` | The judge model's temperature. |
-| `max_tokens` | `128000` | The token limit for the judge call. |
-| `has_golden_answer` | `false` | Compare each candidate against a reference answer. Set by selecting a **Golden field**. |
-| `randomize_order` | `true` | **Shuffle candidate order**: shuffle the candidate order per row (deterministically, seeded by the row index) before the judge sees them, to reduce position bias. |
-| `allow_tie` | `true` | Allow the judge to return a tie when the candidates are equivalent. |
-| `swap_and_reconcile` | `true` | **Swap And Reconcile**: ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
-| `include_metrics` | `[]` | **Include cost** and **Include duration**: show those per candidate to the judge. |
-| `prompt` | The built-in judge prompt | Custom judge instructions. |
+| Setting              | Default                   | Description                                                                                                                                                                |
+| -------------------- | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`              | `openai/gpt-5-mini`       | The judge model.                                                                                                                                                           |
+| `temperature`        | `0.0`                     | The judge model's temperature.                                                                                                                                             |
+| `max_tokens`         | `128000`                  | The token limit for the judge call.                                                                                                                                        |
+| `has_golden_answer`  | `false`                   | Compare each candidate against a reference answer. Set by selecting a **Golden field**.                                                                                    |
+| `randomize_order`    | `true`                    | **Shuffle candidate order**: shuffle the candidate order per row (deterministically, seeded by the row index) before the judge sees them, to reduce position bias.         |
+| `allow_tie`          | `true`                    | Allow the judge to return a tie when the candidates are equivalent.                                                                                                        |
+| `swap_and_reconcile` | `true`                    | **Swap And Reconcile**: ask the judge a second time with the candidate order reversed, and record no winner when the two answers disagree. Doubles the judge cost per row. |
+| `include_metrics`    | `[]`                      | **Include cost** and **Include duration**: show those per candidate to the judge.                                                                                          |
+| `prompt`             | The built-in judge prompt | Custom judge instructions.                                                                                                                                                 |
 
 ## Using it from the SDK
 

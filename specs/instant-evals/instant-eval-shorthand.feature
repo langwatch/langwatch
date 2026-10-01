@@ -4,7 +4,7 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
   I want to name a target, a trace filter and my questions
   So that the platform writes the LangWatchQL statement for me and hands it back to me to edit
 
-  Issue: Instant Evals, PR 5. ADR-137 amendment.
+  Issue: Instant Evals, PR 5. ADR-153 amendment.
 
   The shape:
   - `POST /api/v1/instant-evals` and `POST /api/v1/instant-evals/estimate` take either a
@@ -70,12 +70,13 @@ Feature: The Instant Eval shorthand, a target and a filter expanded into one sta
     And the statement orders by TraceId
 
   @unit
-  Scenario: The threads target judges one bounded transcript per conversation
+  Scenario: The threads target judges the steps view of each conversation
     Given a shorthand naming the threads target
     When it is expanded
     Then the statement selects from the LangWatchQL trace metrics view
     And it groups by ConversationId and projects the conversation's last trace as TraceId
-    And each question is an eval function over conversation_bounded of the conversation id
+    And each question is an eval function over llm_readable_thread of the conversation id, each turn with its tool calls and results
+    And the bound is the judge's whole text budget at the transcript ratio, so an ordinary conversation arrives whole
     And rows with no conversation id are left out
 
   @unit

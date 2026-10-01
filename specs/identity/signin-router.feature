@@ -107,6 +107,14 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the decision never routes to sign-up
 
   @unit
+  Scenario: A migrated account is answered from the projection alone
+    Given an account whose identifier backfill has finalized
+    And legacy rows still carry a method the migration moved
+    When that address is submitted to the router
+    Then the legacy rows are not read
+    And the decision offers only what the projection holds
+
+  @unit
   Scenario: The methods offered are the ones that account holds
     Given "home.net" belongs to no ACTIVE connection
     And the account for "sam@home.net" holds a passkey and no password
@@ -495,3 +503,16 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the reconciliation runs
     Then each user's state is re-derived from their identifier data
     And the column is dropped once nothing reads it
+
+  @unit
+  Scenario: The installed router sends an address nobody holds to sign-up
+    Given an email-mode deployment with the identity module installed through the process chain
+    When "nobody@home.net" is submitted through IdentityApi.routeSignIn
+    Then the decision routes to sign-up with the reason code "identifier_unknown"
+    And the decision offers no method at all
+
+  @unit
+  Scenario: The served page names the identifier-first screens as the sign-in front door
+    Given any deployment, whatever its environment says
+    When the auth module projects its browser config
+    Then the browser is told the identifier-first screens are the front door

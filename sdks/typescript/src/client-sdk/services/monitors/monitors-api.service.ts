@@ -1,8 +1,9 @@
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
+import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { buildAuthHeaders } from "@/internal/api/auth";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface MonitorResponse {
@@ -72,11 +73,10 @@ export class MonitorsApiService {
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
-      headers: {
-        ...buildAuthHeaders({ apiKey: this.apiKey }),
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
+      headers: mergeHeaders(
+        { ...buildRequestHeaders({ apiKey: this.apiKey }), "Content-Type": "application/json" },
+        options?.headers,
+      ),
     });
 
     if (!response.ok) {
@@ -86,8 +86,12 @@ export class MonitorsApiService {
         parsed = JSON.parse(errorText);
       } catch {
         // leave as raw text
+        void 0;
       }
-      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
+      const message = formatApiErrorMessage({
+        error: parsed,
+        options: { status: response.status },
+      });
       throwIfHandledError({
         operation: options?.method ?? "GET",
         error: parsed,
@@ -105,36 +109,36 @@ export class MonitorsApiService {
   }
 
   async getAll(): Promise<MonitorResponse[]> {
-    return this.request<MonitorResponse[]>("/api/monitors");
+    return this.request<MonitorResponse[]>("/api/v1/monitors");
   }
 
   async get(id: string): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`);
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`);
   }
 
   async create(body: CreateMonitorBody): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>("/api/monitors", {
+    return this.request<MonitorResponse>("/api/v1/monitors", {
       method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async update(id: string, body: UpdateMonitorBody): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`, {
       method: "PATCH",
       body: JSON.stringify(body),
     });
   }
 
   async toggle(id: string, enabled: boolean): Promise<MonitorResponse> {
-    return this.request<MonitorResponse>(`/api/monitors/${encodeURIComponent(id)}/toggle`, {
+    return this.request<MonitorResponse>(`/api/v1/monitors/${encodeURIComponent(id)}/toggle`, {
       method: "POST",
       body: JSON.stringify({ enabled }),
     });
   }
 
   async delete(id: string): Promise<MonitorDeleteResponse> {
-    return this.request<MonitorDeleteResponse>(`/api/monitors/${encodeURIComponent(id)}`, {
+    return this.request<MonitorDeleteResponse>(`/api/v1/monitors/${encodeURIComponent(id)}`, {
       method: "DELETE",
     });
   }

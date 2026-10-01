@@ -1,0 +1,314 @@
+import {
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  type SpanFactsContributedEvent,
+} from "@langwatch/coding-agent-contract";
+import { createTenantId } from "@langwatch/eventing";
+import type { Instant } from "@langwatch/time";
+import { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { inertReceivedFacts } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { TestClock } from "../../__tests__/fixtures/coding-agent.fixture.ts";
+import type {
+  CodingAgentProjectActivity,
+  CodingAgentPullRequestMapping,
+} from "../../app/coding-agent.members.ts";
+import { LiveCodingAgentRepositories } from "../../repositories/live/live.coding-agent.repositories.ts";
+import { SystemCodingAgentClockService } from "../../services/coding-agent-clock.service.ts";
+import { OtelCodingAgentCostMetricsService } from "../../services/coding-agent-cost-metrics.service.ts";
+import { CodingAgentProjectionPersistenceService } from "../../services/coding-agent-projection-persistence.service.ts";
+import { ModelCatalogCostEstimatorService } from "../../services/model-catalog-cost-estimator.service.ts";
+import {
+  type CodingAgentProcessingPipeline,
+  EventingCodingAgentProcessingAdapter,
+} from "../coding-agent-processing.pipeline.ts";
+
+/**
+ * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
+ * Restated here, not imported, since importing would assert the constant
+ * against itself rather than prove an unconfigured process still gets a bounded TTL.
+ */
+const FOLD_CACHE_FLOOR_SECONDS = 300;
+
+class TestTraceCanonicalisation extends TraceCanonicalisationService {
+  canonicalizeSpanAttributes() {
+    return { attributes: {}, events: [], appliedRules: [] };
+  }
+
+  canonicalizeLogRecord() {
+    return { attributes: {}, appliedRules: [] };
+  }
+
+  extractMessageText(): null {
+    return null;
+  }
+
+  deriveClaudeRequestContent() {
+    return { messages: null, toolResults: [] };
+  }
+
+  deriveClaudeResponseContent() {
+    return { assistantText: null, assistantOutput: null, sessionTitle: null };
+  }
+
+  classifyClaudeCall() {
+    return { conversational: false, cacheWritesLongLived: false };
+  }
+}
+
+class RecordingProjectActivity implements CodingAgentProjectActivity {
+  readonly touched: { projectId: string; at: Instant }[] = [];
+
+  async touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
+    this.touched.push(input);
+  }
+}
+
+class MappingEverything implements CodingAgentPullRequestMapping {
+  canMapRepositoryHost(): boolean {
+    return true;
+  }
+
+  async requestBranchMapping(): Promise<void> {}
+}
+
+/**
+ * One model call on session_1: enough to make the fold persistable, since a
+ * state with no signal at all is dropped before it reaches ClickHouse by design.
+ */
+function modelCallEvent(): SpanFactsContributedEvent {
+  return {
+    id: "evt-1",
+    aggregateId: "session_1",
+    aggregateType: "coding_agent_session",
+    createdAt: 1_800_000_000_000,
+    occurredAt: 1_800_000_000_000,
+    version: "2025-01-01",
+    tenantId: createTenantId("project_alpha"),
+    type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+    data: {
+      tenantId: "project_alpha",
+      sessionId: "session_1",
+      sessionKeySource: "provider",
+      agent: "claude_code",
+      occurredAt: 1_800_000_000_000,
+      traceId: "trace_1",
+      spanId: "llm-1",
+      name: "claude_code.llm_request",
+      startTimeUnixMs: 1_800_000_000_000,
+      endTimeUnixMs: 1_800_000_000_500,
+      statusCode: 0,
+      facts: { input_tokens: 10, output_tokens: 5 },
+      scopeName: "com.anthropic.claude_code.tracing",
+    },
+  };
+}
+
+function compose(
+  options: {
+    pullRequestMapping?: CodingAgentPullRequestMapping | undefined;
+  } = {},
+) {
+  const insert = vi.fn(
+    async (_request: {
+      tenantId: string;
+      table: string;
+      rows: readonly Record<string, unknown>[];
+    }) => undefined,
+  );
+  const clickhouse = { insert, query: async () => ({ rows: [] }) };
+  const set = vi.fn(async (..._args: unknown[]) => "OK");
+  const redis = { get: vi.fn(async () => null), set };
+  const projectActivity = new RecordingProjectActivity();
+
+  const repositories = LiveCodingAgentRepositories.create({
+    clickhouse: clickhouse as never,
+    clock: new TestClock(),
+    telemetry: { observe: () => undefined },
+    redis: redis as never,
+  });
+  const github =
+    "pullRequestMapping" in options ? options.pullRequestMapping : new MappingEverything();
+  const pipeline: CodingAgentProcessingPipeline = EventingCodingAgentProcessingAdapter.create({
+    traceCanonicalisation: new TestTraceCanonicalisation(),
+    modelProviders: ModelCatalogCostEstimatorService.create(),
+    costMetrics: OtelCodingAgentCostMetricsService.create(),
+    projections: CodingAgentProjectionPersistenceService.create(repositories),
+    projects: projectActivity,
+    clock: SystemCodingAgentClockService.create(),
+    defaultRetentionDays: () => 49,
+    sessionContextMemo: repositories.sessionContextMemo,
+    sessionFoldCache: repositories.sessionFoldCache,
+    ...(github ? { github } : {}),
+    receivedFacts: inertReceivedFacts,
+  }).build();
+
+  return { pipeline, insert, redis, set, projectActivity };
+}
+
+/** One model call, folded and stored through the fold the pipeline registered. */
+async function storeThrough(pipeline: CodingAgentProcessingPipeline): Promise<void> {
+  const fold = pipeline.foldProjections.get("codingAgentSession");
+  expect(fold, "the pipeline registered no codingAgentSession fold").toBeDefined();
+  await fold!.open((definition) =>
+    definition.store.store(definition.apply(definition.init(), modelCallEvent()), {
+      aggregateId: "session_1",
+      tenantId: createTenantId("project_alpha"),
+    }),
+  );
+}
+
+describe("coding_agent_processing over the live repositories", () => {
+  describe("given a process holding a tenant-keyed client, its own Redis and a project seam", () => {
+    /** @scenario "Durable processing composes from one client, one Redis and one database" */
+    it("builds the session pipeline from those alone", () => {
+      const { pipeline } = compose();
+
+      expect(pipeline.metadata.name).toBe("coding_agent_processing");
+      expect(pipeline.commands.map((command) => command.definition.name)).toEqual([
+        "contributeSpanFacts",
+        "contributeLogFacts",
+        "contributeMetricFacts",
+      ]);
+    });
+
+    /** @scenario "Durable processing composes from one client, one Redis and one database" */
+    it("registers the fold, its three appends and the cost-drift subscriber", () => {
+      const { pipeline } = compose();
+
+      expect([...pipeline.foldProjections.keys()]).toEqual(["codingAgentSession"]);
+      expect([...pipeline.mapProjections.keys()]).toEqual([
+        "codingAgentTraceSessions",
+        "sessionMetricSeries",
+        "codingAgentSessionEvents",
+      ]);
+      expect([...pipeline.eventSubscribers.keys()]).toEqual(["codingAgentCostDrift"]);
+    });
+
+    /** @scenario "Durable processing composes from one client, one Redis and one database" */
+    it("registers the pull-request mapping subscriber, because the queue routes its key", () => {
+      const { pipeline } = compose();
+
+      // `reactor:pullRequestMapping` is one of the routing keys the producer
+      // stages jobs against. A consumer composed without a GitHub demand path
+      // registers one key fewer, and the queue rejects an unroutable job for
+      // redelivery rather than dropping it — so those jobs stall forever
+      // while every health signal stays green.
+      expect([...pipeline.foldSubscribers.keys()]).toEqual(["pullRequestMapping"]);
+    });
+
+    /** @scenario "Durable processing composes from one client, one Redis and one database" */
+    it("mounts no mapping subscriber where there is no GitHub connection to ask", () => {
+      const { pipeline } = compose({ pullRequestMapping: undefined });
+
+      expect([...pipeline.foldSubscribers.keys()]).toEqual([]);
+    });
+  });
+
+  describe("when a folded session is stored", () => {
+    /** @scenario "Session rows are written through the client this graph resolved" */
+    it("names the tenant the session names, so the client routes the write to their server", async () => {
+      const { pipeline, insert } = compose();
+
+      await storeThrough(pipeline);
+
+      // The tenant the fold names, on the statement itself. A write that named
+      // any other tenant registers the identical routing keys and lands its
+      // rows on a server nothing reads them back from.
+      expect(insert.mock.calls.map(([request]) => request.tenantId)).toEqual(["project_alpha"]);
+      expect(insert.mock.calls.map(([request]) => request.table)).toEqual([
+        "coding_agent_sessions",
+      ]);
+    });
+
+    /** @scenario "Session rows are written through the client this graph resolved" */
+    it("stamps the row with the retention the substrate already carries", async () => {
+      const { pipeline, insert } = compose();
+
+      await storeThrough(pipeline);
+
+      // 49 is the `defaultRetentionDays` this adapter was composed with, not a
+      // number configured a second time. Two graphs stamping different
+      // retentions on one table expire each other's rows.
+      expect(insert.mock.calls[0]![0].rows[0]).toMatchObject({
+        TenantId: "project_alpha",
+        SessionId: "session_1",
+        _retention_days: 49,
+      });
+    });
+
+    /** @scenario "Both graphs cache the session fold under one keyspace" */
+    it("writes the cache entry under the keyspace the App also reads", async () => {
+      const { pipeline, set } = compose();
+
+      await storeThrough(pipeline);
+
+      // Frozen twin: the pipeline definition names `coding_agent_sessions` on
+      // both graphs, and the two share one Redis. A prefix that drifted would
+      // leave each side reading a cache the other never writes.
+      expect(set.mock.calls[0]![0]).toBe("fold:coding_agent_sessions:project_alpha:session_1");
+    });
+
+    /** @scenario "Storing a session stamps its project's activity" */
+    it("records the project as having seen coding-agent activity", async () => {
+      const { pipeline, projectActivity } = compose();
+
+      await storeThrough(pipeline);
+
+      // The stamp is why the pipeline used to demand the whole ProjectApi.
+      // It is fire-and-forget behind the commit, so the assertion is that the
+      // one-method seam this graph composed is the thing that receives it.
+      expect(projectActivity.touched.map((entry) => entry.projectId)).toEqual(["project_alpha"]);
+    });
+  });
+
+  describe("given no fold cache TTL named by the process", () => {
+    /** @scenario "The fold cache falls back to the replication-lag floor" */
+    it("falls back to the replication-lag floor", async () => {
+      const { pipeline, set } = compose();
+
+      await storeThrough(pipeline);
+
+      expect(set.mock.calls[0]!.slice(2)).toEqual(["EX", FOLD_CACHE_FLOOR_SECONDS]);
+    });
+  });
+
+  describe("when a model call is priced", () => {
+    /** @scenario "A model call is priced from the platform catalog alone" */
+    it("prices a catalogued model from the catalog's own rates", () => {
+      const estimator = ModelCatalogCostEstimatorService.create();
+
+      const cost = estimator.estimateCost({
+        attrs: {},
+        model: "openai/gpt-5-mini",
+        promptTokens: 1_000_000,
+        completionTokens: 0,
+      });
+
+      // A real rate rather than a pinned number: the catalog's prices change
+      // with the vendors', and what this holds is that the estimator reads
+      // them at all. A composition that reached no catalog answers zero.
+      expect(cost).toBeGreaterThan(0);
+    });
+
+    /** @scenario "A model call is priced from the platform catalog alone" */
+    it("prefers custom per-token rates carried on the call's own attributes", () => {
+      const estimator = ModelCatalogCostEstimatorService.create();
+
+      const cost = estimator.estimateCost({
+        attrs: {
+          "langwatch.model.inputCostPerToken": 0.5,
+          "langwatch.model.outputCostPerToken": 0,
+        },
+        model: "openai/gpt-5-mini",
+        promptTokens: 4,
+        completionTokens: 0,
+      });
+
+      // This is why the App's provider stack was never being consulted: a
+      // tenant's overridden price travels on the span, so both graphs price
+      // an overridden call identically without either reading a database.
+      expect(cost).toBe(2);
+    });
+  });
+});

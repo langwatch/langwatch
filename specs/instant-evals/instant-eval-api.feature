@@ -4,7 +4,7 @@ Feature: The Instant Eval run over REST, one LWQL statement, judged as a job
   I want to run an eval statement over my whole production history as a job
   So that a question I thought of today is answered across rows a synchronous query cannot reach
 
-  Issue: Instant Evals, PR 4. ADR-137.
+  Issue: Instant Evals, PR 4. ADR-153.
 
   The shape:
   - The input is always a LangWatchQL statement, the same one `POST /api/v1/query` runs. It

@@ -1,0 +1,267 @@
+/**
+ * Warning an organization that it is approaching its monthly usage limit.
+ */
+
+import {
+  NOTIFICATION_TYPES,
+  type BillingUsageLimitOrganization,
+  type UsageWarningDecision,
+} from "@langwatch/enterprise-billing-contract";
+import type { Notification } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
+
+import type { UsageLimitEmailData } from "./billing-usage-notice.service.ts";
+
+const logger = createLogger("langwatch:notifications:usageWarning");
+
+/**
+ * Most calls find the warning already sent this month, or nobody to send it
+ * to: "no email went out" is an ordinary outcome, so it is a named result.
+ */
+export type CheckAndSendWarningResult =
+  | { outcome: "sent"; notification: Notification }
+  | { outcome: "skipped" };
+
+import { toDate } from "@langwatch/time";
+
+import {
+  getCurrentMonthStart,
+  type UsageWarningServiceOptions,
+} from "../rules/usage-warning-thresholds.rules.ts";
+import { UsageWarningDispatchService } from "./usage-warning-dispatch.service.ts";
+
+export class UsageWarningService {
+  private readonly records: UsageWarningServiceOptions["records"];
+  private readonly organizations: BillingUsageLimitOrganization;
+  private readonly emails: UsageWarningServiceOptions["emails"];
+  private readonly baseHost: string;
+
+  static create(options: UsageWarningServiceOptions): UsageWarningService {
+    return new UsageWarningService(options);
+  }
+
+  private constructor(options: UsageWarningServiceOptions) {
+    this.records = options.records;
+    this.organizations = options.organizations;
+    this.emails = options.emails;
+    this.baseHost = options.baseHost;
+    this.dispatch = UsageWarningDispatchService.create({
+      records: options.records,
+      emails: options.emails,
+      baseHost: options.baseHost,
+    });
+  }
+
+  private readonly dispatch: UsageWarningDispatchService;
+
+  /**
+   * Sends the warning entitlement decided, unless this threshold went out this month, and
+   * records that it went.
+   */
+  async send(decision: UsageWarningDecision): Promise<CheckAndSendWarningResult> {
+    const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit, crossedThreshold } =
+      decision;
+    const usagePercentage =
+      maxMonthlyUsageLimit > 0 ? (currentMonthMessagesCount / maxMonthlyUsageLimit) * 100 : 0;
+
+    const organization = await this.organizations.findWithAdmins(organizationId);
+
+    if (!organization) {
+      logger.warn({ organizationId }, "Organization not found");
+
+      return { outcome: "skipped" };
+    }
+
+    if (organization.members.length === 0) {
+      logger.warn({ organizationId }, "No admin members found for organization");
+
+      return { outcome: "skipped" };
+    }
+
+    if (await this.alreadyWarnedThisMonth({ organizationId, crossedThreshold })) {
+      return { outcome: "skipped" };
+    }
+
+    const projectUsageData = await this.projectUsage(decision);
+
+    const deliverableAdmins = organization.members.filter((member) => member.user.email);
+
+    if (deliverableAdmins.length === 0) {
+      logger.info(
+        {
+          organizationId,
+          totalAdmins: organization.members.length,
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "No admins with email addresses found, skipping notification (no deliverable recipients)",
+      );
+
+      return { outcome: "skipped" };
+    }
+
+    const notification = await this.sendAndRecord({
+      organizationId,
+      organizationName: organization.name,
+      deliverableAdmins,
+      emailContext: this.dispatch.buildEmailContext({
+        organizationName: organization.name,
+        usagePercentage,
+        currentMonthMessagesCount,
+        maxMonthlyUsageLimit,
+        crossedThreshold,
+        projectUsageData,
+      }),
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      usagePercentage,
+      crossedThreshold,
+    });
+
+    return { outcome: "sent", notification };
+  }
+
+  /**
+   * Whether this threshold was already warned about in the current calendar month.
+   */
+  private async alreadyWarnedThisMonth({
+    organizationId,
+    crossedThreshold,
+  }: {
+    organizationId: string;
+    crossedThreshold: number;
+  }): Promise<boolean> {
+    const currentMonthStart = getCurrentMonthStart();
+
+    const recentNotifications = await this.records.listRecentByOrganization({
+      organizationId,
+      since: toDate(currentMonthStart),
+    });
+
+    const alreadySent = recentNotifications.find((notification) => {
+      if (!notification.metadata || typeof notification.metadata !== "object") {
+        return false;
+      }
+
+      const metadata = notification.metadata as Record<string, unknown>;
+
+      return (
+        metadata.type === NOTIFICATION_TYPES.USAGE_LIMIT_WARNING &&
+        metadata.threshold === crossedThreshold
+      );
+    });
+
+    if (!alreadySent) {
+      return false;
+    }
+
+    logger.debug(
+      {
+        organizationId,
+        threshold: crossedThreshold,
+        lastSentAt: alreadySent.sentAt,
+        currentMonthStart,
+      },
+      "Notification already sent for this threshold in current calendar month, skipping duplicate",
+    );
+
+    return true;
+  }
+
+  /** The named projects, each with the count entitlement decided on; 0 where it counted none. */
+  private async projectUsage({
+    organizationId,
+    projectCounts,
+  }: UsageWarningDecision): Promise<{ id: string; name: string; messageCount: number }[]> {
+    const projects = await this.organizations.findProjectsWithName(organizationId);
+    const countsMap = new Map(projectCounts.map((count) => [count.projectId, count.count]));
+
+    return projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      messageCount: countsMap.get(project.id) ?? 0,
+    }));
+  }
+
+  /**
+   * Sends to every deliverable admin and records that it happened.
+   */
+  private async sendAndRecord({
+    organizationId,
+    organizationName,
+    deliverableAdmins,
+    emailContext,
+    currentMonthMessagesCount,
+    maxMonthlyUsageLimit,
+    usagePercentage,
+    crossedThreshold,
+  }: {
+    organizationId: string;
+    organizationName: string;
+    deliverableAdmins: { user: { id: string; name: string | null; email: string | null } }[];
+    emailContext: UsageLimitEmailData;
+    currentMonthMessagesCount: number;
+    maxMonthlyUsageLimit: number;
+    usagePercentage: number;
+    crossedThreshold: number;
+  }): Promise<Notification> {
+    try {
+      const { recipientsSuccessCount, recipientsFailureCount, failedRecipients } =
+        await this.dispatch.dispatchEmails({
+          organizationId,
+          organizationName,
+          deliverableAdmins,
+          emailContext,
+        });
+
+      if (recipientsSuccessCount === 0) {
+        logger.error(
+          {
+            organizationId,
+            recipientsFailureCount,
+            failedRecipients,
+            usagePercentage: usagePercentage.toFixed(2),
+            threshold: crossedThreshold,
+          },
+          "All usage limit warning emails failed to send, aborting notification creation to allow retries",
+        );
+
+        throw new Error(`All ${recipientsFailureCount} usage limit warning emails failed to send`);
+      }
+
+      const notification = await this.dispatch.recordNotification({
+        organizationId,
+        currentMonthMessagesCount,
+        maxMonthlyUsageLimit,
+        usagePercentage,
+        crossedThreshold,
+        deliverableAdminsCount: deliverableAdmins.length,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        failedRecipients,
+      });
+
+      logger.info(
+        {
+          organizationId,
+          notificationId: notification.id,
+          recipientsCount: deliverableAdmins.length,
+          recipientsSuccessCount,
+          recipientsFailureCount,
+          ...(recipientsFailureCount > 0 && { failedRecipients }),
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "Usage limit warning notifications sent successfully",
+      );
+
+      return notification;
+    } catch (error) {
+      logger.error({ error, organizationId }, "Error sending usage limit warning notifications");
+
+      throw error;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+}

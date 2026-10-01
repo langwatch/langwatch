@@ -1,0 +1,14 @@
+/**
+ * What a simulation run points at: domain shape, not transport shape, so
+ * the services that resolve it and the router that accepts it read the
+ * same definition. Extensible as the platform grows a new type.
+ */
+
+import { z } from "zod";
+
+export const simulationTargetSchema = z.object({
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  referenceId: z.string(),
+});
+
+export type SimulationTarget = z.infer<typeof simulationTargetSchema>;

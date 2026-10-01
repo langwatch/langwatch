@@ -1,14 +1,7 @@
 /**
- * Guardrail Example - Real-time Evaluation for Safety
- *
- * This example demonstrates how to use langwatch.evaluations.evaluate()
- * to run guardrails in real-time, blocking or modifying responses
- * based on evaluation results.
- *
- * The guardrail runs within a traced span, so it appears connected
- * to the parent trace in the LangWatch dashboard.
- *
- * Run with: npm run start:guardrail
+ * Guardrail Example: uses langwatch.evaluations.evaluate() in real time to
+ * block or modify responses. Runs within a traced span, so it appears
+ * connected to the parent trace in the dashboard. Run: npm run start:guardrail
  */
 
 import "dotenv/config";
@@ -75,17 +68,14 @@ const processMessage = async (userInput: string): Promise<string> => {
 
   // Run guardrail to check for PII - this creates a span attached to the current trace
   try {
-    const guardrail = await langwatch.evaluations.evaluate(
-      "presidio/pii_detection",
-      {
-        data: {
-          input: userInput,
-          output: generatedResponse,
-        },
-        name: "PII Detection Guardrail",
-        asGuardrail: true,
-      }
-    );
+    const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+      data: {
+        input: userInput,
+        output: generatedResponse,
+      },
+      name: "PII Detection Guardrail",
+      asGuardrail: true,
+    });
 
     console.log(`🔍 Guardrail Result:`);
     console.log(`   - Status: ${guardrail.status}`);
@@ -105,7 +95,7 @@ const processMessage = async (userInput: string): Promise<string> => {
       return generatedResponse;
     }
   } catch (error) {
-    console.error(`❌ Guardrail error: ${error}`);
+    console.error("❌ Guardrail error:", error);
     // On guardrail error, you might want to block or allow based on your policy
     console.log("⚠️  Allowing response due to guardrail error (fail-open policy)");
     return generatedResponse;
@@ -132,7 +122,7 @@ const main = async () => {
         } finally {
           span.end();
         }
-      }
+      },
     );
   }
 

@@ -1,0 +1,25 @@
+import { Box, HStack, type StackProps, Text } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Info } from "lucide-react";
+
+export type PropertySectionTitleProps = {
+  children: React.ReactNode;
+  tooltip?: React.ReactNode;
+} & StackProps;
+
+export function PropertySectionTitle({ children, tooltip, ...props }: PropertySectionTitleProps) {
+  return (
+    <HStack paddingLeft={2} {...props}>
+      <Text fontSize="12px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+        {children}
+      </Text>
+      {tooltip && (
+        <Tooltip content={tooltip}>
+          <Box marginBottom="-2px">
+            <Info size={14} />
+          </Box>
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}

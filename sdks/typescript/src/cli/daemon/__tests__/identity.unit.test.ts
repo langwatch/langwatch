@@ -1,8 +1,9 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as net from "node:net";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 
 import {
   daemonSocketDir,
@@ -125,9 +126,7 @@ describe("daemonSocketDir", () => {
       // NOT the OS temp dir: on Linux that is /tmp, mode 1777, so another user
       // can pre-create langwatch-<uid>, own it, and leave us unable to secure
       // the socket. Nobody but us can create a directory under $HOME.
-      expect(dir).toBe(
-        path.join(os.homedir(), ".langwatch", "run", path.basename(dir)),
-      );
+      expect(dir).toBe(path.join(os.homedir(), ".langwatch", "run", path.basename(dir)));
       expect(path.basename(dir)).toMatch(/^langwatch-\d+$/);
     });
 
@@ -173,10 +172,7 @@ describe("socket permissions", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = path.join(
-      fs.mkdtempSync(path.join(os.tmpdir(), "lw-daemon-perm-")),
-      "sockets",
-    );
+    dir = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "lw-daemon-perm-")), "sockets");
   });
 
   afterEach(() => {
@@ -258,9 +254,7 @@ describe("inspectSocketTrust", () => {
     it("refuses it, so we never hand our args and API key to a stranger", async () => {
       await bindSocket();
       // We cannot chown without root; moving OUR uid is the same comparison.
-      vi.spyOn(process, "getuid").mockReturnValue(
-        (process.getuid?.() ?? 0) + 1,
-      );
+      vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
       expect(inspectSocketTrust(socketPath)).toBe("socket-dir-foreign-owner");
     });
@@ -310,9 +304,7 @@ describe("inspectSocketTrust", () => {
     });
 
     it("reports a missing directory rather than throwing", () => {
-      expect(inspectSocketTrust(path.join(dir, "gone", "d.sock"))).toBe(
-        "socket-dir-missing",
-      );
+      expect(inspectSocketTrust(path.join(dir, "gone", "d.sock"))).toBe("socket-dir-missing");
     });
   });
 });
@@ -333,9 +325,7 @@ describe("ensureSocketDir", () => {
     it("fails closed instead of continuing with a socket it cannot make private", () => {
       const squatted = path.join(root, "langwatch-501");
       fs.mkdirSync(squatted, { mode: 0o777 });
-      vi.spyOn(process, "getuid").mockReturnValue(
-        (process.getuid?.() ?? 0) + 1,
-      );
+      vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
       expect(() => ensureSocketDir(squatted)).toThrow(UntrustedSocketDirError);
     });
@@ -356,20 +346,16 @@ describe("ensureSocketDir", () => {
 describe("isSocketPathUsable", () => {
   describe("given a path longer than sockaddr_un allows", () => {
     it("rejects it, so the client falls back instead of crashing at bind()", () => {
-      expect(isSocketPathUsable("/tmp/" + "x".repeat(120) + ".sock")).toBe(
-        false,
-      );
+      expect(isSocketPathUsable("/tmp/" + "x".repeat(120) + ".sock")).toBe(false);
     });
   });
 });
 
 describe("isDaemonSocketPathUsable", () => {
   /**
-   * The band between "the shared path fits" and "a daemon can run on it". A
-   * daemon binds a pid-scoped name beside the shared one, and it is longer.
-   * Approving this band is what left the client spawning a daemon every second
-   * miss, each dying at bind(), forever — with an error naming the shared path,
-   * which anybody could measure and find to be within the limit.
+   * The band between "the shared path fits" and "a daemon can run on it": a
+   * daemon's pid-scoped name is longer. Approving this band left the client
+   * spawning (and dying at bind()) forever, with an error naming the shorter path.
    */
   describe("given a shared path that fits but leaves no room for the staging name", () => {
     // 100 bytes exactly: the widest path `isSocketPathUsable` still allows.
@@ -382,8 +368,7 @@ describe("isDaemonSocketPathUsable", () => {
     });
 
     it("becomes usable once the staging allowance fits", () => {
-      const shorter =
-        "/tmp/" + "x".repeat(90 - MAX_STAGING_OVERHEAD_BYTES) + ".sock";
+      const shorter = "/tmp/" + "x".repeat(90 - MAX_STAGING_OVERHEAD_BYTES) + ".sock";
 
       expect(isDaemonSocketPathUsable(shorter)).toBe(true);
     });

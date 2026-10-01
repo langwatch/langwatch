@@ -1,22 +1,12 @@
 /**
- * pi AgentSession wiring for the langy worker.
- *
- * - The model comes from a generated models.json (see models.ts): the ONLY
- *   provider is the mediated gateway, keyed by env reference.
- * - Everything pi persists lives under the worker home: agentDir at
- *   `$HOME/.langy-pi`, the session JSONL under config.sessionDir.
- * - Auto-compaction ON, and pi's retry loop ON with the policy in
- *   model-retry.ts: a model call that fails for a transient reason is made
- *   again inside the turn. The manager's LLM proxy still re-sends a burst
- *   rate limit by the provider's Retry-After first (llmretry.go).
- * - The resource loader discovers nothing (noExtensions/noSkills/
- *   noContextFiles): the system prompt is wholly owned by the wrapper, and
- *   the only extensions are the inline factories: `todowrite`, `skill`,
- *   `question` and the local workspace tools.
+ * pi AgentSession wiring: model from the generated models.json, state under
+ * the worker home, auto-compaction on, pi's retry loop on with the policy in
+ * model-retry.ts, and a resource loader whose only tools are inline.
  */
 
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+
 import {
   createAgentSession,
   DefaultResourceLoader,
@@ -27,7 +17,10 @@ import {
   type ExtensionAPI,
   type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
+
 import type { LangyWorkerConfig } from "./config.js";
+import { guidedSkillRefusal } from "./guided-kickoff.js";
+import { closingLineRefusal } from "./guided-turn-end.js";
 import { MODEL_RETRY_MAX_ATTEMPTS, installModelRetry } from "./model-retry.js";
 import { writeModelsJson } from "./models.js";
 import {
@@ -37,12 +30,7 @@ import {
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
 import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
-import { guidedSkillRefusal } from "./guided-kickoff.js";
-import { closingLineRefusal } from "./guided-turn-end.js";
-import {
-  SECRET_SNIPPET_TOOL_NAME,
-  createSecretSnippetExtension,
-} from "./tools/secret-snippet.js";
+import { SECRET_SNIPPET_TOOL_NAME, createSecretSnippetExtension } from "./tools/secret-snippet.js";
 import { SKILL_TOOL_NAME, createSkillExtension } from "./tools/skill.js";
 import { TODOWRITE_TOOL_NAME, createTodowriteExtension } from "./tools/todowrite.js";
 import type { TurnContext } from "./tools/turn-context.js";
@@ -65,11 +53,9 @@ export const ENABLED_TOOLS = [
 ] as const;
 
 /**
- * The one channel through which the per-turn system prompt reaches pi:
- * `AgentSession.prompt()` resets `agent.state.systemPrompt` to the base
- * prompt on every call, and the documented way to replace it per turn is a
- * `before_agent_start` extension result. The holder is mutated by the turn
- * runner before each prompt; the extension reads it on every agent start.
+ * The one channel through which the per-turn system prompt reaches pi, via a
+ * `before_agent_start` extension result; the runner mutates the holder
+ * before each prompt.
  */
 export type SystemPromptHolder = { current: string };
 
@@ -94,31 +80,22 @@ export type CreateLangySessionOptions = {
 export type LangySessionHandle = {
   session: AgentSession;
   /**
-   * Whether the session continues a persisted transcript this home already
-   * held. The worker home outlives the process on an idle reap or a crash, so
-   * a respawn finds the previous session file and resumes it: the session's
-   * own history is then the single copy of the conversation, the manager
-   * skips the transcript seed, and the prompt prefix stays byte-stable for
-   * provider caching. False means a genuinely fresh session (new
-   * conversation, or the home was lost) and the seed path applies.
+   * The session continues a persisted transcript this home already held (a
+   * respawn after an idle reap or crash); the manager then skips the seed
+   * and the prompt prefix stays byte-stable. False means a fresh session.
    */
   resumed: boolean;
 };
 
 /**
- * Resume the newest persisted session when the home still holds one, so a
- * respawned worker keeps the conversation's own context instead of being
- * re-seeded a transcript (which would also break the byte-stable prompt
- * prefix provider caching reads). A failed listing or a corrupt file degrades
- * to a fresh session rather than failing the spawn.
+ * Resume the newest persisted session when the home still holds one; a
+ * failed listing or a corrupt file degrades to a fresh session rather than
+ * failing the spawn.
  */
-export function openSessionManager({
-  home,
-  sessionDir,
-}: {
-  home: string;
-  sessionDir: string;
-}): { sessionManager: SessionManager; resumed: boolean } {
+export function openSessionManager({ home, sessionDir }: { home: string; sessionDir: string }): {
+  sessionManager: SessionManager;
+  resumed: boolean;
+} {
   try {
     const sessionManager = SessionManager.continueRecent(home, sessionDir);
     return { sessionManager, resumed: sessionManager.getEntries().length > 0 };

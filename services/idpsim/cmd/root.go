@@ -11,9 +11,23 @@ import (
 	"github.com/langwatch/langwatch/services/idpsim"
 )
 
+// Options are the host's overrides, as for aigateway: the combined dev process
+// hands Addr in because it cannot share SERVER_ADDR. Empty keeps SERVER_ADDR.
+type Options struct {
+	Addr string
+}
+
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
+	return Run(ctx, Options{})
+}
+
+// Run boots idpsim with the host's overrides applied.
+func Run(ctx context.Context, overrides Options) error {
 	cfg, err := idpsim.LoadConfig()
+	if overrides.Addr != "" {
+		cfg, err = idpsim.LoadConfigAt(overrides.Addr)
+	}
 	if err != nil {
 		return err
 	}

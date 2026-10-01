@@ -1,0 +1,125 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/browser-host": ["./src/index.ts"]
+    }
+  },
+  "files": [
+    "./src/index.ts",
+    "./src/compat/next-dynamic.ts",
+    "./src/slots.tsx",
+    "./src/capabilities.ts",
+    "./src/use-router.ts",
+    "./src/toaster.ts",
+    "./src/storage.ts",
+    "./src/errors.ts",
+    "./src/query-retry.ts",
+    "./src/testing.ts",
+    "./src/link.tsx",
+    "./src/use-drawer.ts",
+    "./src/upgrade-modal-store.ts",
+    "./src/use-organization-team-project.ts",
+    "./src/format-time-ago.ts",
+    "./src/feature-flag.ts",
+    "./src/period-selector.tsx",
+    "./src/markdown/index.tsx",
+    "./src/isolated-error-boundary.tsx",
+    "./src/copy-button.tsx",
+    "./src/drawer/index.ts",
+    "./src/transport.ts",
+    "./src/sse-subscription-link.ts",
+    "./src/browser-rpc.ts",
+    "./src/address.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../modules/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/annotation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../api/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../browser-trpc/tsconfig.build.json"
+    },
+    {
+      "path": "../config/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dashboard/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../error-presentation/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../react-rum/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
+    }
+  ]
+}

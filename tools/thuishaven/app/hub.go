@@ -37,8 +37,65 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 	}
 	for _, svc := range st.Services {
 		o.proxy.Remove(svc.Name, slug)
+		// The extra ways in go with it: an alias left registered keeps resolving
+		// to a port the kernel has since reissued.
+		for _, alias := range domain.ServiceHostAliases[svc.Name] {
+			o.proxy.Remove(alias, slug)
+		}
 	}
 	o.store.RemoveStack(slug)
+	return nil
+}
+
+// DestroyStack is DownStack plus the data: it stops the stack named by slug
+// and drops the ClickHouse + Postgres databases haven created for it. The
+// worktree is left alone - a stack is not a checkout, and a tool that boots a
+// throwaway stack inside a checkout it does not own (apidiff, one stack per
+// instance under its own run-scoped slug) must be able to take its own stack
+// and its own data away without touching the directory it borrowed.
+//
+// Naming the slug is the whole safety story: nothing here is derived from a
+// directory, so a run can only ever destroy the slugs it started. The shared
+// main database is refused outright, and a slug with no registered stack is
+// not an error - a boot that died before it registered still leaves the
+// databases its migrations created, and those are exactly what the caller is
+// asking to take away.
+func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
+	if !domain.ValidSlug(slug) {
+		return domain.ErrInvalidSlug(slug)
+	}
+	db := domain.DatabaseForSlug(slug)
+	if domain.IsProtectedDatabase(db) {
+		return fmt.Errorf("refusing to destroy %q - %s is the shared database every worktree without its own falls back to", slug, db)
+	}
+	var downed []int
+	var worktreeDir string
+	if st, ok := o.stackBySlug(slug); ok {
+		worktreeDir = st.WorktreeDir
+		if st.LauncherPID != 0 {
+			downed = append(downed, st.LauncherPID)
+		}
+		if err := o.DownStack(ctx, slug); err != nil {
+			return err
+		}
+	}
+	// Same ordering rule as stopAndDropForDir: the launcher's children must be
+	// gone before the databases they hold connections to are dropped.
+	o.waitForProcessesDead(downed)
+	o.stopNxDaemon(ctx, worktreeDir)
+	o.dropWorktreeDatabases(ctx, slug)
+	// Logs are haven's own state, same as the databases above: remove this
+	// slug's share of them, not the checkout (ruling 2026-09-29). Best-effort —
+	// a slug with no registered stack has no worktree to resolve one from.
+	if worktreeDir != "" {
+		dir, combined := domain.StackLogPaths(worktreeDir, slug)
+		_ = os.RemoveAll(dir)
+		_ = os.RemoveAll(combined)
+	}
+	o.removeStackHome(slug)
+	o.removeNxPrivateDir(slug)
+	o.removeStackCredentials(slug)
+	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }
 
@@ -75,10 +132,12 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 		return fmt.Errorf("%s is not a worktree of this repository", dir)
 	}
 
-	o.stopAndDropForDir(ctx, dir)
+	slug := o.stopAndDropForDir(ctx, dir)
 	if err := o.hyg.RemoveWorktree(gitDir, dir); err != nil {
 		return fmt.Errorf("removing worktree: %w", err)
 	}
+	o.removeStackHome(slug)
+	o.removeNxPrivateDir(slug)
 	o.hyg.PruneGitWorktrees(gitDir)
 	return nil
 }
@@ -93,7 +152,7 @@ func (o *Orchestrator) DestroyWorktree(ctx context.Context, gitDir, dir, selfDir
 // admin — the callers decide whether to remove one worktree or rm many and prune
 // once. Safe to run concurrently across distinct dirs: each downs only its own
 // stacks and drops only its own databases.
-func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
+func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) string {
 	dbSlug := o.resolveDestroySlug(canonDir)
 
 	var downedPIDs []int
@@ -110,7 +169,9 @@ func (o *Orchestrator) stopAndDropForDir(ctx context.Context, canonDir string) {
 	// group); wait for them to actually exit before touching the databases or the
 	// directory, so the removal does not race a node/vite stack still writing.
 	o.waitForProcessesDead(downedPIDs)
+	o.stopNxDaemon(ctx, canonDir)
 	o.dropWorktreeDatabases(ctx, dbSlug)
+	return dbSlug
 }
 
 // resolveDestroySlug picks the slug whose databases DestroyWorktree may drop,
@@ -265,6 +326,21 @@ type HubStack struct {
 	PortsUp int
 	// ServiceUp is the per-service port probe, keyed by service name.
 	ServiceUp map[string]bool
+	// Uptime is the live launcher's wall-clock age, zero when it is not live.
+	Uptime time.Duration
+}
+
+// launcherAge is a live stack's uptime: its launcher's age in the listing.
+func launcherAge(samples []ProcessSample, row HubStack) time.Duration {
+	if !row.IsLive {
+		return 0
+	}
+	for _, s := range samples {
+		if s.PID == row.Stack.LauncherPID {
+			return s.Elapsed
+		}
+	}
+	return 0
 }
 
 // HubWorktree is a worktree with no registered stack — visible in the hub so
@@ -315,10 +391,13 @@ type HubView struct {
 // from (its row is marked protected); either may be "" to skip the listing.
 func (o *Orchestrator) HubView(gitDir, selfDir string) HubView {
 	stacks := o.store.Stacks()
-	part := o.partitionMachine(stacks)
+	samples := o.sys.ProcessSamples()
+	part := partitionSamples(stacks, samples, o.sys.ProcessAlive)
 	view := HubView{Footprint: o.hubFootprint(part)}
 	for i := range stacks {
-		view.Stacks = append(view.Stacks, o.hubStackRow(&stacks[i], part))
+		row := o.hubStackRow(&stacks[i], part)
+		row.Uptime = launcherAge(samples, row)
+		view.Stacks = append(view.Stacks, row)
 	}
 	view.Worktrees = o.hubWorktrees(gitDir, selfDir, stacks)
 	view.Events = newestFirst(o.store.ReapEvents())
@@ -328,13 +407,18 @@ func (o *Orchestrator) HubView(gitDir, selfDir string) HubView {
 // partitionMachine attributes one process listing across the live stacks'
 // launcher groups and everything else the footprint names.
 func (o *Orchestrator) partitionMachine(stacks []domain.Stack) domain.Footprint {
+	return partitionSamples(stacks, o.sys.ProcessSamples(), o.sys.ProcessAlive)
+}
+
+// partitionSamples is partitionMachine over a listing already taken, so one
+// hub refresh reads the process table once.
+func partitionSamples(stacks []domain.Stack, samples []ProcessSample, alive func(pid int) bool) domain.Footprint {
 	var launchers []int
 	for i := range stacks {
-		if o.sys.ProcessAlive(stacks[i].LauncherPID) {
+		if alive(stacks[i].LauncherPID) {
 			launchers = append(launchers, stacks[i].LauncherPID)
 		}
 	}
-	samples := o.sys.ProcessSamples()
 	fpSamples := make([]domain.FootprintSample, 0, len(samples))
 	for _, s := range samples {
 		fpSamples = append(fpSamples, domain.FootprintSample{PID: s.PID, PPID: s.PPID, PGID: s.PGID, RSS: s.RSSBytes, Command: s.Command})

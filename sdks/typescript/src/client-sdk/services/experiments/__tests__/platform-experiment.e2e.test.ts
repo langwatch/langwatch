@@ -1,27 +1,21 @@
 /**
- * Integration tests for platform evaluations API (Evaluations V3)
- *
- * These tests require:
- * - LANGWATCH_ENDPOINT=http://localhost:5560 (or your backend URL)
- * - LANGWATCH_API_KEY set with a valid API key
- * - A saved evaluation with slug "test-evaluation" (or TEST_EVALUATION_SLUG env var)
+ * Integration tests for platform evaluations API (Evaluations V3). Needs
+ * LANGWATCH_ENDPOINT, LANGWATCH_API_KEY, and a saved evaluation with slug
+ * "test-evaluation" (or TEST_EVALUATION_SLUG).
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
-import {
-  ExperimentNotFoundError,
-  ExperimentsApiError,
-} from "../platformErrors";
+
+import { ExperimentNotFoundError, ExperimentsApiError } from "../platformErrors";
 
 // Skip if not configured for integration testing
-const shouldRun =
-  process.env.LANGWATCH_ENDPOINT && process.env.LANGWATCH_API_KEY;
+const shouldRun = process.env.LANGWATCH_ENDPOINT && process.env.LANGWATCH_API_KEY;
 
 describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
   let langwatch: LangWatch;
-  const testSlug =
-    process.env.TEST_EVALUATION_SLUG ?? "test-evaluation";
+  const testSlug = process.env.TEST_EVALUATION_SLUG ?? "test-evaluation";
 
   beforeAll(() => {
     langwatch = new LangWatch({
@@ -30,11 +24,11 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
     });
   });
 
-  describe("error handling", () => {
+  describe("when the run request fails", () => {
     it("throws ExperimentNotFoundError for non-existent slug", async () => {
-      await expect(
-        langwatch.experiments.run("non-existent-evaluation-slug-12345")
-      ).rejects.toThrow(ExperimentNotFoundError);
+      await expect(langwatch.experiments.run("non-existent-evaluation-slug-12345")).rejects.toThrow(
+        ExperimentNotFoundError,
+      );
     });
 
     it("throws ExperimentsApiError with invalid API key", async () => {
@@ -43,13 +37,11 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
         endpoint: process.env.LANGWATCH_ENDPOINT,
       });
 
-      await expect(
-        invalidClient.experiments.run(testSlug)
-      ).rejects.toThrow(ExperimentsApiError);
+      await expect(invalidClient.experiments.run(testSlug)).rejects.toThrow(ExperimentsApiError);
     });
   });
 
-  describe("run evaluation", () => {
+  describe("when running an evaluation", () => {
     it("runs an evaluation and returns results", async () => {
       // This test requires a real evaluation to be set up
       // Skip if TEST_EVALUATION_SLUG is not provided
@@ -82,7 +74,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
         return;
       }
 
-      const progressUpdates: Array<{ completed: number; total: number }> = [];
+      const progressUpdates: { completed: number; total: number }[] = [];
 
       await langwatch.experiments.run(testSlug, {
         timeout: 300000,
@@ -97,7 +89,7 @@ describe.skipIf(!shouldRun)("Platform Experiments Integration", () => {
       // Progress should increase (or stay same)
       for (let i = 1; i < progressUpdates.length; i++) {
         expect(progressUpdates[i]!.completed).toBeGreaterThanOrEqual(
-          progressUpdates[i - 1]!.completed
+          progressUpdates[i - 1]!.completed,
         );
       }
     }, 300000);

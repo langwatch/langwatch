@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -23,7 +24,8 @@ import (
 // Server renders live state pulled through the callbacks it is built with, so it
 // never imports the app core.
 type Server struct {
-	config Config
+	config  Config
+	console http.Handler
 }
 
 // Probes are the optional OS checks the page uses to show live health. A nil
@@ -40,25 +42,62 @@ type Probes struct {
 // telemetry); Extras yields the machine picture (may be nil — the page
 // degrades to registry-only).
 type Config struct {
+	// LogDir resolves a slug's capture directory — its own worktree under
+	// domain.HavenLogsRoot, or the pre-ruling global home for a stack still
+	// running under the old layout (ruling 2026-09-29). Nil is log-capture-off.
+	LogDir    func(slug string) string
 	Stacks    func() []domain.Stack
 	SharedURL func(service string) string
 	Probes    Probes
 	Extras    func() Extras
+	// Actions are the lifecycle operations the page may take. Zero-valued means
+	// a dashboard you can only read, which is what it was before.
+	Actions Actions
+	// Limits reads and edits the machine resource limits. Zero-valued leaves
+	// the routes answering 501.
+	Limits Limits
+	// Naming reads a Host header as a stack's home and names a stopped
+	// stack's hosts; StackURL builds a routed URL through the live proxy.
+	Naming   domain.Naming
+	StackURL func(service, slug string) string
+	// IdPTenants lists the tenants of the IdP simulator on a loopback port,
+	// or none. Nil leaves a stack home's credentials without them.
+	IdPTenants func(ctx context.Context, port int) []IdPTenant
+	// Console is the haven-web bundle; nil serves the one embedded at build.
+	Console fs.FS
 }
 
 // New builds a Server.
 func New(config Config) *Server {
-	return &Server{config: config}
+	return &Server{config: config, console: newConsole(config.Console)}
 }
 
-// Serve runs the HTTP surface until the context is cancelled.
-func (s *Server) Serve(ctx context.Context, port int) error {
+// routes is the whole HTTP surface, built apart from Serve so a test can drive
+// it without binding a port. The host guard wraps it in Serve rather than here:
+// what it refuses is a Host header, which is a property of being served.
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok") })
 	mux.HandleFunc("/api/registry", s.handleRegistry)
+	mux.HandleFunc("GET /api/logs", s.handleLogs)
+	mux.HandleFunc("GET /api/hub", s.handleHub)
+	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
+	mux.HandleFunc("POST /api/stacks/{slug}/api-key", s.handleRevealAPIKey)
+	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
+	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
+	mux.HandleFunc("/api/worktrees/start", s.handleStart)
+	mux.HandleFunc("GET /api/limits", s.handleLimits)
+	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)
+	mux.HandleFunc("DELETE /api/limits/{name}", s.handleUnsetLimit)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(mux), ReadHeaderTimeout: 5 * time.Second}
+	return mux
+}
+
+// Serve runs the HTTP surface until the context is canceled.
+func (s *Server) Serve(ctx context.Context, port int) error {
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.routes()), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -114,19 +153,10 @@ func (s *Server) hostAllowed(host string) bool {
 	return h == base || strings.HasSuffix(h, "."+base)
 }
 
+// handleIndex serves the console bundle (apps/haven-web): the hub on its own
+// host, a stack's home on <slug>.langwatch.localhost, and every client route.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
-		http.NotFound(w, r)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	var extras Extras
-	if s.config.Extras != nil {
-		extras = s.config.Extras()
-	}
-	_, _ = io.WriteString(w, renderHTML(s.config.Stacks(), renderInputs{
-		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: extras,
-	}))
+	s.console.ServeHTTP(w, r)
 }
 
 // registryStack mirrors domain.Stack for the unauthenticated /api/registry

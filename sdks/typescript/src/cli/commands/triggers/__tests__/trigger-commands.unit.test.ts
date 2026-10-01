@@ -75,7 +75,7 @@ describe("listTriggersCommand()", () => {
       await listTriggersCommand();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/triggers"),
+        expect.stringContaining("/api/v1/triggers"),
         expect.objectContaining({
           headers: expect.objectContaining({
             authorization: "Bearer test-key",
@@ -156,7 +156,7 @@ describe("getTriggerCommand()", () => {
       await getTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.anything(),
       );
     });
@@ -280,7 +280,7 @@ describe("createTriggerCommand()", () => {
       await createTriggerCommand("Error Alert", { action: "SEND_EMAIL" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers",
+        "http://localhost:5560/api/v1/triggers",
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining("SEND_EMAIL"),
@@ -407,7 +407,7 @@ describe("updateTriggerCommand()", () => {
       await updateTriggerCommand("trigger_abc", { active: "false" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({
           method: "PATCH",
           body: expect.stringContaining("false"),
@@ -474,7 +474,7 @@ describe("setTriggerActiveCommand()", () => {
       await setTriggerActiveCommand({ id: "trigger_abc", active: false });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/disable",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/disable",
         expect.objectContaining({ method: "POST" }),
       );
     });
@@ -490,7 +490,7 @@ describe("setTriggerActiveCommand()", () => {
       await setTriggerActiveCommand({ id: "trigger_abc", active: true });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/enable",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/enable",
         expect.objectContaining({ method: "POST" }),
       );
     });
@@ -525,7 +525,7 @@ describe("testFireTriggerCommand()", () => {
       const command = await testFireTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/test-fire",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/test-fire",
         expect.objectContaining({ method: "POST" }),
       );
       expect(command?.data).toEqual(result);
@@ -554,7 +554,7 @@ describe("triggerFiresCommand()", () => {
       await triggerFiresCommand({ id: "trigger_abc", options: { limit: "5" } });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/fires?limit=5",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/fires?limit=5",
         expect.anything(),
       );
     });
@@ -577,7 +577,7 @@ describe("triggerFiresCommand()", () => {
       result?.table?.();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc/fires?limit=1&cursor=cursor_2",
+        "http://localhost:5560/api/v1/triggers/trigger_abc/fires?limit=1&cursor=cursor_2",
         expect.anything(),
       );
       expect(result?.data).toMatchObject({ nextCursor: "cursor_3" });
@@ -621,7 +621,7 @@ describe("deleteTriggerCommand()", () => {
       await deleteTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({ method: "DELETE" }),
       );
     });

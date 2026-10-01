@@ -1,0 +1,398 @@
+/**
+ * Materialises the internal gateway config bundle. Since the virtual-key binding collapse the
+ * model provider absorbed the old gateway credential's fields, and a key's eligible-provider set
+ * computes from its scope graph plus the optional routing policy's ordering.
+ */
+import {
+  type GatewayConnectUpstream,
+  type ModelProvider,
+  type VirtualKeyWithScopes,
+  computeBudgetPeriodFloorMs,
+  parseVirtualKeyConfig,
+  type GatewayResolvedBudget,
+} from "@langwatch/gateway-contract";
+import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
+import {
+  type ModelProviderApi,
+  ModelProviderCustomKeysMissingError,
+  ModelProviderNotFoundError,
+  PLATFORM_PROVIDER_ID_PREFIX,
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+
+import {
+  type GatewayConfigAssembly,
+  type GatewayModelProviderCredentials,
+  type GatewayBudgetSpend,
+} from "../app/gateway.members.ts";
+import {
+  budgetToWire,
+  buildProviderSlot,
+  cacheRuleToWire,
+  toExpiresAtWire,
+  guardrailAttachmentToWire,
+  guardrailToWire,
+  providerExclusions,
+  providerExclusionWire,
+  resolvePolicySideOfBundle,
+  routingModeToWire,
+  type GatewayConfigPayload,
+  type ProviderExclusionWire,
+} from "../rules/gateway-config-wire.rules.ts";
+import { GatewayConnectUpstreamService } from "./gateway-connect-upstream.service.ts";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import type { GatewayService } from "./gateway.service.ts";
+
+const logger = createLogger("langwatch:gateway:config-materialiser");
+
+/**
+ * How long the config endpoint waits for the ClickHouse spend read before it ships the stored
+ * spend instead. Well under the gateway's 10s config fetch timeout, so a slow replica costs
+ * budget freshness, not the key's config.
+ */
+export const CONFIG_SPEND_READ_TIMEOUT_MS = 2_000;
+
+/** The one model-provider read the bundle needs. */
+export type GatewayCustomKeys = Pick<ModelProviderApi, "getCustomKeys">;
+
+const NO_KEYS: GatewayModelProviderCredentials = { readCustomKeys: () => ({}) };
+const PLAIN_KEYS: GatewayModelProviderCredentials = {
+  readCustomKeys: (stored) => (isKeyBag(stored) ? stored : {}),
+};
+
+function isKeyBag(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export class GatewayConfigMaterialiserService {
+  private readonly scopeResolution: GatewayScopeResolutionService;
+  private readonly projects: ProjectApi;
+  private readonly chRepo: GatewayBudgetSpend | null;
+  private readonly budgetDecisions: GatewayService;
+  private readonly modelProviders: GatewayCustomKeys;
+  private readonly assembly: GatewayConfigAssembly;
+  private readonly langyMirrorProjectId: string | undefined;
+  private readonly connectUpstream: GatewayConnectUpstreamService | undefined;
+
+  private constructor(
+    /** Which providers a key reaches, and in which dispatch order. */
+    {
+      scopeResolution,
+      projects,
+      chRepo,
+      budgetDecisions,
+      modelProviders,
+      assembly,
+      langyMirrorProjectId,
+      connectUpstream,
+    }: {
+      scopeResolution: GatewayScopeResolutionService;
+      projects: ProjectApi;
+      chRepo: GatewayBudgetSpend | null;
+      budgetDecisions: GatewayService;
+      modelProviders: GatewayCustomKeys;
+      assembly: GatewayConfigAssembly;
+      langyMirrorProjectId: string | undefined;
+      connectUpstream: GatewayConnectUpstreamService | undefined;
+    },
+  ) {
+    this.scopeResolution = scopeResolution;
+    this.projects = projects;
+    this.chRepo = chRepo;
+    this.budgetDecisions = budgetDecisions;
+    this.modelProviders = modelProviders;
+    this.assembly = assembly;
+    this.langyMirrorProjectId = langyMirrorProjectId;
+    this.connectUpstream = connectUpstream;
+  }
+
+  static create(input: {
+    scopeResolution: GatewayScopeResolutionService;
+    projects: ProjectApi;
+    chRepo: GatewayBudgetSpend | null;
+    budgetDecisions: GatewayService;
+    /** Model provider decrypts its own rows' keys; the gateway never holds that cipher. */
+    modelProviders: GatewayCustomKeys;
+    assembly: GatewayConfigAssembly;
+    /** `LANGY_MIRROR_PROJECT_ID`; absent means nothing is mirrored. */
+    langyMirrorProjectId?: string | undefined;
+    connectUpstream?: GatewayConnectUpstreamService | undefined;
+  }): GatewayConfigMaterialiserService {
+    return new GatewayConfigMaterialiserService({
+      scopeResolution: input.scopeResolution,
+      projects: input.projects,
+      chRepo: input.chRepo,
+      budgetDecisions: input.budgetDecisions,
+      modelProviders: input.modelProviders,
+      assembly: input.assembly,
+      langyMirrorProjectId: input.langyMirrorProjectId,
+      connectUpstream: input.connectUpstream,
+    });
+  }
+
+  /**
+   * Providers this key dispatches to, plus the three wire fields naming why a resolved provider
+   * was not used. The eligible set is already routing-policy-applied, so scope-reachable minus
+   * dispatch is what the policy dropped and the allowlist complement is what access dropped.
+   */
+  private async dispatchAndExclusions(
+    vk: VirtualKeyWithScopes,
+    eligibleProviders: ModelProvider[],
+    allowed: string[] | null,
+  ): Promise<{
+    providers: ModelProvider[];
+    exclusions: {
+      routing_excluded_providers: ProviderExclusionWire[];
+      access_excluded_providers: ProviderExclusionWire[];
+      routing_policy_name: string | null;
+    };
+  }> {
+    const providers = allowed
+      ? eligibleProviders.filter((mp) => allowed.includes(mp.id))
+      : eligibleProviders;
+    const scopeReachable = await this.scopeResolution.scopeReachableModelProvidersForVk(vk);
+    const { routingExcluded, accessExcluded } = providerExclusions({
+      scopeReachable,
+      eligibleProviders,
+      allowed,
+    });
+
+    return {
+      providers,
+      exclusions: {
+        routing_excluded_providers: routingExcluded.map(providerExclusionWire),
+        access_excluded_providers: accessExcluded.map(providerExclusionWire),
+        routing_policy_name: vk.routingPolicy?.name ?? null,
+      },
+    };
+  }
+
+  /**
+   * Version token for the bundle materialise would build for this key. It lives beside materialise
+   * because it describes that output: the token must move whenever the bundle would differ, and
+   * drifting apart is what lets a 304 confirm a stale bundle.
+   */
+  async versionToken(vk: VirtualKeyWithScopes): Promise<string> {
+    return this.assembly.versionToken(vk, await this.upstreamOf(vk.organizationId));
+  }
+
+  /** The organization's hosted provider on a connected install, if licensing wrote one. */
+  private async upstreamOf(organizationId: string): Promise<GatewayConnectUpstream | undefined> {
+    if (!this.connectUpstream) return undefined;
+    const [upstream] = await this.connectUpstream.findForOrganization(organizationId);
+    return upstream;
+  }
+
+  async materialise(vk: VirtualKeyWithScopes): Promise<GatewayConfigPayload> {
+    const eligibleProviders = await this.scopeResolution.eligibleModelProvidersForVk(vk);
+    const traceProject = vk.traceProjectId
+      ? await this.projects.findTraceDestination(vk.traceProjectId)
+      : null;
+    const budgets = await this.applicableBudgets(vk, traceProject);
+    const spendByBudgetId = await this.loadCurrentSpend(vk, budgets);
+    const config = parseVirtualKeyConfig(vk.config);
+    const { providers, exclusions } = await this.dispatchAndExclusions(
+      vk,
+      eligibleProviders,
+      config.providersAllowed,
+    );
+    const policySides = resolvePolicySideOfBundle(vk, config, this.assembly);
+    const upstream = await this.upstreamOf(vk.organizationId);
+    const readers = await Promise.all(providers.map((mp) => this.credentialReaderFor(mp)));
+    const ownSlots = providers.map((mp, index) =>
+      buildProviderSlot({
+        mp,
+        index,
+        credentialReader: readers[index] ?? NO_KEYS,
+        assembly: this.assembly,
+      }),
+    );
+    // LangWatch goes last: a customer credential keeps serving the models it serves.
+    const slots = upstream
+      ? [...ownSlots, GatewayConnectUpstreamService.providerSlot(upstream, ownSlots.length)]
+      : ownSlots;
+    // The cache-rule bundle, the project's guardrail catalogue and the key's
+    // surviving attachments come from the one Gateway service that owns those
+    // tables, rather than from a second copy of each query living here.
+    const bundle = await this.budgetDecisions.loadConfigurationPersistence({
+      organizationId: vk.organizationId,
+      traceProjectId: traceProject?.id ?? null,
+      guardrailAttachments: config.guardrailAttachments.map((attachment) => ({
+        direction: attachment.direction,
+        guardrailIds: [...attachment.guardrailIds],
+      })),
+    });
+
+    return {
+      revision: vk.revision.toString(),
+      vk_id: vk.id,
+      status: vk.status === "ACTIVE" ? "active" : "revoked",
+      display_prefix: vk.displayPrefix,
+      organization_id: vk.organizationId,
+      project_id: traceProject?.id ?? null,
+      project_otlp_token: traceProject?.apiKey ?? null,
+      team_id: traceProject?.teamId ?? null,
+      principal_id: vk.principalUserId,
+      // ADR-061: only a Langy VK's calls are mirrored — the gen_ai span is the
+      // one part of a Langy turn's trace the manager's relay never sees. Every
+      // other VK resolves to skip, so ordinary customer traffic is never
+      // duplicated into LangWatch's mirror project.
+      langy_mirror_tier:
+        vk.purpose === "LANGY" && traceProject?.id
+          ? resolveLangyMirrorTier(
+              { projectId: traceProject.id },
+              { LANGY_MIRROR_PROJECT_ID: this.langyMirrorProjectId },
+            )
+          : "skip",
+      providers: slots,
+      fallback: {
+        chain: slots.map((slot) => slot.id),
+        // routing_mode NONE means the request never leaves the provider
+        // that serves the model, so the attempt budget is one. Pinning it
+        // here makes no-fallback real for gateways that predate the
+        // routing_mode field instead of promising it in the UI only.
+        max_attempts: vk.routingMode === "NONE" ? 1 : config.fallback.maxAttempts,
+      },
+      model_aliases: policySides.modelAliases,
+      models_allowed: config.modelsAllowed,
+      providers_allowed: config.providersAllowed,
+      routing_mode: routingModeToWire(vk.routingMode),
+      ...exclusions,
+      cache: { mode: config.cache.mode, ttl_s: config.cache.ttlS },
+      guardrails: bundle.guardrails.map(guardrailToWire),
+      guardrail_attachments: bundle.attachments.map(guardrailAttachmentToWire),
+      policy_rules: policySides.policyRules,
+      rate_limits: {
+        rpm: config.rateLimits.rpm,
+        tpm: config.rateLimits.tpm,
+        rpd: config.rateLimits.rpd,
+      },
+      budgets: budgets.map((resolved) => budgetToWire(resolved, spendByBudgetId)),
+      cache_rules: bundle.cacheRules.map(cacheRuleToWire),
+      metadata: config.metadata ?? {},
+      vk_tags: config.metadata?.tags ?? [],
+      expires_at: toExpiresAtWire(vk.expiresAt),
+    };
+  }
+
+  /**
+   * One row's keys, decrypted by model provider. A synthesised platform row holds its bag in
+   * plain; a row deleted mid-read or storing none reads as no keys, as main's decoder did.
+   */
+  private async credentialReaderFor(mp: ModelProvider): Promise<GatewayModelProviderCredentials> {
+    if (mp.id.startsWith(PLATFORM_PROVIDER_ID_PREFIX)) return PLAIN_KEYS;
+    try {
+      const { customKeys } = await this.modelProviders.getCustomKeys({ modelProviderId: mp.id });
+      return { readCustomKeys: () => customKeys };
+    } catch (error) {
+      if (error instanceof ModelProviderCustomKeysMissingError) return NO_KEYS;
+      if (error instanceof ModelProviderNotFoundError) return NO_KEYS;
+      throw error;
+    }
+  }
+
+  /**
+   * ClickHouse spend, falling back to the Postgres column when ClickHouse is not wired or slower
+   * than CONFIG_SPEND_READ_TIMEOUT_MS. Tenants are every project in the key's org, so org, team
+   * and principal budgets see rows under whichever project emitted the trace.
+   */
+  private async loadCurrentSpend(
+    vk: VirtualKeyWithScopes,
+    budgets: GatewayResolvedBudget[],
+  ): Promise<Map<string, string>> {
+    if (this.chRepo === null || budgets.length === 0) {
+      return new Map();
+    }
+
+    try {
+      const tenantIds = await this.budgetDecisions.listSpendTenantIds(vk.organizationId);
+      if (tenantIds.length === 0) {
+        return new Map();
+      }
+
+      // Read each budget's spend from its RESOLVED bucket, exactly. The
+      // bundle enforces this key's buckets, so the figure must be the
+      // bucket's own: a GROUP budget read from the raw row would prefix-sum
+      // every member's bucket, and the gateway would then cap each member
+      // at what the whole group spent together.
+      const deadline = AbortSignal.timeout(CONFIG_SPEND_READ_TIMEOUT_MS);
+      const read = this.chRepo.getSpendForBudgetsAcrossTenantsUntil({
+        tenantIds,
+        budgets: budgets
+          // Templates have no single bucket to read; their per-user spend
+          // is fetched request-side through the bucket-spend endpoint.
+          .filter((r) => r.budget.scopeType !== "ATTRIBUTED_USER")
+          .map((r) => ({
+            budgetId: r.budget.id,
+            scope: r.budget.scopeType,
+            scopeId: r.bucketScopeId,
+            window: r.budget.window,
+            match: "exact" as const,
+            periodFloorMs: computeBudgetPeriodFloorMs(r.budget),
+          })),
+        signal: deadline,
+      });
+      const spends = await settleBefore({ work: read, signal: deadline });
+      const out = new Map<string, string>();
+      for (const s of spends) {
+        out.set(s.budgetId, s.spentUsd);
+      }
+
+      return out;
+    } catch (error) {
+      logger.warn(
+        { virtualKeyId: vk.id, error },
+        "gateway config spend read failed; shipping the stored spend instead",
+      );
+      return new Map();
+    }
+  }
+
+  /**
+   * Every budget applying to this key: org and key scopes always; team and project only when a
+   * trace project resolves; principal and per-member group only when the key carries a principal.
+   * Scope semantics live in the shared resolver the request-time check also calls.
+   */
+  private async applicableBudgets(
+    vk: VirtualKeyWithScopes,
+    traceProject: { id: string; teamId: string } | null,
+  ): Promise<GatewayResolvedBudget[]> {
+    return this.budgetDecisions.resolveApplicableBudgets({
+      organizationId: vk.organizationId,
+      virtualKeyId: vk.id,
+      teamId: traceProject?.teamId ?? null,
+      projectId: traceProject?.id ?? null,
+      principalUserId: vk.principalUserId,
+    });
+  }
+}
+
+// Resolves the policy-side of the bundle (model aliases + rules) from the
+// VK's RoutingPolicy when present, else the VK config defaults — legacy VK
+// config keys are stripped post bug-7 step (iv), so the fallback is always
+// empty and the RP read becomes source of truth once routingPolicyId is set.
+// Empty-rules normalize to the wire-contracted shape regardless of DB content.
+
+/** Resolves with `work`, or rejects with the signal's reason once it aborts. */
+async function settleBefore<T>({
+  work,
+  signal,
+}: {
+  work: Promise<T>;
+  signal: AbortSignal;
+}): Promise<T> {
+  // A late rejection from abandoned work has nobody waiting for it.
+  work.catch(() => undefined);
+  signal.throwIfAborted();
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([work, aborted]);
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}

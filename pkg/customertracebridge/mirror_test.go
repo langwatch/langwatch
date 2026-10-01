@@ -18,8 +18,8 @@ import (
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/langwatch/langwatch/pkg/aitrace"
 	"github.com/langwatch/langwatch/pkg/contexts"
-	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const (
@@ -87,7 +87,7 @@ func attrValue(a *commonpb.KeyValue) string {
 
 // emitOne runs one full BeginSpan/EndSpan cycle through an emitter wired to the
 // given mirror config, and flushes.
-func emitOne(t *testing.T, mirror MirrorConfig, params domain.AITraceParams) *capturingIngest {
+func emitOne(t *testing.T, mirror MirrorConfig, params aitrace.AITraceParams) *capturingIngest {
 	t.Helper()
 	ingest := startCapturingIngest(t)
 
@@ -116,17 +116,17 @@ func emitOne(t *testing.T, mirror MirrorConfig, params domain.AITraceParams) *ca
 	// as an unjoinable duplicate instead of exporting it (the Langy drop
 	// guard), which is its own test, not this fixture's subject.
 	ctx = WithTraceParent(ctx, "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
-	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", domain.RequestTypeChat)
+	spanCtx, _ := e.BeginSpan(ctx, "proj-customer", aitrace.RequestTypeChat)
 	e.EndSpan(spanCtx, params)
 	require.NoError(t, e.tp.ForceFlush(context.Background()))
 	return ingest
 }
 
-func baseParams() domain.AITraceParams {
-	return domain.AITraceParams{
+func baseParams() aitrace.AITraceParams {
+	return aitrace.AITraceParams{
 		Model:        "gpt-test",
-		Usage:        domain.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
-		RequestType:  domain.RequestTypeChat,
+		Usage:        aitrace.Usage{PromptTokens: 10, CompletionTokens: 5, TotalTokens: 15},
+		RequestType:  aitrace.RequestTypeChat,
 		RequestBody:  []byte(`{"messages":` + mirrorTestPrompt + `}`),
 		ResponseBody: []byte(`{"choices":[{"message":{"role":"assistant","content":"` + mirrorTestCompletion + `"}}]}`),
 	}

@@ -30,6 +30,17 @@ Feature: Handled errors — the handled-error boundary
     And Hono's `onError` normalises a HandledError to `{ error: code, message, ...meta }`
 
   # ==========================================================================
+  # The REST body's shape: the fields sit at the root, not in an envelope
+  # ==========================================================================
+
+  @unit @bdd @domain-errors
+  Scenario: A REST refusal carries its fields at the root of the body
+    Given a handled error crosses the /api/ REST boundary
+    When the caller reads the response body
+    Then code, type, message and retryable are at the root of the body
+    And none of them is nested under an error key, because the REST surface is not tRPC
+
+  # ==========================================================================
   # Handled: known, user-relevant failures cross the boundary with meaning
   # ==========================================================================
 
@@ -61,8 +72,8 @@ Feature: Handled errors — the handled-error boundary
     When the suite reads every message they are constructed with
     Then none of them names an environment variable, an internal host or an address
       # those go in the log line beside the throw, where the trace id ties them
-      # back; nothing on a handled error is sensitive, by definition — and a
-      # REST caller IS shown this sentence, see the Hono scenario below
+      # back; nothing on a handled error is sensitive, by definition. A REST
+      # caller is shown the code, not this sentence (#5984), see the Hono scenario below
 
   @unit @bdd @domain-errors
   Scenario: A known failure is normalised by Hono to a client-safe body
@@ -70,10 +81,31 @@ Feature: Handled errors — the handled-error boundary
     When the client calls that route
     Then the HTTP status is 403
     And the response body carries code "conversation_not_owned" with its meta
-    And the body's `error` field is that code, so a consumer never guesses from the status
-    And the body's `message` field is the error's own sentence, which is why it
-      must be written customer-safe
+    And the body's `message` field is that code, never the error's own sentence
+    So the words a customer reads come from the presentation registry keyed by the code (#5984)
     And no stack trace or internal detail is present
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal keeps the status it was raised with
+    Given a route raises the HTTP framework's own refusal with status 404
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries code "http_error", never the refusal's own sentence
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal raised through a second copy of the framework is still a refusal
+    Given a route raises a refusal carrying status 404 from a second copy of the HTTP framework
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries code "http_error", never the refusal's own sentence
+    So a refusal never becomes a 500 because two packages resolved the framework differently
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal at 5xx still collapses to the generic body
+    Given a route raises the HTTP framework's own refusal with status 503
+    When the client calls that route
+    Then the HTTP status is 503
+    And the body carries code "internal_error", never the refusal's own sentence
 
   @unit @bdd @domain-errors
   Scenario: Validation failures travel the one handled-error channel
@@ -146,6 +178,28 @@ Feature: Handled errors — the handled-error boundary
     Then its response is used unchanged
     So the shared behaviour is a default, never an override
 
+  # --------------------------------------------------------------------------
+  # One code, one status per class: the status a refusal answers is the one
+  # the class that raised it names (#5984); the canonical envelope reconciles
+  # nothing, so `ValidationError` answers 422 wherever it is raised.
+  # --------------------------------------------------------------------------
+
+  @unit @bdd @domain-errors
+  Scenario: A validation failure answers the status its class named
+    Given a refusal of code "validation_error" raised at 400 by its own class
+    When it reaches the canonical error envelope
+    Then the response status is 400
+    And the envelope's code and type are both "validation_error"
+    So the status is decided once, by the class that raised it
+
+  @integration @bdd @domain-errors
+  Scenario: Both classes answer the same way on every family the process mounts
+    Given two REST families behind different doors, one project-keyed and one public
+    When a request to either is rejected on its values
+    Then both answer 422 with code "validation_error"
+    And the offending fields are named on each
+    So the status a caller reads does not depend on which family it asked
+
   # @unimplemented: the "type" half is a Go/REST producer concern, pinned
   # nowhere on the TypeScript side — `readHandledError` resolves code then
   # kind and never looks at `type`. Needs a Go-side test binding.
@@ -172,8 +226,9 @@ Feature: Handled errors — the handled-error boundary
 
   @unit @bdd @domain-errors
   Scenario: An external contract wins over cross-transport symmetry
-    Given published SDKs read the REST body's `error` field as a string
-    Then that body stays flat at the root rather than nesting under `error`
+    Given clients still read the REST body's older `kind` discriminant
+    Then the body carries `kind` beside `code`, holding the same value
+    And that body stays flat at the root rather than nesting under `error`
     So consistency is pursued only where no caller contract forbids it
 
   # @unimplemented: 404 and 422 are pinned incidentally by the tRPC formatter
@@ -250,7 +305,9 @@ Feature: Handled errors — the handled-error boundary
   # ==========================================================================
 
   # @unimplemented: no SSE subscription is exercised end-to-end anywhere that
-  # would observe the error frame's payload.
+  # would observe the error frame's payload. When registerSse (packages/api)
+  # becomes the transport for these streams, this payload is the contract it
+  # adopts — packages/api/specs/sse-streaming.feature pins the framework side.
   @integration @unimplemented @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
     Given an SSE subscription hits a known failure mid-stream

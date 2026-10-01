@@ -10,8 +10,3 @@ export const EnvUtil = {
     return value;
   },
 };
-
-
-
-
-

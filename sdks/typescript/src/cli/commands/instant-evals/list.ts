@@ -11,11 +11,8 @@ import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
+import { INSTANT_EVAL_LIST_CEILING, readCountFlag } from "./countFlag";
 import { printRunList } from "./render";
-import {
-  INSTANT_EVAL_LIST_CEILING,
-  readCountFlag,
-} from "./countFlag";
 
 export const listInstantEvalsCommand = async (options: {
   limit?: string;
@@ -36,9 +33,7 @@ export const listInstantEvalsCommand = async (options: {
     const runs = await service.list({
       ...(limit === undefined ? {} : { limit }),
       ...(options.before === undefined ? {} : { before: options.before }),
-      ...(options.beforeId === undefined
-        ? {}
-        : { beforeId: options.beforeId }),
+      ...(options.beforeId === undefined ? {} : { beforeId: options.beforeId }),
     });
 
     spinner.succeed(`Found ${runs.length} run${runs.length === 1 ? "" : "s"}`);
@@ -50,9 +45,7 @@ export const listInstantEvalsCommand = async (options: {
         if (runs.length > 0) {
           console.log();
           console.log(
-            chalk.gray(
-              `Read one with ${chalk.cyan("langwatch instant-eval status <id>")}`,
-            ),
+            chalk.gray(`Read one with ${chalk.cyan("langwatch instant-eval status <id>")}`),
           );
         }
       },

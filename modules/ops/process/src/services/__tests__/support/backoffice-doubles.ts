@@ -1,0 +1,142 @@
+/**
+ * The collaborators the backoffice's organization edit does NOT reach: a
+ * legacy single sign-on refusal happens before storage, so the repository
+ * records whether it was called at all and the rest throw.
+ */
+import type {
+  BrowserSessionApi,
+  BrowserSessionResolution,
+  BrowserSessionVerification,
+} from "@langwatch/auth-contract";
+import type { AdminOperationInput, AdminOperationResult } from "@langwatch/ops-contract";
+import type { UserProfile } from "@langwatch/user-contract";
+import { vi } from "vitest";
+
+import { AdminBackofficeRepository } from "../../../repositories/admin-backoffice.repository.ts";
+import { AdminAuditSink } from "../../impersonation.service.ts";
+
+export const backofficeOperator: UserProfile = {
+  id: "olive",
+  name: "Olive",
+  email: "olive@example.com",
+  emailVerified: true,
+  image: null,
+  pendingSsoSetup: false,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+  lastLoginAt: null,
+  deactivatedAt: null,
+};
+
+export class AuthStub implements BrowserSessionApi {
+  requestNewAccountVerification(): never {
+    throw new Error("unused");
+  }
+  sendMyAddressConfirmation(): never {
+    throw new Error("unused");
+  }
+  findDialableIdentityProviderOrigins(): never {
+    throw new Error("unused");
+  }
+  countUsage(): never {
+    throw new Error("unused");
+  }
+  issuesOwnPasswords(): boolean {
+    return false;
+  }
+  offersTwoStepVerification(): never {
+    throw new Error("unused");
+  }
+  getSignedInWith(): never {
+    throw new Error("unused");
+  }
+  getSignInSecuritySettings(): never {
+    throw new Error("unused");
+  }
+  saveSignInSecuritySettings(): never {
+    throw new Error("unused");
+  }
+  releaseHeldAccount(): never {
+    throw new Error("unused");
+  }
+  /** Auth's cutover half, which nothing here exercises. */
+  async retireLegacySsoAccess(): Promise<{ retired: number; remaining: number }> {
+    return { retired: 0, remaining: 0 };
+  }
+
+  async countLegacySsoAccess(): Promise<number> {
+    return 0;
+  }
+
+  async findFederatedAccountProviders(): Promise<string[]> {
+    return [];
+  }
+
+  async listBrowserSessions(): Promise<never[]> {
+    return [];
+  }
+  async endBrowserSession(): Promise<{ ended: number }> {
+    return { ended: 0 };
+  }
+  async isWithinBudget(): Promise<Readonly<{ allowed: boolean }>> {
+    return { allowed: false };
+  }
+  async route(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async addressIsRegistered(): Promise<boolean> {
+    return false;
+  }
+  async requestSignUpVerification(): Promise<void> {}
+  async completeSignUpVerification(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async readInviteLanding(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async requestFreshInvite(): Promise<void> {}
+  async resolveAuthProvider(): Promise<string> {
+    return "email";
+  }
+  verifyBrowserSession = vi.fn(async (): Promise<BrowserSessionVerification> => ({
+    kind: "anonymous",
+  }));
+  resolveBrowserSession = vi.fn(async (): Promise<BrowserSessionResolution> => ({
+    kind: "anonymous",
+  }));
+  revokeAllBrowserSessions = vi.fn(async () => undefined);
+  revokeBrowserSession = vi.fn(async () => undefined);
+  revokeOtherBrowserSessions = vi.fn(async () => undefined);
+
+  offersPasskeys(): boolean {
+    return false;
+  }
+
+  async findCliAccessSession(): Promise<null> {
+    return null;
+  }
+
+  async revokeCliAccessToken(): Promise<void> {}
+}
+
+export class RepositoryStub extends AdminBackofficeRepository {
+  execute = vi.fn(async (_input: AdminOperationInput): Promise<AdminOperationResult> => ({
+    data: {},
+  }));
+  findUserById = vi.fn(async () => ({ data: backofficeOperator }));
+  setUserDeactivatedAt = vi.fn(async () => undefined);
+}
+
+export class AuditStub extends AdminAuditSink {
+  record = vi.fn(async () => undefined);
+}
+
+export function organizationEdit(data: Record<string, unknown>): AdminOperationInput {
+  return {
+    resource: "organization",
+    method: "update",
+    params: { id: "org-acme", data },
+    actorId: "olive",
+    req: { headers: {} },
+  };
+}

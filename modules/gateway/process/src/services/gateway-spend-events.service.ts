@@ -1,0 +1,105 @@
+import type {
+  GatewaySpendDay,
+  GatewayUsageCount,
+  SpendBucket,
+  SpendEventRow,
+  SpendFilters,
+  SpendGroupByKey,
+} from "@langwatch/gateway-contract";
+
+import type {
+  GatewaySpendEventsRepository,
+  SpendEventsPageCursor,
+  SpendSummaryRow,
+} from "../repositories/gateway-spend-events.repository.ts";
+
+export class GatewaySpendEventsService {
+  private constructor(private readonly repository: GatewaySpendEventsRepository) {}
+
+  static create(repository: GatewaySpendEventsRepository): GatewaySpendEventsService {
+    return new GatewaySpendEventsService(repository);
+  }
+
+  getSpendEventsPage(input: {
+    tenantId: string;
+    fromMs: number;
+    toMs: number;
+    filters?: SpendFilters;
+    cursor?: SpendEventsPageCursor;
+    limit?: number;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: SpendEventsPageCursor | null }> {
+    return this.repository.readSpendEventsPage(input);
+  }
+
+  getSpendSummaries(input: {
+    tenantIds: string[];
+    groupBy: SpendGroupByKey[];
+    bucket?: SpendBucket;
+    timezone?: string;
+    fromMs: number;
+    toMs: number;
+    cursor?: string | null;
+    limit?: number;
+    filters?: SpendFilters;
+  }): Promise<{ rows: SpendSummaryRow[]; nextCursor: string | null }> {
+    return this.repository.readSpendSummaries(input);
+  }
+
+  walkSpendEvents(input: {
+    tenantIds: string[];
+    fromMs?: number;
+    toMs?: number;
+    cursor?: string | null;
+    limit: number;
+    filters?: SpendFilters;
+  }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }> {
+    return this.repository.walkSpendEvents(input);
+  }
+
+  /** What one request type has cost these tenants, in integer nano-USD. */
+  sumSpendNanoUsdByRequestType(input: {
+    tenantIds: string[];
+    requestType: string;
+    fromMs?: number;
+    toMs?: number;
+  }): Promise<number> {
+    return this.repository.sumCostNanoUsdByRequestType(input);
+  }
+
+  /** Main's governance metered-lane read, served by the ledger's owner. */
+  findSpendDaysForOrganizationProjects(input: {
+    tenantIds: readonly string[];
+    fromDay: string;
+    toDay: string;
+  }): Promise<GatewaySpendDay[]> {
+    if (input.tenantIds.length === 0) return Promise.resolve([]);
+    return this.repository.sumDaysForOrganizationProjects(input);
+  }
+
+  getEndUserSpend(input: {
+    tenantIds: string[];
+    endUserId: string;
+    fromMs: number;
+    toMs: number;
+    virtualKeyId?: string;
+  }): Promise<{
+    spendUsd: string;
+    spendNanoUsd: number;
+    requestCount: number;
+    tokensInput: number;
+    tokensOutput: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+    tokensReasoning: number;
+    tokensInputImage: number;
+    tokensOutputImage: number;
+    imageCount: number;
+  }> {
+    return this.repository.readEndUserSpend(input);
+  }
+
+  /** The usage report's figures (ADR-156, section 10). */
+  countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<GatewayUsageCount> {
+    return this.repository.countUsage(input);
+  }
+}

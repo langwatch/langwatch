@@ -1,0 +1,117 @@
+import { useColorMode } from "@langwatch/design-system/color-mode";
+import { toaster } from "@langwatch/design-system/toaster";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import {
+  collectMediaParts,
+  isPythonRepr,
+  type MediaPartData,
+  parsePythonInsideJson,
+} from "@langwatch/trace-contract";
+import type { CollapsedFieldProps } from "@microlink/react-json-view";
+import React, { lazy, Suspense } from "react";
+
+import { TraceInputOutput, type TraceJsonViewOptions } from "../../blocks/trace-input-output.tsx";
+import { CopyIcon } from "../../elements/icons/copy.tsx";
+import { showErrorToast } from "../errors/index.ts";
+import { TraceMediaPart } from "./trace-media-part.tsx";
+
+const ReactJson = lazy(() => import("@microlink/react-json-view"));
+
+type RenderInputOutputProps = {
+  value: unknown;
+  showTools?: boolean | "copy-only";
+  collapsed?: TraceJsonViewOptions["collapsed"];
+  collapseStringsAfterLength?: TraceJsonViewOptions["collapseStringsAfterLength"];
+  /**
+   * Per-node collapse decision, e.g. "start every array collapsed".
+   */
+  shouldCollapse?: (field: CollapsedFieldProps) => boolean;
+  /** Show the entry count beside each object and array. */
+  displayObjectSize?: boolean;
+};
+
+export const RenderInputOutput = React.memo(function RenderInputOutput(
+  props: RenderInputOutputProps,
+) {
+  const { colorMode } = useColorMode();
+
+  const copyToClipboard = async (value: string) => {
+    await navigator.clipboard.writeText(value);
+    toaster.create({
+      title: "Copied to clipboard",
+      type: "success",
+    });
+  };
+
+  const onCopyFailure = () => {
+    if (
+      window.location.protocol === "http:" &&
+      window.location.hostname !== "localhost" &&
+      window.location.hostname !== "127.0.0.1"
+    ) {
+      showErrorToast({
+        fallbackTitle: "Cannot copy to clipboard on HTTP",
+        description: "Browsers only allow the clipboard on a secure origin.",
+      });
+      return;
+    }
+
+    showErrorToast({
+      fallbackTitle: "Couldn't copy to clipboard",
+      description: "Clipboard access is restricted. This can happen on non-HTTPS domains.",
+    });
+  };
+
+  const renderJsonViewer = (value: object, options: TraceJsonViewOptions) => (
+    <Suspense fallback={<div />}>
+      <ReactJson
+        src={value}
+        name={false}
+        displayDataTypes={false}
+        displayObjectSize={props.displayObjectSize ?? false}
+        shouldCollapse={props.shouldCollapse}
+        enableClipboard={false}
+        collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
+        collapsed={options.collapsed}
+        style={{
+          fontSize: "13px",
+          backgroundColor: "transparent",
+        }}
+        theme={colorMode === "dark" ? "twilight" : "rjv-default"}
+        displayArrayKey={false}
+      />
+    </Suspense>
+  );
+
+  return (
+    <TraceInputOutput
+      value={props.value}
+      showTools={props.showTools}
+      collectMediaParts={collectMediaParts}
+      renderMediaPart={(part: MediaPartData) => <TraceMediaPart part={part} />}
+      isPythonRepr={isPythonRepr}
+      parsePythonInsideJson={(value) => {
+        if (typeof value === "object" && value !== null) {
+          return parsePythonInsideJson(value);
+        }
+
+        if (typeof value === "string" && isPythonRepr(value)) {
+          const parsed = parsePythonInsideJson({ value });
+
+          if (typeof parsed === "object" && parsed !== null && "value" in parsed) {
+            return parsed.value;
+          }
+        }
+
+        return value;
+      }}
+      renderJsonViewer={renderJsonViewer}
+      copyToClipboard={copyToClipboard}
+      onCopyFailure={onCopyFailure}
+      copyIcon={<CopyIcon width={12} height={12} />}
+      renderTooltip={(content, child) => <Tooltip content={content}>{child}</Tooltip>}
+      collapsed={props.collapsed}
+      collapseStringsAfterLength={props.collapseStringsAfterLength}
+    />
+  );
+});

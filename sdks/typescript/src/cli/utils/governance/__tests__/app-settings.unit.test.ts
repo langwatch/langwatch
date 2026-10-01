@@ -1,12 +1,7 @@
 /**
- * Unit tests for the per-tool app-settings persist target — currently
- * only ~/.claude/settings.json for the `claude` wrapper. Covers the
- * three interesting shapes for the merge:
- *   - target file missing entirely (created from scratch)
- *   - target file exists with unrelated user settings (merged, other
- *     top-level keys preserved verbatim)
- *   - target file's env already carries every required key (detected as
- *     installed → no re-prompt)
+ * Unit tests for the per-tool app-settings persist target (currently
+ * ~/.claude/settings.json for `claude`): missing file, existing file with
+ * unrelated keys, and a file whose env already carries every required key.
  */
 
 import * as fs from "node:fs";
@@ -131,9 +126,7 @@ describe("installAppEnv", () => {
       installAppEnv(target, otelVars);
 
       const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
-      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "http://app.example.com/api/otel",
-      );
+      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
     });
   });
 
@@ -144,9 +137,7 @@ describe("installAppEnv", () => {
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
       fs.writeFileSync(target.path, "{not valid json");
 
-      expect(() => installAppEnv(target, otelVars)).toThrow(
-        /is not valid JSON/,
-      );
+      expect(() => installAppEnv(target, otelVars)).toThrow(/is not valid JSON/);
       expect(fs.readFileSync(target.path, "utf8")).toBe("{not valid json");
     });
   });
@@ -221,11 +212,7 @@ describe("appEnvHasAnyVar", () => {
     fs.mkdirSync(path.dirname(target.path), { recursive: true });
     fs.writeFileSync(
       target.path,
-      JSON.stringify(
-        { env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x", USER: "keep" } },
-        null,
-        2,
-      ),
+      JSON.stringify({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x", USER: "keep" } }, null, 2),
     );
     expect(appEnvHasAnyVar(target, Object.keys(otelVars))).toBe(true);
   });
@@ -233,10 +220,7 @@ describe("appEnvHasAnyVar", () => {
   it("returns false when the env has none of the keys", () => {
     const target = appSettingsTargetFor("claude")!;
     fs.mkdirSync(path.dirname(target.path), { recursive: true });
-    fs.writeFileSync(
-      target.path,
-      JSON.stringify({ env: { USER_ONLY: "x" } }, null, 2),
-    );
+    fs.writeFileSync(target.path, JSON.stringify({ env: { USER_ONLY: "x" } }, null, 2));
     expect(appEnvHasAnyVar(target, Object.keys(otelVars))).toBe(false);
   });
 });

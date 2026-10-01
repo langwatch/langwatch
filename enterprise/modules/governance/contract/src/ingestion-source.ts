@@ -1,0 +1,87 @@
+import { z } from "zod";
+
+export const OTTL_ENABLED_SOURCE_TYPES = ["otel_generic"] as const;
+export const ottlEnabledSourceTypeSchema = z.enum(OTTL_ENABLED_SOURCE_TYPES);
+export type OttlEnabledSourceType = z.infer<typeof ottlEnabledSourceTypeSchema>;
+
+/**
+ * Platform-known tools use native extractors. Only the generic OTLP source
+ * exposes the custom OTTL editor, and it deliberately starts empty.
+ */
+export function getStarterTemplate(_sourceType: string): readonly string[] {
+  return [];
+}
+
+export function isOttlEnabledSourceType(sourceType: string): sourceType is OttlEnabledSourceType {
+  return ottlEnabledSourceTypeSchema.validate(sourceType);
+}
+
+/**
+ * How the last pull went, as main's `sourcePullStatus` reports it: dates and a
+ * continuation flag only, never cursors or upstream error bodies.
+ */
+export const ingestionSourcePullStatusSchema = z
+  .object({
+    lastRunAt: z.string().nullable(),
+    outcome: z.string().nullable(),
+    error: z.string().nullable(),
+    backfillThrough: z.string().nullable(),
+    hasMore: z.boolean().nullable(),
+  })
+  .strict();
+export type IngestionSourcePullStatus = z.infer<typeof ingestionSourcePullStatusSchema>;
+
+/**
+ * One configured source, as the admin surface reads it — deliberately NOT
+ * the stored row: the secret hash, rotation slot and credentials envelope
+ * never travel, guarding against a later `select` widening putting one back.
+ */
+export const ingestionSourceDtoSchema = z
+  .object({
+    id: z.string(),
+    organizationId: z.string(),
+    teamId: z.string().nullable(),
+    sourceType: z.string(),
+    name: z.string(),
+    description: z.string().nullable(),
+    parserConfig: z.record(z.string(), z.unknown()),
+    hasPollerCursor: z.boolean(),
+    pullSchedule: z.string().nullable(),
+    status: z.string(),
+    errorCount: z.number().int().nonnegative(),
+    lastSuccessAt: z.date().nullable(),
+    lastReadThroughAt: z.date().nullable(),
+    lastRunCompleteness: z.string().nullable(),
+    pullStatus: ingestionSourcePullStatusSchema,
+    traceProjectId: z.string().nullable(),
+    /** The destination it points at is gone: archived, deleted, or never ours. */
+    traceProjectArchived: z.boolean(),
+    lastEventAt: z.date().nullable(),
+    archivedAt: z.date().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    createdById: z.string().nullable(),
+  })
+  .strict();
+export type IngestionSourceDto = z.infer<typeof ingestionSourceDtoSchema>;
+
+/**
+ * A source plus its ingest secret — the one moment the plaintext exists on the
+ * wire. Answered by a create and by a rotation, and by nothing else.
+ */
+export const ingestionSourceWithSecretSchema = z
+  .object({ source: ingestionSourceDtoSchema, ingestSecret: z.string() })
+  .strict();
+
+/**
+ * The canonical OTTL starter statements for a source type, and whether OTTL
+ * editing is offered for it at all.
+ */
+export const ottlStarterTemplateSchema = z
+  .object({
+    enabled: z.boolean(),
+    statements: z.array(z.string()),
+    enabledSourceTypes: z.array(z.string()),
+  })
+  .strict();
+export type OttlStarterTemplate = z.infer<typeof ottlStarterTemplateSchema>;

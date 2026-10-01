@@ -1,0 +1,149 @@
+import type { OrganizationIntent } from "@langwatch/organization-contract";
+
+import type { Attribution } from "./attribution.ts";
+
+// Enum values are identities, not positions — order comes from
+// OnboardingFlowConfig.visibleScreens (ADR-038: INTENT renders second).
+export enum OnboardingScreenIndex {
+  ORGANIZATION = 0,
+  BASIC_INFO = 1,
+  DESIRES = 2,
+  ROLE = 3,
+  INTENT = 4,
+  /** The takeover screens of the guided variant: Langy speaks, no card. */
+  HELLO = 5,
+  VALUE = 6,
+  PROVIDER = 7,
+}
+
+export enum ProductScreenIndex {
+  SELECTION = 0,
+  VIA_CLAUDE_CODE = 1,
+  VIA_PLATFORM = 2,
+  VIA_CLAUDE_DESKTOP = 3,
+  MANUALLY = 4,
+  MODEL_PROVIDER = 5,
+}
+
+export enum OnboardingFlowDirection {
+  FORWARD = 1,
+  BACKWARD = -1,
+}
+
+export const USAGE_STYLES = ["For myself", "For my clients", "For my company"] as const;
+export const COMPANY_SIZES = [
+  "1_to_10",
+  "11_to_50",
+  "51_to_200",
+  "201_to_1000",
+  "1000_to_5000",
+  "5000_plus",
+] as const;
+export const SOLUTION_TYPES = ["SaaS", "On-Premise"] as const;
+export const DESIRE_TYPES = [
+  "everything",
+  "evaluations",
+  "model_experimentation",
+  "prompt_management_optimization",
+  "agent_simulations",
+  "observability",
+  "safety_compliance",
+  "annotation_collaboration",
+  "just_exploring",
+] as const;
+export const ROLE_TYPES = [
+  "Product Manager",
+  "Software Engineer",
+  "AI Engineer",
+  "Engineering Manager",
+  "Data Scientist",
+  "AI Researcher",
+  "CTO/Founder",
+  "Other",
+] as const;
+
+export type UsageStyle = (typeof USAGE_STYLES)[number];
+export type CompanySize = (typeof COMPANY_SIZES)[number];
+export type SolutionType = (typeof SOLUTION_TYPES)[number];
+export type DesireType = (typeof DESIRE_TYPES)[number];
+export type RoleType = (typeof ROLE_TYPES)[number];
+
+export interface OnboardingFormData {
+  organizationName?: string;
+  agreement?: boolean;
+  /** ADR-038 declared signup intent; picked on the INTENT screen. */
+  intent?: OrganizationIntent;
+  usageStyle?: UsageStyle;
+  phoneNumber?: string;
+  companySize?: CompanySize;
+  solutionType?: SolutionType;
+  selectedDesires: DesireType[];
+  role?: RoleType;
+  attribution?: Attribution;
+}
+
+/** The surface a screen names on every event it emits, supplied by the flow that mounts it. */
+export interface OnboardingAnalyticsSurface {
+  boundary: string;
+  /** Facts about the surface itself, which ride on every event emitted from it. */
+  attributes?: Readonly<Record<string, unknown>>;
+}
+
+/** What every screen a flow mounts receives. */
+export interface OnboardingScreenProps {
+  surface: OnboardingAnalyticsSurface;
+}
+
+export interface OnboardingScreen {
+  id: string;
+  required: boolean;
+  component: React.ComponentType<OnboardingScreenProps>;
+  heading: string;
+  subHeading?: string;
+  widthVariant?: "narrow" | "full";
+}
+
+export interface FormItem<T> {
+  title: string;
+  value: T;
+}
+
+export interface IconFormItem<TValue> extends FormItem<TValue> {
+  icon: React.ComponentType;
+}
+
+export interface OnboardingFlowState {
+  currentScreenIndex: number;
+  direction: number;
+}
+
+export interface OnboardingNavigation {
+  nextScreen: () => void;
+  prevScreen: () => void;
+  skipScreen: () => void;
+  canProceed: () => boolean;
+}
+
+export type OnboardingFlowVariant = "full" | "self_hosted" | "guided";
+
+export interface OnboardingFlowConfig {
+  variant: OnboardingFlowVariant;
+  visibleScreens: OnboardingScreenIndex[];
+  first: OnboardingScreenIndex;
+  last: OnboardingScreenIndex;
+  total: number;
+}
+
+export type ProductSelection =
+  | "via-claude-code"
+  | "via-platform"
+  | "via-claude-desktop"
+  | "manually";
+
+export interface ProductFlowConfig {
+  variant: "product";
+  visibleScreens: ProductScreenIndex[];
+  first: ProductScreenIndex;
+  last: ProductScreenIndex;
+  total: number;
+}

@@ -32,6 +32,12 @@ Feature: Plan-gated data-retention menu
     When the manager enters a custom retention shorter than the recovery floor
     Then the change is rejected as below the minimum for their plan
 
+  @unit
+  Scenario: A self-hosted deployment gets the full retention range on any paid plan
+    Given a self-hosted deployment whose organization is on a paid, non-enterprise plan
+    When a manager sets a custom retention of one year
+    Then the plan does not cap the value to the fixed pair
+
   Scenario: Keep-forever stays a platform-admin capability on every plan
     Given an organization on an enterprise plan
     And the acting user is not a platform administrator

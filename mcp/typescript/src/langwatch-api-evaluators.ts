@@ -1,4 +1,4 @@
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 // --- Evaluator types ---
 
@@ -13,8 +13,8 @@ export interface EvaluatorSummary {
   copiedFromEvaluatorId: string | null;
   createdAt: string;
   updatedAt: string;
-  fields: Array<{ identifier: string; type: string; optional?: boolean }>;
-  outputFields: Array<{ identifier: string; type: string; optional?: boolean }>;
+  fields: { identifier: string; type: string; optional?: boolean }[];
+  outputFields: { identifier: string; type: string; optional?: boolean }[];
   workflowName?: string;
   workflowIcon?: string;
 }
@@ -25,25 +25,22 @@ export interface EvaluatorSummary {
  * Extracts the evaluatorType from an evaluator's config.
  * Centralises the cast so callers don't repeat it.
  */
-export function getEvaluatorType(
-  evaluator: Pick<EvaluatorSummary, "config">,
-): string | undefined {
-  return (evaluator.config as Record<string, unknown> | null)
-    ?.evaluatorType as string | undefined;
+export function getEvaluatorType(evaluator: Pick<EvaluatorSummary, "config">): string | undefined {
+  return (evaluator.config as Record<string, unknown> | null)?.evaluatorType as string | undefined;
 }
 
 // --- Evaluator API functions ---
 
 /** Lists all evaluators in the project. */
 export async function listEvaluators(): Promise<EvaluatorSummary[]> {
-  return makeRequest("GET", "/api/evaluators") as Promise<EvaluatorSummary[]>;
+  return makeRequest("GET", "/api/v1/evaluators") as Promise<EvaluatorSummary[]>;
 }
 
 /** Retrieves a single evaluator by ID or slug. */
 export async function getEvaluator(idOrSlug: string): Promise<EvaluatorSummary> {
   return makeRequest(
     "GET",
-    `/api/evaluators/${encodeURIComponent(idOrSlug)}`,
+    `/api/v1/evaluators/${encodeURIComponent(idOrSlug)}`,
   ) as Promise<EvaluatorSummary>;
 }
 
@@ -52,7 +49,7 @@ export async function createEvaluator(data: {
   name: string;
   config: Record<string, unknown>;
 }): Promise<EvaluatorSummary> {
-  return makeRequest("POST", "/api/evaluators", data) as Promise<EvaluatorSummary>;
+  return makeRequest("POST", "/api/v1/evaluators", data) as Promise<EvaluatorSummary>;
 }
 
 /** Updates an existing evaluator. */
@@ -64,17 +61,14 @@ export async function updateEvaluator(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PUT",
-    `/api/evaluators/${encodeURIComponent(id)}`,
+    `/api/v1/evaluators/${encodeURIComponent(id)}`,
     data,
   ) as Promise<EvaluatorSummary>;
 }
 
 /** Archives (soft-deletes) an evaluator. */
-export async function deleteEvaluator(
-  idOrSlug: string,
-): Promise<{ id: string; archived: boolean }> {
-  return makeRequest(
-    "DELETE",
-    `/api/evaluators/${encodeURIComponent(idOrSlug)}`,
-  ) as Promise<{ id: string; archived: boolean }>;
+export async function deleteEvaluator(idOrSlug: string): Promise<{ success: boolean }> {
+  return makeRequest("DELETE", `/api/v1/evaluators/${encodeURIComponent(idOrSlug)}`) as Promise<{
+    success: boolean;
+  }>;
 }

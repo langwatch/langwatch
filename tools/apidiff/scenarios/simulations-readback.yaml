@@ -1,0 +1,145 @@
+# cov-readback: simulation-runs, scenario-events and fuzz reproductions for the simulations family (simulations.yaml is one JSON array, so these live beside it).
+# ---- cov-readback: simulation-runs written through scenario-events, read back ----
+- id: simulation-runs-get-reads-finished-verdict
+  endpoint: GET /api/simulation-runs/{id}
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c"], "unmetCriteria": []}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "contains": "ok-{uid}"}}
+  request: {"path": "/api/simulation-runs/run-{uid}"}
+  expect: {"status": 200, "body": {"scenarioRunId": "run-{uid}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioSetId": "set-{uid}", "name": "vd-{uid}", "description": "apidiff", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}"}}}
+- id: simulation-runs-get-reads-started-run-in-progress
+  endpoint: GET /api/simulation-runs/{id}
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/simulation-runs/run-{uid}"}
+  expect: {"status": 200, "body": {"scenarioRunId": "run-{uid}", "name": "vd-{uid}", "status": "IN_PROGRESS"}}
+- id: simulation-runs-list-reads-both-runs-of-a-batch
+  endpoint: GET /api/simulation-runs
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run2-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+    - {"request": "GET /api/simulation-runs/run2-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/simulation-runs", "query": {"batchRunId": "batch-{uid}"}}
+  expect: {"status": 200, "path": "runs", "length": 2, "contains": ["run-{uid}", "run2-{uid}"]}
+- id: simulation-runs-batch-reads-pass-and-total-counts
+  endpoint: GET /api/simulation-runs/batches/{batchRunId}
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c"], "unmetCriteria": []}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run2-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "contains": "SUCCESS"}}
+    - {"request": "GET /api/simulation-runs/run2-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/simulation-runs/batches/batch-{uid}"}
+  expect: {"status": 200, "body": {"batchRunId": "batch-{uid}", "totalCount": 2, "passCount": 1}}
+- id: simulation-runs-batches-list-reads-started-batch
+  endpoint: GET /api/simulation-runs/batches/list
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/simulation-runs/batches/list", "query": {"scenarioSetId": "set-{uid}"}}
+  expect: {"status": 200, "path": "batches", "length": 1, "contains": "batch-{uid}"}
+- id: scenario-events-start-reads-back-in-run-list-and-batch
+  endpoint: POST /api/scenario-events
+  request: {"path": "/api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}}
+  expect: {"status": 201}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "body": {"scenarioRunId": "run-{uid}", "name": "vd-{uid}", "description": "apidiff", "status": "IN_PROGRESS"}}}
+    - {"request": {"method": "GET", "path": "/api/simulation-runs", "query": {"scenarioSetId": "set-{uid}"}}, "eventually": "90s", "expect": {"status": 200, "path": "runs", "length": 1, "contains": "run-{uid}"}}
+    - {"request": "GET /api/simulation-runs/batches/batch-{uid}", "eventually": "90s", "expect": {"status": 200, "body": {"batchRunId": "batch-{uid}", "totalCount": 1}}}
+- id: scenario-events-finish-reads-back-verdict-and-counts
+  endpoint: POST /api/scenario-events
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c"], "unmetCriteria": []}}}
+  expect: {"status": 201}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "body": {"status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}"}}}}
+    - {"request": "GET /api/simulation-runs/batches/batch-{uid}", "eventually": "90s", "expect": {"status": 200, "body": {"totalCount": 1, "passCount": 1}}}
+- id: scenario-events-invalid-finish-leaves-run-in-progress
+  endpoint: POST /api/scenario-events
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "MOSTLY_FINE", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c"], "unmetCriteria": []}}}
+  expect: {"status": [400, 422]}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "expect": {"status": 200, "body": {"status": "IN_PROGRESS"}, "notContains": "ok-{uid}"}}
+- id: scenario-events-refuses-no-key-writes-nothing
+  endpoint: POST /api/scenario-events
+  auth: none
+  request: {"path": "/api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "auth": "project", "expect": {"status": 404}}
+    - {"request": {"method": "GET", "path": "/api/simulation-runs", "query": {"batchRunId": "batch-{uid}"}}, "auth": "project", "expect": {"status": 200, "path": "runs", "length": 0}}
+- id: scenario-events-refuses-readonly-key-writes-nothing
+  endpoint: POST /api/scenario-events
+  auth: restricted
+  request: {"path": "/api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "auth": "project", "expect": {"status": 404}}
+- id: simulation-runs-get-other-project-cannot-read-written-run
+  endpoint: GET /api/simulation-runs/{id}
+  auth: project-b
+  setup:
+    - {"request": "POST /api/scenario-events", "auth": "project", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"auth": "project", "request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/simulation-runs/run-{uid}"}
+  expect: {"status": 404}
+- id: scenario-events-delete-finished-run-reads-404-and-empty-batch
+  endpoint: DELETE /api/scenario-events
+  setup:
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"request": "POST /api/scenario-events", "body": {"type": "SCENARIO_RUN_FINISHED", "timestamp": "{nowMs+1000}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "status": "SUCCESS", "results": {"verdict": "success", "reasoning": "ok-{uid}", "metCriteria": ["c"], "unmetCriteria": []}}, "expect": {"status": 201}}
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200, "contains": "SUCCESS"}}
+  request: {"path": "/api/scenario-events", "query": {"scenarioRunId": "run-{uid}"}}
+  expect: {"status": 200}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 404}}
+    - {"request": "GET /api/simulation-runs/batches/batch-{uid}", "eventually": "90s", "expect": {"status": 404}}
+- id: scenario-events-delete-refuses-readonly-key-leaves-run
+  endpoint: DELETE /api/scenario-events
+  auth: restricted
+  setup:
+    - {"request": "POST /api/scenario-events", "auth": "project", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"auth": "project", "request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/scenario-events", "query": {"scenarioRunId": "run-{uid}"}}
+  expect: {"status": [401, 403]}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "auth": "project", "expect": {"status": 200, "body": {"scenarioRunId": "run-{uid}"}}}
+- id: scenario-events-delete-refuses-no-key-leaves-run
+  endpoint: DELETE /api/scenario-events
+  auth: none
+  setup:
+    - {"request": "POST /api/scenario-events", "auth": "project", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"auth": "project", "request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/scenario-events", "query": {"scenarioRunId": "run-{uid}"}}
+  expect: {"status": 401}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "auth": "project", "expect": {"status": 200, "body": {"scenarioRunId": "run-{uid}"}}}
+- id: scenario-events-delete-other-project-leaves-run
+  endpoint: DELETE /api/scenario-events
+  auth: project-b
+  setup:
+    - {"request": "POST /api/scenario-events", "auth": "project", "body": {"type": "SCENARIO_RUN_STARTED", "timestamp": "{nowMs}", "batchRunId": "batch-{uid}", "scenarioId": "scen-{uid}", "scenarioRunId": "run-{uid}", "scenarioSetId": "set-{uid}", "metadata": {"name": "vd-{uid}", "description": "apidiff", "langwatch": {"targetReferenceId": "ref-{uid}", "targetType": "http"}}}, "expect": {"status": 201}}
+    - {"auth": "project", "request": "GET /api/simulation-runs/run-{uid}", "eventually": "90s", "expect": {"status": 200}}
+  request: {"path": "/api/scenario-events", "query": {"scenarioRunId": "run-{uid}"}}
+  expect: {"status": [200, 404]}
+  verify:
+    - {"request": "GET /api/simulation-runs/run-{uid}", "auth": "project", "expect": {"status": 200, "body": {"scenarioRunId": "run-{uid}"}}}
+
+# ---- cov-readback: fuzz 5xx reproductions ----
+
+- id: fuzz-scenarios-create-nul-name
+  endpoint: POST /api/scenarios
+  request: {"path": "/api/scenarios", "body": {"name": "😀\u0000\ufffd\u202e中文", "situation": "fuzzer"}}
+  expect: {"status": [422, 500]}
+- id: fuzz-test-suites-create-nul-name
+  endpoint: POST /api/v1/test-suites
+  request: {"path": "/api/v1/test-suites", "body": {"name": "😀\u0000\ufffd\u202e中文"}}
+  expect: {"status": [422, 500]}

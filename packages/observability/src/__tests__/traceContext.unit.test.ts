@@ -1,14 +1,14 @@
-import { propagation, trace } from "@opentelemetry/api";
+import { trace } from "@opentelemetry/api";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { INVALID_TRACE_ID } from "../constants";
-import {
-  getActiveTraceId,
-  injectTraceContextHeaders,
-} from "../trace/traceContext";
+
+import { INVALID_TRACE_ID } from "../constants.ts";
+import { getActiveTraceId, injectTraceContextHeaders } from "../trace/traceContext.ts";
+
+const { inject } = vi.hoisted(() => ({ inject: vi.fn() }));
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
-  propagation: { inject: vi.fn() },
+  propagation: { inject },
   trace: { getActiveSpan: vi.fn(() => undefined) },
 }));
 
@@ -27,10 +27,7 @@ describe("injectTraceContextHeaders", () => {
 
       expect(result.headers).toBe(headers);
       expect(result.traceId).toBeUndefined();
-      expect(propagation.inject).toHaveBeenCalledWith(
-        expect.anything(),
-        headers,
-      );
+      expect(inject).toHaveBeenCalledWith(expect.anything(), headers);
     });
   });
 
@@ -48,7 +45,7 @@ describe("injectTraceContextHeaders", () => {
       const result = injectTraceContextHeaders({ headers });
 
       expect(result.traceId).toBe("abc123def456");
-      expect(propagation.inject).toHaveBeenCalled();
+      expect(inject).toHaveBeenCalled();
     });
   });
 });

@@ -1,14 +1,7 @@
 /**
- * Browser tracing: the half of a trace that happens before the request leaves
- * the tab.
- *
- * Exports OTLP to the app's own origin rather than to a collector directly —
- * same-origin means no CORS and no internet-facing collector. The host app is
- * expected to proxy {@link RUM_TRACES_PATH} on to a collector. See ADR-058.
- *
- * Everything here is best-effort. Telemetry that breaks the page it is
- * measuring is worse than no telemetry, so the whole bootstrap is wrapped and
- * a failure leaves the app running untraced.
+ * Browser tracing: the half of a trace that happens before the request leaves the tab. Exports
+ * OTLP to the app's own origin via {@link RUM_TRACES_PATH}, not a collector directly (ADR-058).
+ * Best-effort throughout: telemetry that breaks the page it measures leaves it untraced.
  */
 
 import { W3CTraceContextPropagator } from "@opentelemetry/core";
@@ -19,10 +12,7 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
 import {
@@ -30,11 +20,11 @@ import {
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
-} from "./constants";
-import { NavigationContextManager } from "./navigationContextManager";
-import { createBrowserSampler } from "./sampling";
-import { currentSessionId } from "./session";
-import { SessionSpanProcessor } from "./sessionSpanProcessor";
+} from "./constants.ts";
+import { NavigationContextManager } from "./navigationContextManager.ts";
+import { createBrowserSampler } from "./sampling.ts";
+import { currentSessionId } from "./session.ts";
+import { SessionSpanProcessor } from "./sessionSpanProcessor.ts";
 
 let started = false;
 
@@ -68,9 +58,7 @@ export function startBrowserTracing({
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: RUM_SERVICE_NAME,
         ...(serviceVersion ? { [ATTR_SERVICE_VERSION]: serviceVersion } : {}),
-        ...(environment
-          ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment }
-          : {}),
+        ...(environment ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment } : {}),
       }),
       spanProcessors: [
         new SessionSpanProcessor(),
@@ -112,19 +100,18 @@ export function startBrowserTracing({
     });
   } catch {
     // Leave the page untraced rather than broken.
+    return;
   }
 }
 
 /**
  * Read once at construction: the exporter's headers are fixed, and the session
- * travels per-span as `session.id` anyway. This header exists so the ingest
- * route can rate limit per browser instead of per IP, where an office behind
- * one address would throttle each other.
+ * travels per-span as `session.id` anyway. Exists so the ingest route can rate
+ * limit per browser, not per IP — an office behind one address would collide.
  */
 function sessionHeader(): Record<string, string> {
   const sessionId = currentSessionId();
   return sessionId ? { [RUM_SESSION_HEADER]: sessionId } : {};
 }
 
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

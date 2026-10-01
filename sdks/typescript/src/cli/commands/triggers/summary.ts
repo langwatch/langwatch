@@ -6,7 +6,7 @@
 
 type Loose = Record<string, unknown> | null | undefined;
 
-/** An automation as `/api/triggers` answers with it, credentials redacted. */
+/** An automation as `/api/v1/triggers` answers with it, credentials redacted. */
 export interface TriggerRecord {
   id: string;
   name: string;

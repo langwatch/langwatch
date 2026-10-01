@@ -11,11 +11,11 @@
 
 ## What rebuilds what
 
-| Table | Rebuilt by | Source |
-|---|---|---|
-| `gateway_budget_scope_totals` | migration 00064 itself | `gateway_budget_ledger_events` (replicated), no operator action |
-| `trace_analytics_rollup` | replay of projection `traceAnalyticsRollup` | `SpanReceivedEvent`s in `event_log` (replicated) |
-| `evaluation_analytics_rollup` | replay of projection `evaluationAnalyticsRollup` | terminal evaluation events in `event_log` (replicated) |
+| Table                         | Rebuilt by                                       | Source                                                          |
+| ----------------------------- | ------------------------------------------------ | --------------------------------------------------------------- |
+| `gateway_budget_scope_totals` | migration 00064 itself                           | `gateway_budget_ledger_events` (replicated), no operator action |
+| `trace_analytics_rollup`      | replay of projection `traceAnalyticsRollup`      | `SpanReceivedEvent`s in `event_log` (replicated)                |
+| `evaluation_analytics_rollup` | replay of projection `evaluationAnalyticsRollup` | terminal evaluation events in `event_log` (replicated)          |
 
 The rollup rows are produced by TypeScript map projections
 (`traceAnalyticsRollup.mapProjection.ts`,
@@ -46,7 +46,7 @@ permission required). One run covers both projections:
   "since": "1970-01-01T00:00:00.000Z",
   // Required here. See "Why fullRebuild" below.
   "fullRebuild": true,
-  "description": "rebuild analytics rollups after Replicated-engine conversion (00065/00066)"
+  "description": "rebuild analytics rollups after Replicated-engine conversion (00065/00066)",
 }
 ```
 
@@ -121,4 +121,3 @@ SELECT sum(SpanCount) FROM trace_analytics
 WHERE TenantId = {tenant:String}
   AND OccurredAt >= {hour:DateTime64} AND OccurredAt < {hourEnd:DateTime64};
 ```
-

@@ -1,0 +1,286 @@
+import "../../model/ambient.d.ts";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Alert, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { PASSWORD_REQUIREMENTS_HINT, describePasswordProblem } from "@langwatch/identity-contract";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+
+import { authApi as api } from "../../behavior/auth-api.ts";
+import { signIn } from "../../behavior/auth-client.tsx";
+import { usePublicEnv } from "../../behavior/use-public-env.ts";
+import { applyHandledErrorToForm } from "../../model/apply-handled-error-to-form.ts";
+import { authFailureMessage } from "../../model/auth-failure-message.ts";
+import { credentialSignInFailure } from "../../model/credential-sign-in.ts";
+import { SHAPE } from "../../model/front-door-theme.ts";
+import { rememberLastUsedMethod } from "../../model/last-used-method.ts";
+import { readHandledError } from "../../model/read-handled-error.ts";
+import { EmailPill } from "../elements/email-pill.tsx";
+
+import "../elements/auth-front-door.css";
+import { FormServerError } from "../elements/form-server-error.tsx";
+import { FrontDoorField } from "../elements/front-door-field.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { PasswordInput } from "../elements/password-input.tsx";
+import { PasskeySignUpButton } from "./passkey-sign-up-button.tsx";
+import { MethodDivider } from "./sign-in-method-picker.tsx";
+
+// No name here: onboarding asks for it where it's worth asking, not at the
+// moment somebody has least patience, to learn something the next screen
+// learns anyway. Rules come from `@langwatch/identity-contract`, read by the
+// same mutation, asked as a refinement rather than restated zod constraints
+// (restating is how they drift).
+const signUpSchema = z
+  .object({
+    password: z.string().superRefine((value, ctx) => {
+      const problem = describePasswordProblem(value);
+      if (problem) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
+      }
+    }),
+    confirmPassword: z.string(),
+  })
+  .refine((values) => values.password === values.confirmPassword, {
+    message: "The two passwords are not the same",
+    path: ["confirmPassword"],
+  });
+
+type SignUpValues = z.infer<typeof signUpSchema>;
+
+/**
+ * The account exists by the time the sign-in leg runs, so a failure there says
+ * so: implying the sign-up itself failed would send somebody back to create an
+ * account they already have.
+ */
+const ACCOUNT_CREATED_FALLBACK =
+  "Your account was created. Log in with your new details to carry on.";
+
+/**
+ * Sign-up step that creates account; passkey or password; address hidden for password manager
+ */
+export function SignUpCredentialForm({
+  email,
+  addressProof,
+  addressConfirmed = true,
+  callbackUrl,
+  onUseDifferentEmail,
+  onAddressAlreadyRegistered,
+}: {
+  email: string;
+  /** The proof the spent link returned; registering spends it. */
+  addressProof: string;
+  /** False on an installation that sends no email: only a password is offered there. */
+  addressConfirmed?: boolean;
+  callbackUrl: string;
+  /** Back to the address step, for the address that was typed wrong. */
+  onUseDifferentEmail: () => void;
+  /**
+   * The address turned out to have an account. Not a refusal and not a field
+   * error — it is the wrong door, and the screen becomes the right one with
+   * the address already in it.
+   */
+  onAddressAlreadyRegistered?: () => void;
+}) {
+  const form = useForm<SignUpValues>({
+    resolver: zodResolver(signUpSchema),
+    // Nothing validates automatically; `blurJudged` below decides when a
+    // judgement is welcome — the same line the address and sign-in steps take.
+    mode: "onSubmit",
+    reValidateMode: "onSubmit",
+  });
+
+  /**
+   * Judge a field on the way out of it, but only once there's something to
+   * judge — answering an empty field with "required" while somebody is
+   * still tabbing through three fields tells them off before they've tried.
+   */
+  const blurJudged = (field: keyof SignUpValues) => ({
+    onBlur: () => {
+      if (form.getValues(field)) void form.trigger(field);
+      else form.clearErrors(field);
+    },
+  });
+  const register = api.user.register.useMutation();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [serverErrorIsOnTheForm, setServerErrorIsOnTheForm] = useState(false);
+  const registerError = !submitError && !serverErrorIsOnTheForm ? register.error : null;
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+  // Whether the password half of the form has opened. Latched rather than
+  // derived from focus, so the confirmation does not vanish the moment
+  // somebody tabs into it.
+  const [isChoosingPassword, setIsChoosingPassword] = useState(false);
+  // Only where this deployment mounted the plugin. Offering to create a
+  // passkey against an endpoint that was never registered is an offer we
+  // cannot honour.
+  const publicEnv = usePublicEnv();
+  const offersPasskeys = addressConfirmed && publicEnv.data?.PASSKEYS_ENABLED === true;
+
+  const onSubmit = async (values: SignUpValues) => {
+    setSubmitError(null);
+    setServerErrorIsOnTheForm(false);
+    try {
+      await register.mutateAsync({ email, password: values.password, addressProof });
+    } catch (error) {
+      // An address that already has an account is a wrong door, not a bad
+      // field: the way on is to log in, with the address carried, and the
+      // screen says so instead of rejecting the form.
+      if (
+        onAddressAlreadyRegistered &&
+        readHandledError(error)?.code === "email_already_registered"
+      ) {
+        onAddressAlreadyRegistered();
+        return;
+      }
+      // A rejected field belongs next to that field. Anything the form has no
+      // input for falls through to the alert below.
+      setServerErrorIsOnTheForm(applyHandledErrorToForm({ error, form, hasFormErrorSlot: true }));
+      return;
+    }
+
+    setIsSigningIn(true);
+    let message: string | null = null;
+    try {
+      const response = await signIn("credentials", {
+        email,
+        password: values.password,
+        callbackUrl,
+      });
+      message =
+        credentialSignInFailure({
+          response,
+          fallback: ACCOUNT_CREATED_FALLBACK,
+        })?.message ?? null;
+    } catch {
+      message = authFailureMessage({ fallback: ACCOUNT_CREATED_FALLBACK });
+    } finally {
+      setIsSigningIn(false);
+    }
+
+    if (message) {
+      setSubmitError(message);
+      return;
+    }
+    rememberLastUsedMethod({ id: "password" });
+  };
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
+      <VStack width="full" align="stretch" gap="13px">
+        {/* Every failure shows in one place, at the top. The marker below is a
+            false positive, not an exemption: `onSubmit`'s local assigned from
+            `?.message` taints a literal title, which the raw-message scanner
+            then flags — the identical alert on log-in, with no such local, isn't. */}
+        <HandledErrorAlert
+          error={passkeyError}
+          fallbackTitle="Could not create a passkey" // no-raw-error-toast-ok
+          className="lw-front-door-alert"
+        />
+        {/* The address this is for, and the way back to change it. It is the
+            last chance to notice a typo before it becomes an account. */}
+        <EmailPill
+          email={email}
+          actionLabel="Wrong email?"
+          onAction={onUseDifferentEmail}
+          testId="signup-identifier"
+        />
+        {/* Above the password, because it is the better thing to leave with
+            and the one most people have never been offered. Beside it rather
+            than in front of it: declining has to cost nothing, and here it
+            costs a glance — the other way on is already on the screen. */}
+        {offersPasskeys ? (
+          <>
+            <PasskeySignUpButton
+              email={email}
+              addressProof={addressProof}
+              callbackUrl={callbackUrl}
+              onError={setPasskeyError}
+              onAddressAlreadyRegistered={onAddressAlreadyRegistered}
+            />
+            <MethodDivider />
+          </>
+        ) : null}
+        {/* Carried in the form as well as shown above it, so a password
+            manager saves the pair it was registered with. */}
+        <input type="hidden" name="email" value={email} autoComplete="username" readOnly />
+        <FrontDoorField
+          label="Password"
+          labelEnd={
+            <Text fontSize="12px" color="fg.muted">
+              {PASSWORD_REQUIREMENTS_HINT}
+            </Text>
+          }
+          error={form.formState.errors.password}
+        >
+          {(id) => (
+            <PasswordInput
+              id={id}
+              autoComplete="new-password"
+              registration={form.register("password", {
+                ...blurJudged("password"),
+                // The second half of the form arrives the moment somebody
+                // starts using the first. A manager that fills both fields at
+                // once fires this too, so an autofilled sign-up never has to
+                // wait for a focus that never happens.
+                onChange: () => setIsChoosingPassword(true),
+              })}
+              onFocus={() => setIsChoosingPassword(true)}
+            />
+          )}
+        </FrontDoorField>
+        {/* Confirm and the submit are the SAME decision as typing a password,
+            so they arrive with it rather than sitting there first. Four
+            stacked things — a passkey, a password, a confirmation and a
+            call to action — is a screen that asks somebody to plan before
+            they can start; one field is a screen that asks them to begin. */}
+        {isChoosingPassword ? (
+          <FrontDoorField label="Confirm password" error={form.formState.errors.confirmPassword}>
+            {(id) => (
+              <PasswordInput
+                id={id}
+                autoComplete="new-password"
+                registration={form.register("confirmPassword", blurJudged("confirmPassword"))}
+              />
+            )}
+          </FrontDoorField>
+        ) : null}
+        <FormServerError form={form} />
+        {submitError ? (
+          <Alert.Root
+            status="error"
+            variant="outline"
+            borderStartWidth="4px"
+            borderStartColor={"frontDoor.danger"}
+          >
+            <Alert.Content>
+              <Alert.Description color={"frontDoor.danger"}>{submitError}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+        ) : null}
+        {registerError ? (
+          <HandledErrorAlert error={registerError} fallbackTitle="Couldn't create your account" />
+        ) : null}
+        {/* Arrives with the confirmation. Before that the passkey button IS
+            the call to action, and a second primary button under an empty
+            field only competes with it. */}
+        {isChoosingPassword ? (
+          <Button
+            className="lw-front-door-primary"
+            type="submit"
+            width="full"
+            minHeight="44px"
+            marginTop={2}
+            fontWeight={600}
+            borderRadius={SHAPE.action}
+            backgroundColor={"frontDoor.action"}
+            color={"frontDoor.onAction"}
+            _hover={{ backgroundColor: "frontDoor.actionHover" }}
+            loading={register.isPending || isSigningIn}
+          >
+            Create account
+          </Button>
+        ) : null}
+      </VStack>
+    </form>
+  );
+}

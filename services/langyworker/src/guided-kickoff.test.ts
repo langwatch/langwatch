@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   GUIDED_KICKOFF_OPENER,
   GUIDED_ONBOARDING_SKILL_NAME,
@@ -32,12 +33,16 @@ describe("isGuidedKickoffPrompt", () => {
 
   describe("when data rides ahead of the brief under the user-message label", () => {
     it("reads the brief after the last label", () => {
-      const prompt = ["[Screen context]\nThe traces page.", `THE USER'S MESSAGE:\n${BRIEF}`].join("\n\n");
+      const prompt = ["[Screen context]\nThe traces page.", `THE USER'S MESSAGE:\n${BRIEF}`].join(
+        "\n\n",
+      );
       expect(isGuidedKickoffPrompt(prompt)).toBe(true);
     });
 
     it("does not read a kickoff quoted in the data ahead of the label", () => {
-      const prompt = [`Transcript:\nuser: ${BRIEF}`, "THE USER'S MESSAGE:\nwhat did I pick?"].join("\n\n");
+      const prompt = [`Transcript:\nuser: ${BRIEF}`, "THE USER'S MESSAGE:\nwhat did I pick?"].join(
+        "\n\n",
+      );
       expect(isGuidedKickoffPrompt(prompt)).toBe(false);
     });
   });
@@ -62,14 +67,27 @@ describe("isGuidedKickoffPrompt", () => {
 
 describe("historyHasGuidedKickoff", () => {
   it("reads the guided path off a kickoff brief in the history", () => {
-    expect(historyHasGuidedKickoff([{ role: "user", content: "Guided onboarding kickoff.\nPath: llmops." }])).toBe(true);
     expect(
       historyHasGuidedKickoff([
-        { role: "user", content: [{ type: "text", text: '[Skill "guided-onboarding"]\nGuided onboarding kickoff.' }] },
+        { role: "user", content: "Guided onboarding kickoff.\nPath: llmops." },
       ]),
     ).toBe(true);
-    expect(historyHasGuidedKickoff([{ role: "assistant", content: "Guided onboarding kickoff." }])).toBe(false);
-    expect(historyHasGuidedKickoff([{ role: "user", content: "How do I add a trace?" }])).toBe(false);
+    expect(
+      historyHasGuidedKickoff([
+        {
+          role: "user",
+          content: [
+            { type: "text", text: '[Skill "guided-onboarding"]\nGuided onboarding kickoff.' },
+          ],
+        },
+      ]),
+    ).toBe(true);
+    expect(
+      historyHasGuidedKickoff([{ role: "assistant", content: "Guided onboarding kickoff." }]),
+    ).toBe(false);
+    expect(historyHasGuidedKickoff([{ role: "user", content: "How do I add a trace?" }])).toBe(
+      false,
+    );
   });
 });
 
@@ -92,14 +110,22 @@ describe("isGuidedTurn", () => {
 
   it("reads the kickoff off the brief, or off the history, and nothing off a plain message", () => {
     expect(isGuidedTurn({ prompt: BRIEF, history: [] })).toBe(true);
-    expect(isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: BRIEF }] })).toBe(true);
-    expect(isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: "show me traces" }] })).toBe(false);
+    expect(isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: BRIEF }] })).toBe(
+      true,
+    );
+    expect(
+      isGuidedTurn({ prompt: "Go ahead.", history: [{ role: "user", content: "show me traces" }] }),
+    ).toBe(false);
   });
 });
 
 describe("prependSkillBody", () => {
   it("frames the skill ahead of the message and keeps the message last", () => {
-    const prompt = prependSkillBody({ prompt: BRIEF, name: "guided-onboarding", body: "# Skill\n\nDo this.\n" });
+    const prompt = prependSkillBody({
+      prompt: BRIEF,
+      name: "guided-onboarding",
+      body: "# Skill\n\nDo this.\n",
+    });
     const lines = prompt.split("\n");
     expect(lines[0]).toContain('[Skill "guided-onboarding"');
     expect(prompt).toContain("# Skill\n\nDo this.\n[End of skill.");
@@ -113,7 +139,9 @@ describe("guidedSkillRefusal", () => {
     expect(guidedSkillRefusal({ name: GUIDED_ONBOARDING_SKILL_NAME, guided: false })).toBe(
       GUIDED_SKILL_REFUSAL,
     );
-    expect(guidedSkillRefusal({ name: GUIDED_ONBOARDING_SKILL_NAME, guided: true })).toBeUndefined();
+    expect(
+      guidedSkillRefusal({ name: GUIDED_ONBOARDING_SKILL_NAME, guided: true }),
+    ).toBeUndefined();
     expect(guidedSkillRefusal({ name: "tracing", guided: false })).toBeUndefined();
   });
 });

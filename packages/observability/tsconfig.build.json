@@ -1,0 +1,42 @@
+{
+  "extends": ["./tsconfig.json", "../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "module": "esnext",
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/observability": ["./src/index.ts"]
+    }
+  },
+  "files": [
+    "./src/index.ts",
+    "./src/constants.ts",
+    "./src/context/index.ts",
+    "./src/node/index.ts",
+    "./src/request/requestLogging.ts",
+    "./src/trace/traceContext.ts",
+    "./src/metrics/index.ts",
+    "./src/metrics/testing.ts",
+    "./src/trace/grafana-links.ts"
+  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+
+  "references": [
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
+}

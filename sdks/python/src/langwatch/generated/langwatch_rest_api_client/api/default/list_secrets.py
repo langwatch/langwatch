@@ -1,0 +1,179 @@
+from typing import Any
+
+import httpx
+
+from ... import errors
+from ...client import AuthenticatedClient, Client
+from ...models.list_secrets_response_200_item import ListSecretsResponse200Item
+from ...types import UNSET, Response, safe_http_status
+
+
+def _get_kwargs(
+    *,
+    project_id: str,
+) -> dict[str, Any]:
+
+    params: dict[str, Any] = {}
+
+    params["projectId"] = project_id
+
+    params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
+
+    _kwargs: dict[str, Any] = {
+        "method": "get",
+        "url": "/api/v1/secret",
+        "params": params,
+    }
+
+    return _kwargs
+
+
+def _parse_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> list[ListSecretsResponse200Item] | None:
+    if response.status_code == 200:
+        response_200 = []
+        _response_200 = response.json()
+        for response_200_item_data in _response_200:
+            response_200_item = ListSecretsResponse200Item.from_dict(response_200_item_data)
+
+            response_200.append(response_200_item)
+
+        return response_200
+
+    if client.raise_on_unexpected_status:
+        raise errors.UnexpectedStatus(response.status_code, response.content)
+    else:
+        return None
+
+
+def _build_response(
+    *, client: AuthenticatedClient | Client, response: httpx.Response
+) -> Response[list[ListSecretsResponse200Item]]:
+    # LangWatch override: use safe_http_status to tolerate non-IANA status codes
+    # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
+    # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
+    return Response(
+        status_code=safe_http_status(response.status_code),
+        content=response.content,
+        headers=response.headers,
+        parsed=_parse_response(client=client, response=response),
+    )
+
+
+def sync_detailed(
+    *,
+    client: AuthenticatedClient,
+    project_id: str,
+) -> Response[list[ListSecretsResponse200Item]]:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[list[ListSecretsResponse200Item]]
+    """
+
+    kwargs = _get_kwargs(
+        project_id=project_id,
+    )
+
+    response = client.get_httpx_client().request(
+        **kwargs,
+    )
+
+    return _build_response(client=client, response=response)
+
+
+def sync(
+    *,
+    client: AuthenticatedClient,
+    project_id: str,
+) -> list[ListSecretsResponse200Item] | None:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        list[ListSecretsResponse200Item]
+    """
+
+    return sync_detailed(
+        client=client,
+        project_id=project_id,
+    ).parsed
+
+
+async def asyncio_detailed(
+    *,
+    client: AuthenticatedClient,
+    project_id: str,
+) -> Response[list[ListSecretsResponse200Item]]:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        Response[list[ListSecretsResponse200Item]]
+    """
+
+    kwargs = _get_kwargs(
+        project_id=project_id,
+    )
+
+    response = await client.get_async_httpx_client().request(**kwargs)
+
+    return _build_response(client=client, response=response)
+
+
+async def asyncio(
+    *,
+    client: AuthenticatedClient,
+    project_id: str,
+) -> list[ListSecretsResponse200Item] | None:
+    """List project secrets
+
+     Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service
+    enforces the 50-secret cap. Responses are not cached.
+
+    Args:
+        project_id (str):
+
+    Raises:
+        errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
+        httpx.TimeoutException: If the request takes longer than Client.timeout.
+
+    Returns:
+        list[ListSecretsResponse200Item]
+    """
+
+    return (
+        await asyncio_detailed(
+            client=client,
+            project_id=project_id,
+        )
+    ).parsed

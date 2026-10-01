@@ -40,14 +40,6 @@ Feature: PlanProvider License Integration
     And seats are uncapped
 
   # ============================================================================
-  # LicenseHandler Singleton
-  # ============================================================================
-
-  Scenario: getLicenseHandler returns same instance
-    When I call getLicenseHandler twice
-    Then both calls return the same instance
-
-  # ============================================================================
   # LicenseHandler.getLicenseStatus
   # ============================================================================
 

@@ -1,0 +1,108 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+
+  // Every rule the langwatch plugin registers, each at `error`: lint runs with
+  // --quiet, so `warn` is off. There is no baseline and no per-file exemption;
+  // an override only sets a threshold or scopes a rule to a category of path.
+  "jsPlugins": [
+    {
+      "name": "langwatch",
+      "specifier": "./oxlint-plugin.mjs",
+    },
+  ],
+  "rules": {
+    "langwatch/banned-test-model-names": "error",
+    "langwatch/enterprise-license-header": "error",
+    "langwatch/eventing-role-purity": "error",
+    "langwatch/signature-mirror": "error",
+    "langwatch/transport-declares": "error",
+    "langwatch/clickhouse-no-version-order-limit": "error",
+    "langwatch/clickhouse-tenant-id": "error",
+    "langwatch/no-form-watch-in-child": "error",
+    "langwatch/no-hand-rolled-plan-gate": "error",
+    "langwatch/no-tautological-assertion": "error",
+    "langwatch/require-fetch-timeout": "error",
+    "langwatch/banned-verb-prefix": "error",
+    "langwatch/module-classes": "error",
+    "langwatch/module-layers": "error",
+    "langwatch/pass-through-class": "error",
+    "langwatch/rest-route": "error",
+    "langwatch/store-containment": "error",
+    "langwatch/browser-store-containment": "error",
+    "langwatch/effect-derives-state": "error",
+    "langwatch/no-redux": "error",
+    "langwatch/query-data-in-state": "error",
+    "langwatch/unresolved-relative-import": "error",
+    "langwatch/cognitive-complexity": ["error", { "max": 15 }],
+    "langwatch/comment-block-size": "error",
+    // Two calls joined by `&&` read fine; three calls, four operators, a nested
+    // ternary or a deep chain that also combines are what a reader trips on.
+    "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 3, "maxHops": 3 }],
+    "langwatch/conditional-type-depth": "error",
+    "langwatch/em-dash-in-copy": "error",
+    "langwatch/environment-boundaries": "error",
+    "langwatch/fallible-result-naming": "error",
+    "langwatch/feature-source-filename": "error",
+    "langwatch/feature-source-layout": "error",
+    "langwatch/feature-source-subject": "error",
+    "langwatch/handled-error-outside-contract": "error",
+    "langwatch/id-generation-origin": "error",
+    "langwatch/idempotency-key-is-stable": "error",
+    "langwatch/jsx-from-hook": "error",
+    "langwatch/legacy-monolith-path": "error",
+    "langwatch/namespace-class": "error",
+    "langwatch/no-alias-reexport": "error",
+    "langwatch/no-boot-hook-outside-guard": "error",
+    "langwatch/no-inline-dynamic-import": "error",
+    "langwatch/no-logger-spy": "error",
+    "langwatch/no-port-vocabulary": "error",
+    "langwatch/no-prototype-stub": "error",
+    "langwatch/no-runtime-reflection": "error",
+    "langwatch/overload-by-literal": "error",
+    "langwatch/package-boundaries": "error",
+    "langwatch/plan-literals": "error",
+    "langwatch/prisma-count-in-list-query": "error",
+    "langwatch/refusal-is-a-handled-error": "error",
+    "langwatch/schema-outside-contract": "error",
+    "langwatch/service-does-not-open-a-channel": "error",
+    "langwatch/service-loads-its-own-config": "error",
+    "langwatch/shared-setup-is-a-hook": "error",
+    "langwatch/stand-in-cast": "error",
+    "langwatch/temporal-only": "error",
+    "langwatch/test-description-is-an-action": "error",
+    "langwatch/unbounded-loop": "error",
+    "langwatch/unit-test-does-not-render": "error",
+    "langwatch/web-imports-server-shaped-value": "error",
+    "langwatch/zod-internals": "error",
+    "langwatch/zod-object-composition": "error",
+    "langwatch/zod-object-intersection": "error",
+    "langwatch/zod-schema-per-call": "error",
+    "langwatch/zod-validate-for-boolean": "error",
+  },
+  "overrides": [
+    {
+      // The enforcer's own source holds conditions to two operators.
+      "files": ["packages/architecture-enforcer/src/**/*.ts"],
+      "rules": {
+        "langwatch/condition-shape": ["error", { "maxCalls": 2, "maxOperators": 2, "maxHops": 3 }],
+      },
+    },
+    {
+      // JSX scores higher for the same reading effort: every `&&` guard and
+      // ternary in a tree is a branch. 25 is where .tsx and .ts report at the
+      // same rate (re-measured 2026-09-17).
+      "files": ["**/*.tsx"],
+      "rules": {
+        "langwatch/cognitive-complexity": ["error", { "max": 25 }],
+      },
+    },
+    {
+      // A table-driven suite branches more than a service method. Listed after
+      // the .tsx entry so a component test keeps 40: later entries win.
+      "files": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "langwatch/cognitive-complexity": ["error", { "max": 40 }],
+      },
+    },
+  ],
+}

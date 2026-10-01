@@ -39,7 +39,7 @@ Feature: Authorization grants
   @unit
   Scenario: A role's aggregate is the role
     When a custom role is defined in "org_acme"
-    Then the appended event's aggregate type is "authz_role"
+    Then the appended event's aggregate type is "authz_grant"
     And the appended event's aggregate id is the role id
     And the appended event's tenant is "org_acme"
 
@@ -297,6 +297,26 @@ Feature: Authorization grants
     Then the old attach is rejected by the membership lifetime fence
     And the old legacy USER binding is gone
 
+  @unit
+  Scenario: A live USER attach carries the membership lifetime it locked
+    Given an attach naming a member of "org_acme"
+    When the attach is stated
+    Then the fact carries the lifetime read under that membership's row lock
+    And an attach naming a user with no live membership is refused
+
+  @unit
+  Scenario: The insert is fenced on the lifetime the fact was stamped against
+    Given a stamped USER fact arriving at the projection
+    When the row is written
+    Then the insert names the membership lifetime and takes its row lock
+
+  @unit
+  Scenario: Only a founder's own admin grants may state their own lifetime
+    Given a grant carrying the founder bootstrap marker
+    When the wire reads it
+    Then it is accepted only as a stamped USER admin organization or team grant
+    And an organization bootstrap naming another organization is refused
+
   @unit @unimplemented
   Scenario: Offboarding records one revocation per grant
     When a member holding 12 grants is offboarded
@@ -373,6 +393,24 @@ Feature: Authorization grants
     Given a canonical Role row with the requested name and permissions
     When the role definition is written
     Then the write is reported as done
+
+  @unit
+  Scenario: A role definition that clears the description waits for the cleared Role row
+    Given a canonical Role row with the requested name and permissions but the old description
+    When the role definition is written without a description
+    Then the write is not confirmed
+
+  @unit
+  Scenario: Deleting a role binding twice answers not found the second time
+    Given a role binding whose grant was revoked but whose compatibility row has not been removed yet
+    When the binding is looked up for deletion
+    Then it reads as missing
+
+  @unit
+  Scenario: A restricted API key's private role permissions are read by id within its organization
+    Given a live role of the system API key kind in the organization
+    When its permissions are read by id
+    Then the role is returned with its permissions, whatever its kind
 
   @unit
   Scenario: A changed binding role is confirmed by the canonical Grant projection

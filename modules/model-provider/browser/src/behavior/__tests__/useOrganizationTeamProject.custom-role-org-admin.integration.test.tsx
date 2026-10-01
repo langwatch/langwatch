@@ -1,0 +1,177 @@
+/**
+ * @vitest-environment jsdom
+ * Server-side, an org-scoped ADMIN binding grants everything regardless of custom
+ * team role, so the hook's resolution must fall back to that before the role's own list.
+ * Spec: specs/rbac/fetch-org-role-permission-resolution.feature
+ */
+import { cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery, hostRole } = vi.hoisted(
+  () => ({
+    mockOrganizationsQuery: vi.fn(),
+    idleQuery: () => ({
+      data: undefined,
+      isLoading: false,
+      isFetched: true,
+    }),
+    mockRouter: {
+      query: {} as Record<string, string>,
+      route: "/settings/api-keys",
+      pathname: "/settings/api-keys",
+      asPath: "/settings/api-keys",
+      push: vi.fn(),
+      replace: vi.fn(),
+    },
+    mockLocalStorage: {
+      selectedOrganizationId: "",
+      selectedTeamId: "",
+      selectedProjectSlug: "",
+    } as Record<string, string>,
+    hostRole: { current: "MEMBER" },
+  }),
+);
+
+vi.mock("../../model/model-provider-host.ts", () => ({
+  useModelProviderHost: () => ({
+    scope: () => ({
+      organizationId: "org-acme",
+      teamId: "team-data",
+      projectId: "proj-data",
+      projectSlug: "data-app",
+    }),
+    availableScopes: () => ({
+      organization: { id: "org-acme", name: "ACME" },
+      teams: [{ id: "team-data", name: "ACME Data" }],
+      projects: [{ id: "proj-data", name: "Data App", teamId: "team-data" }],
+    }),
+    hasPermission: (permission: string) =>
+      permission === "analytics:view" || hostRole.current === "ADMIN",
+  }),
+}));
+
+vi.mock("~/utils/api", () => ({
+  api: {
+    organization: { getAll: { useQuery: mockOrganizationsQuery } },
+    sharedTrace: { get: { useQuery: idleQuery } },
+    identity: { myTestArrival: { useQuery: idleQuery } },
+    publicEnv: { useQuery: idleQuery },
+    modelProvider: { getAllForProject: { useQuery: idleQuery } },
+  },
+}));
+
+vi.mock("~/utils/auth-client", () => ({
+  useSession: () => ({
+    data: { user: { id: USER_ID } },
+    status: "authenticated",
+  }),
+}));
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => mockRouter,
+}));
+
+vi.mock("usehooks-ts", () => ({
+  useLocalStorage: (key: string, initial: string) => [
+    mockLocalStorage[key] ?? initial,
+    (value: string) => {
+      mockLocalStorage[key] = value;
+    },
+  ],
+}));
+
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
+
+const USER_ID = "user-analyst";
+
+/** A custom role that grants analytics viewing and nothing else. */
+const ANALYTICS_ONLY_ROLE = { permissions: ["analytics:view"] };
+
+function organizationWith({ organizationRole }: { organizationRole: string }) {
+  return {
+    data: [
+      {
+        id: "org-acme",
+        name: "ACME",
+        slug: "acme",
+        primaryIntent: null,
+        members: [{ role: organizationRole }],
+        teams: [
+          {
+            id: "team-data",
+            name: "ACME Data",
+            slug: "acme-data",
+            isPersonal: false,
+            ownerUserId: null,
+            members: [
+              {
+                userId: USER_ID,
+                role: "CUSTOM",
+                assignedRole: ANALYTICS_ONLY_ROLE,
+              },
+            ],
+            projects: [{ id: "proj-data", name: "Data App", slug: "data-app" }],
+          },
+        ],
+      },
+    ],
+    isLoading: false,
+    isFetched: true,
+    isRefetching: false,
+  };
+}
+
+function renderResolution() {
+  return renderHook(() => useOrganizationTeamProject());
+}
+
+describe("useOrganizationTeamProject with a custom team role", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRouter.query = {};
+    hostRole.current = "MEMBER";
+    for (const key of Object.keys(mockLocalStorage)) {
+      mockLocalStorage[key] = "";
+    }
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("given an org admin holding a custom team role", () => {
+    beforeEach(() => {
+      hostRole.current = "ADMIN";
+      mockOrganizationsQuery.mockReturnValue(organizationWith({ organizationRole: "ADMIN" }));
+    });
+
+    /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */
+    it("grants a team-scoped permission the custom role omits", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.hasPermission("datasets:manage")).toBe(true);
+    });
+
+    /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */
+    it("still grants what the custom role itself lists", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.hasPermission("analytics:view")).toBe(true);
+    });
+  });
+
+  describe("given an org member holding the same custom team role", () => {
+    beforeEach(() => {
+      hostRole.current = "MEMBER";
+      mockOrganizationsQuery.mockReturnValue(organizationWith({ organizationRole: "MEMBER" }));
+    });
+
+    /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */
+    it("keeps refusing what the custom role omits", () => {
+      const { result } = renderResolution();
+
+      expect(result.current.hasPermission("analytics:view")).toBe(true);
+      expect(result.current.hasPermission("datasets:manage")).toBe(false);
+    });
+  });
+});

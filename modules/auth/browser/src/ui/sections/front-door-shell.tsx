@@ -1,0 +1,90 @@
+import "../../model/ambient.d.ts";
+import { BrandedCardPage } from "@langwatch/design-system/branded-card";
+import { Box, Flex } from "@langwatch/design-system/primitives";
+import type { ReactNode } from "react";
+
+import "../elements/auth-front-door.css";
+import { CastleSnake } from "../elements/castle-snake.tsx";
+import { FrontDoorValuePanel } from "../elements/front-door-value-panel.tsx";
+import { FrontDoorGround } from "./front-door-ground.tsx";
+import { LogoHandoff } from "./logo-handoff.tsx";
+
+/**
+ * Front door layout ground; a headline composes the split surroundings around
+ * the card, and its absence the plain one. The deployment does not decide.
+ */
+export function FrontDoorShell({
+  headline,
+  headlineAccent,
+  tagline,
+  trustStrip,
+  children,
+}: {
+  /** Shown beside (or above) the card. Its presence is what splits the layout. */
+  headline?: string;
+  /** The one word of the headline that carries the gradient. */
+  headlineAccent?: string;
+  /** A short line under the headline, in the mono face. Desktop only. */
+  tagline?: string;
+  /** Shown under the panel on desktop. Empty until there is something true to
+   *  put in it: an invented customer logo is worse than a gap. */
+  trustStrip?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Box
+      // The modifier says the value panel is on screen, which is the one thing
+      // the card needs to know without being told: it drops its own wordmark
+      // so the page says it once, above the headline.
+      className={headline ? "lw-front-door lw-front-door--split" : "lw-front-door"}
+      position="relative"
+      backgroundColor="frontDoor.ground"
+      minHeight="100vh"
+      width="full"
+      overflowX="clip"
+    >
+      <LogoHandoff />
+      {/* Renders nothing until somebody double-taps the castle. Mounted here
+          so it exists exactly where the front door exists — same flag, same
+          screens — and nowhere else. */}
+      <CastleSnake />
+      {headline ? (
+        <>
+          <FrontDoorGround protect="left" />
+          {/* Capped at the site's content width and centred, so a big monitor
+              widens the field around the conversation. Both doors keep the
+              same seats: words on the left, card on the right. */}
+          <Flex
+            position="relative"
+            zIndex={1}
+            direction={{ base: "column", md: "row" }}
+            align="stretch"
+            minHeight="100vh"
+            width="full"
+            maxWidth="1440px"
+            marginX="auto"
+          >
+            <FrontDoorValuePanel
+              headline={headline}
+              headlineAccent={headlineAccent}
+              tagline={tagline}
+              trustStrip={trustStrip}
+            />
+            <Flex
+              flex="1"
+              justify="center"
+              align={{ base: "flex-start", md: "center" }}
+              paddingX={{ base: 0, sm: 4, md: 10 }}
+              paddingBottom={10}
+              data-testid="front-door-card-column"
+            >
+              {children}
+            </Flex>
+          </Flex>
+        </>
+      ) : (
+        <BrandedCardPage ground={<FrontDoorGround protect="center" />}>{children}</BrandedCardPage>
+      )}
+    </Box>
+  );
+}

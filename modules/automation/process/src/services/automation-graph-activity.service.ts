@@ -1,0 +1,97 @@
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type {
+  GraphTriggerEvaluationReason,
+  GraphTriggerEvaluationResult,
+  TriggerSummary,
+} from "@langwatch/automation-contract";
+
+import type {
+  AutomationGraphActivity,
+  AutomationProjectDirectory,
+  AutomationClock,
+  AutomationGraphDelivery,
+  AutomationDispatchError,
+  AutomationLogger,
+} from "../app/automation.members.ts";
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "../repositories/trigger.repository.ts";
+import type { AutomationWebhookProvider } from "../services/automation-webhook-secrets.service.ts";
+import { ActiveTriggerCacheService } from "./active-trigger-cache.service.ts";
+import type { AutomationEmailCapService } from "./email-cap.service.ts";
+import { GraphAlertDispatchService } from "./graph-alert-dispatch.service.ts";
+import { GraphTriggerEvaluatorService } from "./graph-trigger-evaluator.service.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
+import type { TriggerLatestEvaluationService } from "./trigger-latest-evaluation.service.ts";
+
+/**
+ * Graph-alert dispatch: re-evaluate automations and send notifications via chosen
+ * channels. Deliberately excludes heartbeat sweep and persistence-cap containment.
+ */
+export class AutomationGraphActivityService implements AutomationGraphActivity {
+  static create(input: {
+    triggers: TriggerRepository;
+    customGraphs: CustomGraphRepository;
+    graphTriggerSent: GraphTriggerSentRepository;
+    /** The suppression, send-claim and webhook-log half a dispatched alert writes. */
+    persistence: AutomationGraphDelivery;
+    clock: AutomationClock;
+    projects: AutomationProjectDirectory;
+    analytics: AnalyticsService;
+    /** The process's outbound transports: mail, Slack, webhook. */
+    delivery: AutomationNotificationDelivery;
+    webhooks: AutomationWebhookProvider;
+    slackDestinations: SlackDestinationService;
+    emailCaps: AutomationEmailCapService;
+    logger: AutomationLogger;
+    dispatchErrors: AutomationDispatchError;
+    latestEvaluations: Pick<TriggerLatestEvaluationService, "record">;
+    baseHost: string;
+    emailHourlyCap: number;
+    tenantDailyCap: number;
+  }): AutomationGraphActivityService {
+    return new AutomationGraphActivityService(
+      ActiveTriggerCacheService.create({ triggers: input.triggers, clock: input.clock }),
+      GraphTriggerEvaluatorService.create({
+        triggers: input.triggers,
+        customGraphs: input.customGraphs,
+        projects: input.projects,
+        analytics: input.analytics,
+        triggerSent: input.graphTriggerSent,
+        notifier: GraphAlertDispatchService.create({
+          persistence: input.persistence,
+          emailCaps: input.emailCaps,
+          delivery: input.delivery,
+          webhooks: input.webhooks,
+          clock: input.clock,
+          emailHourlyCap: input.emailHourlyCap,
+          tenantDailyCap: input.tenantDailyCap,
+        }),
+        logger: input.logger,
+        slackDestinations: input.slackDestinations,
+        dispatchErrors: input.dispatchErrors,
+        latestEvaluations: input.latestEvaluations,
+        clock: input.clock,
+        baseHost: input.baseHost,
+      }),
+    );
+  }
+
+  private constructor(
+    private readonly active: ActiveTriggerCacheService,
+    private readonly evaluator: GraphTriggerEvaluatorService,
+  ) {}
+
+  getActiveGraphTriggersForProject(projectId: string): Promise<TriggerSummary[]> {
+    return this.active.getActiveGraphTriggersForProject(projectId);
+  }
+
+  evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: GraphTriggerEvaluationReason;
+  }): Promise<GraphTriggerEvaluationResult> {
+    return this.evaluator.evaluate(input);
+  }
+}

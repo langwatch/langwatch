@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import datetime
 from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+from dateutil.parser import isoparse
 
 T = TypeVar("T", bound="GetRoleResponse200")
 
@@ -17,16 +19,16 @@ class GetRoleResponse200:
         name (str):
         description (None | str):
         permissions (list[str]):
-        created_at (str):
-        updated_at (str):
+        created_at (datetime.datetime):
+        updated_at (datetime.datetime):
     """
 
     id: str
     name: str
     description: None | str
     permissions: list[str]
-    created_at: str
-    updated_at: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,9 +41,9 @@ class GetRoleResponse200:
 
         permissions = self.permissions
 
-        created_at = self.created_at
+        created_at = self.created_at.isoformat()
 
-        updated_at = self.updated_at
+        updated_at = self.updated_at.isoformat()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -74,9 +76,9 @@ class GetRoleResponse200:
 
         permissions = cast(list[str], d.pop("permissions"))
 
-        created_at = d.pop("createdAt")
+        created_at = isoparse(d.pop("createdAt"))
 
-        updated_at = d.pop("updatedAt")
+        updated_at = isoparse(d.pop("updatedAt"))
 
         get_role_response_200 = cls(
             id=id,

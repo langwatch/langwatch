@@ -1,0 +1,550 @@
+import { ProviderScopeChips, type ProviderScopeType } from "@langwatch/authz-browser-kit";
+import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  HStack,
+  Progress,
+  Spacer,
+  Spinner,
+  Table,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { formatBudgetUsd } from "@langwatch/gateway-contract";
+import { toEpochMs } from "@langwatch/time";
+import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus, TriangleAlert } from "lucide-react";
+import { useState } from "react";
+
+import { api } from "../../../behavior/gateway-api.ts";
+import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
+import { useGatewayRouter } from "../../../behavior/gateway-router.ts";
+import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { BudgetCreateDrawer } from "../../../features/budgets/ui/sections/budget-create-drawer.tsx";
+import { BudgetEditDrawer } from "../../../features/budgets/ui/sections/budget-edit-drawer.tsx";
+import { readableDate } from "../../../model/readable-date.ts";
+import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
+import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
+
+type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
+
+function useBudgetRows(organizationId: string | undefined) {
+  const listQuery = api.gatewayBudgets.list.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId },
+  );
+  return {
+    rows: listQuery.data?.budgets ?? [],
+    spendAvailable: listQuery.data?.spendAvailable ?? true,
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    error: listQuery.error,
+    refetch: listQuery.refetch,
+  };
+}
+
+function BudgetSpendCell({
+  budget,
+  spent,
+  limit,
+  pct,
+  seatsSeen,
+  seatsOver,
+  seatsOverPct,
+}: {
+  budget: BudgetListRow;
+  spent: number;
+  limit: number;
+  pct: number;
+  seatsSeen: number;
+  seatsOver: number;
+  seatsOverPct: number;
+}) {
+  if (!budget.spendAvailable) {
+    return (
+      <HStack fontSize="xs">
+        <Text color="fg.muted">Unavailable</Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+      </HStack>
+    );
+  }
+  if (budget.scopeType === "GROUP") {
+    // A group budget is one allowance per member; the list can only total everyone's
+    // spend together, so it says exactly that. Per-member standing lives on the
+    // detail page and in the key drawer's applies list.
+    return (
+      <VStack align="stretch" gap={0.5} data-testid="budget-group-spend">
+        <HStack fontSize="xs" gap={1}>
+          <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
+          <Text color="fg.muted">group total</Text>
+        </HStack>
+        <Text fontSize="2xs" color="fg.muted">
+          {formatBudgetUsd(limit)} per member
+          {typeof budget.scopeTarget?.memberCount === "number"
+            ? ` · ${budget.scopeTarget.memberCount} ${
+                budget.scopeTarget.memberCount === 1 ? "member" : "members"
+              }`
+            : ""}
+        </Text>
+      </VStack>
+    );
+  }
+  if (budget.scopeType === "ATTRIBUTED_USER") {
+    // A per-person template is one allowance per end user, so there is no single total;
+    // the list names the cap each person carries and how many have passed it.
+    return (
+      <VStack align="stretch" gap={1} data-testid="budget-attributed-user-spend">
+        <HStack fontSize="xs" gap={1}>
+          <Text fontWeight="medium">{formatBudgetUsd(limit)}</Text>
+          <Text color="fg.muted">per person</Text>
+        </HStack>
+        <Text fontSize="2xs" color="fg.muted">
+          {seatsOver} of {seatsSeen} people over cap
+        </Text>
+        <Progress.Root
+          value={seatsOverPct}
+          size="xs"
+          colorPalette={seatsOver > 0 ? "red" : "green"}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
+      </VStack>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1}>
+      <HStack fontSize="xs">
+        <Text fontWeight="medium">{formatBudgetUsd(spent)}</Text>
+        <Text color="fg.muted">/ {formatBudgetUsd(limit)}</Text>
+        <Spacer />
+        <Badge variant="outline" colorPalette={usagePalette(pct)} fontSize="2xs">
+          {pct.toFixed(0)}%
+        </Badge>
+      </HStack>
+      <Progress.Root value={pct} size="xs" colorPalette={usagePalette(pct)}>
+        <Progress.Track>
+          <Progress.Range />
+        </Progress.Track>
+      </Progress.Root>
+    </VStack>
+  );
+}
+
+function usagePalette(pct: number): "red" | "orange" | "green" {
+  if (pct >= 100) return "red";
+  if (pct >= 80) return "orange";
+  return "green";
+}
+
+function BudgetsPage() {
+  const showErrorToast = useShowErrorToast();
+  const { organization, hasPermission } = useOrganizationTeamProject();
+  const canCreate = hasPermission("gatewayBudgets:create");
+  const canUpdate = hasPermission("gatewayBudgets:update");
+  const canDelete = hasPermission("gatewayBudgets:delete");
+
+  const router = useGatewayRouter();
+  const { rows, spendAvailable, isLoading, isError, error, refetch } = useBudgetRows(
+    organization?.id,
+  );
+
+  const utils = api.useUtils();
+  const archiveMutation = api.gatewayBudgets.archive.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayBudgets.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editing, setEditing] = useState<BudgetListRow | null>(null);
+  const [archiving, setArchiving] = useState<BudgetListRow | null>(null);
+
+  const showError = !isLoading && isError;
+  const showEmpty = !isLoading && !isError && rows.length === 0;
+  const showRows = !isLoading && !isError && rows.length > 0;
+
+  const confirmArchive = async () => {
+    if (!archiving || !organization) return;
+    try {
+      await archiveMutation.mutateAsync({
+        organizationId: organization.id,
+        id: archiving.id,
+      });
+      setArchiving(null);
+    } catch (error) {
+      showErrorToast({ error, fallbackTitle: "Couldn't archive the budget" });
+    }
+  };
+
+  return (
+    <AiGatewayLayout>
+      <>
+        <PageLayout.Header>
+          <PageLayout.Heading>Budgets</PageLayout.Heading>
+          <Spacer />
+          {canCreate && (
+            <PageLayout.HeaderButton
+              data-testid="gateway-budget-new"
+              onClick={() => setCreateOpen(true)}
+            >
+              <Plus size={14} /> New budget
+            </PageLayout.HeaderButton>
+          )}
+        </PageLayout.Header>
+
+        <PageLayout.Container>
+          {isLoading && <Spinner />}
+          {showError && (
+            <GatewayErrorPanel
+              title="Failed to load budgets"
+              error={error}
+              onRetry={() => refetch()}
+            />
+          )}
+          {showEmpty && (
+            <NoDataInfoBlock
+              title="No budgets yet"
+              description="Budgets enforce a spend ceiling on any dimension: organization, group, team, project, member, or virtual key; each optionally limited to a single provider. Create one to start governing cost."
+              icon={<Gauge size={32} />}
+            >
+              {canCreate && (
+                <PageLayout.HeaderButton
+                  variant="solid"
+                  colorPalette="orange"
+                  onClick={() => setCreateOpen(true)}
+                  marginTop={4}
+                >
+                  <Plus size={14} /> New budget
+                </PageLayout.HeaderButton>
+              )}
+            </NoDataInfoBlock>
+          )}
+          {showRows && (
+            <VStack align="stretch" gap={4}>
+              {!spendAvailable && (
+                <Alert.Root status="warning" data-testid="budget-spend-unavailable">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Spend figures are unavailable</Alert.Title>
+                    <Alert.Description>
+                      Spend cannot be totalled right now, so these budgets are not stopping or
+                      warning about anything.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
+              <Card.Root width="full" overflow="hidden">
+                {/* The card clips; the body scrolls. Without this the
+                    right-hand columns are simply unreachable on a narrow
+                    window instead of scrolling into view. Focusable so the
+                    scroll is reachable from the keyboard alone. */}
+                <Card.Body
+                  as="section"
+                  paddingY={0}
+                  paddingX={0}
+                  overflowX="auto"
+                  tabIndex={0}
+                  aria-label="Budgets table"
+                >
+                  <Table.Root variant="line" size="md" width="full">
+                    <Table.Header>
+                      <Table.Row>
+                        <Table.ColumnHeader>Name</Table.ColumnHeader>
+                        <Table.ColumnHeader>Scope</Table.ColumnHeader>
+                        <Table.ColumnHeader>Window</Table.ColumnHeader>
+                        <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
+                        <Table.ColumnHeader>
+                          <Tooltip
+                            content={
+                              <Text fontSize="xs">
+                                WARN: emits 402-equivalent warning header + audit event, request
+                                proceeds.{"\n"}BLOCK: the gateway returns HTTP 402 and refuses to
+                                dispatch once the limit is crossed.
+                              </Text>
+                            }
+                          >
+                            <Text as="span">On breach</Text>
+                          </Tooltip>
+                        </Table.ColumnHeader>
+                        <Table.ColumnHeader>Resets</Table.ColumnHeader>
+                        <Table.ColumnHeader></Table.ColumnHeader>
+                      </Table.Row>
+                    </Table.Header>
+                    <Table.Body>
+                      {rows.map((b) => (
+                        <BudgetTableRow
+                          key={b.id}
+                          budget={b}
+                          canUpdate={canUpdate}
+                          canDelete={canDelete}
+                          onOpen={() => router.push(`/gateway/budgets/${b.id}`)}
+                          onEdit={() => setEditing(b)}
+                          onArchive={() => setArchiving(b)}
+                        />
+                      ))}
+                    </Table.Body>
+                  </Table.Root>
+                </Card.Body>
+              </Card.Root>
+            </VStack>
+          )}
+        </PageLayout.Container>
+      </>
+
+      {organization?.id && (
+        <BudgetCreateDrawer
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => {
+            void refetch();
+          }}
+        />
+      )}
+      <BudgetEditDrawer
+        budget={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={() => {
+          setEditing(null);
+          void refetch();
+        }}
+      />
+      <ConfirmDialog
+        open={!!archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+        title={`Archive ${archiving?.name ?? "budget"}?`}
+        message="Debits against this budget stop counting. The historical ledger is preserved but new requests route as if the budget didn't exist."
+        confirmLabel="Archive"
+        tone="warning"
+        loading={archiveMutation.isPending}
+        onConfirm={confirmArchive}
+      />
+    </AiGatewayLayout>
+  );
+}
+
+function BudgetTableRow({
+  budget: b,
+  canUpdate,
+  canDelete,
+  onOpen,
+  onEdit,
+  onArchive,
+}: {
+  budget: BudgetListRow;
+  canUpdate: boolean;
+  canDelete: boolean;
+  onOpen: () => void;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  const spent = Number.parseFloat(b.spentUsd);
+  const limit = Number.parseFloat(b.limitUsd);
+  const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+  // Per-person templates report a headcount, not a
+  // total. Nobody seen yet is "0 of 0", which is true,
+  // rather than a dash that reads as broken.
+  const seatsSeen = b.endUsersSeen ?? 0;
+  const seatsOver = b.endUsersOver ?? 0;
+  const seatsOverPct = seatsSeen > 0 ? (seatsOver / seatsSeen) * 100 : 0;
+  return (
+    <Table.Row
+      data-testid="gateway-budget-row"
+      cursor="pointer"
+      _hover={{ bg: "bg.subtle" }}
+      onClick={onOpen}
+    >
+      <Table.Cell>
+        <VStack align="start" gap={0}>
+          <Link href={`/gateway/budgets/${b.id}`}>
+            <Text fontWeight="medium">{b.name}</Text>
+          </Link>
+          {b.description && (
+            <Text fontSize="xs" color="fg.muted">
+              {b.description}
+            </Text>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <VStack align="start" gap={1}>
+          <ScopeCell
+            scopeType={b.scopeType}
+            scopeTarget={b.scopeTarget ?? null}
+            providerLabel={b.providerLabel ?? null}
+          />
+          {b.unreachableByAnyKey && (
+            <Tooltip content="Traffic is attributed to the project a key is scoped to. No active key is scoped so that its traffic reaches this budget, so it will stay at zero and never stop a request.">
+              <Badge
+                colorPalette="orange"
+                variant="subtle"
+                fontSize="2xs"
+                data-testid="budget-unreachable-badge"
+              >
+                <TriangleAlert size={10} /> No key sends traffic here
+              </Badge>
+            </Tooltip>
+          )}
+        </VStack>
+      </Table.Cell>
+      <Table.Cell>
+        <Badge variant="subtle" colorPalette="gray" textTransform="capitalize">
+          {b.window.toLowerCase()}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell minWidth="220px">
+        <BudgetSpendCell
+          budget={b}
+          spent={spent}
+          limit={limit}
+          pct={pct}
+          seatsSeen={seatsSeen}
+          seatsOver={seatsOver}
+          seatsOverPct={seatsOverPct}
+        />
+      </Table.Cell>
+      <Table.Cell>
+        <Badge colorPalette={b.onBreach === "BLOCK" ? "red" : "yellow"}>
+          {b.onBreach.toLowerCase()}
+        </Badge>
+      </Table.Cell>
+      <Table.Cell>
+        {b.window === "TOTAL" ? (
+          <Text fontSize="xs" color="fg.muted">
+            never
+          </Text>
+        ) : (
+          <Tooltip content={readableDate(b.resetsAt).toLocaleString()}>
+            <Text fontSize="xs">{formatTimeAgo(toEpochMs(b.resetsAt))}</Text>
+          </Tooltip>
+        )}
+      </Table.Cell>
+      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button
+              data-testid="gateway-budget-row-actions"
+              variant="ghost"
+              size="xs"
+              aria-label="Actions"
+            >
+              <MoreVertical size={14} />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item value="details" onClick={onOpen}>
+              <Eye size={14} /> Details
+            </Menu.Item>
+            {canUpdate && (
+              <Menu.Item value="edit" data-testid="gateway-budget-row-edit" onClick={onEdit}>
+                <Pencil size={14} /> Edit
+              </Menu.Item>
+            )}
+            {canDelete && (
+              <Menu.Item
+                value="archive"
+                data-testid="gateway-budget-row-archive"
+                onClick={onArchive}
+              >
+                <Archive size={14} /> Archive
+              </Menu.Item>
+            )}
+          </Menu.Content>
+        </Menu.Root>
+      </Table.Cell>
+    </Table.Row>
+  );
+}
+
+type ScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary?: string | null;
+  projectSlug?: string | null;
+  memberCount?: number;
+};
+
+/**
+ * The one detail line the chip's tooltip carries: whatever identifies the
+ * target beyond its name (a slug, a key prefix) plus, for a group, how
+ * many people the limit is handed to.
+ */
+export function scopeChipDetail(scopeTarget: ScopeTarget | null): string | undefined {
+  if (!scopeTarget) return undefined;
+  const parts: string[] = [];
+  if (scopeTarget.secondary) parts.push(scopeTarget.secondary);
+  if (typeof scopeTarget.memberCount === "number") {
+    parts.push(
+      `${scopeTarget.memberCount} ${scopeTarget.memberCount === 1 ? "member" : "members"}`,
+    );
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+/**
+ * One line: the same scope chip every other settings surface renders,
+ * plus the qualifiers that change what the limit means. A virtual-key
+ * target links to that key.
+ */
+function ScopeCell({
+  scopeType,
+  scopeTarget,
+  providerLabel,
+}: {
+  scopeType: string;
+  scopeTarget: ScopeTarget | null;
+  providerLabel?: string | null;
+}) {
+  return (
+    <HStack gap={1} wrap="wrap">
+      <ProviderScopeChips
+        scopes={[
+          {
+            scopeType: scopeType as ProviderScopeType,
+            scopeId: scopeTarget?.id ?? "",
+            name: scopeTarget?.name,
+            detail: scopeChipDetail(scopeTarget),
+            href:
+              scopeTarget && scopeType === "VIRTUAL_KEY"
+                ? `/gateway/virtual-keys/${scopeTarget.id}`
+                : undefined,
+          },
+        ]}
+      />
+      {scopeType === "GROUP" && (
+        <Tooltip content="Each member of the group gets this limit individually.">
+          <Badge colorPalette="cyan" variant="subtle" data-testid="budget-per-member-badge">
+            per member
+          </Badge>
+        </Tooltip>
+      )}
+      {providerLabel && (
+        <Tooltip content="Only spend dispatched to this provider counts toward this budget.">
+          <Badge colorPalette="blue" variant="subtle" data-testid="budget-provider-badge">
+            {providerLabel} only
+          </Badge>
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}
+
+export default BudgetsPage;

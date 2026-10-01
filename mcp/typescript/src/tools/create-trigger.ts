@@ -1,8 +1,8 @@
 import {
   createTrigger as apiCreateTrigger,
   type CreateTriggerInput,
-} from "../langwatch-api-triggers.js";
-import { validateActionParamsForAction } from "../schemas/triggers.js";
+} from "../langwatch-api-triggers.ts";
+import { validateActionParamsForAction } from "../schemas/triggers.ts";
 
 /** An MCP tool result; `isError` tells the client the call was refused. */
 export type TriggerToolResult = {

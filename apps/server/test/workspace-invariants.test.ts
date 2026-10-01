@@ -1,0 +1,478 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
+
+import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
+
+// ADR-076 invariants. Cheap to state, expensive to lose.
+
+const repoRoot = join(__dirname, "..", "..", "..");
+
+function readJson(relPath: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(join(repoRoot, relPath), "utf8"));
+}
+
+function readShippedFiles(): string[] {
+  return z.array(z.string()).parse(readJson("apps/server/distribution-files.json"));
+}
+
+function gitLsFiles(pattern: string): string[] {
+  return execFileSync("git", ["ls-files", pattern], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean);
+}
+
+/**
+ * The `packages:` list from pnpm-workspace.yaml, via a line scan rather
+ * than a YAML parser — not worth a devDependency for one test, and an
+ * empty result fails loudly on the assertions below.
+ */
+function workspaceMembers(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "packages:");
+  if (start === -1) return [];
+
+  const members: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    const entry = /^\s+-\s+"?([^"#]+?)"?\s*$/.exec(line);
+    if (entry?.[1]) {
+      members.push(entry[1]);
+      continue;
+    }
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
+    break; // the next top-level key ends the list
+  }
+  return members;
+}
+
+/** The keys of the root `overrides:` block, same line-scan approach. */
+function rootOverrideKeys(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "overrides:");
+  if (start === -1) return [];
+
+  const keys: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
+    if (!/^\s/.test(line)) break; // next top-level key
+    const m = /^\s+"?([^"]+?)"?:/.exec(line);
+    if (m?.[1]) keys.push(m[1]);
+  }
+  return keys;
+}
+
+/**
+ * The patch files `patchedDependencies:` names, same line-scan approach.
+ */
+function patchedDependencyPaths(): string[] {
+  const lines = readFileSync(join(repoRoot, "pnpm-workspace.yaml"), "utf8").split("\n");
+  const start = lines.findIndex((l) => l.trimEnd() === "patchedDependencies:");
+  if (start === -1) return [];
+
+  const paths: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.trim() === "") continue;
+    if (line.trimStart().startsWith("#")) continue;
+    if (!/^\s/.test(line)) break; // next top-level key
+    const target = /:\s*"?([^"\s]+)"?\s*$/.exec(line);
+    if (target?.[1]) paths.push(target[1]);
+  }
+  return paths;
+}
+
+/** Every package.json the repo tracks, excluding installed dependencies. */
+function trackedManifests(): string[] {
+  return execFileSync(
+    "git",
+    ["ls-files", "--cached", "--others", "--exclude-standard", "*package.json"],
+    { cwd: repoRoot, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter(Boolean)
+    .filter((p) => !p.includes("node_modules") && existsSync(join(repoRoot, p)));
+}
+
+/** Directory of a manifest, "" for the root one. */
+function manifestDir(manifest: string): string {
+  return manifest.replace(/\/?package\.json$/, "");
+}
+
+/** Whether dir is a workspace member per the `packages:` globs. */
+function isWorkspaceMember(dir: string): boolean {
+  if (dir === "") return false;
+  const directoryParts = dir.split("/");
+  return workspaceMembers().some((glob) => {
+    const globParts = glob.split("/");
+    return (
+      globParts.length === directoryParts.length &&
+      globParts.every((part, index) => part === "*" || part === directoryParts[index])
+    );
+  });
+}
+
+/**
+ * Whether a distribution entry ships the path. The prefix compared against always ends in "/",
+ * so an entry of `langwatch` cannot be read as shipping `langwatch-something/package.json`.
+ */
+function isShippedBy({ shipped, relPath }: { shipped: string[]; relPath: string }): boolean {
+  return shipped.some((f) => relPath === f || relPath.startsWith(f.endsWith("/") ? f : `${f}/`));
+}
+
+const installRulesSchema = z.object({
+  pnpm: z.record(z.string(), z.unknown()).optional(),
+  resolutions: z.record(z.string(), z.unknown()).optional(),
+});
+
+const dependenciesSchema = z.object({
+  dependencies: z.record(z.string(), z.string()).optional(),
+  devDependencies: z.record(z.string(), z.string()).optional(),
+});
+
+/** Install rules a member carries that pnpm honours only in the root manifest. */
+function memberInstallRules(): string[] {
+  return trackedManifests()
+    .filter((manifest) => manifest !== "package.json")
+    .flatMap((manifest) => {
+      const pkg = installRulesSchema.parse(readJson(manifest));
+      const rules = Object.keys(pkg.pnpm ?? {}).map((key) => `${manifest}: pnpm.${key}`);
+      return pkg.resolutions === undefined ? rules : [...rules, `${manifest}: resolutions`];
+    });
+}
+
+/** Every workspace member's dependency on a package that lives in this repo, bar the SDK. */
+function memberInternalDependencies(): { manifest: string; name: string; spec: string }[] {
+  const internalNames = new Set(
+    trackedManifests()
+      .map((m) => readJson(m).name)
+      .filter((n): n is string => typeof n === "string"),
+  );
+  return trackedManifests()
+    .filter((manifest) => isWorkspaceMember(manifestDir(manifest)))
+    .flatMap((manifest) => {
+      const pkg = dependenciesSchema.parse(readJson(manifest));
+      return Object.entries({ ...pkg.dependencies, ...pkg.devDependencies })
+        .filter(([name]) => internalNames.has(name) && name !== "langwatch")
+        .map(([name, spec]) => ({ manifest, name, spec }));
+    });
+}
+
+/**
+ * `extends` targets of shipped tsconfigs the tarball does not carry. Only tsconfigs the tarball
+ * carries count: one a package excludes on purpose extends nothing the end user needs.
+ */
+function unshippedExtendsTargets({
+  shipped,
+  tsconfigPaths,
+}: {
+  shipped: string[];
+  tsconfigPaths: string[];
+}): string[] {
+  return tsconfigPaths
+    .filter((tsconfigPath) => isShippedBy({ shipped, relPath: tsconfigPath }))
+    .flatMap((tsconfigPath) => {
+      const target = /"extends"\s*:\s*"([^"]+)"/.exec(
+        readFileSync(join(repoRoot, tsconfigPath), "utf8"),
+      )?.[1];
+      if (target === undefined) return [];
+      const shippedTarget = isShippedBy({ shipped, relPath: join(dirname(tsconfigPath), target) });
+      return shippedTarget ? [] : [`${tsconfigPath} -> ${target}`];
+    });
+}
+
+describe("the repo is a single pnpm workspace", () => {
+  describe("when the lockfiles are counted", () => {
+    /** @scenario The repo holds one lockfile */
+    it("finds exactly one, at the repo root", () => {
+      expect(gitLsFiles("*pnpm-lock.yaml")).toEqual(["pnpm-lock.yaml"]);
+    });
+  });
+
+  describe("when the workspace definition is read", () => {
+    /** @scenario Projects that used to opt out of the workspace no longer do */
+    it("lists every JavaScript project the repo used to install separately", () => {
+      const members = workspaceMembers();
+
+      for (const project of [
+        "apps/*",
+        "sdks/typescript",
+        "mcp/typescript",
+        "skills",
+        "dev/tests/agentic-e2e",
+      ]) {
+        expect(members).toContain(project);
+      }
+    });
+
+    /** @scenario The repo holds one lockfile */
+    it("keeps the workspace definition at the repo root and nowhere else", () => {
+      expect(gitLsFiles("*pnpm-workspace.yaml")).toEqual(["pnpm-workspace.yaml"]);
+    });
+  });
+
+  describe("when the package names are compared", () => {
+    /** @scenario The application and the SDK no longer share a package name */
+    it("gives each deployable the name the npx installer filters by, and the SDK its own", () => {
+      const deployables = ["apps/api", "apps/worker", "apps/ui", "apps/tasks"].map(
+        (dir) => readJson(`${dir}/package.json`).name,
+      );
+      const sdk = readJson("sdks/typescript/package.json").name;
+
+      // Cross-checked against the constants the end-user install filters
+      // by, not against literals: pnpm exits 0 on a filter that matches
+      // nothing, so a rename that misses node-deps.ts turns every npx
+      // first boot into a silent no-op that fails minutes later inside a
+      // migration. This is the only assertion tying the two together.
+      expect(deployables).toEqual([...APP_PACKAGE_NAMES]);
+      expect(sdk).toBe("langwatch");
+      expect(deployables).not.toContain(sdk);
+    });
+
+    /** @scenario The application links the SDK working copy */
+    it("links the SDK working copy rather than a published release", () => {
+      // The invariant is asserted where the specifier lives: every
+      // `langwatch` dependency names the working copy, so an SDK edit
+      // reaches the applications and the production image without a
+      // publish. `linkWorkspacePackages` stays false otherwise.
+      const specifiers = execFileSync(
+        "git",
+        ["grep", "-h", "--", '"langwatch": "', "--", "packages", "apps"],
+        { cwd: repoRoot, encoding: "utf8" },
+      )
+        .split("\n")
+        .filter((line) => line.trim().startsWith('"langwatch":'));
+
+      expect(specifiers.length).toBeGreaterThan(0);
+      for (const line of specifiers) {
+        expect(line).toMatch(/"langwatch":\s*"workspace:/);
+      }
+    });
+
+    /** @scenario The SDK carries its own copy of a pinned dependency */
+    it("bundles zod into the SDK instead of importing it from the consumer", () => {
+      const bundle = join(repoRoot, "sdks/typescript/dist/index.mjs");
+      if (!existsSync(bundle)) return; // dist is a build artefact, not tracked
+
+      // The link above is only survivable because of this. Left external, a
+      // consumer-selected incompatible Zod runtime could replace the SDK's
+      // tested runtime and fail at first import, taking down the app rather
+      // than only the SDK path.
+      const source = readFileSync(bundle, "utf8");
+      const externalZodImports = source.match(/from\s*["']zod(?:\/[^"']*)?["']/g);
+
+      expect(externalZodImports ?? []).toEqual([]);
+    });
+  });
+
+  describe("when a member carries install configuration of its own", () => {
+    /** @scenario No project keeps a dependency rule that no longer applies */
+    it("finds no member holding dependency rules pnpm would ignore", () => {
+      // pnpm honours these only in the workspace ROOT manifest: the whole
+      // `pnpm` block (overrides, packageExtensions, onlyBuiltDependencies,
+      // patchedDependencies, ...) and yarn-style `resolutions`. One left in
+      // a member looks like an active pin and does nothing — which is
+      // exactly how the six old roots drifted apart.
+      expect(memberInstallRules()).toEqual([]);
+    });
+
+    /** @scenario No project keeps a dependency rule that no longer applies */
+    it("finds no .npmrc outside the repo root", () => {
+      // An .npmrc is read from the install root, which is the repo root
+      // now. A member one is dead config that still READS as active —
+      // skills/.npmrc held a release-age exemption for @langwatch/scenario
+      // that silently stopped applying the day the roots merged.
+      expect(gitLsFiles("*.npmrc")).toEqual([".npmrc"]);
+    });
+  });
+
+  describe("when the root overrides are read", () => {
+    /** @scenario A pin that suits one project is not forced onto the others */
+    it("carries no unconditional pin for the packages the projects disagree on", () => {
+      // Three projects legitimately sit on different zod majors (app 3.x,
+      // SDK 4.0, MCP server 4.3) via their own direct dependency — an
+      // unconditional root pin (no `@range` selector) would drag them onto
+      // one version, so a future merge adding one back must fail here.
+      const disputed = ["zod", "@opentelemetry/api-logs", "@opentelemetry/sdk-logs"];
+      const unconditional = rootOverrideKeys().filter((k) => !k.replace(/^@/, "").includes("@"));
+
+      // Guards the guard: the parser returning nothing would pass
+      // vacuously. The alignment block genuinely holds unconditional keys.
+      expect(unconditional.length).toBeGreaterThan(3);
+
+      for (const name of disputed) {
+        expect(unconditional, `root overrides pin ${name} for every project`).not.toContain(name);
+      }
+    });
+  });
+
+  describe("when a member depends on an internal package", () => {
+    /** @scenario A shared internal package is reachable from every project */
+    it("resolves every internal dependency to the working copy", () => {
+      // Generalised over every member and internal name: any dependency on
+      // a package that lives in this repo must take the working copy. The
+      // one exception is `langwatch` (the published SDK), consumed from
+      // the registry on purpose (see "keeps the app on the published SDK").
+      const internalDependencies = memberInternalDependencies();
+      const internalDepsSeen = internalDependencies.length;
+      const offenders = internalDependencies
+        .filter(({ spec }) => !spec.startsWith("workspace:"))
+        .map(({ manifest, name, spec }) => `${manifest}: ${name} -> ${spec}`);
+
+      // Guards the guard: zero internal dependencies found would mean the
+      // scan is broken, not that the repo is clean.
+      expect(internalDepsSeen).toBeGreaterThan(5);
+      expect(offenders).toEqual([]);
+    });
+  });
+
+  describe("when the published package manifest is read", () => {
+    /** @scenario "The self-host command remains compatible" */
+    it("keeps publishing ownership in apps/server", () => {
+      const root = readJson("package.json") as {
+        name?: string;
+        private?: boolean;
+        bin?: Record<string, string>;
+        files?: string[];
+      };
+      const server = readJson("apps/server/package.json") as {
+        name?: string;
+        private?: boolean;
+        bin?: Record<string, string>;
+      };
+
+      expect(root.name).toBe("@langwatch/workspace");
+      expect(root.private).toBe(true);
+      expect(root.bin).toBeUndefined();
+      expect(root.files).toBeUndefined();
+      expect(server.name).toBe("@langwatch/server");
+      expect(server.private).not.toBe(true);
+      expect(server.bin).toEqual({ "langwatch-server": "dist/cli.cjs" });
+    });
+
+    it("stages the workspace definition and the lockfile", () => {
+      // Necessary, not sufficient: the distribution manifest drives what
+      // pack-npm.sh stages, but npm deletes a package-root lockfile. The
+      // packing script and smoke job assert that the nested copy survives.
+      const shipped = readJson("apps/server/distribution-files.json") as unknown;
+
+      expect(shipped).toBeInstanceOf(Array);
+      expect(shipped).toContain("pnpm-workspace.yaml");
+      expect(shipped).toContain("pnpm-lock.yaml");
+    });
+
+    /** @scenario The published package carries every input its install reads */
+    it("ships every patch the workspace applies", () => {
+      const shipped = readShippedFiles();
+      const patches = patchedDependencyPaths();
+
+      // A patch the package does not carry is not a weaker install, it is no
+      // install: pnpm stops the whole `--frozen-lockfile` run with ENOENT on
+      // the missing file, before anything is built and long before the first
+      // migration. The workspace definition ships, so the declaration always
+      // reaches the end user whether or not the file it names does.
+      const unshipped = patches.filter((patch) => !isShippedBy({ shipped, relPath: patch }));
+      expect(unshipped, "patches no distribution entry ships").toEqual([]);
+    });
+
+    /** @scenario The published package carries every input its install reads */
+    it("lists every extends target of a listed package's tsconfig", () => {
+      // A tsconfig `extends` chain can reach a repo-root file (like
+      // tsconfig.base.json) that the sibling completeness checks above
+      // don't track as shipped — missing it crashes `prisma generate` at
+      // first boot.
+      const shipped = readShippedFiles();
+      const tsconfigPaths = gitLsFiles("*tsconfig*.json");
+      expect(tsconfigPaths.length).toBeGreaterThan(5);
+
+      expect(unshippedExtendsTargets({ shipped, tsconfigPaths })).toEqual([]);
+    });
+
+    /** @scenario Every project the lockfile mentions is resolvable */
+    it("ships a manifest for every workspace member", () => {
+      const shipped = readShippedFiles();
+
+      // Workspace members only — `sdks/typescript/examples/*` carry a
+      // package.json but are not members, so the lockfile never mentions
+      // them and the tarball has no reason to.
+      const memberManifests = trackedManifests().filter((manifest) =>
+        isWorkspaceMember(manifestDir(manifest)),
+      );
+
+      expect(memberManifests.length).toBeGreaterThan(5);
+
+      // A member whose directory is absent installs without complaint and
+      // fails much later, inside a migration.
+      const unshipped = memberManifests.filter(
+        (manifest) => !isShippedBy({ shipped, relPath: manifest }),
+      );
+      expect(unshipped, "member manifests no distribution entry ships").toEqual([]);
+    });
+  });
+
+  describe("when the end-user install arguments are built", () => {
+    /** @scenario The install still refuses to drift from the lockfile */
+    /** @scenario "The self-host command remains compatible" */
+    it("pins both install passes to the lockfile and to the app's closure", () => {
+      // Both invariants an `npx @langwatch/server` first boot depends on:
+      // --frozen-lockfile makes the install reproducible-or-failed, and the
+      // `...` filter keeps the SDK, skills compiler and test suites off the
+      // end user's machine. This PR rewrote these argv twice; they are the
+      // most likely thing to lose in a refactor.
+      for (const prod of [true, false]) {
+        const args = workspaceInstallArgs("/some/root", { prod });
+        expect(args).toContain("--frozen-lockfile");
+        for (const name of APP_PACKAGE_NAMES) {
+          expect(args).toContain(`${name}...`);
+        }
+        expect(args).toContain(prod ? "--prod" : "--prod=false");
+      }
+    });
+  });
+
+  describe("when the applications are started from a fresh clone", () => {
+    const ensureBuilt = "dev/scripts/devscripts.sh ensure-built";
+    const ensureBuiltSource = "tools/devscripts/ensurebuilt.go";
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("hooks the bundle build onto every application's dev script", () => {
+      for (const app of ["apps/ui", "apps/api", "apps/worker"]) {
+        const scripts = readJson(`${app}/package.json`).scripts as Record<string, string>;
+        expect(scripts.dev).toBeDefined();
+        expect(scripts.predev).toContain(ensureBuilt);
+      }
+      expect(existsSync(join(repoRoot, "dev/scripts/devscripts.sh"))).toBe(true);
+    });
+
+    /** @scenario A fresh clone starts the applications without a manual build step */
+    it("leaves only generation in the repository's file-generation step", () => {
+      const scripts = readJson("package.json").scripts as Record<string, string>;
+
+      // The two bundles are the only workspace packages consumed as `dist`;
+      // everything else exports its own `src`. Building them inside the
+      // generator chain made a build a thing you had to know to run.
+      expect(scripts["start:prepare:files"]).not.toMatch(/--filter\s+langwatch\s+build/);
+      expect(scripts["start:prepare:files"]).not.toMatch(/mcp-server\s+build/);
+      expect(scripts["ensure:built"]).toContain(ensureBuilt);
+    });
+
+    /** @scenario A stale SDK build is rebuilt before the browser application starts */
+    it("decides by comparing the bundle against the source it was built from", () => {
+      const source = readFileSync(join(repoRoot, ensureBuiltSource), "utf8");
+
+      // Named entry points, not directories: a half-written `dist` passes a
+      // directory check and fails minutes later inside a dependency scan.
+      expect(source).toContain("sdks/typescript");
+      expect(source).toContain("dist/index.mjs");
+      expect(source).toContain("mcp/typescript");
+      expect(source).toContain("dist/index.js");
+      expect(source).toMatch(/ModTime/);
+    });
+  });
+});

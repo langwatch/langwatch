@@ -18,6 +18,21 @@ const REQUEST_TIMEOUT_MS = 120000;
 
 // ---------- args ----------
 
+/** What each value flag sets on the options; `next` reads the flag's argument. */
+const FLAG_SETTERS = {
+  "--rules": (opts, next) => (opts.rules = next()),
+  "--section-level": (opts, next) => (opts.sectionLevel = Number(next())),
+  "--json": (opts) => (opts.json = true),
+  "--threshold": (opts, next, a) => (opts.threshold = probability(a, next())),
+  "--min": (opts, next, a) => (opts.min = probability(a, next())),
+  "--locate": (opts, next, a) => (opts.locate = probability(a, next())),
+  "--no-locate": (opts) => (opts.noLocate = true),
+  "--context": (opts) => (opts.context = true),
+  "--concurrency": (opts, next, a) => (opts.concurrency = positiveInteger(a, next())),
+  "--only": (opts, next) => (opts.only = new Set(next().split(","))),
+  "--skip": (opts, next) => (opts.skip = new Set(next().split(","))),
+};
+
 function parseArgs(argv) {
   const opts = {
     files: [],
@@ -36,17 +51,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
-    if (a === "--rules") opts.rules = next();
-    else if (a === "--section-level") opts.sectionLevel = Number(next());
-    else if (a === "--json") opts.json = true;
-    else if (a === "--threshold") opts.threshold = probability(a, next());
-    else if (a === "--min") opts.min = probability(a, next());
-    else if (a === "--locate") opts.locate = probability(a, next());
-    else if (a === "--no-locate") opts.noLocate = true;
-    else if (a === "--context") opts.context = true;
-    else if (a === "--concurrency") opts.concurrency = positiveInteger(a, next());
-    else if (a === "--only") opts.only = new Set(next().split(","));
-    else if (a === "--skip") opts.skip = new Set(next().split(","));
+    if (Object.hasOwn(FLAG_SETTERS, a)) FLAG_SETTERS[a](opts, next, a);
     else if (a === "-h" || a === "--help") {
       usage();
       process.exit(0);
@@ -65,10 +70,17 @@ function parseArgs(argv) {
 
 // A flag that takes a probability: a finite number from 0 to 1. Anything else
 // would silently make every rule fire, or none, so it is refused up front.
+function isProbability(raw, value) {
+  if (raw === undefined || raw === "") return false;
+  return Number.isFinite(value) && value >= 0 && value <= 1;
+}
+
 function probability(flag, raw) {
   const value = Number(raw);
-  if (raw === undefined || raw === "" || !Number.isFinite(value) || value < 0 || value > 1) {
-    console.error(`${flag} takes a number from 0 to 1, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+  if (!isProbability(raw, value)) {
+    console.error(
+      `${flag} takes a number from 0 to 1, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`,
+    );
     process.exit(2);
   }
   return value;
@@ -77,7 +89,9 @@ function probability(flag, raw) {
 function positiveInteger(flag, raw) {
   const value = Number(raw);
   if (raw === undefined || raw === "" || !Number.isInteger(value) || value < 1) {
-    console.error(`${flag} takes a whole number of 1 or more, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`);
+    console.error(
+      `${flag} takes a whole number of 1 or more, got ${raw === undefined ? "nothing" : JSON.stringify(raw)}`,
+    );
     process.exit(2);
   }
   return value;
@@ -134,24 +148,36 @@ function readDotenv(file, name) {
 
 // ---------- rules ----------
 
+function ruleSetsFor(which) {
+  if (which === "both") return ["docs", "writing"];
+  return which === "landing" ? ["landing", "writing"] : [which];
+}
+
+function addSetRules({ set, rules, amend, seen, only, skip, out }) {
+  for (const r of rules) {
+    if (seen.has(r.id)) continue; // shared rules (em-dash) run once
+    seen.add(r.id);
+    const key = `${set}/${r.id}`;
+    if (only && !only.has(r.id) && !only.has(key)) continue;
+    if (skip && (skip.has(r.id) || skip.has(key))) continue;
+    const extra = amend[r.id];
+    out.push(
+      extra && r.kind === "judge"
+        ? { ...r, set, key, instruction: `${r.instruction} ${extra}` }
+        : { ...r, set, key },
+    );
+  }
+}
+
 function loadRules(which, only, skip) {
-  const sets = which === "both" ? ["docs", "writing"] : which === "landing" ? ["landing", "writing"] : [which];
   const out = [];
   const seen = new Set();
   const amend = {};
-  for (const set of sets) {
+  for (const set of ruleSetsFor(which)) {
     const file = join(HERE, "rules", `${set}.json`);
     const doc = JSON.parse(readFileSync(file, "utf8"));
     Object.assign(amend, doc.amend ?? {});
-    for (const r of doc.rules) {
-      if (seen.has(r.id)) continue; // shared rules (em-dash) run once
-      seen.add(r.id);
-      const key = `${set}/${r.id}`;
-      if (only && !only.has(r.id) && !only.has(key)) continue;
-      if (skip && (skip.has(r.id) || skip.has(key))) continue;
-      const extra = amend[r.id];
-      out.push(extra && r.kind === "judge" ? { ...r, set, key, instruction: `${r.instruction} ${extra}` } : { ...r, set, key });
-    }
+    addSetRules({ set, rules: doc.rules, amend, seen, only, skip, out });
   }
   return out;
 }
@@ -175,7 +201,8 @@ function founderUnitsIn(paragraphs) {
       .map((l) => l.replace(/\s+/g, " ").trim())
       .filter(isFounder);
     for (const u of p.units) {
-      if (isFounder(u) || founderLines.some((l) => l.includes(u))) marked.add(u);
+      const onFounderLine = isFounder(u) || founderLines.some((l) => l.includes(u));
+      if (onFounderLine) marked.add(u);
       else plain.add(u);
     }
   }
@@ -222,7 +249,9 @@ function splitSections(body, level) {
     index: i,
     heading: s.heading,
     level: s.level,
-    text: ((s.heading ? `${"#".repeat(s.level)} ${s.heading}\n\n` : "") + s.lines.join("\n")).trim(),
+    text: (
+      (s.heading ? `${"#".repeat(s.level)} ${s.heading}\n\n` : "") + s.lines.join("\n")
+    ).trim(),
     paragraphs: splitParagraphs(s.lines),
   }));
 }
@@ -275,10 +304,18 @@ function classify(lines, kind) {
   if (lines.every((l) => /^\s*\|/.test(l))) {
     const rows = lines
       .filter((l) => !/^\s*\|?\s*:?-{2,}/.test(l))
-      .map((l) => l.replace(/^\s*\||\|\s*$/g, "").split("|").map((c) => c.trim()).filter(Boolean).join(". "));
+      .map((l) =>
+        l
+          .replace(/^\s*\||\|\s*$/g, "")
+          .split("|")
+          .map((c) => c.trim())
+          .filter(Boolean)
+          .join(". "),
+      );
     return { kind: "table", text, exempt, units: rows };
   }
-  if (lines.every((l) => /^\s*([-*+]|\d+[.)])\s/.test(l) || /^\s{2,}\S/.test(l))) {
+  const isList = lines.every((l) => /^\s*([-*+]|\d+[.)])\s/.test(l) || /^\s{2,}\S/.test(l));
+  if (isList) {
     const items = [];
     for (const l of lines) {
       if (/^\s*([-*+]|\d+[.)])\s/.test(l)) items.push(l.replace(/^\s*([-*+]|\d+[.)])\s+/, ""));
@@ -298,14 +335,20 @@ function classify(lines, kind) {
       .filter(Boolean)
       .join(" "),
   );
-  return { kind: "prose", text, exempt, units: splitSentences(prose), words: prose.split(/\s+/).length };
+  return {
+    kind: "prose",
+    text,
+    exempt,
+    units: splitSentences(prose),
+    words: prose.split(/\s+/).length,
+  };
 }
 
 function splitSentences(s) {
   const clean = s.replace(/\s+/g, " ").trim();
   if (!clean) return [];
   return clean
-    .split(/(?<=[.!?])["')\]]?\s+(?=["'(\[`*_]?[A-Z0-9])/)
+    .split(/(?<=[.!?])["')\]]?\s+(?=["'([`*_]?[A-Z0-9])/)
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
 }
@@ -323,38 +366,62 @@ function stripInlineCode(s) {
 
 // ---------- regex and local rules ----------
 
+function findHeadingHits({ re, section }) {
+  const heads = [section.heading ? `${"#".repeat(section.level)} ${section.heading}` : ""].concat(
+    section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()),
+  );
+  const hits = [];
+  for (const h of heads) {
+    // The pattern carries the g flag, so test() would resume from where
+    // the previous heading matched and skip a hit at the start of this one.
+    re.lastIndex = 0;
+    if (h && re.test(h)) hits.push({ sentence: h, match: h });
+  }
+  return hits;
+}
+
+function findProseHits({ re, section }) {
+  const hits = [];
+  for (const p of section.paragraphs) {
+    if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
+    for (const u of p.units) {
+      const m = stripInlineCode(u).match(re);
+      if (m) hits.push({ sentence: u, match: m[0] });
+    }
+  }
+  return hits;
+}
+
+/** Where a regex rule matches in one section, by the text it targets. */
+function findRegexHits({ re, target, section }) {
+  if (target === "raw") {
+    return [...section.text.matchAll(re)].map((m) => ({
+      sentence: m[0].slice(0, 200),
+      match: m[0],
+    }));
+  }
+  if (target === "headings") return findHeadingHits({ re, section });
+  return findProseHits({ re, section });
+}
+
 function runRegexRules(rules, section, doc, docCounts) {
   const findings = [];
   for (const r of rules) {
     if (r.kind !== "regex") continue;
     const re = new RegExp(r.pattern, r.flags ?? "gi");
-    let hits = [];
-    if (r.target === "raw") {
-      for (const m of section.text.matchAll(re)) hits.push({ sentence: m[0].slice(0, 200), match: m[0] });
-    } else if (r.target === "headings") {
-      const heads = [section.heading ? `${"#".repeat(section.level)} ${section.heading}` : ""].concat(
-        section.paragraphs.filter((p) => p.kind === "heading").map((p) => p.text.trim()),
-      );
-      for (const h of heads) {
-        // The pattern carries the g flag, so test() would resume from where
-        // the previous heading matched and skip a hit at the start of this one.
-        re.lastIndex = 0;
-        if (h && re.test(h)) hits.push({ sentence: h, match: h });
-      }
-    } else {
-      for (const p of section.paragraphs) {
-        if (p.kind === "code" || p.kind === "tag" || p.exempt) continue;
-        for (const u of p.units) {
-          const probe = stripInlineCode(u);
-          const m = probe.match(re);
-          if (m) hits.push({ sentence: u, match: m[0] });
-        }
-      }
-    }
+    const hits = findRegexHits({ re, target: r.target, section });
     if (r.documentMax != null) {
       // count across the whole document, fire only past the cap
       docCounts[r.key] = (docCounts[r.key] ?? 0) + hits.length;
-      if (hits.length) findings.push({ rule: r, probability: 1, sentence: hits[0].sentence, match: hits[0].match, deferred: true, count: hits.length });
+      if (hits.length)
+        findings.push({
+          rule: r,
+          probability: 1,
+          sentence: hits[0].sentence,
+          match: hits[0].match,
+          deferred: true,
+          count: hits.length,
+        });
       continue;
     }
     if (hits.length) {
@@ -371,38 +438,77 @@ function runRegexRules(rules, section, doc, docCounts) {
   return findings;
 }
 
+function paragraphWordsFindings({ rule, section }) {
+  const over = section.paragraphs.filter(
+    (p) => (p.kind === "prose" || p.kind === "list") && !p.exempt && countWords(p) > rule.max,
+  );
+  if (over.length === 0) return [];
+  const p = over[0];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `${countWords(p)} words: ${p.units[0] ?? p.text.slice(0, 120)}`,
+      count: over.length,
+    },
+  ];
+}
+
+function oneSentenceRunFindings({ rule, section }) {
+  let run = 0;
+  let best = 0;
+  let at = null;
+  for (const p of section.paragraphs) {
+    run = p.kind === "prose" && p.units.length === 1 ? run + 1 : 0;
+    if (run > best) {
+      best = run;
+      at = p;
+    }
+  }
+  if (best <= rule.max) return [];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `${best} one-sentence paragraphs in a row, ending: ${at.units[0]}`,
+    },
+  ];
+}
+
+function titleRepeatedFindings({ rule, section, doc }) {
+  if (section.index !== 0) return [];
+  const title = (doc.frontmatter.title ?? "").toLowerCase();
+  const first = doc.firstHeading?.toLowerCase();
+  if (!title || !first || title !== first) return [];
+  return [
+    {
+      rule,
+      probability: 1,
+      sentence: `title and first heading are both "${doc.frontmatter.title}"`,
+    },
+  ];
+}
+
+function titleHowToFindings({ rule, section, doc }) {
+  if (section.index !== 0) return [];
+  const title = doc.frontmatter.title ?? "";
+  if (!/^how to\b/i.test(title)) return [];
+  return [{ rule, probability: 1, sentence: `title: ${title}` }];
+}
+
+/** The local checks by name; each returns the findings it raises for one section. */
+const LOCAL_CHECKS = {
+  "paragraph-words": paragraphWordsFindings,
+  "one-sentence-paragraph-run": oneSentenceRunFindings,
+  "title-repeated-as-heading": titleRepeatedFindings,
+  "title-how-to": titleHowToFindings,
+};
+
 function runLocalRules(rules, section, doc) {
   const findings = [];
-  for (const r of rules) {
-    if (r.kind !== "local") continue;
-    if (r.check === "paragraph-words") {
-      const over = section.paragraphs.filter((p) => (p.kind === "prose" || p.kind === "list") && !p.exempt && countWords(p) > r.max);
-      if (over.length) {
-        const p = over[0];
-        findings.push({ rule: r, probability: 1, sentence: `${countWords(p)} words: ${p.units[0] ?? p.text.slice(0, 120)}`, count: over.length });
-      }
-    } else if (r.check === "one-sentence-paragraph-run") {
-      let run = 0;
-      let best = 0;
-      let at = null;
-      for (const p of section.paragraphs) {
-        if (p.kind === "prose" && p.units.length === 1) {
-          run++;
-          if (run > best) {
-            best = run;
-            at = p;
-          }
-        } else run = 0;
-      }
-      if (best > r.max) findings.push({ rule: r, probability: 1, sentence: `${best} one-sentence paragraphs in a row, ending: ${at.units[0]}` });
-    } else if (r.check === "title-repeated-as-heading" && section.index === 0) {
-      const title = (doc.frontmatter.title ?? "").toLowerCase();
-      const first = doc.firstHeading?.toLowerCase();
-      if (title && first && title === first) findings.push({ rule: r, probability: 1, sentence: `title and first heading are both "${doc.frontmatter.title}"` });
-    } else if (r.check === "title-how-to" && section.index === 0) {
-      const title = doc.frontmatter.title ?? "";
-      if (/^how to\b/i.test(title)) findings.push({ rule: r, probability: 1, sentence: `title: ${title}` });
-    }
+  for (const rule of rules) {
+    if (rule.kind !== "local" || !Object.hasOwn(LOCAL_CHECKS, rule.check)) continue;
+    findings.push(...LOCAL_CHECKS[rule.check]({ rule, section, doc }));
   }
   return findings;
 }
@@ -415,6 +521,13 @@ function countWords(p) {
 // ---------- Jev ----------
 
 class MaxTokens extends Error {}
+
+async function waitBeforeRetry(res, attempt, text) {
+  if (attempt >= 6)
+    throw new Error(`HTTP ${res.status} after ${attempt} attempts: ${text.slice(0, 200)}`);
+  const ra = Number(res.headers.get("retry-after"));
+  await sleep(ra > 0 ? ra * 1000 : backoff(attempt));
+}
 
 async function jev(key, state, questions, usage) {
   const body = JSON.stringify({ state, model: MODEL, questions });
@@ -443,11 +556,10 @@ async function jev(key, state, questions, usage) {
       usage.inputTokens += out.usage?.input_tokens ?? 0;
       return out;
     }
-    if (res.status === 400 && /max_tokens_exceeded/.test(text)) throw new MaxTokens(text.slice(0, 200));
+    if (res.status === 400 && /max_tokens_exceeded/.test(text))
+      throw new MaxTokens(text.slice(0, 200));
     if (res.status === 429 || res.status === 529 || res.status >= 500) {
-      if (attempt >= 6) throw new Error(`HTTP ${res.status} after ${attempt} attempts: ${text.slice(0, 200)}`);
-      const ra = Number(res.headers.get("retry-after"));
-      await sleep(ra > 0 ? ra * 1000 : backoff(attempt));
+      await waitBeforeRetry(res, attempt, text);
       continue;
     }
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
@@ -459,14 +571,21 @@ const backoff = (n) => (1 << Math.min(n, 4)) * 1000 * (0.5 + Math.random() * 0.5
 const estimateTokens = (s) => Math.ceil(s.length / 3.2);
 
 function noul(rule) {
-  return { type: "noul", instructions: rule.instruction, criteria: { true: rule.yes, false: rule.no } };
+  return {
+    type: "noul",
+    instructions: rule.instruction,
+    criteria: { true: rule.yes, false: rule.no },
+  };
 }
 
 // Sends the questions over one state, splitting the questions (never the
 // state) across requests when the token budget or the API says so.
 async function askInBatches(key, state, questions, usage) {
   const stateTokens = estimateTokens(JSON.stringify(state));
-  if (stateTokens > TOKEN_BUDGET) throw new Error(`section text alone is ~${stateTokens} tokens, over the ${TOKEN_BUDGET} budget; split it with a lower --section-level`);
+  if (stateTokens > TOKEN_BUDGET)
+    throw new Error(
+      `section text alone is ~${stateTokens} tokens, over the ${TOKEN_BUDGET} budget; split it with a lower --section-level`,
+    );
   const entries = Object.entries(questions);
   const answers = {};
   const queue = [entries];
@@ -493,7 +612,8 @@ async function askInBatches(key, state, questions, usage) {
   return answers;
 }
 
-const hasContent = (section) => section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
+const hasContent = (section) =>
+  section.paragraphs.some((p) => p.kind === "code" || p.units.length > 0);
 
 // The state a section is judged in. `withAbove` adds everything the reader
 // has seen before this block, so a rule can ask whether the block is
@@ -503,7 +623,10 @@ const hasContent = (section) => section.paragraphs.some((p) => p.kind === "code"
 function sectionState(section, doc, { withAbove = false } = {}) {
   const state = { heading: section.heading || "(no heading)", text: section.text };
   if (withAbove) {
-    const above = doc.sections.slice(0, section.index).map((s) => s.text).join("\n\n");
+    const above = doc.sections
+      .slice(0, section.index)
+      .map((s) => s.text)
+      .join("\n\n");
     state.above = above || "(nothing: this is the first block on the page)";
   }
   if (section.index === doc.firstContentIndex) {
@@ -531,7 +654,10 @@ async function askByContext(key, section, doc, items, toQuestion, usage) {
 async function judgeSection(key, rules, section, doc, opts, usage) {
   if (!hasContent(section)) return []; // a bare heading has nothing to judge
   const judge = rules.filter(
-    (r) => r.kind === "judge" && (r.scope !== "first-section" || section.index === doc.firstContentIndex) && (!r.context || doc.context),
+    (r) =>
+      r.kind === "judge" &&
+      (r.scope !== "first-section" || section.index === doc.firstContentIndex) &&
+      (!r.context || doc.context),
   );
   if (judge.length === 0) return [];
   const answers = await askByContext(
@@ -551,6 +677,26 @@ async function judgeSection(key, rules, section, doc, opts, usage) {
   return findings;
 }
 
+// Places the findings whose rule points at the heading or the opener, and
+// returns the rest, which need a second request to locate.
+function locateWithoutRequest({ fired, section, sentences, markFounder }) {
+  const targets = [];
+  for (const f of fired) {
+    // rules about the heading or the opener need no second request
+    if (f.rule.locate === "heading")
+      f.sentence = section.heading
+        ? `${"#".repeat(section.level)} ${section.heading}`
+        : sentences[0];
+    else if (f.rule.locate === "first-sentence") f.sentence = sentences[0];
+    else {
+      targets.push(f);
+      continue;
+    }
+    markFounder(f);
+  }
+  return targets;
+}
+
 async function locateSentences(key, findings, section, doc, opts, usage) {
   // A finding that can fail the run is located even below --locate: without a
   // sentence there is no way to tell whether it sits on a founder line.
@@ -562,17 +708,7 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
   const markFounder = (f) => {
     f.founder = isFounder(f.sentence) || founderUnits.has(f.sentence);
   };
-  const targets = [];
-  for (const f of fired) {
-    // rules about the heading or the opener need no second request
-    if (f.rule.locate === "heading") f.sentence = section.heading ? `${"#".repeat(section.level)} ${section.heading}` : sentences[0];
-    else if (f.rule.locate === "first-sentence") f.sentence = sentences[0];
-    else {
-      targets.push(f);
-      continue;
-    }
-    markFounder(f);
-  }
+  const targets = locateWithoutRequest({ fired, section, sentences, markFounder });
   if (targets.length === 0) return;
   const uniq = [...new Set(sentences)].slice(0, MAX_CHOICE_OPTIONS);
   if (uniq.length < 2) {
@@ -582,7 +718,9 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
     }
     return;
   }
-  const criteria = Object.fromEntries(uniq.map((s, i) => [`s${i + 1}`, s.length > 400 ? s.slice(0, 400) + "..." : s]));
+  const criteria = Object.fromEntries(
+    uniq.map((s, i) => [`s${i + 1}`, s.length > 400 ? s.slice(0, 400) + "..." : s]),
+  );
   const answers = await askByContext(
     key,
     section,
@@ -607,42 +745,68 @@ async function locateSentences(key, findings, section, doc, opts, usage) {
 
 // ---------- driver ----------
 
+async function lintSection({ section, rules, doc, docCounts, opts, key, usage }) {
+  const findings = [
+    ...runRegexRules(rules, section, doc, docCounts),
+    ...runLocalRules(rules, section, doc),
+  ];
+  let error = null;
+  try {
+    findings.push(...(await judgeSection(key, rules, section, doc, opts, usage)));
+    if (!opts.noLocate) await locateSentences(key, findings, section, doc, opts, usage);
+  } catch (e) {
+    error = e.message;
+  }
+  return { section, findings, error };
+}
+
 async function lintFile(file, rules, opts, key) {
   const src = readFileSync(file, "utf8");
   const { frontmatter, body } = parseFrontmatter(src);
   const sections = splitSections(body, opts.sectionLevel);
   const firstHeading = sections.find((s) => s.heading)?.heading;
   const firstContentIndex = Math.max(0, sections.findIndex(hasContent));
-  const doc = { file, frontmatter, firstHeading, firstContentIndex, context: opts.context, sections };
+  const doc = {
+    file,
+    frontmatter,
+    firstHeading,
+    firstContentIndex,
+    context: opts.context,
+    sections,
+  };
   const skipped = rules.filter((r) => r.context && !opts.context);
-  if (skipped.length) console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
+  if (skipped.length)
+    console.error(`note: ${skipped.map((r) => r.key).join(", ")} need --context and were skipped`);
   if (opts.noLocate && /\[founder\]/.test(src))
-    console.error("note: --no-locate skips the sentence-locating request, so [founder] lines are not recognised and can fail the run");
+    console.error(
+      "note: --no-locate skips the sentence-locating request, so [founder] lines are not recognised and can fail the run",
+    );
   const usage = { requests: 0, inputTokens: 0 };
   const docCounts = {};
-  const results = new Array(sections.length);
+  const results = Array.from({ length: sections.length });
 
   let next = 0;
   async function worker() {
     while (next < sections.length) {
       const i = next++;
-      const section = sections[i];
-      const findings = [...runRegexRules(rules, section, doc, docCounts), ...runLocalRules(rules, section, doc)];
-      let error = null;
-      try {
-        findings.push(...(await judgeSection(key, rules, section, doc, opts, usage)));
-        if (!opts.noLocate) await locateSentences(key, findings, section, doc, opts, usage);
-      } catch (e) {
-        error = e.message;
-      }
-      results[i] = { section, findings, error };
+      results[i] = await lintSection({
+        section: sections[i],
+        rules,
+        doc,
+        docCounts,
+        opts,
+        key,
+        usage,
+      });
     }
   }
   await Promise.all(Array.from({ length: Math.max(1, opts.concurrency) }, worker));
 
   // document-level caps (exclamation marks) resolve after every section ran
   for (const r of results) {
-    r.findings = r.findings.filter((f) => !f.deferred || docCounts[f.rule.key] > f.rule.documentMax);
+    r.findings = r.findings.filter(
+      (f) => !f.deferred || docCounts[f.rule.key] > f.rule.documentMax,
+    );
   }
 
   const out = {
@@ -654,7 +818,7 @@ async function lintFile(file, rules, opts, key) {
       error: r.error,
       findings: r.findings
         .filter((f) => f.probability >= opts.min)
-        .sort((a, b) => b.probability - a.probability)
+        .toSorted((a, b) => b.probability - a.probability)
         .map((f) => ({
           rule: f.rule.key,
           name: f.rule.name,
@@ -668,28 +832,40 @@ async function lintFile(file, rules, opts, key) {
     })),
     usage: { ...usage, usd: round((usage.inputTokens / 1e6) * PRICE_PER_MTOK, 6) },
   };
-  out.failed = out.sections.some((s) => s.findings.some((f) => f.probability >= opts.threshold && !f.founder));
+  out.failed = out.sections.some((s) =>
+    s.findings.some((f) => f.probability >= opts.threshold && !f.founder),
+  );
   return out;
 }
 
 const round = (x, d = 3) => Math.round(x * 10 ** d) / 10 ** d;
 
+function findingFlag(f, threshold) {
+  if (f.founder) return "f";
+  return f.probability >= threshold ? "!" : " ";
+}
+
+function sectionReportLines(s, opts) {
+  const lines = [`## ${s.heading || "(intro)"}  [${s.words} words]`];
+  if (s.error) lines.push(`  error: ${s.error}`);
+  if (s.findings.length === 0) lines.push("  clean");
+  for (const f of s.findings) {
+    const flag = findingFlag(f, opts.threshold);
+    const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
+    lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
+    if (f.sentence) lines.push(`        > ${f.sentence}`);
+  }
+  lines.push("");
+  return lines;
+}
+
 function printReport(rep, opts) {
   const lines = [];
-  lines.push(`${basename(rep.file)}  (${rep.rules} rules, ${rep.sections.length} sections, threshold ${opts.threshold})`);
+  lines.push(
+    `${basename(rep.file)}  (${rep.rules} rules, ${rep.sections.length} sections, threshold ${opts.threshold})`,
+  );
   lines.push("");
-  for (const s of rep.sections) {
-    lines.push(`## ${s.heading || "(intro)"}  [${s.words} words]`);
-    if (s.error) lines.push(`  error: ${s.error}`);
-    if (s.findings.length === 0) lines.push("  clean");
-    for (const f of s.findings) {
-      const flag = f.founder ? "f" : f.probability >= opts.threshold ? "!" : " ";
-      const extra = f.count && f.count > 1 ? `  (${f.count} hits)` : "";
-      lines.push(`${flag} ${f.probability.toFixed(2)}  ${f.rule}  ${f.name}${extra}`);
-      if (f.sentence) lines.push(`        > ${f.sentence}`);
-    }
-    lines.push("");
-  }
+  for (const s of rep.sections) lines.push(...sectionReportLines(s, opts));
   lines.push(
     `cost: ${rep.usage.inputTokens.toLocaleString()} input tokens over ${rep.usage.requests} requests = USD ${rep.usage.usd.toFixed(4)} (${PRICE_PER_MTOK} USD per million)`,
   );

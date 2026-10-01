@@ -1,22 +1,21 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   AgentsApiService,
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { type ResolvedCredentials, resolveCredentials } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { collapseStaleSiblings } from "./collapseAgents";
 
 /**
  * Who a personal or host-scoped agent belongs to, empty for a shared one.
- *
- * A personal agent of another person is listed like every other, because two
- * agents of one name are told apart by this column alone. It reads "owner
- * only" so the difference between "you can run this" and "you can see this"
- * is on the row rather than in a later refusal.
+ * Reads "owner only" so "you can run this" versus "you can see this" is on
+ * the row rather than in a later refusal.
  */
 export const agentOwnerLabel = (agent: AgentResponse): string => {
   const owner = agent.owner?.name ?? agent.hostLabel ?? "";
@@ -65,6 +64,39 @@ export interface ListAgentsOptions {
   all?: boolean;
 }
 
+/**
+ * The rows this command ships, not the rows the project has: stale siblings are
+ * collapsed unless `--all` asks for every row, and the total counts what ships.
+ */
+const shownAgents = ({
+  agents,
+  total,
+  all,
+}: {
+  agents: AgentResponse[];
+  total: number;
+  all?: boolean;
+}): { agents: AgentResponse[]; hidden: number; total: number } => {
+  const shown = all ? agents : collapseStaleSiblings({ agents });
+  const hidden = agents.length - shown.length;
+  return { agents: shown, hidden, total: total - hidden };
+};
+
+const foundAgentsLine = ({ total, hidden }: { total: number; hidden: number }): string => {
+  const found = `Found ${total} agent${total !== 1 ? "s" : ""}`;
+  if (hidden === 0) return found;
+  return `${found} (${hidden} stale row${hidden !== 1 ? "s" : ""} hidden, --all lists them)`;
+};
+
+const printHiddenRowsNote = (hidden: number): void => {
+  if (hidden === 0) return;
+  console.log(
+    chalk.gray(
+      `${hidden} stale row${hidden !== 1 ? "s" : ""} of a name and environment with a newer row hidden; ${chalk.cyan("langwatch agent list --all")} lists every row`,
+    ),
+  );
+};
+
 /** How often the list is read again while waiting. */
 const WAIT_POLL_MS = 3000;
 /** How long the wait lasts when the caller names no timeout. */
@@ -83,12 +115,9 @@ function identityOf(credentials: ResolvedCredentials): string {
 }
 
 /**
- * What `--wait-online` says when the timeout passes, on stderr in every output
- * format. It names the agent, the wait and the credentials the listing was
- * read with, so the reader is left with the agent process as the thing to
- * look at. It never mentions the login commands: under `--format json` the
- * spinner is silent, and a timeout whose only stderr line is the identity
- * notice with "langwatch login" in it reads as a login failure.
+ * What `--wait-online` says on timeout (stderr, every format): the agent, the wait and the
+ * credentials used. It never mentions login, which would read as a login failure under `--format
+ * json`.
  */
 export function waitOnlineTimeoutLine({
   wanted,
@@ -102,28 +131,17 @@ export function waitOnlineTimeoutLine({
   return `No agent named ${wanted} reported online within ${timeoutSeconds} seconds of --wait-online. The listing was read as ${identityOf(credentials)} at ${credentials.endpoint} and answered; the agent process never reported online.`;
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** True when the list holds the agent, by name or id, and it reports online. */
 const reportsOnline = (agents: AgentResponse[], wanted: string): boolean =>
   agents.some(
-    (agent) =>
-      (agent.name === wanted || agent.id === wanted) && agent.status === "online",
+    (agent) => (agent.name === wanted || agent.id === wanted) && agent.status === "online",
   );
 
 /**
- * Returns the listing rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). The `table` closure
- * is the human form.
- *
- * With `--wait-online`, the list is read again until the named agent reports
- * online. A process that has just started takes a few seconds to register,
- * and the wait belongs here rather than in a loop the caller writes: a
- * caller polling this command reads the document back itself, and one
- * misread gives up on an agent that is online the whole time.
- *
- * @see specs/typescript-sdk/cli-agents.feature
+ * Returns the listing rather than printing it: the output port renders it
+ * in whatever format the caller asked for (utils/output.ts).
  */
 export const listAgentsCommand = async (
   options: ListAgentsOptions = {},
@@ -146,9 +164,7 @@ export const listAgentsCommand = async (
           // Not spinner.fail: the spinner is silent under a machine format,
           // and this line has to reach the caller whatever the format.
           spinner.stop();
-          console.error(
-            waitOnlineTimeoutLine({ wanted, timeoutSeconds, credentials }),
-          );
+          console.error(waitOnlineTimeoutLine({ wanted, timeoutSeconds, credentials }));
           console.error(
             chalk.gray(
               "Read the process's own output for the reason: an exception at startup, or the SDK's connect line.",
@@ -160,22 +176,13 @@ export const listAgentsCommand = async (
         result = await service.list({ limit: 100 });
       }
     }
-    const agents = options.all
-      ? result.data
-      : collapseStaleSiblings({ agents: result.data });
-    const hidden = result.data.length - agents.length;
-    // The rows this command ships, not the rows the project has: a reader of
-    // the machine document counts what it was given, and a total that includes
-    // the collapsed siblings reads as a truncated page.
-    const total = result.pagination.total - hidden;
+    const { agents, hidden, total } = shownAgents({
+      agents: result.data,
+      total: result.pagination.total,
+      all: options.all,
+    });
 
-    spinner.succeed(
-      `Found ${total} agent${total !== 1 ? "s" : ""}${
-        hidden > 0
-          ? ` (${hidden} stale row${hidden !== 1 ? "s" : ""} hidden, --all lists them)`
-          : ""
-      }`,
-    );
+    spinner.succeed(foundAgentsLine({ total, hidden }));
 
     return {
       data: {
@@ -188,7 +195,11 @@ export const listAgentsCommand = async (
         if (agents.length === 0) {
           console.log();
           console.log(chalk.gray("No agents found in this project."));
-          console.log(chalk.gray("Connect one from code with connectAgent (langwatch/agent), or create an HTTP agent with:"));
+          console.log(
+            chalk.gray(
+              "Connect one from code with connectAgent (langwatch/agent), or create an HTTP agent with:",
+            ),
+          );
           console.log(
             chalk.cyan(
               '  langwatch agent create "My Agent" --type http --config \'{"url":"https://..."}\'',
@@ -223,17 +234,9 @@ export const listAgentsCommand = async (
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch agent get <id>")} to view agent details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch agent get <id>")} to view agent details`),
         );
-        if (hidden > 0) {
-          console.log(
-            chalk.gray(
-              `${hidden} stale row${hidden !== 1 ? "s" : ""} of a name and environment with a newer row hidden; ${chalk.cyan("langwatch agent list --all")} lists every row`,
-            ),
-          );
-        }
+        printHiddenRowsNote(hidden);
       },
     };
   } catch (error) {

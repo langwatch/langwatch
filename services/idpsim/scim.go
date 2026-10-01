@@ -203,8 +203,11 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 			scimError(w, http.StatusBadRequest, "unparseable user resource")
 			return
 		}
+		t.mu.Lock()
 		body.applyTo(u)
-		writeJSON(w, http.StatusOK, scimUserResource(u))
+		resource := scimUserResource(u)
+		t.mu.Unlock()
+		writeJSON(w, http.StatusOK, resource)
 	case http.MethodPatch:
 		s.patchSCIMUser(w, r, scimUserTarget{Tenant: t, User: u})
 	case http.MethodDelete:
@@ -226,19 +229,24 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 // doing, and it should not read as a generic "updated".
 func (s *Server) patchSCIMUser(w http.ResponseWriter, r *http.Request, target scimUserTarget) {
 	u := target.User
+	target.Tenant.mu.Lock()
 	wasActive := u.Active
 	if !applySCIMPatch(w, r, func(path string, value any) {
 		applyUserPatch(u, path, value)
 	}) {
+		target.Tenant.mu.Unlock()
 		return
 	}
+	subject, detail := u.Email, patchDetail(u, wasActive)
+	resource := scimUserResource(u)
+	target.Tenant.mu.Unlock()
 	s.record(target.Tenant, Event{
 		Kind:    "scim.user.update",
 		Outcome: OutcomeOK,
-		Subject: u.Email,
-		Detail:  patchDetail(u, wasActive),
+		Subject: subject,
+		Detail:  detail,
 	})
-	writeJSON(w, http.StatusOK, scimUserResource(u))
+	writeJSON(w, http.StatusOK, resource)
 }
 
 // scimUserTarget is the user a SCIM operation resolved to, and the tenant it
@@ -447,12 +455,16 @@ func (s *Server) handleSCIMGroup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, scimGroupResource(t, g))
 	case http.MethodPatch:
+		t.mu.Lock()
 		if !applySCIMPatch(w, r, func(path string, value any) {
 			applyGroupPatch(g, path, value)
 		}) {
+			t.mu.Unlock()
 			return
 		}
-		writeJSON(w, http.StatusOK, scimGroupResource(t, g))
+		updated := &Group{ID: g.ID, Name: g.Name, MemberIDs: append([]string{}, g.MemberIDs...)}
+		t.mu.Unlock()
+		writeJSON(w, http.StatusOK, scimGroupResource(t, updated))
 	case http.MethodDelete:
 		t.RemoveGroup(g.ID)
 		w.WriteHeader(http.StatusNoContent)

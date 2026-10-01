@@ -20,7 +20,7 @@ What problem does this feature solve? Why is it needed?
 
 As a [role], I want [capability], so that [benefit].
 
-*One capability per issue; split otherwise.*
+_One capability per issue; split otherwise._
 
 **Alternatives considered**
 

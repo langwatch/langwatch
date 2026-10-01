@@ -33,6 +33,33 @@ FLATTENED = {
 }
 
 
+def flatten_self_reference(node, ref):
+    """The span value's `list` arm nests itself; the generator rejects that as it does JsonValue."""
+    if isinstance(node, dict):
+        if node.get("$ref") == ref:
+            return dict(FLATTENED)
+        return {key: flatten_self_reference(value, ref) for key, value in node.items()}
+    if isinstance(node, list):
+        return [flatten_self_reference(value, ref) for value in node]
+    return node
+
+
+def relax_prompt_schema(node):
+    """Prompts keep the published SDK's reading: dates stay wire strings, platformUrl optional."""
+    if isinstance(node, dict):
+        relaxed = {
+            key: relax_prompt_schema(value)
+            for key, value in node.items()
+            if not (key == "format" and value == "date-time")
+        }
+        if isinstance(relaxed.get("required"), list) and "platformUrl" in relaxed.get("properties", {}):
+            relaxed["required"] = [name for name in relaxed["required"] if name != "platformUrl"]
+        return relaxed
+    if isinstance(node, list):
+        return [relax_prompt_schema(value) for value in node]
+    return node
+
+
 def main() -> int:
     if len(sys.argv) != 3:
         print(
@@ -57,6 +84,13 @@ def main() -> int:
         return 1
 
     schemas["JsonValue"] = dict(FLATTENED)
+    for path, item in spec.get("paths", {}).items():
+        if path.startswith("/api/v1/prompts"):
+            spec["paths"][path] = relax_prompt_schema(item)
+    if "SpanInputOutput" in schemas:
+        schemas["SpanInputOutput"] = flatten_self_reference(
+            schemas["SpanInputOutput"], "#/components/schemas/SpanInputOutput"
+        )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(spec, indent=2))
     print(f"spec-for-python-generator: wrote {destination}")

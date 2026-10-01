@@ -1,0 +1,98 @@
+import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import {
+  langyTurnDeps,
+  workerCredentials,
+  conversationDetail,
+} from "../../__tests__/support/langy-turn-deps.ts";
+import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
+
+function makeFixture() {
+  const acceptTurn = vi.fn(async () => ({ turnId: "turn-1" }));
+  const dispatch = vi.fn(async () => "accepted" as const);
+  const deps = langyTurnDeps({
+    conversations: {
+      ensureConversation: vi.fn(async () => ({ id: "conversation-1", isNew: false })),
+      findByIdVisible: vi.fn(async () =>
+        conversationDetail({ status: LANGY_CONVERSATION_STATUS.IDLE }),
+      ),
+      findPendingHandoff: vi.fn(async () => null),
+      findRunToken: vi.fn(async () => "run-token"),
+      acceptTurn,
+      finalizeTurn: vi.fn(async () => ({ messageId: "message-1" })),
+    },
+    credentials: {
+      getOrProvision: vi.fn(async () => workerCredentials({ organizationId: "organization-1" })),
+      findEgressAllowlist: vi.fn(async () => null),
+      resolveMirrorTier: vi.fn(async () => "content" as const),
+      findModelsAllowed: vi.fn(async () => null),
+    },
+    models: { resolve: vi.fn(async () => ({ modelId: "openai/gpt-5-mini" })) },
+    worker: {
+      probe: vi.fn(async () => false),
+      dispatch,
+      cancel: vi.fn(async () => undefined),
+      warm: vi.fn(async () => undefined),
+    },
+    tokenBuffer: null,
+    permits: {
+      reserve: vi.fn(async () => ({ reserved: false, allowed: true, resetAt: 0 })),
+      release: vi.fn(async () => undefined),
+      check: vi.fn(async () => ({ allowed: true })),
+    },
+    perDayPrCap: 5,
+    sessionKeys: {
+      mint: vi.fn(async () => ({ token: "session-key", apiKeyId: "key-1" })),
+      revoke: vi.fn(async () => undefined),
+    },
+    context: { render: vi.fn(() => null) },
+    uiActionSurface: { resolve: vi.fn(async () => true) },
+    skillGates: { resolveDisabled: vi.fn(async () => []) },
+    metrics: { count: vi.fn() },
+    admission: {
+      claim: vi.fn(async () => ({
+        kind: "claimed" as const,
+        claimToken: "claim-1",
+        conversationId: "conversation-1",
+        turnId: "turn-1",
+      })),
+      commit: vi.fn(async () => undefined),
+      abort: vi.fn(async () => undefined),
+      release: vi.fn(async () => undefined),
+    },
+    accessStore: {
+      grant: vi.fn(async () => undefined),
+      isTurnActor: vi.fn(async () => true),
+    },
+    handoffStore: { stash: vi.fn(async () => undefined) },
+    messages: { findAllByConversation: vi.fn(async () => []) },
+  });
+  return { deps, acceptTurn, dispatch };
+}
+
+const input: StartConversationTurnInput = {
+  projectId: "project-1",
+  idempotencyKey: "00000000-0000-4000-8000-000000000001",
+  session: { user: { id: "user-1" } },
+  requestedConversationId: null,
+  messages: [{ role: "user", parts: [{ type: "text", text: "hello" }] }],
+  isRetry: false,
+  turnContext: {},
+};
+
+describe("LangyTurnService package boundary", () => {
+  it("admits before it records and directly dispatches only after commit", async () => {
+    const fixture = makeFixture();
+    const result = await LangyTurnService.create(fixture.deps).startConversationTurn(input);
+    expect(result).toEqual({ conversationId: "conversation-1", turnId: "turn-1" });
+    expect(fixture.acceptTurn).toHaveBeenCalledOnce();
+    expect(fixture.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conversationId: "conversation-1",
+        intent: "create",
+        modelOverride: "openai/gpt-5-mini",
+      }),
+    );
+  });
+});

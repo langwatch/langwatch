@@ -29,6 +29,12 @@ func runSetup(_ context.Context, d deps, inv invocation) error {
 		printFeatures(os.Stdout)
 		return nil
 	}
+	if inv.has("--off") {
+		if len(inv.args) == 0 {
+			return fmt.Errorf("haven setup --off needs a feature name (e.g. haven setup gate-hook --off)")
+		}
+		return offFeatures(d, inv.args)
+	}
 
 	wanted := inv.args
 	if len(wanted) == 0 {
@@ -64,6 +70,23 @@ func installFeatures(d deps, wanted []string) error {
 			fmt.Printf("✓ %s installed\n", name)
 		default:
 			fmt.Printf("· %s was already installed\n", name)
+		}
+	}
+	return nil
+}
+
+// offFeatures turns each named feature back off, so a later automatic install
+// - the gate hook's is the one `haven up` makes today - leaves it alone.
+func offFeatures(d deps, wanted []string) error {
+	for _, name := range wanted {
+		turnedOff, err := d.orch.OptOutFeature(name)
+		switch {
+		case err != nil:
+			return err
+		case turnedOff:
+			fmt.Printf("✓ %s turned off here; haven up will not reinstall it\n", name)
+		default:
+			fmt.Printf("· %s was already off\n", name)
 		}
 	}
 	return nil

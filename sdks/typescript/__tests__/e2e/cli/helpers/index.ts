@@ -8,5 +8,8 @@ export * from "./lock-file-manager";
 // Constants
 export * from "./constants";
 
+// The journey suite's spawn environment
+export * from "./journey-cli";
+
 // Expectations
 export * as expectations from "./expectations";

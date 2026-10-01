@@ -1,20 +1,18 @@
 /**
  * The ACME support application: one HTTP endpoint over the support agent.
- *
- * Run it with `pnpm dev`. The same process serves `POST /chat` and answers
- * simulations from LangWatch, because `connectAgent` opens one outbound
- * connection when the module loads.
+ * `pnpm dev` runs it; the same process serves POST /chat and answers
+ * LangWatch simulations, since `connectAgent` opens a connection on load.
  */
 import "dotenv/config";
+import { pathToFileURL } from "node:url";
 
 import { serve } from "@hono/node-server";
+import type { ModelMessage } from "ai";
 import { Hono } from "hono";
 import { connectAgent, type AgentMessage } from "langwatch/agent";
-import { pathToFileURL } from "node:url";
 import { z } from "zod";
 
-import { ACCOUNT_ID, answerTurn } from "./agent.js";
-import type { ModelMessage } from "ai";
+import { ACCOUNT_ID, answerTurn } from "./agent.ts";
 
 export const acmeSupport = connectAgent(
   {

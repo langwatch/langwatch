@@ -30,9 +30,15 @@ COMMANDS
 EXAMPLES
     haven up                     # stack up in the background + attached log view
     haven up +langy              # add a service here, now and from now on
+    haven up +design-system +mail-room  # add the design-system Storybook + mail studio
+    haven up +langevals          # run the evaluators monitors and evaluations call
+    haven up +llm                # answer every model call from llmsim, at no cost
+    haven up +analytics          # catch PostHog and Customer.io calls in analyticssim
     haven                        # the hub: the whole machine + actions (git/cleanup/down/destroy)
     haven status                 # every stack + shared-server health, one shot
     haven logs nlp -t            # tail one service live
+    haven errors                 # the last distinct failures, grouped and counted
+    haven traces --json          # this stack's recent root spans, for an agent
     haven db seed demo           # reseed in place, dropping nothing
     haven pr 4913                # try PR #4913 locally in a fresh worktree
     haven down                   # stop the stack, keep the databases
@@ -54,12 +60,29 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
+The six simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp and storage run by default; llm, voice and analytics come with "haven up +llm
++voice +analytics". Read one's output with "haven logs <name>".
+
+    mail|idp|storage|llm|voice|analytics.portless.langwatch.localhost
+
+Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
+
+    design-system.portless.langwatch.localhost  The design system's Storybook
+    mail-room.portless.langwatch.localhost      The mail studio
+
+The design system takes a shorter spelling too: "ds" stands in for
+"design-system". The mail studio has no alias — its hostname is
+mail-room.<slug>, full stop.
+
 The app and its API share ONE origin: open app.<slug>.langwatch.localhost for the
 UI and hit app.<slug>.langwatch.localhost/api for the API — one URL, not two.
 
 Postgres has no routed hostname: unlike ClickHouse (HTTP), it speaks its own
 wire protocol, which the HTTP proxy can't carry — "haven db url postgres" (or
-DATABASE_URL in .env.portless) is the real, loopback connection string.
+DATABASE_URL from "haven env --reveal") is the real, loopback connection string:
+plain "haven env" masks every classified secret and strips the credential out of
+a connection string, so paste that one into an issue and the reveal into a shell.
 
 Shared, machine-wide (one daemon, all worktrees):
 
@@ -72,8 +95,8 @@ Shared, machine-wide (one daemon, all worktrees):
 
 var envHelpText = `Environment variables.
 
-    Most of the knobs below also resolve from platform/app/.env (then
-    .env.portless), so a lasting preference like "this machine runs native
+    Most of the knobs below also resolve from .env, so a lasting
+    preference like "this machine runs native
     ClickHouse, never provision one" lives next to the URL it belongs with and
     travels into every new worktree. An exported variable still wins, for
     overriding a single run.
@@ -81,7 +104,8 @@ var envHelpText = `Environment variables.
     These describe ONE run rather than one machine, so they are read from the
     process environment only: LANGWATCH_SLUG, HAVEN_BASELINE, LANGWATCH_SEED,
     HAVEN_SEED_TRACES, HAVEN_STUB, HAVEN_AGENT, NO_COLOR, FORCE_COLOR,
-    HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT. Every worktree shares one
+    HAVEN_TRUSTED_REPO_ROOT, HAVEN_UNTRUSTED_CHECKOUT, HAVEN_JOB_DIR,
+    CLAUDE_JOB_DIR. Every worktree shares one
     .env, so pinning a slug or a baseline marker there would apply it to all of
     them, and a seed flag would re-seed on every up.
 
@@ -112,36 +136,39 @@ var envHelpText = `Environment variables.
 
   Machine load: slots, pressure and reaping
     HAVEN_TYPECHECK_SLOTS=N      Cap concurrent "haven typecheck" runs (default:
-                                 one per ~4 GiB RAM, capped at CPU count).
+                                 the shared CHECK_SLOTS policy).
     HAVEN_TYPECHECK_MAX_RSS_MB   Kill a typecheck run over this RSS (default 6144
                                  = 6 GiB) or over 10 minutes wall-clock — a
                                  runaway typecheck shouldn't sit on a slot
-                                 forever.
-    CHECK_SLOTS=N                Caps concurrent whole-repo checks ("pnpm
-                                 typecheck", "pnpm lint") machine wide (0
-                                 disables — from a person's shell; agent shells
-                                 carry CLAUDECODE and a gate-off there is
-                                 ignored). With haven installed those runs are
-                                 delegated to "haven slot run", which gates on
-                                 the same flock semaphore "haven typecheck"
-                                 holds — one counter for everything that
-                                 saturates the cores. Both set CHECK_SLOTS=0
-                                 with their pid in CHECK_QUEUE_HELD for the run
-                                 they spawn, so a run is never counted twice
-                                 and cannot queue behind itself; the marker
-                                 only convinces a descendant, and only when it
-                                 names one of those two wrappers.
-                                 CHECK_QUEUE_IMPL=js forces the JavaScript
-                                 queue in dev/scripts/check-queue.mjs.
+                                 forever. Per slot: an --affected run
+                                 holding N slots may use N times this.
+    CHECK_SLOTS=N                Concurrent checks across optional agent hooks,
+                                 "haven slot run" and "haven typecheck". The
+                                 default uses available machine capacity; plain
+                                 repository scripts run directly. A live queue
+                                 owner is recognized through CHECK_QUEUE_HELD
+                                 so descendants do not take another slot.
+    CHECK_PRESSURE=green|amber|red
+                                 Override the measured machine pressure when
+                                 resolving the shared queue's capacity.
     HAVEN_SLOT_HELD=1            Set by "haven run" inside the command it spawns:
                                  this run is already admitted, do not admit again.
     HAVEN_IDLE_TTL=4h            Reap a stack whose heartbeat is older than this.
-    HAVEN_DB_TTL=336h            Background-prune databases whose worktree has not
-                                 been up for this long (default 14 days; 0 disables).
+    HAVEN_DB_TTL=96h             Background-prune databases whose worktree has not
+                                 been up for this long (default 4 days; 0 disables).
                                  Only databases haven itself created are considered,
                                  and lw_main is always kept.
     HAVEN_PRUNE_STALE_DAYS=5     Idle age at which "haven clean" pre-ticks a
                                  worktree for deletion (--stale-days N overrides).
+                                 Temporary and merged worktrees are pre-ticked on
+                                 their class instead, whatever their age.
+    HAVEN_JOBS_ROOT=<dir>        Where agent job directories live (default
+                                 ~/.claude/jobs). "haven clean" and the daemon
+                                 reclaim a cold job's scratch and keep its
+                                 state.json + timeline.jsonl. Cold means terminal
+                                 for more than 48h, or untouched for a week; a job
+                                 that finished more recently is reached only by
+                                 "haven clean --include-recent". Empty disables it.
 
   Services and data
     LANGWATCH_SEED=1             Seed the DB during up.
@@ -153,12 +180,12 @@ var envHelpText = `Environment variables.
                                  worktree and agent authenticates with the same
                                  key. Same story for the rest of the seeded
                                  identity (admin login, PATs) — see
-                                 platform/app/prisma/seed.ts's header comment.
+                                 the seed script's header comment.
 
   ClickHouse
     LANGWATCH_HAVEN_CH=0         Do not manage ClickHouse (use .env CLICKHOUSE_URL).
     LANGWATCH_HAVEN_CH_STOP_IDLE=1  Daemon stops the CH container when no stacks run.
-    LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 1536).
+    LANGWATCH_HAVEN_CH_MEMORY_MB    CH container memory ceiling in MB (default 3/64 of RAM, 1536-4096).
     HAVEN_CH_IMAGE=<image>       Override the pinned Altinity ClickHouse image.
     HAVEN_CLICKHOUSE_FULL_LOGS=1 Keep ClickHouse's stock logging. By default
                                  haven disables the high-volume system logs
@@ -186,6 +213,18 @@ var envHelpText = `Environment variables.
                                  (writes fail loudly at the cap instead of the
                                  machine paging; 0 disables the cap).
 
+  Machine limits (also: haven limits [set <name> <value> | unset <name>])
+    Each is a knob below, and a settings file in haven's home holds what
+    "haven limits set" saves. Precedence: environment > .env > settings > default.
+    LW_OBS_MEMORY_MB             Observability container memory ceiling in MB.
+    HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
+    HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
+    HAVEN_TEST_WORKERS=N         Machine-wide cap on unit test workers.
+    HAVEN_INSTANT_EVAL_MOCK_JUDGE=1  Judge Instant Evals with the app's deterministic
+                                 memory judge (INSTANT_EVAL_CLASSIFIER=memory); modular
+                                 checkouts only, from the next haven up. Default 0.
+    (also LANGWATCH_HAVEN_CH_MEMORY_MB and HAVEN_REDIS_MAXMEMORY_MB, above.)
+
   Containers, langy and observability
     HAVEN_COLIMA_PROFILE=name    colima profile ClickHouse + observability run on
                                  (default: default). A profile haven creates is
@@ -201,9 +240,12 @@ var envHelpText = `Environment variables.
                                  flag) keeps the sandbox on, mirroring production.
     LANGY_UNSAFE_HOST_ACCESS=1   Run the langyagent worker as a bare host process
                                  with no colima and no VM boundary, so it has
-                                 full host access.
-                                 The fast-iteration tier, and the one that lets a
-                                 stack come up with no container runtime at all.
+                                 full host access. The fast-iteration tier.
+                                 A development stack with no container runtime
+                                 resolves to it on its own and says so on "up";
+                                 LANGY_UNSAFE_HOST_ACCESS=0 refuses that and
+                                 keeps the sandboxed tier (langy then does not
+                                 start without a runtime).
     HAVEN_LANGY_IMAGE_REGISTRY   Registry ref (e.g. ghcr.io/langwatch/langyagent)
                                  to pull a CI-published langy image for the
                                  current content hash instead of building.

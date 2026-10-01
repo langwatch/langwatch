@@ -1,0 +1,217 @@
+/**
+ * @vitest-environment node
+ *
+ * @see specs/scenarios/scenario-input-mapping.feature
+ */
+
+import { describe, expect, it } from "vitest";
+
+import {
+  ChildProcessJobDataSchema,
+  CodeAgentDataSchema,
+  TargetConfigSchema,
+} from "../scenario-execution-data.ts";
+
+describe("CodeAgentDataSchema", () => {
+  describe("when scenarioOutputField is provided", () => {
+    it("validates and preserves scenarioOutputField", () => {
+      const result = CodeAgentDataSchema.safeParse({
+        type: "code",
+        agentId: "agent_1",
+        code: "def execute(x): return x",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [
+          { identifier: "answer", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+        scenarioOutputField: "answer",
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
+      }
+      expect(result.data.scenarioOutputField).toBe("answer");
+    });
+  });
+
+  describe("when scenarioOutputField is omitted", () => {
+    it("validates successfully with scenarioOutputField as undefined", () => {
+      const result = CodeAgentDataSchema.safeParse({
+        type: "code",
+        agentId: "agent_1",
+        code: "def execute(x): return x",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+      });
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
+      }
+      expect(result.data.scenarioOutputField).toBeUndefined();
+    });
+  });
+});
+
+describe("TargetConfigSchema", () => {
+  describe("when only type and referenceId are provided", () => {
+    it("validates successfully", () => {
+      const result = TargetConfigSchema.safeParse({
+        type: "http",
+        referenceId: "agent_http_1",
+      });
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe("when all valid target types are used", () => {
+    /** @scenario Suite target schema accepts all valid target types */
+    it("accepts every valid target type", () => {
+      for (const type of ["prompt", "http", "code", "workflow"] as const) {
+        expect(TargetConfigSchema.validate({ type, referenceId: `${type}_ref` })).toBe(true);
+      }
+    });
+
+    it("accepts prompt type", () => {
+      expect(TargetConfigSchema.validate({ type: "prompt", referenceId: "p1" })).toBe(true);
+    });
+
+    it("accepts http type", () => {
+      expect(TargetConfigSchema.validate({ type: "http", referenceId: "h1" })).toBe(true);
+    });
+
+    it("accepts code type", () => {
+      expect(TargetConfigSchema.validate({ type: "code", referenceId: "c1" })).toBe(true);
+    });
+  });
+});
+
+describe("ChildProcessJobDataSchema", () => {
+  describe("when scenarioMappings are on adapterData", () => {
+    /** @scenario fieldMappings threads through scenario job schema */
+    /** @scenario fieldMappings threads through child process data schema */
+    it("validates and preserves scenarioMappings in parsed output", () => {
+      const payload = {
+        context: {
+          projectId: "proj_1",
+          scenarioId: "scen_1",
+          setId: "set_1",
+          batchRunId: "batch_1",
+        },
+        scenario: {
+          id: "scen_1",
+          name: "Test",
+          situation: "A situation",
+          criteria: [],
+          labels: [],
+        },
+        adapterData: {
+          type: "code",
+          agentId: "agent_1",
+          code: "def execute(x): return x",
+          inputs: [{ identifier: "query", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          scenarioMappings: {
+            query: {
+              type: "source",
+              sourceId: "scenario",
+              path: ["scenario_message"],
+            },
+          },
+        },
+        modelParams: {
+          api_key: "key",
+          model: "openai/gpt-5-mini",
+        },
+        simulatorModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        judgeModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        nlpServiceUrl: "http://localhost:8080",
+        target: { type: "code", referenceId: "agent_1" },
+      };
+
+      const result = ChildProcessJobDataSchema.safeParse(payload);
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
+      }
+      expect(result.data.adapterData.type).toBe("code");
+      if (result.data.adapterData.type !== "code") {
+        throw new Error("expected a code adapter");
+      }
+      expect(result.data.adapterData.scenarioMappings).toEqual(
+        payload.adapterData.scenarioMappings,
+      );
+    });
+  });
+
+  describe("when scenarioMappings are on HttpAgentData", () => {
+    it("validates and preserves scenarioMappings in parsed output", () => {
+      const payload = {
+        context: {
+          projectId: "proj_1",
+          scenarioId: "scen_1",
+          setId: "set_1",
+          batchRunId: "batch_1",
+        },
+        scenario: {
+          id: "scen_1",
+          name: "Test",
+          situation: "A situation",
+          criteria: [],
+          labels: [],
+        },
+        adapterData: {
+          type: "http",
+          agentId: "agent_1",
+          url: "https://api.example.com",
+          method: "POST",
+          headers: [],
+          scenarioMappings: {
+            input: {
+              type: "source",
+              sourceId: "scenario",
+              path: ["scenario_message"],
+            },
+          },
+        },
+        modelParams: {
+          api_key: "key",
+          model: "openai/gpt-5-mini",
+        },
+        simulatorModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        judgeModelParams: {
+          api_key: "test-key",
+          model: "openai/gpt-5-mini",
+        },
+        nlpServiceUrl: "http://localhost:8080",
+        target: { type: "http", referenceId: "agent_1" },
+      };
+
+      const result = ChildProcessJobDataSchema.safeParse(payload);
+
+      expect(result.success).toBe(true);
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
+      }
+      expect(result.data.adapterData.type).toBe("http");
+      if (result.data.adapterData.type !== "http") {
+        throw new Error("expected an http adapter");
+      }
+      expect(result.data.adapterData.scenarioMappings).toEqual(
+        payload.adapterData.scenarioMappings,
+      );
+    });
+  });
+});

@@ -639,6 +639,21 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And I can go back to the address step for a mistyped address
 
   @integration
+  Scenario: An address with no account on an installation that cannot send email goes to the password step
+    Given the installation has no email provider configured
+    When I enter an email address no account holds on the log-in screen
+    And I continue with the sign-up it offers
+    Then no confirmation link is sent and I am not told to check my email
+    And the sign-up door opens on the password step for that address, marked unconfirmed
+
+  @integration
+  Scenario: A late instance-methods answer does not undo the carried address routing
+    Given the sign-up door opened with an address carried from the log-in screen
+    And it asked the router about the instance's methods and about that address
+    When the answer for the address arrives before the answer for the methods
+    Then the screen keeps the routing decision for the address
+
+  @integration
   Scenario: An account with a passkey is asked for it, not offered a button
     Given my account holds a passkey
     When I submit my email address
@@ -694,6 +709,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: A successful sign-in shows no error
     When I sign in with the correct password
     Then no alert or toast appears on the page I land on
+
+  # The door meters through the counter the process already supplies it, so a
+  # refusal is the throttle's own code with the wait in its meta — never the
+  # platform-fault "service unavailable" a missing collaborator raises. The
+  # presentation registry for `auth_rate_limited` reads `retryAfterSeconds`
+  # to say how long; without it every customer is told "a few minutes".
+  @unit
+  Scenario: A throttled door says how long the wait is
+    Given a front door operation past its budget
+    When the door refuses the attempt
+    Then the refusal carries the rate-limit code, not a service-unavailable one
+    And it carries the seconds to wait, so the words can name them
 
   # Bug-bash finding: the ordinary case — a person kept getting logged out
   # and signing back in, the way a shared machine or a flaky network makes

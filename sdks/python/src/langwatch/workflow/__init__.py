@@ -27,7 +27,7 @@ from langwatch.experiment.platform_run import (
 )
 from langwatch.http_client import create_client
 from langwatch.state import get_api_key, get_endpoint
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 
 
 def _experiment_slug_from_run_url(run_url: str) -> str:
@@ -153,8 +153,8 @@ def _evaluate_workflow(
     """Kick off a workflow evaluation run."""
     with create_client(timeout=60) as client:
         response = client.post(
-            f"{endpoint}/api/workflows/{workflow_id}/evaluate",
-            headers=build_auth_headers(api_key),
+            f"{endpoint}/api/v1/workflows/{workflow_id}/evaluate",
+            headers=build_request_headers(api_key),
             json=body or None,
         )
 

@@ -1,19 +1,7 @@
 /**
- * The frames of the local control socket, as the CLI speaks them.
- *
- * `langwatch langy --share-control` opens this socket from the developer's
- * machine. Langy's local tools arrive as `call` frames the CLI runs in the
- * shared folder; the CLI answers with `result`. A call that needs the
- * developer's approval produces `permission_required`, the panel renders the
- * card, and the platform answers with `permission`.
- *
- * `platform/app/src/server/langy-local-control/protocol.ts` is the contract;
- * this file is the CLI's copy. The validators are small and hand-written for
- * the same reason `protocol.ts` next door has hand-written ones: no schema
- * library may cross into the published surface. A drift test in
- * `__tests__/local-control-protocol-drift.unit.test.ts` pins the two together.
- *
- * @see dev/docs/adr/129-langy-local-control.md
+ * The frames of the local control socket, as the CLI speaks them: a
+ * hand-written copy of the platform's own protocol.ts, pinned together by
+ * `__tests__/local-control-protocol-drift.unit.test.ts`.
  */
 
 export const LOCAL_CONTROL_PROTOCOL_VERSION = 1;
@@ -69,14 +57,11 @@ export interface LocalWriteParams {
  * One edit: a replacement of text the file already holds, or text appended
  * at the end of the file.
  */
-export type LocalEditReplace =
-  | { oldText: string; newText: string }
-  | { append: string };
+export type LocalEditReplace = { oldText: string; newText: string } | { append: string };
 
 /** True for the form of an edit that adds text at the end of the file. */
-export const isAppendEdit = (
-  edit: LocalEditReplace,
-): edit is { append: string } => "append" in edit;
+export const isAppendEdit = (edit: LocalEditReplace): edit is { append: string } =>
+  "append" in edit;
 
 export interface LocalEditParams {
   path: string;
@@ -225,13 +210,9 @@ export interface LocalResultFrame {
 }
 
 /**
- * One segment of a shell command chain, as the card lists it.
- *
- * A chain that stages, commits and pushes is one call and three segments. A
- * card that offered a single pattern granted the first segment's pattern and
- * ran the rest under it, so the segments travel with the ask: the reader sees
- * every part, and an "allow this pattern" answer covers exactly the segments
- * that are not read-only.
+ * One segment of a shell command chain, as the card lists it (a chain that
+ * stages, commits and pushes is one call and three segments), so an "allow
+ * this pattern" answer covers exactly the segments that are not read-only.
  */
 export interface CommandSegment {
   /** The segment as the developer wrote it. */
@@ -317,8 +298,7 @@ export const LOCAL_CONTROL_REFUSED_CODES = [
   "replica_count_unsupported",
   "protocol_invalid",
 ] as const;
-export type LocalControlRefusedCode =
-  (typeof LOCAL_CONTROL_REFUSED_CODES)[number];
+export type LocalControlRefusedCode = (typeof LOCAL_CONTROL_REFUSED_CODES)[number];
 
 export interface LocalRefusedFrame {
   type: "refused";
@@ -348,25 +328,15 @@ export interface LocalCancelFrame {
   callId: string;
 }
 
-export const PERMISSION_DECISIONS = [
-  "allow_once",
-  "allow_pattern",
-  "deny",
-  "expired",
-] as const;
+export const PERMISSION_DECISIONS = ["allow_once", "allow_pattern", "deny", "expired"] as const;
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 
 /**
  * The answers the terminal can give. It has no "expired": a wait runs out on
  * the platform, never in the selector.
  */
-export const TERMINAL_PERMISSION_DECISIONS = [
-  "allow_once",
-  "allow_pattern",
-  "deny",
-] as const;
-export type TerminalPermissionDecision =
-  (typeof TERMINAL_PERMISSION_DECISIONS)[number];
+export const TERMINAL_PERMISSION_DECISIONS = ["allow_once", "allow_pattern", "deny"] as const;
+export type TerminalPermissionDecision = (typeof TERMINAL_PERMISSION_DECISIONS)[number];
 
 export interface LocalPermissionFrame {
   type: "permission";
@@ -417,9 +387,7 @@ const protocolOf = (frame: Record<string, unknown>): number =>
 const readString = (value: unknown, fallback: string): string =>
   isString(value) ? value : fallback;
 
-const readRegistered = (
-  frame: Record<string, unknown>,
-): LocalRegisteredFrame | null => {
+const readRegistered = (frame: Record<string, unknown>): LocalRegisteredFrame | null => {
   if (!isString(frame.instanceId)) return null;
   const conversation = isRecord(frame.conversation) ? frame.conversation : {};
   const policy = isRecord(frame.policy) ? frame.policy : {};
@@ -439,12 +407,24 @@ const readRegistered = (
   };
 };
 
-/** The tool call inside a `call` frame, or null when the tool is unknown. */
-const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
-  const params = isRecord(value.params) ? value.params : null;
-  if (!params) return null;
-  switch (value.tool) {
-    case "local_read":
+/** A `local_edit` call's replacements, or null when one is malformed. */
+const readEdits = (entries: unknown[]): LocalEditReplace[] | null => {
+  const edits: LocalEditReplace[] = [];
+  for (const entry of entries) {
+    if (!isRecord(entry)) return null;
+    if (!isString(entry.oldText)) return null;
+    edits.push({ oldText: entry.oldText, newText: readString(entry.newText, "") });
+  }
+  return edits;
+};
+
+type ToolCallReader = (params: Record<string, unknown>) => LocalToolCall | null;
+
+/** Each local tool, with how its params read off the wire. */
+const TOOL_CALL_READERS: ReadonlyMap<string, ToolCallReader> = new Map<string, ToolCallReader>([
+  [
+    "local_read",
+    (params) => {
       if (!isString(params.path)) return null;
       return {
         tool: "local_read",
@@ -454,30 +434,31 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_write":
-      if (!isString(params.path) || !isString(params.content)) return null;
+    },
+  ],
+  [
+    "local_write",
+    (params) => {
+      if (!isString(params.path)) return null;
+      if (!isString(params.content)) return null;
       return {
         tool: "local_write",
         params: { path: params.path, content: params.content },
       };
-    case "local_edit": {
-      if (!isString(params.path) || !Array.isArray(params.edits)) return null;
-      const edits: LocalEditReplace[] = [];
-      for (const entry of params.edits) {
-        if (!isRecord(entry)) return null;
-        if (isString(entry.append)) {
-          edits.push({ append: entry.append });
-          continue;
-        }
-        if (!isString(entry.oldText)) return null;
-        edits.push({
-          oldText: entry.oldText,
-          newText: readString(entry.newText, ""),
-        });
-      }
-      return { tool: "local_edit", params: { path: params.path, edits } };
-    }
-    case "local_bash":
+    },
+  ],
+  [
+    "local_edit",
+    (params) => {
+      if (!isString(params.path)) return null;
+      if (!Array.isArray(params.edits)) return null;
+      const edits = readEdits(params.edits);
+      return edits === null ? null : { tool: "local_edit", params: { path: params.path, edits } };
+    },
+  ],
+  [
+    "local_bash",
+    (params) => {
       if (!isString(params.command)) return null;
       return {
         tool: "local_bash",
@@ -487,7 +468,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(params.background === true ? { background: true } : {}),
         },
       };
-    case "local_grep":
+    },
+  ],
+  [
+    "local_grep",
+    (params) => {
       if (!isString(params.pattern)) return null;
       return {
         tool: "local_grep",
@@ -501,7 +486,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_find":
+    },
+  ],
+  [
+    "local_find",
+    (params) => {
       if (!isString(params.pattern)) return null;
       return {
         tool: "local_find",
@@ -511,7 +500,11 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_ls":
+    },
+  ],
+  [
+    "local_ls",
+    (params) => {
       return {
         tool: "local_ls",
         params: {
@@ -519,16 +512,25 @@ const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
           ...(isNumber(params.limit) ? { limit: params.limit } : {}),
         },
       };
-    case "local_langwatch_env":
+    },
+  ],
+  [
+    "local_langwatch_env",
+    (params) => {
       return {
         tool: "local_langwatch_env",
-        params: {
-          ...(isString(params.path) ? { path: params.path } : {}),
-        },
+        params: isString(params.path) ? { path: params.path } : {},
       };
-    default:
-      return null;
-  }
+    },
+  ],
+]);
+
+/** The tool call inside a `call` frame, or null when the tool is unknown. */
+const readToolCall = (value: Record<string, unknown>): LocalToolCall | null => {
+  const params = isRecord(value.params) ? value.params : null;
+  if (!params) return null;
+  const reader = isString(value.tool) ? TOOL_CALL_READERS.get(value.tool) : undefined;
+  return reader === undefined ? null : reader(params);
 };
 
 const readCall = (frame: Record<string, unknown>): LocalCallFrame | null => {
@@ -550,14 +552,12 @@ const readCall = (frame: Record<string, unknown>): LocalCallFrame | null => {
 };
 
 const isDecision = (value: unknown): value is PermissionDecision =>
-  isString(value) &&
-  (PERMISSION_DECISIONS as readonly string[]).includes(value);
+  isString(value) && (PERMISSION_DECISIONS as readonly string[]).includes(value);
 
 /**
- * Reads one text message from the platform into a typed frame, or null when
- * the message is not a frame this protocol version knows. Unknown types and
- * malformed frames are dropped rather than thrown, so a newer platform never
- * crashes an older CLI.
+ * Reads one text message from the platform into a typed frame, or null.
+ * Unknown types and malformed frames are dropped, not thrown, so a newer
+ * platform never crashes an older CLI.
  */
 export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
   let parsed: unknown;
@@ -566,7 +566,8 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
   } catch {
     return null;
   }
-  if (!isRecord(parsed) || !isString(parsed.type)) return null;
+  if (!isRecord(parsed)) return null;
+  if (!isString(parsed.type)) return null;
   switch (parsed.type) {
     case "registered":
       return readRegistered(parsed);
@@ -575,10 +576,7 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
         type: "refused",
         protocol: protocolOf(parsed),
         code: readString(parsed.code, "protocol_invalid"),
-        message: readString(
-          parsed.message,
-          "LangWatch refused the connection.",
-        ),
+        message: readString(parsed.message, "LangWatch refused the connection."),
       };
     case "call":
       return readCall(parsed);
@@ -587,14 +585,17 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
         ? { type: "cancel", protocol: protocolOf(parsed), callId: parsed.callId }
         : null;
     case "permission":
-      return isString(parsed.callId) && isDecision(parsed.decision)
-        ? {
+      if (isString(parsed.callId)) {
+        if (isDecision(parsed.decision)) {
+          return {
             type: "permission",
             protocol: protocolOf(parsed),
             callId: parsed.callId,
             decision: parsed.decision,
-          }
-        : null;
+          };
+        }
+      }
+      return null;
     case "policy":
       return {
         type: "policy",

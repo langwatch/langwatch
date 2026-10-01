@@ -16,7 +16,7 @@ on:
       - "services/**"
       - "dev/docs/adr/**"
       - "dev/docs/best_practices/**"
-      - "platform/app/.env.example"
+      - ".env.example"
       - "docs/self-hosting/**"
 
 # Triggered on `edited`, and it reads the PR description, so an in-flight run

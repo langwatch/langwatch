@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { LocalPromptsService } from "../local-prompts.service";
-import { type FileManager } from "@/cli/utils/fileManager";
 import { mock, type MockProxy } from "vitest-mock-extended";
-import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
+
+import { type FileManager } from "@/cli/utils/fileManager";
 import { type Logger } from "@/logger";
+
+import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
+import { LocalPromptsService } from "../local-prompts.service";
 import type { PromptData } from "../types";
 
 describe("LocalPromptsService", () => {
@@ -23,7 +25,7 @@ describe("LocalPromptsService", () => {
     service = new LocalPromptsService(config);
   });
 
-  describe("get", () => {
+  describe("get()", () => {
     describe("when prompt has direct file path in config", () => {
       it("returns prompt from the file", async () => {
         const filePath = "custom-path/my-prompt.prompt.yaml";
@@ -38,13 +40,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(filePath);
       });
@@ -72,13 +76,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",
@@ -108,13 +114,15 @@ describe("LocalPromptsService", () => {
 
         const result = await service.get(handle);
 
-        expect(result).toEqual(expect.objectContaining({
-          model: mockPrompt.model,
-          messages: mockPrompt.messages,
-          temperature: mockPrompt.modelParameters?.temperature,
-          maxTokens: mockPrompt.modelParameters?.max_tokens,
-          handle: handle,
-        }));
+        expect(result).toEqual(
+          expect.objectContaining({
+            model: mockPrompt.model,
+            messages: mockPrompt.messages,
+            temperature: mockPrompt.modelParameters?.temperature,
+            maxTokens: mockPrompt.modelParameters?.max_tokens,
+            handle: handle,
+          }),
+        );
 
         expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
           "prompts/.materialized/my-handle.prompt.yaml",
@@ -136,8 +144,7 @@ describe("LocalPromptsService", () => {
 
     describe("when explicitly referenced file fails to load", () => {
       const filePath = "missing-file.prompt.yaml";
-      const errorMessage =
-        "Local prompt file not found: missing-file.prompt.yaml";
+      const errorMessage = "Local prompt file not found: missing-file.prompt.yaml";
       let result: PromptData | null;
 
       beforeEach(async () => {

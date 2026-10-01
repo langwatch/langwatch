@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+export type ScimUserPushOperation = "create" | "update" | "deactivate";
+
+export type ScimRemovalOperation = "delete_user" | "deactivate_user";
+
+/** Durable directory-sync history, which `ScimApp` builds over its own guards and ledger. */
+export interface ScimSyncLifecycle {
+  tokenIssued(input: {
+    organizationId: string;
+    connectionId: string;
+    tokenId: string;
+  }): Promise<void>;
+
+  userPushed: (input: {
+    organizationId: string;
+    connectionId: string;
+    userId: string;
+    externalId: string;
+    op: ScimUserPushOperation;
+  }) => Promise<void>;
+
+  groupMapped(input: {
+    organizationId: string;
+    connectionId: string;
+    groupId: string;
+    externalId: string | null;
+  }): Promise<void>;
+
+  applyFailed(input: {
+    organizationId: string;
+    connectionId: string;
+    op: ScimRemovalOperation;
+    errorCode: string;
+    retryable: boolean;
+    userId: string;
+  }): Promise<void>;
+
+  /** A platform operator sent a retired apply through again (ADR-122). */
+  applyRedriven(input: {
+    organizationId: string;
+    connectionId: string;
+    retiredAtMs: number;
+    operator: { userId: string };
+  }): Promise<void>;
+
+  revoked(input: {
+    organizationId: string;
+    connectionId: string;
+    tokenId: string | null;
+    cause: "revoke" | "teardown";
+  }): Promise<void>;
+}

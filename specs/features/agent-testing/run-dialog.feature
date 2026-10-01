@@ -189,6 +189,14 @@ Feature: The run dialog
     And choosing it opens the instructions to set an agent up
 
   @integration
+  Scenario: The reason a refused run cannot start is readable without a mouse
+    Given a project with no agent and no prompt to test
+    When the run dialog is opened
+    Then Run is off
+    And the dialog reads "Choose an agent to run against." beside it
+    And the refused Run control is described by that sentence
+
+  @integration
   Scenario: A run with no target selected is refused
     Given the run dialog is open with no target selected
     When Run is chosen

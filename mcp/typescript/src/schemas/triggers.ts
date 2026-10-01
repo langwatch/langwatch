@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** The shape of an automation on the `/api/triggers` surface, stated once for
+/** The shape of an automation on the `/api/v1/triggers` surface, stated once for
  *  the tool registrations and the API client. Every type is inferred from its
  *  schema, so what the API sends and what a caller reads cannot drift. */
 
@@ -200,7 +200,7 @@ export function validateActionParamsForAction({
 }
 
 /** How `filters` is written. A keyed field sent flat never matches, so each
- *  keyed shape is spelled out; see the `/api/triggers` 422 for the refusal. */
+ *  keyed shape is spelled out; see the `/api/v1/triggers` 422 for the refusal. */
 export const TRIGGER_FILTERS_DESCRIPTION = [
   "Trace conditions as a JSON object string.",
   'Unkeyed fields take a list of values: {"traces.error":["true"]}.',
@@ -216,7 +216,7 @@ export const TRIGGER_FILTER_QUERY_DESCRIPTION = [
 
 /** Stated on the create tool: Slack needs a connection or it never posts. */
 export const SLACK_DELIVERY_NOTE =
-  'For SEND_SLACK_MESSAGE, send {"slackIntegrationId":"<connection id>"} for a webhook connection, or {"slackIntegrationId":"<connection id>","slackChannelId":"C..."} for a bot connection. Slack connections are listed and added in LangWatch under Settings, Integrations, Slack (organization-wide or for one project); they are also listed by GET /api/slack-connections and `langwatch slack-connection list`, or ask the user for the id. slackIntegrationId is preferred: a legacy {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackBotToken":"xoxb-...","slackChannelId":"C..."} is still accepted for one release and is stored as a connection. A Slack automation with no connection will never post.';
+  'For SEND_SLACK_MESSAGE, send {"slackIntegrationId":"<connection id>"} for a webhook connection, or {"slackIntegrationId":"<connection id>","slackChannelId":"C..."} for a bot connection. Slack connections are listed and added in LangWatch under Settings, Integrations, Slack (organization-wide or for one project); they are also listed by GET /api/v1/slack-connections and `langwatch slack-connection list`, or ask the user for the id. slackIntegrationId is preferred: a legacy {"slackWebhook":"https://hooks.slack.com/..."} or {"slackDelivery":"bot","slackBotToken":"xoxb-...","slackChannelId":"C..."} is still accepted for one release and is stored as a connection. A Slack automation with no connection will never post.';
 
 export const graphAlertSchema = z
   .object({

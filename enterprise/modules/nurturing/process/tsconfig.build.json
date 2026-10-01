@@ -1,0 +1,81 @@
+{
+  "extends": ["./tsconfig.json", "../../../../tsconfig.emit.json"],
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
+    "paths": {
+      "@langwatch/enterprise-nurturing-process": ["./src/index.ts"]
+    }
+  },
+  "files": ["./src/index.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "exclude": [
+    "**/__tests__/**",
+    "**/__mocks__/**",
+    "**/tests/**",
+    "**/*.test.*",
+    "**/*.spec.*",
+    "**/*.stories.*",
+    "**/*.bench.*",
+    "**/__bench__/**",
+    "**/testing.ts",
+    "**/testing.tsx"
+  ],
+  "references": [
+    {
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/workflow/contract/tsconfig.build.json"
+    }
+  ]
+}

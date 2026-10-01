@@ -1,0 +1,1022 @@
+# Evaluations: online evaluations, experiments, evaluators, datasets and workflows.
+#
+# Every name carries {uid}, so any number of flows share one stack. No flow here
+# calls a model: evaluators are created, not run, and the online evaluation uses
+# lingua/language_detection, which needs only the output field the drawer maps by
+# itself (expected_answer evaluators leave an unmapped expected_output and the
+# drawer's Create button stays disabled). Delete confirmations come from the
+# shared ConfirmDialog, which has no test ids, so its button is clicked by text.
+# Skipped on purpose: instant-evals (no UI), the evaluator "Run on samples"
+# (legacy /evaluations/{id}/edit needs a monitor id no placeholder carries),
+# the workbench full run and the pairwise verdict (both need a saved prompt and
+# a model run; the prompt list drawer belongs to the prompt module).
+flows:
+  - id: eval-online-create-and-list
+    title: Create an online evaluation with a new evaluator and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: new-evaluator-button
+      - action: click
+        with:
+          testId: evaluator-category-quality
+      - action: click
+        with:
+          testId: evaluator-type-lingua-language_detection
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-eval-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: vd-mon-{uid}
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          api: /api/monitors
+          contains: vd-mon-{uid}
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: vd-mon-{uid}
+          role: row
+          name: vd-mon-{uid}
+
+  - id: eval-online-toggle-edit-delete
+    title: Pause, rename and delete an online evaluation
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: new-evaluator-button
+      - action: click
+        with:
+          testId: evaluator-category-quality
+      - action: click
+        with:
+          testId: evaluator-type-lingua-language_detection
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-eval-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: vd-mon-{uid}
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          text: Active
+          role: row
+          name: vd-mon-{uid}
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*(Enable|Disable)\s*$/
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: vd-mon-{uid}
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: vd-mon-{uid}
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: vd-mon-{uid}-renamed
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          text: vd-mon-{uid}-renamed
+          role: row
+          name: vd-mon-{uid}-renamed
+      - action: click
+        with:
+          label: Actions for vd-mon-{uid}-renamed
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^Delete$/
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-mon-{uid}-renamed")'
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-mon-{uid}-renamed")'
+          equals: "0"
+
+  - id: eval-experiment-create-and-rename
+    title: Create an experiment, rename it in the workbench and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          text: New Experiment
+      - action: click
+        with:
+          text: Create Experiment
+      - action: expect
+        with:
+          text: Datasets
+      - action: click
+        with:
+          selector: .edit-icon
+      - action: fill
+        with:
+          selector: input:focus
+          value: vd-exp-{uid}
+      - action: click
+        with:
+          text: Datasets
+      - action: expect
+        with:
+          api: /api/experiments
+          contains: vd-exp-{uid}
+          timeout: "20000"
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: expect
+        with:
+          text: vd-exp-{uid}
+          role: row
+          name: vd-exp-{uid}
+
+  - id: eval-evaluator-create-code
+    title: Create a custom code evaluator and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          text: New Evaluator
+      - action: click
+        with:
+          testId: evaluator-category-code
+      - action: fill
+        with:
+          testId: code-evaluator-name
+          value: vd-code-{uid}
+      - action: click
+        with:
+          testId: code-evaluator-input-add
+      - action: fill
+        with:
+          testId: code-evaluator-input-identifier-0
+          value: output
+      - action: click
+        with:
+          testId: save-code-evaluator
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-code-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-code-{uid}
+
+  - id: eval-evaluator-create-llm-judge
+    title: Create an LLM judge evaluator without running it and find it after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          text: New Evaluator
+      - action: click
+        with:
+          testId: evaluator-category-llm_judge
+      - action: click
+        with:
+          testId: evaluator-type-langevals-llm_boolean
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-judge-{uid}
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-judge-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-judge-{uid}
+
+  - id: eval-dataset-create-and-edit-rows
+    title: Create an empty dataset with an extra column, add a row and reopen it
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          text: Create empty dataset
+      - action: fill
+        with:
+          selector: input[name="name"]
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          text: Add Column
+      - action: fill
+        with:
+          selector: input[name="columnTypes.7.name"]
+          value: vd_extra
+      - action: click
+        with:
+          text: Create Dataset
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-ds-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          selector: tr
+          text: vd-ds-{uid}
+      - action: expect
+        with:
+          testId: dataset-title
+          hasText: vd-ds-{uid}
+      - action: click
+        with:
+          testId: add-row
+      - action: expect
+        with:
+          testId: save-status-saved
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          selector: tr
+          text: vd-ds-{uid}
+      - action: expect
+        with:
+          testId: dataset-row-count
+          hasText: /^1 /
+
+  - id: eval-dataset-upload-csv
+    title: Upload a CSV as a renamed dataset and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          text: Upload datasets
+      - action: upload
+        with:
+          fixture: sample.csv
+      - action: expect
+        with:
+          testId: bulk-summary
+      - action: click
+        with:
+          selector: button[title="Rename dataset"]
+      - action: fill
+        with:
+          label: Dataset name
+          value: vd-csv-{uid}
+      - action: click
+        with:
+          text: /^\s*Upload all\s*$/
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-csv-{uid}
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: expect
+        with:
+          count: tr:has-text("vd-csv-{uid}")
+          min: "1"
+
+  - id: eval-dataset-use-in-experiment
+    title: Create a dataset, then select it in a new experiment's workbench
+    steps:
+      - action: go
+        with:
+          path: /{slug}/datasets
+      - action: click
+        with:
+          testId: upload-or-create-dataset
+      - action: click
+        with:
+          text: Create empty dataset
+      - action: fill
+        with:
+          selector: input[name="name"]
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          text: Create Dataset
+      - action: expect
+        with:
+          api: /api/dataset
+          contains: vd-ds-{uid}
+      - action: go
+        with:
+          path: /{slug}/experiments
+      - action: click
+        with:
+          text: New Experiment
+      - action: click
+        with:
+          text: Create Experiment
+      - action: click
+        with:
+          selector: button:text-is("Add")
+      - action: click
+        with:
+          text: Select existing dataset
+      - action: fill
+        with:
+          testId: dataset-picker-search
+          value: vd-ds-{uid}
+      - action: click
+        with:
+          testId: dataset-card-vd-ds-{uid}
+      - action: expect
+        with:
+          testIdPrefix: dataset-tab-
+          hasText: vd-ds-{uid}
+
+  - id: eval-workflow-create-blank
+    title: Create a blank workflow and find it in the list
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wf-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="end"]
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wf-{uid}
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: vd-wf-{uid}
+
+  - id: eval-workflow-publish
+    title: Create a blank workflow and publish its first version
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfp-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: click
+        with:
+          text: /^\s*Publish\s*$/
+      - action: click
+        with:
+          text: /^\s*Publish workflow\s*$/i
+      - action: click
+        with:
+          text: /^\s*Publish( Version \d+)?\s*$/
+      - action: expect
+        with:
+          text: New version published
+
+  # Same journey as eval-online-toggle-edit-delete, for main: the monitor is posted through the
+  # API and every click uses handles both trees draw (Actions for <name>, menu words, the
+  # drawer's name placeholder and its Save Changes button).
+  - id: eval-online-disable-edit-delete-shared
+    title: Disable an online evaluation, rename it, delete it, each read back from the API
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Active
+          role: row
+          name: "{monitorName}"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Disable\s*$/
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: enabled
+          equals: "false"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          text: Paused
+          role: row
+          name: "{monitorName}"
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: "{monitorName}-renamed"
+      - action: click
+        with:
+          text: Save Changes
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: name
+          equals: "{monitorName}-renamed"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}-renamed")'
+          min: "1"
+      - action: click
+        with:
+          label: Actions for {monitorName}-renamed
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          status: "404"
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("{monitorName}-renamed")'
+          equals: "0"
+
+  # Sampling and preconditions on an existing online evaluation, edited in the drawer and read
+  # back from the API. Main's sampling box has no label or test id, so it is found by its
+  # number input; a new precondition row starts as metadata.labels contains "".
+  - id: eval-online-edit-sampling-filters
+    title: Edit an online evaluation's sampling and add then remove a precondition, each read back
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: langevals/exact_match
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+        as:
+          monitorId: id
+          monitorName: name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          selector: input[type="number"][max="1"]
+          value: "0.5"
+      - action: click
+        with:
+          text: Add Precondition
+      - action: fill
+        with:
+          selector: input[placeholder="text"]
+          value: vd-label-{uid}
+      - action: click
+        with:
+          text: Save Changes
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: sample
+          equals: "0.5"
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: preconditions.0.value
+          equals: vd-label-{uid}
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: preconditions.0.field
+          equals: metadata.labels
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          label: Actions for {monitorName}
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: expect
+        with:
+          count: input[placeholder="text"]
+          min: "1"
+      - action: click
+        with:
+          label: Remove precondition 1
+      - action: click
+        with:
+          text: Save Changes
+      - action: expect
+        with:
+          api: /api/monitors/{monitorId}
+          field: preconditions
+          equals: "[]"
+
+  # The evaluation runs through langevals (needs `haven up +langevals`; without it the result
+  # is an error status and the flow fails on both sides). lingua/language_detection needs no
+  # model, only the output the mapping reads from the trace.
+  - id: eval-online-scores-on-trace
+    title: A trace sent after an online evaluation exists gets a processed result, in the API and the drawer
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: lingua/language_detection
+        as:
+          evaluatorId: id
+      - post: /api/monitors
+        body:
+          name: vd-mon-{uid}
+          checkType: lingua/language_detection
+          evaluatorId: "{evaluatorId}"
+          parameters: {}
+          mappings:
+            mapping:
+              output:
+                source: output
+            expansions: []
+        as:
+          monitorId: id
+          monitorName: name
+      - post: /api/collector
+        body:
+          trace_id: vd-scored-{uid}
+          spans:
+            - type: llm
+              span_id: vd-scored-span-{uid}
+              trace_id: vd-scored-{uid}
+              name: vd-scored-call
+              model: gpt-5
+              vendor: openai
+              input:
+                type: text
+                value: Say hello in English
+              output:
+                type: text
+                value: Hello, how are you doing today? I hope everything is going well for you.
+              metrics:
+                prompt_tokens: 6
+                completion_tokens: 18
+              timestamps:
+                started_at: 1790723307541
+                finished_at: 1790723308041
+    steps:
+      - action: expect
+        with:
+          api: /api/traces/vd-scored-{uid}
+          field: evaluations
+          contains: vd-mon-{uid}
+          timeout: "120000"
+      - action: expect
+        with:
+          api: /api/traces/vd-scored-{uid}
+          field: evaluations.0.status
+          equals: processed
+          timeout: "60000"
+      - action: go
+        with:
+          path: /{slug}/traces/vd-scored-{uid}
+      - action: expect
+        with:
+          text: vd-mon-{uid}
+          timeout: "20000"
+
+  - id: eval-evaluator-edit-code
+    title: Create a custom code evaluator, rename it from the library card menu and find the new name
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          text: New Evaluator
+      - action: click
+        with:
+          testId: evaluator-category-code
+      - action: fill
+        with:
+          testId: code-evaluator-name
+          value: vd-code-{uid}
+      - action: click
+        with:
+          testId: code-evaluator-input-add
+      - action: fill
+        with:
+          testId: code-evaluator-input-identifier-0
+          value: output
+      - action: click
+        with:
+          testId: save-code-evaluator
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-code-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          selector: '[data-testid^="evaluator-card-"]:has-text("vd-code-{uid}") .js-inner-menu'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          testId: code-evaluator-name
+          value: vd-code-{uid}-edited
+      - action: click
+        with:
+          testId: save-code-evaluator
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-code-{uid}-edited
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-code-{uid}-edited
+
+  - id: eval-evaluator-edit-builtin
+    title: Rename a built-in evaluator from the library card menu and read the name back
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          selector: '[data-testid="evaluator-card-{evaluatorId}"] .js-inner-menu'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Edit\s*$/
+      - action: fill
+        with:
+          testId: evaluator-name-input
+          value: vd-ev-{uid}-edited
+      - action: click
+        with:
+          testId: save-evaluator-button
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-ev-{uid}-edited
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          text: vd-ev-{uid}-edited
+
+  - id: eval-evaluator-delete
+    title: Delete an evaluator from the library, typing delete to confirm, and see it gone after a reload
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          testId: evaluator-card-{evaluatorId}
+      - action: click
+        with:
+          selector: '[data-testid="evaluator-card-{evaluatorId}"] .js-inner-menu'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          count: '[data-testid="evaluator-card-{evaluatorId}"]'
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          count: '[data-testid="evaluator-card-{evaluatorId}"]'
+          equals: "0"
+
+  - id: eval-evaluator-use-in-monitor-then-delete
+    title: Use a custom evaluator in an online evaluation, then delete the evaluator and lose the monitor
+    steps:
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          text: New Evaluator
+      - action: click
+        with:
+          testId: evaluator-category-code
+      - action: fill
+        with:
+          testId: code-evaluator-name
+          value: vd-code-{uid}
+      - action: click
+        with:
+          testId: code-evaluator-input-add
+      - action: fill
+        with:
+          testId: code-evaluator-input-identifier-0
+          value: output
+      - action: click
+        with:
+          testId: save-code-evaluator
+      - action: expect
+        with:
+          api: /api/evaluators
+          contains: vd-code-{uid}
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: New Online Evaluation
+      - action: click
+        with:
+          text: Trace Level
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          selector: '[data-testid^="evaluator-card-"]'
+          hasText: vd-code-{uid}
+      - action: fill
+        with:
+          field: Enter evaluation name
+          value: vd-mon-{uid}
+      - action: click
+        with:
+          text: /^\s*(Create Online Evaluation|Save Changes)\s*$/
+      - action: expect
+        with:
+          api: /api/monitors
+          contains: vd-mon-{uid}
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: click
+        with:
+          selector: '[data-testid^="evaluator-card-"]:has-text("vd-code-{uid}") .js-inner-menu'
+      - action: click
+        with:
+          selector: '[role="menuitem"]'
+          hasText: /^\s*Delete\s*$/
+      - action: expect
+        with:
+          text: vd-mon-{uid}
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: expect
+        with:
+          count: 'tr:has-text("vd-mon-{uid}")'
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/evaluators
+      - action: expect
+        with:
+          count: '[data-testid^="evaluator-card-"]:has-text("vd-code-{uid}")'
+          equals: "0"
+
+  # Guardrails have no list of their own on main: the online evaluations header opens a drawer
+  # that picks an evaluator and prints the SDK snippet that calls it with as_guardrail.
+  - id: eval-guardrail-drawer
+    title: Open Set up Guardrail, pick an evaluator and get the integration code
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-ev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+    steps:
+      - action: go
+        with:
+          path: /{slug}/online-evaluations
+      - action: click
+        with:
+          text: Set up Guardrail
+      - action: expect
+        with:
+          text: New Guardrail
+      - action: click
+        with:
+          text: Select Evaluator
+      - action: click
+        with:
+          testId: evaluator-card-{evaluatorId}
+      - action: expect
+        with:
+          text: Integration Code
+      - action: expect
+        with:
+          text: Find your API key

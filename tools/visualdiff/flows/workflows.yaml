@@ -1,0 +1,847 @@
+# The studio journey (create, publish and import live in evaluations.yaml and files-media.yaml):
+# nodes and wiring, runs and evaluations against llmsim (`haven up +llm`), versions and restore,
+# export, rename and delete. Labels and test ids are main's; each flow reads its change back.
+flows:
+  - id: workflow-attach-dataset-and-save-version
+    title: Attach the seeded dataset to the entry node, save a version and find it attached after reopening
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfds-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wfds-{uid}
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: click
+        with:
+          text: /^\s*Replace\s*$/
+      - action: click
+        with:
+          testId: dataset-card-Visual Diff QA
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+      - action: click
+        with:
+          selector: button:has(path[d^="M3.51 14A9"])
+      - action: click
+        with:
+          text: Save new version
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfds-{uid}"), button[aria-label="vd-wfds-{uid}"]'
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+          timeout: "20000"
+
+  - id: workflow-delete
+    title: Delete a workflow behind its typed confirmation and see it gone after a reload
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfdel-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: expect
+        with:
+          api: /api/workflows
+          contains: vd-wfdel-{uid}
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: vd-wfdel-{uid}
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfdel-{uid}") button.js-inner-menu, [data-testid="workflow-card-vd-wfdel-{uid}"] button.js-inner-menu'
+      - action: click
+        with:
+          text: /^\s*Delete\s*$/
+      - action: fill
+        with:
+          testId: cascade-archive-confirm-input
+          value: delete
+      - action: click
+        with:
+          testId: cascade-archive-confirm-button
+      - action: expect
+        with:
+          text: vd-wfdel-{uid}
+          equals: "0"
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: expect
+        with:
+          text: New Workflow
+      - action: expect
+        with:
+          text: vd-wfdel-{uid}
+          equals: "0"
+
+  - id: workflow-create-from-template
+    title: Create a workflow from the custom evaluator template, see its nodes and find it in the list after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-custom_evaluator
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wftpl-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="llm_call"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          text: Sample LLM Bias Detection
+      - action: expect
+        with:
+          api: "/api/workflows"
+          contains: "vd-wftpl-{uid}"
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: expect
+        with:
+          text: "vd-wftpl-{uid}"
+
+  - id: workflow-rename
+    title: Rename a workflow from the studio header and find only the new name after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfrn-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: click
+        with:
+          text: "vd-wfrn-{uid}"
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfrn2-{uid}"
+      - action: click
+        with:
+          selector: '.react-flow__node[data-id="entry"]'
+      - action: expect
+        with:
+          api: "/api/workflows"
+          contains: "vd-wfrn2-{uid}"
+          timeout: "30000"
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: expect
+        with:
+          text: "vd-wfrn2-{uid}"
+      - action: expect
+        with:
+          text: "vd-wfrn-{uid}"
+          equals: "0"
+
+  - id: workflow-add-node-connect-save
+    title: Drop a code node on the canvas, wire the entry to it, save a version and find the node and its edge after reopening
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfnode-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: drag
+        with:
+          fromSelector: xpath=//*[@draggable="true"][.//text()[normalize-space()="Code"]]
+          toSelector: .react-flow__pane
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="code"]'
+          timeout: "20000"
+      - action: drag
+        with:
+          fromSelector: '.react-flow__handle[data-nodeid="entry"][data-handleid="outputs.input"]'
+          toSelector: '.react-flow__handle[data-nodeid="code"][data-handleid="inputs.input"]'
+      - action: expect
+        with:
+          count: .react-flow__edge
+          min: "3"
+      - action: click
+        with:
+          selector: button:has(path[d^="M3.51 14A9"])
+      - action: click
+        with:
+          text: Save new version
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfnode-{uid}"), button[aria-label="vd-wfnode-{uid}"]'
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="code"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__edge
+          min: "3"
+
+  - id: workflow-run-once
+    title: Run the workflow up to its LLM node once from the entry dataset and see the node finish
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfrun-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="llm_call"] button:has(svg:has(polygon[points="5 3 19 12 5 21 5 3"]))
+      - action: click
+        with:
+          text: Run workflow until here
+      - action: expect
+        with:
+          testId: run-until-here-dialog
+      - action: click
+        with:
+          testId: run-until-here-run
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="llm_call"] svg:has(polyline[points="20 6 9 17 4 12"])
+          timeout: "90000"
+
+  - id: workflow-add-evaluator-node-connect-save
+    title: Drop an evaluator node, pick a saved evaluator, wire the LLM output to it, save a version and find both after reopening
+    setup:
+      - post: /api/evaluators
+        body:
+          name: vd-wfev-{uid}
+          config:
+            evaluatorType: langevals/exact_match
+        as:
+          evaluatorId: id
+          evaluatorName: name
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfev-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: drag
+        with:
+          fromSelector: xpath=//*[@draggable="true"][.//text()[normalize-space()="Evaluator"]]
+          toSelector: .react-flow__pane
+      - action: click
+        with:
+          testId: "evaluator-card-{evaluatorId}"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="evaluator"]'
+          timeout: "20000"
+      - action: expect
+        with:
+          text: "{evaluatorName}"
+      - action: drag
+        with:
+          fromSelector: '.react-flow__handle[data-nodeid="llm_call"][data-handleid="outputs.output"]'
+          toSelector: '.react-flow__handle[data-nodeid="evaluator"][data-handleid="inputs.output"]'
+      - action: expect
+        with:
+          count: .react-flow__edge
+          min: "3"
+      - action: click
+        with:
+          selector: button:has(path[d^="M3.51 14A9"])
+      - action: fill
+        with:
+          field: Description
+          value: "vd evaluator {uid}"
+      - action: click
+        with:
+          text: Save new version
+      - action: expect
+        with:
+          text: /Saved version/
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfev-{uid}"), button[aria-label="vd-wfev-{uid}"]'
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="evaluator"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__edge
+          min: "3"
+
+  - id: workflow-run-to-end-and-read-result
+    title: Run the whole workflow to its end node with a typed input against llmsim and open the finished node's results
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfend-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="end"] button:has(svg:has(polygon[points="5 3 19 12 5 21 5 3"]))
+      - action: click
+        with:
+          text: Run workflow until here
+      - action: expect
+        with:
+          testId: run-until-here-dialog
+      - action: fill
+        with:
+          testId: run-until-here-input-input
+          value: "vd input {uid}"
+      - action: click
+        with:
+          testId: run-until-here-run
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="llm_call"] svg:has(polyline[points="20 6 9 17 4 12"])
+          timeout: "90000"
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="end"] svg:has(polyline[points="20 6 9 17 4 12"])
+          timeout: "30000"
+      - action: click
+        with:
+          selector: '.react-flow__node[data-id="llm_call"] div[role="button"]:has(svg:has(polyline[points="20 6 9 17 4 12"]))'
+      - action: expect
+        with:
+          text: Outputs
+      - action: expect
+        with:
+          text: Waiting for execution
+          equals: "0"
+
+  - id: workflow-evaluate-on-dataset
+    title: Attach the seeded dataset, evaluate the workflow on it against llmsim and read the finished run
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfeval-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="entry"]'
+          timeout: "30000"
+      - action: click
+        with:
+          selector: '.react-flow__node[data-id="entry"]'
+      - action: click
+        with:
+          text: /^\s*Replace\s*$/
+      - action: click
+        with:
+          testId: dataset-card-Visual Diff QA
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Visual Diff QA
+      - action: click
+        with:
+          selector: .react-flow__pane
+      - action: click
+        with:
+          text: '/^\s*Evaluate\s*$/'
+      - action: expect
+        with:
+          text: Evaluate Workflow
+      - action: fill
+        with:
+          field: Description
+          value: "vd eval {uid}"
+      - action: click
+        with:
+          text: Save & Run Evaluation
+      - action: expect
+        with:
+          text: Runtime
+          timeout: "120000"
+      - action: expect
+        with:
+          text: Total Cost
+
+  - id: workflow-restore-version
+    title: Save a version with a code node, restore the first version and find the code node gone after a reload
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfrst-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: drag
+        with:
+          fromSelector: xpath=//*[@draggable="true"][.//text()[normalize-space()="Code"]]
+          toSelector: .react-flow__pane
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="code"]'
+          timeout: "20000"
+      - action: click
+        with:
+          selector: button:has(path[d^="M3.51 14A9"])
+      - action: fill
+        with:
+          field: Description
+          value: "vd with code {uid}"
+      - action: click
+        with:
+          text: Save new version
+      - action: expect
+        with:
+          text: "vd with code {uid}"
+          timeout: "20000"
+      - action: click
+        with:
+          selector: '[data-scope="popover"][data-part="content"] button:has(path[d^="M3.51 14A9"])'
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="code"]'
+          equals: "0"
+          timeout: "20000"
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfrst-{uid}"), button[aria-label="vd-wfrst-{uid}"]'
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="entry"]'
+          timeout: "30000"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="code"]'
+          equals: "0"
+
+  - id: workflow-publish-then-read-published-version
+    title: Publish a workflow, reload it and read the published version in the Publish menu
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfpub-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="entry"]'
+          timeout: "30000"
+      - action: click
+        with:
+          text: '/^\s*Publish\s*$/'
+      - action: click
+        with:
+          text: '/^\s*Publish workflow\s*$/i'
+      - action: click
+        with:
+          text: '/^\s*Publish( Version \d+)?\s*$/'
+      - action: expect
+        with:
+          text: New version published
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          selector: 'a:has-text("vd-wfpub-{uid}"), button[aria-label="vd-wfpub-{uid}"]'
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="entry"]'
+          timeout: "30000"
+      - action: click
+        with:
+          text: '/^\s*Publish\s*$/'
+      - action: expect
+        with:
+          text: Published Version
+          timeout: "20000"
+
+  - id: workflow-export-json
+    title: Export a workflow from the Publish menu and find its name and nodes in the downloaded JSON
+    steps:
+      - action: go
+        with:
+          path: "/{slug}/workflows"
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: "vd-wfexp-{uid}"
+      - action: click
+        with:
+          text: "/^create workflow$/i"
+      - action: expect
+        with:
+          count: '.react-flow__node[data-id="entry"]'
+          timeout: "30000"
+      - action: click
+        with:
+          text: '/^\s*Publish\s*$/'
+      - action: download
+        with:
+          text: Export Workflow
+          contains: '"llm_call"'
+          filename: '/^workflow--vd-wfexp-.*\.json$/'
+
+  # Studio and dialog states the prod comparison could not judge. Labels are main's: the create
+  # dialog (NewWorkflowModal), the components rail (NodeSelectionPanel) and the properties panels.
+  # The loading state is too brief to hold an expect on; the canvas flow passes through it.
+  - id: workflow-create-dialog-offers-three-starts
+    title: New Workflow opens the create dialog with Blank, Custom Evaluator and From Export
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: expect
+        with:
+          text: Create new workflow
+      - action: expect
+        with:
+          testId: new-workflow-card-blank
+          hasText: Blank
+      - action: expect
+        with:
+          testId: new-workflow-card-custom_evaluator
+          hasText: Custom Evaluator
+      - action: expect
+        with:
+          testId: new-workflow-card-import
+          hasText: From Export
+
+  - id: workflow-studio-canvas-and-components-rail
+    title: A new blank workflow opens its canvas with entry, LLM and end nodes and the components rail
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfcanvas-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="end"]
+      - action: expect
+        with:
+          url: /studio/
+      - action: expect
+        with:
+          text: /^Components$/
+      - action: expect
+        with:
+          text: /^Prompt$/
+      - action: expect
+        with:
+          text: /^Code$/
+      - action: expect
+        with:
+          text: /^HTTP Call$/
+      - action: expect
+        with:
+          text: /^If\/Else$/
+      - action: expect
+        with:
+          text: /^Agent$/
+      - action: expect
+        with:
+          text: /^Evaluator$/
+
+  - id: workflow-studio-entry-node-panel
+    title: Select the entry node and read its properties panel, inputs, dataset and Go to end node
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfentry-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node[data-id="entry"]
+          timeout: "30000"
+      - action: click
+        with:
+          selector: .react-flow__node[data-id="entry"]
+      - action: expect
+        with:
+          text: /^Entry point$/
+          min: "2"
+      - action: expect
+        with:
+          text: Workflow Outputs
+      - action: expect
+        with:
+          text: Go to end node
+      - action: expect
+        with:
+          testId: entry-dataset-card
+          hasText: Draft Dataset
+
+  - id: workflow-studio-http-node-panel
+    title: Drop an HTTP Call node, open its properties and read the Body, Auth, Headers and Test tabs
+    steps:
+      - action: go
+        with:
+          path: /{slug}/workflows
+      - action: click
+        with:
+          text: New Workflow
+      - action: click
+        with:
+          testId: new-workflow-card-blank
+      - action: fill
+        with:
+          label: Name and Icon
+          value: vd-wfhttp-{uid}
+      - action: click
+        with:
+          text: /^create workflow$/i
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "3"
+          timeout: "30000"
+      - action: drag
+        with:
+          fromSelector: xpath=//*[@draggable="true"][.//text()[normalize-space()="HTTP Call"]]
+          toSelector: .react-flow__pane
+      - action: expect
+        with:
+          count: .react-flow__node
+          min: "4"
+          timeout: "20000"
+      - action: click
+        with:
+          selector: '.react-flow__node:has-text("HTTP Call")'
+      - action: expect
+        with:
+          text: Request Body Template
+          timeout: "15000"
+      - action: expect
+        with:
+          text: /^Body$/
+      - action: expect
+        with:
+          text: /^Auth$/
+      - action: expect
+        with:
+          text: /^Headers$/
+      - action: expect
+        with:
+          text: /^Test$/

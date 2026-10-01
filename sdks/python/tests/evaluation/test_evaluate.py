@@ -146,7 +146,7 @@ class TestEvaluate:
 
         # Verify API was called with correct URL
         call_args = mock_client.post.call_args
-        assert "https://api.langwatch.ai/api/evaluations/test-evaluator/evaluate" in str(
+        assert "https://api.langwatch.ai/api/v1/evaluations/test-evaluator/evaluate" in str(
             call_args
         )
 

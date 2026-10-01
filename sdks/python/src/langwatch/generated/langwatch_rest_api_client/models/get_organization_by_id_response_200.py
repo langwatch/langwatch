@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 if TYPE_CHECKING:
     from ..models.get_organization_by_id_response_200_organization import GetOrganizationByIdResponse200Organization
 
@@ -19,22 +17,22 @@ T = TypeVar("T", bound="GetOrganizationByIdResponse200")
 class GetOrganizationByIdResponse200:
     """
     Attributes:
-        organization (GetOrganizationByIdResponse200Organization | Unset):
+        organization (GetOrganizationByIdResponse200Organization):
     """
 
-    organization: GetOrganizationByIdResponse200Organization | Unset = UNSET
+    organization: GetOrganizationByIdResponse200Organization
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        organization: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.organization, Unset):
-            organization = self.organization.to_dict()
+        organization = self.organization.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if organization is not UNSET:
-            field_dict["organization"] = organization
+        field_dict.update(
+            {
+                "organization": organization,
+            }
+        )
 
         return field_dict
 
@@ -43,12 +41,7 @@ class GetOrganizationByIdResponse200:
         from ..models.get_organization_by_id_response_200_organization import GetOrganizationByIdResponse200Organization
 
         d = dict(src_dict)
-        _organization = d.pop("organization", UNSET)
-        organization: GetOrganizationByIdResponse200Organization | Unset
-        if isinstance(_organization, Unset):
-            organization = UNSET
-        else:
-            organization = GetOrganizationByIdResponse200Organization.from_dict(_organization)
+        organization = GetOrganizationByIdResponse200Organization.from_dict(d.pop("organization"))
 
         get_organization_by_id_response_200 = cls(
             organization=organization,

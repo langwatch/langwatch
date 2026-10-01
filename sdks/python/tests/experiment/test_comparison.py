@@ -720,7 +720,7 @@ class TestGivenBothSdksImplementComparison:
         experiment.compare(0)
 
         assert judge.last["url"] == (
-            "https://app.langwatch.test/api/evaluations/"
+            "https://app.langwatch.test/api/v1/evaluations/"
             "langevals/select_best_compare/evaluate"
         )
         assert judge.body()["name"] == "comparison"

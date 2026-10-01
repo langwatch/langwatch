@@ -1,31 +1,17 @@
 #!/usr/bin/env node
 /**
- * profile-startup — what does one CLI invocation actually load and run?
- *
- * For a given CLI argv (default `--help`, always with LANGWATCH_NO_DAEMON=1
- * so the in-process path is what is measured) this produces, in
- * `sdks/typescript/.startup-profile/`:
- *
- *   <label>-require-tree.json   timed require tree (every external module,
- *                               with parent links, self + total time)
- *   <label>-require-tree.txt    top-30 tables (by total, by self)
- *   <label>-speedscope.json     CPU profile in speedscope format — drop it
- *                               onto https://speedscope.app
- *   <label>-wall.txt            median wall time over --runs runs
- *
- * Usage:
- *   node scripts/profile-startup.mjs                       # --help
- *   node scripts/profile-startup.mjs whoami
- *   node scripts/profile-startup.mjs skills list
- *   node scripts/profile-startup.mjs --runs 10 --binary --help
- *
- * Flags:
- *   --runs N    wall-time repetitions for the median (default 10)
- *   --binary    also time dist/bin/langwatch (skipped gracefully if absent;
- *               the bun binary is never rebuilt from here — it takes minutes)
- *   --label L   output file prefix (default: the argv joined with '-')
- *
- * Requires the built dist: run `pnpm build` first.
+ * profile-startup -- what does one CLI invocation actually load and run?
+ * Runs a given CLI argv (default `--help`) with LANGWATCH_NO_DAEMON=1.
+ */
+
+/**
+ * Writes to `sdks/typescript/.startup-profile/`: a timed require tree, its
+ * top-30 tables, a speedscope CPU profile, and the median wall time.
+ */
+
+/**
+ * Usage: node scripts/profile-startup.mjs [args] [--runs N] [--binary]
+ * [--label L]. Requires the built dist: run `pnpm build` first.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -35,7 +21,7 @@ import { fileURLToPath } from "node:url";
 
 const SDK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const CLI_ENTRY = path.join(SDK_ROOT, "dist", "cli", "index.js");
-const BINARY = path.join(SDK_ROOT, "dist", "bin", "langwatch");
+const BINARY = path.join(SDK_ROOT, "..", "..", ".bin", "langwatch", "langwatch");
 const HOOK = path.join(SDK_ROOT, "scripts", "startup-require-hook.cjs");
 const OUT_DIR = path.join(SDK_ROOT, ".startup-profile");
 
@@ -75,7 +61,7 @@ const runNode = (extraNodeArgs, env = {}) =>
   });
 
 const median = (values) => {
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
@@ -97,14 +83,17 @@ const timeRuns = (command, commandArgs) => {
     if (result.error) throw result.error;
     samples.push(elapsed);
   }
-  return { median: median(samples), min: Math.min(...samples), max: Math.max(...samples) };
+  return {
+    median: median(samples),
+    min: Math.min(...samples),
+    max: Math.max(...samples),
+  };
 };
 
-// ----------------------------------------------- cpuprofile → speedscope ----
+// --- cpuprofile -> speedscope ---
 /**
  * The V8 .cpuprofile is already samples + deltas; speedscope's "sampled"
- * format is the same idea with frames hoisted into a shared table. This is a
- * mechanical re-index, nothing clever.
+ * format hoists frames into a shared table. Mechanical re-index, nothing clever.
  */
 const convertCpuProfile = (cpuprofile, name) => {
   const nodeById = new Map(cpuprofile.nodes.map((node) => [node.id, node]));
@@ -190,8 +179,8 @@ const renderTopTables = (tree) => {
     const nm = id.split("node_modules/");
     return nm.length > 1 ? nm[nm.length - 1] : id.replace(SDK_ROOT, "<sdk>");
   };
-  const byTotal = [...tree.flat].sort((a, b) => b.totalMs - a.totalMs).slice(0, 30);
-  const bySelf = [...tree.flat].sort((a, b) => b.selfMs - a.selfMs).slice(0, 30);
+  const byTotal = [...tree.flat].toSorted((a, b) => b.totalMs - a.totalMs).slice(0, 30);
+  const bySelf = [...tree.flat].toSorted((a, b) => b.selfMs - a.selfMs).slice(0, 30);
   lines.push(`node boot (preload → first require): ${tree.nodeBootMs.toFixed(1)}ms`);
   lines.push(`modules loaded: ${tree.moduleCount}`);
   pushTable("TOP 30 BY TOTAL TIME (load + everything it pulled in)", byTotal);
@@ -200,7 +189,9 @@ const renderTopTables = (tree) => {
 };
 
 // ------------------------------------------------------------------ run ----
-console.log(`profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`);
+console.log(
+  `profiling: langwatch ${cliArgs.join(" ")}  (LANGWATCH_NO_DAEMON=1, ${runs} wall runs)`,
+);
 
 // 1. require tree
 const treePath = path.join(OUT_DIR, `${label}-require-tree.json`);
@@ -244,10 +235,10 @@ wallText += `startup above node boot: ${(nodeWall.median - bootWall.median).toFi
 if (useBinary) {
   if (fs.existsSync(BINARY)) {
     const binWall = timeRuns(BINARY, cliArgs);
-    wallText += `dist/bin/langwatch ${cliArgs.join(" ")}\n`;
+    wallText += `.bin/langwatch/langwatch ${cliArgs.join(" ")}\n`;
     wallText += `  median ${binWall.median.toFixed(1)}ms  (min ${binWall.min.toFixed(1)}, max ${binWall.max.toFixed(1)})\n`;
   } else {
-    wallText += `dist/bin/langwatch: not present, skipped (not rebuilt — that takes minutes)\n`;
+    wallText += `.bin/langwatch/langwatch: not present, skipped (not rebuilt — that takes minutes)\n`;
   }
 }
 

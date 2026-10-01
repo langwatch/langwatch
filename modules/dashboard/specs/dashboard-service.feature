@@ -1,0 +1,80 @@
+Feature: Shared Dashboard service
+  Dashboard, builder graphs, and saved workbench charts share one process
+  service while compatibility transports retain their existing URLs.
+
+  @unit
+  Scenario: A dashboard is created after the project's current dashboards
+    Given the project has a dashboard at order 0
+    When the Dashboard service creates a dashboard
+    Then the new dashboard is assigned the next order
+
+  @unit
+  Scenario: A dashboard from another project cannot be renamed
+    When the Dashboard service renames a dashboard outside the project
+    Then it throws DashboardNotFoundError
+    And it does not update a dashboard
+
+  @unit
+  Scenario: A graph is placed after every chart in the shared grid
+    Given the dashboard has a chart at grid row 2
+    When the Dashboard service creates a graph without a row
+    Then the graph is assigned grid row 3
+
+  @unit
+  Scenario: A new graph is placed below the bottom edge of the tallest chart
+    Given the dashboard has a chart at grid row 0 spanning three rows
+    When the Dashboard service creates a graph without a row
+    Then the graph is assigned grid row 3
+
+  @unit
+  Scenario: A graph created without a size lands at the grid's default size
+    When the Custom Graph page creates a graph on a dashboard without a size
+    Then the graph spans half the grid's width and three rows
+
+  @unit
+  Scenario: A graph can be resized across the whole eight-column grid
+    Given a graph on a dashboard
+    When the grid resizes it to span all eight columns
+    Then the new size is stored and read back
+    And a size that runs past the grid's right edge is refused
+
+  @unit
+  Scenario: A graph created with an empty dashboard id is placed on no dashboard
+    When the Dashboard service creates a graph with an empty dashboard id
+    Then the graph belongs to no dashboard
+
+  @unit
+  Scenario: A graph name has no length limit
+    When the Dashboard service renames a known graph to a name of twenty thousand characters
+    Then the graph is renamed
+    And renaming an unknown graph that way throws GraphNotFoundError
+
+  @integration
+  Scenario: Builder and workbench rows remain isolated
+    When a graph operation reads a project
+    Then it reads only rows with kind builder
+    And saved workbench chart operations read only rows with kind workbench_sql
+
+  @unit
+  Scenario: Saved chart governance is called before persistence
+    Given a saved chart policy is injected into Dashboard service
+    When a saved workbench chart is created
+    Then the policy validates its definition before the repository writes it
+
+  @unit
+  Scenario: A saved chart posted without a definition is refused by the service
+    Given the saved chart REST body documents the definition as optional, as main published it
+    When a saved workbench chart is created without a definition
+    Then the service refuses it as a validation error before the policy or repository runs
+
+  @unit
+  Scenario: Compatibility transports share one service instance
+    When tRPC, REST, or RPC handles a Dashboard operation
+    Then it reads DashboardService from process application context
+    And it does not construct Prisma or a repository per request
+
+  @unit
+  Scenario: The memory and Postgres dashboard repositories answer alike
+    Given the same dashboards, builder graphs, saved workbench charts and saved views written to each backend
+    When the same reads and writes run against every backend
+    Then each answers the same rows, refuses the same absences, and never a row belonging to another project

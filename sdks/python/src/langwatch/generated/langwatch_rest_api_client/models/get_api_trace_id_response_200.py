@@ -9,14 +9,19 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
-    from ..models.get_api_trace_id_response_200_evaluations_item import GetApiTraceIdResponse200EvaluationsItem
-    from ..models.get_api_trace_id_response_200_input import GetApiTraceIdResponse200Input
-    from ..models.get_api_trace_id_response_200_metadata import GetApiTraceIdResponse200Metadata
-    from ..models.get_api_trace_id_response_200_metrics import GetApiTraceIdResponse200Metrics
-    from ..models.get_api_trace_id_response_200_output import GetApiTraceIdResponse200Output
-    from ..models.get_api_trace_id_response_200_spans_item import GetApiTraceIdResponse200SpansItem
-    from ..models.get_api_trace_id_response_200_timestamps import GetApiTraceIdResponse200Timestamps
+    from ..models.evaluation import Evaluation
+    from ..models.input_ import Input
+    from ..models.metadata import Metadata
+    from ..models.metrics import Metrics
+    from ..models.output import Output
+    from ..models.timestamps import Timestamps
+    from ..models.trace_error_type_0 import TraceErrorType0
+    from ..models.trace_events_item import TraceEventsItem
+    from ..models.trace_expected_output import TraceExpectedOutput
+    from ..models.trace_privacy import TracePrivacy
+    from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+    from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+    from ..models.trace_spans_item_type_2 import TraceSpansItemType2
 
 
 T = TypeVar("T", bound="GetApiTraceIdResponse200")
@@ -26,34 +31,62 @@ T = TypeVar("T", bound="GetApiTraceIdResponse200")
 class GetApiTraceIdResponse200:
     """
     Attributes:
-        trace_id (str | Unset):  Example: trace_BKZL_X0TKSD4oa1aBJTc_.
-        project_id (str | Unset):  Example: KAXYxPR8MUgTcP8CF193y.
-        metadata (GetApiTraceIdResponse200Metadata | Unset):
-        timestamps (GetApiTraceIdResponse200Timestamps | Unset):
-        input_ (GetApiTraceIdResponse200Input | Unset):
-        output (GetApiTraceIdResponse200Output | Unset):
-        metrics (GetApiTraceIdResponse200Metrics | Unset):
-        error (GetApiTraceIdResponse200ErrorType0 | None | Unset):
-        indexing_md5s (list[str] | Unset):  Example: ['cccd21e0b70c706034dfd9f7772816a3'].
-        spans (list[GetApiTraceIdResponse200SpansItem] | Unset):
-        evaluations (list[GetApiTraceIdResponse200EvaluationsItem] | Unset):
+        spans (list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]):
+        ascii_tree (str):
+        trace_id (str | Unset):
+        project_id (str | Unset):
+        metadata (Metadata | Unset):
+        privacy (TracePrivacy | Unset):
+        timestamps (Timestamps | Unset):
+        input_ (Input | Unset):
+        output (Output | Unset):
+        contexts (list[Any] | Unset):
+        expected_output (TraceExpectedOutput | Unset):
+        metrics (Metrics | Unset):
+        error (None | TraceErrorType0 | Unset):
+        indexing_md5s (list[str] | Unset):
+        events (list[TraceEventsItem] | Unset):
+        evaluations (list[Evaluation] | Unset):
+        redacted_by_visibility_window (bool | Unset):
     """
 
+    spans: list[TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2]
+    ascii_tree: str
     trace_id: str | Unset = UNSET
     project_id: str | Unset = UNSET
-    metadata: GetApiTraceIdResponse200Metadata | Unset = UNSET
-    timestamps: GetApiTraceIdResponse200Timestamps | Unset = UNSET
-    input_: GetApiTraceIdResponse200Input | Unset = UNSET
-    output: GetApiTraceIdResponse200Output | Unset = UNSET
-    metrics: GetApiTraceIdResponse200Metrics | Unset = UNSET
-    error: GetApiTraceIdResponse200ErrorType0 | None | Unset = UNSET
+    metadata: Metadata | Unset = UNSET
+    privacy: TracePrivacy | Unset = UNSET
+    timestamps: Timestamps | Unset = UNSET
+    input_: Input | Unset = UNSET
+    output: Output | Unset = UNSET
+    contexts: list[Any] | Unset = UNSET
+    expected_output: TraceExpectedOutput | Unset = UNSET
+    metrics: Metrics | Unset = UNSET
+    error: None | TraceErrorType0 | Unset = UNSET
     indexing_md5s: list[str] | Unset = UNSET
-    spans: list[GetApiTraceIdResponse200SpansItem] | Unset = UNSET
-    evaluations: list[GetApiTraceIdResponse200EvaluationsItem] | Unset = UNSET
+    events: list[TraceEventsItem] | Unset = UNSET
+    evaluations: list[Evaluation] | Unset = UNSET
+    redacted_by_visibility_window: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
+        from ..models.trace_error_type_0 import TraceErrorType0
+        from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+        from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+
+        spans = []
+        for spans_item_data in self.spans:
+            spans_item: dict[str, Any]
+            if isinstance(spans_item_data, TraceSpansItemType0):
+                spans_item = spans_item_data.to_dict()
+            elif isinstance(spans_item_data, TraceSpansItemType1):
+                spans_item = spans_item_data.to_dict()
+            else:
+                spans_item = spans_item_data.to_dict()
+
+            spans.append(spans_item)
+
+        ascii_tree = self.ascii_tree
 
         trace_id = self.trace_id
 
@@ -62,6 +95,10 @@ class GetApiTraceIdResponse200:
         metadata: dict[str, Any] | Unset = UNSET
         if not isinstance(self.metadata, Unset):
             metadata = self.metadata.to_dict()
+
+        privacy: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.privacy, Unset):
+            privacy = self.privacy.to_dict()
 
         timestamps: dict[str, Any] | Unset = UNSET
         if not isinstance(self.timestamps, Unset):
@@ -75,6 +112,14 @@ class GetApiTraceIdResponse200:
         if not isinstance(self.output, Unset):
             output = self.output.to_dict()
 
+        contexts: list[Any] | Unset = UNSET
+        if not isinstance(self.contexts, Unset):
+            contexts = self.contexts
+
+        expected_output: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.expected_output, Unset):
+            expected_output = self.expected_output.to_dict()
+
         metrics: dict[str, Any] | Unset = UNSET
         if not isinstance(self.metrics, Unset):
             metrics = self.metrics.to_dict()
@@ -82,7 +127,7 @@ class GetApiTraceIdResponse200:
         error: dict[str, Any] | None | Unset
         if isinstance(self.error, Unset):
             error = UNSET
-        elif isinstance(self.error, GetApiTraceIdResponse200ErrorType0):
+        elif isinstance(self.error, TraceErrorType0):
             error = self.error.to_dict()
         else:
             error = self.error
@@ -91,12 +136,12 @@ class GetApiTraceIdResponse200:
         if not isinstance(self.indexing_md5s, Unset):
             indexing_md5s = self.indexing_md5s
 
-        spans: list[dict[str, Any]] | Unset = UNSET
-        if not isinstance(self.spans, Unset):
-            spans = []
-            for spans_item_data in self.spans:
-                spans_item = spans_item_data.to_dict()
-                spans.append(spans_item)
+        events: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.events, Unset):
+            events = []
+            for events_item_data in self.events:
+                events_item = events_item_data.to_dict()
+                events.append(events_item)
 
         evaluations: list[dict[str, Any]] | Unset = UNSET
         if not isinstance(self.evaluations, Unset):
@@ -105,86 +150,155 @@ class GetApiTraceIdResponse200:
                 evaluations_item = evaluations_item_data.to_dict()
                 evaluations.append(evaluations_item)
 
+        redacted_by_visibility_window = self.redacted_by_visibility_window
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
+        field_dict.update(
+            {
+                "spans": spans,
+                "ascii_tree": ascii_tree,
+            }
+        )
         if trace_id is not UNSET:
             field_dict["trace_id"] = trace_id
         if project_id is not UNSET:
             field_dict["project_id"] = project_id
         if metadata is not UNSET:
             field_dict["metadata"] = metadata
+        if privacy is not UNSET:
+            field_dict["privacy"] = privacy
         if timestamps is not UNSET:
             field_dict["timestamps"] = timestamps
         if input_ is not UNSET:
             field_dict["input"] = input_
         if output is not UNSET:
             field_dict["output"] = output
+        if contexts is not UNSET:
+            field_dict["contexts"] = contexts
+        if expected_output is not UNSET:
+            field_dict["expected_output"] = expected_output
         if metrics is not UNSET:
             field_dict["metrics"] = metrics
         if error is not UNSET:
             field_dict["error"] = error
         if indexing_md5s is not UNSET:
             field_dict["indexing_md5s"] = indexing_md5s
-        if spans is not UNSET:
-            field_dict["spans"] = spans
+        if events is not UNSET:
+            field_dict["events"] = events
         if evaluations is not UNSET:
             field_dict["evaluations"] = evaluations
+        if redacted_by_visibility_window is not UNSET:
+            field_dict["redacted_by_visibility_window"] = redacted_by_visibility_window
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
-        from ..models.get_api_trace_id_response_200_evaluations_item import GetApiTraceIdResponse200EvaluationsItem
-        from ..models.get_api_trace_id_response_200_input import GetApiTraceIdResponse200Input
-        from ..models.get_api_trace_id_response_200_metadata import GetApiTraceIdResponse200Metadata
-        from ..models.get_api_trace_id_response_200_metrics import GetApiTraceIdResponse200Metrics
-        from ..models.get_api_trace_id_response_200_output import GetApiTraceIdResponse200Output
-        from ..models.get_api_trace_id_response_200_spans_item import GetApiTraceIdResponse200SpansItem
-        from ..models.get_api_trace_id_response_200_timestamps import GetApiTraceIdResponse200Timestamps
+        from ..models.evaluation import Evaluation
+        from ..models.input_ import Input
+        from ..models.metadata import Metadata
+        from ..models.metrics import Metrics
+        from ..models.output import Output
+        from ..models.timestamps import Timestamps
+        from ..models.trace_error_type_0 import TraceErrorType0
+        from ..models.trace_events_item import TraceEventsItem
+        from ..models.trace_expected_output import TraceExpectedOutput
+        from ..models.trace_privacy import TracePrivacy
+        from ..models.trace_spans_item_type_0 import TraceSpansItemType0
+        from ..models.trace_spans_item_type_1 import TraceSpansItemType1
+        from ..models.trace_spans_item_type_2 import TraceSpansItemType2
 
         d = dict(src_dict)
+        spans = []
+        _spans = d.pop("spans")
+        for spans_item_data in _spans:
+
+            def _parse_spans_item(data: object) -> TraceSpansItemType0 | TraceSpansItemType1 | TraceSpansItemType2:
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    spans_item_type_0 = TraceSpansItemType0.from_dict(data)
+
+                    return spans_item_type_0
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    spans_item_type_1 = TraceSpansItemType1.from_dict(data)
+
+                    return spans_item_type_1
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                if not isinstance(data, dict):
+                    raise TypeError()
+                spans_item_type_2 = TraceSpansItemType2.from_dict(data)
+
+                return spans_item_type_2
+
+            spans_item = _parse_spans_item(spans_item_data)
+
+            spans.append(spans_item)
+
+        ascii_tree = d.pop("ascii_tree")
+
         trace_id = d.pop("trace_id", UNSET)
 
         project_id = d.pop("project_id", UNSET)
 
         _metadata = d.pop("metadata", UNSET)
-        metadata: GetApiTraceIdResponse200Metadata | Unset
+        metadata: Metadata | Unset
         if isinstance(_metadata, Unset):
             metadata = UNSET
         else:
-            metadata = GetApiTraceIdResponse200Metadata.from_dict(_metadata)
+            metadata = Metadata.from_dict(_metadata)
+
+        _privacy = d.pop("privacy", UNSET)
+        privacy: TracePrivacy | Unset
+        if isinstance(_privacy, Unset):
+            privacy = UNSET
+        else:
+            privacy = TracePrivacy.from_dict(_privacy)
 
         _timestamps = d.pop("timestamps", UNSET)
-        timestamps: GetApiTraceIdResponse200Timestamps | Unset
+        timestamps: Timestamps | Unset
         if isinstance(_timestamps, Unset):
             timestamps = UNSET
         else:
-            timestamps = GetApiTraceIdResponse200Timestamps.from_dict(_timestamps)
+            timestamps = Timestamps.from_dict(_timestamps)
 
         _input_ = d.pop("input", UNSET)
-        input_: GetApiTraceIdResponse200Input | Unset
+        input_: Input | Unset
         if isinstance(_input_, Unset):
             input_ = UNSET
         else:
-            input_ = GetApiTraceIdResponse200Input.from_dict(_input_)
+            input_ = Input.from_dict(_input_)
 
         _output = d.pop("output", UNSET)
-        output: GetApiTraceIdResponse200Output | Unset
+        output: Output | Unset
         if isinstance(_output, Unset):
             output = UNSET
         else:
-            output = GetApiTraceIdResponse200Output.from_dict(_output)
+            output = Output.from_dict(_output)
+
+        contexts = cast(list[Any], d.pop("contexts", UNSET))
+
+        _expected_output = d.pop("expected_output", UNSET)
+        expected_output: TraceExpectedOutput | Unset
+        if isinstance(_expected_output, Unset):
+            expected_output = UNSET
+        else:
+            expected_output = TraceExpectedOutput.from_dict(_expected_output)
 
         _metrics = d.pop("metrics", UNSET)
-        metrics: GetApiTraceIdResponse200Metrics | Unset
+        metrics: Metrics | Unset
         if isinstance(_metrics, Unset):
             metrics = UNSET
         else:
-            metrics = GetApiTraceIdResponse200Metrics.from_dict(_metrics)
+            metrics = Metrics.from_dict(_metrics)
 
-        def _parse_error(data: object) -> GetApiTraceIdResponse200ErrorType0 | None | Unset:
+        def _parse_error(data: object) -> None | TraceErrorType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -192,47 +306,55 @@ class GetApiTraceIdResponse200:
             try:
                 if not isinstance(data, dict):
                     raise TypeError()
-                error_type_0 = GetApiTraceIdResponse200ErrorType0.from_dict(data)
+                error_type_0 = TraceErrorType0.from_dict(data)
 
                 return error_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            return cast(GetApiTraceIdResponse200ErrorType0 | None | Unset, data)
+            return cast(None | TraceErrorType0 | Unset, data)
 
         error = _parse_error(d.pop("error", UNSET))
 
         indexing_md5s = cast(list[str], d.pop("indexing_md5s", UNSET))
 
-        _spans = d.pop("spans", UNSET)
-        spans: list[GetApiTraceIdResponse200SpansItem] | Unset = UNSET
-        if _spans is not UNSET:
-            spans = []
-            for spans_item_data in _spans:
-                spans_item = GetApiTraceIdResponse200SpansItem.from_dict(spans_item_data)
+        _events = d.pop("events", UNSET)
+        events: list[TraceEventsItem] | Unset = UNSET
+        if _events is not UNSET:
+            events = []
+            for events_item_data in _events:
+                events_item = TraceEventsItem.from_dict(events_item_data)
 
-                spans.append(spans_item)
+                events.append(events_item)
 
         _evaluations = d.pop("evaluations", UNSET)
-        evaluations: list[GetApiTraceIdResponse200EvaluationsItem] | Unset = UNSET
+        evaluations: list[Evaluation] | Unset = UNSET
         if _evaluations is not UNSET:
             evaluations = []
             for evaluations_item_data in _evaluations:
-                evaluations_item = GetApiTraceIdResponse200EvaluationsItem.from_dict(evaluations_item_data)
+                evaluations_item = Evaluation.from_dict(evaluations_item_data)
 
                 evaluations.append(evaluations_item)
 
+        redacted_by_visibility_window = d.pop("redacted_by_visibility_window", UNSET)
+
         get_api_trace_id_response_200 = cls(
+            spans=spans,
+            ascii_tree=ascii_tree,
             trace_id=trace_id,
             project_id=project_id,
             metadata=metadata,
+            privacy=privacy,
             timestamps=timestamps,
             input_=input_,
             output=output,
+            contexts=contexts,
+            expected_output=expected_output,
             metrics=metrics,
             error=error,
             indexing_md5s=indexing_md5s,
-            spans=spans,
+            events=events,
             evaluations=evaluations,
+            redacted_by_visibility_window=redacted_by_visibility_window,
         )
 
         get_api_trace_id_response_200.additional_properties = d

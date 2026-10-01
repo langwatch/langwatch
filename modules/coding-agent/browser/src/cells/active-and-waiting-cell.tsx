@@ -1,0 +1,32 @@
+import { formatDurationSeconds, MissingValue } from "@langwatch/coding-agent-browser-kit";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+import type React from "react";
+
+import type { SessionListRow } from "../session-list-row.ts";
+
+/**
+ * How long the agent worked against how long it stood waiting on its human.
+ * The second figure is usually the one nobody had measured, and it is what
+ * turns "the session took all afternoon" into something actionable.
+ */
+export const ActiveAndWaitingCell: React.FC<{ row: SessionListRow }> = ({ row }) => {
+  const waitingSeconds = row.blockedOnUserMs / 1000;
+  if (row.activeTimeCliSec === 0 && waitingSeconds === 0) {
+    return <MissingValue />;
+  }
+
+  return (
+    <VStack align="start" gap={0}>
+      {row.activeTimeCliSec > 0 ? (
+        <Text fontSize="sm" whiteSpace="nowrap">
+          {formatDurationSeconds(row.activeTimeCliSec)} active
+        </Text>
+      ) : null}
+      {waitingSeconds > 0 ? (
+        <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
+          {formatDurationSeconds(waitingSeconds)} waiting
+        </Text>
+      ) : null}
+    </VStack>
+  );
+};

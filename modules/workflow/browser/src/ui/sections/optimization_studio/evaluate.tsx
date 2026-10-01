@@ -1,0 +1,570 @@
+import { toaster } from "@langwatch/browser-host/toaster";
+import {
+  Button,
+  createListCollection,
+  HStack,
+  Input,
+  Spacer,
+  Text,
+  useDisclosure,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Select } from "@langwatch/design-system/select";
+import { SmallLabel } from "@langwatch/design-system/small-label";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { trainTestSplit } from "@langwatch/workflow-browser-kit";
+import type { Entry } from "@langwatch/workflow-contract";
+import type { Node } from "@xyflow/react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ComponentProps } from "react";
+import { CheckSquare } from "react-feather";
+import {
+  Controller,
+  type ControllerRenderProps,
+  FormProvider,
+  type UseFormReturn,
+  useForm,
+  useWatch,
+} from "react-hook-form";
+
+import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
+import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
+import { AddModelProviderKey } from "../../elements/optimization_studio/add-model-provider-key.tsx";
+import { useEvaluationExecution } from "./use-evaluation-execution.ts";
+import { VersionToBeUsed } from "./version-to-be-used.tsx";
+
+export function Evaluate() {
+  const { open, onToggle, onClose, setOpen } = useDisclosure();
+
+  const { evaluationState } = useWorkflowStore(({ state }) => ({
+    evaluationState: state.evaluation,
+  }));
+
+  const isRunning = evaluationState?.status === "running";
+
+  const form = useForm<EvaluateForm>({
+    defaultValues: {
+      version: "",
+      commitMessage: "",
+      evaluateOn: undefined,
+    },
+  });
+
+  return (
+    <>
+      <Tooltip content={isRunning ? "Evaluation is running" : ""}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            // `trackEvent` DID NOT TRAVEL. Product analytics is the application's own
+            // browser singleton, and a feature-web package has no capability to
+            // answer it — the same refusal the workflows list recorded.
+            form.reset({
+              version: "",
+              commitMessage: "",
+              evaluateOn: undefined,
+            });
+            onToggle();
+          }}
+          disabled={isRunning}
+        >
+          <CheckSquare size={16} /> Evaluate
+        </Button>
+      </Tooltip>
+      <Dialog.Root open={open} onOpenChange={({ open }) => setOpen(open)}>
+        {open && <EvaluateModalContent form={form} onClose={onClose} />}
+      </Dialog.Root>
+    </>
+  );
+}
+
+type EvaluateForm = {
+  version: string;
+  commitMessage: string;
+  evaluateOn?: DatasetSplitOption;
+};
+
+type DatasetSplitOption = {
+  label: string;
+  value: "full" | "test" | "train" | "specific";
+  description: string;
+  datasetEntry?: number;
+};
+
+function evaluateDisabledReason({
+  hasProvidersWithoutCustomKeys,
+  isDatasetLoading,
+  estimatedTotal,
+  needsACommitMessage,
+}: {
+  hasProvidersWithoutCustomKeys: boolean;
+  isDatasetLoading: boolean;
+  estimatedTotal: number | undefined;
+  needsACommitMessage: boolean;
+}): string | false {
+  if (hasProvidersWithoutCustomKeys) return "Set up your API keys to run evaluations";
+  if (isDatasetLoading) return false;
+  if (!estimatedTotal || estimatedTotal < 1) {
+    return "You need at least 1 dataset entry to run evaluations";
+  }
+  if (needsACommitMessage) return "You need to provide a version description";
+  return false;
+}
+
+export function EvaluateModalContent({
+  form,
+  onClose,
+}: {
+  form: UseFormReturn<EvaluateForm>;
+  onClose: () => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const {
+    workflowId,
+    getWorkflow,
+    evaluationState,
+    deselectAllNodes,
+    setOpenResultsPanelRequest,
+    setLastCommittedWorkflow,
+    setCurrentVersionId,
+    currentVersionId,
+    checkCanCommitNewVersion,
+  } = useWorkflowStore(
+    ({
+      workflow_id: workflowId,
+      getWorkflow,
+      state,
+      deselectAllNodes,
+      setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
+    }) => ({
+      workflowId,
+      getWorkflow,
+      evaluationState: state.evaluation,
+      deselectAllNodes: deselectAllNodes,
+      setOpenResultsPanelRequest: setOpenResultsPanelRequest,
+      setLastCommittedWorkflow,
+      setCurrentVersionId,
+      currentVersionId,
+      checkCanCommitNewVersion,
+    }),
+  );
+
+  const { hasProvidersWithoutCustomKeys, nodeProvidersWithoutCustomKeys } = useModelProviderKeys({
+    workflow: getWorkflow(),
+  });
+
+  const entryNode = getWorkflow().nodes.find((node) => node.type === "entry") as
+    | Node<Entry>
+    | undefined;
+
+  const { total, query: datasetQuery } = useGetDatasetData({
+    dataset: entryNode?.data.dataset,
+    preview: true,
+  });
+
+  const evaluateOn = useWatch({ control: form.control, name: "evaluateOn" });
+  const commitMessage = useWatch({
+    control: form.control,
+    name: "commitMessage",
+  });
+
+  const { datasetName, trainSize, testSize, isPercentage, train, test } = datasetSplit(
+    entryNode,
+    total,
+  );
+  const testCount = test.length;
+  const trainCount = train.length;
+  const splitOptions = useMemo(
+    () =>
+      buildSplitOptions({ datasetName, isPercentage, testSize, trainSize, testCount, trainCount }),
+    [datasetName, isPercentage, testSize, trainSize, testCount, trainCount],
+  );
+
+  useEffect(() => {
+    if (!evaluateOn) form.setValue("evaluateOn", defaultSplitOption(total, splitOptions));
+  }, [form, total, evaluateOn, splitOptions]);
+
+  const estimatedTotal = useMemo(
+    () =>
+      estimatedEntries({
+        split: evaluateOn?.value,
+        total,
+        trainCount: train.length,
+        testCount: test.length,
+      }),
+    [evaluateOn, total, train.length, test.length],
+  );
+
+  const canSave = checkCanCommitNewVersion();
+  const trpc = workflowApi.useUtils();
+
+  const commitVersion = workflowApi.workflow.commitVersion.useMutation();
+  const { startEvaluationExecution } = useEvaluationExecution();
+
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    if (hasStarted && evaluationState?.status === "running") {
+      onClose();
+      deselectAllNodes();
+      setOpenResultsPanelRequest("evaluations");
+    }
+  }, [evaluationState?.status, hasStarted, onClose, deselectAllNodes, setOpenResultsPanelRequest]);
+
+  const onSubmit = useCallback(
+    async ({ version, commitMessage, evaluateOn }: EvaluateForm) => {
+      if (!project || !workflowId) return;
+
+      if (!estimatedTotal || !evaluateOn || !confirmEntryCount(estimatedTotal)) return;
+
+      const versionId = canSave
+        ? await commitEvaluatedVersion(async () => {
+            const versionResponse = await commitVersion.mutateAsync({
+              projectId: project.id,
+              workflowId,
+              commitMessage,
+              dsl: { ...getWorkflow(), version },
+            });
+            setLastCommittedWorkflow(getWorkflow());
+            setCurrentVersionId(versionResponse.id);
+            return versionResponse.id;
+          })
+        : currentVersionId;
+
+      if (!versionId) {
+        toaster.create({
+          title: "Version ID not found for evaluation",
+          type: "error",
+          duration: 5000,
+        });
+        return;
+      }
+
+      void trpc.workflow.getVersions.invalidate();
+
+      startEvaluationExecution({
+        workflow_version_id: versionId,
+        evaluate_on: evaluateOn.value,
+        dataset_entry: evaluateOn.value === "specific" ? evaluateOn.datasetEntry : undefined,
+      });
+      setHasStarted(true);
+    },
+    [
+      canSave,
+      commitVersion,
+      currentVersionId,
+      estimatedTotal,
+      getWorkflow,
+      project,
+      setCurrentVersionId,
+      setLastCommittedWorkflow,
+      startEvaluationExecution,
+      trpc.workflow.getVersions,
+      workflowId,
+    ],
+  );
+
+  const isRunning = evaluationState?.status === "running";
+
+  if (isRunning) {
+    return null;
+  }
+
+  const needsACommitMessage = canSave && !commitMessage;
+
+  const isDatasetLoading = total === undefined && datasetQuery.isFetching;
+
+  const isDisabled = evaluateDisabledReason({
+    hasProvidersWithoutCustomKeys,
+    isDatasetLoading,
+    estimatedTotal,
+    needsACommitMessage,
+  });
+
+  return (
+    <FormProvider {...form}>
+      <Dialog.Content
+        bg="bg"
+        as="form"
+        onSubmit={form.handleSubmit(onSubmit)}
+        borderTop="5px solid"
+        borderTopColor="green.400"
+      >
+        <Dialog.Header>
+          <Dialog.Title fontWeight={600}>Evaluate Workflow</Dialog.Title>
+          <Dialog.CloseTrigger />
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="start" width="full" gap={4}>
+            <VStack align="start" width="full">
+              <VersionToBeUsed />
+            </VStack>
+            <VStack align="start" width="full" gap={2}>
+              <SmallLabel>Evaluate on</SmallLabel>
+              <Controller
+                control={form.control}
+                name="evaluateOn"
+                rules={{ required: "Evaluate on is required" }}
+                render={({ field }) => (
+                  <DatasetSplitSelect field={field} options={splitOptions} total={total} />
+                )}
+              />
+            </VStack>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer borderTop="1px solid" borderColor="border" marginTop={4}>
+          <EvaluateFooter
+            nodeProvidersWithoutCustomKeys={
+              hasProvidersWithoutCustomKeys ? nodeProvidersWithoutCustomKeys : undefined
+            }
+            isDatasetLoading={isDatasetLoading}
+            estimatedTotal={estimatedTotal}
+            disabledReason={isDisabled}
+            isBusy={
+              isDatasetLoading || commitVersion.isPending || evaluationState?.status === "waiting"
+            }
+            canSave={canSave}
+          />
+        </Dialog.Footer>
+      </Dialog.Content>
+    </FormProvider>
+  );
+}
+
+const DatasetSplitSelect = ({
+  field,
+  options,
+  total,
+}: {
+  field: ControllerRenderProps<EvaluateForm, "evaluateOn">;
+  options: DatasetSplitOption[];
+  total?: number;
+}) => {
+  const datasetSplitCollection = createListCollection({
+    items: options,
+  });
+
+  return (
+    <VStack width="100%" gap={2}>
+      <Select.Root
+        {...field}
+        collection={datasetSplitCollection}
+        value={field.value?.value ? [field.value.value] : []}
+        onChange={undefined}
+        onValueChange={(change) => {
+          const selectedOption = options.find((option) => option.value === change.value[0]);
+          field.onChange({
+            target: {
+              name: field.name,
+              value: selectedOption,
+            },
+          });
+        }}
+        width="100%"
+      >
+        <Select.Trigger>
+          <Select.ValueText placeholder="Select dataset split" />
+        </Select.Trigger>
+        <Select.Content>
+          {options.map((option) => (
+            <Select.Item item={option} key={option.value}>
+              <VStack align="start" width="full">
+                <Text>{option.label}</Text>
+                <Text fontSize="13px" color="fg.muted">
+                  {option.description}
+                </Text>
+              </VStack>
+            </Select.Item>
+          ))}
+        </Select.Content>
+      </Select.Root>
+      {field.value?.value === "specific" && (
+        <Input
+          type="text"
+          placeholder={`Enter row index (0-${(total ?? 0) - 1})`}
+          value={String(field.value.datasetEntry ?? "")}
+          onChange={(e) => {
+            const input = e.target.value;
+            if (input === "" || /^[0-9]*$/.test(input)) {
+              const value = input === "" ? undefined : parseInt(input);
+              field.onChange({
+                target: {
+                  name: field.name,
+                  value: {
+                    ...field.value,
+                    datasetEntry: value,
+                    label: value !== undefined ? `Entry ${value}` : "Specific entry",
+                  },
+                },
+              });
+            }
+          }}
+        />
+      )}
+    </VStack>
+  );
+};
+
+function buildSplitOptions({
+  datasetName,
+  isPercentage,
+  testSize,
+  trainSize,
+  testCount,
+  trainCount,
+}: {
+  datasetName: string | undefined;
+  isPercentage: boolean;
+  testSize: number;
+  trainSize: number;
+  testCount: number;
+  trainCount: number;
+}): DatasetSplitOption[] {
+  return [
+    {
+      label: "Full dataset",
+      value: "full",
+      description: `Full ${datasetName} dataset`,
+    },
+    {
+      label: "Test entries",
+      value: "test",
+      description: isPercentage
+        ? `${Math.round(testSize * 100)}% of ${datasetName} dataset`
+        : `${testCount} entries`,
+    },
+    {
+      label: "Train entries",
+      value: "train",
+      description: isPercentage
+        ? `${Math.round(trainSize * 100)}% of ${datasetName} dataset`
+        : `${trainCount} entries`,
+    },
+    {
+      label: "Specific entry",
+      value: "specific",
+      description: `Specific entry from ${datasetName} dataset`,
+    },
+  ];
+}
+
+function estimatedEntries({
+  split,
+  total,
+  trainCount,
+  testCount,
+}: {
+  split: DatasetSplitOption["value"] | undefined;
+  total: number | undefined;
+  trainCount: number;
+  testCount: number;
+}): number | undefined {
+  if (split === "full") return total;
+  if (split === "test") return testCount;
+  if (split === "train") return trainCount;
+  if (split === "specific") return 1;
+  return 0;
+}
+
+/** Large runs ask first; runs over the ceiling are refused. */
+function confirmEntryCount(estimatedTotal: number): boolean {
+  if (
+    estimatedTotal >= 300 &&
+    !confirm(`Going to evaluate ${estimatedTotal} entries. Are you sure?`)
+  ) {
+    return false;
+  }
+  if (estimatedTotal >= 5000) {
+    alert(
+      "A maximum of 5000 entries can be evaluated at a time. Please contact support if you need to evaluate more.",
+    );
+    return false;
+  }
+  return true;
+}
+
+async function commitEvaluatedVersion(commit: () => Promise<string>): Promise<string> {
+  try {
+    return await commit();
+  } catch (error) {
+    toaster.create({
+      error,
+      title: "Couldn't save the version",
+      type: "error",
+      duration: 5000,
+    });
+    throw error;
+  }
+}
+
+function datasetSplit(entryNode: Node<Entry> | undefined, total: number | undefined) {
+  const trainSize = entryNode?.data.train_size ?? 0.8;
+  const testSize = entryNode?.data.test_size ?? 0.2;
+  const { train, test } = trainTestSplit(
+    Array.from({ length: total ?? 0 }, (_, i) => i),
+    { trainSize, testSize },
+  );
+  return {
+    datasetName: entryNode?.data.dataset?.name,
+    trainSize,
+    testSize,
+    isPercentage: trainSize < 1 || testSize < 1,
+    train,
+    test,
+  };
+}
+
+function EvaluateFooter({
+  nodeProvidersWithoutCustomKeys,
+  isDatasetLoading,
+  estimatedTotal,
+  disabledReason,
+  isBusy,
+  canSave,
+}: {
+  nodeProvidersWithoutCustomKeys:
+    | ComponentProps<typeof AddModelProviderKey>["nodeProvidersWithoutCustomKeys"]
+    | undefined;
+  isDatasetLoading: boolean;
+  estimatedTotal: number | undefined;
+  disabledReason: string | false;
+  isBusy: boolean;
+  canSave: boolean;
+}) {
+  return (
+    <VStack align="start" width="full" gap={3}>
+      {nodeProvidersWithoutCustomKeys && (
+        <AddModelProviderKey
+          runWhat="run evaluations"
+          nodeProvidersWithoutCustomKeys={nodeProvidersWithoutCustomKeys}
+        />
+      )}
+      <HStack width="full">
+        <Text fontWeight={500}>
+          {isDatasetLoading ? "Loading dataset..." : `${estimatedTotal ?? 0} entries`}
+        </Text>
+        <Spacer />
+        <Tooltip content={disabledReason}>
+          <Button variant="outline" type="submit" disabled={!!disabledReason} loading={isBusy}>
+            <CheckSquare size={16} />
+            {canSave ? "Save & Run Evaluation" : "Run Evaluation"}
+          </Button>
+        </Tooltip>
+      </HStack>
+    </VStack>
+  );
+}
+
+/** Big datasets default to the test split; small ones run in full. */
+function defaultSplitOption(total: number | undefined, splitOptions: DatasetSplitOption[]) {
+  return total && total > 50 ? splitOptions[1]! : splitOptions[0]!;
+}

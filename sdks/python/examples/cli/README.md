@@ -9,11 +9,13 @@ This directory contains command-line interface examples that demonstrate LangWat
 ## Running CLI Examples
 
 ### Individual Example
+
 ```bash
 python examples/cli/guaranteed_availability_with_cli.py
 ```
 
 ### All CLI Examples
+
 ```bash
 make cli-examples
 ```
@@ -21,6 +23,7 @@ make cli-examples
 ## Testing
 
 CLI examples are tested separately from bot examples:
+
 - `make bot-examples` - Tests interactive chatbot examples
 - `make cli-examples` - Tests CLI workflow examples
 - `make test-examples` - Runs both bot and CLI examples
@@ -28,6 +31,7 @@ CLI examples are tested separately from bot examples:
 ## Requirements
 
 CLI examples may require additional dependencies:
+
 - Node.js/npx for LangWatch CLI commands
 - LANGWATCH_API_KEY environment variable
 - Various CLI tools depending on the example

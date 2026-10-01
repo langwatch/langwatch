@@ -1,0 +1,486 @@
+import {
+  REPORT_TRIGGER_DEFAULTS,
+  renderTriggerEmail,
+  renderTriggerSlack,
+  resolveSlackTemplateType,
+  buildReportTemplateContext,
+  type ReportChart,
+  type ReportTraceRow,
+  type ReportSource,
+  findReportFromTriggerRow,
+  type Trigger,
+} from "@langwatch/automation-contract";
+import { createLogger } from "@langwatch/observability";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { Cron } from "croner";
+
+import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import type { SlackDestinationService } from "./slack-destination.service.ts";
+
+const logger = createLogger("langwatch:report-dispatch");
+
+/** One due slot of one report automation. */
+export type ReportFire = { projectId: string; triggerId: string; slot: Instant };
+
+export interface ReportDispatchDeps {
+  findTrigger(params: { projectId: string; triggerId: string }): Promise<Trigger | null>;
+  findProject(projectId: string): Promise<ReportProject | null>;
+  /**
+   * The same outbound provider surface every other automation notification
+   * goes through, so a report email carries the ADR-031 unsubscribe footer and
+   * a report Slack message rides the same fenced transport.
+   */
+  delivery: AutomationNotificationDelivery;
+  /** Where the report's Slack message goes: its connection, else its own legacy secret. */
+  slackDestinations: Pick<
+    SlackDestinationService,
+    "findSlackDestination" | "getMissingDispatchError"
+  >;
+  filterSuppressedRecipients: (params: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }) => Promise<string[]>;
+  /**
+   * The top-N traces matching the report's search query over its schedule window, newest first,
+   * as typed rows. Injected by the composition root so this module stays free of the trace-list
+   * service and its ClickHouse plumbing. Only called for `traceQuery` report sources.
+   */
+  listReportTraces(params: {
+    projectId: string;
+    /** Deep-links each row back to the trace. */
+    projectSlug: string;
+    query: string;
+    from: number;
+    to: number;
+    limit: number;
+  }): Promise<ReportTraceRow[]>;
+  /**
+   * The report's charts — one per panel — over its schedule window. Only
+   * called for `customGraph` / `dashboard` report sources.
+   */
+  loadReportCharts(params: {
+    projectId: string;
+    source: ReportSource;
+    from: number;
+    to: number;
+  }): Promise<ReportChart[]>;
+  /**
+   * Record that the report was sent, so it shows up in the automations page's
+   * history and last-sent alongside everything else. Without this a report can
+   * run for a month and leave no trace that it ever did.
+   */
+  recordFire(params: { projectId: string; triggerId: string; firedAt: Instant }): Promise<void>;
+  baseHost: string;
+}
+
+/** The project fields a report renders; the row itself is the caller's. */
+export interface ReportProject {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** A fire summarises at least a minute and at most a year, whatever the cron. */
+const MIN_WINDOW_MS = 60 * 1000;
+const MAX_WINDOW_MS = 366 * DAY_MS;
+
+/** Human summary of what a report renders (context `report.sourceLabel`). */
+function sourceLabel(source: ReportSource): string {
+  switch (source.kind) {
+    case "traceQuery":
+      return `Top ${source.topN} matching traces`;
+    case "customGraph":
+      return "Custom graph";
+    case "dashboard":
+      return "Dashboard";
+  }
+}
+
+/** Deep link to view the report's underlying data. */
+function viewUrl(source: ReportSource, baseHost: string, slug: string): string {
+  const base = `${baseHost}/${slug}`;
+  switch (source.kind) {
+    case "traceQuery":
+      return `${base}/traces`;
+    case "customGraph":
+      return `${base}/analytics/custom/${encodeURIComponent(source.customGraphId)}`;
+    case "dashboard":
+      // The deep link the dashboard page itself uses; the bare /analytics dropped it (#6716).
+      return `${base}/analytics/reports?dashboard=${encodeURIComponent(source.dashboardId)}`;
+  }
+}
+
+/** Light human schedule description (enrich with a cron humanizer later). */
+function scheduleLabel(cron: string, timezone: string): string {
+  return `on schedule \`${cron}\` (${timezone})`;
+}
+
+/**
+ * The span a fire summarises: everything since the report's PREVIOUS scheduled slot, up to
+ * the slot being fired.
+ */
+function reportWindowMs({
+  cron,
+  timezone,
+  slot,
+}: {
+  cron: string;
+  timezone: string;
+  slot: Instant;
+}): number {
+  let previous: Instant | undefined;
+  try {
+    const [run] = new Cron(cron, { timezone }).previousRuns(1, toDate(slot));
+    previous = run === undefined ? undefined : fromDate(run);
+  } catch {
+    return WEEK_MS;
+  }
+
+  if (!previous) {
+    return WEEK_MS;
+  }
+
+  const span = slot.epochMilliseconds - previous.epochMilliseconds;
+  if (!Number.isFinite(span) || span <= 0) {
+    return WEEK_MS;
+  }
+
+  return Math.min(Math.max(span, MIN_WINDOW_MS), MAX_WINDOW_MS);
+}
+
+/** Sending one scheduled report: its window, its data, and the notify pipeline. */
+export class ReportDispatchService {
+  static create(deps: ReportDispatchDeps): ReportDispatchService {
+    return new ReportDispatchService(deps);
+  }
+
+  private constructor(private readonly deps: ReportDispatchDeps) {}
+
+  /**
+   * ADR-044 Phase 3c: the scheduler's report handler. When a report's
+   */
+  async dispatchScheduledReport(fire: ReportFire): Promise<void> {
+    const deps = this.deps;
+    const loaded = await findDispatch({ deps, fire });
+    if (!loaded) {
+      return;
+    }
+
+    const { trigger, report, project } = loaded;
+
+    const params = trigger.actionParams as { members?: string[] };
+
+    // Every report carries its DATA, not just a link to it, over the window
+    // `[previous slot, this slot]` — exactly the period this fire is responsible
+    // for, so a monthly report summarises its month and a daily one its day. A
+    // trace-query report sends the traces matching its search query; a graph or
+    // dashboard report sends the plotted series of each panel.
+    const to = fire.slot.epochMilliseconds;
+    const from =
+      to -
+      reportWindowMs({
+        cron: report.schedule.cron,
+        timezone: report.schedule.timezone,
+        slot: fire.slot,
+      });
+
+    const { traces, charts } = await loadReportData({
+      deps,
+      source: report.source,
+      projectId: fire.projectId,
+      projectSlug: project.slug,
+      query: trigger.filterQuery ?? "",
+      from,
+      to,
+    });
+
+    const context = buildReportTemplateContext({
+      trigger: { id: trigger.id, name: trigger.name },
+      report: {
+        sourceLabel: sourceLabel(report.source),
+        scheduleLabel: scheduleLabel(report.schedule.cron, report.schedule.timezone),
+        sourceKind: report.source.kind,
+      },
+      viewUrl: viewUrl(report.source, deps.baseHost, project.slug),
+      traces,
+      charts,
+      occurredAt: fire.slot,
+      project: { id: project.id, name: project.name, slug: project.slug },
+      baseHost: deps.baseHost,
+    });
+
+    if (!(await deliverReport({ deps, trigger, project, params, context }))) {
+      return;
+    }
+
+    await recordReportFire({
+      deps,
+      projectId: project.id,
+      triggerId: trigger.id,
+      firedAt: fire.slot,
+    });
+  }
+}
+
+type ReportTemplateContext = ReturnType<typeof buildReportTemplateContext>;
+
+/**
+ * A report with no recipients, no webhook, or an unusable bot connection delivers nothing,
+ * and recording a fire for it would put a lie in the history — so this reports whether the
+ * message actually went out.
+ */
+async function deliverReport({
+  deps,
+  trigger,
+  project,
+  params,
+  context,
+}: {
+  deps: ReportDispatchDeps;
+  trigger: Trigger;
+  project: ReportProject;
+  params: { members?: string[] };
+  context: ReportTemplateContext;
+}): Promise<boolean> {
+  if (trigger.action === "SEND_EMAIL") {
+    return deliverReportEmail({ deps, trigger, project, context, params });
+  }
+
+  if (trigger.action === "SEND_SLACK_MESSAGE") {
+    return deliverReportSlack({ deps, trigger, context });
+  }
+
+  logger.warn(
+    { triggerId: trigger.id, action: trigger.action },
+    "Report trigger action is not a notify channel — skipping",
+  );
+
+  return false;
+}
+
+async function deliverReportEmail({
+  deps,
+  trigger,
+  project,
+  params,
+  context,
+}: {
+  deps: ReportDispatchDeps;
+  trigger: Trigger;
+  project: ReportProject;
+  params: { members?: string[] };
+  context: ReportTemplateContext;
+}): Promise<boolean> {
+  const recipients = params.members ?? [];
+  if (recipients.length === 0) {
+    return false;
+  }
+
+  const allowed = await deps.filterSuppressedRecipients({
+    projectId: project.id,
+    triggerId: trigger.id,
+    emails: recipients,
+  });
+  if (allowed.length === 0) {
+    return false;
+  }
+
+  const rendered = await renderTriggerEmail({
+    subjectTemplate: trigger.templates.emailSubjectTemplate,
+    bodyTemplate: trigger.templates.emailBodyTemplate,
+    context,
+    defaults: REPORT_TRIGGER_DEFAULTS,
+  });
+  await deps.delivery.sendEmail({
+    recipients: allowed,
+    triggerId: trigger.id,
+    projectId: project.id,
+    subject: rendered.subject,
+    html: rendered.html,
+    // A scheduled report has no per-recipient dedup ledger: the scheduler's
+    // slot lease is what stops a double send, so every recipient of this
+    // fire is unsent by definition.
+    isRecipientSent: async () => false,
+    recordRecipientSent: async () => {},
+  });
+
+  return true;
+}
+
+async function deliverReportSlack({
+  deps,
+  trigger,
+  context,
+}: {
+  deps: ReportDispatchDeps;
+  trigger: Trigger;
+  context: ReportTemplateContext;
+}): Promise<boolean> {
+  const logContext = { projectId: trigger.projectId, triggerId: trigger.id };
+
+  // A report's connection, else its own legacy secret (ARCHITECTURE.md §3).
+  const [destination] = await deps.slackDestinations.findSlackDestination({
+    projectId: trigger.projectId,
+    actionParams: trigger.actionParams,
+  });
+  if (!destination) {
+    logger.warn(
+      { ...logContext, code: "slack_integration_missing" },
+      "Report has no usable Slack connection and no secret of its own — nothing sent",
+    );
+    return false;
+  }
+
+  if (destination.kind === "bot") {
+    if (!destination.channel) {
+      logger.warn(
+        { ...logContext, code: "slack_channel_missing" },
+        "Report is configured for Slack bot delivery but has no channel — nothing sent",
+      );
+      return false;
+    }
+    // ADR-041: a bot connection posts via the Web API with the gate open.
+    const rendered = await renderTriggerSlack({
+      templateType: resolveSlackTemplateType({
+        configured: trigger.templates.slackTemplateType,
+        deliveryMethod: "bot",
+      }),
+      template: trigger.templates.slackTemplate,
+      context,
+      defaults: REPORT_TRIGGER_DEFAULTS,
+      allowGatedBlocks: true,
+    });
+    await deps.delivery.sendSlackBot({
+      token: destination.token,
+      channel: destination.channel,
+      payload: rendered.payload,
+      triggerName: trigger.name,
+    });
+    return true;
+  }
+
+  const rendered = await renderTriggerSlack({
+    templateType: resolveSlackTemplateType({
+      configured: trigger.templates.slackTemplateType,
+      deliveryMethod: "webhook",
+    }),
+    template: trigger.templates.slackTemplate,
+    context,
+    defaults: REPORT_TRIGGER_DEFAULTS,
+  });
+  await deps.delivery.sendSlackWebhook({
+    webhook: destination.url,
+    triggerName: trigger.name,
+    payload: rendered.payload,
+  });
+
+  return true;
+}
+
+/** The report's own payload for the window: matching traces, or every panel's plotted series. */
+async function loadReportData({
+  deps,
+  source,
+  projectId,
+  projectSlug,
+  query,
+  from,
+  to,
+}: {
+  deps: ReportDispatchDeps;
+  source: ReportSource;
+  projectId: string;
+  projectSlug: string;
+  /** The Subject facet (ADR-043) the author writes and previews. Empty means the whole window. */
+  query: string;
+  from: number;
+  to: number;
+}): Promise<{ traces: ReportTraceRow[]; charts: ReportChart[] }> {
+  if (source.kind === "traceQuery") {
+    const traces = await deps.listReportTraces({
+      projectId,
+      projectSlug,
+      query,
+      from,
+      to,
+      limit: source.topN,
+    });
+
+    return { traces, charts: [] };
+  }
+
+  const charts = await deps.loadReportCharts({ projectId, source, from, to });
+
+  return { traces: [], charts };
+}
+
+/**
+ * The report went out — record it so the automations page can show when it last sent.
+ * Best-effort: a bookkeeping failure must not fail (and so re-run) a report that already
+ * reached the customer.
+ */
+async function recordReportFire({
+  deps,
+  projectId,
+  triggerId,
+  firedAt,
+}: {
+  deps: ReportDispatchDeps;
+  projectId: string;
+  triggerId: string;
+  firedAt: Instant;
+}): Promise<void> {
+  try {
+    await deps.recordFire({ projectId, triggerId, firedAt });
+  } catch (error) {
+    logger.warn({ triggerId, projectId, error }, "Report delivered but recording its fire failed");
+  }
+}
+
+/**
+ * Finds the trigger, its parsed report and the project it belongs to — or null when the fire has
+ * nothing to send: an inactive or deleted trigger, action parameters that did not parse, or a
+ * project that is no longer there.
+ */
+async function findDispatch({
+  deps,
+  fire,
+}: {
+  deps: ReportDispatchDeps;
+  fire: ReportFire;
+}): Promise<{
+  trigger: Trigger;
+  report: NonNullable<ReturnType<typeof findReportFromTriggerRow>>;
+  project: ReportProject;
+} | null> {
+  const trigger = await deps.findTrigger({
+    projectId: fire.projectId,
+    triggerId: fire.triggerId,
+  });
+  if (!trigger?.active || trigger.deleted) {
+    logger.info(
+      { triggerId: fire.triggerId, projectId: fire.projectId },
+      "Report trigger missing/inactive — skipping scheduled fire",
+    );
+
+    return null;
+  }
+
+  const report = findReportFromTriggerRow(trigger.actionParams);
+  if (!report) {
+    logger.warn(
+      { triggerId: trigger.id, projectId: fire.projectId },
+      "Report trigger actionParams did not parse — skipping",
+    );
+
+    return null;
+  }
+
+  const project = await deps.findProject(fire.projectId);
+
+  return project ? { trigger, report, project } : null;
+}

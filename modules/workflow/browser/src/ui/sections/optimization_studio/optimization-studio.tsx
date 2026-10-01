@@ -1,0 +1,748 @@
+import { Link } from "@langwatch/browser-host/link";
+import { toaster } from "@langwatch/browser-host/toaster";
+import { useDrawer } from "@langwatch/browser-host/use-drawer";
+import { DatasetImagePreviewTable } from "@langwatch/dataset-browser-kit";
+
+import "@xyflow/react/dist/style.css";
+import {
+  useColorMode,
+  useColorModeValue,
+  useColorRawValue,
+} from "@langwatch/design-system/color-mode";
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  HStack,
+  Spinner,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { EvaluationProgressBar } from "@langwatch/experiment-browser-kit";
+import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
+import {
+  ComponentIcon,
+  assertCrispChatHidden,
+  EmojiPickerModal,
+} from "@langwatch/workflow-browser-kit";
+import {
+  fieldSchema,
+  getInputsOutputs,
+  studioWorkflowWireSchema,
+  studioWorkflowSchema,
+  type Entry,
+  type StudioWorkflow,
+} from "@langwatch/workflow-contract";
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  ReactFlow,
+  type ReactFlowProps,
+  ReactFlowProvider,
+} from "@xyflow/react";
+import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { DndProvider, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { BarChart2 } from "react-feather";
+import {
+  type ImperativePanelHandle,
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+} from "react-resizable-panels";
+import { useShallow } from "zustand/react/shallow";
+
+import { LLMModelDisplay } from "../../../behavior/lent-model-provider.tsx";
+import { useAgentPickerFlow } from "../../../behavior/optimization_studio/use-agent-picker-flow.ts";
+import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
+import { useEvaluatorPickerFlow } from "../../../behavior/optimization_studio/use-evaluator-picker-flow.ts";
+import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
+import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
+import { usePromptPickerFlow } from "../../../behavior/optimization_studio/use-prompt-picker-flow.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
+import { useAskBeforeLeaving } from "../../../behavior/use-ask-before-leaving.ts";
+import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
+import { workflowApi } from "../../../behavior/workflow-api.ts";
+import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
+import { isConnectionAllowed } from "../../../model/control-flow.ts";
+import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
+import Head from "../../elements/compat/next-head.tsx";
+import { LogoIcon } from "../../elements/logo-icon.tsx";
+import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
+import { HoverableBigText } from "../hoverable-big-text.tsx";
+import { WorkflowAutosave } from "../workflow-autosave.tsx";
+import { WorkflowDragPreview } from "../workflow-drag-preview.tsx";
+import { WorkflowEdge } from "../workflow-edge.tsx";
+import {
+  type WorkflowEmojiPickerRenderProps,
+  WorkflowNamePopover,
+} from "../workflow-name-popover.tsx";
+import {
+  WorkflowNodeSelectionPanel,
+  WorkflowNodeSelectionPanelButton,
+} from "../workflow-node-selection-panel.tsx";
+import { workflowNodeComponents } from "../workflow-nodes.registry.ts";
+import { WorkflowProgressToast } from "../workflow-progress-toast.tsx";
+import {
+  WorkflowRunUntilHereDialog,
+  getWorkflowEntryNode,
+} from "../workflow-run-until-here-dialog.tsx";
+import { WorkflowRunningStatus } from "../workflow-running-status.tsx";
+import { WorkflowUndoRedo } from "../workflow-undo-redo.tsx";
+import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
+import { Evaluate } from "./evaluate.tsx";
+import { History } from "./history.tsx";
+import { Optimize } from "./optimize.tsx";
+import { Publish } from "./publish.tsx";
+import { ResultsPanel } from "./results-panel.tsx";
+import { useComponentExecution } from "./use-component-execution.ts";
+import { useEvaluationExecution } from "./use-evaluation-execution.ts";
+import { useOptimizationExecution } from "./use-optimization-execution.ts";
+import { PostEventProvider, usePostEvent } from "./use-post-event.tsx";
+import { useWorkflowExecution } from "./use-workflow-execution.ts";
+
+function useEntryDatasetTotal(dataset: Entry["dataset"]) {
+  return useGetDatasetData({ dataset, preview: true }).total;
+}
+
+/** Provided once around the whole studio: canvas, node panel, drag preview and drawers. */
+const studioNodeHost = {
+  ComponentIcon,
+  HoverableBigText,
+  LLMModelDisplay,
+  useColorModeValue,
+  useComponentExecution,
+  useComponentVersion,
+  useEntryDatasetTotal,
+};
+
+function DragDropArea({ children }: { children: React.ReactNode }) {
+  const [_, drop] = useDrop(() => ({
+    accept: "node",
+    drop: (_item, monitor) => {
+      const clientOffset = monitor.getClientOffset();
+      if (clientOffset) {
+        const { x, y } = clientOffset;
+        return { name: "Studio", x, y }; // Return the name and the coordinates
+      }
+      return { name: "Studio" }; // Default return if no coordinates
+    },
+    collect: (monitor) => ({
+      isOver: monitor.isOver(),
+      canDrop: monitor.canDrop(),
+    }),
+  }));
+
+  return (
+    <Box ref={drop} width="full" height="full">
+      {children}
+    </Box>
+  );
+}
+
+export default function OptimizationStudio() {
+  const {
+    name,
+    nodes,
+    edges,
+    onNodesChange,
+    onNodesDelete,
+    onEdgesChange,
+    onConnect,
+    onConnectStart,
+    onConnectEnd,
+    setIsDraggingNode,
+    setClickedNodeId,
+    openResultsPanelRequest,
+    setOpenResultsPanelRequest,
+    executionStatus,
+  } = useWorkflowStore(
+    useShallow((state) => {
+      if (typeof window !== "undefined") {
+        // @ts-expect-error: debugging hook — `state` is not part of the Window type
+        window.state = state;
+      }
+      return {
+        name: state.name,
+        nodes: state.nodes,
+        edges: state.edges,
+        onNodesChange: state.onNodesChange,
+        onNodesDelete: state.onNodesDelete,
+        onEdgesChange: state.onEdgesChange,
+        onConnect: state.onConnect,
+        onConnectStart: state.onConnectStart,
+        onConnectEnd: state.onConnectEnd,
+        setIsDraggingNode: state.setIsDraggingNode,
+        setClickedNodeId: state.setClickedNodeId,
+        openResultsPanelRequest: state.openResultsPanelRequest,
+        setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
+        executionStatus: state.state.execution?.status,
+      };
+    }),
+  );
+
+  const { project } = useOrganizationTeamProject();
+  const { socketStatus } = usePostEvent();
+  const { closeDrawer, currentDrawer } = useDrawer();
+
+  const [nodeSelectionPanelIsOpen, setNodeSelectionPanelIsOpen] = useState(true);
+
+  const panelRef = useRef<ImperativePanelHandle>(null);
+  const [isResultsPanelCollapsed, setIsResultsPanelCollapsed] = useState(false);
+
+  const collapsePanel = () => {
+    const panel = panelRef.current;
+    if (panel) {
+      panel.collapse();
+    }
+  };
+
+  // The effect below clears the request it just handled, so its own dependency
+  // flips mid-flight and an effect-scoped cleanup would cut the expand
+  // animation short. The frame is tracked on a ref instead, cancelled on
+  // unmount and whenever a fresh request arrives.
+  const expandFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    applyResultsPanelRequest({
+      request: openResultsPanelRequest,
+      panelRef,
+      expandFrameRef,
+      isCollapsed: isResultsPanelCollapsed,
+    });
+    setOpenResultsPanelRequest(undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openResultsPanelRequest]);
+
+  useEffect(
+    () => () => {
+      if (expandFrameRef.current !== null) {
+        window.cancelAnimationFrame(expandFrameRef.current);
+      }
+    },
+    [],
+  );
+
+  // The Crisp bubble policy keeps the support bubble hidden app-wide unless
+  // deliberately opened; re-assert on entering the studio so it can never
+  // cover the canvas controls even if Crisp booted mid-navigation.
+  useEffect(() => {
+    assertCrispChatHidden();
+  }, []);
+
+  useAskBeforeLeaving();
+
+  return (
+    <WorkflowNodeHostProvider value={studioNodeHost}>
+      <div style={{ width: "100vw", height: "100vh" }}>
+        <Head>
+          <title>LangWatch - Optimization Studio - {name}</title>
+        </Head>
+        <ReactFlowProvider>
+          <DndProvider backend={HTML5Backend}>
+            <PostEventProvider>
+              <WorkflowDragPreview />
+              <VStack width="full" height="full" gap={0}>
+                <HStack
+                  width="full"
+                  background="bg"
+                  padding={2}
+                  borderBottom="1px solid"
+                  borderColor="border.emphasized"
+                >
+                  <HStack width="full">
+                    <Link href={`/${project?.slug}/workflows`}>
+                      <LogoIcon width={24} height={24} />
+                    </Link>
+                    <StudioWorkflowRunningStatus />
+                    {!["waiting", "running"].includes(executionStatus ?? "") && (
+                      <StudioWorkflowAutosave />
+                    )}
+                  </HStack>
+                  <HStack width="full" justify="center">
+                    <StudioWorkflowNamePopover />
+                    <StatusCircle
+                      status={socketStatus}
+                      tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
+                    />
+                  </HStack>
+                  <HStack width="full" justify="end">
+                    <StudioWorkflowUndoRedo />
+                    <History />
+                    <Box />
+                    <Evaluate />
+
+                    <Optimize />
+                    <Publish isDisabled={socketStatus !== "connected"} />
+                  </HStack>
+                </HStack>
+                <Box width="full" height="full" position="relative">
+                  <Flex width="full" height="full">
+                    <StudioWorkflowNodeSelectionPanel
+                      isOpen={nodeSelectionPanelIsOpen}
+                      setIsOpen={setNodeSelectionPanelIsOpen}
+                    />
+                    <PanelGroup direction="vertical">
+                      <Panel style={{ position: "relative" }}>
+                        <HStack position="absolute" bottom={3} left={3} zIndex={100}>
+                          <StudioWorkflowNodeSelectionPanelButton
+                            isOpen={nodeSelectionPanelIsOpen}
+                            setIsOpen={setNodeSelectionPanelIsOpen}
+                          />
+                          <Button
+                            size="sm"
+                            display={isResultsPanelCollapsed ? "block" : "none"}
+                            background="bg"
+                            borderRadius={4}
+                            borderColor="border.emphasized"
+                            variant="outline"
+                            onClick={() => {
+                              panelRef.current?.expand(70);
+                            }}
+                          >
+                            <HStack>
+                              <BarChart2 size={14} />
+                              <Text>Results</Text>
+                            </HStack>
+                          </Button>
+                        </HStack>
+                        {isResultsPanelCollapsed && <StudioWorkflowProgressToast />}
+                        <DragDropArea>
+                          <OptimizationStudioCanvas
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onNodesDelete={() => setTimeout(onNodesDelete, 0)}
+                            onConnect={(connection) => {
+                              const result = onConnect(connection);
+                              if (result?.error) {
+                                toaster.create({
+                                  title: "Error",
+                                  description: result.error,
+                                  type: "error",
+                                  duration: 5000,
+                                });
+                              }
+                            }}
+                            onConnectStart={(_event, params) =>
+                              onConnectStart({
+                                nodeId: params.nodeId,
+                                handleId: params.handleId,
+                              })
+                            }
+                            onConnectEnd={() => onConnectEnd()}
+                            isValidConnection={(connection) =>
+                              isConnectionAllowed({ nodes, connection })
+                            }
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
+                            }}
+                            onPaneClick={() => {
+                              if (currentDrawer) closeDrawer();
+                            }}
+                            onNodeClick={(_event, node) => {
+                              if (currentDrawer) closeDrawer();
+                              setClickedNodeId(node.id);
+                            }}
+                            fitView
+                            fitViewOptions={{
+                              maxZoom: 1.2,
+                            }}
+                          >
+                            <Controls
+                              position="bottom-left"
+                              orientation="horizontal"
+                              style={{
+                                marginLeft: controlsMarginLeft({
+                                  nodeSelectionPanelIsOpen,
+                                  isResultsPanelCollapsed,
+                                }),
+                                marginBottom: "15px",
+                              }}
+                            />
+                          </OptimizationStudioCanvas>
+                        </DragDropArea>
+                      </Panel>
+                      <PanelResizeHandle style={{ position: "relative", marginTop: "-20px" }}>
+                        <Center paddingY={2}>
+                          <Box
+                            width="30px"
+                            height="3px"
+                            borderRadius="full"
+                            background="bg.emphasized"
+                          />
+                        </Center>
+                      </PanelResizeHandle>
+                      <Panel
+                        collapsible
+                        minSize={6}
+                        ref={panelRef}
+                        onCollapse={() => setIsResultsPanelCollapsed(true)}
+                        onExpand={() => setIsResultsPanelCollapsed(false)}
+                        defaultSize={0}
+                      >
+                        <ResultsPanel
+                          isCollapsed={isResultsPanelCollapsed}
+                          collapsePanel={collapsePanel}
+                        />
+                      </Panel>
+                    </PanelGroup>
+                    <StudioNodeDrawer />
+                  </Flex>
+                </Box>
+              </VStack>
+            </PostEventProvider>
+          </DndProvider>
+        </ReactFlowProvider>
+
+        <StudioWorkflowRunUntilHereDialog />
+        {/*
+        Global mounts (CurrentDrawer, GlobalTraceV2DrawerMount, GlobalUpgradeModal) not ported:
+        studio has no layout/overlay slot. Breaks drawers, traces, and upgrade dialog.
+        Pending app-level overlay slot in apps/ui.
+      */}
+      </div>
+    </WorkflowNodeHostProvider>
+  );
+}
+
+function ReactFlowBackground() {
+  const bgColor = useColorModeValue(useColorRawValue("gray.100"), useColorRawValue("gray.900"));
+  // Hardcoded to the pre-redesign grays (old gray.300 in light, a subtle dark
+  // in dark). The theme gray scale shifted to darker Chakra v3 defaults, which
+  // turned the canvas dots into a heavy grid; pin them so the texture stays the
+  // light, subtle one it was for years rather than tracking the token.
+  const dotColor = useColorModeValue("#E5E7EB", "#2d2d3d");
+
+  return (
+    <Background
+      variant={BackgroundVariant.Dots}
+      gap={12}
+      size={2}
+      bgColor={bgColor}
+      color={dotColor}
+    />
+  );
+}
+
+function controlsMarginLeft({
+  nodeSelectionPanelIsOpen,
+  isResultsPanelCollapsed,
+}: {
+  nodeSelectionPanelIsOpen: boolean;
+  isResultsPanelCollapsed: boolean;
+}): string {
+  if (nodeSelectionPanelIsOpen) return isResultsPanelCollapsed ? "122px" : "16px";
+  return isResultsPanelCollapsed ? "262px" : "180px";
+}
+
+function statusCircleColor({ status }: { status: string }): string {
+  if (status === "connected") return "green.500";
+  if (status === "disconnected") return "red.300";
+  return "yellow.500";
+}
+
+function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
+  return (
+    <Tooltip content={tooltip}>
+      <HStack>
+        <Box
+          minWidth="12px"
+          maxWidth="12px"
+          minHeight="12px"
+          maxHeight="12px"
+          background={statusCircleColor({ status })}
+          borderRadius="full"
+        />
+        {status !== "connected" && status !== "disconnected" && (
+          <HStack>
+            <Text>Connecting...</Text>
+            <Spinner size="sm" />
+          </HStack>
+        )}
+      </HStack>
+    </Tooltip>
+  );
+}
+
+export function OptimizationStudioCanvas({
+  children,
+  defaultZoom = 1,
+  yAdjust = -360,
+  ...props
+}: {
+  children?: React.ReactNode;
+  defaultZoom?: number;
+  yAdjust?: number;
+} & ReactFlowProps) {
+  const nodeTypes = useMemo(() => workflowNodeComponents, []);
+  const edgeTypes = useMemo(() => ({ default: WorkflowEdge }), []);
+  const { colorMode } = useColorMode();
+
+  return (
+    <ReactFlow
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      colorMode={colorMode}
+      // ReactFlow defaults deleteKeyCode to "Backspace" only; also bind Delete
+      // so a selected node or connection is removable with either key.
+      deleteKeyCode={["Backspace", "Delete"]}
+      defaultViewport={{
+        zoom: defaultZoom,
+        x: 100,
+        y: Math.round(
+          ((typeof window !== "undefined" ? window.innerHeight - yAdjust : 0) || 300) / 2,
+        ),
+      }}
+      proOptions={{ hideAttribution: true }}
+      {...props}
+    >
+      <ReactFlowBackground />
+      {children}
+    </ReactFlow>
+  );
+}
+
+function StudioWorkflowNodeSelectionPanel({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+}) {
+  const { project } = useOrganizationTeamProject();
+  const workflowId = useWorkflowStore((state) => state.workflow_id);
+  const { handlePromptDragEnd } = usePromptPickerFlow();
+  const { handleEvaluatorDragEnd } = useEvaluatorPickerFlow();
+  const { handleAgentDragEnd } = useAgentPickerFlow();
+  const resolvedDefault = workflowApi.modelProvider.getResolvedDefault.useQuery(
+    { projectId: project?.id ?? "", featureKey: "workflows.create_default" },
+    { enabled: !!project?.id },
+  );
+  const components = workflowApi.optimization.getComponents.useQuery(
+    { projectId: project?.id ?? "" },
+    {
+      enabled: !!project?.id && !!workflowId,
+      refetchOnWindowFocus: true,
+    },
+  );
+
+  const customComponents = useMemo(() => {
+    const parsedComponents = publishedComponentsSchema.safeParse(components.data ?? []);
+    const componentList = parsedComponents.success ? parsedComponents.data : [];
+
+    return componentList.flatMap((component) => {
+      if (!component.isComponent || !component.publishedId) {
+        return [];
+      }
+
+      const publishedVersion = component.versions.find(
+        (version) => version.id === component.publishedId,
+      );
+      if (!publishedVersion) {
+        return [];
+      }
+
+      const workflow = studioWorkflowSchema.safeParse(publishedVersion.dsl);
+      if (!workflow.success) {
+        return [];
+      }
+
+      const fields = getInputsOutputs(workflow.data.edges, workflow.data.nodes);
+      return [
+        {
+          id: component.id,
+          name: component.name,
+          publishedId: component.publishedId,
+          inputs: normalizePaletteFields(fields.inputs),
+          outputs: normalizePaletteFields(fields.outputs),
+        },
+      ];
+    });
+  }, [components.data]);
+
+  return (
+    <WorkflowNodeSelectionPanel
+      isOpen={isOpen}
+      setIsOpen={setIsOpen}
+      defaultModel={resolvedDefault.data?.model ?? DEFAULT_MODEL}
+      customComponents={customComponents}
+      onPromptDragEnd={handlePromptDragEnd}
+      onEvaluatorDragEnd={handleEvaluatorDragEnd}
+      onAgentDragEnd={handleAgentDragEnd}
+    />
+  );
+}
+
+function StudioWorkflowAutosave() {
+  const { project } = useOrganizationTeamProject();
+  const { workflow } = useLoadWorkflow();
+  const autosave = workflowApi.workflow.autosave.useMutation();
+  const trpc = workflowApi.useUtils();
+  const onSave = useCallback(
+    ({ dsl, setAsLatestVersion }: { dsl: StudioWorkflow; setAsLatestVersion: boolean }) => {
+      if (!project || !workflow.data) {
+        return Promise.reject(new Error("Workflow is not ready to autosave"));
+      }
+      return autosave.mutateAsync({
+        projectId: project.id,
+        workflowId: workflow.data.id,
+        dsl: studioWorkflowWireSchema.parse(dsl),
+        setAsLatestVersion,
+      });
+    },
+    [autosave, project, workflow.data],
+  );
+  const onRefreshVersions = useCallback(async () => {
+    if (!project || !workflow.data) {
+      return;
+    }
+    await trpc.workflow.getVersions.refetch({
+      workflowId: workflow.data.id,
+      projectId: project.id,
+      returnDSL: "previousVersion",
+    });
+  }, [project, trpc.workflow.getVersions, workflow.data]);
+
+  return (
+    <WorkflowAutosave
+      isWorkflowReady={!!project && !!workflow.data}
+      onSave={onSave}
+      onRefreshVersions={onRefreshVersions}
+    />
+  );
+}
+
+function StudioWorkflowRunningStatus({ isLoading }: { isLoading?: boolean }) {
+  const { stopWorkflowExecution } = useWorkflowExecution();
+
+  return (
+    <WorkflowRunningStatus
+      isLoading={isLoading}
+      onStop={({ traceId }) => stopWorkflowExecution({ trace_id: traceId })}
+    />
+  );
+}
+
+function StudioWorkflowRunUntilHereDialog() {
+  const dataset = useWorkflowStore((state) => getWorkflowEntryNode(state.nodes)?.data.dataset);
+  const { rows, columns } = useGetDatasetData({ dataset });
+  const { startWorkflowExecution } = useWorkflowExecution();
+
+  return (
+    <WorkflowRunUntilHereDialog
+      datasetRows={rows}
+      datasetColumns={columns}
+      onStartWorkflowExecution={startWorkflowExecution}
+      renderDatasetPreview={({ rows: previewRows, columns: previewColumns, onRowClick }) => (
+        <DatasetImagePreviewTable
+          rows={previewRows}
+          columns={previewColumns}
+          background="bg.panel"
+          onRowClick={onRowClick}
+        />
+      )}
+    />
+  );
+}
+
+function StudioWorkflowUndoRedo() {
+  const { workflow } = useLoadWorkflow();
+  return <WorkflowUndoRedo isWorkflowLoaded={workflow.isFetched} />;
+}
+
+function StudioWorkflowNamePopover() {
+  return <WorkflowNamePopover renderEmojiPicker={renderWorkflowEmojiPicker} />;
+}
+
+function StudioWorkflowProgressToast() {
+  const { stopEvaluationExecution } = useEvaluationExecution();
+  const { stopOptimizationExecution } = useOptimizationExecution();
+
+  return (
+    <WorkflowProgressToast
+      renderEvaluationProgress={(state) => <EvaluationProgressBar evaluationState={state} />}
+      onStopEvaluation={({ runId }) => stopEvaluationExecution({ run_id: runId })}
+      onStopOptimization={({ runId }) => stopOptimizationExecution({ run_id: runId })}
+    />
+  );
+}
+
+const StudioWorkflowNodeSelectionPanelButton = WorkflowNodeSelectionPanelButton;
+
+function renderWorkflowEmojiPicker(props: WorkflowEmojiPickerRenderProps) {
+  return <EmojiPickerModal {...props} />;
+}
+
+function normalizePaletteFields(fields: unknown[] | undefined) {
+  return (fields ?? []).flatMap((field) => {
+    const parsed = fieldSchema.safeParse(field);
+    return parsed.success ? [parsed.data] : [];
+  });
+}
+
+/** Answers the latest results-panel request: expand animated, collapse, or nothing. */
+function applyResultsPanelRequest({
+  request,
+  panelRef,
+  expandFrameRef,
+  isCollapsed,
+}: {
+  request: WorkflowStore["openResultsPanelRequest"];
+  panelRef: RefObject<ImperativePanelHandle | null>;
+  expandFrameRef: RefObject<number | null>;
+  isCollapsed: boolean;
+}) {
+  // A new request supersedes whatever the last one was still animating
+  // towards. Without this an in-flight expand keeps resizing the panel back
+  // up while a "closed" request is collapsing it. The cleared request that
+  // this effect writes at the end is not a new one, so it must not cancel.
+  if (request !== undefined && expandFrameRef.current !== null) {
+    window.cancelAnimationFrame(expandFrameRef.current);
+    expandFrameRef.current = null;
+  }
+
+  if (request === "evaluations") {
+    panelRef.current?.expand(0);
+    panelRef.current?.resize(6);
+
+    const step = () => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const size = panel.getSize();
+      if (size < 70) {
+        panel.resize(size + 10);
+        expandFrameRef.current = window.requestAnimationFrame(step);
+      }
+    };
+    step();
+  }
+  if (request === "closed" && !isCollapsed) {
+    panelRef.current?.collapse();
+  }
+}
+
+function SocketStatusTooltip({ socketStatus }: { socketStatus: SocketStatus }) {
+  if (socketStatus !== "connecting-python") return <>{titleCase(socketStatus)}</>;
+  return (
+    <VStack align="start" gap={1} padding={2}>
+      <HStack>
+        <StatusCircle status="connected" />
+        <Text>Socket Connection</Text>
+      </HStack>
+      <HStack>
+        <StatusCircle status="connecting" />
+        <Text>Python Runtime</Text>
+      </HStack>
+    </VStack>
+  );
+}

@@ -1,18 +1,18 @@
 /**
- * Tests for trace isolation in evaluation.withTarget()
- *
- * These tests verify that each withTarget() call creates an independent trace
- * with a unique trace_id, NOT shared across targets within the same dataset row.
+ * Trace isolation in evaluation.withTarget(): each call creates an
+ * independent trace with a unique trace_id, not shared across targets
+ * within the same dataset row.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatch } from "@/client-sdk";
+import { trace } from "@opentelemetry/api";
 import {
   NodeTracerProvider,
   SimpleSpanProcessor,
   InMemorySpanExporter,
 } from "@opentelemetry/sdk-trace-node";
-import { trace } from "@opentelemetry/api";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { LangWatch } from "@/client-sdk";
 
 // Mock fetch globally
 const originalFetch = globalThis.fetch;
@@ -53,14 +53,16 @@ describe("Target Trace Isolation", () => {
     const { provider } = setupTestTracer();
     tracerProvider = provider;
 
-    const capturedBodies: Array<{
-      dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { index: number; target_id: string; trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr = requestUrl(input);
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -92,7 +94,7 @@ describe("Target Trace Isolation", () => {
           }),
         ]);
       },
-      { concurrency: 1 }
+      { concurrency: 1 },
     );
 
     // Wait for flush
@@ -132,14 +134,16 @@ describe("Target Trace Isolation", () => {
     const { provider } = setupTestTracer();
     tracerProvider = provider;
 
-    const capturedBodies: Array<{
-      dataset: Array<{ index: number; target_id: string; trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { index: number; target_id: string; trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr = requestUrl(input);
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -169,7 +173,7 @@ describe("Target Trace Isolation", () => {
           }),
         ]);
       },
-      { concurrency: 3 }
+      { concurrency: 3 },
     );
 
     // Wait for flush
@@ -182,21 +186,25 @@ describe("Target Trace Isolation", () => {
     expect(allEntries.length).toBe(6);
 
     // ALL trace_ids should be unique
-    const traceIds = allEntries.map((e) => e.trace_id).filter((t): t is string => t !== null && t !== "");
+    const traceIds = allEntries
+      .map((e) => e.trace_id)
+      .filter((t): t is string => t !== null && t !== "");
 
     expect(traceIds.length).toBe(6); // All should have valid trace IDs
     expect(new Set(traceIds).size).toBe(6); // All should be unique
   });
 
   it("sends null trace_id when no tracer is configured (no-op tracer)", async () => {
-    const capturedBodies: Array<{
-      dataset: Array<{ trace_id: string | null }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { trace_id: string | null }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr = requestUrl(input);
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -212,12 +220,9 @@ describe("Target Trace Isolation", () => {
 
     const evaluation = await langwatch.experiments.init("test-noop-tracer");
 
-    await evaluation.run(
-      [{ q: "test" }],
-      async () => {
-        await evaluation.withTarget("model", async () => "response");
-      }
-    );
+    await evaluation.run([{ q: "test" }], async () => {
+      await evaluation.withTarget("model", async () => "response");
+    });
 
     // Wait for flush
     await new Promise((r) => setTimeout(r, 200));
@@ -229,17 +234,17 @@ describe("Target Trace Isolation", () => {
     expect(entries.length).toBeGreaterThan(0);
     for (const entry of entries) {
       // Should be null or empty string, NOT "00000000000000000000000000000000"
-      if (entry.trace_id !== null) {
-        expect(entry.trace_id).not.toBe("00000000000000000000000000000000");
-      }
+      expect(entry.trace_id).not.toBe("00000000000000000000000000000000");
     }
   });
 
   it("sets evaluationUsesTargets flag on first withTarget call", async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr = requestUrl(input);
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       return new Response(JSON.stringify({}), { status: 200 });
     }) as typeof fetch;
@@ -271,21 +276,23 @@ describe("Target Trace Isolation", () => {
           // We verify this by checking that only target entries exist, not iteration entries
         }
       },
-      { concurrency: 1 }
+      { concurrency: 1 },
     );
 
     expect(firstCallComplete).toBe(true);
   });
 
   it("skips iteration trace when evaluation uses targets", async () => {
-    const capturedBodies: Array<{
-      dataset: Array<{ target_id?: string }>;
-    }> = [];
+    const capturedBodies: {
+      dataset: { target_id?: string }[];
+    }[] = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr = requestUrl(input);
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -307,7 +314,7 @@ describe("Target Trace Isolation", () => {
         // Always use withTarget
         await evaluation.withTarget("model", async () => "response");
       },
-      { concurrency: 2 }
+      { concurrency: 2 },
     );
 
     // Wait for flush
@@ -324,3 +331,9 @@ describe("Target Trace Isolation", () => {
     }
   });
 });
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}

@@ -1,0 +1,382 @@
+import { createApiFixture } from "@langwatch/api-fixture";
+import type {
+  EvaluatorConfig,
+  EvaluationV3Event,
+  ExecutionCell,
+} from "@langwatch/experiment-contract";
+import {
+  parseStudioWorkflow,
+  type StudioServerEvent,
+  type WorkflowApi,
+} from "@langwatch/workflow-contract";
+/**
+ * Tests ExperimentWorkflowCellService.executeWorkflowCell with a fake studio
+ * boundary port fed scripted events instead of live NLP services.
+ * @see specs/experiments-v3/evaluation-execution.feature
+ */
+import { beforeEach, describe, expect, it } from "vitest";
+
+import type { ExperimentRunCollaborators } from "../../rules/experiment-run-input.rules.ts";
+import { ExperimentCellExecutionService } from "../experiment-cell-execution.service.ts";
+import { ExperimentWorkflowCellService } from "../experiment-workflow-cell.service.ts";
+import { createNoAttachmentsFixture } from "./experiment-attachments.fixture.ts";
+
+const scripted: {
+  flow: StudioServerEvent[];
+  component: StudioServerEvent[];
+  componentThrows: Error | undefined;
+  dispatched: { type: string; payload: Record<string, any> }[];
+} = { flow: [], component: [], componentThrows: undefined, dispatched: [] };
+
+const ports = createApiFixture<ExperimentRunCollaborators>(
+  {
+    attachments: createNoAttachmentsFixture(),
+    studio: {
+      postStudioEvent: async ({
+        event,
+        onEvent,
+      }: {
+        event: { type: string; payload: Record<string, any> };
+        onEvent: (event: StudioServerEvent) => void;
+      }) => {
+        scripted.dispatched.push(event);
+        if (event.type === "execute_component") {
+          if (scripted.componentThrows) throw scripted.componentThrows;
+          for (const serverEvent of scripted.component) onEvent(serverEvent);
+          return;
+        }
+        for (const serverEvent of scripted.flow) onEvent(serverEvent);
+      },
+    },
+  },
+  "ports",
+);
+
+const workflows = createApiFixture<WorkflowApi>({
+  enrichStudioEvent: async ({ event }) => event,
+  prepareStudioEvent: async ({ event }) => event,
+});
+
+const workflowDsl = parseStudioWorkflow({
+  workflow_id: "workflow-1",
+  spec_version: "1.4",
+  name: "Workflow",
+  icon: "x",
+  description: "x",
+  version: "1",
+  nodes: [
+    { id: "entry", type: "entry", position: { x: 0, y: 0 }, data: {} },
+    { id: "llm", type: "signature", position: { x: 0, y: 0 }, data: {} },
+    { id: "eval_1", type: "evaluator", position: { x: 0, y: 0 }, data: { name: "Exact match" } },
+    { id: "end", type: "end", position: { x: 0, y: 0 }, data: {} },
+  ],
+  edges: [],
+  state: {},
+});
+
+const makeCell = (overrides?: Partial<ExecutionCell>): ExecutionCell => ({
+  rowIndex: 0,
+  targetId: "wf-target",
+  targetConfig: {
+    id: "wf-target",
+    type: "workflow",
+    workflowId: "wf_1",
+    inputs: [],
+    outputs: [],
+    mappings: {},
+  },
+  evaluatorConfigs: [],
+  datasetEntry: { _datasetId: "dataset-1", question: "is a dog an animal?" },
+  ...overrides,
+});
+
+/**
+ * A grading evaluator attached to the target column in the workbench, reading
+ * one of the workflow's results. This is not one of the workflow's own
+ * evaluator nodes — it exists only in the workbench.
+ */
+const gradingEvaluator = (sourceField: string): EvaluatorConfig => ({
+  id: "eval-grading",
+  evaluatorType: "langevals/exact_match",
+  dbEvaluatorId: "db-eval-1",
+  inputs: [{ identifier: "output", type: "str" }],
+  mappings: {
+    "dataset-1": {
+      "wf-target": {
+        output: {
+          type: "source",
+          source: "target",
+          sourceId: "wf-target",
+          sourceField,
+        },
+      },
+    },
+  },
+});
+
+const run = async (cell: ExecutionCell): Promise<EvaluationV3Event[]> => {
+  const events: EvaluationV3Event[] = [];
+  for await (const event of executeWorkflowCell({
+    cell,
+    projectId: "p1",
+    workflowDsl,
+    datasetColumns: [{ id: "col_1", name: "question", type: "string" }],
+    ports,
+    workflows,
+  })) {
+    events.push(event);
+  }
+  return events;
+};
+
+const succeedingRun: StudioServerEvent[] = [
+  {
+    type: "component_state_change",
+    payload: {
+      component_id: "llm",
+      execution_state: {
+        status: "success",
+        cost: 0.5,
+        outputs: { output: "yes" },
+      },
+    },
+  },
+  {
+    type: "component_state_change",
+    payload: {
+      component_id: "eval_1",
+      execution_state: {
+        status: "success",
+        cost: 0.25,
+        outputs: { score: "0.85", passed: "true", label: "match" },
+      },
+    },
+  },
+  {
+    type: "execution_state_change",
+    payload: {
+      execution_state: {
+        status: "success",
+        trace_id: "trace_wf_0",
+        result: { output: "yes" },
+        timestamps: { started_at: 1000, finished_at: 1500 },
+      },
+    },
+  },
+  { type: "done" },
+];
+
+/** Two results on the end node, the shape that exposed the bug. */
+const twoResultRun: StudioServerEvent[] = [
+  {
+    type: "execution_state_change",
+    payload: {
+      execution_state: {
+        status: "success",
+        trace_id: "trace_wf_0",
+        result: { output: "yes", chunks: { a: 1 } },
+        timestamps: { started_at: 1000, finished_at: 1500 },
+      },
+    },
+  },
+  { type: "done" },
+];
+
+const failingRun: StudioServerEvent[] = [
+  {
+    type: "execution_state_change",
+    payload: {
+      execution_state: {
+        status: "error",
+        trace_id: "trace_wf_0",
+        error: "the http call timed out",
+      },
+    },
+  },
+  { type: "done" },
+];
+
+const gradingSuccess: StudioServerEvent[] = [
+  {
+    type: "component_state_change",
+    payload: {
+      component_id: "wf-target.eval-grading",
+      execution_state: {
+        status: "success",
+        outputs: { score: 1, passed: true },
+      },
+    },
+  },
+];
+
+beforeEach(() => {
+  scripted.flow = [];
+  scripted.component = [];
+  scripted.componentThrows = undefined;
+  scripted.dispatched = [];
+});
+
+describe("ExperimentWorkflowCellService.executeWorkflowCell", () => {
+  describe("given a workflow run that succeeds with an evaluator node", () => {
+    describe("when the cell is executed", () => {
+      /** @scenario "A workflow target produces one result per dataset row" */
+      it("yields exactly one target_result from the workflow end-node result", async () => {
+        scripted.flow = succeedingRun;
+        const events = await run(makeCell());
+
+        const targets = events.filter((e) => e.type === "target_result");
+        expect(targets).toHaveLength(1);
+        expect(targets[0]).toMatchObject({
+          rowIndex: 0,
+          targetId: "wf-target",
+          output: "yes",
+          traceId: "trace_wf_0",
+        });
+      });
+
+      /** @scenario "The workflow's own evaluator nodes surface as evaluator results" */
+      it("surfaces each workflow evaluator node, coercing string score and passed", async () => {
+        scripted.flow = succeedingRun;
+        const events = await run(makeCell());
+
+        const evaluator = events.find((e) => e.type === "evaluator_result");
+        expect(evaluator).toMatchObject({
+          rowIndex: 0,
+          targetId: "wf-target",
+          evaluatorId: "eval_1",
+        });
+        // Workflow evaluators emit stringy values; they are coerced.
+        expect(evaluator?.type === "evaluator_result" && evaluator.result).toMatchObject({
+          status: "processed",
+          score: 0.85,
+          passed: true,
+          label: "match",
+        });
+
+        // Target result is yielded before the evaluator result so storage can
+        // link them.
+        const targetIdx = events.findIndex((e) => e.type === "target_result");
+        const evalIdx = events.findIndex((e) => e.type === "evaluator_result");
+        expect(targetIdx).toBeLessThan(evalIdx);
+      });
+
+      /** @scenario "Cost and duration from the workflow run are captured per row" */
+      it("captures summed node cost and the run duration on the target result", async () => {
+        scripted.flow = succeedingRun;
+        const events = await run(makeCell());
+
+        const target = events.find((e) => e.type === "target_result");
+        expect(target?.type === "target_result" && target.cost).toBe(0.75);
+        expect(target?.type === "target_result" && target.duration).toBe(500);
+      });
+    });
+  });
+
+  describe("given a grading evaluator attached to the workflow target", () => {
+    describe("when the workflow run succeeds", () => {
+      /** @scenario "An evaluator attached to a workflow target runs against its results" */
+      it("dispatches the evaluator and yields its score", async () => {
+        scripted.flow = twoResultRun;
+        scripted.component = gradingSuccess;
+
+        const events = await run(makeCell({ evaluatorConfigs: [gradingEvaluator("output")] }));
+
+        const graded = events.find(
+          (e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
+        );
+        expect(graded).toMatchObject({ rowIndex: 0, targetId: "wf-target" });
+        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject({
+          status: "processed",
+          score: 1,
+          passed: true,
+        });
+      });
+
+      /** @scenario "An evaluator can read a result other than the first one" */
+      it("resolves a mapping onto a result other than output", async () => {
+        scripted.flow = twoResultRun;
+        scripted.component = gradingSuccess;
+
+        await run(makeCell({ evaluatorConfigs: [gradingEvaluator("chunks")] }));
+
+        const componentDispatch = scripted.dispatched.find((m) => m.type === "execute_component");
+        expect(componentDispatch?.payload.node_id).toBe("wf-target.eval-grading");
+        expect(componentDispatch?.payload.inputs).toEqual({
+          output: { a: 1 },
+        });
+      });
+
+      /** @scenario "An evaluator can read a result other than the first one" */
+      it("runs the evaluator inside the same trace as the workflow", async () => {
+        scripted.flow = twoResultRun;
+        scripted.component = gradingSuccess;
+
+        await run(makeCell({ evaluatorConfigs: [gradingEvaluator("output")] }));
+
+        const componentDispatch = scripted.dispatched.find((m) => m.type === "execute_component");
+        expect(componentDispatch?.payload.trace_id).toBe("trace_wf_0");
+      });
+    });
+
+    describe("when the workflow run fails", () => {
+      /** @scenario "A failing workflow row does not run its evaluators" */
+      it("reports the workflow error and dispatches no evaluator", async () => {
+        scripted.flow = failingRun;
+        scripted.component = gradingSuccess;
+
+        const events = await run(makeCell({ evaluatorConfigs: [gradingEvaluator("output")] }));
+
+        const target = events.find((e) => e.type === "target_result");
+        expect(target).toBeDefined();
+        expect(target?.type === "target_result" && target.error).toBe("the http call timed out");
+        expect(scripted.dispatched.some((m) => m.type === "execute_component")).toBe(false);
+        expect(
+          events.some((e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading"),
+        ).toBe(false);
+      });
+    });
+
+    describe("when the evaluator itself fails", () => {
+      /** @scenario "An evaluator that fails does not lose the workflow's own result" */
+      it("keeps the workflow result and reports the evaluator error", async () => {
+        scripted.flow = twoResultRun;
+        scripted.componentThrows = new Error("evaluator service unreachable");
+
+        const events = await run(makeCell({ evaluatorConfigs: [gradingEvaluator("output")] }));
+
+        const target = events.find((e) => e.type === "target_result");
+        expect(target).toBeDefined();
+        expect(target?.type === "target_result" && target.output).toEqual({
+          output: "yes",
+          chunks: { a: 1 },
+        });
+        expect(target?.type === "target_result" && target.error).toBeUndefined();
+
+        const graded = events.find(
+          (e) => e.type === "evaluator_result" && e.evaluatorId === "eval-grading",
+        );
+        expect(graded).toBeDefined();
+        expect(graded?.type === "evaluator_result" && graded.result).toMatchObject({
+          status: "error",
+          error_type: "EvaluatorError",
+        });
+      });
+    });
+  });
+});
+
+/** A workflow cell executed as the run's cell command executes it. */
+function executeWorkflowCell({
+  ports: collaborators,
+  workflows: engine,
+  ...cell
+}: Parameters<ExperimentWorkflowCellService["executeWorkflowCell"]>[0] & {
+  ports: ExperimentRunCollaborators;
+  workflows: WorkflowApi;
+}): AsyncGenerator<EvaluationV3Event> {
+  return ExperimentWorkflowCellService.create({
+    ports: collaborators,
+    workflows: engine,
+    cells: ExperimentCellExecutionService.create({ ports: collaborators, workflows: engine }),
+  }).executeWorkflowCell(cell);
+}

@@ -152,6 +152,13 @@ Feature: Profile - who I am here, and where I am signed in
       And a confirmed address is marked nothing at all
 
     @integration
+    Scenario: The sign-in methods keep the Security page's labels
+      Given I hold two addresses and a single sign-on identifier
+      When I open the sign-in methods on my profile
+      Then each is a bordered row labelled "Email address" or "Single sign-on"
+      And the address row says how many addresses I hold
+
+    @integration
     Scenario: Only an account with no address anywhere is told it has none
       Given my account has no address on it and no identifiers
       When I open the sign-in methods on my profile

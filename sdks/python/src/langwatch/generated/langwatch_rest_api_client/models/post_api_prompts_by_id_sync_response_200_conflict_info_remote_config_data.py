@@ -37,10 +37,10 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
     """
     Attributes:
         prompt (str):
-        messages (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem]):
-        inputs (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem]):
         outputs (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem]):
         model (str):
+        messages (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem] | Unset):
+        inputs (list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem] | Unset):
         temperature (float | Unset):
         max_tokens (float | Unset):
         top_p (float | Unset):
@@ -61,10 +61,10 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
     """
 
     prompt: str
-    messages: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem]
-    inputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem]
     outputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem]
     model: str
+    messages: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem] | Unset = UNSET
+    inputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem] | Unset = UNSET
     temperature: float | Unset = UNSET
     max_tokens: float | Unset = UNSET
     top_p: float | Unset = UNSET
@@ -87,22 +87,26 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
     def to_dict(self) -> dict[str, Any]:
         prompt = self.prompt
 
-        messages = []
-        for messages_item_data in self.messages:
-            messages_item = messages_item_data.to_dict()
-            messages.append(messages_item)
-
-        inputs = []
-        for inputs_item_data in self.inputs:
-            inputs_item = inputs_item_data.to_dict()
-            inputs.append(inputs_item)
-
         outputs = []
         for outputs_item_data in self.outputs:
             outputs_item = outputs_item_data.to_dict()
             outputs.append(outputs_item)
 
         model = self.model
+
+        messages: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.messages, Unset):
+            messages = []
+            for messages_item_data in self.messages:
+                messages_item = messages_item_data.to_dict()
+                messages.append(messages_item)
+
+        inputs: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.inputs, Unset):
+            inputs = []
+            for inputs_item_data in self.inputs:
+                inputs_item = inputs_item_data.to_dict()
+                inputs.append(inputs_item)
 
         temperature = self.temperature
 
@@ -149,12 +153,14 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
         field_dict.update(
             {
                 "prompt": prompt,
-                "messages": messages,
-                "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
             }
         )
+        if messages is not UNSET:
+            field_dict["messages"] = messages
+        if inputs is not UNSET:
+            field_dict["inputs"] = inputs
         if temperature is not UNSET:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
@@ -216,24 +222,6 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
         d = dict(src_dict)
         prompt = d.pop("prompt")
 
-        messages = []
-        _messages = d.pop("messages")
-        for messages_item_data in _messages:
-            messages_item = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem.from_dict(
-                messages_item_data
-            )
-
-            messages.append(messages_item)
-
-        inputs = []
-        _inputs = d.pop("inputs")
-        for inputs_item_data in _inputs:
-            inputs_item = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem.from_dict(
-                inputs_item_data
-            )
-
-            inputs.append(inputs_item)
-
         outputs = []
         _outputs = d.pop("outputs")
         for outputs_item_data in _outputs:
@@ -244,6 +232,28 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             outputs.append(outputs_item)
 
         model = d.pop("model")
+
+        _messages = d.pop("messages", UNSET)
+        messages: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem] | Unset = UNSET
+        if _messages is not UNSET:
+            messages = []
+            for messages_item_data in _messages:
+                messages_item = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem.from_dict(
+                    messages_item_data
+                )
+
+                messages.append(messages_item)
+
+        _inputs = d.pop("inputs", UNSET)
+        inputs: list[PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem] | Unset = UNSET
+        if _inputs is not UNSET:
+            inputs = []
+            for inputs_item_data in _inputs:
+                inputs_item = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem.from_dict(
+                    inputs_item_data
+                )
+
+                inputs.append(inputs_item)
 
         temperature = d.pop("temperature", UNSET)
 
@@ -304,10 +314,10 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data = cls(
             prompt=prompt,
-            messages=messages,
-            inputs=inputs,
             outputs=outputs,
             model=model,
+            messages=messages,
+            inputs=inputs,
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,

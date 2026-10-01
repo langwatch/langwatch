@@ -1,15 +1,13 @@
-/**
- * RFC 8628 device-code OAuth client for the `langwatch login --device`
- * flow. Targets the control plane's `/api/auth/cli/*` endpoints —
- * the same wire surface a custom CLI client would hit (documented in
- * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
- *
- * Pure stdlib `fetch`, no axios — matches the rest of the typescript
- * CLI's HTTP style.
- */
-
 import * as os from "node:os";
+/**
+ * RFC 8628 device-code OAuth client for `langwatch login --device`, hitting the control plane's
+ * `/api/auth/cli/*` endpoints (documented in
+ * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
+ */
 import { setTimeout as wait } from "node:timers/promises";
+
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+
 import { normalizeEndpoint } from "../../../internal/endpoint";
 
 export interface DeviceCode {
@@ -46,10 +44,9 @@ export interface ExchangeProject {
 }
 
 /**
- * The caller's personal workspace project, shipped on device-session
- * exchanges so data commands can authenticate with its API key without
- * any env var. Older servers omit it; the CLI then lazily exchanges via
- * `GET /api/auth/cli/personal-project` on first use.
+ * Shipped on device-session exchanges so data commands can authenticate
+ * without an env var. Older servers omit it; the CLI then lazily exchanges
+ * via `GET /api/auth/cli/personal-project` on first use.
  */
 export interface ExchangePersonalProject {
   id: string;
@@ -74,17 +71,9 @@ export interface ExchangeCliApiKeyScope {
 }
 
 /**
- * The CLI device-code flow can mint two distinct credential types:
- *   - "device_session" — the user-scoped OAuth-style access+refresh
- *     token pair used by `langwatch claude/codex/...` wrappers.
- *   - "project_api_key" — the project-scoped SDK key
- *     (`Project.apiKey`) returned verbatim, used by SDK consumers
- *     and `langwatch sync/eval/prompt/...` commands.
- *
- * Caller selects via `startDeviceCode({ credentialType })`. Server
- * stamps the choice on the device-code record + flips the response
- * shape on /exchange. Same browser approval ceremony for both — only
- * the persist target differs (`~/.langwatch/config.json` vs `.env`).
+ * "device_session": user-scoped OAuth token pair, for the `claude`/`codex`
+ * wrappers. "project_api_key": the project-scoped SDK key verbatim. Same
+ * approval ceremony for both; only the persist target differs.
  */
 export type CredentialType = "device_session" | "project_api_key";
 
@@ -116,20 +105,16 @@ export interface ExchangeApiKeyResult {
   endpoint?: string;
 }
 
-export type ExchangeResult =
-  | ExchangeDeviceSessionResult
-  | ExchangeApiKeyResult;
+export type ExchangeResult = ExchangeDeviceSessionResult | ExchangeApiKeyResult;
 
 /**
- * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
- * builds returned the unkinded shape verbatim; the runtime normaliser
- * below maps that to `{ kind: 'device_session', ... }` so callers can
- * always assume the discriminated form.
+ * Back-compat: pre-`f9fcc3927` servers returned this shape unkinded; the
+ * runtime normaliser below maps it to `{ kind: 'device_session', ... }` so
+ * callers can always assume the discriminated form.
  */
-export type LegacyExchangeResult = Omit<
-  ExchangeDeviceSessionResult,
-  "kind"
-> & { kind?: "device_session" };
+export type LegacyExchangeResult = Omit<ExchangeDeviceSessionResult, "kind"> & {
+  kind?: "device_session";
+};
 
 export interface RefreshResult {
   access_token: string;
@@ -138,7 +123,10 @@ export interface RefreshResult {
 }
 
 export class DeviceFlowError extends Error {
-  constructor(public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other", message: string) {
+  constructor(
+    public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other",
+    message: string,
+  ) {
     super(message);
     this.name = "DeviceFlowError";
   }
@@ -153,32 +141,27 @@ export interface DeviceFlowOptions {
 
 /**
  * `POST /api/auth/cli/device-code` — mint a device-code + user-code pair.
- *
- * Optional `credentialType` selects what `/exchange` will return on
- * approval: a user-scoped device session (default) or a project-scoped
- * API key. Older servers ignore the field and stay on the device-session
- * shape — back-compat is the server's responsibility.
+ * Optional `credentialType` selects what `/exchange` returns: a user-scoped
+ * device session (default) or a project-scoped API key.
  */
 export async function startDeviceCode(
   opts: DeviceFlowOptions,
-  init: { credentialType?: CredentialType } = {},
+  init: { credentialType?: CredentialType; management?: boolean } = {},
 ): Promise<DeviceCode> {
   const body: Record<string, unknown> = {};
   if (init.credentialType) body.credential_type = init.credentialType;
+  // Sent only when asked, so a login without --management reads exactly as
+  // it did before the flag existed.
+  if (init.management) body.management = true;
   const dc = await postJSON<DeviceCode>(opts, "/api/auth/cli/device-code", body);
   if (!dc.interval || dc.interval <= 0) dc.interval = 5;
   return dc;
 }
 
 /**
- * Device fingerprint stamped onto the CLI session at /exchange time.
- * The control plane persists it on the access + refresh token records
- * so /me/devices can render "Mac (rchaves.local)" instead of
- * "Unknown device" — multi-device users need this to revoke
- * individual sessions without nuking every device they're logged in
- * on (Ariana QA finding). See
- * `platform/app/src/server/routes/auth-cli.ts#clientInfoSchema` for the
- * server contract.
+ * Fingerprint stamped on the CLI session so /me/devices can render "Mac
+ * (rchaves.local)" and one device can be revoked without logging out every
+ * device. Contract: `auth-cli-device-flow.api.ts#clientInfoSchema`.
  */
 function collectClientInfo(): {
   hostname: string;
@@ -191,21 +174,22 @@ function collectClientInfo(): {
     hostname = os.hostname();
   } catch {
     // os.hostname() can throw on locked-down sandboxes; carry empty.
+    void 0;
   }
   try {
     uname = os.userInfo().username;
   } catch {
     // os.userInfo() throws when the uid has no /etc/passwd entry
     // (some Docker images, CI sandboxes); carry empty.
+    void 0;
   }
   return { hostname, uname, platform: process.platform };
 }
 
 /**
- * `POST /api/auth/cli/exchange` — single poll. Returns the access+refresh
- * token bundle on success (200), or throws DeviceFlowError with a
- * categorised `kind` so the caller can decide whether to keep polling
- * (`pending`, `slow_down`) or stop (`denied`, `expired`).
+ * `POST /api/auth/cli/exchange` — single poll. Returns the token bundle on
+ * success (200), or throws `DeviceFlowError` with a `kind` so the caller
+ * can decide whether to keep polling or stop.
  */
 export async function exchange(
   opts: DeviceFlowOptions,
@@ -217,13 +201,11 @@ export async function exchange(
   });
   switch (res.status) {
     case 200: {
-      const body = (await res.json()) as
-        | ExchangeResult
-        | LegacyExchangeResult;
+      const body = (await res.json()) as ExchangeResult | LegacyExchangeResult;
       // Pre-f9fcc3927 servers returned the device-session shape without
       // a `kind` field. Normalise so callers can always discriminate.
       if (!("kind" in body) || !body.kind) {
-        return { kind: "device_session", ...(body) };
+        return { kind: "device_session", ...body };
       }
       return body as ExchangeResult;
     }
@@ -243,14 +225,9 @@ export async function exchange(
 }
 
 /**
- * `GET /api/auth/cli/device-approval` — a stream that emits one frame the
- * moment the browser approves or denies the code. It carries no credential;
- * it only says "poll now", which is what turns the wait from "up to the poll
- * interval" into "as fast as the round trip".
- *
- * Resolves when a frame arrives, and never otherwise: a server that predates
- * the route, a proxy that buffers the body, or a dropped connection all leave
- * the poll timer in charge rather than making it fire early.
+ * `GET /api/auth/cli/device-approval` — emits one frame when the browser
+ * approves/denies (no credential, just "poll now"); never resolves otherwise,
+ * so an old server or dropped connection leaves the poll timer in charge.
  */
 function watchDeviceApproval({
   opts,
@@ -261,14 +238,13 @@ function watchDeviceApproval({
 }): { settled: Promise<void>; close: () => void } {
   const controller = new AbortController();
   const settled = new Promise<void>((resolve) => {
-    readApprovalStream({ opts, deviceCode, signal: controller.signal }).then(
-      (sawFrame) => {
+    readApprovalStream({ opts, deviceCode, signal: controller.signal })
+      .then((sawFrame) => {
         if (sawFrame) resolve();
-      },
-      () => {
+      })
+      .catch(() => {
         // Never settles: polling stays in charge.
-      },
-    );
+      });
   });
   return { settled, close: () => controller.abort() };
 }
@@ -295,9 +271,7 @@ async function readApprovalStream({
   );
   if (!res.ok || !res.body) return false;
 
-  const reader = (
-    res.body as ReadableStream<Uint8Array>
-  ).getReader();
+  const reader = (res.body as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder();
   let buffered = "";
   try {
@@ -342,16 +316,9 @@ async function waitForNextPoll({
 }
 
 /**
- * Poll `exchange` until the user approves, denies, or the device-code
- * expires. Honours RFC 8628 §3.5 by doubling the polling interval on
- * `slow_down` responses.
- *
- * Two things keep the wait short. The first poll goes out immediately, since
- * a login approved while the browser was still opening should not cost a
- * whole interval; and the approval stream cuts every later wait short the
- * moment the browser settles the code. Both are accelerators over the same
- * timer, so a server or network that supports neither still logs in at the
- * cadence the server asked for.
+ * Poll `exchange` until approved, denied, or expired — honouring RFC 8628
+ * §3.5 by doubling the interval on `slow_down`. The approval stream also
+ * cuts a wait short the moment the browser settles the code.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,
@@ -363,16 +330,13 @@ export async function pollUntilDone(
 
   const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
   const approval = watch.settled;
-  // A signal fires once, so it is tracked in two parts. `signalled` says the
-  // frame arrived, `spent` says a poll has already been let through because
-  // of it. A frame that lands while an /exchange is in flight therefore still
-  // shortens the next wait instead of being dropped, and once it is spent the
-  // loop stops racing an already-resolved promise, which would otherwise turn
-  // into a hot poll if /exchange somehow still answered `pending`.
-  let signalled = false;
-  let spent = false;
+  // A signal fires once, tracked in two flags: `signalled` (frame arrived) and
+  // `spent` (already let one poll through for it) — a frame during an in-flight
+  // exchange still shortens the next wait, and `spent` stops the loop racing
+  // an already-resolved promise into a hot poll.
+  const signal = { signalled: false, spent: false };
   void approval.then(() => {
-    signalled = true;
+    signal.signalled = true;
   });
 
   try {
@@ -383,25 +347,14 @@ export async function pollUntilDone(
       }
       if (firstPoll) {
         firstPoll = false;
-      } else if (signalled && !spent) {
-        // The browser settled the code while the previous poll was in
-        // flight. Poll again straight away rather than sleeping out an
-        // interval the signal exists to skip.
-        spent = true;
       } else {
-        await waitForNextPoll({ ms: interval, approval: spent ? null : approval });
-        if (signalled) spent = true;
+        await waitForDevicePoll(interval, approval, signal);
       }
+
       try {
         return await exchange(opts, dc.device_code);
       } catch (err) {
-        if (!(err instanceof DeviceFlowError)) throw err;
-        if (err.kind === "pending") continue;
-        if (err.kind === "slow_down") {
-          interval = Math.min(interval * 2, ceiling);
-          continue;
-        }
-        throw err;
+        interval = nextPollInterval(err, interval, ceiling);
       }
     }
   } finally {
@@ -418,7 +371,9 @@ export async function refresh(
   opts: DeviceFlowOptions,
   refreshToken: string,
 ): Promise<RefreshResult> {
-  const res = await rawPost(opts, "/api/auth/cli/refresh", { refresh_token: refreshToken });
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+  });
   if (res.status === 401) {
     throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
   }
@@ -430,11 +385,9 @@ export async function refresh(
 }
 
 /**
- * `POST /api/auth/cli/logout` — server-side revoke a refresh token
- * AND its paired access token (per `e7a042c69`: a stolen access
- * token used to survive logout for up to 1h until expiry; sending
- * both closes the gap). Idempotent — 200 on already-revoked or
- * unknown tokens.
+ * `POST /api/auth/cli/logout` — revokes the refresh token AND its paired
+ * access token (per `e7a042c69`: a stolen access token used to survive
+ * logout for up to 1h; sending both closes the gap). Idempotent.
  */
 export async function logout(
   opts: DeviceFlowOptions,
@@ -465,6 +418,7 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
   return f(url, {
     method: "POST",
     headers: {
+      ...buildSdkIdentityHeaders({ surface: "cli" }),
       "Content-Type": "application/json",
       Accept: "application/json",
       // Origin enforcement on the server requires this for non-browser
@@ -474,4 +428,25 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
     },
     body: JSON.stringify(body ?? {}),
   });
+}
+
+function nextPollInterval(error: unknown, interval: number, ceiling: number): number {
+  if (!(error instanceof DeviceFlowError)) throw error;
+  if (error.kind === "pending") return interval;
+  if (error.kind === "slow_down") return Math.min(interval * 2, ceiling);
+  throw error;
+}
+
+async function waitForDevicePoll(
+  interval: number,
+  approval: Promise<void>,
+  signal: { signalled: boolean; spent: boolean },
+): Promise<void> {
+  // An approval arriving during an exchange skips exactly one wait.
+  if (signal.signalled && !signal.spent) {
+    signal.spent = true;
+    return;
+  }
+  await waitForNextPoll({ ms: interval, approval: signal.spent ? null : approval });
+  if (signal.signalled) signal.spent = true;
 }

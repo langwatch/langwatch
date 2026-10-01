@@ -1,271 +1,127 @@
-# ADR-022: event_log as single source of truth · S3 as transient spool only
+# ADR-022: The event log owns full trace content; projections stay lean
 
-**Date:** 2026-05-28
+**Date:** 2026-04-13
 
-**Status:** Proposed (issue [#4215](https://github.com/langwatch/langwatch/issues/4215))
+**Status:** Accepted
 
-**Supersedes:** [ADR-021](./021-lean-fold-cache.md) (jointly with [ADR-066](./066-projection-clickhouse-cached-store.md)). This ADR owns the heavy-content decisions; the rules still in force are restated below, so ADR-021 is not required reading.
-
-**Relates to:** [ADR-007](./007-event-sourcing-architecture.md) (event sourcing), [ADR-015](./015-projection-replay-coordination.md) (replay), [ADR-017](./017-gateway-trace-payload-capture.md) (gateway payload capture), [ADR-066](./066-projection-clickhouse-cached-store.md) (projection store — the fold-cache mechanics that used to live in ADR-021).
+**Related:** [projection replay](../../../packages/eventing/adrs/015-projection-replay-coordination.md),
+[ClickHouse cached projections](../../../packages/eventing/adrs/066-clickhouse-cached-projections.md),
+[content-addressed queue payloads](../../../packages/group-queue/adrs/029-content-addressed-payload-store.md),
+and [gateway payload capture](./017-gateway-trace-payload-capture.md).
 
 ## Context
 
-ADR-021 leans the fold cache by **offloading over-threshold field values to S3 permanently** at the edge. Implementation surfaced two design facts ADR-021 didn't account for:
+Trace events may contain large inputs, outputs and span attributes. Copying
+their complete content into every projection and queue job makes Redis and
+ClickHouse projection writes scale with payload size. Permanently offloading
+individual fields to object storage would instead make replay and full reads
+depend on a second durable authority.
 
-1. **A 256 KB cap already exists** at `recordSpanCommand.ts:146` (`capOversizedAttributes`). Anything downstream of the command worker is already bounded today. The unbounded-payload problem is narrower than the ADR framed: it's the **edge → command queue** leg, where the full OTLP request rides through Redis as a BullMQ-style job payload before the cap fires.
-2. **Commands go through a queue.** `commands.traces.recordSpan(data).send()` puts the full command payload into the global GroupQueueProcessor. The event isn't in `event_log` yet when `.send()` returns. Anything we want to lean MUST be leaned before `.send()`, because the queue stage is the Redis pressure point.
-
-A direct sync write to ClickHouse via `event_log` (with `async_insert: 1, wait_for_async_insert: 1`, which langwatch already uses) is ~20–50 ms at p50 — **faster** than an S3 PUT (~50–150 ms). The "S3 is naturally sync-friendly" argument ADR-021 implicitly leaned on doesn't hold: CH inserts are equally sync-friendly here, with a cleaner durability story (event_log alone is replay-sufficient).
-
-Search is also a real concern under ADR-021: `translateFreeText` does `ILIKE` on the `trace_summaries.ComputedInput/Output` preview column, so search becomes lossy past the preview boundary. The cleanest answer is "extend the preview budget to cover a standard Claude response," not "send users to a second backend."
+The append-only event log already has the identity, tenant boundary and
+retention policy required to own the full event. Projection rows need bounded
+previews and a way to resolve the full value only when a caller asks for it.
 
 ## Decision
 
-**`event_log` is the single durable source of truth. Full content lives there. S3 is reduced to a transient spool used only for oversize protection of the command queue.**
+`event_log` is the durable source of truth for full trace event content.
+Object storage is a transient spool used only to protect command transport
+from an oversized serialized payload.
 
-Concretely:
+### Edge transport is bounded
 
-- **`COMMAND_INLINE_THRESHOLD = 256 KB`** — matches the existing `capOversizedAttributes` boundary. Spans whose serialized command payload exceeds this are spooled to S3 at the edge, with the command carrying `{spoolRef}` only.
-- **`IO_PREVIEW_BYTES = 64 KB`** — preview budget for IO attributes (`langwatch.input`, `langwatch.output`, `gen_ai.input.messages`, `gen_ai.output.messages`, log-record `body`). Covers a complete chat-style Claude completion at the common `max_tokens=8192` setting (~16K tokens × 4 chars/token ≈ 64 KB), and most longer-form completions up to ~16K tokens. Configurable via `LANGWATCH_IO_PREVIEW_BYTES`. **Sized to a "standard Claude response length"** — search hits the preview, and the preview is wide enough to be lossless for the modal case.
-- **Edge handles oversize protection only.** No per-attribute offload at the edge anymore. Size-check the whole serialized command payload; spool the entire span if it crosses the threshold; otherwise pass through inline.
-- **Interposition derives lean shapes** at a single hook in `eventSourcingService.ts:242-251`, between `eventStore.storeEvents()` and `router.dispatch()`. `leanForProjection(event)` rewrites over-threshold IO attribute values to a preview + a server-set `langwatch.reserved.eventref.<attrKey>` pointer, leaves other attributes unchanged, and is a no-op for event types without heavy fields.
-- **Projection queue carries the lean events.** Projections (`stored_spans`, `trace_summaries`, the fold cache, all reactors) see lean shapes. The fold cache stays bounded because the dispatch lean step bounded it; `RedisCachedFoldStore.toCacheable` continues to strip non-IO ephemera (`events[]`, `spanCosts`, accumulated `attributes`).
-- **`event_log` row carries FULL content** in `EventPayload` (ZSTD(3) compressed; LLM text compresses 3–8×). Replay reads the full event from `event_log` and applies `leanForProjection(event)` **before** invoking `projection.apply(state, event)` — same utility, same shape, so live and replay produce byte-identical projection state.
-- **Read paths:**
-  - List / search / detail-collapsed → projections (preview, fast, `ILIKE`).
-  - "Show full" / online eval → CH SELECT on `event_log` by `(TenantId, AggregateType, AggregateId, EventId)` (sort-keyed + bloom-filtered → microseconds), parse `EventPayload`, extract the field. `TenantId` in the WHERE clause structurally blocks cross-tenant reads.
-  - Replay (operational) → `event_log` rows → `leanForProjection` → projection apply.
-- **`BlobStore`** stays as the swap-seam interface. `put` writes the transient S3 spool. `get({eventId, field})` reads the `event_log` row and extracts the field. `BlobStore.delete` is the cleanup hook called after `storeEvents` succeeds.
+When a serialized command exceeds `COMMAND_INLINE_THRESHOLD` (256 KiB), the
+edge writes the complete span payload to the deployment's object store and
+queues an opaque spool marker. The command worker reads the spool, appends the
+full event to `event_log`, and eagerly deletes the object after the waited
+append succeeds.
 
-## Walkthrough
+The marker does not carry a bucket, raw object key or tenant-controlled
+location. The worker derives the spool path from the authenticated tenant,
+trace and span identities. Each dynamic path component is either restricted to
+`[A-Za-z0-9_-]` or replaced by a deterministic hash before it reaches a
+storage driver.
+
+Spool writes use the object-store capability already injected into the trace
+pipeline, so S3 and Azure Blob follow the deployment's configured destination
+without importing Stored Objects. A local-filesystem destination is refused
+because it cannot provide the lifecycle policy that reaps objects left by a
+crash between write and delete. Trace spooling retains its own transient
+lifecycle.
+
+The spool prefix has a three-day provider lifecycle rule as an orphan safety
+net. Azure writes require the deployment assertion that this management-plane
+policy exists. That assertion gates writes only; reads and deletes remain
+available so changing configuration cannot strand in-flight objects.
+
+A spool write failure is fail-open: ingestion logs the loss of oversize
+protection and sends the full inline command. A spool read failure is
+retryable and must not silently create a content-free event.
+
+### One interposition derives the projection shape
+
+After the full event append and before live projection dispatch,
+`leanForProjection(event)` replaces over-threshold IO values with:
+
+- a bounded preview up to `IO_PREVIEW_BYTES` (64 KiB by default); and
+- a server-owned `langwatch.reserved.eventref.<attribute>` marker naming the
+  field within the same event.
+
+The event identity is implicit in the projection row; the marker does not
+repeat a storage URI. Event types without heavy fields pass through unchanged.
+
+Live delivery and replay call the same interposition. Projection state is
+therefore byte-identical whether it is produced from a queued event or rebuilt
+from the canonical log.
 
 ```text
-EDGE — OTLP collector
-  receive OTLP request → for each span:
-    compute serialized-command-payload bytes
-    payload ≤ COMMAND_INLINE_THRESHOLD (256 KB)
-      → regular RecordSpan command  (inline data in payload)
-    payload > 256 KB:
-      try S3 PUT (spool object, transient)
-        success → oversized RecordSpan command  (carries {spoolRef} only)
-        failure → fail-open: send regular RecordSpan command (full inline)
-                  log warn ("oversize protection skipped; queue carries full payload")
-  command.send() → COMMAND QUEUE (Redis GroupQueueProcessor)
-  edge returns; durability lives at the queue stage, not event_log yet
-
-COMMAND WORKER  (pulls from global queue)
-  if regular:    use inline span data
-  if oversized:  S3 GET(spoolRef) → reconstitute full span
-  RecordSpanCommand.handle:
-    stripReservedAttributes (defense; passthrough for langwatch.reserved.causality_depth)
-    PII redaction · cost enrichment · token estimation
-    construct SpanReceivedEvent with FULL content as data
-  storeEvents → event_log INSERT (full content, ZSTD compressed)
-  on success:
-    if oversized → best-effort S3 DELETE(spool key)   (lifecycle policy = 24h safety net)
-                                ↓
-INTERPOSITION  (eventSourcingService.ts:242-251 — single hook)
-  enrichedEvents = enrichedEvents.map(leanForProjection)
-    leanForProjection(event):
-      switch event.type:
-        SpanReceived       → for each over-threshold IO attr
-                             (langwatch.input/output, gen_ai.input/output.messages):
-                               replace value with preview (≤ IO_PREVIEW_BYTES = 64 KB)
-                               attach langwatch.reserved.eventref.<attrKey> = { field }
-        LogRecordReceived  → if body > IO_PREVIEW_BYTES:
-                               replace body with preview
-                               attach langwatch.reserved.eventref.body = { field: "body" }
-        other event types  → pass through unchanged
-  router.dispatch(enrichedEvents)  → PROJECTION QUEUE (Redis)
-                                ↓
-PROJECTION WORKERS  (each pulls a lean event from its queue)
-  fold projection      → trace_summaries  (preview as ComputedInput / ComputedOutput)
-  map projection       → stored_spans     (lean SpanAttributes — preview + eventref)
-  reactors             → eval triggers, broadcast, etc.  (same lean event)
-  fold cache (Redis) write-through uses toCacheable to also strip non-IO ephemera
-                     (events[], spanCosts, accumulated attributes for pathological many-span traces)
-
-READS
-  list / search / detail-collapsed
-      ──▶ trace_summaries · stored_spans  (preview, fast, ILIKE on preview column)
-  detail-expanded ("show full") · online eval
-      ──▶ read langwatch.reserved.eventref.<attrKey> from stored_spans
-          CH SELECT on event_log by (TenantId, AggregateType, AggregateId, EventId)
-          → parse EventPayload JSON → extract <attrKey> field
-          (slower, opt-in; CH point lookup with bloom + sort key = microseconds;
-           TenantId in WHERE clause structurally blocks cross-tenant reads)
-  replay (operational)
-      ──▶ replayEventLoader reads event_log rows (full content)
-          replayExecutor.apply: leanForProjection(event) → projection.apply(state, event)
-          SAME utility as live → identical projection state
-
-DURABILITY MAP
-  event_log (CH)   = single source of truth · FULL content · replay-sufficient
-  S3 spool         = transient oversize protection · gone after event_log INSERT succeeds
-  projection tables= derived lean views · regenerable from event_log via replay
-
-LEAN BOUNDARIES  (what stays small at each hop)
-  Command queue (Redis)    ≤ 256 KB per job   (inline data or spoolRef — bounded by edge size-check,
-                                                with fail-open fallback to full inline on S3 outage)
-  event_log row (CH)       unbounded, ZSTD-compressed  (the only place full content lives)
-  Projection queue (Redis) ≤ ~64 KB per IO attr        (bounded by interposition)
-  Fold cache (Redis)       same as projection queue    (downstream of lean step + toCacheable)
-  stored_spans / trace_summaries (CH)   ≤ ~64 KB per IO attr  (downstream of lean step)
+full command
+  -> optional transient spool
+  -> waited full event_log append
+  -> leanForProjection
+  -> Group Queue
+       -> ClickHouse map/fold projections
+       -> projection subscribers
 ```
 
-## Rules in force
+### Reads choose the store by intent
 
-*(These were first written in ADR-021 and remain the rules; restated here so this ADR is self-contained.)*
+- list, search and collapsed-detail reads use lean projection columns;
+- an expanded full-content read follows the event reference to `event_log` by
+  tenant, aggregate and event identity;
+- replay reads full events from `event_log`, derives the lean shape, and
+  applies the selected projection;
+- transient spool storage is never used as the long-term read path.
 
-- **Reserved-namespace edge strip** (already at command worker via `RecordSpanCommand.stripReservedAttributes`, with `langwatch.reserved.causality_depth` passthrough).
-- **Reserved-namespace exclusion from user-visible facet enumeration** (`buildSpanAttributeKeysFacetQuery` filters `langwatch.reserved.*`).
-- **Differential preview budget** — IO attrs get the wide preview (now 64 KB), non-IO attrs stay at 2 KB.
-- **`RedisCachedFoldStore.toCacheable`** as secondary defence for non-IO ephemera (`events[]`, `spanCosts`).
-- **`BlobStore`** as the swap-seam interface. Backend changes; surface stays.
+`TenantId` is required in every full-content lookup. User-visible attribute
+enumeration excludes the `langwatch.reserved.*` namespace.
 
-## Approaches not used (and why)
+### Reserved markers are server-owned
 
-*(Earlier shapes we deliberately do not use — recorded so they are not re-proposed.)*
+Client-supplied `langwatch.reserved.*` attributes are stripped at the command
+boundary, apart from explicitly sanctioned internal propagation fields. The
+lean interposition sets event references only after that strip. A projection
+or subscriber cannot cause arbitrary object reads by altering the marker.
 
-- **Edge offload of every over-threshold field to permanent S3.** Replaced by edge oversize-spool + dispatch-time lean.
-- **Manifest-shaped storage** (one S3 object per span carrying multiple fields). Replaced by `event_log` row, which is naturally the per-span manifest.
-- **sha256-per-field integrity check** on `BlobStore.get`. ClickHouse's MergeTree parts manage row integrity; per-field hashes are redundant.
-- **Project-prefix authorization** on `BlobStore.get`. Cross-tenant access is structurally blocked by `TenantId` in the WHERE clause of the `event_log` SELECT.
-- **`BlobIntegrityError`** (deletable; CH handles integrity).
+### Retention has one durable ceiling
+
+Full-content availability follows the `event_log` retention period. Projection
+previews may have their own analytical retention, but object-spool lifecycle
+does not define customer data retention because the spool is transient.
+
+## Alternatives considered
+
+Permanent per-field object storage introduces another durability and retention
+authority and makes every full read depend on it. Keeping full values in fold
+state makes Redis cache and ClickHouse writes unbounded. Truncating without a
+reference preserves system health but silently discards customer content.
 
 ## Consequences
 
-- `event_log` row size grows from leaned (~32 KB per IO attr) to full content (potentially MBs). CH handles this — `EventPayload` is `String CODEC(ZSTD(3))`, LLM text compresses 3–8×, MergeTree parts accommodate. Compaction works harder on bigger parts; monitor via existing CH metrics.
-- Replay reads heavier rows. Acceptable since replays are operational/infrequent. Could be optimized later via CH column projection (load only the lean shape on replay).
-- Each dispatch step adds a `leanForProjection` call. Single map over events array, microseconds, in the hot path of the command worker.
-- The dispatch interposition is a structural change to `eventSourcingService.ts` that touches every pipeline downstream. Localized — one file, single hook — but worth a dedicated review pass.
-- Read-time "show full" latency: CH point lookup with bloom + sort-key match — microseconds at p50, predictable p99 (better than S3 GET). One JSON parse + field extract per row.
-- Operational footprint shrinks: S3 storage approaches zero (only transient spools, deleted on success). One less storage system to keep healthy in the user-facing path.
-- **Replay durability invariant restored.** `event_log` alone is sufficient. No "event_log + S3 jointly are the source of truth" caveat.
-- **The dispatch interposition runs unconditionally**, not gated by `release_trace_blob_offload`. It is a defensive content transformation: leaning is a no-op for sub-threshold IO (the modal case) and a safety-net lean for over-threshold IO regardless of flag. The flag gates the **user-visible** behavior (edge S3 spool + on-the-wire shape with the eventref attr); the interposition is server-internal and benefits projections + replay regardless. Rationale: gating the interposition would re-introduce the Redis clog risk for over-threshold IO when the flag is off, defeating the safety net.
-
-## On-prem / no-object-storage deployments
-
-- **Reads are object-storage-independent.** Full content lives in `event_log` (ClickHouse). `BlobStore.getFromEventLog` (`blob-store.service.ts:85-158`) issues a CH SELECT and parses `EventPayload`; it never calls `resolveS3Client`. "Show full" and online-eval work with no object storage present.
-- **The edge spool is on by default and fail-open.** `release_trace_blob_offload` defaults to on, so a deployment that has object storage configured keeps oversized content intact without setting anything; the flag stays the kill switch and the per-project opt-out. Flag off → edge spool code never runs → pre-ADR-022 behavior (worker-side `capOversizedAttributes` bounds the payload). Flag on but storage absent → edge PUT fails open (full inline payload forwarded, `warn` logged), ingestion is never blocked.
-- **"No S3 equivalent" means no object storage at all.** S3-compatible stores (MinIO, Ceph RGW) satisfy the AWS S3 client; they are equivalent. Deployments with no object storage keep ingesting with the flag on: every over-threshold span fails open to the inline path, costing a `warn` per span and the edge Redis-queue oversize protection, not any read-path capability. Switching `release_trace_blob_offload` off there silences the warn and changes nothing else.
-
-## Rules
-
-- `leanForProjection` is **the** single source of truth for the leaned shape. It is invoked at the dispatch interposition AND in `replayExecutor.apply` before invoking projection handlers. Any future place that consumes events for projection MUST go through it. Tests pin this invariant.
-- `langwatch.reserved.*` is the server-internal namespace. Client-supplied attributes in that namespace MUST be dropped at the command worker (already enforced by `stripReservedAttributes`, with the `langwatch.reserved.causality_depth` passthrough for nlpgo loop detection). `leanForProjection` SETS the `langwatch.reserved.eventref.<attrKey>` attribute server-side after the strip.
-- `langwatch.reserved.eventref.<attrKey>` carries `{ field: <attrKey> }` only — the `eventId` is implicit in the row carrying the eventref (it's the same span). `BlobStore.get` derives `(TenantId, AggregateType, AggregateId, EventId)` from the read context.
-- S3 spool objects MUST be eagerly DELETEd after `storeEvents()` succeeds. Bucket MUST have a 24h lifecycle policy as a safety net for orphans (edge crash between PUT and command processing).
-- On edge S3 PUT failure (oversize protection unavailable): **fail open** — send the regular RecordSpan command with full inline payload, log at `warn`. Ingestion is never blocked by oversize protection.
-- Any user-visible enumeration of `stored_spans.SpanAttributes` keys MUST exclude `langwatch.reserved.*`. (Survived from ADR-021.)
-- `event_log` retention drives the durability ceiling for "show full" reads. There is no longer a separate S3 retention to coordinate.
-
-## Amendment: the spool is backend-agnostic (langwatch/langwatch-saas#800)
-
-This ADR was written when S3 was the only object store LangWatch could write to,
-so it says "S3 spool" throughout. That is no longer accurate, and taking it
-literally is what kept the spool hardcoded to the AWS SDK long after every other
-byte-writing surface had moved behind the shared `stored-objects` layer. Read
-every "S3" above as "the deployment's object store".
-
-**What changed.** `BlobStore` no longer builds an S3 client for the spool. It
-resolves the project's storage destination through
-`resolveProjectStorageDestination` and writes through the `stored-objects`
-`StorageRegistry`, exactly as the GroupQueue durable blob tier does (ADR-030).
-The spool therefore lands in Azure Blob, S3, or the local filesystem according
-to how the deployment is configured. `mintUriForDestination`
-(`stored-objects/uri.ts`) is now the single destination → URI mapping; the three
-copies of that switch that used to exist are gone.
-
-**The object path is unchanged**: `trace-blobs/spool/{projectId}/{traceId}/{spanId}`,
-with the prefix deliberately kept ABOVE the tenant segment. An S3 lifecycle
-prefix filter cannot wildcard a leading tenant segment, so moving the prefix
-below it would make orphan spools unexpirable. Existing lifecycle rules keep
-working untouched.
-
-**The reference no longer carries a location.** A spooled command used to carry
-the raw object key, and the read path parsed the tenant id back out of that
-string to choose a bucket — so a tampered queue message could steer a read at
-another tenant's object. Commands now carry the opaque marker `spool:v2` and the
-worker re-derives the location from the command's own authenticated `tenantId`
-and span ids. This is the same discipline `BlobRef` follows in ADR-030 §5.
-
-For one release the worker still accepts a v1 raw key, so commands queued across
-the deploy resolve; a v1 key whose tenant segment does not match the command's
-authenticated tenant is refused rather than dereferenced. **Removal is tracked in
-langwatch/langwatch-saas#837**, and the `TODO` markers in `blob-store.service.ts`
-name that issue. It is safe to remove one release after this ships: a v1
-reference can only live inside a command queued before the deploy, and the object
-it names is reaped by the lifecycle rule within 3 days.
-
-**Each derived path segment is a single component.** Percent-encoding is not
-enough on its own: `LocalFilesystemDriver` round-trips the URI through
-`decodeURIComponent`, which turns `..%2F..%2F` back into `../../` before
-`mkdir`/`writeFile` see it. Since `idSchema` accepts arbitrary strings, a span id
-of `../../…` would otherwise have escaped the object root. Ids outside
-`[A-Za-z0-9_-]` are replaced by a hash of the id — deterministic, so the read and
-delete paths re-derive the same location, and incapable of carrying a separator
-whatever decodes it downstream. `LocalFilesystemDriver` additionally refuses any
-`file:` URI whose decoded path is not already canonical, so a future caller that
-gets this wrong fails loudly rather than writing outside the root.
-
-**The spool has no local-filesystem destination.** It is the one stored-objects
-consumer whose boundedness depends on something outside the object store: it
-deletes eagerly after the `event_log` INSERT and leans on a lifecycle rule to
-reap what a crash between those two steps leaves behind. A filesystem cannot
-express such a rule, so an orphan there is permanent and the volume is what
-fills. `mintSpoolUri` therefore refuses a `file` destination and ingestion
-continues with the payload inline. This is not a regression: before the spool
-moved onto the shared storage layer it built an S3 client, which on a local
-install resolved to the hardcoded `langwatch` bucket, so the write failed and the
-same fail-open path ran every time. It is now explicit instead of incidental.
-
-**The orphan-cleanup window is 3 days, not 24h — and enabling the flag does not
-create it.** This ADR says 24h in two places (the flow sketch and the rules
-list); the implementation has said 3 days since it was written, with the
-rationale that a weekend incident needs catch-up time before orphans are reaped.
-Three days is the intended value and the only one now stated in code.
-
-Provisioning that rule is the **operator's** job and a prerequisite for turning
-the flag on, not a consequence of it. On S3 it is a lifecycle rule on the
-`trace-blobs/spool/` prefix; on Azure Blob it is a lifecycle management policy
-with the same prefix filter. Since `release_trace_blob_offload` has never been
-enabled in a shipped deployment, no such rule exists anywhere yet — an operator
-turning the flag on creates it fresh, so there is no deployed rule for the 24h
-correction to contradict.
-
-**On Azure the spool fails closed until the operator says the rule exists.**
-Documenting the prerequisite is not enough on its own: an operator who enables
-the flag without creating the policy gets exactly the unbounded-orphan case the
-local-filesystem refusal above exists to prevent, and trace payloads then
-outlive the retention this ADR promises. `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`
-(chart: `app.dataplane.providers.azureBlob.spoolRetentionConfirmed`) defaults to
-false, and `putSpool` refuses an azure destination without it, so ingestion
-degrades to inline payloads rather than accumulating objects nothing reaps.
-
-The refusal is on the **write** path only. It is a rule about creating an object
-nothing will reap, and it must never touch the objects already out there:
-turning the assertion back off is the documented remediation, and a chart
-rollback does it silently, so gating reads and deletes on it would make every
-in-flight spooled span unreadable (`getSpool` does not fail open, and the edge
-has already cleared the attributes) and would skip the eager delete that is the
-spool's *first* line of cleanup — manufacturing the exact orphan the gate
-exists to prevent. Same reasoning for the local-filesystem refusal.
-
-It is an assertion, not a verification, and deliberately so. An Azure lifecycle
-policy is a management-plane resource
-(`Microsoft.Storage/storageAccounts/managementPolicies`); this deployment holds
-only a data-plane key, so reading the policy back would mean requiring ARM
-credentials, a subscription id and a resource-group name that the feature
-otherwise has no use for — a much larger blast radius than the problem. The
-affirmation lives in the same config that turns the spool on, and the default is
-the safe one. S3 is deliberately not gated the same way: its lifecycle
-requirement predates this change and is the long-standing ADR-022 rule, so
-extending the gate there would silently disable the spool for every existing
-install.
-
-**Superseded above:** "'No S3 equivalent' means no object storage at all";
-"deployments with no object storage should leave `release_trace_blob_offload`
-off"; and both "24h lifecycle policy" statements. Azure Blob is now a
-first-class spool destination alongside S3. The fail-open-on-write and
-read-must-not-degrade rules are unchanged.
+- Projection and queue cost is bounded by preview size rather than trace
+  content size.
+- Full-content reads and replay have one durable authority.
+- Object storage protects transport without becoming part of the projection
+  contract.
+- The storage lifecycle rule is an operational prerequisite for spool writes.
+- Search is complete within the preview budget and intentionally lossy beyond
+  it until a full-content search index exists.

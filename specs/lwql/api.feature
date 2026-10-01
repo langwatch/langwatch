@@ -463,6 +463,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And every view statement the provisioner emits creates a view under that prefix
     And a view named outside it would be created without a grant, and so read as empty rather than fail
 
+  @unit
+  Scenario: The operator opt-out skips LangWatchQL provisioning in the boot chain
+    Given the deploy sets SKIP_LWQL_PROVISION to true
+    When the boot chain runs the lwql-provision task
+    Then the task provisions nothing and reads no project rows
+    And the boot chain continues to the process it was going to start
+
   @integration
   Scenario: PG connection credentials are not exposed to the restricted identity
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
@@ -925,6 +932,32 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the run aborts rather than skipping the row policy
     And the same read-only error is skipped only when the inventoried policy is on the very table the statement targets
 
+  # Named collections are server-global. Two stacks on one ClickHouse (haven) each
+  # drop and recreate theirs at boot, so a shared name let the last booter repoint
+  # every other stack's engine tables at its own PostgreSQL database.
+  @unit
+  Scenario: Each ClickHouse database provisions its own named collection
+    Given two LangWatchQL databases on the same ClickHouse server
+    When the self-provisioning statements are rendered for each
+    Then each creates a named collection whose name carries its own database
+    And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
+  # engine table was never created, and every view over it would fail later as
+  # UNKNOWN_TABLE, naming neither the table nor the collection.
+  @unit
+  Scenario: A missing named collection fails provisioning at the engine table that needs it
+    Given a PostgreSQL-engine table statement rejected because the named collection does not exist
+    When the config-store-tolerant runner executes the list
+    Then the run aborts at that statement rather than skipping it
+    And the failure is logged with the table it was creating and the collection it could not find
+
+  @unit
+  Scenario: A provisioning failure over a missing table names both objects
+    Given a view statement rejected because the table it reads does not exist
+    When the config-store-tolerant runner executes the list
+    Then the failure is logged with the view it was creating and the missing table
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the
@@ -954,22 +987,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # store that never releases gives up at a ~30-minute budget with a warning.
   @unit
   Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
-    Given the running app server polls a stateless LangWatchQL ownership probe after a chart upgrade
+    Given the worker's scheduled reconvergence process polls a stateless LangWatchQL ownership probe after a chart upgrade
     When a probe finds the model is owned by neither the config store nor the SQL store
-    Then the app re-provisions the app-owned access model exactly once and stops watching
-    And while the config store still owns the model the watch keeps polling on a backoff
-    And when the SQL store already owns the model the watch stops without re-provisioning
-    And a probe error alone never re-provisions — the watch keeps polling until a snapshot is authoritative
+    Then the app re-provisions the app-owned access model, and later probes find the SQL store and do nothing
+    And while the config store still owns the model the process keeps probing on a backoff
+    And when the SQL store already owns the model the probe does nothing
+    And a probe error alone never re-provisions — the process keeps probing until a snapshot is authoritative
     And a config store that never releases the model gives up at the budget with a warning
 
-  # AC4 shutdown race: stop() may fire while an ownership probe is already in
-  # flight. A probe that resolves "none" after shutdown was requested must never
-  # re-provision — the app is tearing down the very App a converge would touch.
+  # Shutdown: the watch is a worker-hosted process manager, and the worker drains
+  # its outbox before it closes the app, so a re-provision is never left running
+  # against a torn-down app — the intent awaits the whole convergence.
   @unit
-  Scenario: A probe that resolves after shutdown never re-provisions
-    Given the reconvergence watch has a probe in flight when the app requests shutdown
-    When that probe resolves "none" after stop was requested
-    Then the watch discards the snapshot and never calls converge
+  Scenario: A re-provision in flight finishes before the worker lets the app close
+    Given the reconvergence intent has started a re-provision
+    When the worker begins draining for shutdown
+    Then the intent resolves only once the re-provision has finished
 
   # The re-provision gate is only as trustworthy as the probe behind it, so the
   # ownership classification is split from its I/O and unit-tested directly: a

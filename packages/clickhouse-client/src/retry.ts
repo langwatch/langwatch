@@ -1,28 +1,18 @@
 /**
- * Retrying a statement that failed for a reason worth trying again.
- *
- * Composes the policies in ./resilience.ts rather than restating them, so the
- * classifier this uses is the same one the outer job queue uses and the two
- * cannot drift into disagreeing about what "transient" means.
- *
- * {@link ClickHouseQueryClient} runs this *inside* the concurrency limiter, so
- * a retrying statement keeps its slot instead of rejoining the queue behind
- * fresh work.
+ * Retrying a statement that failed for a reason worth trying again. Composes
+ * ./resilience.ts so this and the outer job queue can't drift on "transient",
+ * and runs inside the query client's limiter so a retry keeps its slot.
  */
 
-import type { AbortSignalLike, QueryRequest } from "./query";
-import {
-  isTransientClickHouseError,
-  jitteredBackoffMs,
-  retryNoticeLevel,
-} from "./resilience";
+import { quietly } from "./observability.ts";
+import type { AbortSignalLike, QueryRequest } from "./query.ts";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience.ts";
 
 export interface RetryNotice {
   /**
-   * Absent when the policy was run without one — `run(task)` is a supported
-   * form. Optional rather than cast away: a callback that reads tenant or table
-   * off this would otherwise throw into runWithRetry's guard, and the retry
-   * telemetry would vanish rather than fail loudly.
+   * Absent when the policy ran without one — `run(task)` is a supported form.
+   * Optional rather than cast away: a callback reading tenant/table off this
+   * would otherwise throw into the guard, silencing retry telemetry.
    */
   request?: QueryRequest | undefined;
   /** Zero-based. */
@@ -57,11 +47,7 @@ const DEFAULT_MAX_DELAY_MS = 30_000;
  */
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
-    (
-      globalThis as unknown as {
-        setTimeout: (fn: () => void, ms: number) => unknown;
-      }
-    ).setTimeout(resolve, ms);
+    globalThis.setTimeout(resolve, ms);
   });
 
 /** What {@link runWithRetry} reports on each retry. No request: it is generic. */
@@ -75,8 +61,10 @@ export interface RetryAttemptNotice {
   level: "warn" | "debug";
 }
 
-export interface RunWithRetryOptions
-  extends Omit<RetryOptions, "onRetry" | "transientMessageFragments"> {
+export interface RunWithRetryOptions extends Omit<
+  RetryOptions,
+  "onRetry" | "transientMessageFragments"
+> {
   transientMessageFragments?: readonly string[] | undefined;
   onRetry?: ((notice: RetryAttemptNotice) => void) | undefined;
   /** Stop retrying once this reports true. Nobody is waiting any more. */
@@ -84,13 +72,9 @@ export interface RunWithRetryOptions
 }
 
 /**
- * Retry any operation under this package's policy.
- *
- * The loop lives here rather than in the client class so callers that are not
- * on the {@link ClickHouseQueryClient} port - `VendorClientResilience`, which
- * wraps the vendor client's own `query`/`insert`, and any host retrying
- * non-statement work - share one implementation instead of keeping a second
- * copy that drifts.
+ * Retry any operation under this package's policy. Lives here, not in the
+ * client class, so callers off the ClickHouseQueryClient port
+ * (`VendorClientResilience`, other host retries) share one implementation.
  */
 export async function runWithRetry<T>(
   fn: () => Promise<T>,
@@ -137,24 +121,18 @@ export async function runWithRetry<T>(
         maxDelayMs,
         ...(random === undefined ? {} : { random }),
       });
-      // Guarded because `onRetry` is host code - a logger, a counter - and it
-      // runs inside the catch. An exception from it would propagate in place of
-      // `error`, so the caller would be handed a logging failure and never
-      // learn which ClickHouse error actually happened, and the remaining
-      // attempts would be cancelled by the reporting of the failure rather than
-      // the failure. Observability must not change what it observes.
-      try {
+      // Guarded because `onRetry` is host code running inside the catch: an
+      // exception from it would replace `error`, so the caller learns a
+      // logging failure instead of the real one. Observability must not change what it observes.
+      quietly(() =>
         onRetry?.({
           attempt,
           maxAttempts,
           delayMs,
           error,
           level: retryNoticeLevel(attempt),
-        });
-      } catch {
-        // Deliberately swallowed. There is nowhere better to put it: the only
-        // channel for reporting it is the thing that just threw.
-      }
+        }),
+      );
 
       await sleep(delayMs);
 
@@ -169,11 +147,9 @@ export async function runWithRetry<T>(
 }
 
 /**
- * A configured retry policy, reusable across statements.
- *
- * Holds its options once instead of threading them through every call, which
- * is what lets the client hold one policy rather than rebuilding the argument
- * object per query.
+ * A configured retry policy, reusable across statements. Holds its options
+ * once instead of threading them through every call, so the client holds
+ * one policy rather than rebuilding the argument object per query.
  */
 export class RetryPolicy {
   private readonly onRetry: ((notice: RetryNotice) => void) | undefined;
@@ -185,11 +161,9 @@ export class RetryPolicy {
   }
 
   /**
-   * Run `task`, retrying transient failures until the budget is spent.
-   *
-   * `request` is optional and only decorates the retry notice: a caller that
-   * has one gets it echoed back for logging, and a caller retrying something
-   * that is not a statement still gets the same backoff.
+   * Runs `task`, retrying transient failures until the budget is spent.
+   * `request` is optional and only decorates the retry notice — a caller
+   * retrying something that isn't a statement still gets the same backoff.
    */
   run<T>(
     task: () => Promise<T>,
@@ -210,8 +184,7 @@ export class RetryPolicy {
       ...(onRetry === undefined
         ? {}
         : {
-            onRetry: (notice: Omit<RetryNotice, "request">) =>
-              onRetry({ ...notice, request }),
+            onRetry: (notice: Omit<RetryNotice, "request">) => onRetry({ ...notice, request }),
           }),
     });
   }

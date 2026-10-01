@@ -1,15 +1,12 @@
 import { createServer, type Server } from "http";
+
 import { afterAll, beforeAll, describe, expect, it, vi, beforeEach } from "vitest";
-import { initConfig } from "../config.js";
-import {
-  fetchDocumentation,
-  resolveDocumentationUrl,
-} from "../documentation-fetch.js";
-import {
-  deleteAgent,
-  getAgent,
-  updateAgent,
-} from "../langwatch-api-agents.js";
+import { z } from "zod";
+
+import { initConfig } from "../config.ts";
+import { fetchDocumentation, resolveDocumentationUrl } from "../documentation-fetch.ts";
+import { deleteAgent, getAgent, updateAgent } from "../langwatch-api-agents.ts";
+import { handleSearchTraces } from "../tools/search-traces.ts";
 import QUERY_REFERENCE_FIXTURE from "./fixtures/query-reference.json" with { type: "json" };
 
 // --- Canned responses for every API endpoint ---
@@ -19,9 +16,9 @@ const CANNED_TRACES_SEARCH = {
     {
       trace_id: "trace-001",
       formatted_trace:
-        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Hello, how are you?\n    Output: I am fine, thank you!",
-      input: { value: "Hello, how are you?" },
-      output: { value: "I am fine, thank you!" },
+        "Root [server] 1200ms\n  LLM Call [llm] 500ms\n    Input: Login error while authenticating\n    Output: Please try again",
+      input: { value: "Login error while authenticating" },
+      output: { value: "Please try again" },
       timestamps: { started_at: 1700000000000 },
       metadata: { user_id: "user-42", thread_id: "thread-1" },
       evaluations: [
@@ -36,6 +33,25 @@ const CANNED_TRACES_SEARCH = {
   ],
   pagination: { totalHits: 1 },
 };
+
+/**
+ * Traces addressable by exact id, for the `traceIds` path. The ids are the
+ * bare-hex form the platform's own fixtures and prefix resolver use.
+ */
+const CANNED_TRACES_BY_ID = [
+  {
+    trace_id: "63dc535cea6335c506bc81ef3543a07d",
+    formatted_trace: "Root [server] 900ms",
+    input: { value: "First by id" },
+    output: { value: "First out" },
+  },
+  {
+    trace_id: "a3c6656cf433e97549f654034be02955",
+    formatted_trace: "Root [server] 300ms",
+    input: { value: "Second by id" },
+    output: { value: "Second out" },
+  },
+];
 
 const CANNED_TRACES_SEARCH_WITH_SCROLL = {
   traces: [
@@ -129,7 +145,7 @@ const CANNED_PROMPT_DETAIL = {
   version: 3,
   versionId: "ver_p1v3",
   commitMessage: "Updated tone",
-  model: "openai/gpt-4o",
+  model: "openai/gpt-5-mini",
   messages: [{ role: "system", content: "You are a friendly bot." }],
   parameters: {},
   tags: [{ name: "latest", versionId: "ver_p1v3" }],
@@ -153,10 +169,7 @@ const CANNED_SCENARIOS_LIST = [
     id: "scen_abc123",
     name: "Login Flow Happy Path",
     situation: "User attempts to log in with valid credentials",
-    criteria: [
-      "Responds with a welcome message",
-      "Includes user name in greeting",
-    ],
+    criteria: ["Responds with a welcome message", "Includes user name in greeting"],
     labels: ["auth", "happy-path"],
   },
   {
@@ -172,10 +185,7 @@ const CANNED_SCENARIO_DETAIL = {
   id: "scen_abc123",
   name: "Login Flow Happy Path",
   situation: "User attempts to log in with valid credentials",
-  criteria: [
-    "Responds with a welcome message",
-    "Includes user name in greeting",
-  ],
+  criteria: ["Responds with a welcome message", "Includes user name in greeting"],
   labels: ["auth", "happy-path"],
 };
 
@@ -191,11 +201,7 @@ const CANNED_SCENARIO_UPDATED = {
   id: "scen_abc123",
   name: "Login Flow - Updated",
   situation: "User logs in with correct email and pass",
-  criteria: [
-    "Responds with welcome message",
-    "Sets session cookie",
-    "Redirects to dashboard",
-  ],
+  criteria: ["Responds with welcome message", "Sets session cookie", "Redirects to dashboard"],
   labels: ["auth", "happy-path"],
 };
 
@@ -297,7 +303,7 @@ const CANNED_MODEL_PROVIDERS_LIST = {
     provider: "openai",
     enabled: true,
     customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-    models: ["gpt-4o", "gpt-4o-mini"],
+    models: ["gpt-5-mini", "gpt-5-mini"],
     embeddingsModels: ["text-embedding-3-small"],
     deploymentMapping: null,
     extraHeaders: [],
@@ -315,29 +321,78 @@ const CANNED_MODEL_PROVIDERS_LIST = {
 
 const CANNED_AGENTS_LIST = {
   data: [
-    { id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+    {
+      id: "agent_abc",
+      name: "Test Agent",
+      type: "http",
+      config: { url: "http://example.com" },
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    },
   ],
   pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
 };
 
 const CANNED_AGENT_DETAIL = {
-  id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+  id: "agent_abc",
+  name: "Test Agent",
+  type: "http",
+  config: { url: "http://example.com" },
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
 };
 
 const CANNED_RUN_PLAN = {
-  id: "plan_abc", name: "Regression Plan", slug: "regression-plan", scope: { mode: "labels", labels: ["auth"] }, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 2, simulatorModel: "openai/gpt-5-mini", judgeModel: null, labels: [], archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
+  id: "plan_abc",
+  name: "Regression Plan",
+  slug: "regression-plan",
+  scope: { mode: "labels", labels: ["auth"] },
+  scenarioIds: ["scen_abc123"],
+  targets: [{ type: "http", referenceId: "agent_abc" }],
+  repeatCount: 2,
+  simulatorModel: "openai/gpt-5-mini",
+  judgeModel: null,
+  labels: [],
+  archivedAt: null,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLANS_LIST = [CANNED_RUN_PLAN];
 
 const CANNED_RUN_PLAN_RUN = {
-  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 2, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }], runPlanId: "plan_abc", planName: "Regression Plan", created: true, platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
+  scheduled: true,
+  batchRunId: "batch_123",
+  setId: "set_456",
+  jobCount: 2,
+  skippedArchived: { scenarios: [], targets: [] },
+  items: [
+    {
+      scenarioRunId: "run_1",
+      scenarioId: "scen_abc123",
+      target: { type: "http", referenceId: "agent_abc" },
+      name: "Test",
+    },
+  ],
+  runPlanId: "plan_abc",
+  planName: "Regression Plan",
+  created: true,
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/results/regression-plan",
 };
 
 const CANNED_RUN_PLAN_RERUN = { ...CANNED_RUN_PLAN_RUN, created: false };
 
 const CANNED_TEST_SUITE = {
-  id: "suite_abc", name: "Checkout", slug: "checkout", scenarioIds: ["scen_abc123"], scenarioCount: 1, archivedAt: null, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z", platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
+  id: "suite_abc",
+  name: "Checkout",
+  slug: "checkout",
+  scenarioIds: ["scen_abc123"],
+  scenarioCount: 1,
+  archivedAt: null,
+  createdAt: "2024-01-01T00:00:00Z",
+  updatedAt: "2024-01-01T00:00:00Z",
+  platformUrl: "https://app.langwatch.ai/proj/agent-testing/suites/checkout",
 };
 
 const CANNED_TEST_SUITES_LIST = [CANNED_TEST_SUITE];
@@ -348,26 +403,84 @@ const CANNED_TEST_SUITE_DETAIL = {
 };
 
 const CANNED_TEST_SUITE_CREATED = {
-  ...CANNED_TEST_SUITE, id: "suite_new", name: "New Suite", slug: "new-suite", scenarioIds: [], scenarioCount: 0,
+  ...CANNED_TEST_SUITE,
+  id: "suite_new",
+  name: "New Suite",
+  slug: "new-suite",
+  scenarioIds: [],
+  scenarioCount: 0,
 };
 
-const CANNED_TEST_SUITE_RENAMED = { ...CANNED_TEST_SUITE, name: "Checkout v2", slug: "checkout-v2" };
+const CANNED_TEST_SUITE_RENAMED = {
+  ...CANNED_TEST_SUITE,
+  name: "Checkout v2",
+  slug: "checkout-v2",
+};
 
 const CANNED_SIMULATION_RUNS = {
-  runs: [{ scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, timestamp: 1700000000000, updatedAt: 1700000001000 }],
+  runs: [
+    {
+      scenarioRunId: "run_abc",
+      scenarioId: "scen_abc123",
+      batchRunId: "batch_xyz",
+      name: "Login Flow",
+      status: "SUCCESS",
+      durationInMs: 5200,
+      totalCost: 0.0042,
+      timestamp: 1700000000000,
+      updatedAt: 1700000001000,
+    },
+  ],
   hasMore: false,
 };
 
 const CANNED_SIMULATION_RUN_DETAIL = {
-  scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, results: { verdict: "passed", reasoning: "All criteria met", metCriteria: ["Greets user"], unmetCriteria: [], error: null }, messages: [{ role: "user", content: "Hello" }, { role: "assistant", content: "Hi there!" }], timestamp: 1700000000000, updatedAt: 1700000001000,
+  scenarioRunId: "run_abc",
+  scenarioId: "scen_abc123",
+  batchRunId: "batch_xyz",
+  name: "Login Flow",
+  status: "SUCCESS",
+  durationInMs: 5200,
+  totalCost: 0.0042,
+  results: {
+    verdict: "passed",
+    reasoning: "All criteria met",
+    metCriteria: ["Greets user"],
+    unmetCriteria: [],
+    error: null,
+  },
+  messages: [
+    { role: "user", content: "Hello" },
+    { role: "assistant", content: "Hi there!" },
+  ],
+  timestamp: 1700000000000,
+  updatedAt: 1700000001000,
 };
 
 const CANNED_DASHBOARDS_LIST = {
-  data: [{ id: "dash_abc", name: "Main Dashboard", order: 0, graphCount: 3, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" }],
+  data: [
+    {
+      id: "dash_abc",
+      name: "Main Dashboard",
+      order: 0,
+      graphCount: 3,
+      createdAt: "2024-01-01T00:00:00Z",
+      updatedAt: "2024-01-01T00:00:00Z",
+    },
+  ],
 };
 
 const CANNED_WORKFLOWS_LIST = [
-  { id: "wf_abc", name: "Test Workflow", icon: null, description: "A workflow", isEvaluator: false, isComponent: false, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+  {
+    id: "wf_abc",
+    name: "Test Workflow",
+    icon: null,
+    description: "A workflow",
+    isEvaluator: false,
+    isComponent: false,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+  },
 ];
 
 const CANNED_MODEL_PROVIDER_SET = {
@@ -375,7 +488,7 @@ const CANNED_MODEL_PROVIDER_SET = {
     provider: "openai",
     enabled: true,
     customKeys: { OPENAI_API_KEY: "HAS_KEY" },
-    models: ["gpt-4o"],
+    models: ["gpt-5-mini"],
     embeddingsModels: null,
     deploymentMapping: null,
     extraHeaders: [],
@@ -387,6 +500,13 @@ const CANNED_MODEL_PROVIDER_SET = {
 /** Track last request for each route so tests can assert on request body/params. */
 const lastRequests: Record<string, { method: string; url: string; body: string }> = {};
 
+const traceSearchRequestSchema = z.object({
+  query: z.string().optional(),
+  traceIds: z.array(z.string()).optional(),
+  startDate: z.number(),
+  endDate: z.number(),
+});
+
 /**
  * Mutable prompt detail so the mock is stateful: a PUT updates it and the
  * subsequent confirmation GET reflects the new version. Reset per test.
@@ -395,6 +515,539 @@ let promptDetailState: typeof CANNED_PROMPT_DETAIL = { ...CANNED_PROMPT_DETAIL }
 beforeEach(() => {
   promptDetailState = { ...CANNED_PROMPT_DETAIL };
 });
+
+/** A canned answer: the first route whose method and URL match the request answers it. */
+type MockRoute = {
+  method: string;
+  matches: (url: string) => boolean;
+  status: number;
+  answer: (request: { body: string; url: string }) => unknown;
+};
+
+const MOCK_ROUTES: MockRoute[] = [
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/query/reference",
+    status: 200,
+    answer: () => QUERY_REFERENCE_FIXTURE,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/query",
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body) as { sql?: string };
+      if (parsed.sql === "__many__") {
+        return {
+          ...CANNED_QUERY_RESULT,
+          rows: Array.from({ length: 120 }, (_, index) => ({
+            day: `2026-09-${String((index % 28) + 1).padStart(2, "0")} 00:00:00.000`,
+            traces: index,
+            messages: null,
+          })),
+        };
+      }
+      return CANNED_QUERY_RESULT;
+    },
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/traces/search",
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body);
+      if (Array.isArray(parsed.traceIds) && parsed.traceIds.length > 0) {
+        const wanted = new Set<string>(parsed.traceIds);
+        const found = CANNED_TRACES_BY_ID.filter((t) => wanted.has(t.trace_id));
+        return { traces: found, pagination: { totalHits: found.length } };
+      }
+      if (typeof parsed.query === "string" && parsed.query.length > 0) {
+        const haystack = JSON.stringify(CANNED_TRACES_SEARCH.traces).toLowerCase();
+        const hit = haystack.includes(parsed.query.toLowerCase());
+        return hit ? CANNED_TRACES_SEARCH : CANNED_TRACES_EMPTY;
+      } else if (parsed.pageSize === 5) {
+        return CANNED_TRACES_SEARCH_WITH_SCROLL;
+      } else {
+        return CANNED_TRACES_SEARCH;
+      }
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/traces\/trace-nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Trace not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/traces\/[^/]+(\?|$)/.test(url),
+    status: 200,
+    answer: () => CANNED_TRACE_DETAIL,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/analytics/timeseries",
+    status: 200,
+    answer: () => CANNED_ANALYTICS,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/prompts",
+    status: 200,
+    answer: () => CANNED_PROMPTS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/prompts",
+    status: 200,
+    answer: () => CANNED_PROMPT_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/prompts\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => promptDetailState,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/prompts\/[^/]+$/.test(url),
+    status: 200,
+    answer: ({ body }) => {
+      const parsed = JSON.parse(body) as {
+        commitMessage?: string;
+        model?: string;
+        messages?: { role: string; content: string }[];
+        tags?: string[];
+      };
+      const newVersionId = "ver_p1v4";
+      promptDetailState = {
+        ...promptDetailState,
+        version: 4,
+        versionId: newVersionId,
+        commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
+        model: parsed.model ?? promptDetailState.model,
+        messages: parsed.messages ?? promptDetailState.messages,
+        tags:
+          parsed.tags === undefined
+            ? promptDetailState.tags.map((tag) =>
+                tag.name === "latest" ? { name: "latest", versionId: newVersionId } : tag,
+              )
+            : [
+                { name: "latest", versionId: newVersionId },
+                ...parsed.tags
+                  .filter((name) => name !== "latest")
+                  .map((name) => ({ name, versionId: newVersionId })),
+              ],
+      };
+      return CANNED_PROMPT_UPDATED;
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/scenarios",
+    status: 200,
+    answer: () => CANNED_SCENARIOS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/scenarios",
+    status: 200,
+    answer: () => CANNED_SCENARIO_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Scenario not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_DETAIL,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_UPDATED,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/scenarios\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SCENARIO_ARCHIVED,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/evaluators",
+    status: 200,
+    answer: () => CANNED_EVALUATORS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/evaluators",
+    status: 200,
+    answer: () => CANNED_EVALUATOR_CREATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/evaluators\/evaluator_nonexistent(\?|$)/.test(url),
+    status: 404,
+    answer: () => ({ message: "Evaluator not found" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/evaluators\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_EVALUATOR_DETAIL,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/evaluators\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_EVALUATOR_UPDATED,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/model-providers",
+    status: 200,
+    answer: () => CANNED_MODEL_PROVIDERS_LIST,
+  },
+  {
+    method: "PUT",
+    matches: (url) => /^\/api\/v1\/model-providers\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_MODEL_PROVIDER_SET,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/agents",
+    status: 200,
+    answer: () => CANNED_AGENTS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/agents",
+    status: 201,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_AGENT_DETAIL,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/agents\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "agent_abc", name: "Test Agent" }),
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/run-plans/run",
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/run-plans(\?.*)?$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLANS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RERUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/run-plans\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "plan_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/test-suites",
+    status: 200,
+    answer: () => CANNED_TEST_SUITES_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/test-suites",
+    status: 201,
+    answer: () => CANNED_TEST_SUITE_CREATED,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => CANNED_RUN_PLAN_RUN,
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_TEST_SUITE_DETAIL,
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_TEST_SUITE_RENAMED,
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/test-suites\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "suite_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/simulation-runs\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_SIMULATION_RUN_DETAIL,
+  },
+  {
+    method: "GET",
+    matches: (url) => url.startsWith("/api/v1/simulation-runs"),
+    status: 200,
+    answer: () => CANNED_SIMULATION_RUNS,
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/dashboards",
+    status: 200,
+    answer: () => CANNED_DASHBOARDS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/dashboards",
+    status: 201,
+    answer: () => ({ id: "dash_new", name: "New Dashboard" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/dashboards\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_DASHBOARDS_LIST.data[0],
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/dashboards\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "dash_abc", name: "Main Dashboard" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/workflows",
+    status: 200,
+    answer: () => CANNED_WORKFLOWS_LIST,
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+\/run$/.test(url),
+    status: 200,
+    answer: () => ({ output: "workflow result" }),
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => CANNED_WORKFLOWS_LIST[0],
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/workflows\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({ id: "wf_abc", archived: true }),
+  },
+  {
+    method: "GET",
+    matches: (url) => url === "/api/v1/monitors",
+    status: 200,
+    answer: () => [
+      {
+        id: "mon_abc",
+        name: "Toxicity Check",
+        slug: "toxicity-check-x1y2z",
+        checkType: "ragas/toxicity",
+        enabled: true,
+        executionMode: "ON_MESSAGE",
+        sample: 1.0,
+        level: "trace",
+        evaluatorId: null,
+        preconditions: [],
+        parameters: {},
+        mappings: {},
+        threadIdleTimeout: null,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    ],
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/monitors",
+    status: 201,
+    answer: () => ({
+      id: "mon_new",
+      name: "New Monitor",
+      slug: "new-monitor-abc12",
+      checkType: "ragas/toxicity",
+      enabled: true,
+      executionMode: "ON_MESSAGE",
+      sample: 1.0,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "POST",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+\/toggle$/.test(url),
+    status: 200,
+    answer: ({ url }) => {
+      const monitorId = url?.split("/")[3];
+      return { id: monitorId, enabled: true };
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "mon_abc",
+      name: "Toxicity Check",
+      slug: "toxicity-check-x1y2z",
+      checkType: "ragas/toxicity",
+      enabled: true,
+      executionMode: "ON_MESSAGE",
+      sample: 1.0,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "PATCH",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "mon_abc",
+      name: "Updated Monitor",
+      slug: "toxicity-check-x1y2z",
+      checkType: "ragas/toxicity",
+      enabled: false,
+      executionMode: "ON_MESSAGE",
+      sample: 0.5,
+      level: "trace",
+      evaluatorId: null,
+      preconditions: [],
+      parameters: {},
+      mappings: {},
+      threadIdleTimeout: null,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+    }),
+  },
+  {
+    method: "DELETE",
+    matches: (url) => /^\/api\/v1\/monitors\/[^/]+$/.test(url),
+    status: 200,
+    answer: ({ url }) => {
+      const monitorId = url?.split("/").pop();
+      return { id: monitorId, deleted: true };
+    },
+  },
+  {
+    method: "GET",
+    matches: (url) => url.startsWith("/api/v1/secrets?"),
+    status: 200,
+    answer: () => [
+      {
+        id: "secret_abc",
+        projectId: "proj_123",
+        name: "MY_API_KEY",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+      {
+        id: "secret_def",
+        projectId: "proj_123",
+        name: "DB_PASSWORD",
+        createdAt: "2026-01-02T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z",
+      },
+    ],
+  },
+  {
+    method: "GET",
+    matches: (url) => /^\/api\/v1\/secret\/[^?]+\?/.test(url),
+    status: 200,
+    answer: () => ({
+      id: "secret_abc",
+      projectId: "proj_123",
+      name: "MY_API_KEY",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  },
+  {
+    method: "POST",
+    matches: (url) => url === "/api/v1/secrets",
+    status: 201,
+    answer: () => ({
+      id: "secret_new",
+      projectId: "proj_123",
+      name: "NEW_SECRET",
+      createdAt: "2026-01-03T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+    }),
+  },
+  {
+    method: "PUT",
+    matches: (url) => url === "/api/v1/secrets/secret_abc",
+    status: 200,
+    answer: () => ({
+      id: "secret_abc",
+      projectId: "proj_123",
+      name: "MY_API_KEY",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-03T00:00:00Z",
+    }),
+  },
+  {
+    method: "DELETE",
+    matches: (url) => url === "/api/v1/secrets/secret_abc",
+    status: 200,
+    answer: () => ({ id: "secret_abc", deleted: true }),
+  },
+];
 
 function createMockServer(): Server {
   return createServer((req, res) => {
@@ -416,320 +1069,16 @@ function createMockServer(): Server {
       const routeKey = `${method} ${url.split("?")[0]}`;
       lastRequests[routeKey] = { method, url, body };
 
-      if (url === "/api/v1/query/reference" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(QUERY_REFERENCE_FIXTURE));
+      const route = MOCK_ROUTES.find(
+        (candidate) => candidate.method === method && candidate.matches(url),
+      );
+      if (!route) {
+        res.writeHead(404);
+        res.end(JSON.stringify({ message: `Not found: ${method} ${url}` }));
         return;
       }
-      if (url === "/api/v1/query" && method === "POST") {
-        const parsed = JSON.parse(body) as { sql?: string };
-        if (parsed.sql === "__many__") {
-          res.writeHead(200);
-          res.end(
-            JSON.stringify({
-              ...CANNED_QUERY_RESULT,
-              rows: Array.from({ length: 120 }, (_, index) => ({
-                day: `2026-09-${String((index % 28) + 1).padStart(2, "0")} 00:00:00.000`,
-                traces: index,
-                messages: null,
-              })),
-            }),
-          );
-          return;
-        }
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_QUERY_RESULT));
-        return;
-      }
-
-      // --- Trace endpoints ---
-      if (url === "/api/traces/search" && method === "POST") {
-        const parsed = JSON.parse(body);
-        // Return empty results when a special query is used
-        if (parsed.query === "__empty__") {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_EMPTY));
-        } else if (parsed.pageSize === 5) {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_SEARCH_WITH_SCROLL));
-        } else {
-          res.writeHead(200);
-          res.end(JSON.stringify(CANNED_TRACES_SEARCH));
-        }
-      } else if (
-        url.match(/^\/api\/traces\/trace-nonexistent(\?|$)/) &&
-        method === "GET"
-      ) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Trace not found" }));
-      } else if (
-        url.match(/^\/api\/traces\/[^/]+(\?|$)/) &&
-        method === "GET"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TRACE_DETAIL));
-      }
-      // --- Analytics endpoint ---
-      else if (url === "/api/analytics/timeseries" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_ANALYTICS));
-      }
-      // --- Prompt endpoints ---
-      else if (url === "/api/prompts" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPTS_LIST));
-      } else if (url === "/api/prompts" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_CREATED));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        method === "GET"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(promptDetailState));
-      } else if (
-        url.match(/^\/api\/prompts\/[^/]+$/) &&
-        method === "PUT"
-      ) {
-        const parsed = JSON.parse(body) as {
-          commitMessage?: string;
-          model?: string;
-          messages?: Array<{ role: string; content: string }>;
-          tags?: string[];
-        };
-        const newVersionId = "ver_p1v4";
-        promptDetailState = {
-          ...promptDetailState,
-          version: 4,
-          versionId: newVersionId,
-          commitMessage: parsed.commitMessage ?? promptDetailState.commitMessage,
-          model: parsed.model ?? promptDetailState.model,
-          messages: parsed.messages ?? promptDetailState.messages,
-          tags:
-            parsed.tags === undefined
-              ? promptDetailState.tags.map((tag) =>
-                  tag.name === "latest"
-                    ? { name: "latest", versionId: newVersionId }
-                    : tag,
-                )
-              : [
-                  { name: "latest", versionId: newVersionId },
-                  ...parsed.tags
-                    .filter((name) => name !== "latest")
-                    .map((name) => ({ name, versionId: newVersionId })),
-                ],
-        };
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_PROMPT_UPDATED));
-      }
-      // --- Scenario endpoints ---
-      else if (url === "/api/scenarios" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
-      } else if (url === "/api/scenarios" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
-      } else if (
-        url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) &&
-        method === "GET"
-      ) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Scenario not found" }));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "GET"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "PUT"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
-      } else if (
-        url.match(/^\/api\/scenarios\/[^/]+$/) &&
-        method === "DELETE"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
-      }
-      // --- Evaluator endpoints ---
-      else if (url === "/api/evaluators" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATORS_LIST));
-      } else if (url === "/api/evaluators" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_CREATED));
-      } else if (
-        url.match(/^\/api\/evaluators\/evaluator_nonexistent(\?|$)/) &&
-        method === "GET"
-      ) {
-        res.writeHead(404);
-        res.end(JSON.stringify({ message: "Evaluator not found" }));
-      } else if (
-        url.match(/^\/api\/evaluators\/[^/]+$/) &&
-        method === "GET"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_DETAIL));
-      } else if (
-        url.match(/^\/api\/evaluators\/[^/]+$/) &&
-        method === "PUT"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_EVALUATOR_UPDATED));
-      }
-      // --- Model Provider endpoints ---
-      else if (url === "/api/model-providers" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_MODEL_PROVIDERS_LIST));
-      } else if (
-        url.match(/^\/api\/model-providers\/[^/]+$/) &&
-        method === "PUT"
-      ) {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
-      }
-      // --- Agent endpoints ---
-      else if (url === "/api/v1/agents" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENTS_LIST));
-      } else if (url === "/api/v1/agents" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/agents\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
-      }
-      // --- Run plan endpoints ---
-      else if (url === "/api/v1/run-plans/run" && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
-      } else if (url?.match(/^\/api\/v1\/run-plans(\?.*)?$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLANS_LIST));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RERUN));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN));
-      } else if (url?.match(/^\/api\/v1\/run-plans\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "plan_abc", archived: true }));
-      }
-      // --- Test suite endpoints ---
-      else if (url === "/api/v1/test-suites" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITES_LIST));
-      } else if (url === "/api/v1/test-suites" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_CREATED));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_RUN_PLAN_RUN));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_DETAIL));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_TEST_SUITE_RENAMED));
-      } else if (url?.match(/^\/api\/v1\/test-suites\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "suite_abc", archived: true }));
-      }
-      // --- Simulation Run endpoints ---
-      else if (url?.match(/^\/api\/simulation-runs\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SIMULATION_RUN_DETAIL));
-      } else if (url?.match(/^\/api\/simulation-runs/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_SIMULATION_RUNS));
-      }
-      // --- Dashboard endpoints ---
-      else if (url === "/api/dashboards" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST));
-      } else if (url === "/api/dashboards" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify({ id: "dash_new", name: "New Dashboard" }));
-      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST.data[0]));
-      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "dash_abc", name: "Main Dashboard" }));
-      }
-      // --- Workflow endpoints ---
-      else if (url === "/api/workflows" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+\/run$/) && method === "POST") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ output: "workflow result" }));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST[0]));
-      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "DELETE") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "wf_abc", archived: true }));
-      }
-      // --- Monitor endpoints ---
-      else if (url === "/api/monitors" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify([
-          { id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-        ]));
-      } else if (url === "/api/monitors" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify({ id: "mon_new", name: "New Monitor", slug: "new-monitor-abc12", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/monitors\/[^/]+\/toggle$/) && method === "POST") {
-        const monitorId = url?.split("/")[3];
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: monitorId, enabled: true }));
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "PATCH") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "mon_abc", name: "Updated Monitor", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: false, executionMode: "ON_MESSAGE", sample: 0.5, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "DELETE") {
-        const monitorId = url?.split("/").pop();
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: monitorId, deleted: true }));
-      }
-      // --- Secret endpoints ---
-      else if (url === "/api/secrets" && method === "GET") {
-        res.writeHead(200);
-        res.end(JSON.stringify([
-          { id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
-          { id: "secret_def", projectId: "proj_123", name: "DB_PASSWORD", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
-        ]));
-      } else if (url === "/api/secrets" && method === "POST") {
-        res.writeHead(201);
-        res.end(JSON.stringify({ id: "secret_new", projectId: "proj_123", name: "NEW_SECRET", createdAt: "2026-01-03T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "PUT") {
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
-      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "DELETE") {
-        const secretId = url?.split("/").pop();
-        res.writeHead(200);
-        res.end(JSON.stringify({ id: secretId, deleted: true }));
-      }
-      // --- Fallback ---
-      else {
-        res.writeHead(404);
-        res.end(
-          JSON.stringify({ message: `Not found: ${method} ${url}` }),
-        );
-      }
+      res.writeHead(route.status);
+      res.end(JSON.stringify(route.answer({ body, url })));
     });
   });
 }
@@ -751,6 +1100,7 @@ describe("All MCP tools integration", () => {
         initConfig({
           apiKey: "test-integration-key",
           endpoint: `http://localhost:${port}`,
+          projectId: "proj_123",
         });
         resolve();
       });
@@ -764,7 +1114,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // 1. fetch_langwatch_docs
   // =====================
-  describe("fetch_langwatch_docs", () => {
+  describe("fetch_langwatch_docs()", () => {
     it("resolves the trusted docs index", () => {
       expect(resolveDocumentationUrl("langwatch").toString()).toBe(
         "https://langwatch.ai/docs/llms.txt",
@@ -772,31 +1122,22 @@ describe("All MCP tools integration", () => {
     });
 
     it("fetches trusted docs without following redirects", async () => {
-      const mockFetch = vi.fn().mockResolvedValue(
-        new Response("# Integration Guide"),
-      );
+      const mockFetch = vi.fn().mockResolvedValue(new Response("# Integration Guide"));
 
-      const text = await fetchDocumentation(
-        "langwatch",
-        "integration",
-        mockFetch,
-      );
+      const text = await fetchDocumentation("langwatch", "integration", mockFetch);
 
       expect(text).toContain("Integration Guide");
-      expect(mockFetch).toHaveBeenCalledWith(
-        new URL("https://langwatch.ai/docs/integration.md"),
-        {
-          redirect: "error",
-          signal: expect.any(AbortSignal),
-        },
-      );
+      expect(mockFetch).toHaveBeenCalledWith(new URL("https://langwatch.ai/docs/integration.md"), {
+        redirect: "error",
+        signal: expect.any(AbortSignal),
+      });
     });
   });
 
   // =====================
   // 2. fetch_scenario_docs
   // =====================
-  describe("fetch_scenario_docs", () => {
+  describe("fetch_scenario_docs()", () => {
     it("resolves the trusted Scenario docs index", () => {
       expect(resolveDocumentationUrl("scenario").toString()).toBe(
         "https://langwatch.ai/scenario/llms.txt",
@@ -813,13 +1154,11 @@ describe("All MCP tools integration", () => {
   // =====================
   // 3. discover_schema
   // =====================
-  describe("discover_schema", () => {
+  describe("discover_schema()", () => {
     describe("when category is filters", () => {
       /** @scenario Agent discovers available filter fields */
       it("returns the platform's own filter fields", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("filters");
 
         expect(result).toContain("## Trace Filter Fields");
@@ -833,9 +1172,7 @@ describe("All MCP tools integration", () => {
     describe("when category is lwql", () => {
       /** @scenario Agent discovers the analytics SQL schema */
       it("returns the datasets with their time columns and example statements", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("lwql");
 
         expect(result).toContain("## Analytics SQL");
@@ -848,9 +1185,7 @@ describe("All MCP tools integration", () => {
     describe("when category is metrics", () => {
       /** @scenario Agent discovers available metrics with allowed aggregations */
       it("returns metric documentation", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("metrics");
 
         expect(result).toContain("## Available Metrics");
@@ -859,9 +1194,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is aggregations", () => {
       it("returns aggregation types", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("aggregations");
 
         expect(result).toContain("## Available Aggregation Types");
@@ -874,9 +1207,7 @@ describe("All MCP tools integration", () => {
     describe("when category is groups", () => {
       /** @scenario Agent discovers available group-by options */
       it("returns group-by options", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("groups");
 
         expect(result).toContain("## Available Group-By Options");
@@ -885,9 +1216,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is scenarios", () => {
       it("returns scenario schema documentation", async () => {
-        const { formatScenarioSchema } = await import(
-          "../tools/discover-scenario-schema.js"
-        );
+        const { formatScenarioSchema } = await import("../tools/discover-scenario-schema.ts");
         const result = formatScenarioSchema();
 
         expect(result).toContain("# Scenario Schema");
@@ -898,9 +1227,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators", () => {
       it("returns evaluator type overview", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema();
 
         expect(result).toContain("# Available Evaluator Types");
@@ -909,9 +1236,7 @@ describe("All MCP tools integration", () => {
 
     describe("when category is evaluators with specific type", () => {
       it("returns detailed evaluator schema", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema("langevals/llm_boolean");
 
         expect(result).toContain("langevals/llm_boolean");
@@ -921,21 +1246,17 @@ describe("All MCP tools integration", () => {
 
     describe("when evaluator type is unknown", () => {
       it("returns an error message", async () => {
-        const { formatEvaluatorSchema } = await import(
-          "../tools/discover-evaluator-schema.js"
-        );
+        const { formatEvaluatorSchema } = await import("../tools/discover-evaluator-schema.ts");
         const result = formatEvaluatorSchema("nonexistent/type");
 
-        expect(result).toContain('Unknown evaluator type');
+        expect(result).toContain("Unknown evaluator type");
       });
     });
 
     describe("when category is all", () => {
       /** @scenario Agent discovers all schema information at once */
       it("returns all schema categories", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         const result = await formatSchema("all");
 
         expect(result).toContain("## Trace Filter Fields");
@@ -948,27 +1269,23 @@ describe("All MCP tools integration", () => {
 
     describe("when the reference is fetched", () => {
       it("sends the credential", async () => {
-        const { formatSchema } = await import(
-          "../tools/discover-schema.js"
-        );
+        const { formatSchema } = await import("../tools/discover-schema.ts");
         await formatSchema("filters");
         expect(lastRequests["GET /api/v1/query/reference"]?.method).toBe("GET");
       });
     });
   });
 
-  describe("run_query", () => {
+  describe("run_query()", () => {
     describe("when the statement returns rows", () => {
       /** @scenario Agent runs an analytics SQL statement and reads a table */
       it("sends the statement unchanged and renders a markdown table", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
         const sql =
           "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
         const result = await handleRunQuery({ sql });
 
-        expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).sql).toBe(
-          sql,
-        );
+        expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).sql).toBe(sql);
         expect(result).toContain("| day | traces | messages |");
         expect(result).toContain("| --- | --- | --- |");
         expect(result).toContain("2026-09-01 00:00:00.000");
@@ -976,22 +1293,22 @@ describe("All MCP tools integration", () => {
       });
 
       it("passes the declared parameters through", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
         await handleRunQuery({
           sql: "SELECT {days:UInt32}",
           parameters: { days: 7 },
         });
-        expect(
-          JSON.parse(lastRequests["POST /api/v1/query"]!.body).parameters,
-        ).toEqual({ days: 7 });
+        expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).parameters).toEqual({
+          days: 7,
+        });
       });
     });
 
     describe("when the statement returns more rows than the tool prints", () => {
       /** @scenario A long result is capped and says so */
       it("prints the cap and reports the real count", async () => {
-        const { handleRunQuery } = await import("../tools/run-query.js");
-        const { RUN_QUERY_ROW_CAP } = await import("../tools/run-query.js");
+        const { handleRunQuery } = await import("../tools/run-query.ts");
+        const { RUN_QUERY_ROW_CAP } = await import("../tools/run-query.ts");
         const result = await handleRunQuery({ sql: "__many__" });
 
         const dataRows = result
@@ -1008,43 +1325,169 @@ describe("All MCP tools integration", () => {
   // =====================
   // 4. search_traces
   // =====================
-  describe("search_traces", () => {
+  describe("search_traces()", () => {
     describe("when traces are found", () => {
       /** @scenario Agent searches traces with a text query */
       it("returns formatted trace digests", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
-          startDate: "24h",
-          endDate: "now",
+          query: "login error",
         });
 
         expect(result).toContain("trace-001");
         expect(result).toContain("LLM Call [llm] 500ms");
+        expect(result).toContain("Input: Login error while authenticating");
+        expect(result).toContain("Output: Please try again");
+        expect(result).toContain("**Time**: 1700000000000");
         expect(result).toContain("1 trace");
+
+        const req = lastRequests["POST /api/v1/traces/search"];
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
+        expect(parsed.query).toBe("login error");
+        expect(parsed.endDate - parsed.startDate).toBe(24 * 60 * 60 * 1000);
       });
     });
 
     describe("when no traces match", () => {
-      it("returns a no-results message", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+      /** @scenario A search that matches nothing says which window it searched */
+      it("states the window it searched and names get_trace", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           query: "__empty__",
         });
 
-        expect(result).toBe("No traces found matching your query.");
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("Searched the last 24 hours");
+        expect(result).toContain("get_trace");
+        expect(result).toContain("8–31 character hex prefix");
+        expect(result).toContain("last 90 days");
+      });
+
+      /** @scenario An empty search offers a wider window */
+      it("offers a wider startDate and the units it accepts", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        const result = await handleSearchTraces({
+          query: "__empty__",
+        });
+
+        expect(result).toContain('startDate: "7d"');
+        expect(result).toContain("w (weeks)");
+      });
+
+      /** @scenario An end-only search anchors its default window to that end */
+      it("anchors the default start to an explicit end", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+
+        await handleSearchTraces({
+          endDate: "2026-08-01T12:00:00Z",
+        });
+
+        const req = lastRequests["POST /api/v1/traces/search"];
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
+
+        expect(parsed.endDate).toBe(Date.parse("2026-08-01T12:00:00Z"));
+        expect(parsed.endDate - parsed.startDate).toBe(24 * 60 * 60 * 1000);
+      });
+
+      /** @scenario A trace id in a format the shape check cannot recognise still gets guidance */
+      it("still names get_trace for a customer-assigned id it cannot recognise", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        const result = await handleSearchTraces({ query: "order-12345" });
+
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("get_trace");
+        // The shape check does not claim this one; the unconditional guidance
+        // is what carries it.
+        expect(result).not.toContain("looks like a trace id");
+      });
+    });
+
+    describe("when the query looks like a trace id", () => {
+      /** @scenario Agent pastes a trace id into the search query */
+      it("says it looks like a trace id and points at get_trace", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        const result = await handleSearchTraces({
+          query: "63dc535cea6335c506bc81ef3543a07d",
+        });
+
+        expect(result).toContain("No traces found matching your query.");
+        expect(result).toContain("looks like a trace id");
+        expect(result).toContain('get_trace` with traceId: "63dc535cea6335c506bc81ef3543a07d"');
+      });
+
+      /** @scenario A trace id truncated by the CLI is still recognised as an id */
+      it("recognises a 20-character truncation the CLI prints", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        const result = await handleSearchTraces({
+          query: "63dc535cea6335c506bc",
+        });
+
+        expect(result).toContain("looks like a trace id");
+      });
+
+      /** @scenario An id-shaped query is still executed as a search */
+      it("still executes a search and never a single-trace lookup", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        delete lastRequests["GET /api/v1/traces/63dc535cea6335c506bc81ef3543a07d"];
+
+        await handleSearchTraces({
+          query: "63dc535cea6335c506bc81ef3543a07d",
+        });
+
+        const search = lastRequests["POST /api/v1/traces/search"];
+        expect(search).toBeDefined();
+        const requestBody = traceSearchRequestSchema.parse(JSON.parse(search!.body));
+        expect(requestBody.query).toBe("63dc535cea6335c506bc81ef3543a07d");
+        expect(lastRequests["GET /api/v1/traces/63dc535cea6335c506bc81ef3543a07d"]).toBeUndefined();
+      });
+    });
+
+    describe("when trace ids are named", () => {
+      /** @scenario "An empty batch id lookup gives advice for that request" */
+      it("suggests an earlier window instead of repeating traceIds guidance", async () => {
+        const result = await handleSearchTraces({
+          traceIds: ["unknown-trace-id"],
+        });
+
+        expect(result).toContain(
+          "No traces matched the requested trace ids in the searched window.",
+        );
+        expect(result).toContain("Retry with an earlier startDate");
+        expect(result).not.toContain("pass `traceIds`");
+      });
+
+      /** @scenario Agent looks up several traces by id in one call */
+      it("fetches exactly those traces in one call", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        const result = await handleSearchTraces({
+          traceIds: ["63dc535cea6335c506bc81ef3543a07d", "a3c6656cf433e97549f654034be02955"],
+        });
+
+        expect(result).toContain("63dc535cea6335c506bc81ef3543a07d");
+        expect(result).toContain("a3c6656cf433e97549f654034be02955");
+        expect(result).toContain("Found 2 traces");
+      });
+
+      /** @scenario Naming trace ids widens the default window past 24 hours */
+      it("defaults the window to 90 days instead of 24 hours", async () => {
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
+        await handleSearchTraces({
+          traceIds: ["63dc535cea6335c506bc81ef3543a07d"],
+        });
+
+        const req = lastRequests["POST /api/v1/traces/search"];
+        const parsed = traceSearchRequestSchema.parse(JSON.parse(req!.body));
+        const spanDays = (parsed.endDate - parsed.startDate) / (24 * 60 * 60 * 1000);
+
+        expect(parsed.traceIds).toEqual(["63dc535cea6335c506bc81ef3543a07d"]);
+        expect(spanDays).toBeCloseTo(90, 0);
       });
     });
 
     describe("when pagination token is present", () => {
       /** @scenario Agent paginates through trace results */
       it("includes scroll ID for next page", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           pageSize: 5,
         });
@@ -1055,9 +1498,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           format: "json",
         });
@@ -1072,14 +1513,12 @@ describe("All MCP tools integration", () => {
     describe("when filters are applied", () => {
       /** @scenario Agent searches traces filtered by user_id */
       it("passes filters to the API", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({
           filters: { "metadata.user_id": ["user-42"] },
         });
 
-        const req = lastRequests["POST /api/traces/search"];
+        const req = lastRequests["POST /api/v1/traces/search"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.filters).toEqual({
@@ -1091,30 +1530,27 @@ describe("All MCP tools integration", () => {
     describe("when a trace filter string is given", () => {
       /** @scenario Agent filters a trace search with the trace filter language */
       it("sends it as the filter, not as the text query", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({
           filter: "status:error AND model:gpt-*",
           query: "refund",
         });
 
-        const parsed = JSON.parse(
-          lastRequests["POST /api/traces/search"]!.body,
-        ) as { filter?: string; query?: string };
+        const parsed = JSON.parse(lastRequests["POST /api/v1/traces/search"]!.body) as {
+          filter?: string;
+          query?: string;
+        };
         expect(parsed.filter).toBe("status:error AND model:gpt-*");
         expect(parsed.query).toBe("refund");
       });
 
       it("sends no filter key when none was given", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         await handleSearchTraces({ query: "refund" });
 
-        const parsed = JSON.parse(
-          lastRequests["POST /api/traces/search"]!.body,
-        ) as { filter?: string };
+        const parsed = JSON.parse(lastRequests["POST /api/v1/traces/search"]!.body) as {
+          filter?: string;
+        };
         expect(parsed.filter).toBeUndefined();
       });
     });
@@ -1122,9 +1558,7 @@ describe("All MCP tools integration", () => {
     describe("given a trace has evaluation results", () => {
       /** @scenario Agent searches traces and sees evaluation results without a follow-up call */
       it("includes evaluation status in the digest without a follow-up call", async () => {
-        const { handleSearchTraces } = await import(
-          "../tools/search-traces.js"
-        );
+        const { handleSearchTraces } = await import("../tools/search-traces.ts");
         const result = await handleSearchTraces({
           startDate: "24h",
           endDate: "now",
@@ -1138,13 +1572,11 @@ describe("All MCP tools integration", () => {
   // =====================
   // 5. get_trace
   // =====================
-  describe("get_trace", () => {
+  describe("get_trace()", () => {
     describe("when trace exists", () => {
       /** @scenario Agent gets a single trace by ID in AI-readable format */
       it("returns formatted trace with metadata and evaluations", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
         const result = await handleGetTrace({ traceId: "trace-001" });
 
         expect(result).toContain("# Trace: trace-001");
@@ -1160,21 +1592,15 @@ describe("All MCP tools integration", () => {
     describe("when trace does not exist", () => {
       /** @scenario Agent gets a trace that does not exist */
       it("propagates the 404 error", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
 
-        await expect(
-          handleGetTrace({ traceId: "trace-nonexistent" }),
-        ).rejects.toThrow("404");
+        await expect(handleGetTrace({ traceId: "trace-nonexistent" })).rejects.toThrow("404");
       });
     });
 
     describe("when format is json", () => {
       it("returns parseable JSON with full trace data", async () => {
-        const { handleGetTrace } = await import(
-          "../tools/get-trace.js"
-        );
+        const { handleGetTrace } = await import("../tools/get-trace.ts");
         const result = await handleGetTrace({
           traceId: "trace-001",
           format: "json",
@@ -1191,12 +1617,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 6. get_analytics
   // =====================
-  describe("get_analytics", () => {
+  describe("get_analytics()", () => {
     describe("when data is available", () => {
       it("returns formatted analytics with markdown table", async () => {
-        const { handleGetAnalytics } = await import(
-          "../tools/get-analytics.js"
-        );
+        const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
         const result = await handleGetAnalytics({
           metric: "metadata.trace_id",
           aggregation: "cardinality",
@@ -1211,15 +1635,13 @@ describe("All MCP tools integration", () => {
 
     describe("when metric and aggregation are specified", () => {
       it("passes them through to the API", async () => {
-        const { handleGetAnalytics } = await import(
-          "../tools/get-analytics.js"
-        );
+        const { handleGetAnalytics } = await import("../tools/get-analytics.ts");
         await handleGetAnalytics({
           metric: "performance.total_cost",
           aggregation: "sum",
         });
 
-        const req = lastRequests["POST /api/analytics/timeseries"];
+        const req = lastRequests["POST /api/v1/analytics/timeseries"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.series[0].metric).toBe("performance.total_cost");
@@ -1231,22 +1653,20 @@ describe("All MCP tools integration", () => {
   // =====================
   // 7. platform_create_prompt
   // =====================
-  describe("platform_create_prompt", () => {
+  describe("platform_create_prompt()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with prompt details", async () => {
-        const { handleCreatePrompt } = await import(
-          "../tools/create-prompt.js"
-        );
+        const { handleCreatePrompt } = await import("../tools/create-prompt.ts");
         const result = await handleCreatePrompt({
           name: "New Prompt",
           messages: [{ role: "system", content: "You are helpful." }],
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
         });
 
         expect(result).toContain("created successfully");
         expect(result).toContain("p-new");
         expect(result).toContain("**Name**: New Prompt");
-        expect(result).toContain("**Model**: openai/gpt-4o");
+        expect(result).toContain("**Model**: openai/gpt-5-mini");
       });
     });
   });
@@ -1254,12 +1674,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 8. platform_list_prompts
   // =====================
-  describe("platform_list_prompts", () => {
+  describe("platform_list_prompts()", () => {
     describe("when prompts exist", () => {
       it("returns formatted prompt list", async () => {
-        const { handleListPrompts } = await import(
-          "../tools/list-prompts.js"
-        );
+        const { handleListPrompts } = await import("../tools/list-prompts.ts");
         const result = await handleListPrompts();
 
         expect(result).toContain("greeting-bot");
@@ -1274,18 +1692,16 @@ describe("All MCP tools integration", () => {
   // =====================
   // 9. platform_get_prompt
   // =====================
-  describe("platform_get_prompt", () => {
+  describe("platform_get_prompt()", () => {
     describe("when prompt exists", () => {
       it("returns formatted prompt details with messages and deployments", async () => {
-        const { handleGetPrompt } = await import(
-          "../tools/get-prompt.js"
-        );
+        const { handleGetPrompt } = await import("../tools/get-prompt.ts");
         const result = await handleGetPrompt({
           idOrHandle: "greeting-bot",
         });
 
         expect(result).toContain("# Prompt: Greeting Bot");
-        expect(result).toContain("gpt-4o");
+        expect(result).toContain("gpt-5-mini");
         expect(result).toContain("You are a friendly bot.");
         expect(result).toContain("v3");
         expect(result).toContain("## Deployments");
@@ -1297,15 +1713,13 @@ describe("All MCP tools integration", () => {
   // =====================
   // 10. platform_update_prompt
   // =====================
-  describe("platform_update_prompt", () => {
+  describe("platform_update_prompt()", () => {
     describe("when updating a prompt", () => {
       it("returns success message", async () => {
-        const { handleUpdatePrompt } = await import(
-          "../tools/update-prompt.js"
-        );
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         const result = await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o-mini",
+          model: "openai/gpt-5-mini",
           commitMessage: "Switch to mini",
         });
 
@@ -1319,16 +1733,14 @@ describe("All MCP tools integration", () => {
     describe("when an update supplies only messages and a commit message", () => {
       /** @scenario Carrying forward prior fields when an update supplies only messages and a commit message */
       it("does not send fields that would wipe prior prompt configuration", async () => {
-        const { handleUpdatePrompt } = await import(
-          "../tools/update-prompt.js"
-        );
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
           messages: [{ role: "system", content: "You are a helpful bot." }],
           commitMessage: "Only messages changed",
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed).not.toHaveProperty("parameters");
@@ -1342,16 +1754,14 @@ describe("All MCP tools integration", () => {
     describe("when an update omits tags", () => {
       /** @scenario Tag-to-version mapping stays unchanged when an update omits tags */
       it("does not send a tags field in the update request", async () => {
-        const { handleUpdatePrompt } = await import(
-          "../tools/update-prompt.js"
-        );
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
           commitMessage: "No tag change requested",
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed).not.toHaveProperty("tags");
@@ -1361,17 +1771,15 @@ describe("All MCP tools integration", () => {
     describe("when an update passes tags explicitly", () => {
       /** @scenario Passing tags explicitly moves the tag to the new version */
       it("sends the requested tags in the update request", async () => {
-        const { handleUpdatePrompt } = await import(
-          "../tools/update-prompt.js"
-        );
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
         await handleUpdatePrompt({
           idOrHandle: "greeting-bot",
-          model: "openai/gpt-4o",
+          model: "openai/gpt-5-mini",
           commitMessage: "Deploy new version to production",
           tags: ["production"],
         });
 
-        const req = lastRequests["PUT /api/prompts/greeting-bot"];
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
         expect(req).toBeDefined();
         const parsed = JSON.parse(req!.body);
         expect(parsed.tags).toEqual(["production"]);
@@ -1382,12 +1790,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 11. platform_create_scenario
   // =====================
-  describe("platform_create_scenario", () => {
+  describe("platform_create_scenario()", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
-        const { handleCreateScenario } = await import(
-          "../tools/create-scenario.js"
-        );
+        const { handleCreateScenario } = await import("../tools/create-scenario.ts");
         const result = await handleCreateScenario({
           name: "New Scenario",
           situation: "User does something",
@@ -1404,12 +1810,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 12. platform_list_scenarios
   // =====================
-  describe("platform_list_scenarios", () => {
+  describe("platform_list_scenarios()", () => {
     describe("when scenarios exist", () => {
       it("returns formatted scenario list", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.ts");
         const result = await handleListScenarios({});
 
         expect(result).toContain("# Scenarios (2 total)");
@@ -1420,9 +1824,7 @@ describe("All MCP tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON matching API response", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.ts");
         const result = await handleListScenarios({ format: "json" });
 
         expect(JSON.parse(result)).toEqual(CANNED_SCENARIOS_LIST);
@@ -1433,12 +1835,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 13. platform_get_scenario
   // =====================
-  describe("platform_get_scenario", () => {
+  describe("platform_get_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns formatted scenario details", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
         });
@@ -1451,21 +1851,15 @@ describe("All MCP tools integration", () => {
 
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
 
-        await expect(
-          handleGetScenario({ scenarioId: "scen_nonexistent" }),
-        ).rejects.toThrow("404");
+        await expect(handleGetScenario({ scenarioId: "scen_nonexistent" })).rejects.toThrow("404");
       });
     });
 
     describe("when format is json", () => {
       it("returns parseable JSON", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.ts");
         const result = await handleGetScenario({
           scenarioId: "scen_abc123",
           format: "json",
@@ -1479,12 +1873,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 14. platform_update_scenario
   // =====================
-  describe("platform_update_scenario", () => {
+  describe("platform_update_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns update confirmation with updated details", async () => {
-        const { handleUpdateScenario } = await import(
-          "../tools/update-scenario.js"
-        );
+        const { handleUpdateScenario } = await import("../tools/update-scenario.ts");
         const result = await handleUpdateScenario({
           scenarioId: "scen_abc123",
           name: "Login Flow - Updated",
@@ -1499,12 +1891,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 15. platform_archive_scenario
   // =====================
-  describe("platform_archive_scenario", () => {
+  describe("platform_archive_scenario()", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
-        const { handleArchiveScenario } = await import(
-          "../tools/archive-scenario.js"
-        );
+        const { handleArchiveScenario } = await import("../tools/archive-scenario.ts");
         const result = await handleArchiveScenario({
           scenarioId: "scen_abc123",
         });
@@ -1519,12 +1909,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 16. platform_create_evaluator
   // =====================
-  describe("platform_create_evaluator", () => {
+  describe("platform_create_evaluator()", () => {
     describe("when valid data is provided", () => {
       it("returns success confirmation with evaluator details", async () => {
-        const { handleCreateEvaluator } = await import(
-          "../tools/create-evaluator.js"
-        );
+        const { handleCreateEvaluator } = await import("../tools/create-evaluator.ts");
         const result = await handleCreateEvaluator({
           name: "My LLM Judge",
           config: { evaluatorType: "langevals/llm_boolean" },
@@ -1541,12 +1929,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 17. platform_list_evaluators
   // =====================
-  describe("platform_list_evaluators", () => {
+  describe("platform_list_evaluators()", () => {
     describe("when evaluators exist", () => {
       it("returns formatted evaluator list", async () => {
-        const { handleListEvaluators } = await import(
-          "../tools/list-evaluators.js"
-        );
+        const { handleListEvaluators } = await import("../tools/list-evaluators.ts");
         const result = await handleListEvaluators();
 
         expect(result).toContain("# Evaluators (2 total)");
@@ -1562,12 +1948,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 18. platform_get_evaluator
   // =====================
-  describe("platform_get_evaluator", () => {
+  describe("platform_get_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns formatted evaluator details with config and fields", async () => {
-        const { handleGetEvaluator } = await import(
-          "../tools/get-evaluator.js"
-        );
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.ts");
         const result = await handleGetEvaluator({
           idOrSlug: "evaluator_abc123",
         });
@@ -1585,13 +1969,11 @@ describe("All MCP tools integration", () => {
 
     describe("when the evaluator does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetEvaluator } = await import(
-          "../tools/get-evaluator.js"
-        );
+        const { handleGetEvaluator } = await import("../tools/get-evaluator.ts");
 
-        await expect(
-          handleGetEvaluator({ idOrSlug: "evaluator_nonexistent" }),
-        ).rejects.toThrow("404");
+        await expect(handleGetEvaluator({ idOrSlug: "evaluator_nonexistent" })).rejects.toThrow(
+          "404",
+        );
       });
     });
   });
@@ -1599,12 +1981,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 19. platform_update_evaluator
   // =====================
-  describe("platform_update_evaluator", () => {
+  describe("platform_update_evaluator()", () => {
     describe("when the evaluator exists", () => {
       it("returns update confirmation", async () => {
-        const { handleUpdateEvaluator } = await import(
-          "../tools/update-evaluator.js"
-        );
+        const { handleUpdateEvaluator } = await import("../tools/update-evaluator.ts");
         const result = await handleUpdateEvaluator({
           evaluatorId: "evaluator_abc123",
           name: "Updated Toxicity",
@@ -1620,12 +2000,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 20. platform_set_model_provider
   // =====================
-  describe("platform_set_model_provider", () => {
+  describe("platform_set_model_provider()", () => {
     describe("when setting a provider with API key", () => {
       it("returns success confirmation with provider details", async () => {
-        const { handleSetModelProvider } = await import(
-          "../tools/set-model-provider.js"
-        );
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.ts");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
@@ -1641,16 +2019,14 @@ describe("All MCP tools integration", () => {
 
     describe("when setting a default model", () => {
       it("shows the normalized model name with provider prefix", async () => {
-        const { handleSetModelProvider } = await import(
-          "../tools/set-model-provider.js"
-        );
+        const { handleSetModelProvider } = await import("../tools/set-model-provider.ts");
         const result = await handleSetModelProvider({
           provider: "openai",
           enabled: true,
-          defaultModel: "gpt-4o",
+          defaultModel: "gpt-5-mini",
         });
 
-        expect(result).toContain("**Default Model**: openai/gpt-4o");
+        expect(result).toContain("**Default Model**: openai/gpt-5-mini");
       });
     });
   });
@@ -1658,12 +2034,10 @@ describe("All MCP tools integration", () => {
   // =====================
   // 21. platform_list_model_providers
   // =====================
-  describe("platform_list_model_providers", () => {
+  describe("platform_list_model_providers()", () => {
     describe("when providers exist", () => {
       it("returns formatted provider list with status and key info", async () => {
-        const { handleListModelProviders } = await import(
-          "../tools/list-model-providers.js"
-        );
+        const { handleListModelProviders } = await import("../tools/list-model-providers.ts");
         const result = await handleListModelProviders();
 
         expect(result).toContain("# Model Providers (2 total)");
@@ -1685,6 +2059,7 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "test-integration-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
     });
 
@@ -1692,25 +2067,21 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
-      const { handleSearchTraces } = await import(
-        "../tools/search-traces.js"
-      );
-      await expect(
-        handleSearchTraces({ startDate: "24h" }),
-      ).rejects.toThrow("401");
+      const { handleSearchTraces } = await import("../tools/search-traces.ts");
+      await expect(handleSearchTraces({ startDate: "24h" })).rejects.toThrow("401");
     });
 
     it("throws an error with 401 status for evaluator list", async () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
-      const { handleListEvaluators } = await import(
-        "../tools/list-evaluators.js"
-      );
+      const { handleListEvaluators } = await import("../tools/list-evaluators.ts");
       await expect(handleListEvaluators()).rejects.toThrow("401");
     });
 
@@ -1718,11 +2089,10 @@ describe("All MCP tools integration", () => {
       initConfig({
         apiKey: "bad-key",
         endpoint: `http://localhost:${port}`,
+        projectId: "proj_123",
       });
 
-      const { handleListModelProviders } = await import(
-        "../tools/list-model-providers.js"
-      );
+      const { handleListModelProviders } = await import("../tools/list-model-providers.ts");
       await expect(handleListModelProviders()).rejects.toThrow("401");
     });
   });
@@ -1730,9 +2100,9 @@ describe("All MCP tools integration", () => {
   // =====================
   // Run Plan Tools
   // =====================
-  describe("platform_run_plan", () => {
+  describe("platform_run_plan()", () => {
     it("runs a configuration and reports the plan it created", async () => {
-      const { handleRunPlan } = await import("../tools/run-plan.js");
+      const { handleRunPlan } = await import("../tools/run-plan.ts");
       const result = await handleRunPlan({
         name: "Regression Plan",
         scope: { mode: "labels", labels: ["auth"] },
@@ -1748,9 +2118,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_list_run_plans", () => {
+  describe("platform_list_run_plans()", () => {
     it("returns formatted run plan list", async () => {
-      const { handleListRunPlans } = await import("../tools/list-run-plans.js");
+      const { handleListRunPlans } = await import("../tools/list-run-plans.ts");
       const result = await handleListRunPlans({});
 
       expect(result).toContain("Run Plans (1 total)");
@@ -1758,9 +2128,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_run_plan", () => {
+  describe("platform_get_run_plan()", () => {
     it("returns the plan configuration", async () => {
-      const { handleGetRunPlan } = await import("../tools/get-run-plan.js");
+      const { handleGetRunPlan } = await import("../tools/get-run-plan.ts");
       const result = await handleGetRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("Regression Plan");
@@ -1769,11 +2139,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_rerun_run_plan", () => {
+  describe("platform_rerun_run_plan()", () => {
     it("runs the stored configuration again and reports it joined the plan", async () => {
-      const { handleRerunRunPlan } = await import(
-        "../tools/rerun-run-plan.js"
-      );
+      const { handleRerunRunPlan } = await import("../tools/rerun-run-plan.ts");
       const result = await handleRerunRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("Regression Plan");
@@ -1782,11 +2150,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_archive_run_plan", () => {
+  describe("platform_archive_run_plan()", () => {
     it("archives the run plan", async () => {
-      const { handleArchiveRunPlan } = await import(
-        "../tools/archive-run-plan.js"
-      );
+      const { handleArchiveRunPlan } = await import("../tools/archive-run-plan.ts");
       const result = await handleArchiveRunPlan({ id: "plan_abc" });
 
       expect(result).toContain("archived");
@@ -1797,11 +2163,9 @@ describe("All MCP tools integration", () => {
   // =====================
   // Test Suite Tools
   // =====================
-  describe("platform_list_test_suites", () => {
+  describe("platform_list_test_suites()", () => {
     it("returns formatted test suite list", async () => {
-      const { handleListTestSuites } = await import(
-        "../tools/list-test-suites.js"
-      );
+      const { handleListTestSuites } = await import("../tools/list-test-suites.ts");
       const result = await handleListTestSuites({});
 
       expect(result).toContain("Test Suites (1 total)");
@@ -1809,11 +2173,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_test_suite", () => {
+  describe("platform_create_test_suite()", () => {
     it("creates a test suite and returns confirmation", async () => {
-      const { handleCreateTestSuite } = await import(
-        "../tools/create-test-suite.js"
-      );
+      const { handleCreateTestSuite } = await import("../tools/create-test-suite.ts");
       const result = await handleCreateTestSuite({ name: "New Suite" });
 
       expect(result).toContain("created");
@@ -1822,11 +2184,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_test_suite", () => {
+  describe("platform_get_test_suite()", () => {
     it("returns the suite with the scenarios filed in it", async () => {
-      const { handleGetTestSuite } = await import(
-        "../tools/get-test-suite.js"
-      );
+      const { handleGetTestSuite } = await import("../tools/get-test-suite.ts");
       const result = await handleGetTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("Checkout");
@@ -1834,11 +2194,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_rename_test_suite", () => {
+  describe("platform_rename_test_suite()", () => {
     it("renames the test suite", async () => {
-      const { handleRenameTestSuite } = await import(
-        "../tools/rename-test-suite.js"
-      );
+      const { handleRenameTestSuite } = await import("../tools/rename-test-suite.ts");
       const result = await handleRenameTestSuite({
         id: "suite_abc",
         name: "Checkout v2",
@@ -1848,11 +2206,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_archive_test_suite", () => {
+  describe("platform_archive_test_suite()", () => {
     it("archives the suite and says the filed scenarios went with it", async () => {
-      const { handleArchiveTestSuite } = await import(
-        "../tools/archive-test-suite.js"
-      );
+      const { handleArchiveTestSuite } = await import("../tools/archive-test-suite.ts");
       const result = await handleArchiveTestSuite({ id: "suite_abc" });
 
       expect(result).toContain("archived");
@@ -1860,11 +2216,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_run_test_suite", () => {
+  describe("platform_run_test_suite()", () => {
     it("runs the suite against a target and reports the derived plan", async () => {
-      const { handleRunTestSuite } = await import(
-        "../tools/run-test-suite.js"
-      );
+      const { handleRunTestSuite } = await import("../tools/run-test-suite.ts");
       const result = await handleRunTestSuite({
         id: "suite_abc",
         targets: [{ type: "http", referenceId: "agent_abc" }],
@@ -1878,9 +2232,9 @@ describe("All MCP tools integration", () => {
   // =====================
   // Simulation Run Tools
   // =====================
-  describe("platform_list_simulation_runs", () => {
+  describe("platform_list_simulation_runs()", () => {
     it("returns formatted run list", async () => {
-      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.js");
+      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.ts");
       const result = await handleListSimulationRuns({});
 
       expect(result).toContain("Simulation Runs");
@@ -1888,9 +2242,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_simulation_run", () => {
+  describe("platform_get_simulation_run()", () => {
     it("returns run details with conversation", async () => {
-      const { handleGetSimulationRun } = await import("../tools/get-simulation-run.js");
+      const { handleGetSimulationRun } = await import("../tools/get-simulation-run.ts");
       const result = await handleGetSimulationRun({ scenarioRunId: "run_abc" });
 
       expect(result).toContain("Login Flow");
@@ -1902,9 +2256,9 @@ describe("All MCP tools integration", () => {
   // =====================
   // Monitor Tools
   // =====================
-  describe("platform_list_monitors", () => {
+  describe("platform_list_monitors()", () => {
     it("returns formatted monitor list", async () => {
-      const { listMonitors } = await import("../langwatch-api-monitors.js");
+      const { listMonitors } = await import("../langwatch-api-monitors.ts");
       const monitors = await listMonitors();
       expect(monitors).toHaveLength(1);
       expect(monitors[0]!.name).toBe("Toxicity Check");
@@ -1912,9 +2266,9 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_get_monitor", () => {
+  describe("platform_get_monitor()", () => {
     it("returns monitor details", async () => {
-      const { getMonitor } = await import("../langwatch-api-monitors.js");
+      const { getMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await getMonitor("mon_abc");
       expect(monitor.id).toBe("mon_abc");
       expect(monitor.name).toBe("Toxicity Check");
@@ -1922,27 +2276,27 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_create_monitor", () => {
+  describe("platform_create_monitor()", () => {
     it("creates a monitor and returns metadata", async () => {
-      const { createMonitor } = await import("../langwatch-api-monitors.js");
+      const { createMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
       expect(monitor.id).toBe("mon_new");
       expect(monitor.name).toBe("New Monitor");
     });
   });
 
-  describe("platform_update_monitor", () => {
+  describe("platform_update_monitor()", () => {
     it("updates a monitor", async () => {
-      const { updateMonitor } = await import("../langwatch-api-monitors.js");
+      const { updateMonitor } = await import("../langwatch-api-monitors.ts");
       const monitor = await updateMonitor({ id: "mon_abc", enabled: false });
       expect(monitor.id).toBe("mon_abc");
       expect(monitor.enabled).toBe(false);
     });
   });
 
-  describe("platform_delete_monitor", () => {
+  describe("platform_delete_monitor()", () => {
     it("deletes a monitor", async () => {
-      const { deleteMonitor } = await import("../langwatch-api-monitors.js");
+      const { deleteMonitor } = await import("../langwatch-api-monitors.ts");
       const result = await deleteMonitor("mon_abc");
       expect(result.id).toBe("mon_abc");
       expect(result.deleted).toBe(true);
@@ -1952,36 +2306,36 @@ describe("All MCP tools integration", () => {
   // =====================
   // Secret Tools
   // =====================
-  describe("platform_list_secrets", () => {
+  describe("platform_list_secrets()", () => {
     it("returns formatted secret list", async () => {
-      const { listSecrets } = await import("../langwatch-api-secrets.js");
+      const { listSecrets } = await import("../langwatch-api-secrets.ts");
       const secrets = await listSecrets();
       expect(secrets).toHaveLength(2);
       expect(secrets[0]!.name).toBe("MY_API_KEY");
     });
   });
 
-  describe("platform_create_secret", () => {
+  describe("platform_create_secret()", () => {
     it("creates a secret and returns metadata", async () => {
-      const { createSecret } = await import("../langwatch-api-secrets.js");
+      const { createSecret } = await import("../langwatch-api-secrets.ts");
       const secret = await createSecret({ name: "NEW_SECRET", value: "sk-123" });
       expect(secret.id).toBe("secret_new");
       expect(secret.name).toBe("NEW_SECRET");
     });
   });
 
-  describe("platform_update_secret", () => {
+  describe("platform_update_secret()", () => {
     it("updates a secret value", async () => {
-      const { updateSecret } = await import("../langwatch-api-secrets.js");
+      const { updateSecret } = await import("../langwatch-api-secrets.ts");
       const secret = await updateSecret({ id: "secret_abc", value: "new-val" });
       expect(secret.id).toBe("secret_abc");
       expect(secret.name).toBe("MY_API_KEY");
     });
   });
 
-  describe("platform_delete_secret", () => {
+  describe("platform_delete_secret()", () => {
     it("deletes a secret", async () => {
-      const { deleteSecret } = await import("../langwatch-api-secrets.js");
+      const { deleteSecret } = await import("../langwatch-api-secrets.ts");
       const result = await deleteSecret("secret_abc");
       expect(result.id).toBe("secret_abc");
       expect(result.deleted).toBe(true);
@@ -1991,7 +2345,7 @@ describe("All MCP tools integration", () => {
   // =====================
   // Agent Tools
   // =====================
-  describe("platform_get_agent", () => {
+  describe("platform_get_agent()", () => {
     it("returns one agent by id", async () => {
       const agent = await getAgent("agent_abc");
       expect(agent.id).toBe("agent_abc");
@@ -1999,14 +2353,14 @@ describe("All MCP tools integration", () => {
     });
   });
 
-  describe("platform_update_agent", () => {
+  describe("platform_update_agent()", () => {
     it("updates an agent and returns it", async () => {
       const agent = await updateAgent({ id: "agent_abc", name: "Test Agent" });
       expect(agent.id).toBe("agent_abc");
     });
   });
 
-  describe("platform_delete_agent", () => {
+  describe("platform_delete_agent()", () => {
     it("deletes an agent", async () => {
       const result = await deleteAgent("agent_abc");
       expect(result.id).toBe("agent_abc");
@@ -2016,9 +2370,9 @@ describe("All MCP tools integration", () => {
   // =====================
   // Agent Run Tool
   // =====================
-  describe("platform_run_workflow", () => {
+  describe("platform_run_workflow()", () => {
     it("executes a workflow and returns result", async () => {
-      const { handleRunWorkflow } = await import("../tools/run-workflow.js");
+      const { handleRunWorkflow } = await import("../tools/run-workflow.ts");
       const result = await handleRunWorkflow({ id: "wf_abc" });
 
       expect(result).toContain("executed successfully");

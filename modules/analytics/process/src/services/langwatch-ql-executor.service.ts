@@ -1,0 +1,83 @@
+/**
+ * What the LangWatchQL executor seam needs decided outside a transport: the result bounds the
+ * service applies, and whether this deployment provisioned a restricted identity at all.
+ */
+import {
+  LWQL_MAX_RESULT_BYTES,
+  LWQL_MAX_RESULT_ROWS,
+} from "@langwatch/analytics-contract/langwatch-ql-limits";
+import { createLogger } from "@langwatch/observability";
+
+import type {
+  LangWatchQLConnection,
+  LangWatchQLResultLimits,
+} from "../repositories/langwatch-ql-executor.repository.ts";
+
+const logger = createLogger("langwatch:analytics:lwql:executor");
+
+export type { LangWatchQLColumn, LangWatchQLStatistics } from "@langwatch/analytics-contract";
+
+/**
+ * The shipped result bounds, single-sourced with the validator's `LIMIT_TOO_HIGH` cap.
+ */
+export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
+  maxRows: LWQL_MAX_RESULT_ROWS,
+  maxResultBytes: LWQL_MAX_RESULT_BYTES,
+};
+
+export class LangWatchQLExecutorService {
+  static create(): LangWatchQLExecutorService {
+    return new LangWatchQLExecutorService();
+  }
+
+  private constructor() {}
+
+  /**
+   * Reads the restricted identity's connection out of the environment a process handed over, or
+   * reports that this deployment has none.
+   */
+  parseConnectionFromEnvironment(
+    environment: Record<string, string | undefined>,
+  ): LangWatchQLConnection | null {
+    const url = environment.LWQL_CLICKHOUSE_URL;
+    const username = environment.LWQL_CLICKHOUSE_USER;
+    const password = environment.LWQL_CLICKHOUSE_PASSWORD;
+    const database = environment.LWQL_DATABASE;
+    const tenantSetting = environment.LWQL_TENANT_SETTING;
+
+    const required = [
+      ["LWQL_CLICKHOUSE_URL", url],
+      ["LWQL_CLICKHOUSE_USER", username],
+      ["LWQL_CLICKHOUSE_PASSWORD", password],
+      ["LWQL_DATABASE", database],
+      ["LWQL_TENANT_SETTING", tenantSetting],
+    ] as const;
+    const absent = required.filter(([, value]) => !value).map(([name]) => name);
+
+    if (absent.length > 0) {
+      // A deployment that set *some* of these meant to enable the API and got a
+      // silent refusal on every query instead, so name what is missing. One that
+      // set none is simply not running the API and says nothing. Variable names
+      // only, never their values — one of these is a password.
+      if (absent.length < required.length) {
+        logger.warn(
+          { absent },
+          "LangWatchQL is partially configured, so every query will be refused",
+        );
+      }
+
+      return null;
+    }
+
+    // Re-checked rather than asserted: `absent` is computed by a callback, which
+    // TypeScript cannot use to narrow these five, and reaching for `!` here would
+    // silently outlive someone editing the list above.
+    if (!url) return null;
+    if (!username) return null;
+    if (!password) return null;
+    if (!database) return null;
+    if (!tenantSetting) return null;
+
+    return { url, username, password, database, tenantSetting };
+  }
+}

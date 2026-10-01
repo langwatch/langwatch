@@ -1,0 +1,27 @@
+# The Python workspace root — the uv counterpart of pnpm-workspace.yaml
+# (ADR-076 for JavaScript, ADR-145 for Python). Virtual on purpose: nothing
+# builds or publishes from here, it only names the members that share one
+# uv.lock and one .venv. services/langevals stays out — its evaluator
+# dependency zoo needs its own resolution (see the ADR).
+
+[tool.uv.workspace]
+members = ["sdks/python", "packages/ksuid-python"]
+
+# Resolution settings live here because uv only honours them at the workspace
+# root; a member's [tool.uv] block is silently ignored. They apply to every
+# member's resolution.
+[tool.uv]
+exclude-newer = "7 days"
+
+# Transitive-dependency security pins. Keep these even when the importing
+# package isn't a direct dependency, so a future re-resolution can't silently
+# pull a vulnerable version back in.
+constraint-dependencies = [
+  "jupyter-server>=2.20.0", # security: CVE-2026-44727 stored XSS in nbconvert handlers (GHSA-fcw5-x6j4-ccmp)
+  "vcrpy>=8.2.1", # security: vcrpy advisory (#1531)
+  "langsmith>=0.8.18", # security: langsmith advisory (#1532)
+  "python-engineio>=4.13.2", # security: python-engineio advisory (#1545, #1546)
+  "python-socketio>=5.16.2", # security: python-socketio advisory (#1547)
+  "bleach>=6.4.0", # security: bleach advisory (#1494)
+  "onnx>=1.22.0", # security: onnx advisory (#1560)
+]
