@@ -22,7 +22,6 @@
   "dependencies": {
     "@ag-ui/core": "~0.0.57",
     "@langwatch/agent-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",

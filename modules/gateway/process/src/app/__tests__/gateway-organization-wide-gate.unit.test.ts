@@ -55,6 +55,7 @@ function gatewayApp(authz: Partial<AuthzApi>): Promise<GatewayApp> {
       baseUrl: void 0,
       publicUrl: void 0,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

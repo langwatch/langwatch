@@ -102,6 +102,7 @@ describe("toBudgetDto", () => {
   });
 
   /** @scenario "A per-person template reports no total of its own" */
+  /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
   it("nulls the spend fields on a per-person template", () => {
     const dto = budgetDtos.toBudgetDto({
       budget: budget({
@@ -122,6 +123,7 @@ describe("toBudgetDto", () => {
   });
 
   /** @scenario Per-person and per-member fields appear only on their scopes */
+  /** @scenario An ATTRIBUTED_USER budget over REST carries the per-person standing */
   it("carries the seat fields only when the scope has them", () => {
     expect(budgetDtos.toBudgetDto({ budget: budget() })).not.toHaveProperty("end_users_seen");
     expect(budgetDtos.toBudgetDto({ budget: budget(), memberCount: 4 })).toMatchObject({

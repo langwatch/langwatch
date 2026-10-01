@@ -15,6 +15,7 @@ export const scenarioTestConfig: ScenarioServerConfig = {
   voiceTunnel: false,
   voiceWorkerOnly: false,
   voiceCallMaxSeconds: void 0,
+  allowLoopbackVoiceProviders: false,
   blockLocalHttpCalls: true,
   allowedProxyHosts: [],
   defaultModel: void 0,
@@ -40,6 +41,7 @@ export function scenarioExecutorPeers() {
     secrets: createApiFixture<SecretApi>(),
     workflows: createApiFixture<WorkflowApi>(),
     apiKeys: createApiFixture<ApiKeyApi>(),
+    gateway: createApiFixture<GatewayApi>(),
   };
 }
 

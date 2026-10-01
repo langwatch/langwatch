@@ -87,6 +87,7 @@ describe("usdToNanoUsd", () => {
 
 describe("usdDisplayString", () => {
   /** @scenario A Float64 spend sum publishes the amount, not its measurement drift */
+  /** @scenario Per-key spend publishes a clean decimal string, whatever the sum drifted to */
   it("publishes the reported spend as a clean decimal string", () => {
     expect(usdDisplayString(FLOAT64_SUM_OF_45_MICRO_USD)).toBe("0.000045");
   });

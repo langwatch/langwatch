@@ -1,7 +1,8 @@
 /** "Talk to it": gate, authorize and run main's voice-session handlers (voice-agents-v1). */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { type AuthzApi, ProjectPermissionDeniedError } from "@langwatch/authz-contract";
+import { ProjectPermissionDeniedError } from "@langwatch/authorization";
+import { type AuthzApi } from "@langwatch/authz-contract";
 import { type FeatureFlagApi, VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -97,6 +98,8 @@ export class VoiceSessionService {
     signingSecret: string | undefined;
     voicePublicBaseUrl: string | undefined;
     voiceCallMaxSeconds: string | undefined;
+    /** The dev loopback switch: a voicesim signed URL passes only with it on. */
+    allowLoopbackVoiceProviders: boolean;
     recordings: VoiceRecordingChannel;
   }): VoiceSessionService {
     const { peers, signingSecret } = input;
@@ -137,7 +140,10 @@ export class VoiceSessionService {
       }).writeCallRun,
       signSessionToken: (payload) =>
         signVoiceSessionToken({ payload, secret: getSigningSecret(signingSecret) }),
-      registry: createVoiceTransportRegistry({ voicePublicBaseUrl: input.voicePublicBaseUrl }),
+      registry: createVoiceTransportRegistry({
+        voicePublicBaseUrl: input.voicePublicBaseUrl,
+        allowLoopbackVoiceProviders: input.allowLoopbackVoiceProviders,
+      }),
     });
 
     return VoiceSessionService.create({

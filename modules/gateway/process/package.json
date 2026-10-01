@@ -90,6 +90,7 @@
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",

@@ -5,7 +5,7 @@ import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc"
  * The `gatewaySpendEvents.list` transport is a thin handler over
  * `GatewayApp.listSpendEventsPage`, pinning only the wiring and shape.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -153,6 +153,7 @@ async function gatewayAppStub(): Promise<GatewayApp> {
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,

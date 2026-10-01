@@ -1,4 +1,4 @@
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 /**
  * The `gatewaySpendEvents.*` procedure, declared once: a read-only, newest-
  * first, cursor-paged view over `gateway_spend`. Project-scoped, like the

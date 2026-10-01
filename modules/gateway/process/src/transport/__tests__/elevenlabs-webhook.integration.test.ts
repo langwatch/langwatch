@@ -139,6 +139,7 @@ async function mountWebhook(): Promise<MountableRestApp> {
         baseUrl: undefined,
         publicUrl: undefined,
         isSaas: false,
+        allowLoopbackVoiceProviders: false,
       },
     })
     .withRelational(database())

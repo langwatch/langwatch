@@ -4,14 +4,14 @@
  * records not writes, and a stub app that fails loudly on any unstubbed member.
  */
 import type { Actor } from "@langwatch/actor";
-import type { TrpcContract } from "@langwatch/api/contract";
 import type {
   TrpcRouterDeclaration,
   TrpcRuntimeAuditEntry,
   TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { TrpcContract } from "@langwatch/kernel/contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";
 

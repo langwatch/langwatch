@@ -3,7 +3,8 @@
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-contract";
 import type { RestDeclaredResult, RestIdentity } from "@langwatch/api/rest";
-import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -862,7 +863,10 @@ export class GatewayApp implements GatewayApi, GatewayInternalDoorApi, GatewaySp
       monitors: setup.dependencies.monitors,
       evaluations: setup.dependencies.evaluations,
     });
-    const voiceCredentials = { modelProviders: setup.dependencies.modelProviders };
+    const voiceCredentials = {
+      modelProviders: setup.dependencies.modelProviders,
+      allowLoopbackVoiceProviders: setup.config?.allowLoopbackVoiceProviders ?? false,
+    };
     const elevenLabsCredential = GatewayElevenLabsCredentialService.create(voiceCredentials);
     const internalProtocol = GatewayInternalProtocolService.create({
       virtualKeys: controlPlane.internalVirtualKeys,

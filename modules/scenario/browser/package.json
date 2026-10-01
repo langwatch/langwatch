@@ -31,7 +31,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/analytics-browser-kit": "workspace:*",
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",

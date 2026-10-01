@@ -450,6 +450,7 @@ describe("the gateway internal control plane", () => {
   });
 
   describe("given a deployment that configured no gateway secret", () => {
+    /** @scenario An unset internal secret denies all callers */
     it("refuses every call rather than letting an unset secret admit everyone", async () => {
       const unset = mountGatewayInternalRest({ changes: testChangeEvents() }, { secret: "" });
 

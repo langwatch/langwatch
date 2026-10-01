@@ -5,7 +5,7 @@ import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc"
  * What the budgets list hands the UI: standing (people over their own cap)
  * and the Scope column's anchor name, off the real control plane.
  */
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -204,6 +204,7 @@ async function callerFor(budgets: Record<string, unknown>[]) {
       baseUrl: undefined,
       publicUrl: undefined,
       isSaas: false,
+      allowLoopbackVoiceProviders: false,
     },
     resources: new ResourceScope(),
     secrets: noSecrets,
