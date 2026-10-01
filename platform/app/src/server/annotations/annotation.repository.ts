@@ -10,7 +10,10 @@ export type CreateAnnotationInput = {
   id: string;
   projectId: string;
   traceId: string;
-  userId: string;
+  /** Null for an annotation made over the REST API, which names no user. */
+  userId: string | null;
+  /** The author's email, which the REST API takes in place of a user. */
+  email?: string | null;
   comment: string;
   isThumbsUp: boolean | null;
   scoreOptions: JsonValue;
@@ -80,6 +83,7 @@ export class AnnotationRepository {
         projectId: input.projectId,
         traceId: input.traceId,
         userId: input.userId,
+        email: input.email ?? null,
         comment: input.comment,
         isThumbsUp: input.isThumbsUp,
         scoreOptions: input.scoreOptions ?? {},

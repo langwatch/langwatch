@@ -39883,6 +39883,8 @@ options, so every condition you send has to hold.
 langwatch trace search --filter "status:error AND model:gpt-*" --limit 20
 langwatch trace search --filter "trace.attribute.langwatch.user_id:alice"
 langwatch trace search --filter "evaluatorVerdict:fail" -q "refund"
+langwatch trace search --filter "has:feedback"
+langwatch trace search --filter "has:annotation"
 ```
 
 Three namespaces reach arbitrary OpenTelemetry attributes:
@@ -61858,7 +61860,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.19.0 # x-release-please-version
+    targetRevision: 3.19.3 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -61907,7 +61909,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.19.0 # x-release-please-version
+      targetRevision: 3.19.3 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -62272,7 +62274,7 @@ For air-gapped or private environments, mirror the images to your own registry:
 ```bash
 # The release you are mirroring. Every tag below follows it, so set it once.
 # Pick the version from https://github.com/langwatch/langwatch/releases
-VERSION=3.19.0 # x-release-please-version
+VERSION=3.19.3 # x-release-please-version
 REGISTRY=registry.example.com
 
 for image in langwatch langwatch_nlp langevals; do
@@ -62288,13 +62290,13 @@ Then configure the Helm chart, giving every tag the version you mirrored:
 images:
   app:
     repository: registry.example.com/langwatch/langwatch
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
   langwatch_nlp:
     repository: registry.example.com/langwatch/langwatch_nlp
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
   langevals:
     repository: registry.example.com/langwatch/langevals
-    tag: "3.19.0" # x-release-please-version
+    tag: "3.19.3" # x-release-please-version
 
 imagePullSecrets:
   - name: registry-credentials
@@ -66576,7 +66578,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.19.0 \
+  --version 3.19.3 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -67775,6 +67777,9 @@ title: 'Add dataset entries programmatically using the LangWatch API to build ev
 openapi: 'POST /api/dataset/{slug}/entries'
 ---
 
+This endpoint only adds entries. To read them back, call
+[`GET /api/dataset/{slugOrId}/records`](/api-reference/datasets/get-records).
+
 ---
 
 # FILE: ./api-reference/datasets/update-dataset.mdx
@@ -67783,6 +67788,11 @@ openapi: 'POST /api/dataset/{slug}/entries'
 title: "Update a dataset by its slug or id"
 openapi: "PATCH /api/dataset/{slugOrId}"
 ---
+
+<Note>
+Renaming a dataset keeps its slug, so the old slug still resolves. A new name
+whose slug another dataset in the project already holds is refused with 409.
+</Note>
 
 ---
 
@@ -72114,6 +72124,32 @@ and **no** `schema` field. Existing integrations are unaffected.
 title: 'Search traces'
 openapi: 'POST /api/traces/search'
 ---
+
+The `filter` field takes the LangWatch filter language. See
+[Filtering traces](/features/querying-your-data#filtering-traces) for the syntax.
+
+```text
+status:error
+-status:error
+evaluatorVerdict:fail
+has:feedback
+has:annotation
+event:thumbs_up_down
+```
+
+`has:feedback` matches traces with `thumbs_up_down` feedback, recorded through
+`POST /api/events/track` or the SDK. `has:annotation` matches traces with an
+annotation, including ones created through `POST /api/annotations/trace/{id}`.
+The annotation reaches trace search a moment after it is saved.
+`event:<name>` matches traces carrying an event with that name.
+
+<Note>
+Prefer `filter` over the older `filters` map. In that map, evaluation fields are
+keyed by monitor ID: `{"evaluations.passed": {"<monitorId>": ["false"]}}`.
+A flat list such as `{"evaluations.passed": ["false"]}` is rejected with 422.
+To find failed evaluations across every evaluator, send
+`"filter": "evaluatorVerdict:fail"`.
+</Note>
 
 ---
 
