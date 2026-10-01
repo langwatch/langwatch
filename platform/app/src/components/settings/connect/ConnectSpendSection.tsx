@@ -32,7 +32,26 @@ export function ConnectSpendSection({
   onSaved,
 }: ConnectSpendSectionProps) {
   const usage = status.usage;
-  if (!usage) return null;
+  if (!usage) {
+    if (!status.usageUnavailable) return null;
+    return (
+      <SettingsSection
+        title="Spend"
+        description="What this install has spent on hosted services, and the cap it stops at."
+        testId="connect-spend"
+      >
+        <Text
+          fontSize="sm"
+          color="fg.muted"
+          data-testid="connect-usage-unavailable"
+        >
+          Usage unavailable. LangWatch could not be reached, so spend and the
+          cap cannot be shown right now. The hosted services keep their
+          settings.
+        </Text>
+      </SettingsSection>
+    );
+  }
 
   const contract = usage.contract;
 

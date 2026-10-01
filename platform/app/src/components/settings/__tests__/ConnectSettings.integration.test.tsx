@@ -121,6 +121,7 @@ const connectedStatus = (overrides: Record<string, unknown> = {}) => ({
     budgets: [],
   },
   refusal: null,
+  usageUnavailable: false,
   sync: { lastSyncAt: null, lastError: null },
   ...overrides,
 });
@@ -373,6 +374,25 @@ describe("<ConnectSettings />", () => {
       expect(
         screen.getByText(/ask LangWatch to reset the license binding/),
       ).toBeDefined();
+    });
+  });
+
+  describe("given the usage read could not reach LangWatch", () => {
+    /** @scenario "The page shows usage as unavailable when LangWatch cannot be reached" */
+    it("says usage is unavailable, keeps the services, and raises no error", () => {
+      renderSettings(
+        connectedStatus({
+          entitledServices: null,
+          usage: null,
+          usageUnavailable: true,
+        }),
+      );
+
+      expect(screen.getByTestId("connect-usage-unavailable")).toBeDefined();
+      expect(screen.getByText(/Usage unavailable/)).toBeDefined();
+      expect(screen.getByTestId("connect-services")).toBeDefined();
+      expect(screen.queryByRole("alert")).toBeNull();
+      expect(toasterCreate).not.toHaveBeenCalled();
     });
   });
 });

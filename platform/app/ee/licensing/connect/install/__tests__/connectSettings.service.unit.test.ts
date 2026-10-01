@@ -6,11 +6,15 @@
  * @see specs/self-hosting/connected-services/connect-settings.feature
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { isAuditLogExempt } from "~/server/api/auditLogExemptions";
-import { ConnectUnreachableError } from "../connectErrors";
+import {
+  ConnectUnreachableError,
+  HostedServiceUnavailableError,
+} from "../connectErrors";
 import type {
   ConnectGatewayClient,
   ConnectUsage,
@@ -364,6 +368,15 @@ describe("given an install whose license syncs", () => {
   });
 });
 
+/** A refusal the host authored, as the transport rebuilds it from the wire. */
+class LicenseRefusal extends HandledError {
+  constructor() {
+    super("connect_license_not_registered", "connect_license_not_registered", {
+      httpStatus: 403,
+    });
+  }
+}
+
 describe("given a host that refuses the read", () => {
   describe("when an admin reads the Connect settings", () => {
     /** @scenario "An unregistered license surfaces as a named error" */
@@ -372,10 +385,7 @@ describe("given a host that refuses the read", () => {
         row: { connectServicesDisabled: [], license: LICENSE_KEY },
         client: fakeClient({
           usage: vi.fn(async () => {
-            throw new ConnectUnreachableError({
-              host: "gateway.example.test",
-              port: 443,
-            });
+            throw new LicenseRefusal();
           }),
         }),
       });
@@ -384,11 +394,68 @@ describe("given a host that refuses the read", () => {
         deployment: "on",
         usage: null,
         entitledServices: null,
-        refusal: {
-          code: "connect_unreachable",
-          meta: { host: "gateway.example.test", port: 443 },
-        },
+        refusal: { code: "connect_license_not_registered" },
+        usageUnavailable: false,
       });
+    });
+  });
+});
+
+describe("given a usage read that cannot reach LangWatch", () => {
+  describe.each([
+    [
+      "the host is unreachable",
+      () =>
+        new ConnectUnreachableError({
+          host: "gateway.example.test",
+          port: 443,
+        }),
+    ],
+    [
+      "the host answers with no usable reply",
+      () =>
+        new HostedServiceUnavailableError({
+          reasons: [new Error("502 from a proxy")],
+        }),
+    ],
+    ["the read fails unexpectedly", () => new Error("socket hang up")],
+  ])("when %s", (_label, failure) => {
+    /** @scenario "A usage read that cannot reach LangWatch shows usage as unavailable" */
+    it("reports usage as unavailable instead of a refusal or a failed read", async () => {
+      const { service } = serviceOver({
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
+        client: fakeClient({
+          usage: vi.fn(async () => {
+            throw failure();
+          }),
+        }),
+      });
+
+      await expect(service.status(ORGANIZATION)).resolves.toMatchObject({
+        deployment: "on",
+        licensed: true,
+        enabledServices: ["instant_evals", "managed_models"],
+        usage: null,
+        refusal: null,
+        usageUnavailable: true,
+      });
+    });
+  });
+
+  describe("when the host never answers", () => {
+    /** @scenario "A usage read that cannot reach LangWatch shows usage as unavailable" */
+    it("bounds the read with a timeout of its own", async () => {
+      const usage = vi.fn(async () => USAGE);
+      const { service } = serviceOver({
+        row: { connectServicesDisabled: [], license: LICENSE_KEY },
+        client: fakeClient({ usage }),
+      });
+
+      await service.status(ORGANIZATION);
+
+      expect(usage).toHaveBeenCalledWith(
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
   });
 });
