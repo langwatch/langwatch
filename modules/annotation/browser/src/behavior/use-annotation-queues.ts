@@ -38,6 +38,7 @@ export function useAnnotationQueues({
   projectId,
   selectedAnnotations = "pending",
   queueId,
+  queueIds,
   showQueueAndUser = false,
   allQueueItems = false,
   pageOffset,
@@ -51,6 +52,8 @@ export function useAnnotationQueues({
   selectedAnnotations?: AnnotationQueueItemStatus;
   /** Narrows the read to one queue. */
   queueId?: string;
+  /** The reviewer's pick of queues to read. Empty or absent reads them all. */
+  queueIds?: readonly string[];
   /** Widens it from the reviewer's own items to every queue they are on. */
   showQueueAndUser?: boolean;
   /**
@@ -74,6 +77,8 @@ export function useAnnotationQueues({
       pageSize,
       pageOffset,
       queueId: queueId ?? "",
+      // Absent rather than empty: an empty list would narrow the read to nothing.
+      ...(queueIds && queueIds.length > 0 ? { queueIds: [...queueIds] } : {}),
       showQueueAndUser,
       allQueueItems,
       ...dateRangeInput({ startDate, endDate }),

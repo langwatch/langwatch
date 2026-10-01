@@ -7,8 +7,6 @@
     "src"
   ],
   "type": "module",
-  "main": "./src/annotations.ts",
-  "types": "./dist/annotations.d.ts",
   "exports": {
     "./declaration": {
       "langwatch-declaration-source": "./src/annotation.web.ts",
