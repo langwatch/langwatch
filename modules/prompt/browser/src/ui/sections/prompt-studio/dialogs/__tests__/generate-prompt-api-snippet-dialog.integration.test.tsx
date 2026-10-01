@@ -147,7 +147,7 @@ describe("the prompt API snippet dialog", () => {
       const call = await createToken();
       await act(async () => call.resolve(API_KEY));
 
-      fireEvent.click(await screen.findByRole("button", { name: "Copy" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Copy example.py" }));
 
       expect(clipboardContents).toContain(API_KEY);
       expect(clipboardContents).not.toContain("***...***");
@@ -162,7 +162,7 @@ describe("the prompt API snippet dialog", () => {
       expect(
         screen.getByRole("button", { name: "Create a personal access token" }),
       ).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Copy example.py" })).toBeNull();
     });
 
     /** @scenario "A token created in the dialog expires in 90 days" */
@@ -187,7 +187,7 @@ describe("the prompt API snippet dialog", () => {
       expect(host.failures).toEqual([
         expect.objectContaining({ fallbackTitle: "Couldn't create the personal access token" }),
       ]);
-      expect(screen.queryByRole("button", { name: "Copy" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Copy example.py" })).toBeNull();
     });
   });
 });
