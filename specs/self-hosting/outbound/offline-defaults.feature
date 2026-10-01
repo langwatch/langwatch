@@ -29,3 +29,23 @@ Feature: A self-hosted install makes no third-party call it was not asked to mak
     Given CHECKPOINT_DISABLE is empty, which would leave the check on
     When any prisma command loads the app's Prisma config
     Then CHECKPOINT_DISABLE is "1" and the check is skipped
+
+  @unit
+  Scenario: LangEvals never downloads the LiteLLM price list
+    Given LITELLM_LOCAL_MODEL_COST_MAP is set to "False"
+    When LangEvals loads its offline defaults
+    Then LITELLM_LOCAL_MODEL_COST_MAP is "True"
+
+  @unit
+  Scenario: LangEvals prices model calls from the LangWatch model catalog
+    Given the LangWatch model catalog and its overlay
+    When LangEvals registers the catalog with LiteLLM
+    Then LiteLLM prices a catalog model at the catalog's per-token rates
+    And a model priced in the overlay takes the overlay's rates
+
+  @unit
+  Scenario: LangEvals sends no RAGAS analytics unless the operator opts in
+    Given RAGAS_DO_NOT_TRACK is unset
+    When LangEvals loads its offline defaults
+    Then RAGAS_DO_NOT_TRACK is "true"
+    And an operator's RAGAS_DO_NOT_TRACK=false is kept

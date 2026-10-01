@@ -20,7 +20,7 @@ import type { EventBus } from "./event-bus.ts";
  */
 export const FORCED_ENV = { CHECKPOINT_DISABLE: "1" } as const;
 
-export type OfflineCachePaths = {
+type OfflineCachePaths = {
 	/** Every tiktoken encoding file, read by the app through TIKTOKENS_PATH. */
 	tiktokenEncodings: string;
 	/** tiktoken's Python cache for LangEvals (TIKTOKEN_CACHE_DIR). */

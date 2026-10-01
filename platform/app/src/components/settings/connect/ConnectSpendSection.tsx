@@ -32,14 +32,15 @@ export function ConnectSpendSection({
   onSaved,
 }: ConnectSpendSectionProps) {
   const usage = status.usage;
-  if (!usage) {
-    if (!status.isUsageUnavailable) return null;
-    return (
-      <SettingsSection
-        title="Spend"
-        description="What this install has spent on hosted services, and the cap it stops at."
-        testId="connect-spend"
-      >
+  if (!usage && !status.isUsageUnavailable) return null;
+
+  return (
+    <SettingsSection
+      title="Spend"
+      description="What this install has spent on hosted services, and the cap it stops at."
+      testId="connect-spend"
+    >
+      {!usage ? (
         <Text
           fontSize="sm"
           color="fg.muted"
@@ -49,28 +50,16 @@ export function ConnectSpendSection({
           cap cannot be shown right now. The hosted services keep their
           settings.
         </Text>
-      </SettingsSection>
-    );
-  }
-
-  const contract = usage.contract;
-
-  return (
-    <SettingsSection
-      title="Spend"
-      description="What this install has spent on hosted services, and the cap it stops at."
-      testId="connect-spend"
-    >
-      {contract ? (
+      ) : usage.contract ? (
         <VStack width="full" align="stretch" gap={5}>
           <SpendFigures
-            contract={contract}
+            contract={usage.contract}
             spendAvailable={usage.spendAvailable}
           />
           {canManage ? (
             <CapField
               organizationId={organizationId}
-              contract={contract}
+              contract={usage.contract}
               onSaved={onSaved}
             />
           ) : null}

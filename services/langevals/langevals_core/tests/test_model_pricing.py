@@ -76,6 +76,7 @@ class TestToLitellmCostMap:
 
 
 class TestRegisterLangwatchModelPricing:
+    # @scenario "LangEvals prices model calls from the LangWatch model catalog"
     def test_overlay_wins_and_litellm_prices_from_it(self, tmp_path, monkeypatch):
         write_catalog(
             tmp_path,
@@ -94,6 +95,7 @@ class TestRegisterLangwatchModelPricing:
         assert entry["input_cost_per_token"] == 0.001
         assert entry["output_cost_per_token"] == 0.002
 
+    # @scenario "LangEvals prices model calls from the LangWatch model catalog"
     def test_the_app_catalog_prices_a_known_model(self, monkeypatch):
         monkeypatch.delenv(PRICING_DIR_ENV, raising=False)
         directory = pricing_dir()
@@ -123,9 +125,11 @@ class TestOfflineDefaults:
             check=True,
         ).stdout.split()
 
+    # @scenario "LangEvals never downloads the LiteLLM price list"
     def test_never_downloads_the_litellm_price_list(self):
         assert self.run({"LITELLM_LOCAL_MODEL_COST_MAP": "False"})[0] == "True"
 
+    # @scenario "LangEvals sends no RAGAS analytics unless the operator opts in"
     def test_ragas_analytics_are_off_unless_opted_in(self):
         env = {k: v for k, v in os.environ.items() if k != "RAGAS_DO_NOT_TRACK"}
         code = (

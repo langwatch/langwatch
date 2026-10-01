@@ -167,7 +167,6 @@ spec:
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
             {{- end }}
 
-
             {{- with .Values.workers.extraEnvs}}
             {{- include "langwatch.assertNoReservedTimeoutEnvs" (dict "envs" . "path" "workers.extraEnvs") }}
             {{- toYaml . | nindent 12 }}
