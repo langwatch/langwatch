@@ -23,14 +23,33 @@ const ENTRA_CLOUDS: ReadonlyMap<string, readonly string[]> = new Map([
 
 /** An https issuer's host and path. Parsed by hand: this package compiles
  *  without DOM or Node types, so `URL` is not available to it. */
-const HTTPS_ISSUER = /^https:\/\/([^/?#]+)([^?#]*)$/i;
-
 function partsOf(
   issuer: string | null | undefined,
 ): { host: string; path: string } | null {
-  const match = issuer ? HTTPS_ISSUER.exec(issuer.trim()) : null;
-  if (!match?.[1]) return null;
-  return { host: match[1].toLowerCase(), path: match[2] ?? "" };
+  const value = issuer?.trim() ?? "";
+  if (value.slice(0, 8).toLowerCase() !== "https://") return null;
+  const rest = value.slice(8);
+  const queryAt = firstIndexOf(rest, ["?", "#"]);
+  const address = queryAt === -1 ? rest : rest.slice(0, queryAt);
+  const pathAt = address.indexOf("/");
+  const host = pathAt === -1 ? address : address.slice(0, pathAt);
+  if (host === "") return null;
+  return {
+    host: host.toLowerCase(),
+    path: pathAt === -1 ? "" : address.slice(pathAt),
+  };
+}
+
+function firstIndexOf(value: string, characters: readonly string[]): number {
+  const found = characters
+    .map((character) => value.indexOf(character))
+    .filter((index) => index !== -1);
+  return found.length === 0 ? -1 : Math.min(...found);
+}
+
+/** The path segments, without empty ones from repeated or edge slashes. */
+function segmentsOf(path: string): string[] {
+  return path.split("/").filter((segment) => segment !== "");
 }
 
 function hostOf(issuer: string | null | undefined): string | null {
@@ -55,8 +74,6 @@ export function entraEndpointOrigins(
   return (host && ENTRA_CLOUDS.get(host)) || [];
 }
 
-/** The Entra ID v2 tenant issuer path: `/<tenant>/v2.0`. */
-const V2_TENANT_PATH = /^\/([^/]+)\/v2\.0\/*$/;
 
 /** The path segments Entra ID uses for its multi-tenant endpoints. Their
  *  discovery documents name the issuer as a `{tenantid}` template, which no
@@ -77,13 +94,14 @@ export function canonicalEntraIssuer(issuer: string): string {
   const parts = partsOf(issuer);
   if (parts === null || !ENTRA_CLOUDS.has(parts.host)) return issuer;
   const origin = `https://${parts.host}`;
-  const v2 = V2_TENANT_PATH.exec(parts.path);
-  if (v2) return `${origin}/${v2[1]}/v2.0`;
-  if (parts.host === "sts.windows.net") {
-    const tenant = parts.path.replace(/^\/+|\/+$/g, "");
-    if (tenant !== "" && !tenant.includes("/")) {
-      return `${origin}/${tenant}/`;
-    }
+  const segments = segmentsOf(parts.path);
+  // The v2 tenant issuer, `/<tenant>/v2.0`, carries no trailing slash.
+  if (segments.length === 2 && segments[1] === "v2.0") {
+    return `${origin}/${segments[0]}/v2.0`;
+  }
+  // The v1 issuer, `https://sts.windows.net/<tenant>/`, carries exactly one.
+  if (parts.host === "sts.windows.net" && segments.length === 1) {
+    return `${origin}/${segments[0]}/`;
   }
   return issuer;
 }
@@ -95,7 +113,7 @@ export function canonicalEntraIssuer(issuer: string): string {
 export function entraMultiTenantSegment(issuer: string): string | null {
   const parts = partsOf(issuer);
   if (parts === null || !ENTRA_CLOUDS.has(parts.host)) return null;
-  const first = parts.path.split("/").filter(Boolean)[0];
+  const first = segmentsOf(parts.path)[0];
   return first && MULTI_TENANT_SEGMENTS.has(first.toLowerCase())
     ? first.toLowerCase()
     : null;
