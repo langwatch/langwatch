@@ -3,5 +3,3 @@ export { NotificationService } from "./notification.api.ts";
 export * from "./notification.config.ts";
 export * from "./mail-gateway.ts";
 export * from "./notification.errors.ts";
-export * from "./read-hints.ts";
-export * from "./notification.trpc.ts";

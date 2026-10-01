@@ -5,8 +5,7 @@
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { ReadHint } from "@langwatch/notification-contract";
-import type { PresenceApi } from "@langwatch/presence-contract";
+import type { PresenceApi, ReadHint } from "@langwatch/presence-contract";
 import { describe, expect, it } from "vitest";
 
 import { ReadHintStreamService } from "../read-hint-stream.service.ts";

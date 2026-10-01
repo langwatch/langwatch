@@ -50,6 +50,7 @@ export async function createScenarioRestTestApp(
     simulations?: Partial<SimulationService>;
     tabs?: Partial<ScenarioTabStore>;
     redis?: Partial<ScenarioRedis>;
+    presence?: Partial<PresenceApi>;
     traces?: Partial<TraceApi>;
     plans?: Partial<EntitlementApi>;
     featureFlags?: Partial<FeatureFlagApi>;
@@ -85,6 +86,7 @@ export async function createScenarioRestTestApp(
       presence: createApiFixture<PresenceApi>({
         getTenantEmitter: () => new EventEmitter(),
         cleanupTenantEmitter: () => {},
+        ...options.presence,
       }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),

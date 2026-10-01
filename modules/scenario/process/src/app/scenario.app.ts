@@ -149,8 +149,6 @@ import {
   type CancellationPublisherClient,
   type CancellationSubscriberClient,
 } from "../channels/redis/redis.scenario-cancellation.channel.ts";
-import type { ScenarioEventBroadcastPublisher } from "../channels/redis/redis.scenario-event-broadcast.channel.ts";
-import { scenarioEventBroadcastChannels } from "../channels/scenario-event-broadcast-channels.registry.ts";
 import { voiceRecordingChannels } from "../channels/voice-recording-channels.registry.ts";
 import {
   buildScenarioLifecyclePipeline,
@@ -284,9 +282,10 @@ export const scenarioAppDependencyTokens = {
 
 export type { ScenarioReadOnlyClickHouse };
 
-/** The process's Redis as scenario reaches it: fan-out publishes and a duplicable subscriber. */
-export type ScenarioRedis = ScenarioEventBroadcastPublisher &
-  CancellationPublisherClient & { duplicate(): CancellationSubscriberClient };
+/** The process's Redis as scenario reaches it: cancel publishes and a duplicable subscriber. */
+export type ScenarioRedis = CancellationPublisherClient & {
+  duplicate(): CancellationSubscriberClient;
+};
 
 type ScenarioProcessMembers = Readonly<{
   clickhouse: ScenarioReadOnlyClickHouse;
@@ -297,7 +296,7 @@ type ScenarioProcessMembers = Readonly<{
       limit?: { requests: number; seconds: number },
     ): Promise<Readonly<{ allowed: boolean; retryAfterSeconds?: number }>>;
   }>;
-  /** Broadcasts and cancel signals across the fleet; absent in a memory process. */
+  /** Cancel signals across the fleet; absent in a memory process. */
   redis: ScenarioRedis | null;
   publicBaseUrl: string | undefined;
   /** The raw-socket door's port, which the worker's quick tunnel points at. */
@@ -413,9 +412,7 @@ export class ScenarioApp implements ScenarioApi {
       legacyDefaultModel: config.defaultModel ?? DEFAULT_MODEL,
     };
     const { redis } = setup.members;
-    const broadcast = redis
-      ? scenarioEventBroadcastChannels.live.create(redis)
-      : scenarioEventBroadcastChannels.memory.create();
+    const broadcast = setup.dependencies.presence;
     const voiceNonces = VoiceNonceRegistryService.create({ nonces: repositories.voiceNonces });
     const memoryCancellations = MemoryScenarioCancellationChannel.create();
     const cancellations = redis
@@ -540,10 +537,10 @@ export class ScenarioApp implements ScenarioApi {
         },
         snapshotUpdates: {
           broadcastUpdate: ({ tenantId, payload }) =>
-            broadcast.broadcastToTenant({
+            broadcast.publishProjectEvent({
               projectId: tenantId,
-              message: payload,
-              eventType: "simulation_updated",
+              channel: "simulation_updated",
+              event: payload,
             }),
         },
         grading: {

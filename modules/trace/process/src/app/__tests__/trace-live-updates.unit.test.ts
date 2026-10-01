@@ -5,7 +5,7 @@
 import { EventEmitter } from "node:events";
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { PresenceApi } from "@langwatch/presence-contract";
+import type { PresenceApi, PresenceProjectEvent } from "@langwatch/presence-contract";
 import {
   type MemoryRedisStore,
   memoryRedisDouble,
@@ -14,7 +14,6 @@ import {
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { traceTenantBroadcastChannels } from "../../channels/trace-tenant-broadcast-channels.registry.ts";
 import {
   TENANT_ID,
   TRACE_ID,
@@ -59,8 +58,17 @@ async function apiFanOut(store: MemoryRedisStore) {
   return { presence, released };
 }
 
+/** The worker's presence, writing the `broadcast:*` envelope its fan-out writes. */
 function workerBroadcast(store: MemoryRedisStore) {
-  return traceTenantBroadcastChannels.live.create(memoryRedisDouble({ store }));
+  const redis = memoryRedisDouble({ store });
+  return {
+    publishProjectEvent: async ({ projectId, channel, event }: PresenceProjectEvent) => {
+      await redis.publish(
+        `broadcast:${channel}`,
+        JSON.stringify({ tenantId: projectId, event, timestamp: 1 }),
+      );
+    },
+  };
 }
 
 describe("trace live updates across processes", () => {
@@ -116,6 +124,19 @@ describe("trace live updates across processes", () => {
       });
     });
 
+    describe("when presence refuses the publish", () => {
+      /** @scenario "A failed publish does not fail the ingestion that caused it" */
+      it("completes the subscriber that asked for it", async () => {
+        const handler = createTraceUpdateBroadcastHandler({
+          broadcast: { publishProjectEvent: () => Promise.reject(new Error("redis down")) },
+        });
+
+        await expect(
+          handler(createSpanReceivedEvent(createOtlpSpan()), createContext(createFoldState())),
+        ).resolves.toBeUndefined();
+      });
+    });
+
     describe("when the subscription's signal aborts", () => {
       /** @scenario "A closed live-update subscription releases the tenant's emitter" */
       it("ends the stream and releases the tenant's emitter", async () => {
@@ -150,10 +171,10 @@ describe("trace live updates across processes", () => {
       });
       const received = stream.next();
 
-      await workerBroadcast(store).broadcastToTenant({
-        tenantId: TENANT_ID,
+      await workerBroadcast(store).publishProjectEvent({
+        projectId: TENANT_ID,
+        channel: "discover_updated",
         event: JSON.stringify({ event: "discover_updated", tenantId: TENANT_ID, timestamp: 1 }),
-        eventType: "discover_updated",
       });
 
       expect((await received).value).toMatchObject({

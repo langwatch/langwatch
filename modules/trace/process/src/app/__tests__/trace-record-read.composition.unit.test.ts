@@ -25,7 +25,6 @@ import type { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
-import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { S3TraceLegacySpoolChannel } from "../../channels/s3/s3.trace-legacy-spool.channel.ts";
 import { traceSummaryRow } from "../../repositories/clickhouse/__tests__/support/trace-summary-row.support.ts";
 import type {
@@ -139,7 +138,7 @@ function compose({
       },
       cleanupTenantEmitter: () => undefined,
     },
-    tenantBroadcast: MemoryTraceTenantBroadcastChannel.create(),
+    tenantBroadcast: { publishProjectEvent: async () => {} },
     protections: {
       authz: apis.reference(AuthzApi),
       projects,

@@ -1,9 +1,9 @@
 import {
   READ_INVALIDATED_BROADCAST_EVENT_TYPE,
   readHintSchema,
+  type PresenceApi,
   type ReadHint,
-} from "@langwatch/notification-contract";
-import type { PresenceApi } from "@langwatch/presence-contract";
+} from "@langwatch/presence-contract";
 
 type TenantEmitters = Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
 

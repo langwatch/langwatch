@@ -2,9 +2,11 @@
 Feature: A browser read is refetched when an event its contract names is committed
   A read's contract names the committed events that make it stale, each hinted under the event's
   own tenant or under a field of its data. One framework subscriber, registered after the modules
-  install, turns each such event into `{ path }` on the tenant broadcast channel
-  `broadcast:read_invalidated`, coalesced per event and tenant. `notification.onReadHints` relays
-  the hints of the caller's user, organization and project to the focused tab, which refetches the
+  install, turns each such event into `{ path }` on the framework's own channel
+  `eventing:read_invalidated`, coalesced per event and tenant; presence subscribes to it and is the
+  only writer of the browser-facing `broadcast:*` wire. `presence.onOrganizationReadHints`
+  (`organization:view`) and `presence.onProjectReadHints` (`project:view`) relay the hints of the
+  caller's user, organization and, for the project stream, project to each visible tab, which refetches the
   reads mounted under that path and marks them stale in the other tabs. A read is otherwise trusted
   for 5 minutes, and nothing in the framework polls. Hints carry no data: the refetch enforces the
   read's own permission.
@@ -48,7 +50,7 @@ Feature: A browser read is refetched when an event its contract names is committ
   Scenario: A committed event a read names publishes one hint per read and tenant
     Given "organization.getScopeGraph" names "lw.project.created" scoped by "organizationId"
     When a project is created in organization "acme"
-    Then "{ path: organization.getScopeGraph }" is published on "broadcast:read_invalidated" for tenant "acme"
+    Then "{ path: organization.getScopeGraph }" is published on "eventing:read_invalidated" for tenant "acme"
 
   @unit
   Scenario: An unscoped read is hinted under the event's own tenant
@@ -77,6 +79,12 @@ Feature: A browser read is refetched when an event its contract names is committ
   # Delivery
 
   @unit
+  Scenario: Presence relays a hint from the framework channel to its own tenant only
+    Given presence's fan-out listening for read hints of tenants "acme" and "globex"
+    When "{ path: organization.getScopeGraph }" arrives on "eventing:read_invalidated" for tenant "acme"
+    Then only "acme" receives it, as a read hint
+
+  @unit
   Scenario: A connection is sent the hints for its user, organization and project
     Given a stream opened by user "u1" in organization "acme" and project "p1"
     When hints arrive for tenants "u1", "acme" and "p1"
@@ -94,13 +102,19 @@ Feature: A browser read is refetched when an event its contract names is committ
     When a frame arrives on its tenant that is not a hint
     Then the stream yields nothing and stays open
 
-  @integration @unimplemented
+  @integration
   Scenario: A stream for an organization the caller does not belong to is refused
     Given a signed-in member of "acme"
     When they open the hint stream for organization "globex"
     Then the stream is refused
 
-  @integration @unimplemented
+  @integration
+  Scenario: A stream for a project outside the caller's organisation is refused
+    Given a signed-in member of "acme"
+    When they open the hint stream for organization "acme" and a project of "globex"
+    Then the stream is refused
+
+  @integration
   Scenario: An anonymous connection is refused the hint stream
     Given a request to the hint stream with no session
     When it opens

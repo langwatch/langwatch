@@ -7,6 +7,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { EventingParticipation } from "@langwatch/kernel";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
+import type { PresenceApi } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
@@ -18,7 +19,6 @@ import type {
   TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
-import type { TraceTenantBroadcast } from "../channels/trace-tenant-broadcast.channel.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import { leanForProjection } from "../rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../services/span-cost-enrichment.service.ts";
@@ -92,7 +92,7 @@ export interface TraceProcessingPipelineInput {
   findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
-  broadcast: TraceTenantBroadcast;
+  broadcast: Pick<PresenceApi, "publishProjectEvent">;
   /** Where a project's first and later traces are recorded as trace's own events. */
   milestones: ProjectMetadataSubscriberDeps["milestones"];
 }

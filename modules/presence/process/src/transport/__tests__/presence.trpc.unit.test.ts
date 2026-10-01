@@ -58,13 +58,15 @@ describe("given the presence declaration", () => {
     expect(Object.keys(presenceTrpc.members).toSorted()).toEqual([
       "cursor",
       "leave",
+      "onOrganizationReadHints",
       "onPresenceCursor",
       "onPresenceUpdate",
+      "onProjectReadHints",
       "update",
     ]);
   });
 
-  it("binds every declared procedure once, under the permission seeing traces takes", () => {
+  it("binds every declared procedure once, under the permission its subject takes", () => {
     expect(
       Object.entries(presenceTrpc.members).map(([name, member], index) => [
         name,
@@ -77,6 +79,8 @@ describe("given the presence declaration", () => {
       ["cursor", "mutation", "traces:view"],
       ["onPresenceUpdate", "subscription", "traces:view"],
       ["onPresenceCursor", "subscription", "traces:view"],
+      ["onOrganizationReadHints", "subscription", "organization:view"],
+      ["onProjectReadHints", "subscription", "project:view"],
     ]);
   });
 });

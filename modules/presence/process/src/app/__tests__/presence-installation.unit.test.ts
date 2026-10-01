@@ -72,6 +72,56 @@ describe("given a process that installs presence", () => {
       }
     });
 
+    /** @scenario "A peer's project signal reaches only the project it was published for" */
+    it.each(["trace_updated", "discover_updated", "simulation_updated"] as const)(
+      "relays a %s signal to its own project's tenant emitter only",
+      async (channel) => {
+        const runtime = await bootPresence();
+        await runtime.start();
+        const presence = runtime.service(PresenceApi);
+        const own: unknown[] = [];
+        const other: unknown[] = [];
+        presence.getTenantEmitter("project-1").on(channel, (frame) => own.push(frame));
+        presence.getTenantEmitter("project-2").on(channel, (frame) => other.push(frame));
+
+        try {
+          await presence.publishProjectEvent({ projectId: "project-1", channel, event: "{}" });
+
+          expect(own).toEqual([expect.objectContaining({ event: "{}" })]);
+          expect(other).toEqual([]);
+        } finally {
+          await runtime.stop();
+        }
+      },
+    );
+
+    /** @scenario "A tiered project signal is dropped once the project's allowance is spent" */
+    it("drops delta signals past the project's allowance", async () => {
+      const runtime = await bootPresence();
+      await runtime.start();
+      const presence = runtime.service(PresenceApi);
+      const received: unknown[] = [];
+      presence.getTenantEmitter("project-1").on("simulation_updated", (frame) => {
+        received.push(frame);
+      });
+
+      try {
+        for (let sent = 0; sent < 600; sent += 1) {
+          await presence.publishProjectEvent({
+            projectId: "project-1",
+            channel: "simulation_updated",
+            event: "{}",
+            tier: "delta",
+          });
+        }
+
+        expect(received.length).toBeGreaterThan(0);
+        expect(received.length).toBeLessThan(600);
+      } finally {
+        await runtime.stop();
+      }
+    });
+
     it("mounts presence over sessions no database was needed for", async () => {
       const runtime = await bootPresence();
 

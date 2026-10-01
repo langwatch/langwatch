@@ -1069,25 +1069,6 @@ export function getSSECompletion(c: Context): Promise<SSECompletion> | undefined
   return completions.get(c);
 }
 
-// Fan-out to every browser watching one tenant. Delivery is Redis pub/sub with a local
-// fallback; which is live depends on the process. Rate-limited calls return whether the event
-// was published (families that broadcast deltas don't act on it).
-
-export interface AppRestBroadcast {
-  broadcastToTenant(
-    tenantId: string,
-    message: string,
-    eventType: "simulation_updated" | "export_progress",
-  ): Promise<unknown>;
-
-  broadcastToTenantRateLimited(
-    tenantId: string,
-    message: string,
-    eventType: "simulation_updated",
-    tier: "structural" | "delta",
-  ): Promise<unknown>;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // The receipt fingerprint: stable, key-order-independent JSON.
 // ─────────────────────────────────────────────────────────────────────────────

@@ -112,7 +112,6 @@ export {
   restRateLimitKey,
   tracerMiddleware,
   validator,
-  type AppRestBroadcast,
   type BodyLimitOptions,
   type FieldViolation,
   type RestCachePolicy,

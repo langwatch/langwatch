@@ -742,6 +742,7 @@ export class TraceApp implements TraceApi, CollectorApp {
         }),
         presence: input.dependencies.presence,
         broadcast: input.dependencies.presence,
+        tenantBroadcast: input.dependencies.presence,
         shareReadLimiter: input.members.rateLimiter,
         protections: {
           authz: input.dependencies.authz,
@@ -781,7 +782,7 @@ export class TraceApp implements TraceApi, CollectorApp {
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
-      broadcast: collaborators.tenantBroadcast,
+      broadcast: input.dependencies.presence,
       milestones,
     });
     return app;

@@ -43,4 +43,25 @@ export const presenceTrpcTransport: TrpcRouterDeclaration<PresenceApi, typeof pr
         signal,
       }),
     )
+
+    .procedure("onOrganizationReadHints")
+    .withPermission("organization:view")
+    .handle(({ app, input, actor, signal }) =>
+      app.readHints({
+        userId: actor.id,
+        organizationId: input.organizationId,
+        ...(signal === undefined ? {} : { signal }),
+      }),
+    )
+
+    .procedure("onProjectReadHints")
+    .withPermission("project:view")
+    .handle(({ app, input, actor, signal }) =>
+      app.readHints({
+        userId: actor.id,
+        organizationId: input.organizationId,
+        projectId: input.projectId,
+        ...(signal === undefined ? {} : { signal }),
+      }),
+    )
     .build();

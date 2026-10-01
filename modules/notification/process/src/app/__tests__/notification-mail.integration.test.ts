@@ -1,10 +1,8 @@
 import { once } from "node:events";
 import { createServer, type Server, type Socket } from "node:net";
 
-import { createApiFixture } from "@langwatch/api-fixture";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
-import type { PresenceApi } from "@langwatch/presence-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -59,7 +57,6 @@ function process(smtp: { host: string | undefined; port: string | undefined; pro
     .withModules([withMemoryRepositories(notificationServer)])
     .withMember("publicBaseUrl", "https://app.langwatch.test")
     .withMember("outboundProxy", {})
-    .provide({ presence: createApiFixture<PresenceApi>() })
     .withConfig({
       notification: {
         defaultFrom: "LangWatch <contact@langwatch.test>",

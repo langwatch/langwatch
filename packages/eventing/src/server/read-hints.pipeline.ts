@@ -1,6 +1,6 @@
 /**
  * The one framework subscriber turning committed events into read hints (record §10, "Server
- * events say when a read is stale"): `{ path }` on the tenant broadcast channel, under the
+ * events say when a read is stale"): `{ path }` on the framework's read-hint channel, under the
  * event's tenant or the field its read named. Spec: packages/api/specs/read-hints.feature.
  */
 import type { ReadHintMap, ReadHintTarget } from "@langwatch/kernel";
@@ -12,8 +12,8 @@ import type { Event } from "../domain/types.ts";
 import { definePipeline } from "../pipeline/staticBuilder.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 
-/** The tenant broadcast channel hints travel on; notification relays it to the focused tab. */
-export const READ_HINT_BROADCAST_CHANNEL = "broadcast:read_invalidated";
+/** The framework's own channel hints travel on; presence relays it to browsers (record §3.3). */
+export const READ_HINT_BROADCAST_CHANNEL = "eventing:read_invalidated";
 
 /** A burst of one event for one tenant waits this long and publishes once. */
 export const READ_HINT_COALESCE_MS = 1_000;

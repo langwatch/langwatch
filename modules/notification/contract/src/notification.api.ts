@@ -7,7 +7,6 @@ import type {
   NotificationRecentQuery,
   SendEmailCommand,
 } from "./notification.ts";
-import type { ReadHint, ReadHintsWatchInput } from "./read-hints.ts";
 
 export interface NotificationService {
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]>;
@@ -18,8 +17,6 @@ export interface NotificationService {
   verifySmtp(): Promise<void>;
   /** Sends one message through this install's gateway; with mail off it is skipped and logged. */
   sendEmail(input: SendEmailCommand): Promise<void>;
-  /** The read hints of one user, organization and project until the signal aborts. */
-  readHints(input: ReadHintsWatchInput): AsyncIterable<ReadHint>;
 }
 
 export const NotificationService = moduleApi<NotificationService>()("notification");

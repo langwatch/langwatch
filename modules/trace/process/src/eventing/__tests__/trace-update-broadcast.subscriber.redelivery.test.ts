@@ -3,6 +3,7 @@
  * @unit
  * State-free notification: all event types, byte-identical message; 2s throttle is cost control.
  */
+import type { PresenceProjectEvent } from "@langwatch/presence-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceUpdateBroadcastHandler } from "../trace-update-broadcast.subscriber.ts";
@@ -24,17 +25,9 @@ function makeBroadcastSink(fail = false) {
     sent,
     deps: {
       broadcast: {
-        async broadcastToTenant({
-          tenantId,
-          event,
-          eventType,
-        }: {
-          tenantId: string;
-          event: string;
-          eventType: "trace_updated" | "discover_updated";
-        }) {
+        async publishProjectEvent({ projectId, channel, event }: PresenceProjectEvent) {
           if (fail) throw new Error("subscriber connection lost");
-          sent.push(`${tenantId}|${eventType}|${event}`);
+          sent.push(`${projectId}|${channel}|${event}`);
         },
       },
     },

@@ -16,6 +16,8 @@ import {
   type PresenceUser,
   type PresenceCursorEvent,
   type PresenceEvent,
+  type ReadHint,
+  type ReadHintsWatchInput,
 } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -26,6 +28,7 @@ import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.
 import { BroadcastTenantRateLimiterService } from "../services/broadcast-tenant-rate-limiter.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 import { PresenceService } from "../services/presence.service.ts";
+import { ReadHintStreamService } from "../services/read-hint-stream.service.ts";
 
 export interface PresenceBroadcast {
   publish(input: {
@@ -33,6 +36,8 @@ export interface PresenceBroadcast {
     event: string;
     channel: "presence_updated" | "presence_cursor" | PresenceProjectEvent["channel"];
     rateLimited: boolean;
+    /** The allowance a rate-limited publish spends; `delta` when unnamed. */
+    tier?: PresenceProjectEvent["tier"];
   }): Promise<void>;
 }
 
@@ -72,6 +77,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
+  readonly #readHints: ReadHintStreamService;
   readonly #users: UserApi;
   /** The same fabric {@link PresenceBroadcastFabric} exposes to a peer. */
   readonly #emitters: PresenceEmitter;
@@ -80,18 +86,21 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
   private constructor({
     presence,
     stream,
+    readHints,
     users,
     emitters,
     broadcast,
   }: {
     presence: PresenceService;
     stream: PresenceStreamService;
+    readHints: ReadHintStreamService;
     users: UserApi;
     emitters: PresenceEmitter;
     broadcast: PresenceBroadcast;
   }) {
     this.#presence = presence;
     this.#stream = stream;
+    this.#readHints = readHints;
     this.#users = users;
     this.#emitters = emitters;
     this.#broadcast = broadcast;
@@ -127,6 +136,7 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     return new PresenceApp({
       presence,
       stream: PresenceStreamService.create({ presence, emitters }),
+      readHints: ReadHintStreamService.create({ emitters }),
       users: dependencies.users,
       emitters,
       broadcast,
@@ -143,8 +153,10 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     this.#emitters.cleanupTenantEmitter(tenantId);
   }
 
-  publishProjectEvent(input: PresenceProjectEvent): Promise<void> {
-    return this.#broadcast.publish({ ...input, rateLimited: false });
+  publishProjectEvent({ tier, ...input }: PresenceProjectEvent): Promise<void> {
+    return this.#broadcast.publish(
+      tier === undefined ? { ...input, rateLimited: false } : { ...input, rateLimited: true, tier },
+    );
   }
 
   isEnabledForProject(input: PresenceProjectInput): Promise<boolean> {
@@ -191,6 +203,16 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     input: PresenceCursorSubscription & { signal?: AbortSignal },
   ): AsyncGenerator<PresenceCursorEvent> {
     return this.#stream.cursors(input);
+  }
+
+  readHints({
+    userId,
+    organizationId,
+    projectId,
+    signal,
+  }: ReadHintsWatchInput & { signal?: AbortSignal }): AsyncIterable<ReadHint> {
+    const tenantIds = [userId, organizationId, ...(projectId === undefined ? [] : [projectId])];
+    return this.#readHints.watch({ tenantIds, ...(signal === undefined ? {} : { signal }) });
   }
 
   /**

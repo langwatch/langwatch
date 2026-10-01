@@ -16,6 +16,11 @@ import {
   presenceProjectInputSchema,
   presenceUpdateRequestSchema,
 } from "./presence.ts";
+import {
+  organizationReadHintsInputSchema,
+  projectReadHintsInputSchema,
+  readHintSchema,
+} from "./read-hints.ts";
 
 export const presenceTrpc = defineTrpcContract("presence")
   /** Heartbeat and location for one browser session. */
@@ -42,4 +47,14 @@ export const presenceTrpc = defineTrpcContract("presence")
   .subscription("onPresenceCursor")
   .withInput(presenceCursorSubscriptionSchema)
   .withOutput(presenceCursorEventSchema)
+
+  /** The focused tab's hint stream for an organisation: its user's and organisation's hints. */
+  .subscription("onOrganizationReadHints")
+  .withInput(organizationReadHintsInputSchema)
+  .withOutput(readHintSchema)
+
+  /** The same at project level, with the project's read hints too. */
+  .subscription("onProjectReadHints")
+  .withInput(projectReadHintsInputSchema)
+  .withOutput(readHintSchema)
   .build();

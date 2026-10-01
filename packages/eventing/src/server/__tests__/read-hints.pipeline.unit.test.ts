@@ -43,7 +43,7 @@ describe("publishReadHints", () => {
 
     expect(hints()).toEqual([
       {
-        channel: "broadcast:read_invalidated",
+        channel: "eventing:read_invalidated",
         tenantId: "acme",
         event: { path: "organization.getScopeGraph" },
       },

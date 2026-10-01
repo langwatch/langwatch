@@ -4,13 +4,12 @@ import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryTraceTenantBroadcastChannel } from "../../channels/memory/memory.trace-tenant-broadcast.channel.ts";
 import { CLICKHOUSE_FACET_CATALOG } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.mapper.ts";
 import { TraceListService } from "../trace-list-read.service.ts";
 
 function serviceWithRepository(listAll: ReturnType<typeof vi.fn>) {
   return TraceListService.create({
-    discoverUpdates: MemoryTraceTenantBroadcastChannel.create(),
+    discoverUpdates: { publishProjectEvent: async () => {} },
     facets: CLICKHOUSE_FACET_CATALOG,
     repository: { listAll } as never,
     evaluations: { findSummariesByTraceIds: vi.fn().mockResolvedValue({}) } as never,
