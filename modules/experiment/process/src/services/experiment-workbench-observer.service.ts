@@ -1,4 +1,8 @@
+import type { EventingCommands } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
+import type { ExperimentLifecyclePipeline } from "../eventing/experiment-lifecycle.pipeline.ts";
 
 /** One run that ended, as the workbench reports it. */
 export type ExperimentRan = Readonly<{
@@ -27,9 +31,22 @@ export type ExperimentRanAnnouncer = (input: ExperimentRan) => Promise<void>;
 export class ExperimentWorkbenchObserverService implements ExperimentWorkbenchObserver {
   static create(input: {
     logger: Pick<Logger, "error">;
-    announce: ExperimentRanAnnouncer;
+    senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> };
   }): ExperimentWorkbenchObserverService {
-    return new ExperimentWorkbenchObserverService(input.logger, input.announce);
+    const { senders } = input;
+    return new ExperimentWorkbenchObserverService(input.logger, async (ran) => {
+      if (!senders.commands) {
+        throw new Error("experiment_lifecycle pipeline senders are not connected yet");
+      }
+      await senders.commands.recordExperimentRan.send({
+        tenantId: ran.projectId,
+        occurredAt: nowInstant().epochMilliseconds,
+        userId: ran.userId,
+        projectId: ran.projectId,
+        experimentId: ran.experimentId ?? null,
+        fullRun: ran.isFullRun,
+      });
+    });
   }
 
   private constructor(

@@ -7,7 +7,6 @@ import { AgentApi } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { RETENTION_TABLE_CATEGORY_MAP } from "@langwatch/data-retention-contract/retention-tables";
 import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
@@ -93,7 +92,6 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { SuiteApi } from "@langwatch/suite-contract";
-import { nowInstant } from "@langwatch/time";
 import {
   WorkflowApi,
   type StudioWorkflow,
@@ -103,65 +101,35 @@ import {
 } from "@langwatch/workflow-contract";
 
 import type { ExperimentBroadcast } from "../channels/experiment-broadcast.channel.ts";
-import { experimentRunEventStreamChannels } from "../channels/experiment-run-event-stream-channels.registry.ts";
-import type { ExperimentRunEventStream } from "../channels/experiment-run-event-stream.channel.ts";
-import { HttpExperimentAttachmentLinkChannel } from "../channels/http/http.experiment-attachment-link.channel.ts";
 import { MemoryExperimentBroadcastChannel } from "../channels/memory/memory.experiment-broadcast.channel.ts";
 import {
   buildExperimentLifecyclePipeline,
   type ExperimentLifecyclePipeline,
 } from "../eventing/experiment-lifecycle.pipeline.ts";
-import { ExecuteExperimentCellCommand } from "../eventing/experiment-run-cell.commands.ts";
-import {
-  completeRun,
-  executeCell,
-  failLostCell,
-} from "../eventing/experiment-run-execution.intent.ts";
-import { createExperimentRunFramesSubscriber } from "../eventing/experiment-run-frames.subscriber.ts";
-import { ExperimentRunPlanStore } from "../eventing/experiment-run-plan.store.ts";
-import {
-  buildExperimentRunProcessingPipeline,
-  type ExperimentRunProcessingPipeline,
-} from "../eventing/experiment-run-processing.pipeline.ts";
-import { ExperimentRunProgressStore } from "../eventing/experiment-run-progress.store.ts";
-import { ExperimentRunStateStore } from "../eventing/experiment-run-state.store.ts";
-import type { ExperimentEventingClickHouseResolver } from "../repositories/clickhouse/clickhouse.experiment-clickhouse.repository.ts";
+import type { ExperimentRunProcessingPipeline } from "../eventing/experiment-run-processing.pipeline.ts";
 import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/clickhouse.experiment-dspy.repository.ts";
-import { ClickHouseExperimentRunProcessingRepository } from "../repositories/clickhouse/clickhouse.experiment-run-processing.repository.ts";
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ClickHouseExperimentSession } from "../repositories/clickhouse/clickhouse.experiment-session.store.ts";
-import type { ExperimentIdLookupRepository } from "../repositories/experiment-id-lookup.repository.ts";
-import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
-import type { ExperimentRunFoldRepository } from "../repositories/experiment-run-fold.repository.ts";
-import { MemoryExperimentRunAbortRepository } from "../repositories/memory/memory.experiment-run-abort.repository.ts";
-import { MemoryExperimentRunFoldRepository } from "../repositories/memory/memory.experiment-run-fold.repository.ts";
 import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
-import { RedisExperimentRunAbortRepository } from "../repositories/redis/redis.experiment-run-abort.repository.ts";
-import { RedisExperimentRunFoldRepository } from "../repositories/redis/redis.experiment-run-fold.repository.ts";
-import { RedisExperimentRunProcessingRepository } from "../repositories/redis/redis.experiment-run-processing.repository.ts";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
-import {
-  runRefusalsOf,
-  type ExperimentRunRefusals,
-} from "../rules/experiment-run-availability.rules.ts";
 import {
   EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE,
   slugifyExperimentName,
 } from "../rules/experiment-slug.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
-import { ExperimentAttachmentInputService } from "../services/experiment-attachment-input.service.ts";
 import { ExperimentCopyService } from "../services/experiment-copy.service.ts";
-import type { ExecutionDataServices } from "../services/experiment-execution-data.service.ts";
+import { ExperimentDspyRetentionService } from "../services/experiment-dspy-retention.service.ts";
 import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
 import { ExperimentListingService } from "../services/experiment-listing.service.ts";
-import { ExperimentRunBoardWriteBackService } from "../services/experiment-run-board-write-back.service.ts";
-import { ExperimentRunCellService } from "../services/experiment-run-cell.service.ts";
 import { ExperimentRunCommandDispatcherService } from "../services/experiment-run-command-dispatcher.service.ts";
 import { ExperimentRunHistoryTelemetryService } from "../services/experiment-run-history-telemetry.service.ts";
-import { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
-import { ExperimentRunSandboxCredentialService } from "../services/experiment-run-sandbox-credential.service.ts";
+import type { ExperimentRunModelCostService } from "../services/experiment-run-model-cost.service.ts";
+import {
+  ExperimentRunService,
+  type ExperimentRunProcessing,
+} from "../services/experiment-run.service.ts";
 import { ExperimentTargetEntityNamesService } from "../services/experiment-target-entity-names.service.ts";
 import {
   ExperimentWorkbenchObserverService,
@@ -174,9 +142,8 @@ import {
 import { ExperimentWorkbenchTargetNamesService } from "../services/experiment-workbench-target-names.service.ts";
 import { ExperimentWorkbenchVersionService } from "../services/experiment-workbench-version.service.ts";
 import { ExperimentWorkflowAuthoringService } from "../services/experiment-workflow-authoring.service.ts";
-import { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
+import type { WorkflowEvaluationService } from "../services/experiment-workflow-evaluation.service.ts";
 import { ExperimentWorkflowLinkService } from "../services/experiment-workflow-link.service.ts";
-import { ExperimentWorkflowSourceService } from "../services/experiment-workflow-source.service.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
 
 /** The display names behind the author ids a version history stores. */
@@ -219,28 +186,8 @@ export interface ExperimentAppDependencies {
     pipeline: ExperimentLifecyclePipeline;
     senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> };
   }>;
-  /** `experiment_run_processing`, its senders and run lookup; absent where a suite builds none. */
-  runProcessing?: Readonly<{
-    pipeline: ExperimentRunProcessingPipeline;
-    commands: ExperimentRunCommandDispatcherService;
-    idLookup: ExperimentIdLookupRepository;
-    /** The channel a run's frames reach the process streaming it on. */
-    stream: ExperimentRunEventStream;
-    /** The run's progress fold, which a poll and an abort read by runId. */
-    folds: ExperimentRunFoldRepository;
-    /** The run's stop signal, set on abort. */
-    abort: ExperimentRunAbortRepository;
-    /** This deployment's public origin, for the link a polled run answers with. */
-    publicBaseUrl: string | undefined;
-    /** The peers a run's execution data is loaded through before it is planned. */
-    services: ExecutionDataServices;
-    /** Refuses a run against someone else's personal development agent before it starts. */
-    ownership: Pick<SuiteApi, "assertConnectedAgentsRunnable">;
-    /** Cells in flight at once when a run names no limit of its own. */
-    concurrency: number;
-    /** What this process refuses of a run, for want of Redis or a public address. */
-    refusals: ExperimentRunRefusals;
-  }>;
+  /** The run pipeline, its senders and run lookup; absent where a suite builds none. */
+  runProcessing?: ExperimentRunProcessing;
 }
 
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
@@ -293,8 +240,8 @@ export class ExperimentApp implements ExperimentApi {
 
   static create(setup: ExperimentSetup): ExperimentApp {
     const { members, dependencies, config } = setup;
-    const { prisma, clickhouse, redis, logger, publicBaseUrl, processName } = members;
-    const { workflows, dataset, agents, evaluators, prompts, projects, retention } = dependencies;
+    const { prisma, clickhouse, logger } = members;
+    const { workflows, dataset, agents, evaluators, prompts, retention } = dependencies;
     const commands = ExperimentRunCommandDispatcherService.create();
     const senders: { commands?: EventingCommands<ExperimentLifecyclePipeline> } = {};
     const resolveClient = ClickHouseExperimentSession.resolverOver(clickhouse);
@@ -309,13 +256,7 @@ export class ExperimentApp implements ExperimentApi {
       }),
       dspyRepository: ClickHouseExperimentDspyRepository.create({
         resolveClient,
-        retention: {
-          findTraceRetentionDays: (tenantId) =>
-            retention.getRetentionDays({
-              projectId: tenantId,
-              category: RETENTION_TABLE_CATEGORY_MAP.dspy_steps,
-            }),
-        },
+        retention: ExperimentDspyRetentionService.create({ retention }),
         telemetry,
       }),
       execution: commands,
@@ -323,184 +264,35 @@ export class ExperimentApp implements ExperimentApi {
       newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
       references: { prompts, agents, evaluators, workflows, dataset },
     });
-
-    // The run's folds, stop signal and frames go through Redis so every replica reads one
-    // plan; in memory where the deployment has none, as its runs are refused at start anyway.
-    const folds = redis
-      ? RedisExperimentRunFoldRepository.create({ redis })
-      : MemoryExperimentRunFoldRepository.create();
-    const abort = redis
-      ? RedisExperimentRunAbortRepository.create({ redis })
-      : MemoryExperimentRunAbortRepository.create();
-    const stream = redis
-      ? experimentRunEventStreamChannels.live.create({ redis })
-      : experimentRunEventStreamChannels.memory.create();
-    const refusals = runRefusalsOf({
-      sharedStore: redis !== undefined,
-      publicBaseUrl,
-      processName,
-    });
-    if (refusals.start) {
-      logger.warn(
-        { capability: refusals.start.capability },
-        "experiment runs are refused in this process",
-      );
-    }
-    const services: ExecutionDataServices = {
-      datasets: dataset,
-      prompts,
-      agents,
-      evaluators,
-      workflows: ExperimentWorkflowSourceService.create(workflows),
-      entitlements: dependencies.entitlement,
-      projects,
-    };
-    const cells = ExperimentRunCellService.create({
-      folds,
-      stream,
-      services,
-      workflows,
-      collaborators: {
-        studio: workflows,
-        cost: ExperimentRunModelCostService.create({ modelProviders: dependencies.modelProviders }),
-        abort,
-        experiments,
-        evaluationReporting: dependencies.evaluation,
-        sandboxCredentials: ExperimentRunSandboxCredentialService.create({
-          projects,
-          apiKeys: dependencies.apiKeys,
-        }),
-        connectedDispatch: agents,
-        attachments: ExperimentAttachmentInputService.create({
-          storedObjects: dependencies.storedObjects,
-          links: HttpExperimentAttachmentLinkChannel.create({
-            policy: {
-              blockLocal: config.blockLocalHttpCalls,
-              allowedHosts: config.allowedProxyHosts,
-              verifyTls: members.isSaas,
-            },
-          }),
-        }),
-      },
-    });
-    const workflowEvaluations = WorkflowEvaluationService.create({
+    const runs = ExperimentRunService.create({
+      commands,
       experiments,
-      workflowSource: services.workflows,
-      services,
-      concurrency: config.runConcurrency,
-      folds,
-      refusals,
-      requests: commands,
-      baseUrl: publicBaseUrl,
+      resolveClient,
+      members,
+      peers: dependencies,
+      config,
     });
-    const boardWriteBack = ExperimentRunBoardWriteBackService.create({
-      folds,
-      experiments: experiments.workbench,
-    });
-    const runStores = ExperimentApp.#runStores({ resolveClient, redis, retention });
     const targetNames = ExperimentWorkbenchTargetNamesService.create();
-    const targetEntities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
+    const entities = ExperimentTargetEntityNamesService.create({ agents, evaluators });
 
     return new ExperimentApp({
       experiments,
       runLookup: ExperimentFindOrCreateService.create(experiments),
       slugify: slugifyExperimentName,
-      workbenchTargetNames: (input) =>
-        targetNames.resolve({ ...input, prompts, entities: targetEntities }),
+      workbenchTargetNames: (input) => targetNames.resolve({ ...input, prompts, entities }),
       workflows,
       dataset,
       monitors: dependencies.monitors,
       broadcast: MemoryExperimentBroadcastChannel.create(),
       permissions: dependencies.permissions,
       people: PrismaExperimentPeopleRepository.create(prisma),
-      modelCosts: ExperimentRunModelCostService.create({
-        modelProviders: dependencies.modelProviders,
-      }),
+      modelCosts: runs.cost,
       workflowAuthoring: ExperimentWorkflowAuthoringService.create(workflows),
-      workflowEvaluations,
-      workbenchObserver: ExperimentWorkbenchObserverService.create({
-        logger,
-        announce: async (ran) => {
-          if (!senders.commands) {
-            throw new Error("experiment_lifecycle pipeline senders are not connected yet");
-          }
-          await senders.commands.recordExperimentRan.send({
-            tenantId: ran.projectId,
-            occurredAt: nowInstant().epochMilliseconds,
-            userId: ran.userId,
-            projectId: ran.projectId,
-            experimentId: ran.experimentId ?? null,
-            fullRun: ran.isFullRun,
-          });
-        },
-      }),
+      workflowEvaluations: runs.workflowEvaluations,
+      workbenchObserver: ExperimentWorkbenchObserverService.create({ logger, senders }),
       lifecycle: { pipeline: buildExperimentLifecyclePipeline(), senders },
-      runProcessing: {
-        pipeline: buildExperimentRunProcessingPipeline({
-          ...runStores,
-          workflowEvaluations,
-          experimentRunPlanFoldStore: ExperimentRunPlanStore.create({ repository: folds }),
-          experimentRunProgressFoldStore: ExperimentRunProgressStore.create({ repository: folds }),
-          executeCell: ExecuteExperimentCellCommand.create({ cells }),
-          runExecution: {
-            executeCell: executeCell(commands),
-            failCell: failLostCell(commands),
-            complete: completeRun({ commands, boardWriteBack }),
-          },
-          runFrames: createExperimentRunFramesSubscriber({ stream }),
-          retention: {
-            resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
-          },
-        }),
-        commands,
-        idLookup: ClickHouseExperimentRunProcessingRepository.create({
-          resolveClient,
-          clickhouseEnabled: true,
-        }).idLookup(),
-        stream,
-        folds,
-        abort,
-        publicBaseUrl,
-        services,
-        ownership: dependencies.suite,
-        concurrency: config.runConcurrency,
-        refusals,
-      },
+      runProcessing: runs.processing,
     });
-  }
-
-  /** The run-state fold caches through Redis where there is one, else reads ClickHouse uncached. */
-  static #runStores({
-    resolveClient,
-    redis,
-    retention,
-  }: {
-    resolveClient: ExperimentEventingClickHouseResolver;
-    redis: ExperimentSetup["members"]["redis"];
-    retention: Pick<DataRetentionApi, "getPlatformDefaultRetentionDays">;
-  }) {
-    const defaultRetentionDays = () => retention.getPlatformDefaultRetentionDays();
-    if (redis) {
-      const cached = RedisExperimentRunProcessingRepository.create({
-        resolveClient,
-        defaultRetentionDays,
-        redis,
-      });
-      return {
-        experimentRunStateFoldStore: cached.stateFoldStore(),
-        experimentRunItemAppendStore: cached.itemStore(),
-      };
-    }
-    const eventing = ClickHouseExperimentRunProcessingRepository.create({
-      resolveClient,
-      clickhouseEnabled: true,
-    });
-    return {
-      experimentRunStateFoldStore: ExperimentRunStateStore.create({
-        repository: eventing.stateRepository({ defaultRetentionDays }),
-      }),
-      experimentRunItemAppendStore: eventing.itemStore({ defaultRetentionDays }),
-    };
   }
 
   /**

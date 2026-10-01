@@ -2,9 +2,9 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type {
   ExperimentEventingClickHouseClient,
+  ExperimentEventingClickHouseResolver,
   ExperimentEventingClickHouseResult,
 } from "../experiment-clickhouse.repository.ts";
-import type { ExperimentEventingClickHouseResolver } from "./clickhouse.experiment-clickhouse.repository.ts";
 
 type ClickHouseRow = Readonly<Record<string, unknown>>;
 

@@ -26,6 +26,11 @@ export type ExperimentEventingClickHouseClient = {
   }): Promise<ExperimentEventingClickHouseResult>;
 };
 
+/** How the application hands the feature a tenant-scoped ClickHouse client. */
+export type ExperimentEventingClickHouseResolver = (
+  tenantId: string,
+) => Promise<ExperimentEventingClickHouseClient>;
+
 /**
  * How the Experiment feature's ClickHouse persistence reaches the
  * tenant-scoped client the application composes. Every read and write
