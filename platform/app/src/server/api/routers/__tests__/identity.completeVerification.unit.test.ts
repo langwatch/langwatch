@@ -126,6 +126,7 @@ vi.mock(
     ssoDomainClaimQueue: () => ({}),
     ssoDomainReproof: () => ({}),
     ssoEngineProviderDerivation: () => undefined,
+    ssoIssuerEndpointOrigins: () => ({}),
     ssoRegisteredIssuers: () => ({}),
     ssoSelfServe: () => ({}),
     // Core identity additions. Stubbed rather than omitted because the annotation

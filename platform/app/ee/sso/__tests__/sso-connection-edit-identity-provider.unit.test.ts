@@ -52,7 +52,7 @@ async function fixtureWith({
     context: {
       deployment: "hosted",
       licensed: true,
-      licenseActivatedSinceStart: false,
+      licenseActivationPending: false,
       optedIn: true,
       singleOrganization: false,
       actorIsPlatformOperator: false,
