@@ -4,7 +4,6 @@
  * `createUiApplication` mounts.
  */
 
-import type { UiBindableVersionedReads } from "@langwatch/browser-host/cache-tiers";
 import type {
   UiCapabilityInstall,
   UiRpc,
@@ -58,10 +57,8 @@ export type UiFeatureInstall = {
   capabilities?: UiCapabilityInstall;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
-  /** The watch that transport's fetch reports session versions to (ADR-164). */
+  /** The watch that transport's fetch reports session versions to (ADR-170). */
   sessionVersions?: SessionVersionWatch;
-  /** The versioned reads that transport was built with; the shell binds its cache to them. */
-  versionedReads?: UiBindableVersionedReads;
   /**
    * The live session this application reads for itself — pass `useBrowserUiSession` to
    * serve the reader, the scope and the permissions from the deployment.

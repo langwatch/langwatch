@@ -123,43 +123,44 @@ Feature: A browser read is refetched when an event its contract names is committ
   # Browser
 
   @unit
-  Scenario: Only the focused tab holds the hint stream
-    Given a tab whose window holds focus
+  Scenario: Only a visible tab holds the hint stream
+    Given a visible tab
     Then it holds one hint stream
-    When the tab loses focus
+    And it still holds it and fetches when its window loses focus
+    When the tab is hidden
     Then its stream is closed and none is open
-    When it regains focus
+    When it is shown again
     Then it holds one hint stream again
 
   @unit
   Scenario: A hint refetches the mounted reads of its procedure and no others
-    Given the focused tab has "organization.getScopeGraph" and "project.getAll" mounted
+    Given a visible tab has "organization.getScopeGraph" and "project.getAll" mounted
     When a hint for "organization.getScopeGraph" arrives
     Then "organization.getScopeGraph" is refetched
     And "project.getAll" is not
 
   @unit
   Scenario: A hint is passed to the other tabs, which mark the read stale without fetching
-    Given the focused tab receives a hint for "organization.getScopeGraph"
+    Given a visible tab receives a hint for "organization.getScopeGraph"
     Then it posts the procedure path on the query sync channel, never data
     And a hidden tab holding that read marks it stale without fetching
 
   @unit
-  Scenario: A connected stream marks every mounted read stale once
-    Given the focused tab has reads mounted
-    When its hint stream opens or reopens
-    Then every mounted read is marked stale and refetched once
+  Scenario: A reopened stream leaves fresh reads alone
+    Given a visible tab has reads mounted and fresh
+    When its hint stream reopens
+    Then nothing is refetched
 
   @unit
   Scenario: A malformed hint is ignored
-    Given the focused tab has "organization.getScopeGraph" mounted
+    Given a visible tab has "organization.getScopeGraph" mounted
     When the stream delivers a hint with no procedure path
     Then nothing is refetched and nothing is posted to the other tabs
 
   @unit
   Scenario: A tab without a broadcast channel still refetches on a hint
     Given a browser that refuses a broadcast channel
-    When the focused tab receives a hint for "organization.getScopeGraph"
+    When a visible tab receives a hint for "organization.getScopeGraph"
     Then "organization.getScopeGraph" is refetched
 
   # Default

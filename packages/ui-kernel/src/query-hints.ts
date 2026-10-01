@@ -1,5 +1,5 @@
 /**
- * The focused tab's one hint stream (record §10, "Server events say when a read is stale"): a hint
+ * A visible tab's one hint stream (record §10, "Server events say when a read is stale"): a hint
  * names a procedure path, whose mounted reads refetch here and go stale in the other tabs.
  * packages/api/specs/read-hints.feature.
  */
@@ -14,11 +14,8 @@ import { z } from "zod";
 const uiQueryHintSchema = z.object({ path: z.string().min(1) });
 export type UiQueryHint = z.infer<typeof uiQueryHintSchema>;
 
-/** Opens the stream; `onOpen` fires on every (re)connect. Answers the close. */
-export type UiQueryHintStream = (handlers: {
-  onOpen: () => void;
-  onHint: (hint: unknown) => void;
-}) => () => void;
+/** Opens the stream and delivers each hint. Answers the close. */
+export type UiQueryHintStream = (handlers: { onHint: (hint: unknown) => void }) => () => void;
 
 /** `presence.onProjectReadHints`, or `presence.onOrganizationReadHints` with no project. */
 export function readHintStreamOver({
@@ -30,8 +27,8 @@ export function readHintStreamOver({
   organizationId: string;
   projectId: string | null;
 }): UiQueryHintStream {
-  return ({ onOpen, onHint }) => {
-    const handlers = { onStarted: onOpen, onData: onHint };
+  return ({ onHint }) => {
+    const handlers = { onData: onHint };
     // Hints are optional (the safety refetch covers staleness), so a runtime
     // with no stream stays quiet.
     try {
@@ -61,7 +58,7 @@ function openChannel(): HintChannel | undefined {
 const underPath = (path: string) => (query: Query) => procedurePathOf(query.queryKey) === path;
 
 /**
- * Starts this tab's half; returns the stop. Every tab listens on the channel, only the focused
+ * Starts this tab's half; returns the stop. Every tab listens on the channel, only a visible
  * one holds the stream.
  */
 export function startUiQueryHints({
@@ -81,9 +78,10 @@ export function startUiQueryHints({
     void queryClient.invalidateQueries({ predicate: underPath(hint.data.path) });
     channel?.postMessage({ path: hint.data.path });
   };
-  const onOpen = () => void queryClient.invalidateQueries({ type: "active" });
+  // A reopened stream revalidates nothing: the one focus pass (query-sync) refetches stale reads.
+  // ARCHITECTURE.md §10.2.
   const follow = (focused: boolean) => {
-    if (focused && !closeStream) closeStream = stream({ onOpen, onHint });
+    if (focused && !closeStream) closeStream = stream({ onHint });
     if (focused || !closeStream) return;
     closeStream();
     closeStream = undefined;

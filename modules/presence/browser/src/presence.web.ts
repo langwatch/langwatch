@@ -1,8 +1,12 @@
 /**
- * What a browser installs when it installs presence: no screen of its own —
- * the trace explorer mounts its stores, markers and avatar stack inline.
+ * What a browser installs when it installs presence: no screen of its own. It
+ * declares the `presence:` slices at install; the trace explorer reads and feeds them.
  */
 
 import { defineWebModule } from "@langwatch/ui-kernel";
+
+import "./behavior/presence-preferences-store.ts";
+import "./behavior/presence-store.ts";
+import "./behavior/section-tracker-store.ts";
 
 export const presenceWeb = defineWebModule("presence");

@@ -72,7 +72,7 @@ The tRPC-wired composition stays in the application under
 `platform/app/src/features/presence/**`: `useCursorBroadcast`,
 `usePeerCursors`, `usePresence`, `usePresenceFeatureEnabled` (reads
 `useOrganizationTeamProject`), `useTracesV2Presence` (reads traces-v2's
-`drawerStore`), and the `PeerCursorOverlay` component that composes them.
+drawer, whose state lives in the address), and the `PeerCursorOverlay` component that composes them.
 Moving those hooks would make the package depend on the app's tRPC client and
 cross-feature stores.
 

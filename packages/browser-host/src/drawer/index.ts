@@ -7,6 +7,7 @@
 export {
   absoluteDrawerAddress,
   drawerRouterRef,
+  readDrawerLocation,
   readFlatQuery,
   useDrawerRouter,
   type DrawerRouter,
@@ -18,7 +19,6 @@ export {
 } from "./behavior/drawer-preloader.ts";
 export {
   clearDrawerOpenRewrite,
-  clearDrawerStack,
   clearFlowCallbacks,
   getAllFlowCallbacks,
   getComplexProps,
@@ -36,7 +36,13 @@ export {
   useUpdateDrawerParams,
   type DrawerOpenRewrite,
   type DrawerType,
+  updateDrawerParams,
 } from "./behavior/use-drawer.ts";
+export {
+  readDrawerAncestors,
+  readDrawerStack,
+  type DrawerStackEntry,
+} from "./model/drawer-stack.ts";
 export {
   lazyDrawer,
   preloadDrawer,

@@ -1,4 +1,3 @@
-import { uiBatchResponse } from "@langwatch/browser-host/testing";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createUiFeatureApiClient } from "../transport.ts";
@@ -8,8 +7,10 @@ const SECRET_INPUT = {
   signingSecret: "whsec_signing_secret",
 };
 
+/** One request per call: the answer is the procedure's plain JSON body. */
 function answering(body: unknown): typeof globalThis.fetch {
-  return (async () => uiBatchResponse({ results: [body] })) as typeof globalThis.fetch;
+  return async () =>
+    new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
 }
 
 function logged(spies: {

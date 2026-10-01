@@ -18,6 +18,7 @@ export const BROWSER_ERROR_MAX_PER_WINDOW = 20;
 export type BrowserErrorSource = "console" | "window" | "unhandledrejection";
 
 const URL_PATTERN = /(https?:\/\/[^\s?#"'<>)]+|\/[^\s?#"'<>)]+)[?#][^\s"'<>)]*/g;
+const SHARE_PATH_PATTERN = /\/share\/[^/\s?#"'<>)]+/g;
 const USERINFO_PATTERN = /(\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@"'<>]+@/gi;
 const EMAIL_PATTERN = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
 const BEARER_PATTERN = /\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+/gi;
@@ -25,13 +26,24 @@ const JWT_PATTERN = /\beyJ[\w-]*\.[\w-]+\.[\w-]*/g;
 const PREFIXED_TOKEN_PATTERN = /\b(?:sk|pat)[-_][\w-]{4,}/gi;
 const SECRET_PAIR_PATTERN =
   /(["']?[\w-]*(?:token|secret|password|passwd|authorization|auth|key|cookie)[\w-]*["']?)\s*[=:]\s*("[^"]*"|'[^']*'|\S+)/gi;
-const LONG_RUN_PATTERN = /[A-Za-z0-9_+-]{24,}={0,2}/g;
+const LONG_RUN_PATTERN = /[A-Za-z0-9_+/-]{20,}={0,2}/g;
 const FRAME_PATTERN = /([^\s()@]+?)(?:\?[^\s:]*)?:(\d+)(?::\d+)?\)?\s*$/;
+/** A V8 `at ...` frame or a Firefox/Safari `fn@url` frame; `Name: message` lines are neither. */
+const FRAME_LINE_PATTERN = /^\s*at\s|^[^\s@]*@/;
+
+/** Drops the query string and fragment from every URL in a value. */
+export function stripUrlQueries({ value }: { value: string }): string {
+  return value.replace(URL_PATTERN, "$1");
+}
+
+/** A share link's path segment is its access; every value names the route `/share/:id` instead. */
+export function redactSharePaths({ value }: { value: string }): string {
+  return value.replace(SHARE_PATH_PATTERN, "/share/:id");
+}
 
 /** Redacts anything credential- or person-shaped, drops query strings, and caps the length. */
 export function sanitiseErrorMessage({ message }: { message: string }): string {
-  return message
-    .replace(URL_PATTERN, "$1")
+  return redactSharePaths({ value: stripUrlQueries({ value: message }) })
     .replace(USERINFO_PATTERN, "$1")
     .replace(EMAIL_PATTERN, "[email]")
     .replace(BEARER_PATTERN, "$1 [redacted]")
@@ -47,6 +59,7 @@ export function sanitiseStack({ stack }: { stack: string | undefined }): string 
   if (!stack) return "";
   return stack
     .split("\n")
+    .filter((line) => FRAME_LINE_PATTERN.test(line))
     .map((line) => FRAME_PATTERN.exec(line)?.slice(1, 3))
     .filter((match): match is [string, string] => match?.length === 2)
     .slice(0, BROWSER_ERROR_MAX_FRAMES)

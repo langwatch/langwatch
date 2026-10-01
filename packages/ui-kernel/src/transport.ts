@@ -1,31 +1,13 @@
 /**
- * One tRPC client per application: HTTP split by `skipBatch`, subscriptions
- * same-origin SSE, batches streamed (JSON lines) so each answer lands as it
- * resolves. See ADR-128, subscription-wire appendix.
+ * One tRPC client per application: one request per call over `httpLink`
+ * (no batching), subscriptions over same-origin SSE. See ADR-128,
+ * subscription-wire appendix.
  */
 
-import {
-  type ModuleApiClient,
-  type ModuleApiMap,
-  type RouterFromMap,
-  trpcQueryKey,
-} from "@langwatch/api/web";
-import type {
-  CacheDeclaringContract,
-  UiQueryVersions,
-  UiVersionedReads,
-} from "@langwatch/browser-host/cache-tiers";
-import { hashKey, type QueryClient } from "@tanstack/react-query";
-import {
-  createTRPCClient,
-  getUntypedClient,
-  httpLink,
-  loggerLink,
-  splitLink,
-  type TRPCLink,
-} from "@trpc/client";
-import type { AnyRouter } from "@trpc/server";
-import { observable } from "@trpc/server/observable";
+import type { ModuleApiClient, ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
+import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import type { QueryClient } from "@tanstack/react-query";
+import { createTRPCClient, getUntypedClient, httpLink, loggerLink, splitLink } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
 
 import { type SseEventSourceConstructor, sseSubscriptionLink } from "./sse-subscription-link";
@@ -61,8 +43,6 @@ export type UiFeatureApiClientOptions = {
   subscriptionUrl?: string;
   /** The EventSource to open live channels with. Defaults to the browser's. */
   eventSource?: SseEventSourceConstructor;
-  /** Reads that send `since`; none today, event-sourced reads will answer by projection cursor. */
-  versionedReads?: UiVersionedReads;
   /** The deployment's `isDevelopment`: logs operation and timing, never what a request carried. */
   isDevelopment?: boolean;
 };
@@ -75,7 +55,6 @@ function uiFeatureApiLinks({
   fetch,
   subscriptionUrl = subscriptionOrigin(),
   eventSource,
-  versionedReads,
   isDevelopment = false,
 }: UiFeatureApiClientOptions) {
   // One request per call: the server does not batch (Alex, 2026-10-01).
@@ -96,7 +75,6 @@ function uiFeatureApiLinks({
 
   return [
     loggerLink({ enabled: () => isDevelopment, logger: logTrpcOperation }),
-    ...(versionedReads ? [versionedReadLink<AnyRouter>(versionedReads)] : []),
     splitLink({
       condition: (operation) => operation.type === "subscription",
       // Reconnect attempts and backoff are the link's own defaults, which
@@ -113,88 +91,7 @@ function uiFeatureApiLinks({
   ];
 }
 
-const isUnchangedAnswer = (value: unknown): boolean =>
-  typeof value === "object" && value !== null && "unchanged" in value && value.unchanged === true;
-
-function versionedAnswerOf(value: unknown): { version: string; data: unknown } | undefined {
-  if (typeof value !== "object" || value === null) return;
-  if (!("version" in value) || typeof value.version !== "string" || !("data" in value)) return;
-  return { version: value.version, data: value.data };
-}
-
-/** The input with the version the caller holds joined to it; unchanged when it holds none. */
-function inputWithSince({ input, since }: { input: unknown; since: string | undefined }): unknown {
-  if (since === undefined) return input;
-  return { ...(typeof input === "object" && input !== null ? input : {}), since };
-}
-
-/** The data a versioned answer stands for, or undefined when the answer is not one. */
-function dataOfVersionedAnswer({
-  answer,
-  versions,
-  hash,
-  cached,
-}: {
-  answer: unknown;
-  versions: UiQueryVersions;
-  hash: string;
-  cached: () => unknown;
-}): { data: unknown } | undefined {
-  if (isUnchangedAnswer(answer)) return { data: cached() };
-  const versioned = versionedAnswerOf(answer);
-  if (!versioned) return;
-  versions.set(hash, versioned.version);
-  return { data: versioned.data };
-}
-
-/**
- * A versioned read is sent with the version its cached data holds and, answered `unchanged`,
- * resolves to that cached data. Kept for cursor-backed reads; none opts in yet (ARCHITECTURE.md).
- */
-function versionedReadLink<TRouter extends AnyRouter>({
-  paths,
-  versions,
-  queryClient,
-}: UiVersionedReads): TRPCLink<TRouter> {
-  return () =>
-    ({ op, next }) => {
-      if (op.type !== "query" || !paths.has(op.path)) return next(op);
-      const key = trpcQueryKey(op.path, { input: op.input, type: "query" });
-      const hash = hashKey(key);
-      const held = queryClient()?.getQueryData(key);
-      const since = held === undefined ? undefined : versions.get(hash);
-      const input = inputWithSince({ input: op.input, since });
-      const cached = () => queryClient()?.getQueryData(key) ?? held;
-
-      return observable((observer) =>
-        next({ ...op, input }).subscribe({
-          next: (envelope) =>
-            observer.next(resolveVersionedEnvelope({ envelope, versions, hash, cached })),
-          error: (error) => observer.error(error),
-          complete: () => observer.complete(),
-        }),
-      );
-    };
-}
-
-function resolveVersionedEnvelope<TEnvelope extends { result: object }>({
-  envelope,
-  versions,
-  hash,
-  cached,
-}: {
-  envelope: TEnvelope;
-  versions: UiQueryVersions;
-  hash: string;
-  cached: () => unknown;
-}): TEnvelope {
-  const { result } = envelope;
-  const answer = "data" in result ? result.data : undefined;
-  const resolved = dataOfVersionedAnswer({ answer, versions, hash, cached });
-  return resolved ? { ...envelope, result: { data: resolved.data } } : envelope;
-}
-
-/** Builds the transport once per app; `op.context.skipBatch` opts a query out of batching. */
+/** Builds the transport once per app;  */
 export function createUiFeatureApiClient(
   options: UiFeatureApiClientOptions = {},
 ): UiFeatureApiTransport {

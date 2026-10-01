@@ -5,8 +5,8 @@ import { describe, expect, it } from "vitest";
 import { createUiFeatureApiClient } from "../transport.ts";
 
 /**
- * The batch lane against tRPC's own fetch handler, the one `/api/trpc` runs:
- * a batch streams, so a fast answer is not held behind a slow one.
+ * One request per call against tRPC's own fetch handler, the one `/api/trpc`
+ * runs: a fast answer is never held behind a slow one.
  */
 
 const ENDPOINT = "http://ui.test/api/trpc";
@@ -38,9 +38,9 @@ function serverOver({ slowAnswer }: { slowAnswer: Promise<string> }) {
   return { client: createUiFeatureApiClient({ url: ENDPOINT, fetch }), requests };
 }
 
-describe("given one batch holding a fast read and a slow one", () => {
-  describe("when both are asked in the same tick", () => {
-    it("answers the fast one while the slow one is still running, on one request", async () => {
+describe("given a fast read and a slow one asked in the same tick", () => {
+  describe("when both are asked together", () => {
+    it("answers the fast one while the slow one is still running, each on its own request", async () => {
       let release: (value: string) => void = () => undefined;
       const slowAnswer = new Promise<string>((resolve) => {
         release = resolve;
@@ -58,13 +58,13 @@ describe("given one batch holding a fast read and a slow one", () => {
       expect(slowSettled).toBe(false);
       release("done");
       expect(await slow).toBe("done");
-      expect(requests).toHaveLength(1);
-      expect(requests[0]).toContain("batch=1");
+      expect(requests).toHaveLength(2);
+      expect(requests.some((request) => request.includes("batch="))).toBe(false);
     });
   });
 });
 
-describe("given a batch where one read is refused", () => {
+describe("given two reads where one is refused", () => {
   it("fails that read with its own status and still answers the other", async () => {
     const { client } = serverOver({ slowAnswer: Promise.resolve("done") });
 

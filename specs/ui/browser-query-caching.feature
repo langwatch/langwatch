@@ -1,9 +1,9 @@
-Feature: The browser caches a read in memory, and on disk only when its contract says so
+Feature: The browser caches a read in memory and mirrors it to disk by default
   The server never answers `unchanged`: it always sends the full answer. A read is trusted for
-  five minutes, refetched sooner by a read hint (packages/api/specs/read-hints.feature). A read
-  whose contract declares `persist` is also mirrored to a sealed IndexedDB store so a reload
-  paints at once. Event-sourced reads will later answer by projection cursor (not built yet).
-  ADR: dev/docs/adr/164-browser-query-cache-tiers.md
+  five minutes, refetched sooner by a read hint (packages/api/specs/read-hints.feature). Every
+  declared read but a named exclusion is also mirrored to a sealed IndexedDB store, under its
+  schema hash, so a reload paints at once. Event-sourced reads will later answer by projection
+  cursor (not built yet). ARCHITECTURE.md §10.2; ADR: dev/docs/adr/170-browser-query-cache-tiers.md
 
   Background:
     Given a browser application whose query client applies the declared cache policies
@@ -21,17 +21,30 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     Then nothing is invalidated
 
   @integration
+  Scenario: A session-version bump refetches only active reads, spread over a jitter window
+    Given 3 mounted and 5 unmounted reads
+    When a newer session version arrives, and another inside the delay
+    Then all 8 are marked stale and none fetches immediately
+    And only the 3 mounted refetch, once each, after one random delay of up to 2 seconds
+
+  @integration
   Scenario: A reload paints a persisted read from disk, then revalidates it
-    Given "organization.getAll" is declared persist and was cached before a reload
-    When the document reloads for the same user and build
+    Given "organization.getAll" is declared and was cached before a reload
+    When the document reloads for the same user and the same schema hash
     Then the organization graph is drawn from disk
     And it is marked stale so it is fetched again behind the painted copy
 
   @integration
-  Scenario: A read not marked persist never reaches the disk
-    Given an undeclared read and a persisted read are both cached
+  Scenario: Every declared read is mirrored by default
+    Given two declared reads that no contract marks
+    When both are cached
+    Then both are in the store
+
+  @integration
+  Scenario: An excluded read never reaches the disk
+    Given a read on the mirror's exclusion list and a declared read are both cached
     When the cache is saved
-    Then only the persisted read is in the store
+    Then only the declared read is in the store
 
   @integration
   Scenario: A user switch never shows another user's cache
@@ -39,13 +52,6 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     When a different user signs in on the same device
     Then the previous user's cache is not restored
     And it is removed from the store
-
-  @integration
-  Scenario: A build change discards the store
-    Given a persisted cache written by one build
-    When a different build restores it
-    Then nothing is restored
-    And the other build's entries are removed
 
   @unimplemented
   Scenario: Each persisted read is its own object
@@ -66,12 +72,6 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     When a persisted read is cached
     Then reading it back during this document works
     And nothing is written to disk
-
-  @integration
-  Scenario: A restored version is sent as since
-    Given a read sent with a held version was persisted with version "v1"
-    When the document reloads and the read is revalidated
-    Then the request carries since "v1"
 
   @integration
   Scenario: Logout wipes the store
@@ -124,7 +124,7 @@ Feature: The browser caches a read in memory, and on disk only when its contract
 
   @integration
   Scenario: The session read is never mirrored
-    Given the session read answers and is cached, even with its path marked persist
+    Given the session read answers and is cached, even with its path in the plan
     When the cache is saved
     Then no row for the session read is in the store
 
@@ -203,9 +203,43 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     Then the answer carries the "x-lw-session-version" header with the caller's session version
 
   @unit
+  Scenario: Every tRPC query answer carries its schema hash
+    Given a query declared on a contract
+    When the procedure answers
+    Then the answer carries the "x-lw-schema" header with the hash the contract gives that read
+    And a mutation's answer carries none
+
+  @unit
+  Scenario: A read's schema hash follows its shape and its revision
+    Given a read with an input schema, an output schema and an optional revision
+    Then the same schemas give the same hash whatever the field order
+    And a changed field gives another hash
+    And a bumped revision gives another hash
+
+  @unit
+  Scenario: A batched tRPC request is refused
+    Given a request naming more than one procedure or carrying "batch"
+    When it reaches the tRPC door
+    Then it is answered 400 with the canonical error code "batching_not_supported"
+
+  @integration
+  Scenario: A read whose schema changed is not painted from the persisted cache
+    Given a persisted row stored with the schema hash of its read
+    When the contract the browser was built with hashes that read differently
+    Then the row is dropped without painting and the read is fetched
+    And rows whose read hashes the same still restore
+
+  @integration
+  Scenario: An answer under a newer schema drops the row and is not stored
+    Given a tab whose bundle is older than the server
+    When a read's answer carries an "x-lw-schema" header other than the hash the bundle holds for it
+    Then that read's persisted row is removed
+    And the answer is not stored under the bundle's old hash
+
+  @unit
   Scenario: A membership or role binding change bumps the version
     Given a caller whose session version is 7
-    When a grant to them or their group is attached, revoked or changes role, or a role in their organization changes
+    When a grant to them or their group is attached, revoked or changes role, or a role they hold changes
     Then the caller's next answer carries a newer session version
     And a grant to an API key or a share link bumps no one
 
@@ -216,28 +250,8 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     Then the caller's next answer carries a newer session version
 
   @unit
-  Scenario: A versioned read sends the version it holds
-    Given a read sent with a held version is cached under version "v1"
-    When the read is asked again
-    Then the request carries since "v1"
-    And no since is sent when nothing is cached
-
-  @unit
-  Scenario: An unchanged answer keeps the cached data
-    Given a read sent with a held version is cached under version "v1"
-    When the server answers unchanged
-    Then the caller receives the cached data
-
-  @unit
-  Scenario: A new version replaces the data
-    Given a read sent with a held version is cached under version "v1"
-    When the server answers version "v2" with new data
-    Then the caller receives the new data
-    And version "v2" is remembered for the next request
-
-  @unit
-  Scenario: A fetch in the focused tab announces its version, never its data
-    Given this tab is focused and holds a persisted read
+  Scenario: A fetch in a visible tab announces its version, never its data
+    Given this tab is visible and holds a persisted read
     When a fetch for that read lands
     Then the tab broadcasts the read's key and version only
 
@@ -275,12 +289,26 @@ Feature: The browser caches a read in memory, and on disk only when its contract
   Scenario: Gaining focus fetches only a read still behind
     Given a read was marked stale and the stored copy is not newer
     When the tab gains focus
-    Then the read is fetched once, with its version as since
+    Then the read is fetched once
 
   @unimplemented
-  Scenario: A hidden or unfocused tab makes no calls
-    Given a tab that is hidden or whose window is blurred
-    Then it is not focused for polling or revalidation
+  Scenario: A hidden tab makes no calls and catches up when shown
+    Given a tab that is hidden
+    Then it makes no calls for polling or revalidation
+    When it is shown again
+    Then its stale mounted reads are revalidated, whether or not its window holds focus
+
+  @unit
+  Scenario: A tab shown again catches up the stale reads it holds
+    Given a mounted read was marked stale while its tab was hidden
+    When the tab becomes visible again
+    Then the read is refetched once, in one pass
+
+  @unit
+  Scenario: A tab shown again leaves a fetch in flight to finish
+    Given a stale mounted read is already being fetched
+    When the tab becomes visible again
+    Then that fetch is not aborted and not started a second time
 
   @unit
   Scenario: A forbidden read refetches the session once
@@ -288,3 +316,17 @@ Feature: The browser caches a read in memory, and on disk only when its contract
     When many reads fail with 403 at once
     Then the session read is refetched once and nothing else is invalidated
     But a 403 on the session read itself, or any other failure status, refetches nothing
+
+  @integration
+  Scenario: A forbidden read removes its persisted row
+    Given a read mirrored to disk for the current session
+    When it is refetched and answers HTTP 403
+    Then its row is removed from the disk mirror
+    And the session read is still refetched only once
+
+  @integration
+  Scenario: A session change starts a fresh cache
+    Given reads cached for one signed-in user
+    When the signed-in user or the session changes
+    Then every read except the session read is cancelled and removed
+    And no row sealed for the previous session is restored

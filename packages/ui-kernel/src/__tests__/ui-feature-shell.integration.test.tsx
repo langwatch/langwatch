@@ -1,4 +1,5 @@
 import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import type { UiQueryStore } from "@langwatch/browser-host/query-persistence";
 import { SessionVersionWatch } from "@langwatch/browser-host/session-version";
 import {
@@ -6,15 +7,19 @@ import {
   useOrganizationTeamProject,
 } from "@langwatch/browser-host/use-organization-team-project";
 import {
+  focusManager,
   QueryClient,
   QueryClientProvider,
   useMutation,
+  useQueries,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { act, render, waitFor } from "@testing-library/react";
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import {
   createUiFeatureApiClient,
@@ -310,20 +315,23 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     });
   });
 
-  describe("when an installed read declares persist", () => {
+  describe("when an installed contract declares reads", () => {
     const orgGraph = [["organization", "getAll"], { input: {}, type: "query" }];
     const member = [["organization", "getMemberById"], { input: { id: "u" }, type: "query" }];
+    const organizationTrpc = defineTrpcContract("organization")
+      .query("getAll")
+      .withInput(z.object({}))
+      .withOutput(z.array(z.string()))
+      .query("getMemberById")
+      .withInput(z.object({ id: z.string() }))
+      .withOutput(z.object({ id: z.string() }))
+      .build();
 
     function tieredBinding(): UiFeatureApiBinding {
       return {
         name: "organization",
         Provider: ({ children }: { children: ReactNode }) => <>{children}</>,
-        contracts: [
-          {
-            namespace: "organization",
-            members: { getAll: { cache: { persist: true } }, getMemberById: {} },
-          },
-        ],
+        contracts: [organizationTrpc],
       };
     }
 
@@ -360,11 +368,64 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         await waitFor(() => expect(host.getQueryState(orgGraph)?.isInvalidated).toBe(true));
         await waitFor(() => expect(host.getQueryState(member)?.isInvalidated).toBe(true));
       });
+
+      /** @scenario "A session-version bump refetches only active reads, spread over a jitter window" */
+      it("marks all stale at once and refetches only the mounted ones, once, within 2 s", async () => {
+        const host = new QueryClient({
+          defaultOptions: { queries: { refetchOnWindowFocus: false, retry: false } },
+        });
+        const fetches = new Map<string, number>();
+        const read = (name: string) => ({
+          queryKey: ["read", name],
+          queryFn: () => {
+            fetches.set(name, (fetches.get(name) ?? 0) + 1);
+            return Promise.resolve(name);
+          },
+        });
+        const mounted = ["a", "b", "c"];
+        const unmounted = ["d", "e", "f", "g", "h"];
+        for (const name of unmounted) await host.prefetchQuery(read(name));
+        function Page() {
+          useQueries({ queries: mounted.map(read) });
+          return <div />;
+        }
+        const sessionVersions = SessionVersionWatch.create();
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          sessionVersions,
+        });
+        renderShell(shell, <Page />, host);
+        await waitFor(() => expect(mounted.map((name) => fetches.get(name))).toEqual([1, 1, 1]));
+        vi.useFakeTimers();
+        const jitter = vi.spyOn(Math, "random").mockReturnValue(0.5);
+        try {
+          sessionVersions.observe("7");
+          sessionVersions.observe("8");
+          await vi.advanceTimersByTimeAsync(999);
+
+          for (const name of [...mounted, ...unmounted]) {
+            expect(host.getQueryState(["read", name])?.isInvalidated).toBe(true);
+          }
+          expect([...fetches.values()].every((count) => count === 1)).toBe(true);
+
+          sessionVersions.observe("9");
+          await vi.advanceTimersByTimeAsync(1_001);
+
+          expect(mounted.map((name) => fetches.get(name))).toEqual([2, 2, 2]);
+          expect(unmounted.map((name) => fetches.get(name))).toEqual([1, 1, 1, 1, 1]);
+        } finally {
+          jitter.mockRestore();
+          vi.useRealTimers();
+        }
+      });
     });
 
     describe("given a signed-in user and another user's cache on this device", () => {
       /** @scenario "A user switch never shows another user's cache" */
-      it("saves only the marked read, sealed under this user's entry, and removes the other", async () => {
+      it("saves every declared read, sealed under this user's entry, and removes the other", async () => {
         const store = memoryStore();
         store.entries.set("lw-query:user_0:other", {});
         const host = new QueryClient();
@@ -386,9 +447,9 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         host.setQueryData(orgGraph, ["org"]);
         host.setQueryData(member, { id: "u" });
 
-        await waitFor(() => expect(store.entries.size).toBe(1), { timeout: 3_000 });
-        const [key] = [...store.entries.keys()];
-        expect(key?.startsWith("lw-query:user_1:")).toBe(true);
+        await waitFor(() => expect(store.entries.size).toBe(2), { timeout: 3_000 });
+        const keys = [...store.entries.keys()];
+        expect(keys.every((key) => key.startsWith("lw-query:user_1:"))).toBe(true);
         expect(JSON.stringify([...store.entries.values()])).not.toContain("getAll");
         expect(JSON.stringify([...store.entries.values()])).not.toContain("getMemberById");
       });
@@ -456,3 +517,42 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     });
   });
 });
+
+describe("given a signed-in user and no installed contract declares a read", () => {
+  describe("when the tab regains focus", () => {
+    it("still refetches a stale mounted read, since query-sync owns the focus pass", async () => {
+      let fetches = 0;
+      const host = new QueryClient({
+        defaultOptions: { queries: { refetchOnWindowFocus: false, retry: false } },
+      });
+      const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
+        apis: [],
+        capabilities: {},
+        transport: createUiFeatureApiClient(),
+        session: () => ({ session: new StubSession(), scope: new StubScope() }),
+      });
+
+      function Page() {
+        useQuery({
+          queryKey: ["plain", "read"],
+          queryFn: () => {
+            fetches += 1;
+            return Promise.resolve(fetches);
+          },
+        });
+        return <div />;
+      }
+
+      renderShell(shell, <Page />, host);
+      await waitFor(() => expect(fetches).toBe(1));
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+
+      await waitFor(() => expect(fetches).toBe(2));
+    });
+  });
+});
+

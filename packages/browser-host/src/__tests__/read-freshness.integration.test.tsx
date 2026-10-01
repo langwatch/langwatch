@@ -10,18 +10,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 
-import { cachePlanFor } from "../cache-tiers.ts";
+import type { UiCachePlan } from "../cache-tiers.ts";
 import { persistUiQueries, sealedUiQueryStore, type UiQueryStore } from "../query-persistence.ts";
 import { useReadFreshness } from "../read-freshness.ts";
 
-const plan = cachePlanFor({
-  contracts: [
-    {
-      namespace: "organization",
-      members: { getAll: { cache: { persist: true } } },
-    },
-  ],
-});
+const plan: UiCachePlan = {
+  persisted: new Set(["organization.getAll"]),
+  schemaHashFor: (path) => (path === "organization.getAll" ? "schema-1" : undefined),
+};
 const orgGraph = trpcQueryKey("organization.getAll", { input: {}, type: "query" });
 const sessionRead = ["test", "session"];
 const KEY = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
@@ -45,7 +41,6 @@ async function restoredDocument(): Promise<QueryClient> {
       queryClient,
       plan,
       userId: "alice",
-      buildId: "b1",
       store: sealedUiQueryStore({ store: disk, cacheKey: KEY, previousCacheKey: void 0 }),
       sessionQueryKey: sessionRead,
     });

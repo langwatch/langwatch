@@ -11,6 +11,8 @@ type PersonalAccessTokenBannerProps = {
   token: string | null;
   isCreating: boolean;
   onCreate: () => void;
+  /** What this token can do, and only that, shown under the action. */
+  scopeNote?: string;
 };
 
 /**
@@ -21,6 +23,7 @@ export function PersonalAccessTokenBanner({
   token,
   isCreating,
   onCreate,
+  scopeNote,
 }: PersonalAccessTokenBannerProps) {
   return (
     <Box
@@ -67,6 +70,11 @@ export function PersonalAccessTokenBanner({
           {token ? "Create another" : "Create a personal access token"}
         </Button>
       </HStack>
+      {scopeNote ? (
+        <Text fontSize="xs" color="fg.muted" marginTop={2}>
+          {scopeNote}
+        </Text>
+      ) : null}
     </Box>
   );
 }

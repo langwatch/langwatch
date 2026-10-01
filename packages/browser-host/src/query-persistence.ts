@@ -1,7 +1,7 @@
 /**
- * Mirrors `persist: true` reads to IndexedDB, one AES-GCM sealed object per query under the
- * session's key, keyed by user and query hash, discarded by build. ADR-164;
- * specs/ui/browser-query-caching.feature.
+ * Mirrors every read the cache plan keeps to IndexedDB, one AES-GCM sealed object per query under
+ * the session's key, keyed by user and query hash, dropped when its read's schema hash moves.
+ * ARCHITECTURE.md §10.2; specs/ui/browser-query-caching.feature.
  */
 
 import { nowInstant } from "@langwatch/time";
@@ -14,24 +14,19 @@ import {
 } from "@tanstack/react-query";
 import { del, get, keys, set } from "idb-keyval";
 
-import {
-  PERSISTED_QUERY_MAX_AGE,
-  procedurePathOf,
-  type UiCachePlan,
-  type UiQueryVersions,
-} from "./cache-tiers.ts";
+import { procedurePathOf, type UiCachePlan, type UiQueryVersions } from "./cache-tiers.ts";
 import { isForbiddenAnswer } from "./session-version.ts";
 
 const STORE_KEY_PREFIX = "lw-query:";
 const LEGACY_STORE_KEY_PREFIX = "lw-query-cache:";
 
-/** One mirrored read: the data, the version it was answered under (if versioned) and its build. */
+/** One mirrored read: the data, the version it was answered under (if any) and its schema hash. */
 export type UiStoredQuery = {
   queryKey: QueryKey;
   data: unknown;
   version?: string;
   updatedAt: number;
-  buildId: string;
+  schemaHash: string;
 };
 
 /** Where mirrored reads live: IndexedDB in the browser, a map in a test; `Row` is what it holds. */
@@ -51,7 +46,7 @@ export function isStoredQuery(value: unknown): value is UiStoredQuery {
   if (!("data" in value) || !("updatedAt" in value) || typeof value.updatedAt !== "number") {
     return false;
   }
-  if (!("buildId" in value) || typeof value.buildId !== "string") return false;
+  if (!("schemaHash" in value) || typeof value.schemaHash !== "string") return false;
   return !("version" in value) || value.version === undefined || typeof value.version === "string";
 }
 
@@ -92,16 +87,6 @@ export const indexedDbQueryStore: UiQueryStore<unknown> = {
       mem: () => [...memory.keys()],
     }),
 };
-
-/**
- * This build's identity: the entry script's address, whose content hash moves
- * whenever anything it imports changes. A dev server's entry never moves;
- * the revalidation after every restore covers it.
- */
-export function currentUiBuildId(): string {
-  if (typeof document === "undefined") return "unknown";
-  return document.querySelector('script[type="module"][src]')?.getAttribute("src") ?? "unknown";
-}
 
 /** Removes every mirrored read but the named user's; with none named, removes them all. */
 export async function clearPersistedUiQueries({
@@ -418,51 +403,40 @@ export function isRestoredFromDisk({
 }
 
 /**
- * One mirrored read, or nothing: an unreadable entry, another build's and an
- * expired one are removed rather than trusted.
+ * One mirrored read, or nothing: an unreadable entry, and one stored under a schema hash the
+ * plan no longer gives its read, are removed rather than trusted. No build id or age decides it.
  */
 export async function readStoredQuery({
   store,
   key,
-  buildId,
+  plan,
 }: {
   store: UiQueryStore;
   key: string;
-  buildId: string;
+  plan: UiCachePlan;
 }): Promise<UiStoredQuery | undefined> {
   const value = await store.get(key).catch(() => void 0);
   if (value === undefined) return;
   const usable =
     isStoredQuery(value) &&
-    value.buildId === buildId &&
-    nowInstant().epochMilliseconds - value.updatedAt <= PERSISTED_QUERY_MAX_AGE;
+    value.schemaHash === plan.schemaHashFor(procedurePathOf(value.queryKey) ?? "");
   if (usable) return value;
   await store.delete(key).catch(() => void 0);
 }
 
-/** Puts one mirrored read in the cache, or removes it when its read is no longer persisted. */
-async function restoreStoredQuery({
+/** Puts one mirrored read in the cache unless a newer copy is already held. */
+function restoreStoredQuery({
   entry,
   queryClient,
-  plan,
-  userId,
-  store,
   versions,
   restoredAt,
 }: {
   entry: UiStoredQuery;
   queryClient: QueryClient;
-  plan: UiCachePlan;
-  userId: string;
-  store: UiQueryStore;
   versions: UiQueryVersions;
   restoredAt: Map<string, number>;
-}): Promise<void> {
+}): void {
   const hash = hashKey(entry.queryKey);
-  if (!plan.persisted.has(procedurePathOf(entry.queryKey) ?? "")) {
-    await store.delete(storedQueryKey({ userId, queryHash: hash })).catch(() => void 0);
-    return;
-  }
   const held = queryClient.getQueryCache().get(hash)?.state.dataUpdatedAt ?? 0;
   if (held >= entry.updatedAt) return;
   restoredAt.set(hash, entry.updatedAt);
@@ -470,23 +444,29 @@ async function restoreStoredQuery({
   if (entry.version !== undefined) versions.set(hash, entry.version);
 }
 
-/** Mirrors a landed fetch of a persisted read and touches a read one; a restored copy stays put. */
+/**
+ * Mirrors a landed fetch of a persisted read and touches a read one; a restored copy stays put.
+ * An answer the server stamped with another schema hash than this bundle's (an older tab) drops
+ * the row instead of storing new data under the old hash.
+ */
 function mirrorQuery({
   event,
   isPersisted,
+  plan,
+  servedSchemaHashFor,
   restoredAt,
   versions,
   store,
   userId,
-  buildId,
 }: {
   event: QueryCacheNotifyEvent;
   isPersisted: (query: Query) => boolean;
+  plan: UiCachePlan;
+  servedSchemaHashFor: (path: string) => string | undefined;
   restoredAt: Map<string, number>;
   versions: UiQueryVersions;
   store: UiSealedQueryStore;
   userId: string;
-  buildId: string;
 }): void {
   const { query } = event;
   if (!isPersisted(query)) return;
@@ -502,6 +482,14 @@ function mirrorQuery({
   }
   if (event.type !== "updated" || event.action.type !== "success") return;
   if (restoredAt.get(query.queryHash) === query.state.dataUpdatedAt) return;
+  const path = procedurePathOf(query.queryKey) ?? "";
+  const schemaHash = plan.schemaHashFor(path);
+  if (schemaHash === undefined) return;
+  const served = servedSchemaHashFor(path);
+  if (served !== undefined && served !== schemaHash) {
+    void store.delete(storedQueryKey({ userId, queryHash: query.queryHash })).catch(() => void 0);
+    return;
+  }
   const version = versions.get(query.queryHash);
   void store
     .put(storedQueryKey({ userId, queryHash: query.queryHash }), {
@@ -509,7 +497,7 @@ function mirrorQuery({
       data: query.state.data,
       ...(version === undefined ? {} : { version }),
       updatedAt: query.state.dataUpdatedAt,
-      buildId,
+      schemaHash,
     })
     .catch(() => void 0);
 }
@@ -517,26 +505,27 @@ function mirrorQuery({
 /**
  * Restores this user's mirrored reads, then keeps mirroring them. Another user's are removed
  * first, and the session read never mirrors. Returns the unsubscribe and the restore, which settles
- * once the restored reads were revalidated. `versions` is shared with the transport (`since`).
+ * once the restored reads were revalidated. `versions` is shared with the tab sync.
  */
 export function persistUiQueries({
   queryClient,
   plan,
   userId,
-  buildId,
   store,
   sessionQueryKey,
   versions = new Map<string, string>(),
+  servedSchemaHashFor = () => void 0,
 }: {
   queryClient: QueryClient;
   plan: UiCachePlan;
   userId: string;
-  buildId: string;
   /** A sealed store (`sealedUiQueryStore`); the raw disk is never written directly. */
   store: UiSealedQueryStore;
   /** The session read, which carries the key, and so is never written, whatever the plan says. */
   sessionQueryKey: QueryKey;
   versions?: UiQueryVersions;
+  /** The `x-lw-schema` the server last answered a read's path under, if any. */
+  servedSchemaHashFor?: (path: string) => string | undefined;
 }): { unsubscribe: () => void; restored: Promise<void> } {
   const sessionHash = hashKey(sessionQueryKey);
   const isPersisted = (query: Query) =>
@@ -546,7 +535,16 @@ export function persistUiQueries({
   const stopMirroring = queryClient
     .getQueryCache()
     .subscribe((event) =>
-      mirrorQuery({ event, isPersisted, restoredAt, versions, store, userId, buildId }),
+      mirrorQuery({
+        event,
+        isPersisted,
+        plan,
+        servedSchemaHashFor,
+        restoredAt,
+        versions,
+        store,
+        userId,
+      }),
     );
   const unsubscribe = () => {
     stopped = true;
@@ -556,11 +554,11 @@ export function persistUiQueries({
   const restore = async () => {
     const prefix = storedQueryKey({ userId, queryHash: "" });
     const owned = (await store.keys()).filter((key) => key.startsWith(prefix));
-    const entries = await Promise.all(owned.map((key) => readStoredQuery({ store, key, buildId })));
+    const entries = await Promise.all(owned.map((key) => readStoredQuery({ store, key, plan })));
     for (const entry of entries) {
       if (stopped) return;
       if (entry) {
-        await restoreStoredQuery({ entry, queryClient, plan, userId, store, versions, restoredAt });
+        restoreStoredQuery({ entry, queryClient, versions, restoredAt });
       }
     }
   };

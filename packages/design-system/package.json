@@ -110,6 +110,10 @@
       "types": "./dist/components/full-logo.d.ts",
       "default": "./src/components/full-logo.tsx"
     },
+    "./logo-icon": {
+      "types": "./dist/components/logo-icon.d.ts",
+      "default": "./src/components/logo-icon.tsx"
+    },
     "./personal-access-token-banner": {
       "types": "./dist/components/personal-access-token-banner.d.ts",
       "default": "./src/components/personal-access-token-banner.tsx"

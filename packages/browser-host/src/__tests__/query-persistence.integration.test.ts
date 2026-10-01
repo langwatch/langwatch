@@ -1,13 +1,13 @@
 /**
- * Mirroring marked reads across a reload, one sealed object per query, per user and per build,
- * over an in-memory store. ADR-164; specs/ui/browser-query-caching.feature.
+ * Mirroring every planned read across a reload, one sealed object per query, per user and per
+ * schema hash, over an in-memory store. ARCHITECTURE.md §10.2; specs/ui/browser-query-caching.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
-import { cachePlanFor } from "../cache-tiers.ts";
+import type { UiCachePlan } from "../cache-tiers.ts";
 import {
   clearPersistedUiQueries,
   indexedDbQueryStore,
@@ -18,16 +18,23 @@ import {
   type UiQueryStore,
 } from "../query-persistence.ts";
 
-const plan = cachePlanFor({
-  contracts: [
-    {
-      namespace: "organization",
-      members: { getAll: { cache: { persist: true } }, getMemberById: {} },
-    },
-    // Marked persist on purpose: the session read is excluded by key, whatever the plan says.
-    { namespace: "auth", members: { session: { cache: { persist: true } } } },
-  ],
-});
+// The session read is in the plan on purpose: it is excluded by key, whatever the plan says.
+const DECLARED = ["organization.getAll", "organization.getMemberById", "auth.session"];
+
+/** A plan as `cachePlanFor` builds one: every declared read but `excluded`; `moved` hash anew. */
+function planOf({
+  excluded = [],
+  moved = [],
+}: { excluded?: readonly string[]; moved?: readonly string[] } = {}): UiCachePlan {
+  const persisted = new Set(DECLARED.filter((path) => !excluded.includes(path)));
+  return {
+    persisted,
+    schemaHashFor: (path) =>
+      persisted.has(path) ? (moved.includes(path) ? "schema-2" : "schema-1") : undefined,
+  };
+}
+
+const plan = planOf();
 
 /** Three users' or epochs' keys: 32 bytes each, base64, as the session read carries them. */
 const KEY_1 = "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=";
@@ -53,29 +60,31 @@ function memoryStore(): UiQueryStore<unknown> & { entries: Map<string, unknown> 
 async function session({
   store,
   userId,
-  buildId = "build-1",
+  readPlan = plan,
   cacheKey = KEY_1,
   previousCacheKey,
   write,
   versions = new Map<string, string>(),
+  servedSchemaHashFor,
 }: {
   store: UiQueryStore<unknown>;
   userId: string;
-  buildId?: string;
+  readPlan?: UiCachePlan;
   cacheKey?: string;
   previousCacheKey?: string;
   write?: (queryClient: QueryClient) => void;
   versions?: Map<string, string>;
+  servedSchemaHashFor?: (path: string) => string | undefined;
 }): Promise<QueryClient> {
   const queryClient = new QueryClient();
   const { unsubscribe, restored } = persistUiQueries({
     queryClient,
-    plan,
+    plan: readPlan,
     userId,
-    buildId,
     store: sealedUiQueryStore({ store, cacheKey, previousCacheKey }),
     sessionQueryKey: sessionRead,
     versions,
+    ...(servedSchemaHashFor ? { servedSchemaHashFor } : {}),
   });
   await restored;
   write?.(queryClient);
@@ -85,7 +94,7 @@ async function session({
 }
 
 describe("persistUiQueries", () => {
-  describe("given a marked read cached before a reload", () => {
+  describe("given a declared read cached before a reload", () => {
     /** @scenario "A reload paints a persisted read from disk, then revalidates it" */
     it("paints it from disk and marks it for revalidation", async () => {
       const store = memoryStore();
@@ -98,17 +107,35 @@ describe("persistUiQueries", () => {
     });
   });
 
-  describe("given an unmarked read", () => {
-    /** @scenario "A read not marked persist never reaches the disk" */
-    it("never reaches the store", async () => {
+  const writeBoth = (qc: QueryClient) => {
+    qc.setQueryData(orgGraph, ["acme"]);
+    qc.setQueryData(member, { id: "u" });
+  };
+
+  describe("given declared reads nobody marked", () => {
+    /** @scenario "Every declared read is mirrored by default" */
+    it("mirrors each of them", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: writeBoth });
+
+      expect([...store.entries.keys()].toSorted()).toEqual(
+        [
+          storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) }),
+          storedQueryKey({ userId: "alice", queryHash: hashKey(member) }),
+        ].toSorted(),
+      );
+    });
+  });
+
+  describe("given a read on the exclusion list", () => {
+    /** @scenario "An excluded read never reaches the disk" */
+    it("never reaches the store, while the others do", async () => {
       const store = memoryStore();
       await session({
         store,
         userId: "alice",
-        write: (qc) => {
-          qc.setQueryData(orgGraph, ["acme"]);
-          qc.setQueryData(member, { id: "u" });
-        },
+        readPlan: planOf({ excluded: ["organization.getMemberById"] }),
+        write: writeBoth,
       });
 
       expect([...store.entries.keys()]).toEqual([
@@ -129,42 +156,67 @@ describe("persistUiQueries", () => {
     });
   });
 
-  describe("given the build changed since the cache was written", () => {
-    /** @scenario "A build change discards the store" */
-    it("discards the store", async () => {
+  describe("given a read whose schema hash moved since its row was written", () => {
+    /** @scenario "A read whose schema changed is not painted from the persisted cache" */
+    it("drops that row unpainted and restores the reads whose hash held", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: writeBoth });
+
+      const next = await session({
+        store,
+        userId: "alice",
+        readPlan: planOf({ moved: ["organization.getAll"] }),
+      });
+
+      const orgRow = storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) });
+      expect(next.getQueryData(orgGraph)).toBeUndefined();
+      expect(next.getQueryData(member)).toEqual({ id: "u" });
+      expect(store.entries.has(orgRow)).toBe(false);
+    });
+  });
+
+  describe("given an answer the server stamped with a schema hash this bundle does not hold", () => {
+    /** @scenario "An answer under a newer schema drops the row and is not stored" */
+    it("removes that read's row and stores nothing under the old hash", async () => {
+      const store = memoryStore();
+      await session({ store, userId: "alice", write: writeBoth });
+      const orgRow = storedQueryKey({ userId: "alice", queryHash: hashKey(orgGraph) });
+      const memberRow = storedQueryKey({ userId: "alice", queryHash: hashKey(member) });
+      const memberBefore = store.entries.get(memberRow);
+
+      await session({
+        store,
+        userId: "alice",
+        servedSchemaHashFor: (path) => (path === "organization.getAll" ? "schema-2" : void 0),
+        write: (qc) => {
+          qc.setQueryData(orgGraph, ["acme", "newer"]);
+          qc.setQueryData(member, { id: "v" });
+        },
+      });
+
+      expect(store.entries.has(orgRow)).toBe(false);
+      expect(store.entries.get(memberRow)).not.toEqual(memberBefore);
+    });
+  });
+
+  describe("given a row for a read the plan no longer mirrors", () => {
+    it("restores nothing and removes the row", async () => {
       const store = memoryStore();
       await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
 
-      const next = await session({ store, userId: "alice", buildId: "build-2" });
+      const next = await session({
+        store,
+        userId: "alice",
+        readPlan: planOf({ excluded: ["organization.getAll"] }),
+      });
 
       expect(next.getQueryData(orgGraph)).toBeUndefined();
+      expect(store.entries.size).toBe(0);
     });
   });
 });
 
 describe("persistUiQueries versions", () => {
-  describe("given a versioned read was mirrored before a reload", () => {
-    /** @scenario "A restored version is sent as since" */
-    it("restores the version so the first fetch can send it as since", async () => {
-      const store = memoryStore();
-      const versions = new Map<string, string>();
-      await session({
-        store,
-        userId: "alice",
-        versions,
-        write: (qc) => {
-          versions.set(hashKey(orgGraph), "u.v1");
-          qc.setQueryData(orgGraph, ["acme"]);
-        },
-      });
-
-      const reloadedVersions = new Map<string, string>();
-      await session({ store, userId: "alice", versions: reloadedVersions });
-
-      expect(reloadedVersions.get(hashKey(orgGraph))).toBe("u.v1");
-    });
-  });
-
   describe("given an entry that is corrupt", () => {
     /** @scenario "A corrupt entry is dropped and the rest restore" */
     it("drops it and restores the rest", async () => {
@@ -176,17 +228,6 @@ describe("persistUiQueries versions", () => {
 
       expect(reloaded.getQueryData(orgGraph)).toEqual(["acme"]);
       expect(store.entries.has("lw-query:alice:broken")).toBe(false);
-    });
-  });
-
-  describe("given an entry written by another build", () => {
-    it("ignores it and removes it", async () => {
-      const store = memoryStore();
-      await session({ store, userId: "alice", write: (qc) => qc.setQueryData(orgGraph, ["acme"]) });
-
-      await session({ store, userId: "alice", buildId: "build-2" });
-
-      expect(store.entries.size).toBe(0);
     });
   });
 });
@@ -298,7 +339,7 @@ describe("persistUiQueries sealing", () => {
 
   describe("given the session read answers while the cache is mirrored", () => {
     /** @scenario "The session read is never mirrored" */
-    it("writes no row for it, even with its path marked persist", async () => {
+    it("writes no row for it, even with its path in the plan", async () => {
       const store = memoryStore();
 
       await session({
@@ -317,7 +358,7 @@ describe("sealedUiQueryStore budget", () => {
     queryKey: orgGraph,
     data,
     updatedAt: 1,
-    buildId: "b1",
+    schemaHash: "schema-1",
   });
   /** A mirror whose clock the test moves, under a budget of two rows. */
   const mirror = (store: UiQueryStore<unknown>, clock: { at: number }, maxRowBytes = 10_000) =>
@@ -386,7 +427,7 @@ describe("indexedDbQueryStore", () => {
   describe("given IndexedDB is unavailable", () => {
     /** @scenario "Without IndexedDB the cache lives in memory" */
     it("keeps the entry in memory for this document", async () => {
-      const entry: UiStoredQuery = { queryKey: ["a"], data: 1, updatedAt: 1, buildId: "b" };
+      const entry: UiStoredQuery = { queryKey: ["a"], data: 1, updatedAt: 1, schemaHash: "s" };
 
       await indexedDbQueryStore.put("lw-query:alice:x", entry);
 
@@ -454,7 +495,6 @@ describe("persistUiQueries refusal and teardown", () => {
         queryClient,
         plan,
         userId: "alice",
-        buildId: "build-1",
         store: sealedUiQueryStore({ store, cacheKey: KEY_1, previousCacheKey: undefined }),
         sessionQueryKey: sessionRead,
       });

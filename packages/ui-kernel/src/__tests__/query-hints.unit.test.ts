@@ -1,5 +1,5 @@
 /**
- * The focused tab's hint stream. packages/api/specs/read-hints.feature.
+ * A visible tab's hint stream. packages/api/specs/read-hints.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
@@ -11,13 +11,14 @@ import {
 import { focusManager, QueryClient, QueryObserver } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createUiQueryClient } from "../query-client.ts";
 import { readHintStreamOver, startUiQueryHints, type UiQueryHintStream } from "../query-hints.ts";
 
 const graphKey = trpcQueryKey("organization.getScopeGraph", { input: {}, type: "query" });
 const projectsKey = trpcQueryKey("project.getAll", { input: {}, type: "query" });
 
 function fakeStream() {
-  const opened: { onOpen: () => void; onHint: (hint: unknown) => void }[] = [];
+  const opened: { onHint: (hint: unknown) => void }[] = [];
   let open = 0;
   const stream: UiQueryHintStream = (handlers) => {
     opened.push(handlers);
@@ -74,8 +75,8 @@ afterEach(() => {
 });
 
 describe("startUiQueryHints", () => {
-  /** @scenario "Only the focused tab holds the hint stream" */
-  it("opens one stream while focused and closes it on blur", () => {
+  /** @scenario "Only a visible tab holds the hint stream" */
+  it("opens one stream while visible and closes it when hidden", () => {
     focusManager.setFocused(true);
     const { stream, openCount } = fakeStream();
     const stop = startUiQueryHints({
@@ -91,6 +92,27 @@ describe("startUiQueryHints", () => {
     expect(openCount()).toBe(1);
     stop();
     expect(openCount()).toBe(0);
+  });
+
+  /** @scenario "Only a visible tab holds the hint stream" */
+  it("keeps the stream and refetches in a visible tab whose window lost focus", async () => {
+    const unfocused = vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    try {
+      const queryClient = createUiQueryClient();
+      const graph = await mount({ queryClient, queryKey: graphKey });
+      const { stream, openCount, latest } = fakeStream();
+      const stop = startUiQueryHints({ queryClient, stream, channel: fakeChannel() });
+      window.dispatchEvent(new Event("blur"));
+      document.dispatchEvent(new Event("visibilitychange"));
+
+      expect(focusManager.isFocused()).toBe(true);
+      expect(openCount()).toBe(1);
+      latest()?.onHint({ path: "organization.getScopeGraph" });
+      await vi.waitFor(() => expect(graph.fetches()).toBe(2));
+      stop();
+    } finally {
+      unfocused.mockRestore();
+    }
   });
 
   it("opens no stream in a tab that starts hidden", () => {
@@ -136,19 +158,23 @@ describe("startUiQueryHints", () => {
     expect(graph.fetches()).toBe(1);
   });
 
-  /** @scenario "A connected stream marks every mounted read stale once" */
-  it("refetches every mounted read on each open", async () => {
+  /** @scenario "A reopened stream leaves fresh reads alone" */
+  it("revalidates nothing when the stream reopens", async () => {
     focusManager.setFocused(true);
     const queryClient = new QueryClient();
     const graph = await mount({ queryClient, queryKey: graphKey });
     const projects = await mount({ queryClient, queryKey: projectsKey });
-    const { stream, latest } = fakeStream();
+    const { stream, opened } = fakeStream();
     startUiQueryHints({ queryClient, stream, channel: fakeChannel() });
 
-    latest()?.onOpen();
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
 
-    await vi.waitFor(() => expect(graph.fetches()).toBe(2));
-    await vi.waitFor(() => expect(projects.fetches()).toBe(2));
+    expect(opened).toHaveLength(2);
+    expect(graph.fetches()).toBe(1);
+    expect(projects.fetches()).toBe(1);
+    expect(isStale({ queryClient, queryKey: graphKey })).toBe(false);
   });
 
   /** @scenario "A malformed hint is ignored" */
@@ -206,21 +232,17 @@ describe("readHintStreamOver", () => {
   /** @scenario "A hint refetches the mounted reads of its procedure and no others" */
   it("opens presence.onProjectReadHints for where the tab stands and relays its frames", () => {
     const rpc = new RecordingRpc();
-    const opens: number[] = [];
     const hints: unknown[] = [];
 
     const close = readHintStreamOver({ rpc, organizationId: "acme", projectId: "p1" })({
-      onOpen: () => void opens.push(1),
       onHint: (hint) => void hints.push(hint),
     });
-    rpc.opened[0]?.handlers.onStarted?.();
     rpc.opened[0]?.handlers.onData?.({ path: "organization.getScopeGraph" });
     close();
 
     expect(rpc.opened.map(({ path, input }) => ({ path, input }))).toEqual([
       { path: "presence.onProjectReadHints", input: { organizationId: "acme", projectId: "p1" } },
     ]);
-    expect(opens).toEqual([1]);
     expect(hints).toEqual([{ path: "organization.getScopeGraph" }]);
     expect(rpc.closed).toBe(1);
   });
@@ -229,7 +251,6 @@ describe("readHintStreamOver", () => {
     const rpc = new RecordingRpc();
 
     readHintStreamOver({ rpc, organizationId: "acme", projectId: null })({
-      onOpen: () => undefined,
       onHint: () => undefined,
     });
 

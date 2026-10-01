@@ -3,24 +3,21 @@
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
-import { focusManager, hashKey, QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { focusManager, hashKey, QueryClient, QueryObserver } from "@tanstack/react-query";
+import { describe, expect, it, vi } from "vitest";
 
-import { cachePlanFor } from "../cache-tiers.ts";
+import type { UiCachePlan } from "../cache-tiers.ts";
 import { sealedUiQueryStore, storedQueryKey, type UiQueryStore } from "../query-persistence.ts";
 import { digestOf, startUiQuerySync, uiQuerySyncChannelName } from "../query-sync.ts";
 
-const plan = cachePlanFor({
-  contracts: [
-    {
-      namespace: "organization",
-      members: { getScopeGraph: { cache: { persist: true } } },
-    },
-  ],
-});
+const plan: UiCachePlan = {
+  persisted: new Set(["organization.getScopeGraph"]),
+  schemaHashFor: (path) => (path === "organization.getScopeGraph" ? "schema-1" : undefined),
+};
 
 const graphKey = trpcQueryKey("organization.getScopeGraph", { input: {}, type: "query" });
 const graphHash = hashKey(graphKey);
+const projectsKey = trpcQueryKey("project.getAll", { input: {}, type: "query" });
 
 function memoryStore(): UiQueryStore<unknown> & { entries: Map<string, unknown> } {
   const entries = new Map<string, unknown>();
@@ -43,8 +40,7 @@ function fakeChannel() {
   };
 }
 
-function tab() {
-  const queryClient = new QueryClient();
+function tab(queryClient = new QueryClient()) {
   const channel = fakeChannel();
   const versions = new Map<string, string>();
   const store = memoryStore();
@@ -53,7 +49,6 @@ function tab() {
     plan,
     store,
     userId: "alice",
-    buildId: "b1",
     versions,
     channel,
   });
@@ -110,8 +105,8 @@ describe("startUiQuerySync", () => {
     });
   });
 
-  describe("given a fetch lands in the focused tab", () => {
-    /** @scenario "A fetch in the focused tab announces its version, never its data" */
+  describe("given a fetch lands in a visible tab", () => {
+    /** @scenario "A fetch in a visible tab announces its version, never its data" */
     it("broadcasts the key and version, never the data", async () => {
       const { queryClient, channel, versions, stop } = tab();
       versions.set(graphHash, "u.v1");
@@ -135,7 +130,7 @@ describe("startUiQuerySync", () => {
         data: ["new"],
         version: "u.v2",
         updatedAt: Date.now(),
-        buildId: "b1",
+        schemaHash: "schema-1",
       });
       channel.onmessage?.(
         new MessageEvent("message", { data: { key: graphHash, version: "u.v2" } }),
@@ -154,6 +149,94 @@ describe("startUiQuerySync", () => {
     });
   });
 
+  describe("given the tab regains focus with mounted reads", () => {
+    /** @scenario "A read is trusted for five minutes and refetched on focus only when stale" */
+    it("fires one revalidation pass: each stale read once, a fresh one never", async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { refetchOnWindowFocus: false } },
+      });
+      const { stop } = tab(queryClient);
+      const fetches = { graph: 0, projects: 0, fresh: 0 };
+      const mounts = [
+        { queryKey: graphKey, counter: "graph", staleTime: 0 },
+        { queryKey: projectsKey, counter: "projects", staleTime: 0 },
+        { queryKey: [...projectsKey, "fresh"], counter: "fresh", staleTime: 60_000 },
+      ] as const;
+      const unsubscribe = mounts.map(({ queryKey, counter, staleTime }) =>
+        new QueryObserver(queryClient, {
+          queryKey,
+          staleTime,
+          queryFn: async () => ({ fetch: ++fetches[counter] }),
+        }).subscribe(() => void 0),
+      );
+      await vi.waitFor(() => expect(fetches).toEqual({ graph: 1, projects: 1, fresh: 1 }));
+
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(fetches).toEqual({ graph: 2, projects: 2, fresh: 1 });
+      focusManager.setFocused(undefined);
+      unsubscribe.forEach((off) => off());
+      stop();
+    });
+  });
+
+  describe("given a hint was dropped while the tab was hidden", () => {
+    /** @scenario "A tab shown again catches up the stale reads it holds" */
+    it("refetches the stale mounted read once when the tab is shown", async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { refetchOnWindowFocus: false } },
+      });
+      const { stop } = tab(queryClient);
+      let fetches = 0;
+      const unsubscribe = new QueryObserver(queryClient, {
+        queryKey: projectsKey,
+        staleTime: 60_000,
+        queryFn: async () => ({ fetch: ++fetches }),
+      }).subscribe(() => void 0);
+      await vi.waitFor(() => expect(fetches).toBe(1));
+
+      focusManager.setFocused(false);
+      await queryClient.invalidateQueries({ queryKey: projectsKey, refetchType: "none" });
+      expect(fetches).toBe(1);
+      focusManager.setFocused(true);
+      await vi.waitFor(() => expect(fetches).toBe(2));
+
+      focusManager.setFocused(undefined);
+      unsubscribe();
+      stop();
+    });
+  });
+
+  describe("given a stale read already fetching when the tab is shown", () => {
+    /** @scenario "A tab shown again leaves a fetch in flight to finish" */
+    it("does not abort the fetch and start it a second time", async () => {
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { refetchOnWindowFocus: false } },
+      });
+      const { stop } = tab(queryClient);
+      let fetches = 0;
+      const unsubscribe = new QueryObserver(queryClient, {
+        queryKey: projectsKey,
+        queryFn: async () => {
+          const attempt = ++fetches;
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return { attempt };
+        },
+      }).subscribe(() => void 0);
+
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      expect(fetches).toBe(1);
+      focusManager.setFocused(undefined);
+      unsubscribe();
+      stop();
+    });
+  });
+
   describe("given the stored copy was sealed under a key this tab does not hold", () => {
     /** @scenario "A row from another session is a miss and is refetched" */
     it("does not adopt it on focus, and removes it", async () => {
@@ -166,7 +249,7 @@ describe("startUiQuerySync", () => {
         data: ["new"],
         version: "u.v2",
         updatedAt: Date.now(),
-        buildId: "b1",
+        schemaHash: "schema-1",
       });
       const queryClient = new QueryClient();
       const channel = fakeChannel();
@@ -175,7 +258,6 @@ describe("startUiQuerySync", () => {
         plan,
         store: sealedUnder("AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="),
         userId: "alice",
-        buildId: "b1",
         versions: new Map([[graphHash, "u.v1"]]),
         channel,
       });
@@ -198,7 +280,7 @@ describe("startUiQuerySync", () => {
 });
 
 describe("the sync digest and channel", () => {
-  /** @scenario "A fetch in the focused tab announces its version, never its data" */
+  /** @scenario "A fetch in a visible tab announces its version, never its data" */
   it("broadcasts an opaque digest of an unversioned read, never its body", async () => {
     const { queryClient, channel, stop } = tab();
 

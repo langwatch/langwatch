@@ -1,6 +1,6 @@
 /**
- * Only the focused tab speaks to the server; its landed fetch broadcasts `{ key, version }`,
- * never data, and a tab whose version differs marks the key stale. On focus a tab reads
+ * Only a visible tab speaks to the server; its landed fetch broadcasts `{ key, version }`,
+ * never data, and a tab whose version differs marks the key stale. When shown, a tab reads
  * IndexedDB first. specs/ui/browser-query-caching.feature.
  */
 
@@ -69,7 +69,6 @@ type SyncContext = {
   plan: UiCachePlan;
   store: UiQueryStore;
   userId: string;
-  buildId: string;
   versions: UiQueryVersions;
   announced: Map<string, string>;
 };
@@ -93,7 +92,7 @@ function markStale({ queryClient, query }: { queryClient: QueryClient; query: Qu
   });
 }
 
-/** A landed fetch in the focused tab tells the others which version it holds. */
+/** A landed fetch in a visible tab tells the others which version it holds. */
 function announce({
   event,
   channel,
@@ -129,7 +128,7 @@ async function adoptFromDisk({ context, query }: { context: SyncContext; query: 
   const entry = await readStoredQuery({
     store: context.store,
     key: storedQueryKey({ userId: context.userId, queryHash: query.queryHash }),
-    buildId: context.buildId,
+    plan: context.plan,
   });
   if (!entry || entry.updatedAt <= query.state.dataUpdatedAt) return;
   if (entry.version === undefined) versions.delete(query.queryHash);
@@ -139,14 +138,18 @@ async function adoptFromDisk({ context, query }: { context: SyncContext; query: 
   await markStale({ queryClient, query });
 }
 
-/** Disk first, then the network for what is still behind. */
+/**
+ * The tab's one focus pass (ARCHITECTURE.md §10.2): disk first, then the network for the mounted
+ * reads still stale, whether past the safety bound or marked by a hint. The library's is off.
+ * A fetch already in flight is left to finish: a second refetch would abort and resend it.
+ */
 async function refreshOnFocus(context: SyncContext): Promise<void> {
   const { queryClient, plan } = context;
-  const isBehind = (query: Query) => isTracked({ plan, query }) && query.state.isInvalidated;
+  const isBehind = (query: Query) => isTracked({ plan, query }) && query.isStale();
   const behind = queryClient.getQueryCache().findAll({ predicate: isBehind });
   await Promise.all(behind.map((query) => adoptFromDisk({ context, query })));
   context.announced.clear();
-  await queryClient.refetchQueries({ type: "active", predicate: isBehind });
+  await queryClient.refetchQueries({ type: "active", stale: true }, { cancelRefetch: false });
 }
 
 /**

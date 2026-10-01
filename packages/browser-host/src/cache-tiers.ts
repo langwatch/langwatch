@@ -1,68 +1,61 @@
 /**
- * What each contract declares of the browser's cache, keyed by procedure path: which reads
- * the sealed IndexedDB mirror keeps. Staleness is the query client's own default.
+ * Which declared reads the sealed IndexedDB mirror keeps, keyed by procedure path: every query
+ * but the named exclusions (ARCHITECTURE.md §10.2), each with its schema hash. Staleness is the
+ * query client's own default.
  */
 
-import type { TrpcCachePolicy } from "@langwatch/kernel/contract";
-import type { QueryClient, QueryKey } from "@tanstack/react-query";
+import {
+  schemaHashOf,
+  type TrpcContract,
+  type TrpcContractMember,
+} from "@langwatch/kernel/contract";
+import type { QueryKey } from "@tanstack/react-query";
 
-/** How long a read persisted to disk may be restored; its cache entry lives as long. */
+/** How long a mirrored read's cache entry lives in memory once nothing observes it. */
 export const PERSISTED_QUERY_MAX_AGE = 24 * 60 * 60 * 1000;
+
+/**
+ * Reads kept off the disk mirror, by dotted procedure path: ones so high-traffic that sealing
+ * every answer costs more than a reload saves. A read too large is skipped by size instead.
+ */
+export const UI_QUERY_MIRROR_EXCLUDED: ReadonlySet<string> = new Set<string>();
 
 /** What the declared contracts ask of the browser's cache. */
 export type UiCachePlan = Readonly<{
+  /** Every mirrored read's path. */
   persisted: ReadonlySet<string>;
+  /** A mirrored read's schema hash; a row stored under another is dropped. */
+  schemaHashFor: (path: string) => string | undefined;
 }>;
 
 /** The version each cached read was last answered under, by query hash. */
 export type UiQueryVersions = Map<string, string>;
 
-/** What the transport needs to send `since` and keep a read's data on `unchanged`. */
-export type UiVersionedReads = Readonly<{
-  paths: ReadonlySet<string>;
-  versions: UiQueryVersions;
-  /** The cache the data is read from; a getter, as the transport is built before the client. */
-  queryClient: () => QueryClient | undefined;
-}>;
-
 /** The part of a built `TrpcContract` the plan reads. */
-export type CacheDeclaringContract = Readonly<{
-  namespace: string;
-  members: Readonly<Record<string, Readonly<{ cache?: TrpcCachePolicy }>>>;
-}>;
+export type CacheDeclaringContract = Pick<TrpcContract, "namespace" | "members">;
 
-/** Folds every declared read's policy into one plan, keyed by dotted procedure path. */
+/** Every declared query but the excluded ones, keyed by dotted procedure path. */
 export function cachePlanFor({
   contracts,
+  excluded = UI_QUERY_MIRROR_EXCLUDED,
 }: {
   contracts: readonly CacheDeclaringContract[];
+  excluded?: ReadonlySet<string>;
 }): UiCachePlan {
-  const persisted = new Set<string>();
+  const mirrored = new Map<string, TrpcContractMember>();
 
   for (const contract of contracts) {
     for (const [name, member] of Object.entries(contract.members)) {
-      if (member.cache?.persist) persisted.add(`${contract.namespace}.${name}`);
+      const path = `${contract.namespace}.${name}`;
+      if (member.kind === "query" && !excluded.has(path)) mirrored.set(path, member);
     }
   }
 
-  return { persisted };
-}
-
-/** Versioned reads whose cache is bound later: the shell's client is built after the transport. */
-export type UiBindableVersionedReads = UiVersionedReads & {
-  bind(queryClient: QueryClient): void;
-};
-
-/** No read opts in today; event-sourced reads will answer by projection cursor (ARCHITECTURE.md).
- */
-export function createUiVersionedReads(): UiBindableVersionedReads {
-  let bound: QueryClient | undefined;
   return {
-    paths: new Set<string>(),
-    versions: new Map<string, string>(),
-    queryClient: () => bound,
-    bind: (queryClient) => {
-      bound = queryClient;
+    persisted: new Set(mirrored.keys()),
+    schemaHashFor: (path) => {
+      const member = mirrored.get(path);
+      return member && schemaHashOf(member);
     },
   };
 }

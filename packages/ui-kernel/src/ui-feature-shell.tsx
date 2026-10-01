@@ -2,11 +2,7 @@
  * What `apps/ui` mounts around every routed page.
  */
 
-import {
-  cachePlanFor,
-  createUiVersionedReads,
-  type UiBindableVersionedReads,
-} from "@langwatch/browser-host/cache-tiers";
+import { cachePlanFor, type UiQueryVersions } from "@langwatch/browser-host/cache-tiers";
 import {
   BrowserUiDocumentTitle,
   resolveUiCapabilities,
@@ -22,7 +18,6 @@ import {
 import { CurrentDrawer, type UiDrawerRegistry } from "@langwatch/browser-host/drawer";
 import { useRouterUiNavigation, useRouterUiRoute } from "@langwatch/browser-host/navigation";
 import {
-  currentUiBuildId,
   indexedDbQueryStore,
   persistUiQueries,
   sealedUiQueryStore,
@@ -33,7 +28,12 @@ import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-hos
 import { BrowserUiStorage, setUiStorage } from "@langwatch/browser-host/storage";
 import { setUiFeedbackHost } from "@langwatch/browser-host/toaster";
 import { UiScopeHostProvider } from "@langwatch/browser-host/use-organization-team-project";
-import { QueryClientContext, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import {
+  focusManager,
+  QueryClientContext,
+  QueryClientProvider,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   useContext,
   useEffect,
@@ -59,6 +59,17 @@ import type { UiProviderShell } from "./ui-outer-providers.tsx";
 /** The device store the shell publishes to every feature. */
 const SHELL_UI_STORAGE = new BrowserUiStorage();
 
+/** A newer session version's refetch is spread over this window, so tabs do not stampede. */
+const SESSION_BUMP_JITTER_MS = 2_000;
+
+/** What sync reads when nothing is mirrored: no plan, or no sealing key yet. */
+const EMPTY_QUERY_STORE: UiQueryStore = {
+  get: () => Promise.resolve(void 0),
+  put: () => Promise.resolve(),
+  delete: () => Promise.resolve(),
+  keys: () => Promise.resolve([]),
+};
+
 export type UiFeatureShellInstall = {
   /** One entry per feature package whose hooks this application serves. */
   apis: readonly UiFeatureApiBinding[];
@@ -73,11 +84,9 @@ export type UiFeatureShellInstall = {
   moduleHosts?: ComponentType<{ children?: ReactNode }>;
   /** The transport those hooks run on. Built same-origin when absent. */
   transport?: UiFeatureApiTransport;
-  /** The watch the supplied transport's fetch reports session versions to (ADR-164). */
+  /** The watch the supplied transport's fetch reports session versions to (ADR-170). */
   sessionVersions?: SessionVersionWatch;
-  /** The versioned reads the supplied transport was built with; its cache is bound here. */
-  versionedReads?: UiBindableVersionedReads;
-  /** The disk the marked reads are sealed onto; IndexedDB when absent. */
+  /** The disk the planned reads are sealed onto; IndexedDB when absent. */
   queryStore?: UiQueryStore<unknown>;
   /**
    * Every feature's reader of a failed mutation, in install order. A failure a
@@ -158,7 +167,6 @@ export function createUiFeatureShell({
   moduleHosts: ModuleHosts = UiNoModuleHosts,
   transport,
   sessionVersions,
-  versionedReads,
   queryStore,
   failures = [],
   session,
@@ -170,16 +178,18 @@ export function createUiFeatureShell({
   const useSessionCapability = session ?? useUnavailableUiSession;
   // Every installed module's declared cache policies, as one plan.
   const cachePlan = cachePlanFor({ contracts: apis.flatMap((api) => api.contracts ?? []) });
-  // The transport is built before the client the shell owns, so the cache is bound at render.
-  const reads = versionedReads ?? createUiVersionedReads();
+  // The version each mirrored read was last stored under, shared by the mirror and the tab sync.
+  const versions: UiQueryVersions = new Map();
 
   function UiCapabilities({
     transport: sessionTransport,
     rpc,
+    watch,
     children,
   }: {
     transport: UiFeatureApiTransport;
     rpc: UiRpc;
+    watch: SessionVersionWatch;
     children: ReactNode;
   }) {
     const navigation = useRouterUiNavigation();
@@ -206,40 +216,43 @@ export function createUiFeatureShell({
       };
       if (!isAnotherSession({ was, userId, cacheKey, previousCacheKey })) return;
       resetUiQueries({ queryClient, sessionQueryKey });
-      reads.versions.clear();
+      versions.clear();
     }, [queryClient, userId, cacheKey, previousCacheKey]);
-    // The marked reads are mirrored per user, sealed under the session read's keys, and every
-    // tab syncs their versions. No key, no mirror.
+    // The planned reads are mirrored per user, sealed under the session read's keys. No key, no
+    // mirror. Sync runs for any signed-in user: the focus pass revalidates stale mounted reads.
     useEffect(() => {
-      if (!userId || !cacheKey || cachePlan.persisted.size === 0) return;
-      const store = sealedUiQueryStore({
-        store: queryStore ?? indexedDbQueryStore,
-        cacheKey,
-        previousCacheKey,
-      });
-      const buildId = currentUiBuildId();
-      const { unsubscribe } = persistUiQueries({
-        queryClient,
-        plan: cachePlan,
-        userId,
-        buildId,
-        store,
-        sessionQueryKey,
-        versions: reads.versions,
-      });
+      if (!userId) return;
+      const sealed =
+        cacheKey !== void 0 && cachePlan.persisted.size > 0
+          ? sealedUiQueryStore({
+              store: queryStore ?? indexedDbQueryStore,
+              cacheKey,
+              previousCacheKey,
+            })
+          : void 0;
+      const unsubscribe = sealed
+        ? persistUiQueries({
+            queryClient,
+            plan: cachePlan,
+            userId,
+            store: sealed,
+            sessionQueryKey,
+            versions,
+            servedSchemaHashFor: (path) => watch.servedSchemaHashFor(path),
+          }).unsubscribe
+        : () => void 0;
       const stopSync = startUiQuerySync({
         queryClient,
         plan: cachePlan,
-        store,
+        store: sealed ?? EMPTY_QUERY_STORE,
         userId,
-        buildId,
-        versions: reads.versions,
+        versions,
       });
       return () => {
         unsubscribe();
         stopSync();
       };
-    }, [queryClient, userId, cacheKey, previousCacheKey]);
+    }, [queryClient, userId, cacheKey, previousCacheKey, watch]);
     const resolved = useMemo(
       () =>
         resolveUiCapabilities({
@@ -254,7 +267,7 @@ export function createUiFeatureShell({
         }),
       [documentTitle, navigation, route, rpc, live],
     );
-    // The focused tab's one read-hint stream, for where it stands (read-hints.feature).
+    // A visible tab's one read-hint stream, for where it stands (read-hints.feature).
     const { organizationId, projectId } =
       !resolved.scope || resolved.scope === UNAVAILABLE_UI_SCOPE
         ? { organizationId: null, projectId: null }
@@ -311,19 +324,25 @@ export function createUiFeatureShell({
     const queryClient = hostQueryClient ?? ownQueryClient;
     const [watch] = useState(() => sessionVersions ?? SessionVersionWatch.create());
     const [ownTransport] = useState(
-      () =>
-        transport ??
-        createUiFeatureApiClient({
-          fetch: sessionVersionFetch({ watch }),
-          versionedReads: reads,
-        }),
+      () => transport ?? createUiFeatureApiClient({ fetch: sessionVersionFetch({ watch }) }),
     );
-    reads.bind(queryClient);
-    // A newer session version marks every read stale in whichever cache is serving.
-    useEffect(
-      () => watch.onNewer(() => void queryClient.invalidateQueries()),
-      [watch, queryClient],
-    );
+    // A newer session version marks every read stale at once; the mounted ones refetch after a
+    // jitter, one pending refetch per tab, and a hidden tab leaves them to its pass when shown.
+    useEffect(() => {
+      let pending: ReturnType<typeof setTimeout> | undefined;
+      const stop = watch.onNewer(() => {
+        void queryClient.invalidateQueries({ refetchType: "none" });
+        pending ??= setTimeout(() => {
+          pending = void 0;
+          if (!focusManager.isFocused()) return;
+          void queryClient.refetchQueries({ type: "active", stale: true });
+        }, Math.random() * SESSION_BUMP_JITTER_MS);
+      });
+      return () => {
+        stop();
+        clearTimeout(pending);
+      };
+    }, [watch, queryClient]);
 
     // The by-path dispatcher a screen too wide for a procedure map asks for.
     // Built here because this is where both halves of it are: the transport and
@@ -341,7 +360,7 @@ export function createUiFeatureShell({
           {inner}
         </Provider>
       ),
-      <UiCapabilities transport={ownTransport} rpc={rpc}>
+      <UiCapabilities transport={ownTransport} rpc={rpc} watch={watch}>
         {children}
       </UiCapabilities>,
     );

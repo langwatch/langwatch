@@ -6,10 +6,9 @@
 
 import { createStore, useStore } from "zustand";
 
-import { BrowserUiStorage } from "./storage.ts";
+import { onUiStorageReaderChange, readerUiStorage } from "./storage.ts";
 
 const root = createStore<Record<string, unknown>>(() => ({}));
-const disk = new BrowserUiStorage();
 const SLICE_NAME = /^[a-z][a-z0-9-]*:[a-zA-Z][\w-]*$/;
 
 export type SliceUpdate<S> = Partial<S> | ((state: S) => Partial<S>);
@@ -63,8 +62,14 @@ function readerOf<S>({ name, absent }: { name: string; absent?: S }): SliceReade
   });
 }
 
+// Each persisted slice's restore, by name, so a redeclared slice replaces its own.
+const restores = new Map<string, () => void>();
+onUiStorageReaderChange(() => {
+  for (const restore of restores.values()) restore();
+});
+
 function hydrate<S>({ key, initial }: { key: string; initial: S }): S {
-  const raw = disk.read(key);
+  const raw = readerUiStorage.getItem(key);
   if (!raw) return initial;
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -78,7 +83,8 @@ function hydrate<S>({ key, initial }: { key: string; initial: S }): S {
 
 /**
  * Declare a slice. `create` receives `set` and `get` scoped to this slice, as in zustand.
- * `persist` keeps the picked keys on this device under `key` (default `name`).
+ * `persist` keeps the picked preferences, never server data, under `key` (default `name`) for the
+ * signed-in reader only; another reader starts from initial and sign-out forgets them.
  * Declaring a name twice replaces it (hot reload); the last declaration wins.
  */
 export function defineSlice<S extends object>({
@@ -93,6 +99,7 @@ export function defineSlice<S extends object>({
   if (!SLICE_NAME.test(name)) {
     throw new Error(`UI slice name "${name}" must be "<module>:<key>"`);
   }
+  const key = persist?.key ?? name;
   const get = (): S => narrow<S>(root.getState()[name]);
   const set: SetSlice<S> = (update: SliceUpdate<S>, replace?: boolean) => {
     const previous = get();
@@ -101,14 +108,18 @@ export function defineSlice<S extends object>({
     const next = replace ? narrow<S>(patch) : { ...previous, ...patch };
     root.setState({ [name]: next });
     if (persist) {
-      disk.write(
-        persist.key ?? name,
-        JSON.stringify({ state: persist.partialize(next), version: 0 }),
-      );
+      readerUiStorage.setItem(key, JSON.stringify({ state: persist.partialize(next), version: 0 }));
     }
   };
   const initial = create(set, get);
-  root.setState({ [name]: persist ? hydrate({ key: persist.key ?? name, initial }) : initial });
+  root.setState({ [name]: persist ? hydrate({ key, initial }) : initial });
+  if (persist) {
+    // A new reader keeps the session-only keys and gets their own preferences, or initial ones.
+    const base = (): S => ({ ...get(), ...persist.partialize(initial) });
+    restores.set(name, () => root.setState({ [name]: hydrate({ key, initial: base() }) }));
+  } else {
+    restores.delete(name);
+  }
   return Object.assign(readerOf<S>({ name }), { setState: set, getInitialState: () => initial });
 }
 

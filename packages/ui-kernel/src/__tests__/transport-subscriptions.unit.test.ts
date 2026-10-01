@@ -1,4 +1,3 @@
-import { isUiBatchRequest, uiBatchResponse } from "@langwatch/browser-host/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { SseEventSourceConstructor, SseEventSourceLike } from "../sse-subscription-link.ts";
@@ -70,7 +69,6 @@ function transport(bodies: unknown[] = []): Wiring {
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     requests.push(requestUrl(input));
     const body = queue.shift();
-    if (isUiBatchRequest(init) && Array.isArray(body)) return uiBatchResponse({ results: body });
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -86,9 +84,8 @@ function resultOf(data: unknown): unknown {
 }
 
 /**
- * Only the reconnect and teardown blocks take fake timers. The batching link
- * schedules its own flush on a timer, so freezing time for the request-lane
- * tests would hang them rather than speed them up.
+ * Only the reconnect and teardown blocks take fake timers; the request-lane
+ * tests run on real time.
  */
 function frozenClock(): void {
   beforeEach(() => {
@@ -129,7 +126,7 @@ describe("given the browser process transport", () => {
   describe("when a screen reads a procedure", () => {
     /** @scenario "Reading a procedure still sends a request" */
     it("sends it as a request, opening no channel", async () => {
-      const wiring = transport([[resultOf({ id: "prompt_1" })]]);
+      const wiring = transport([resultOf({ id: "prompt_1" })]);
 
       const output = await wiring.client.query("prompts.getById", { id: "prompt_1" });
 
@@ -138,26 +135,18 @@ describe("given the browser process transport", () => {
       expect(wiring.channels).toEqual([]);
     });
 
-    /**
-     * The subscription split now wraps the batching split, so a change to the
-     * outer one can silently swallow the inner one's flag.
-     */
-    /** @scenario "Reads asked for their own connection still get one" */
-    it("still honours a read that asked for its own connection", async () => {
-      const wiring = transport([resultOf({ enabled: true }), [resultOf("other")]]);
+    /** @scenario "Every read travels on its own request" */
+    it("sends each of two reads in the same moment on its own request", async () => {
+      const wiring = transport([resultOf("a"), resultOf("b")]);
 
       const outputs = await Promise.all([
-        wiring.client.query(
-          "featureFlag.isEnabled",
-          { flag: "x" },
-          { context: { skipBatch: true } },
-        ),
+        wiring.client.query("featureFlag.isEnabled", { flag: "x" }),
         wiring.client.query("prompts.getAll", { projectId: "p" }),
       ]);
 
-      expect(outputs).toEqual([{ enabled: true }, "other"]);
+      expect(outputs).toEqual(["a", "b"]);
       expect(wiring.requests).toHaveLength(2);
-      expect(wiring.requests.some((request) => !request.includes("batch=1"))).toBe(true);
+      expect(wiring.requests.some((request) => request.includes("batch="))).toBe(false);
     });
   });
 

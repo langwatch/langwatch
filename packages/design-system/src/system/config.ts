@@ -414,6 +414,15 @@ export const designSystemConfig = defineConfig({
           focusRing: { value: "{colors.orange.focusRing}" },
         },
 
+        // The logo: brand navy with white faces on light; on dark the faces
+        // drop out and the lines go off-white, as the dark-theme wordmark draws it.
+        logo: {
+          mark: { value: { _light: "#213B41", _dark: "{colors.gray.100}" } },
+          face: { value: { _light: "white", _dark: "transparent" } },
+          wordmark: { value: { _light: "#1D293D", _dark: "{colors.gray.100}" } },
+          wordmarkMuted: { value: { _light: "#314158", _dark: "{colors.gray.300}" } },
+        },
+
         // Data series, in the order `rotatingColors` hands out hues.
         chart: {
           1: { value: { _light: "{colors.orange.500}", _dark: "{colors.orange.300}" } },

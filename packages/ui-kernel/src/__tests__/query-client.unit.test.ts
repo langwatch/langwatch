@@ -44,13 +44,13 @@ describe("createUiQueryClient", () => {
 
     /** @scenario "Moving between pages does not ask for the offer again" */
     /** @scenario "A read is trusted for five minutes and refetched on focus only when stale" */
-    it("keeps an answer fresh for five minutes and refetches on focus only once stale", () => {
+    it("keeps an answer fresh for five minutes; query-sync owns the one focus pass", () => {
       const client = createUiQueryClient();
       const queries = client.getDefaultOptions().queries;
 
       expect(queries).toMatchObject({
         staleTime: 5 * 60_000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
         refetchOnReconnect: true,
       });
       expect(queries?.refetchInterval).toBeUndefined();
@@ -227,5 +227,17 @@ describe("resetUiQueries", () => {
     expect(client.getQueryData(["other"])).toBeUndefined();
     expect(client.getQueryData(["slow"])).toBeUndefined();
     expect(client.getQueryData(sessionKey)).toEqual({ cacheKey: "k" });
+  });
+
+  it("drops every mutation answer, so a minted token does not outlive its actor", async () => {
+    const client = createUiQueryClient();
+    const mutation = client.getMutationCache().build(client, {
+      mutationFn: () => Promise.resolve({ token: "minted" }),
+    });
+    await mutation.execute(undefined);
+
+    resetUiQueries({ queryClient: client, sessionQueryKey: ["session"] });
+
+    expect(client.getMutationCache().getAll()).toEqual([]);
   });
 });

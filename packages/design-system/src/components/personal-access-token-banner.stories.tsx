@@ -17,3 +17,9 @@ export const BeforeCreate: Story = {};
 export const Created: Story = {
   args: { token: "pat-lw-example-token" },
 };
+
+export const WithScopeNote: Story = {
+  args: {
+    scopeNote: "This token can only send data to this project. It can't read or change anything.",
+  },
+};

@@ -1,9 +1,14 @@
 /**
- * The cache plan, the persisted gcTime and the session-version stamp. ADR-164;
+ * The cache plan, the persisted gcTime and the session-version stamp. ADR-170;
  * specs/ui/browser-query-caching.feature.
  */
 
 import { trpcQueryKey } from "@langwatch/api/web";
+import {
+  defineTrpcContract,
+  SCHEMA_HASH_HEADER,
+  schemaHashesOf,
+} from "@langwatch/kernel/contract";
 import {
   cachePlanFor,
   PERSISTED_QUERY_MAX_AGE,
@@ -16,20 +21,48 @@ import {
   sessionVersionFetch,
 } from "@langwatch/browser-host/session-version";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { createUiQueryClient } from "../query-client.ts";
 
-// The shape `defineTrpcContract(...).build()` produces, minus the schemas the plan never reads.
-const organizationTrpc = {
-  namespace: "organization",
-  members: { getAll: { cache: { persist: true } }, getMemberById: {} },
-} as const;
+const memberSchema = z.object({ id: z.string() });
+const organizationTrpc = defineTrpcContract("organization")
+  .query("getAll")
+  .withInput(z.object({}))
+  .withOutput(z.array(z.string()))
+  .query("getMemberById")
+  .withInput(memberSchema)
+  .withOutput(memberSchema)
+  .mutation("rename")
+  .withInput(memberSchema)
+  .withOutput(memberSchema)
+  .build();
 
 const plan = cachePlanFor({ contracts: [organizationTrpc] });
+const excludingMember = cachePlanFor({
+  contracts: [organizationTrpc],
+  excluded: new Set(["organization.getMemberById"]),
+});
 
 describe("cachePlanFor", () => {
-  it("marks only the reads declared persist, by their dotted procedure path", () => {
-    expect([...plan.persisted]).toEqual(["organization.getAll"]);
+  it("mirrors every declared query by its dotted procedure path, and no mutation", () => {
+    expect([...plan.persisted].toSorted()).toEqual([
+      "organization.getAll",
+      "organization.getMemberById",
+    ]);
+  });
+
+  it("leaves out a read on the exclusion list", () => {
+    expect([...excludingMember.persisted]).toEqual(["organization.getAll"]);
+    expect(excludingMember.schemaHashFor("organization.getMemberById")).toBeUndefined();
+  });
+
+  it("gives each mirrored read the schema hash its contract declares, and nothing else one", () => {
+    const declared = schemaHashesOf(organizationTrpc);
+
+    expect(plan.schemaHashFor("organization.getAll")).toBe(declared["organization.getAll"]);
+    expect(plan.schemaHashFor("organization.rename")).toBeUndefined();
+    expect(plan.schemaHashFor("elsewhere.read")).toBeUndefined();
   });
 });
 
@@ -46,7 +79,7 @@ describe("procedurePathOf", () => {
 });
 
 describe("createUiQueryClient with a cache plan", () => {
-  const queryClient = createUiQueryClient({ cachePlan: plan });
+  const queryClient = createUiQueryClient({ cachePlan: excludingMember });
   const gcTimeOf = (path: string) =>
     queryClient.defaultQueryOptions({ queryKey: trpcQueryKey(path, { input: {}, type: "query" }) })
       .gcTime;
@@ -55,7 +88,7 @@ describe("createUiQueryClient with a cache plan", () => {
     expect(gcTimeOf("organization.getAll")).toBe(PERSISTED_QUERY_MAX_AGE);
   });
 
-  it("leaves an undeclared read on the default", () => {
+  it("leaves an excluded read on the default", () => {
     expect(gcTimeOf("organization.getMemberById")).not.toBe(PERSISTED_QUERY_MAX_AGE);
   });
 });
@@ -109,6 +142,25 @@ describe("SessionVersionWatch", () => {
       version = "2";
       await fetch("/api/trpc/x");
       expect(onNewer).toHaveBeenCalledTimes(1);
+    });
+
+    it("records the schema hash a query answer carried, by its procedure path", async () => {
+      const watch = SessionVersionWatch.create();
+      const fetch = sessionVersionFetch({
+        watch,
+        fetch: async (input) =>
+          new Response("{}", {
+            headers:
+              typeof input === "string" && input.includes("getAll")
+                ? { [SCHEMA_HASH_HEADER]: "schema-2" }
+                : {},
+          }),
+      });
+      await fetch("/api/trpc/organization.getAll?input=%7B%7D");
+      await fetch("/api/trpc/organization.rename", { method: "POST" });
+
+      expect(watch.servedSchemaHashFor("organization.getAll")).toBe("schema-2");
+      expect(watch.servedSchemaHashFor("organization.rename")).toBeUndefined();
     });
   });
 });

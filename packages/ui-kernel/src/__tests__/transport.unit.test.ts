@@ -1,6 +1,3 @@
-import { trpcQueryKey } from "@langwatch/api/web";
-import { isUiBatchRequest, uiBatchResponse } from "@langwatch/browser-host/testing";
-import { hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../transport.ts";
@@ -24,7 +21,6 @@ function transportOver(
   const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     calls.push({ url: requestUrl(input), method: init?.method ?? "GET" });
     const body = queue.shift();
-    if (isUiBatchRequest(init) && Array.isArray(body)) return uiBatchResponse({ results: body });
     return new Response(JSON.stringify(body), {
       status: 200,
       headers: { "content-type": "application/json" },
@@ -42,7 +38,7 @@ function resultOf(data: unknown): unknown {
 describe("given the browser transport a feature package's hooks run on", () => {
   describe("when a feature queries a procedure", () => {
     it("sends it to the same-origin platform API and decodes the answer", async () => {
-      const { client, calls } = transportOver([[resultOf({ id: "prompt_1" })]]);
+      const { client, calls } = transportOver([resultOf({ id: "prompt_1" })]);
 
       const output = await client.query("prompts.getById", { id: "prompt_1" });
 
@@ -50,8 +46,8 @@ describe("given the browser transport a feature package's hooks run on", () => {
       expect(calls[0]?.url.startsWith("/api/trpc/prompts.getById")).toBe(true);
     });
 
-    it("batches by default, so several calls in one tick share a request", async () => {
-      const { client, calls } = transportOver([[resultOf("a"), resultOf("b")]]);
+    it("sends each call as its own request, with no batch parameter", async () => {
+      const { client, calls } = transportOver([resultOf("a"), resultOf("b")]);
 
       const outputs = await Promise.all([
         client.query("prompts.getById", { id: "a" }),
@@ -59,29 +55,14 @@ describe("given the browser transport a feature package's hooks run on", () => {
       ]);
 
       expect(outputs).toEqual(["a", "b"]);
-      expect(calls).toHaveLength(1);
-      expect(calls[0]?.url).toContain("batch=1");
-    });
-  });
-
-  describe("when a feature asks for its own connection", () => {
-    it("sends that call unbatched, the way the host reads the same flag", async () => {
-      const { client, calls } = transportOver([resultOf({ enabled: true }), [resultOf("other")]]);
-
-      const outputs = await Promise.all([
-        client.query("featureFlag.isEnabled", { flag: "x" }, { context: { skipBatch: true } }),
-        client.query("prompts.getAll", { projectId: "p" }),
-      ]);
-
-      expect(outputs).toEqual([{ enabled: true }, "other"]);
       expect(calls).toHaveLength(2);
-      expect(calls.some((call) => !call.url.includes("batch=1"))).toBe(true);
+      expect(calls.some((call) => call.url.includes("batch="))).toBe(false);
     });
   });
 
   describe("when a feature mutates", () => {
     it("posts to the same endpoint", async () => {
-      const { client, calls } = transportOver([[resultOf({ id: "prompt_2" })]]);
+      const { client, calls } = transportOver([resultOf({ id: "prompt_2" })]);
 
       await client.mutation("prompts.create", { name: "New" });
 
@@ -93,7 +74,7 @@ describe("given the browser transport a feature package's hooks run on", () => {
   describe("when the platform API answers with an error", () => {
     it("surfaces it to the caller rather than resolving with nothing", async () => {
       const { client } = transportOver([
-        [{ error: { message: "not_found", code: -32004, data: {} } }],
+        { error: { message: "not_found", code: -32004, data: {} } },
       ]);
 
       await expect(client.query("prompts.getById", { id: "missing" })).rejects.toThrow("not_found");
@@ -102,14 +83,14 @@ describe("given the browser transport a feature package's hooks run on", () => {
 });
 
 describe("when a feature sends an answer on its way out of the document", () => {
-  it("keeps the request alive past navigation and never batches it", async () => {
+  it("keeps the request alive past navigation and sends the other call on its own", async () => {
     const inits: RequestInit[] = [];
     const urls: string[] = [];
     const fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       urls.push(input instanceof Request ? input.url : input.toString());
       inits.push(init ?? {});
-      if (isUiBatchRequest(init)) return uiBatchResponse({ results: [resultOf("other")] });
-      return new Response(JSON.stringify(resultOf("kept")), {
+      const answer = inits.length === 1 ? "kept" : "other";
+      return new Response(JSON.stringify(resultOf(answer)), {
         status: 200,
         headers: { "content-type": "application/json" },
       });
@@ -123,56 +104,5 @@ describe("when a feature sends an answer on its way out of the document", () => 
     expect(inits[0]?.keepalive).toBe(true);
     expect(urls[0]).not.toContain("batch=1");
     expect(inits[1]?.keepalive).toBeUndefined();
-  });
-});
-
-describe("when a read is declared versioned", () => {
-  const path = "organization.getScopeGraph";
-  const key = trpcQueryKey(path, { input: {}, type: "query" });
-
-  function versionedTransport(bodies: unknown[]) {
-    const queryClient = new QueryClient();
-    const versions = new Map<string, string>();
-    const { client, calls } = transportOver(bodies, {
-      versionedReads: { paths: new Set([path]), versions, queryClient: () => queryClient },
-    });
-    return { client, calls, queryClient, versions };
-  }
-
-  /** @scenario "A versioned read sends the version it holds" */
-  /** @scenario "An unchanged answer keeps the cached data" */
-  it("sends the held version as since and resolves unchanged to the cached data", async () => {
-    const { client, calls, queryClient, versions } = versionedTransport([
-      [resultOf({ unchanged: true })],
-    ]);
-    queryClient.setQueryData(key, ["acme"]);
-    versions.set(hashKey(key), "u.v1");
-
-    const output = await client.query(path, {});
-
-    expect(output).toEqual(["acme"]);
-    expect(decodeURIComponent(calls[0]?.url ?? "")).toContain('"since":"u.v1"');
-  });
-
-  /** @scenario "A new version replaces the data" */
-  it("replaces the data and remembers the version when the version moved", async () => {
-    const { client, queryClient, versions } = versionedTransport([
-      [resultOf({ version: "u.v2", data: ["acme", "globex"] })],
-    ]);
-    queryClient.setQueryData(key, ["acme"]);
-    versions.set(hashKey(key), "u.v1");
-
-    const output = await client.query(path, {});
-
-    expect(output).toEqual(["acme", "globex"]);
-    expect(versions.get(hashKey(key))).toBe("u.v2");
-  });
-
-  it("sends no since when nothing is cached", async () => {
-    const { client, calls } = versionedTransport([[resultOf({ version: "u.v1", data: [] })]]);
-
-    await client.query(path, {});
-
-    expect(decodeURIComponent(calls[0]?.url ?? "")).not.toContain("since");
   });
 });

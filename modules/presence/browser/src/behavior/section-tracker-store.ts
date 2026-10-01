@@ -1,53 +1,36 @@
-import { create } from "zustand";
+import { defineSlice } from "@langwatch/browser-host/global-store";
+import {
+  PRESENCE_SECTION_TRACKER_SLICE,
+  type SectionTrackerState,
+} from "@langwatch/presence-contract";
 
-interface SectionTrackerState {
-  /**
-   * Visibility ratio (0–1) for each registered section id. We pick the
-   * section with the highest ratio as the "currently focused" section so
-   * peers see one stable hint per user, not a list of partial overlaps.
-   */
-  visibility: Map<string, number>;
+export { pickMostVisibleSection } from "@langwatch/presence-contract";
 
-  setVisibility: (id: string, ratio: number) => void;
-  unregister: (id: string) => void;
-  reset: () => void;
-}
+/** Which section the reader is looking at, in the global UI store (`presence:section-tracker`). */
+export const useSectionTrackerStore = defineSlice<SectionTrackerState>({
+  name: PRESENCE_SECTION_TRACKER_SLICE,
+  create: (set) => ({
+    visibility: new Map(),
 
-export const useSectionTrackerStore = create<SectionTrackerState>((set) => ({
-  visibility: new Map(),
+    setVisibility: (id, ratio) =>
+      set((state) => {
+        const next = new Map(state.visibility);
+        if (ratio <= 0) {
+          next.delete(id);
+        } else {
+          next.set(id, ratio);
+        }
+        return { visibility: next };
+      }),
 
-  setVisibility: (id, ratio) =>
-    set((state) => {
-      const next = new Map(state.visibility);
-      if (ratio <= 0) {
+    unregister: (id) =>
+      set((state) => {
+        if (!state.visibility.has(id)) return state;
+        const next = new Map(state.visibility);
         next.delete(id);
-      } else {
-        next.set(id, ratio);
-      }
-      return { visibility: next };
-    }),
+        return { visibility: next };
+      }),
 
-  unregister: (id) =>
-    set((state) => {
-      if (!state.visibility.has(id)) return state;
-      const next = new Map(state.visibility);
-      next.delete(id);
-      return { visibility: next };
-    }),
-
-  reset: () => set({ visibility: new Map() }),
-}));
-
-/** The section id with the highest current visibility, or null when nothing
- *  is in view. Returns null if nothing exceeds the noise floor (10%). */
-export function selectMostVisibleSection(state: SectionTrackerState): string | null {
-  let bestId: string | null = null;
-  let bestRatio = 0.1;
-  for (const [id, ratio] of state.visibility) {
-    if (ratio > bestRatio) {
-      bestRatio = ratio;
-      bestId = id;
-    }
-  }
-  return bestId;
-}
+    reset: () => set({ visibility: new Map() }),
+  }),
+});

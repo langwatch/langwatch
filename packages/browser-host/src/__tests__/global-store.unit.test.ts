@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { defineSlice, readSlice } from "../global-store.ts";
+import { clearReaderUiStorage, setUiStorageReader } from "../storage.ts";
 
 type Counter = { count: number; label: string; bump: () => void };
 
@@ -62,7 +63,11 @@ describe("given two modules that each declared a slice", () => {
 });
 
 describe("given a persisted slice", () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => {
+    clearReaderUiStorage();
+    window.localStorage.clear();
+    setUiStorageReader("user-a");
+  });
 
   describe("when the module is declared again after a write", () => {
     /** @scenario "A persisted slice survives a reload and keeps only the keys it chose" */
@@ -74,10 +79,55 @@ describe("given a persisted slice", () => {
       const reloaded = counterSlice("trace:explorer", true);
 
       expect(reloaded.getState()).toMatchObject({ count: 1, label: "initial" });
-      expect(JSON.parse(window.localStorage.getItem("trace:explorer") ?? "{}")).toEqual({
-        state: { count: 1 },
-        version: 0,
-      });
+      expect(
+        JSON.parse(window.localStorage.getItem("langwatch:user:user-a:trace:explorer") ?? "{}"),
+      ).toEqual({ state: { count: 1 }, version: 0 });
+    });
+  });
+
+  describe("when a different reader signs in on the same device", () => {
+    /** @scenario "A persisted preference belongs to the reader who chose it" */
+    it("starts them from initial and gives the first reader theirs back", () => {
+      const slice = counterSlice("trace:explorer", true);
+      slice.getState().bump();
+
+      setUiStorageReader("user-b");
+      expect(slice.getState().count).toBe(0);
+      expect(counterSlice("trace:explorer", true).getState().count).toBe(0);
+
+      setUiStorageReader("user-a");
+      expect(slice.getState().count).toBe(1);
+    });
+  });
+
+  describe("when nobody is signed in", () => {
+    /** @scenario "A persisted preference belongs to the reader who chose it" */
+    it("remembers nothing", () => {
+      setUiStorageReader(void 0);
+      counterSlice("trace:explorer", true).getState().bump();
+
+      expect(window.localStorage.length).toBe(0);
+    });
+  });
+
+  describe("when the reader signs out", () => {
+    /** @scenario "Sign-out forgets every persisted preference on the device" */
+    it("removes every reader's persisted keys and leaves other keys alone", () => {
+      window.localStorage.setItem("unrelated", "kept");
+      const slice = counterSlice("trace:explorer", true);
+      slice.getState().bump();
+      setUiStorageReader("user-b");
+      slice.getState().bump();
+
+      clearReaderUiStorage();
+
+      const left = Array.from({ length: window.localStorage.length }, (_, index) =>
+        window.localStorage.key(index),
+      );
+      expect(left).toEqual(["unrelated"]);
+      expect(slice.getState().count).toBe(0);
+      setUiStorageReader("user-a");
+      expect(slice.getState().count).toBe(0);
     });
   });
 });

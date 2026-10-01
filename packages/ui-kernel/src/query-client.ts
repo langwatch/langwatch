@@ -10,36 +10,12 @@ import { showErrorToast } from "@langwatch/browser-host/errors";
 import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
 import {
-  focusManager,
   hashKey,
   MutationCache,
   QueryCache,
   QueryClient,
   type Query,
 } from "@tanstack/react-query";
-
-let focusGateInstalled = false;
-
-/**
- * Only a visible tab whose window holds focus counts as focused, so a hidden tab
- * runs no interval and refetches nothing. Until the first event the library's
- * own visibility check answers.
- */
-function installFocusGate(): void {
-  if (focusGateInstalled || typeof document === "undefined") return;
-  focusGateInstalled = true;
-  focusManager.setEventListener((handleFocus) => {
-    const sync = () => handleFocus(document.visibilityState !== "hidden" && document.hasFocus());
-    document.addEventListener("visibilitychange", sync);
-    window.addEventListener("focus", sync);
-    window.addEventListener("blur", sync);
-    return () => {
-      document.removeEventListener("visibilitychange", sync);
-      window.removeEventListener("focus", sync);
-      window.removeEventListener("blur", sync);
-    };
-  });
-}
 
 export type UiQueryClientOptions = {
   /**
@@ -67,15 +43,16 @@ export function createUiQueryClient({
   cachePlan,
   sessionQueryKey,
 }: UiQueryClientOptions = {}): QueryClient {
-  installFocusGate();
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: {
-      // A read is trusted for 5 minutes, then refetched on focus (the focused tab only) or
-      // reconnect; a read hint refetches it sooner. Nothing polls. read-hints.feature.
+      // A read is trusted for 5 minutes, then refetched when the tab is shown or reconnects; a read
+      // hint refetches it sooner. "Focused" is the library's default: the tab is visible, whatever
+      // the window focus. Query-sync owns the one pass on showing, so the library's is off.
+      // ARCHITECTURE.md §10.2, read-hints.feature.
       queries: {
         retry: shouldRetryQuery,
         staleTime: 5 * 60_000,
-        refetchOnWindowFocus: true,
+        refetchOnWindowFocus: false,
         refetchOnReconnect: true,
         refetchIntervalInBackground: false,
       },
@@ -112,6 +89,8 @@ export function resetUiQueries({
   const others = { predicate: (query: Query) => query.queryHash !== sessionHash };
   void queryClient.cancelQueries(others);
   queryClient.removeQueries(others);
+  // Mutation answers go too: a minted token must not outlive the actor who minted it.
+  queryClient.getMutationCache().clear();
 }
 
 function defaultMutationErrorReporter(error: unknown): void {

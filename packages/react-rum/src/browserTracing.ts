@@ -26,6 +26,7 @@ import { NavigationContextManager } from "./navigationContextManager.ts";
 import { createBrowserSampler } from "./sampling.ts";
 import { currentSessionId } from "./session.ts";
 import { SessionSpanProcessor } from "./sessionSpanProcessor.ts";
+import { UrlScrubSpanProcessor } from "./urlScrubSpanProcessor.ts";
 
 let started = false;
 
@@ -63,6 +64,8 @@ export function startBrowserTracing({
       }),
       spanProcessors: [
         new SessionSpanProcessor(),
+        // Ahead of the exporter, so no query string is in what it reads.
+        new UrlScrubSpanProcessor(),
         new BatchSpanProcessor(
           new OTLPTraceExporter({
             url: RUM_TRACES_PATH,

@@ -104,6 +104,25 @@ describe("sanitiseErrorMessage", () => {
   });
 
   /** @scenario Query strings and long messages are stripped */
+  it("drops message lines that only look like frames", () => {
+    const stack = [
+      "Error: connect ECONNREFUSED 10.0.0.5:6379",
+      'retry {"retryAfter":30',
+      "    at connect (https://app.test/assets/redis.js:3:4)",
+    ].join("\n");
+
+    expect(sanitiseStack({ stack })).toBe("redis.js:3");
+  });
+
+  /** @scenario Query strings and long messages are stripped */
+  it.each([
+    ["a base64 run with slashes", "key aGVsbG8/d29ybGQ/c2VjcmV0/dmFsdWU= sent", /aGVsbG8/],
+    ["an access key id", "id AKIAIOSFODNN7EXAMPLE used", /AKIAIOSFODNN7EXAMPLE/],
+  ])("redacts %s", (_label, message, leaked) => {
+    expect(sanitiseErrorMessage({ message })).not.toMatch(leaked);
+  });
+
+  /** @scenario Query strings and long messages are stripped */
   it("caps the length", () => {
     expect(sanitiseErrorMessage({ message: "word ".repeat(1_000) })).toHaveLength(
       BROWSER_ERROR_MAX_LENGTH,
