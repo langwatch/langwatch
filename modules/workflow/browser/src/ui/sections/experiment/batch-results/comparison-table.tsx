@@ -15,6 +15,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
+import {
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
+  type RowHeight,
+} from "../../../../model/experiment/batch-evaluation-results.row-height.ts";
 import { DiffCell, type DiffValue } from "../../../elements/experiment/batch-results/diff-cell.tsx";
 import { TableSkeleton } from "../../../elements/experiment/batch-results/table-skeleton.tsx";
 import type {
@@ -31,13 +36,7 @@ import {
   type RenderBatchEvaluatorResult,
   type RenderTracePeek,
 } from "./presentation.tsx";
-import {
-  calculateMinTableWidth,
-  DEFAULT_ROW_HEIGHT,
-  ESTIMATED_ROW_HEIGHT_PX,
-  getTableStyles,
-  type RowHeight,
-} from "./table-utils.ts";
+import { calculateMinTableWidth, getTableStyles } from "./table-utils.ts";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */

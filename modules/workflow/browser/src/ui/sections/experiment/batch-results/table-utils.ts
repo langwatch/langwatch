@@ -5,14 +5,6 @@ import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
 import { getImageUrl } from "./presentation.tsx";
 
-export {
-  COLLAPSED_CELL_HEIGHT_PX,
-  DEFAULT_ROW_HEIGHT,
-  ESTIMATED_ROW_HEIGHT_PX,
-  type RowHeight,
-  ROW_HEIGHT_OPTIONS,
-} from "../../../../model/experiment/batch-evaluation-results.row-height.ts";
-
 /**
  * Calculate minimum table width based on column counts
  * Row number (40) + dataset cols (210 each) + target cols (300 each)

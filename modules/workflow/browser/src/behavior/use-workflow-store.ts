@@ -3,24 +3,6 @@ import debounce from "lodash-es/debounce";
 import { temporal } from "zundo";
 import { create } from "zustand";
 
-// Keep the public hook and its pure state helpers on one browser package
-// surface; app transport code composes around this hook.
-export {
-  getWorkflow,
-  initialDSL,
-  initialState,
-  removeInvalidDecorations,
-  removeInvalidEdges,
-  type SocketStatus,
-  type State,
-  serializeWorkflow,
-  store,
-  updateCodeClassName,
-  updateInputFields,
-  updateOutputFields,
-  type WorkflowStore,
-} from "./workflow-store.ts";
-
 import { store, type WorkflowStore } from "./workflow-store.ts";
 
 export const _useWorkflowStore = create<WorkflowStore>()(

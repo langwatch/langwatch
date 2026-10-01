@@ -561,5 +561,3 @@ const VariableRow = ({
     </HStack>
   );
 };
-
-export { type AvailableSource, type FieldMapping } from "./variable-mapping-input.tsx";

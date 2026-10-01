@@ -8,8 +8,12 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useRef, useState } from "react";
 import { LuCheck, LuCopy } from "react-icons/lu";
 
+import {
+  COLLAPSED_CELL_HEIGHT_PX,
+  DEFAULT_ROW_HEIGHT,
+  type RowHeight,
+} from "../../../../model/experiment/batch-evaluation-results.row-height.ts";
 import { useEscapeKey } from "./presentation.tsx";
-import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;

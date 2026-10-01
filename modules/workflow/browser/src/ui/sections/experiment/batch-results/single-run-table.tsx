@@ -14,6 +14,11 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
+import {
+  DEFAULT_ROW_HEIGHT,
+  ESTIMATED_ROW_HEIGHT_PX,
+  type RowHeight,
+} from "../../../../model/experiment/batch-evaluation-results.row-height.ts";
 import { TableSkeleton } from "../../../elements/experiment/batch-results/table-skeleton.tsx";
 import {
   type BatchTargetAggregate,
@@ -37,14 +42,7 @@ import {
   type RenderDatasetImage,
   type RenderTracePeek,
 } from "./presentation.tsx";
-import {
-  calculateMinTableWidth,
-  DEFAULT_ROW_HEIGHT,
-  ESTIMATED_ROW_HEIGHT_PX,
-  getTableStyles,
-  inferColumnType,
-  type RowHeight,
-} from "./table-utils.ts";
+import { calculateMinTableWidth, getTableStyles, inferColumnType } from "./table-utils.ts";
 
 type SingleRunTableProps = {
   /** Transformed batch evaluation data */

@@ -15,6 +15,11 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Columns3, HelpCircle, ListTree, Rows3, SlidersHorizontal } from "lucide-react";
 
 import type { ResultField } from "../../../../behavior/experiment/use-result-display-preferences.ts";
+import {
+  DEFAULT_ROW_HEIGHT,
+  ROW_HEIGHT_OPTIONS,
+  type RowHeight,
+} from "../../../../model/experiment/batch-evaluation-results.row-height.ts";
 import type {
   BatchDatasetColumn,
   BatchEvaluationData,
@@ -28,7 +33,6 @@ import type {
   RenderTracePeek,
 } from "./presentation.tsx";
 import { SingleRunTable } from "./single-run-table.tsx";
-import { DEFAULT_ROW_HEIGHT, ROW_HEIGHT_OPTIONS, type RowHeight } from "./table-utils.ts";
 
 type BatchEvaluationResultsTableProps = {
   /** Transformed batch evaluation data (single run mode) */

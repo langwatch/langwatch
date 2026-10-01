@@ -1,6 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { editor, IDisposable, IRange, languages, Position } from "monaco-editor";
 
+import type { PyMember, PyModule } from "./python-api.types.ts";
 import {
   ATTR_ACCESS,
   type ContractRef,
@@ -15,8 +16,6 @@ import {
   PYTHON_KEYWORDS,
   PYTHON_STDLIB_MODULE_BY_NAME,
   PYTHON_STDLIB_MODULE_NAMES,
-  type PyMember,
-  type PyModule,
 } from "./python-stdlib.ts";
 
 function itemKind(monaco: Monaco, kind: PyMember["kind"]): languages.CompletionItemKind {
