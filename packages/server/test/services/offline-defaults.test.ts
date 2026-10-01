@@ -7,6 +7,7 @@ const execCalls: Array<{
 	bin: string;
 	args: string[];
 	env?: Record<string, string | undefined>;
+	timeout?: number;
 }> = [];
 const spawnedEnvs: Record<string, Record<string, string | undefined>> = {};
 let appRootDir = "";
@@ -18,9 +19,14 @@ vi.mock("../../src/services/_pipe-to-bus.ts", () => ({
 			_name: string,
 			bin: string,
 			args: string[],
-			options?: { env?: Record<string, string | undefined> },
+			options?: { env?: Record<string, string | undefined>; timeout?: number },
 		) => {
-			execCalls.push({ bin, args, env: options?.env });
+			execCalls.push({
+				bin,
+				args,
+				env: options?.env,
+				...(options?.timeout !== undefined ? { timeout: options.timeout } : {}),
+			});
 		},
 	),
 }));
@@ -247,6 +253,7 @@ describe("tokenizer files for the app", () => {
 						cache,
 					],
 					env: undefined,
+					timeout: 300_000,
 				},
 			]);
 		});
@@ -275,6 +282,7 @@ describe("tokenizer cache for LangEvals", () => {
 			expect(execCalls[0]?.env?.TIKTOKEN_CACHE_DIR).toBe(
 				join(home, "cache", "tiktoken"),
 			);
+			expect(execCalls[0]?.timeout).toBe(300_000);
 
 			await fill();
 			expect(execCalls).toHaveLength(1);

@@ -24,6 +24,7 @@ func managedSlot() domain.Credential {
 	return domain.Credential{ID: "langwatch_managed", ProviderID: domain.ProviderLangWatch, Models: []string{}}
 }
 
+// TestBareModelIsRefusedWhenLangWatchIsTheOnlyProvider checks that a key whose only provider is the LangWatch slot refuses a bare model.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestBareModelIsRefusedWhenLangWatchIsTheOnlyProvider(t *testing.T) {
 	t.Parallel()
@@ -36,6 +37,7 @@ func TestBareModelIsRefusedWhenLangWatchIsTheOnlyProvider(t *testing.T) {
 	assert.Contains(t, errMessage(err), `"langwatch"`, "the refusal names the prefix the key accepts")
 }
 
+// TestBareModelNoCatalogListsSkipsLangWatch checks that the no-catalog step for a bare model never picks the LangWatch slot.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestBareModelNoCatalogListsSkipsLangWatch(t *testing.T) {
 	t.Parallel()
@@ -52,6 +54,7 @@ func TestBareModelNoCatalogListsSkipsLangWatch(t *testing.T) {
 	mustPick(t, cfg, bare("gpt-5-mini"), "anthropic_1")
 }
 
+// TestBareUnknownModelStaysOnTheNoCatalogProvider checks that a bare model no catalog lists goes to the org's own no-catalog provider.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestBareUnknownModelStaysOnTheNoCatalogProvider(t *testing.T) {
 	t.Parallel()
@@ -64,6 +67,7 @@ func TestBareUnknownModelStaysOnTheNoCatalogProvider(t *testing.T) {
 	mustPick(t, cfg, bare("my-model"), "openai_1")
 }
 
+// TestBareUnknownModelWithCatalogProviderSkipsLangWatch checks that a bare model no catalog lists is never sent to the LangWatch slot.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestBareUnknownModelWithCatalogProviderSkipsLangWatch(t *testing.T) {
 	t.Parallel()
@@ -79,6 +83,7 @@ func TestBareUnknownModelWithCatalogProviderSkipsLangWatch(t *testing.T) {
 	mustPick(t, cfg, bare("my-model"), "openai_1")
 }
 
+// TestBareModelFallbackChainLeavesOutLangWatch checks that the fallback chain for a bare model does not include the LangWatch slot.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestBareModelFallbackChainLeavesOutLangWatch(t *testing.T) {
 	t.Parallel()
@@ -92,6 +97,7 @@ func TestBareModelFallbackChainLeavesOutLangWatch(t *testing.T) {
 	mustPick(t, cfg, bare("my-model"), "custom_1", "bedrock_1")
 }
 
+// TestLangWatchIsNotTheSoleProviderForListedBareModels checks that the lone-credential step skips the LangWatch slot.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestLangWatchIsNotTheSoleProviderForListedBareModels(t *testing.T) {
 	t.Parallel()
@@ -103,6 +109,7 @@ func TestLangWatchIsNotTheSoleProviderForListedBareModels(t *testing.T) {
 	assert.Equal(t, domain.ProviderID(""), soleCredentialProviderID([]domain.Credential{managedSlot()}))
 }
 
+// TestLangWatchPrefixedModelPicksTheManagedSlot checks that a langwatch/ model resolves to the LangWatch slot.
 // @scenario "A langwatch-prefixed model routes to the langwatch provider"
 func TestLangWatchPrefixedModelPicksTheManagedSlot(t *testing.T) {
 	t.Parallel()
@@ -127,6 +134,7 @@ func spellingModels() *mockModels {
 	}
 }
 
+// TestHandleChat_LangWatchPrefixDispatchesToTheManagedSlot checks that a chat call for a langwatch/ model is dispatched to the LangWatch slot.
 // @scenario "A langwatch-prefixed model routes to the langwatch provider"
 func TestHandleChat_LangWatchPrefixDispatchesToTheManagedSlot(t *testing.T) {
 	var attempted []string
@@ -148,6 +156,7 @@ func TestHandleChat_LangWatchPrefixDispatchesToTheManagedSlot(t *testing.T) {
 	assert.Equal(t, []string{"langwatch_managed"}, attempted)
 }
 
+// TestHandleChat_RetryableFailureNeverFallsBackToLangWatch checks that a retryable failure on another provider never retries on the LangWatch slot.
 // @scenario "A call for another provider never falls back to LangWatch"
 func TestHandleChat_RetryableFailureNeverFallsBackToLangWatch(t *testing.T) {
 	for _, tc := range []struct {
@@ -184,6 +193,7 @@ func TestHandleChat_RetryableFailureNeverFallsBackToLangWatch(t *testing.T) {
 	}
 }
 
+// TestHandleChat_BareModelRetryableFailureNeverFallsBackToLangWatch checks that a retryable failure on a bare model never retries on the LangWatch slot.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestHandleChat_BareModelRetryableFailureNeverFallsBackToLangWatch(t *testing.T) {
 	var attempted []string
@@ -208,6 +218,7 @@ func TestHandleChat_BareModelRetryableFailureNeverFallsBackToLangWatch(t *testin
 	assert.Equal(t, []string{"custom_1"}, attempted)
 }
 
+// TestHandleChat_BareModelOnALangWatchOnlyKeyIsRefused checks that a chat call with a bare model on a LangWatch-only key is refused.
 // @scenario "A model name without the langwatch prefix never reaches LangWatch"
 func TestHandleChat_BareModelOnALangWatchOnlyKeyIsRefused(t *testing.T) {
 	provider := &mockProvider{

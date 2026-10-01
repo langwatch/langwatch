@@ -27,7 +27,7 @@ function statusWith(sync: SyncView): ConnectEnabledView {
     entitledServices: null,
     usage: null,
     refusal: null,
-    usageUnavailable: false,
+    isUsageUnavailable: false,
     sync,
   } as ConnectEnabledView;
 }

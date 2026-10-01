@@ -102,6 +102,12 @@ function missingTiktokenEncodings({
 }
 
 /**
+ * How long a tokenizer fill may run before it is killed. A fill that stalls on
+ * the network then fails like any other, and the install goes on.
+ */
+const PREPARE_TIMEOUT_MS = 5 * 60_000;
+
+/**
  * Downloads the tiktoken encoding files once, at install time, the way the
  * image build does. Skipped when every file is already there. A failed
  * download does not fail the install: the app then fetches an encoding the
@@ -124,10 +130,13 @@ export async function ensureTiktokenEncodings({
 		).resolve("tiktoken/registry.json");
 		if (missingTiktokenEncodings({ dir, registryPath }).length === 0) return;
 
-		await execAndPipe(bus, service, process.execPath, [
-			join(langwatchDir, "scripts", "download-tiktoken-encodings.mjs"),
-			dir,
-		]);
+		await execAndPipe(
+			bus,
+			service,
+			process.execPath,
+			[join(langwatchDir, "scripts", "download-tiktoken-encodings.mjs"), dir],
+			{ timeout: PREPARE_TIMEOUT_MS },
+		);
 	} catch (err) {
 		bus.emit({
 			type: "log",
@@ -189,6 +198,7 @@ export async function ensureLangevalsTiktokenCache({
 					UV_PROJECT_ENVIRONMENT: venvDir,
 					TIKTOKEN_CACHE_DIR: cache,
 				},
+				timeout: PREPARE_TIMEOUT_MS,
 			},
 		);
 		writeFileSync(marker, expected);

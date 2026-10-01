@@ -76,7 +76,7 @@ export type ConnectStatus =
        * The usage read failed without a refusal to show: LangWatch was not
        * reached, timed out, or answered with no usable reply.
        */
-      readonly usageUnavailable: boolean;
+      readonly isUsageUnavailable: boolean;
       readonly sync: ConnectSyncView;
     };
 
@@ -123,7 +123,7 @@ export class ConnectSettingsService {
         entitledServices: null,
         usage: null,
         refusal: null,
-        usageUnavailable: false,
+        isUsageUnavailable: false,
       };
     }
 
@@ -138,7 +138,7 @@ export class ConnectSettingsService {
         entitledServices: usage.services,
         usage,
         refusal: null,
-        usageUnavailable: false,
+        isUsageUnavailable: false,
       };
     } catch (error) {
       if (
@@ -151,7 +151,7 @@ export class ConnectSettingsService {
           entitledServices: null,
           usage: null,
           refusal: { code: error.code, meta: error.meta },
-          usageUnavailable: false,
+          isUsageUnavailable: false,
         };
       }
       logger.warn(
@@ -164,7 +164,7 @@ export class ConnectSettingsService {
         entitledServices: null,
         usage: null,
         refusal: null,
-        usageUnavailable: true,
+        isUsageUnavailable: true,
       };
     }
   }

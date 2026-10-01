@@ -121,7 +121,7 @@ const connectedStatus = (overrides: Record<string, unknown> = {}) => ({
     budgets: [],
   },
   refusal: null,
-  usageUnavailable: false,
+  isUsageUnavailable: false,
   sync: { lastSyncAt: null, lastError: null },
   ...overrides,
 });
@@ -384,7 +384,7 @@ describe("<ConnectSettings />", () => {
         connectedStatus({
           entitledServices: null,
           usage: null,
-          usageUnavailable: true,
+          isUsageUnavailable: true,
         }),
       );
 

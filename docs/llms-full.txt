@@ -60569,7 +60569,7 @@ Neither the AWS SDK nor Node's HTTP client reads `HTTPS_PROXY` on its own, so La
 | `VOICE_CALL_MAX_SECONDS` | Longest a voice call can last, in seconds. A scenario call is cut at this limit and marked "Cut at the call limit". Browser calls (**Talk to it**, **Call it myself**) are cut at the same limit. | `300` |
 | `VOICE_RUNS_MAX_CONCURRENT` | Voice runs at a time, per project, per worker process. More voice runs wait in the queue. Text runs are not affected. | `2` |
 | `VOICE_PUBLIC_BASE_URL` | Public https origin of the voice worker, for Twilio phone calls to reach it. When set, it always wins over the tunnel. | - |
-| `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. With both unset, phone runs fail. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
+| `VOICE_TUNNEL` | Set to `true` to have the worker open a cloudflared quick tunnel at boot and use its URL when `VOICE_PUBLIC_BASE_URL` is unset. The tunnel calls Cloudflare. Phone runs fail when `VOICE_PUBLIC_BASE_URL` is unset and no tunnel is open. | `false` when `NODE_ENV=production` (a self-hosted install). Unset, it is on for LangWatch Cloud and when `NODE_ENV` is not `production`, for example local development |
 | `VOICE_WS_PORT` | Port the voice worker listens on for phone audio. Route your public origin to it. | `3300` |
 
 ## Feature Flags

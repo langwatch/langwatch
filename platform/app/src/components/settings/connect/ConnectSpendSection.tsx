@@ -33,7 +33,7 @@ export function ConnectSpendSection({
 }: ConnectSpendSectionProps) {
   const usage = status.usage;
   if (!usage) {
-    if (!status.usageUnavailable) return null;
+    if (!status.isUsageUnavailable) return null;
     return (
       <SettingsSection
         title="Spend"

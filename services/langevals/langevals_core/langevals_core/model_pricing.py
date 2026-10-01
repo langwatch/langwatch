@@ -97,13 +97,13 @@ def register_langwatch_model_pricing() -> int:
         # register_model probes each provider name and warns once per model
         # it does not already know; for a whole catalog that is hundreds of
         # startup lines saying the same thing.
-        suppress_debug_info = litellm.suppress_debug_info
+        was_debug_info_suppressed = litellm.suppress_debug_info
         log_level = verbose_logger.level
         litellm.suppress_debug_info = True
         verbose_logger.setLevel(logging.ERROR)
         try:
             litellm.register_model(cost_map)
         finally:
-            litellm.suppress_debug_info = suppress_debug_info
+            litellm.suppress_debug_info = was_debug_info_suppressed
             verbose_logger.setLevel(log_level)
     return len(cost_map)

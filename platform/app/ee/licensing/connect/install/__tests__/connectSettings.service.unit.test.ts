@@ -395,7 +395,7 @@ describe("given a host that refuses the read", () => {
         usage: null,
         entitledServices: null,
         refusal: { code: "connect_license_not_registered" },
-        usageUnavailable: false,
+        isUsageUnavailable: false,
       });
     });
   });
@@ -437,25 +437,45 @@ describe("given a usage read that cannot reach LangWatch", () => {
         enabledServices: ["instant_evals", "managed_models"],
         usage: null,
         refusal: null,
-        usageUnavailable: true,
+        isUsageUnavailable: true,
       });
     });
   });
 
   describe("when the host never answers", () => {
     /** @scenario "A usage read that cannot reach LangWatch shows usage as unavailable" */
-    it("bounds the read with a timeout of its own", async () => {
-      const usage = vi.fn(async () => USAGE);
-      const { service } = serviceOver({
-        row: { connectServicesDisabled: [], license: LICENSE_KEY },
-        client: fakeClient({ usage }),
-      });
+    it("gives up after 10 seconds and reports usage as unavailable", async () => {
+      // Stands in for the deadline firing, so the test does not wait 10 seconds.
+      const deadline = new AbortController();
+      const timeout = vi
+        .spyOn(AbortSignal, "timeout")
+        .mockReturnValue(deadline.signal);
+      try {
+        const usage = vi.fn(
+          ({ signal }: { signal?: AbortSignal }) =>
+            new Promise<never>((_resolve, reject) => {
+              const fail = () => reject(signal?.reason ?? new Error("aborted"));
+              if (signal?.aborted) fail();
+              signal?.addEventListener("abort", fail);
+            }),
+        );
+        const { service } = serviceOver({
+          row: { connectServicesDisabled: [], license: LICENSE_KEY },
+          client: fakeClient({ usage }),
+        });
 
-      await service.status(ORGANIZATION);
+        const read = service.status(ORGANIZATION);
+        deadline.abort(new DOMException("timed out", "TimeoutError"));
 
-      expect(usage).toHaveBeenCalledWith(
-        expect.objectContaining({ signal: expect.any(AbortSignal) }),
-      );
+        await expect(read).resolves.toMatchObject({
+          usage: null,
+          refusal: null,
+          isUsageUnavailable: true,
+        });
+        expect(timeout).toHaveBeenCalledWith(10_000);
+      } finally {
+        timeout.mockRestore();
+      }
     });
   });
 });
