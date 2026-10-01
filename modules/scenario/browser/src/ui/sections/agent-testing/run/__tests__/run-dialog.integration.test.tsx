@@ -420,6 +420,39 @@ describe("<RunDialog/>", () => {
     expect(mockRunScenario).not.toHaveBeenCalled();
   });
 
+  /** @scenario "The only agent of a project is not chosen for a scenario with no saved agent" */
+  it("shows the only agent unchosen and sends no target until it is picked", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT] });
+    mockSuitesRunPlan.mockRejectedValue(handledRejection("suite_targets_required"));
+    renderDialog(suiteSubject());
+
+    // What is shown is what is held: the one card is not marked chosen.
+    const card = screen.getByTestId("run-dialog-agent-agent_1");
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    expect(card.querySelector("svg.lucide-check")).toBeNull();
+
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ config: expect.objectContaining({ targets: [] }) }),
+    );
+    expect(await screen.findByTestId("run-dialog-error")).toHaveTextContent(
+      "Choose an agent to run against",
+    );
+
+    mockSuitesRunPlan.mockClear();
+    await user.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByTestId("run-dialog-run"));
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          targets: [expect.objectContaining({ type: "http", referenceId: "agent_1" })],
+        }),
+      }),
+    );
+  });
+
   // --- Chips ---
 
   /** @scenario "The note chip adds a note field" */
