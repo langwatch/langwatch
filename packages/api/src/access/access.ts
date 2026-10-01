@@ -4,19 +4,14 @@
  * guard, the blank-scope-id refusal and the project-id mismatch refusal.
  */
 
-// The permission and declaration vocabularies are `@langwatch/authz-contract`'s;
-// nothing here mirrors them.
+// The permission vocabulary is `@langwatch/authorization`'s; nothing here mirrors it.
 import type { Actor } from "@langwatch/actor";
 import {
-  AUTHZ_DECLARATION,
   BlankScopeIdError,
-  declareAuthzMiddleware,
   permissionGrantTiers,
   PermissionDeniedError,
-  resolveDeclaredScope,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
-  type AuthzDeclaration,
   type AuthzDeclaredScopeId,
   type AuthzDenialReason,
   type AuthzGetDecisionInput,
@@ -24,14 +19,19 @@ import {
   type AuthzPermission,
   type AuthzScopeLineageInput,
   type AuthzScopeLineageResult,
-  type BindingScopeTier,
-  type DeclaredScopeId,
+  type DeclaredScopeTier,
   type PermissionDecision,
   type ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 
 import { EnterprisePlanRequiredError, ScopeInputMismatchError } from "../errors.ts";
+import { resolveDeclaredScope } from "./declaration.ts";
+import {
+  AUTHZ_DECLARATION,
+  declareAuthzMiddleware,
+  type AuthzDeclaration,
+} from "./declared-middleware.ts";
 
 const logger = createLogger("langwatch:authz");
 
@@ -69,8 +69,8 @@ export function declareAccessMiddleware<M extends (params: never) => Promise<unk
  */
 export function sharedGrantTiers(
   permissions: readonly AuthzPermission[],
-): readonly BindingScopeTier[] {
-  return permissions.reduce<readonly BindingScopeTier[]>(
+): readonly DeclaredScopeTier[] {
+  return permissions.reduce<readonly DeclaredScopeTier[]>(
     (shared, permission) =>
       shared.filter((tier) => permissionGrantTiers(permission).includes(tier)),
     permissions[0] ? permissionGrantTiers(permissions[0]) : [],
@@ -204,7 +204,7 @@ export function routeScopeOf({
 }: {
   param: ScopeTierField;
   input: unknown;
-}): DeclaredScopeId {
+}): AuthzDeclaredScopeId {
   const named =
     typeof input === "object" && input !== null
       ? (input as Record<string, unknown>)[param]
@@ -235,7 +235,7 @@ export function assertRouteScopePermission({
   denials,
 }: {
   permission: AuthzGetDecisionInput["permission"];
-  target: DeclaredScopeId;
+  target: AuthzDeclaredScopeId;
   decision: PermissionDecision;
   denials?: AccessDenial;
 }): void {
@@ -583,7 +583,7 @@ function requireDeclaredScope({
   permission: AuthzGetDecisionInput["permission"];
   input: unknown;
   via?: ScopeTierField;
-}): DeclaredScopeId {
+}): AuthzDeclaredScopeId {
   const resolution = resolveDeclaredScope({
     permission,
     input: (typeof input === "object" && input !== null ? input : {}) as Partial<
@@ -617,7 +617,7 @@ function denied({
   denials,
 }: {
   permission: AuthzGetDecisionInput["permission"];
-  scope: DeclaredScopeId;
+  scope: AuthzDeclaredScopeId;
   decision: PermissionDecision;
   denials?: AccessDenial;
 }): Error {

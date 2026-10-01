@@ -8,7 +8,7 @@ import type {
   AuthzDeclaredScopeId,
   AuthzPermission,
   ScopeTierField,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import type { ModuleApiToken } from "@langwatch/kernel";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type * as httpStatusModule from "hono/utils/http-status";

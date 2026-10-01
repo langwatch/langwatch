@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
-
 import {
   ALL_PERMISSIONS,
   authzPermissionSchema,
-  bindingScopeCanGrantPermission,
   permissionSatisfiedBy,
-} from "../registry.ts";
+} from "@langwatch/authorization";
+import { describe, expect, it } from "vitest";
+
 import { builtinRoleGrants } from "../roles.ts";
+import { bindingScopeCanGrantPermission } from "../scope.ts";
 
 /**
  * The single sign-on permission split (D05, ADR-122 — see

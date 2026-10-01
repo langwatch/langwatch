@@ -1,7 +1,7 @@
 // Built-in roles from contract; parity-tested against engine; unit test catches omissions.
 
+import { type AuthzPermission } from "@langwatch/authorization";
 import {
-  type AuthzPermission,
   builtinRolePermissions,
   roleKeyForTeamRole,
   type TeamUserRole,

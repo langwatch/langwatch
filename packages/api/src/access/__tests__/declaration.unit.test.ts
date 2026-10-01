@@ -1,12 +1,14 @@
+import {
+  isPlatformTierPermission,
+  permissionGrantTiers,
+  type PermissionScopeArg,
+} from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import {
   findDeclaredScopeId,
-  isPlatformTierPermission,
-  permissionGrantTiers,
   resolveDeclaredScope,
   type DeclarationError,
-  type PermissionScopeArg,
   type ValidatePermissionForInput,
 } from "../declaration.ts";
 

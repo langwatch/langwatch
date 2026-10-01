@@ -18,7 +18,8 @@ import {
   type ResolvedOrganizationApiKeyToken,
 } from "@langwatch/api-key-contract";
 import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
-import type { AuthzApi, AuthzPermission, PermissionDecision } from "@langwatch/authz-contract";
+import type { AuthzPermission, PermissionDecision } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
 import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, type Logger } from "@langwatch/observability";

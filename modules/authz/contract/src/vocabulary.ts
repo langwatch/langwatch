@@ -1,73 +1,9 @@
 /**
- * Authorization vocabulary: scope tiers and principal kinds, declared once.
+ * Principal vocabulary: grant subjects and caller kinds, declared once.
  * Every union, conversion, guard derives from these; spelling errors are
  * caught as type errors.
  */
 import { z } from "zod";
-
-/**
- * The tiers a permission question can be asked at, narrowest first. Order is
- * containment: a grant at a later tier covers questions asked at an earlier
- * one, which is what `scopeChainFor` walks.
- */
-export const SCOPE_TIERS = {
-  resource: { stored: "RESOURCE" },
-  project: { stored: "PROJECT", field: "projectId" },
-  team: { stored: "TEAM", field: "teamId" },
-  organization: { stored: "ORGANIZATION", field: "organizationId" },
-  platform: { stored: "PLATFORM" },
-} as const;
-
-export const SCOPE_TIER_NAMES = Object.keys(SCOPE_TIERS) as readonly ScopeTier[];
-export const scopeTierSchema = z.enum(
-  Object.keys(SCOPE_TIERS) as [keyof typeof SCOPE_TIERS, ...(keyof typeof SCOPE_TIERS)[]],
-);
-export type ScopeTier = z.infer<typeof scopeTierSchema>;
-
-export const storedScopeTierSchema = z.enum([
-  "RESOURCE",
-  "PROJECT",
-  "TEAM",
-  "ORGANIZATION",
-  "PLATFORM",
-]);
-export type StoredScopeTier = z.infer<typeof storedScopeTierSchema>;
-
-/**
- * The tiers a role binding may sit at. `resource` is excluded because a
- * resource is reached by a grant, not a binding; `platform` because operator
- * access is not granted through an organization.
- */
-export const BINDING_SCOPE_TIERS = [
-  "project",
-  "team",
-  "organization",
-] as const satisfies readonly ScopeTier[];
-
-export const bindingScopeTierSchema = z.enum(BINDING_SCOPE_TIERS);
-export type BindingScopeTier = z.infer<typeof bindingScopeTierSchema>;
-
-/**
- * The input field naming each binding tier — the same three tiers, spelled
- * the way a procedure input spells them. Declared on the tiers above, not a
- * separate table, so a tier cannot have a field here and no spelling there.
- */
-export const SCOPE_TIER_FIELDS = {
-  project: SCOPE_TIERS.project.field,
-  team: SCOPE_TIERS.team.field,
-  organization: SCOPE_TIERS.organization.field,
-} as const;
-
-export type ScopeTierField = (typeof SCOPE_TIER_FIELDS)[BindingScopeTier];
-
-/** The tier a scope field names — the reverse of SCOPE_TIER_FIELDS. */
-export const SCOPE_TIER_BY_FIELD = {
-  projectId: "project",
-  teamId: "team",
-  organizationId: "organization",
-} as const satisfies Record<ScopeTierField, BindingScopeTier>;
-export const storedBindingScopeTierSchema = z.enum(["PROJECT", "TEAM", "ORGANIZATION"]);
-export type StoredBindingScopeTier = z.infer<typeof storedBindingScopeTierSchema>;
 
 /**
  * The kinds of thing a grant can name as its subject. `anyone` is the public
@@ -110,14 +46,6 @@ export const CALLER_KINDS = ["user", "apiKey", "anonymous"] as const;
 export const callerKindSchema = z.enum(CALLER_KINDS);
 export type CallerKind = z.infer<typeof callerKindSchema>;
 
-export const STORED_SCOPE_TIER = Object.fromEntries(
-  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [tier, spelling.stored]),
-) as Record<ScopeTier, StoredScopeTier>;
-
-export const SCOPE_TIER_FROM_STORED = Object.fromEntries(
-  Object.entries(SCOPE_TIERS).map(([tier, spelling]) => [spelling.stored, tier]),
-) as Record<StoredScopeTier, ScopeTier>;
-
 export const STORED_PRINCIPAL_KIND = Object.fromEntries(
   Object.entries(PRINCIPAL_KINDS).map(([kind, spelling]) => [kind, spelling.stored]),
 ) as Record<PrincipalKind, StoredPrincipalKind>;
@@ -127,26 +55,17 @@ export const PRINCIPAL_KIND_FROM_STORED = Object.fromEntries(
 ) as Record<StoredPrincipalKind, PrincipalKind>;
 
 // An own-property check, not `in`: an object literal inherits from
-// Object.prototype, so `"constructor" in SCOPE_TIERS` is true and would
-// narrow an untrusted string to a tier whose lookup then yields a function.
+// Object.prototype, so `"constructor" in PRINCIPAL_KINDS` is true and would
+// narrow an untrusted string to a kind whose lookup then yields a function.
 // `hasOwnProperty.call` not `Object.hasOwn`: this package targets es2020.
 const hasOwn = (object: object, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(object, key);
-
-export const isScopeTier = (value: unknown): value is ScopeTier =>
-  typeof value === "string" && hasOwn(SCOPE_TIERS, value);
-
-export const isStoredScopeTier = (value: unknown): value is StoredScopeTier =>
-  typeof value === "string" && hasOwn(SCOPE_TIER_FROM_STORED, value);
 
 export const isPrincipalKind = (value: unknown): value is PrincipalKind =>
   typeof value === "string" && hasOwn(PRINCIPAL_KINDS, value);
 
 export const isStoredPrincipalKind = (value: unknown): value is StoredPrincipalKind =>
   typeof value === "string" && hasOwn(PRINCIPAL_KIND_FROM_STORED, value);
-
-export const isBindingScopeTier = (value: unknown): value is BindingScopeTier =>
-  BINDING_SCOPE_TIERS.includes(value as BindingScopeTier);
 
 /** Whether a principal of this kind carries an id. Only `anyone` does not. */
 export const principalKindIsIdentified = (kind: PrincipalKind): boolean =>

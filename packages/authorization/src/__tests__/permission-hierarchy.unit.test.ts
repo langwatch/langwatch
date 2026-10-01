@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { permissionSatisfiedBy } from "../registry.ts";
+import { ALL_PERMISSIONS, authzPermissionSchema, permissionSatisfiedBy } from "../registry.ts";
 
 const satisfies = (granted: readonly string[], requested: string): boolean =>
   permissionSatisfiedBy({ granted: new Set(granted), requested });
@@ -95,5 +95,13 @@ describe("given a bag of granted permissions", () => {
       expect(satisfies(custom, "datasets:manage")).toBe(false);
       expect(satisfies(custom, "analytics:view")).toBe(true);
     });
+  });
+});
+
+describe("the append-only registry", () => {
+  it("derives runtime permission validation from it", () => {
+    expect(authzPermissionSchema.options).toEqual(ALL_PERMISSIONS);
+    expect(authzPermissionSchema.validate("traces:view")).toBe(true);
+    expect(authzPermissionSchema.validate("traces:rotate")).toBe(false);
   });
 });

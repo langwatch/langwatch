@@ -3,7 +3,7 @@ import type {
   AuthzDeclaredScopeId,
   AuthzPermission,
   PermissionDecision,
-} from "@langwatch/authz-contract";
+} from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";

@@ -1,7 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
 
-import { LiteMemberRestrictedError } from "../authz.errors.ts";
+import { BlankScopeIdError, LiteMemberRestrictedError } from "../errors.ts";
 
 describe("LiteMemberRestrictedError", () => {
   describe("when constructed with a resource", () => {
@@ -55,6 +55,20 @@ describe("LiteMemberRestrictedError", () => {
 
       expect(serialized.kind).toBe("lite_member_restricted");
       expect(serialized.kind).toBe(serialized.code);
+    });
+  });
+});
+
+describe("BlankScopeIdError", () => {
+  it("keeps blank scope ids in the established customer-correctable error envelope", () => {
+    const error = new BlankScopeIdError({ field: "projectId" });
+
+    expect(error).toMatchObject({
+      code: "validation_error",
+      message: "The request did not name a scope to act in.",
+      fault: "customer",
+      httpStatus: 400,
+      meta: { fieldErrors: { projectId: ["Required"] } },
     });
   });
 });

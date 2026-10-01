@@ -1,9 +1,11 @@
+import {
+  authzDenialReasonSchema,
+  type AuthzPermission,
+  type DeclaredScopeTier,
+  organizationRoleSchema,
+  shareableResourceKindSchema,
+} from "@langwatch/authorization";
 import { z } from "zod";
-
-import type { authzPermissionSchema } from "./registry.ts";
-import { shareableResourceKindSchema } from "./registry.ts";
-import type { bindingScopeTierSchema } from "./vocabulary.ts";
-import { storedBindingScopeTierSchema } from "./vocabulary.ts";
 
 /** Portable AuthZ vocabulary. Persisted and transport values validate here. */
 export const teamUserRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
@@ -11,12 +13,7 @@ export type TeamUserRole = z.infer<typeof teamUserRoleSchema>;
 /** The same members as values, for code that names one rather than parses it. */
 export const TeamUserRole = teamUserRoleSchema.enum;
 
-export const organizationRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL"]);
-export type OrganizationRole = z.infer<typeof organizationRoleSchema>;
-export const OrganizationUserRole = organizationRoleSchema.enum;
-export type OrganizationUserRole = OrganizationRole;
-
-export const grantScopeTierSchema = storedBindingScopeTierSchema;
+export const grantScopeTierSchema = z.enum(["PROJECT", "TEAM", "ORGANIZATION"]);
 export type GrantScopeTier = z.infer<typeof grantScopeTierSchema>;
 export const GrantScopeTier = grantScopeTierSchema.enum;
 
@@ -72,13 +69,6 @@ export const authzScopeRefSchema = z.discriminatedUnion("type", [
   resourceScopeRefSchema,
 ]);
 export type AuthzScopeRef = z.infer<typeof authzScopeRefSchema>;
-
-export const declaredScopeIdSchema = z.discriminatedUnion("tier", [
-  z.object({ tier: z.literal("project"), id: z.string() }).strict(),
-  z.object({ tier: z.literal("team"), id: z.string() }).strict(),
-  z.object({ tier: z.literal("organization"), id: z.string() }).strict(),
-]);
-export type AuthzDeclaredScopeId = z.infer<typeof declaredScopeIdSchema>;
 
 export const authzPrincipalRefSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("user"), id: z.string() }).strict(),
@@ -166,15 +156,6 @@ export const collectedGrantsSchema = z
   .strict();
 export type CollectedGrants = z.infer<typeof collectedGrantsSchema>;
 
-export const authzDenialReasonSchema = z.enum([
-  "no-membership",
-  "membership-disabled",
-  "no-binding",
-  "lite-member-restricted",
-  "owner-ceiling",
-]);
-export type AuthzDenialReason = z.infer<typeof authzDenialReasonSchema>;
-
 export const authzGrantViaSchema = z.enum([
   "binding",
   "org-role-floor",
@@ -205,8 +186,8 @@ export type AuthzDecision = z.infer<typeof authzDecisionSchema>;
  */
 declare const AUTHORIZED_BRAND: unique symbol;
 export type Authorized<
-  Tier extends z.infer<typeof bindingScopeTierSchema> = z.infer<typeof bindingScopeTierSchema>,
-  Permission extends z.infer<typeof authzPermissionSchema> = z.infer<typeof authzPermissionSchema>,
+  Tier extends DeclaredScopeTier = DeclaredScopeTier,
+  Permission extends AuthzPermission = AuthzPermission,
 > = {
   readonly [AUTHORIZED_BRAND]: true;
   readonly permission: Permission;

@@ -4,17 +4,17 @@
  */
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { PermissionDecision } from "@langwatch/authz-contract";
+import type { PermissionDecision } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
+import type { Authorize } from "../../access/access.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";
-import type { TrpcAuthorizationDecisions } from "../policy.ts";
 import { defineTrpcRouter } from "../runtime.ts";
 
 interface ReviewApi {
@@ -38,7 +38,7 @@ const reads = defineTrpcRouter(
 
 function served() {
   let permitted = true;
-  const authz = createApiFixture<TrpcAuthorizationDecisions>({
+  const authz = createApiFixture<Authorize>({
     getDecision: async (): Promise<PermissionDecision> => ({
       permitted,
       organizationRole: "MEMBER",

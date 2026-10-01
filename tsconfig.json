@@ -103,6 +103,9 @@
       "path": "modules/auth/process/tsconfig.json"
     },
     {
+      "path": "packages/authorization/tsconfig.json"
+    },
+    {
       "path": "modules/authz/browser/tsconfig.json"
     },
     {
@@ -221,6 +224,9 @@
     },
     {
       "path": "enterprise/modules/demo-data/process/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/digest/contract/tsconfig.json"
     },
     {
       "path": "enterprise/modules/enterprise-gateway/contract/tsconfig.json"

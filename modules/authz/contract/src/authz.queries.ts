@@ -1,17 +1,18 @@
+import {
+  authzDenialReasonSchema,
+  authzPermissionSchema,
+  organizationRoleSchema,
+} from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
-  authzDenialReasonSchema,
   authzDecisionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
   collectedGrantsSchema,
-  declaredScopeIdSchema,
-  organizationRoleSchema,
   grantScopeTierSchema,
   teamUserRoleSchema,
 } from "./authz.ts";
-import { authzPermissionSchema } from "./registry.ts";
 
 export const authzCheckInputSchema = z
   .object({
@@ -58,15 +59,6 @@ export const authzCheckByIdsInputSchema = authzScopeIdsSchema.safeExtend({
   ceiling: z.boolean().optional(),
 });
 export type AuthzCheckByIdsInput = z.infer<typeof authzCheckByIdsInputSchema>;
-
-export const permissionDecisionSchema = z
-  .object({
-    permitted: z.boolean(),
-    organizationRole: organizationRoleSchema.nullable(),
-    denialReason: authzDenialReasonSchema.optional(),
-  })
-  .strict();
-export type PermissionDecision = z.infer<typeof permissionDecisionSchema>;
 
 export const authzCheckByIdsOutputSchema = z
   .object({
@@ -153,24 +145,6 @@ export const authzExplainDecisionInputSchema = z.object({ decision: authzDecisio
 export type AuthzExplainDecisionInput = z.infer<typeof authzExplainDecisionInputSchema>;
 export const authzExplainDecisionOutputSchema = z.array(z.string());
 export type AuthzExplainDecisionOutput = z.infer<typeof authzExplainDecisionOutputSchema>;
-
-export const authzGetDecisionInputSchema = z
-  .object({
-    userId: z.string(),
-    permission: authzPermissionSchema,
-    scope: declaredScopeIdSchema,
-  })
-  .strict();
-export type AuthzGetDecisionInput = z.infer<typeof authzGetDecisionInputSchema>;
-
-export const authzGetProjectAnyDecisionInputSchema = z
-  .object({
-    userId: z.string(),
-    projectId: z.string(),
-    permissions: z.array(authzPermissionSchema).readonly(),
-  })
-  .strict();
-export type AuthzGetProjectAnyDecisionInput = z.infer<typeof authzGetProjectAnyDecisionInputSchema>;
 
 export const authzPermissionByIdsInputSchema = z
   .object({

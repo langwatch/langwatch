@@ -4,7 +4,7 @@
  * packages/api/specs/transport-declaration-split.feature.
  */
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";

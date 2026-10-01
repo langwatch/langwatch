@@ -1,3 +1,4 @@
+import { type OrganizationRole } from "@langwatch/authorization";
 import {
   builtinRolePermissions,
   roleKeyForTeamRole,
@@ -9,7 +10,6 @@ import {
   type AuthzListManagedBindingsForOrganizationOutput,
   type AuthzListManagedBindingsForUserInput,
   type AuthzListManagedBindingsForUserOutput,
-  type OrganizationRole,
 } from "@langwatch/authz-contract";
 
 import type { AuthzListingRepository } from "../repositories/authz-listing.repository.ts";

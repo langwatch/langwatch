@@ -19,7 +19,7 @@
       "path": "../actor/tsconfig.build.json"
     },
     {
-      "path": "../../modules/authz/contract/tsconfig.build.json"
+      "path": "../authorization/tsconfig.build.json"
     },
     {
       "path": "../handled-error/tsconfig.build.json"

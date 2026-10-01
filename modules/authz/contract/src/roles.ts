@@ -2,7 +2,7 @@
  * Built-in roles declared as differences (viewer base, member = viewer +
  * additions, etc); parity-tested against legacy bags (ADR-092 §1).
  */
-import { type AuthzPermission, permissionSatisfiedBy } from "./registry.ts";
+import { type AuthzPermission, permissionSatisfiedBy } from "@langwatch/authorization";
 
 export type BuiltinRoleKey =
   | "admin"

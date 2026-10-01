@@ -7,12 +7,11 @@
 import { createHmac } from "node:crypto";
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { anyAuthenticated } from "../../access/access.ts";
+import { anyAuthenticated, type Authorize } from "../../access/access.ts";
 import {
   createErrorHandler,
   PayloadTooLargeError,
@@ -270,7 +269,7 @@ describe("a request authenticated before its body is parsed", () => {
         sessions: SessionReader.create({
           verify: async (request) => (request.headers.has("cookie") ? { userId: "user-1" } : null),
         }),
-        authz: createApiFixture<AuthzApi>(),
+        authz: createApiFixture<Authorize>(),
         publicBaseUrl: "https://app.example",
       });
 

@@ -1,10 +1,11 @@
+import { storedScopeTierSchema } from "@langwatch/authorization";
+import type { StoredScopeTier } from "@langwatch/authorization";
 import {
   AUTHZ_SHARE_PERMISSION,
   authzShareAudience,
   PRINCIPAL_KIND_FROM_STORED,
   STORED_PRINCIPAL_KIND,
   storedPrincipalKindSchema,
-  storedScopeTierSchema,
 } from "@langwatch/authz-contract";
 import type {
   GrantEventSource,
@@ -15,7 +16,6 @@ import type {
   ResourceGrantTerms,
   RoleFact,
   StoredPrincipalKind,
-  StoredScopeTier,
   TeamUserRole,
 } from "@langwatch/authz-contract";
 import { fromDate, type Instant, Temporal } from "@langwatch/time";

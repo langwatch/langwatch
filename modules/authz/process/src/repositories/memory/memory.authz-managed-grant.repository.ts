@@ -1,4 +1,5 @@
-import type { OrganizationRole, GrantScopeTier } from "@langwatch/authz-contract";
+import type { OrganizationRole } from "@langwatch/authorization";
+import type { GrantScopeTier } from "@langwatch/authz-contract";
 
 import {
   type AuthzAssignableRoleRow,

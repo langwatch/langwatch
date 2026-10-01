@@ -2,33 +2,17 @@
  * Derive type-safe declared permission checks from the registry's tier
  * declarations (ADR-092 decision 25); fail with readable type errors.
  */
-import { AUTHZ_RESOURCES, type AuthzPermission, type AuthzResource } from "./registry.ts";
 import {
-  BINDING_SCOPE_TIERS,
-  type BindingScopeTier,
   SCOPE_TIER_BY_FIELD,
   SCOPE_TIER_FIELDS,
+  permissionGrantTiers,
+  type AuthzDeclaredScopeId,
+  type AuthzPermission,
+  type DeclaredScopeTier,
+  type PermissionGrantTiers,
+  type PlatformTierPermission,
   type ScopeTierField,
-} from "./vocabulary.ts";
-
-export type { BindingScopeTier, ScopeTierField };
-export { SCOPE_TIER_BY_FIELD, SCOPE_TIER_FIELDS };
-
-/** The tiers a resource declares, as the registry wrote them. */
-type TiersOf<P extends AuthzPermission> = P extends `${infer R}:${string}`
-  ? R extends AuthzResource
-    ? (typeof AUTHZ_RESOURCES)[R]["scopes"][number]
-    : never
-  : never;
-
-/** The input-addressable tiers permission P can be granted at. Platform-only
- *  permissions resolve to `never` and are refused by every surface. */
-export type PermissionGrantTiers<P extends AuthzPermission> = Extract<TiersOf<P>, BindingScopeTier>;
-
-/** Permissions grantable only at the platform tier (`ops:*`). */
-export type PlatformTierPermission = {
-  [P in AuthzPermission]: "platform" extends TiersOf<P> ? P : never;
-}[AuthzPermission];
+} from "@langwatch/authorization";
 
 /** Scope-tier fields present in input I at all (optional counts). */
 type FieldsIn<I> = Extract<keyof I, ScopeTierField>;
@@ -50,7 +34,7 @@ export type DeclarationError<Reason extends string> = {
  *  stays deferred and no `extends` constraint can apply to it, so the
  *  conditional does the narrowing and the result still interpolates into the
  *  template-literal diagnostics below. */
-type FieldsForTiers<T> = T extends BindingScopeTier ? (typeof SCOPE_TIER_FIELDS)[T] : never;
+type FieldsForTiers<T> = T extends DeclaredScopeTier ? (typeof SCOPE_TIER_FIELDS)[T] : never;
 
 /**
  * Validate one input against one permission; require at least one allowed
@@ -74,89 +58,6 @@ export type ValidatePermissionForInput<P extends AuthzPermission, I> = [I] exten
     : never;
 
 /**
- * Via fields must be narrower than allowed tiers (earlier in
- * BINDING_SCOPE_TIERS); narrower ids always resolve their ancestors.
- */
-export type ViaFieldFor<P extends AuthzPermission, I> = [P] extends [PlatformTierPermission]
-  ? never
-  : I extends unknown
-    ? {
-        [K in Extract<keyof I, ScopeTierField>]: I extends Record<K, string>
-          ? (typeof SCOPE_TIER_BY_FIELD)[K] extends PermissionGrantTiers<P>
-            ? never
-            : K
-          : never;
-      }[Extract<keyof I, ScopeTierField>]
-    : never;
-
-/**
- * Exactly one of permission or opt-out with reason; undefined counterkeys
- * make the union exclusive so "forgot to declare" is a compile error.
- */
-export type AccessDeclaration =
-  | { permission: AuthzPermission; noPermission?: undefined }
-  | {
-      permission?: undefined;
-      /** Why this endpoint deliberately runs without a permission check. */
-      noPermission: { reason: string };
-    };
-
-export type NoPermissionOptions<I> = I extends unknown
-  ? [FieldsIn<I>] extends [never]
-    ? { reason: string; allow?: undefined }
-    : {
-        reason: string;
-        /** Why each scope id in the input is safe to accept unchecked. */
-        allow: { [K in FieldsIn<I>]: string };
-      }
-  : never;
-
-/**
- * The scope argument an IMPERATIVE check takes for P: exactly one id, at
- * a grantable tier. `undefined` counterkeys make the union exclusive, so
- * two ids or an ungranted tier is a compile error; platform-tier is `never`.
- */
-export type PermissionScopeArg<P extends AuthzPermission> =
-  | ("project" extends PermissionGrantTiers<P>
-      ? { projectId: string; teamId?: undefined; organizationId?: undefined }
-      : never)
-  | ("team" extends PermissionGrantTiers<P>
-      ? { teamId: string; projectId?: undefined; organizationId?: undefined }
-      : never)
-  | ("organization" extends PermissionGrantTiers<P>
-      ? { organizationId: string; projectId?: undefined; teamId?: undefined }
-      : never);
-
-/**
- * The tier a {@link PermissionScopeArg} value addressed — what the witness a
- * throwing check returns is scoped to.
- */
-export type TierOfScopeArg<A> = A extends { projectId: string }
-  ? "project"
-  : A extends { teamId: string }
-    ? "team"
-    : "organization";
-
-// The same rules at runtime, so the middleware agrees with the types.
-
-/** The input-addressable tiers `permission` can be granted at, narrowest first. */
-export function permissionGrantTiers(permission: AuthzPermission): BindingScopeTier[] {
-  const scopes = scopesOf(permission);
-  return BINDING_SCOPE_TIERS.filter((tier) => scopes.includes(tier));
-}
-
-export function isPlatformTierPermission(permission: AuthzPermission): boolean {
-  return scopesOf(permission).includes("platform");
-}
-
-function scopesOf(permission: AuthzPermission): readonly string[] {
-  const resource = permission.split(":")[0] as AuthzResource;
-  return AUTHZ_RESOURCES[resource]?.scopes ?? [];
-}
-
-export type DeclaredScopeId = { tier: BindingScopeTier; id: string };
-
-/**
  * Distinguish caller mistakes (blank field) from wiring bugs (absent field)
  * to avoid paging for malformed requests.
  */
@@ -165,7 +66,7 @@ export type UnresolvedDeclaredScope =
   | { reason: "absent" };
 
 export type DeclaredScopeResolution =
-  | { resolved: true; scope: DeclaredScopeId }
+  | { resolved: true; scope: AuthzDeclaredScopeId }
   | { resolved: false; unresolved: UnresolvedDeclaredScope };
 
 const usableId = (value: unknown): value is string => typeof value === "string" && value.length > 0;
@@ -230,7 +131,7 @@ export function findDeclaredScopeId({
   permission: AuthzPermission;
   input: Partial<Record<ScopeTierField, unknown>>;
   via?: ScopeTierField;
-}): DeclaredScopeId | null {
+}): AuthzDeclaredScopeId | null {
   const resolution = resolveDeclaredScope({ permission, input, via });
   return resolution.resolved ? resolution.scope : null;
 }

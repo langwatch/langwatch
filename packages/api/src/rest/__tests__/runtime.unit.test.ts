@@ -3,7 +3,7 @@
  * `defineRestRouter` records and refuses, and how a static generation is
  * selected from a path, a header or neither.
  */
-import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel";
 import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";

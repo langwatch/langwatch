@@ -22,6 +22,10 @@
     "./supply": {
       "types": "./dist/process-supply.d.ts",
       "default": "./src/process-supply.ts"
+    },
+    "./contract": {
+      "types": "./dist/contract/index.d.ts",
+      "default": "./src/contract/index.ts"
     }
   },
   "scripts": {

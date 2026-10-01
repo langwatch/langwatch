@@ -3,11 +3,8 @@
  * adapters implement the queries. Methods return stored facts, no policy,
  * and follow the repository naming convention (findX, never getX).
  */
-import type {
-  AuthzPrincipalRef,
-  CollectedBinding,
-  ShareableResourceKind,
-} from "@langwatch/authz-contract";
+import type { ShareableResourceKind } from "@langwatch/authorization";
+import type { AuthzPrincipalRef, CollectedBinding } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 /** OrganizationUser.role, or null when no membership row exists. */

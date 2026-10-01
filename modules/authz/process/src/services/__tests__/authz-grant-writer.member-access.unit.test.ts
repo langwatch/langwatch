@@ -15,11 +15,11 @@
  * arithmetic — which rows it revokes, which it attaches, and which it refuses — and every
  * one of those decisions is made above the repository.
  */
+import { type OrganizationRole } from "@langwatch/authorization";
 import {
   type AuthzApplyMemberBindingsInput,
   type AuthzAttachBindingsInput,
   type AuthzRevokeBindingsInput,
-  type OrganizationRole,
   type GrantScopeTier,
   type TeamUserRole,
 } from "@langwatch/authz-contract";

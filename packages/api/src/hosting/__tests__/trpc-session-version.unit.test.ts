@@ -5,16 +5,17 @@
  */
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
+import type { Authorize } from "../../access/access.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../../trpc/compose.ts";
 import { TrpcHost } from "../../trpc/host.ts";
 import { defineTrpcRouter } from "../../trpc/runtime.ts";
+import type { TrpcSessionVersions } from "../../trpc/session-version.ts";
 import { composeApiApplication } from "../api-application.ts";
 
 interface ProfileApi {
@@ -70,7 +71,7 @@ describe("given a tRPC surface reading session versions from authz", () => {
       ["user_ada", "Ada"],
       ["user_bo", "Bo"],
     ]);
-    const authz = createApiFixture<AuthzApi>({
+    const authz = createApiFixture<Authorize & TrpcSessionVersions>({
       getSessionVersion: async () => 7,
       checkScopeLineage: async () => ({ kind: "consistent" }),
     });

@@ -1,3 +1,4 @@
+import { type OrganizationRole } from "@langwatch/authorization";
 import {
   ApiKeyNotInOrganizationError,
   AuthzLiteMemberViewerOnlyError,
@@ -22,7 +23,6 @@ import {
   type AuthzService,
   type AuthzUpdateBindingInput,
   type AuthzDeleteBindingInput,
-  type OrganizationRole,
   type GrantScopeTier,
 } from "@langwatch/authz-contract";
 // One class, one status: an organization's membership is the organization

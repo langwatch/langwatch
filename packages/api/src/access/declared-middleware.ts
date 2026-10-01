@@ -2,8 +2,7 @@
  * Common vocabulary for framework declarations and sweep tests (ADR-092
  * decision 25), avoiding cycles while branding what .use() accepts.
  */
-import type { ScopeTierField } from "./declaration.ts";
-import type { AuthzPermission } from "./registry.ts";
+import type { AuthzPermission, ScopeTierField } from "@langwatch/authorization";
 
 /**
  * `Symbol.for` so the sweep test and the builders agree on the key even

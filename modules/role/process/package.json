@@ -29,6 +29,7 @@
   "dependencies": {
     "@langwatch/actor": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",

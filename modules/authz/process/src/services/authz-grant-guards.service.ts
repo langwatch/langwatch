@@ -2,10 +2,10 @@
  * The checks every grant write runs before it touches a row.
  */
 
+import { isRegistryPermission } from "@langwatch/authorization";
 import {
   GrantExpiryInPastError,
   GrantValidationError,
-  isRegistryPermission,
   type GrantRole,
   type GrantableAuthzScopeRef,
 } from "@langwatch/authz-contract";

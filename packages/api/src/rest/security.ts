@@ -5,7 +5,7 @@
  */
 import { timingSafeEqual } from "node:crypto";
 
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { Context, ErrorHandler, MiddlewareHandler } from "hono";
 
 import type { AccessPolicy, CredentialClass } from "../access-policy.ts";

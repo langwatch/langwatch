@@ -1,4 +1,5 @@
-import { ALL_PERMISSIONS, type CollectedBinding } from "@langwatch/authz-contract";
+import { ALL_PERMISSIONS } from "@langwatch/authorization";
+import { type CollectedBinding } from "@langwatch/authz-contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AuthzService, type AuthzServiceOptions } from "../../services/authz.service.ts";

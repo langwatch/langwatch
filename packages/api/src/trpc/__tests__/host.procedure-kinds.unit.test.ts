@@ -4,10 +4,10 @@
  */
 
 import { moduleApi } from "@langwatch/kernel";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../../contract/trpc-contract.ts";
 import { SessionReader } from "../../rest/credential.ts";
 import { composeTrpcRouters } from "../compose.ts";
 import { TrpcHost } from "../host.ts";

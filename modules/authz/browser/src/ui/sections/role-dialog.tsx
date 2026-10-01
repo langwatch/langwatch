@@ -2,8 +2,8 @@
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
 import { Box, Button, Field, Grid, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
 import type { ScopeTriadEntry } from "@langwatch/authz-browser-kit";
-import { type AuthzPermission, isRegistryPermission } from "@langwatch/authz-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 import { type FieldErrors, type UseFormRegister, useForm, useWatch } from "react-hook-form";

@@ -2,12 +2,9 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import * as contract from "../index.ts";
 import {
-  ALL_PERMISSIONS,
   type Authorized,
-  BlankScopeIdError,
   authzDecisionSchema,
   authzOffboardInputSchema,
-  authzPermissionSchema,
   authzPrincipalRefSchema,
   authzScopeRefSchema,
   attachGrantCommandDataSchema,
@@ -37,12 +34,6 @@ describe("the portable AuthZ contract", () => {
         audience: "member",
       }),
     ).toMatchObject({ allowed: true, permission: "traces:view" });
-  });
-
-  it("derives runtime permission validation from the append-only registry", () => {
-    expect(authzPermissionSchema.options).toEqual(ALL_PERMISSIONS);
-    expect(authzPermissionSchema.validate("traces:view")).toBe(true);
-    expect(authzPermissionSchema.validate("traces:rotate")).toBe(false);
   });
 
   it("keeps tenant identity and grant shape invariants at command boundaries", () => {
@@ -97,17 +88,5 @@ describe("the portable AuthZ contract", () => {
       scope: { tier: "project", id: "project_1" },
     };
     expect(forged.scope.id).toBe("project_1");
-  });
-
-  it("keeps blank scope ids in the established customer-correctable error envelope", () => {
-    const error = new BlankScopeIdError({ field: "projectId" });
-
-    expect(error).toMatchObject({
-      code: "validation_error",
-      message: "The request did not name a scope to act in.",
-      fault: "customer",
-      httpStatus: 400,
-      meta: { fieldErrors: { projectId: ["Required"] } },
-    });
   });
 });
