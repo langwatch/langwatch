@@ -57,7 +57,6 @@
     "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
-    "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",

@@ -83,7 +83,6 @@ function compose() {
         }),
       }),
       topics: createApiFixture<Peers["topics"]>({ bootstrapClustering: async () => undefined }),
-      nurturing: createApiFixture<Peers["nurturing"]>({ recordSignal: async () => undefined }),
     }),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),
@@ -91,6 +90,10 @@ function compose() {
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+    milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>({
+      recordFirstTrace: async () => undefined,
+      recordTraceReceived: async () => undefined,
+    }),
   }).build({ participation: "consume" });
   return { pipeline, updateMetadata };
 }

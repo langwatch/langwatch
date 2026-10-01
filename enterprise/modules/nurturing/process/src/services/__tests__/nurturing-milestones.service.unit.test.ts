@@ -97,3 +97,55 @@ describe("NurturingMilestonesService", () => {
     expect(await serviceOver().evaluationCompleted(settled("eval-1"))).toEqual([]);
   });
 });
+
+/** @see modules/scenario/specs/simulation-run-finished-nurturing-signal.feature */
+describe("NurturingMilestonesService.simulationRunFinished", () => {
+  function finished(runId: string) {
+    return {
+      aggregateId: runId,
+      tenantId: "project-1",
+      data: { scenarioRunId: runId, occurredAt: 3 },
+    };
+  }
+
+  /** @scenario "A finished run tells nurturing the organization's run count so far" */
+  it("tells the run against the admin with the organization's count, the first once", async () => {
+    const service = serviceOver();
+    await service.projectCreated(created());
+
+    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([
+      {
+        kind: "simulation_run_finished",
+        sourceEventId: "run-1",
+        tenantId: "project-1",
+        occurredAt: 3,
+        userId: "admin-1",
+        projectId: "project-1",
+        organizationRunCount: 1,
+        first: true,
+      },
+    ]);
+    expect(await service.simulationRunFinished(finished("run-2"))).toMatchObject([
+      { organizationRunCount: 2, first: false },
+    ]);
+  });
+
+  /** @scenario "A finished run in a project with no organization admin tells nurturing nothing" */
+  it("tells nothing when the organization has no admin", async () => {
+    const service = serviceOver();
+    await service.projectCreated(created({ adminUserId: null }));
+
+    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);
+  });
+
+  it("counts a redelivered run once and never fires the first for a backfilled organization", async () => {
+    const service = serviceOver();
+    await service.projectCreated(created({ backfilled: true }));
+    await service.simulationRunFinished(finished("run-1"));
+
+    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);
+    expect(await service.simulationRunFinished(finished("run-2"))).toMatchObject([
+      { organizationRunCount: 2, first: false },
+    ]);
+  });
+});

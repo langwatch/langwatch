@@ -56,7 +56,16 @@ import {
 import {
   SCENARIO_CREATED_EVENT_TYPE,
   scenarioCreatedEventDataSchema,
+  SIMULATION_RUN_EVENT_TYPES,
+  type SimulationRunFinishedEventData,
+  simulationRunFinishedEventDataSchema,
 } from "@langwatch/scenario-contract";
+import {
+  FIRST_TRACE_RECORDED_EVENT_TYPE,
+  firstTraceRecordedEventDataSchema,
+  TRACE_RECEIVED_EVENT_TYPE,
+  traceReceivedEventDataSchema,
+} from "@langwatch/trace-contract";
 import {
   WORKFLOW_CREATED_EVENT_TYPE,
   workflowCreatedEventDataSchema,
@@ -67,16 +76,19 @@ import {
   checkoutCompletedSignal,
   evaluationRanSignal,
   experimentRanSignal,
+  firstTraceRecordedSignal,
   guidedOnboardingSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
+  scenarioRunSucceededSignal,
   sessionStartedSignal,
   signedUpSignal,
   ssoAutoAddedSignal,
   subscriptionChangedSignal,
+  traceReceivedSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
@@ -105,6 +117,11 @@ export function buildNurturingPipeline(deps: {
   evaluationCompleted: (input: {
     data: EvaluationLifecycleCompletedEventData;
     aggregateId: string;
+  }) => Promise<NurturingSignal[]>;
+  simulationRunFinished: (input: {
+    data: SimulationRunFinishedEventData;
+    aggregateId: string;
+    tenantId: string;
   }) => Promise<NurturingSignal[]>;
 }): NurturingPipeline {
   return definePipeline({
@@ -240,6 +257,40 @@ export function buildNurturingPipeline(deps: {
       data: scenarioCreatedEventDataSchema,
       handle: (data, context) => {
         const signal = scenarioCreatedSignal({ data, ...context });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("scenarioRunSucceeded", {
+      eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      data: simulationRunFinishedEventDataSchema,
+      handle: async (data, context) => {
+        for (const signal of scenarioRunSucceededSignal({ data, ...context })) {
+          await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        }
+      },
+    })
+    .withPeerSubscriber("simulationRunFinished", {
+      eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+      data: simulationRunFinishedEventDataSchema,
+      handle: async (data, context) => {
+        for (const signal of await deps.simulationRunFinished({ data, ...context })) {
+          await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        }
+      },
+    })
+    .withPeerSubscriber("firstTraceRecorded", {
+      eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
+      data: firstTraceRecordedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = firstTraceRecordedSignal({ data, aggregateId });
+        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      },
+    })
+    .withPeerSubscriber("traceReceived", {
+      eventType: TRACE_RECEIVED_EVENT_TYPE,
+      data: traceReceivedEventDataSchema,
+      handle: (data, { aggregateId }) => {
+        const signal = traceReceivedSignal({ data, aggregateId });
         return deps.deliver({ key: nurturingSignalKey(signal), signal });
       },
     })

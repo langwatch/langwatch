@@ -6,6 +6,14 @@ import type {
   NurturingOrganizationState,
 } from "../nurturing-milestones.repository.ts";
 
+const ORGANIZATION_STATE = {
+  organizationId: true,
+  adminUserId: true,
+  seeded: true,
+  evaluationCount: true,
+  simulationRunCount: true,
+} as const;
+
 export class PrismaNurturingMilestonesRepository
   extends PrismaRepository.for("NurturingProject", "NurturingOrganization")
   implements NurturingMilestonesRepository
@@ -40,7 +48,20 @@ export class PrismaNurturingMilestonesRepository
     const organization = await this.prisma.nurturingOrganization.update({
       where: { organizationId: project.organizationId },
       data: { evaluationCount: { increment: 1 } },
-      select: { organizationId: true, adminUserId: true, seeded: true, evaluationCount: true },
+      select: ORGANIZATION_STATE,
+    });
+    return [organization];
+  }
+
+  async countSimulationRun({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
+    const project = await this.prisma.nurturingProject.findUnique({ where: { projectId } });
+    if (!project) return [];
+    const organization = await this.prisma.nurturingOrganization.update({
+      where: { organizationId: project.organizationId },
+      data: { simulationRunCount: { increment: 1 } },
+      select: ORGANIZATION_STATE,
     });
     return [organization];
   }

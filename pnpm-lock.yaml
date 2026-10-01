@@ -3831,6 +3831,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/trace-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/trace/contract
       '@langwatch/user-contract':
         specifier: workspace:*
         version: link:../../../../modules/user/contract
@@ -13430,9 +13433,6 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -15077,9 +15077,6 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
-      '@langwatch/enterprise-nurturing-contract':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/nurturing/contract
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../entitlement/contract
@@ -18087,6 +18084,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

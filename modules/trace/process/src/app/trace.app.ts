@@ -173,6 +173,10 @@ import type { z } from "zod";
 
 import { tokenCounterChannels } from "../channels/token-counter-channels.registry.ts";
 import { TraceProcessingRuntimeAdapter } from "../eventing/trace-processing-runtime.pipeline.ts";
+import {
+  buildTraceProjectMilestonesPipeline,
+  type TraceProjectMilestonesDefinition,
+} from "../eventing/trace-project-milestones.pipeline.ts";
 import { ClickHouseTraceQueryLangWatchQLRepository } from "../repositories/clickhouse/clickhouse.trace-query-langwatch-ql.repository.ts";
 import { ClickHouseTraceQueryRepository } from "../repositories/clickhouse/clickhouse.trace-query.repository.ts";
 import { RedisTraceExportSlotRepository } from "../repositories/redis/redis.trace-export-slot.repository.ts";
@@ -238,6 +242,7 @@ import { TraceLogRecordIOService } from "../services/trace-log-record-io.service
 import { TraceMetadataWriteService } from "../services/trace-metadata-write.service.ts";
 import { TracePreconditionSampleService } from "../services/trace-precondition-sample.service.ts";
 import { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
+import { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import { TraceScenarioEventMediaService } from "../services/trace-scenario-event-media.service.ts";
 import type { TraceTopicClusteringReadService } from "../services/trace-topic-clustering-read.service.ts";
@@ -762,6 +767,10 @@ export class TraceApp implements TraceApi, CollectorApp {
     });
     const tokenizer = tokenCounterChannels.live.create(input.config.tokenizer);
     input.resources.own("Trace tokenizer", () => tokenizer.close());
+    const milestones = TraceProjectMilestonesService.create({
+      processName: input.members.processName,
+    });
+    app.#milestones = milestones;
     app.#processing = TraceProcessingRuntimeAdapter.create({
       processName: input.members.processName,
       tokenizer,
@@ -773,11 +782,13 @@ export class TraceApp implements TraceApi, CollectorApp {
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
       broadcast: collaborators.tenantBroadcast,
+      milestones,
     });
     return app;
   }
 
   #processing: TraceProcessingRuntimeAdapter | null = null;
+  #milestones: TraceProjectMilestonesService | null = null;
   #processingCommands: TraceProcessingCommandsService | null = null;
   #usageCounts: TraceUsageCountService | null = null;
   #modelSpend: TraceModelSpendRepository | null = null;
@@ -819,6 +830,16 @@ export class TraceApp implements TraceApi, CollectorApp {
     commands: EventingCommands<TraceProcessingPipelineDefinition>,
   ): void {
     this.#processingCommands?.connect(commands);
+  }
+
+  /** trace_project_milestones: the same in every role; nurturing reacts from its own side (§9). */
+  projectMilestonesPipeline(): TraceProjectMilestonesDefinition {
+    return buildTraceProjectMilestonesPipeline();
+  }
+
+  /** Binds the milestone senders the worker's project-metadata subscriber records through. */
+  connectProjectMilestones(commands: EventingCommands<TraceProjectMilestonesDefinition>): void {
+    this.#milestones?.connect(commands);
   }
 
   #contentReader: TraceContentReadService;

@@ -83,6 +83,7 @@ export class NurturingApp implements NurturingApi {
         deliver: (input) => delivery.deliver(input),
         projectCreated: (data) => milestones.projectCreated(data),
         evaluationCompleted: (input) => milestones.evaluationCompleted(input),
+        simulationRunFinished: (input) => milestones.simulationRunFinished(input),
       }),
     );
   }

@@ -10,7 +10,6 @@ import {
 } from "@langwatch/api/rest";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -52,7 +51,6 @@ export async function createScenarioRestTestApp(
     tabs?: Partial<ScenarioTabStore>;
     redis?: Partial<ScenarioRedis>;
     traces?: Partial<TraceApi>;
-    nurturing?: Partial<NurturingApi>;
     plans?: Partial<EntitlementApi>;
     featureFlags?: Partial<FeatureFlagApi>;
     projects?: Partial<ProjectApi>;
@@ -90,7 +88,6 @@ export async function createScenarioRestTestApp(
       }),
       auditLog: createApiFixture<AuditLogApi>(),
       traces: createApiFixture<TraceApi>(options.traces, "Trace API"),
-      nurturing: createApiFixture<NurturingApi>(options.nurturing ?? {}, "Nurturing API"),
       retention: createApiFixture<DataRetentionApi>(),
       suites: createApiFixture<SuiteApi>(),
       ...scenarioExecutorPeers(),

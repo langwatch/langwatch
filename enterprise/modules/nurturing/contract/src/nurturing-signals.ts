@@ -106,7 +106,10 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     /** The organization's admin. */
     userId: id,
     projectId: id,
+    /** Counted by nurturing since the cutover, including this one. */
     organizationRunCount: countIncludingThis,
+    /** The organization's first: never for one learned from project's backfill. */
+    first: z.boolean(),
   }),
   z.object({
     kind: z.literal("evaluation_completed"),

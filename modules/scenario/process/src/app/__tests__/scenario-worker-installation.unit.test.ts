@@ -10,7 +10,6 @@ import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -77,7 +76,6 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       }),
       "audit-log": createApiFixture<AuditLogApi>(),
       trace: createApiFixture<TraceApi>(),
-      nurturing: createApiFixture<NurturingApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({
         getResolvedForProject: async () => RETAINED,
       }),
@@ -141,8 +139,6 @@ const SIMULATION_KEYS = [
   "projectionRebuild:simulationRunState",
   "subscriber:pm:scenario_evaluations",
   "subscriber:pm:simulation_run_execution",
-  "subscriber:scenarioRunSucceededNurturing",
-  "subscriber:simulationRunFinishedNurturing",
   "subscriber:snapshotUpdateBroadcast",
   "subscriber:suiteRunSync",
   "subscriber:traceMetricsSync",

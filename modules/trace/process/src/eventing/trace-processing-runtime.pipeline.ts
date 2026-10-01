@@ -2,7 +2,6 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ExperimentApi } from "@langwatch/experiment-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -37,7 +36,10 @@ import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
 import { passesTraceOriginGuards } from "./origin-guarded.subscriber.ts";
-import { createProjectMetadataHandler } from "./project-metadata.subscriber.ts";
+import {
+  createProjectMetadataHandler,
+  type ProjectMetadataSubscriberDeps,
+} from "./project-metadata.subscriber.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSimulationMetricsSyncHandler } from "./simulation-metrics-sync.subscriber.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
@@ -76,7 +78,6 @@ export interface TraceProcessingPeers {
   projects: Pick<ProjectApi, "findById" | "updateMetadata" | "resolveOrgAdmin">;
   scenarios: Pick<ScenarioApi, "computeRunMetrics">;
   topics: Pick<TopicApi, "bootstrapClustering">;
-  nurturing: Pick<NurturingApi, "recordSignal">;
 }
 
 export interface TraceProcessingPipelineInput {
@@ -98,6 +99,8 @@ export interface TraceProcessingPipelineInput {
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: TraceTenantBroadcast;
+  /** Where a project's first and later traces are recorded as trace's own events. */
+  milestones: ProjectMetadataSubscriberDeps["milestones"];
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -206,7 +209,7 @@ export class TraceProcessingRuntimeAdapter {
       projectMetadata: createProjectMetadataHandler({
         projects: peers.projects,
         bootstrapTopicClustering: (projectId) => peers.topics.bootstrapClustering({ projectId }),
-        nurturing: peers.nurturing,
+        milestones: this.input.milestones,
       }),
       simulationMetricsSync: createSimulationMetricsSyncHandler({
         computeRunMetrics: (data) => peers.scenarios.computeRunMetrics(data),

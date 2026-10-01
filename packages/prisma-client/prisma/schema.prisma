@@ -4367,11 +4367,12 @@ model NurturingProject {
 /// Nurturing's read model per organization: its admin and its milestone counts.
 /// `seeded` marks an organization learned from the project backfill: its first_* already happened.
 model NurturingOrganization {
-  organizationId  String   @id
-  adminUserId     String?
-  seeded          Boolean  @default(false)
-  evaluationCount Int      @default(0)
-  updatedAt       DateTime @updatedAt
+  organizationId     String   @id
+  adminUserId        String?
+  seeded             Boolean  @default(false)
+  evaluationCount    Int      @default(0)
+  simulationRunCount Int      @default(0)
+  updatedAt          DateTime @updatedAt
 }
 
 model BillingMeterCheckpoint {

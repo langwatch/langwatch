@@ -11,7 +11,7 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => logger,
 }));
 
-/** Nurturing's command; the subscriber never reaches a product-analytics client itself. */
+/** Trace's milestone commands; the subscriber never reaches a product-analytics client itself. */
 const mockRecordSignal = vi.fn(async () => undefined);
 
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
@@ -28,6 +28,7 @@ import {
   createProjectMetadataHandler,
   isRealFirstIngest,
 } from "../project-metadata.subscriber.ts";
+import { milestonesOver } from "./project-milestones.test-helpers.ts";
 
 function createFoldState(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
@@ -154,7 +155,7 @@ describe("createProjectMetadataHandler()", () => {
     mockProjects = createMockProjectService();
     deps = {
       projects: mockProjects as any,
-      nurturing: { recordSignal: mockRecordSignal },
+      milestones: milestonesOver(mockRecordSignal),
     };
   });
 
@@ -203,7 +204,7 @@ describe("createProjectMetadataHandler()", () => {
           updateMetadata: (input) => mockProjects.updateMetadata(input),
           resolveOrgAdmin: (id) => mockProjects.resolveOrgAdmin(id),
         },
-        nurturing: { recordSignal: mockRecordSignal },
+        milestones: milestonesOver(mockRecordSignal),
       });
 
       await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
@@ -233,8 +234,7 @@ describe("createProjectMetadataHandler()", () => {
 
       expect(mockRecordSignal).toHaveBeenCalledTimes(1);
       expect(mockRecordSignal).toHaveBeenCalledWith({
-        kind: "first_trace_integrated",
-        sourceEventId: "event-1",
+        recorded: "firstTrace",
         tenantId,
         occurredAt: event.occurredAt,
         userId: "admin-user-1",
@@ -246,7 +246,7 @@ describe("createProjectMetadataHandler()", () => {
 
     /** @scenario Recording never fails the trace that caused it */
     it("still writes the project when the nurturing signal is refused", async () => {
-      mockRecordSignal.mockRejectedValueOnce(new Error("nurturing unavailable"));
+      mockRecordSignal.mockRejectedValueOnce(new Error("milestone pipeline unavailable"));
       const subscriber = createProjectMetadataHandler(deps);
 
       await expect(
@@ -393,15 +393,14 @@ describe("createProjectMetadataHandler()", () => {
     it("does not track first_trace_integrated again", async () => {
       expect(mockRecordSignal).toHaveBeenCalledTimes(1);
       expect(mockRecordSignal).not.toHaveBeenCalledWith(
-        expect.objectContaining({ kind: "first_trace_integrated" }),
+        expect.objectContaining({ recorded: "firstTrace" }),
       );
     });
 
     /** @scenario "A later trace tells nurturing against the organization's admin" */
     it("tells nurturing a later trace against the org admin", async () => {
       expect(mockRecordSignal).toHaveBeenCalledWith({
-        kind: "trace_received",
-        sourceEventId: "event-1",
+        recorded: "traceReceived",
         tenantId,
         occurredAt: expect.any(Number),
         userId: "admin-user-1",
@@ -532,7 +531,7 @@ describe("createProjectMetadataHandler()", () => {
       bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
-        nurturing: { recordSignal: mockRecordSignal },
+        milestones: milestonesOver(mockRecordSignal),
         bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
@@ -612,7 +611,7 @@ describe("createProjectMetadataHandler()", () => {
       it("completes the metadata write without error", async () => {
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
-          nurturing: { recordSignal: mockRecordSignal },
+          milestones: milestonesOver(mockRecordSignal),
         });
 
         await expect(
@@ -639,7 +638,7 @@ describe("createProjectMetadataHandler()", () => {
       bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       deps = {
         projects: mockProjects as any,
-        nurturing: { recordSignal: mockRecordSignal },
+        milestones: milestonesOver(mockRecordSignal),
         bootstrapTopicClustering: bootstrapTopicClustering as any,
       };
     });
@@ -665,13 +664,13 @@ describe("createProjectMetadataHandler()", () => {
         // metadata write: an integrated-flag repair must not re-fire it.
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
         expect(mockRecordSignal).not.toHaveBeenCalledWith(
-          expect.objectContaining({ kind: "first_trace_integrated" }),
+          expect.objectContaining({ recorded: "firstTrace" }),
         );
       });
 
       it("tells nurturing a later trace, since firstMessage was already set", async () => {
         expect(mockRecordSignal).toHaveBeenCalledWith(
-          expect.objectContaining({ kind: "trace_received" }),
+          expect.objectContaining({ recorded: "traceReceived" }),
         );
       });
     });
@@ -684,7 +683,7 @@ describe("createProjectMetadataHandler()", () => {
         mockProjects.findById.mockResolvedValue(null);
         const subscriber = createProjectMetadataHandler({
           projects: mockProjects as any,
-          nurturing: { recordSignal: mockRecordSignal },
+          milestones: milestonesOver(mockRecordSignal),
           bootstrapTopicClustering: bootstrapTopicClustering as any,
         });
 

@@ -24,7 +24,7 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
       organizationId,
       known
         ? { ...known, adminUserId: adminUserId ?? known.adminUserId }
-        : { organizationId, adminUserId, seeded, evaluationCount: 0 },
+        : { organizationId, adminUserId, seeded, evaluationCount: 0, simulationRunCount: 0 },
     );
     this.#projects.set(projectId, organizationId);
   }
@@ -35,6 +35,16 @@ export class MemoryNurturingMilestonesRepository implements NurturingMilestonesR
     const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
     if (!organization) return [];
     const counted = { ...organization, evaluationCount: organization.evaluationCount + 1 };
+    this.#organizations.set(organization.organizationId, counted);
+    return [counted];
+  }
+
+  async countSimulationRun({
+    projectId,
+  }: Readonly<{ projectId: string }>): Promise<NurturingOrganizationState[]> {
+    const organization = this.#organizations.get(this.#projects.get(projectId) ?? "");
+    if (!organization) return [];
+    const counted = { ...organization, simulationRunCount: organization.simulationRunCount + 1 };
     this.#organizations.set(organization.organizationId, counted);
     return [counted];
   }

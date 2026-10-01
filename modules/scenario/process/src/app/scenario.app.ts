@@ -8,7 +8,6 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -252,8 +251,6 @@ export const scenarioAppDependencyTokens = {
   presence: PresenceApi,
   auditLog: AuditLogApi,
   traces: TraceApi,
-  /** Where a finished run is told, until nurturing reacts to the finished event itself. */
-  nurturing: NurturingApi,
   /** The platform default a simulation run row is stamped with, read per write. */
   retention: DataRetentionApi,
   /** Where a suite set's scenario runs are recorded against their suite run. */
@@ -554,10 +551,7 @@ export class ScenarioApp implements ScenarioApi {
             reportEvaluation: (data) => setup.dependencies.evaluations.reportEvaluation(data),
           },
         },
-        milestones: {
-          projects: setup.dependencies.projects,
-          nurturing: setup.dependencies.nurturing,
-        },
+        milestones: { projects: setup.dependencies.projects },
         executor: ScenarioExecutorService.create({
           voiceNonces,
           peers: setup.dependencies,

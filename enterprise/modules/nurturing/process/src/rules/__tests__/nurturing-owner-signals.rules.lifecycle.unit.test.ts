@@ -7,14 +7,17 @@ import { describe, expect, it } from "vitest";
 
 import { nurturingSignalKey } from "../../eventing/nurturing-signal.commands.ts";
 import {
+  firstTraceRecordedSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
+  scenarioRunSucceededSignal,
   sessionStartedSignal,
   signedUpSignal,
   ssoAutoAddedSignal,
+  traceReceivedSignal,
   workflowCreatedSignal,
 } from "../nurturing-owner-signals.rules.ts";
 
@@ -199,5 +202,72 @@ describe("a redelivered owner event", () => {
 
     expect(deliver()).toBe(deliver());
     expect(deliver()).toBe("invite_accepted:org_acme:invite_1");
+  });
+});
+
+describe("a finished connected-agent run", () => {
+  const data = {
+    scenarioRunId: "run-1",
+    scenarioId: "scenario-1",
+    target: { type: "connected" as const, referenceId: "agent-1" },
+    results: { verdict: "success" as const, metCriteria: [], unmetCriteria: [] },
+    status: "SUCCESS",
+    organizationAdmin: { userId: "admin-1", onboardingVariant: null },
+    occurredAt: AT,
+  };
+
+  /** @scenario "a scenario run that finished against a connected agent is tracked as succeeded" */
+  it("raises the run against the admin its event carries, keyed by the run", () => {
+    expect(
+      scenarioRunSucceededSignal({ data, aggregateId: "run-1", tenantId: "project-1" }),
+    ).toEqual([
+      {
+        kind: "scenario_run_succeeded",
+        sourceEventId: "run-1",
+        tenantId: "project-1",
+        occurredAt: AT,
+        userId: "admin-1",
+        projectId: "project-1",
+        scenarioId: "scenario-1",
+        runId: "run-1",
+        onboardingVariant: null,
+      },
+    ]);
+  });
+
+  it("raises nothing when the event names no admin or carries no instant", () => {
+    const run = { aggregateId: "run-1", tenantId: "project-1" };
+    expect(
+      scenarioRunSucceededSignal({ ...run, data: { ...data, organizationAdmin: undefined } }),
+    ).toEqual([]);
+    expect(
+      scenarioRunSucceededSignal({ ...run, data: { ...data, occurredAt: undefined } }),
+    ).toEqual([]);
+  });
+});
+
+describe("trace's project milestones", () => {
+  const trace = {
+    tenantId: "project-1",
+    projectId: "project-1",
+    userId: "admin-1",
+    occurredAt: AT,
+  };
+
+  it("raise the first trace with its SDK, once per project", () => {
+    const data = { ...trace, sdkLanguage: "python", sdkFramework: "openai" };
+    expect(firstTraceRecordedSignal({ data, aggregateId: "project-1" })).toEqual({
+      kind: "first_trace_integrated",
+      sourceEventId: "project-1",
+      ...data,
+    });
+  });
+
+  it("raise a later trace keyed by the project and the trace's instant", () => {
+    expect(traceReceivedSignal({ data: trace, aggregateId: "project-1" })).toEqual({
+      kind: "trace_received",
+      sourceEventId: `project-1:${AT}`,
+      ...trace,
+    });
   });
 });

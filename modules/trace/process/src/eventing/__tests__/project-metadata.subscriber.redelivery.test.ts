@@ -5,10 +5,8 @@
  */
 import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
-import {
-  type ProjectMetadataSubscriberDeps,
-  createProjectMetadataHandler,
-} from "../project-metadata.subscriber.ts";
+import { createProjectMetadataHandler } from "../project-metadata.subscriber.ts";
+import { milestonesOver, type RecordedMilestone } from "./project-milestones.test-helpers.ts";
 import {
   TENANT_ID,
   createContext,
@@ -50,7 +48,7 @@ const foldState = createFoldState({
 
 // Typed from the dependency it stands in for, so a change to the command's shape
 // fails here at the injection rather than being absorbed by a bare `vi.fn()`.
-let recordSignal: Mock<ProjectMetadataSubscriberDeps["nurturing"]["recordSignal"]>;
+let recordSignal: Mock<(milestone: RecordedMilestone) => Promise<void>>;
 
 beforeEach(() => {
   recordSignal = vi.fn(async () => undefined);
@@ -65,7 +63,7 @@ describe("given a project receiving its first real trace", () => {
       writes = store.writes;
       const handler = createProjectMetadataHandler({
         projects: store.projects as never,
-        nurturing: { recordSignal },
+        milestones: milestonesOver(recordSignal),
       });
 
       await handler(event, createContext(foldState));
@@ -74,8 +72,7 @@ describe("given a project receiving its first real trace", () => {
 
     it("records the integration milestone once", async () => {
       expect(recordSignal).toHaveBeenCalledWith({
-        kind: "first_trace_integrated",
-        sourceEventId: event.id,
+        recorded: "firstTrace",
         tenantId: TENANT_ID,
         occurredAt: event.occurredAt,
         userId: "user-1",
@@ -84,7 +81,7 @@ describe("given a project receiving its first real trace", () => {
         sdkFramework: "unknown",
       });
       expect(
-        recordSignal.mock.calls.filter(([signal]) => signal.kind === "first_trace_integrated"),
+        recordSignal.mock.calls.filter(([signal]) => signal.recorded === "firstTrace"),
       ).toHaveLength(1);
     });
 
@@ -95,7 +92,7 @@ describe("given a project receiving its first real trace", () => {
     // this level-triggered handler (see the handoff's Risks).
     it("also tells nurturing a later trace on the redelivered pass", async () => {
       expect(
-        recordSignal.mock.calls.filter(([signal]) => signal.kind === "trace_received"),
+        recordSignal.mock.calls.filter(([signal]) => signal.recorded === "traceReceived"),
       ).toHaveLength(1);
     });
 
@@ -114,7 +111,7 @@ describe("given a project receiving its first real trace", () => {
       const store = makeProjectStore({ firstMessage: false, integrated: false });
       const handler = createProjectMetadataHandler({
         projects: store.projects as never,
-        nurturing: { recordSignal },
+        milestones: milestonesOver(recordSignal),
       });
 
       await handler(event, createContext(foldState));
@@ -134,7 +131,7 @@ describe("given a project that was already integrated", () => {
     store = makeProjectStore({ firstMessage: true, integrated: true });
     const handler = createProjectMetadataHandler({
       projects: store.projects as never,
-      nurturing: { recordSignal },
+      milestones: milestonesOver(recordSignal),
     });
 
     await handler(event, createContext(foldState));
@@ -143,7 +140,7 @@ describe("given a project that was already integrated", () => {
 
   it("records no first_trace_integrated milestone on any delivery", () => {
     expect(recordSignal).not.toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "first_trace_integrated" }),
+      expect.objectContaining({ recorded: "firstTrace" }),
     );
     expect(store.writes).toHaveLength(0);
   });
@@ -152,8 +149,7 @@ describe("given a project that was already integrated", () => {
   it("tells nurturing a later trace on every delivery; nurturing's own key collapses the redelivery", () => {
     expect(recordSignal).toHaveBeenCalledTimes(2);
     expect(recordSignal).toHaveBeenCalledWith({
-      kind: "trace_received",
-      sourceEventId: event.id,
+      recorded: "traceReceived",
       tenantId: TENANT_ID,
       occurredAt: event.occurredAt,
       userId: "user-1",
@@ -172,7 +168,7 @@ describe("given a project that was already integrated", () => {
       const bootstrapTopicClustering = vi.fn().mockResolvedValue(undefined);
       const handler = createProjectMetadataHandler({
         projects: store.projects as never,
-        nurturing: { recordSignal },
+        milestones: milestonesOver(recordSignal),
         bootstrapTopicClustering,
       });
 
@@ -190,7 +186,7 @@ describe("given a seeded sample trace", () => {
     const store = makeProjectStore({ firstMessage: false, integrated: false });
     const handler = createProjectMetadataHandler({
       projects: store.projects as never,
-      nurturing: { recordSignal },
+      milestones: milestonesOver(recordSignal),
     });
     const sample = createFoldState({ attributes: { "langwatch.origin": "sample" } });
 

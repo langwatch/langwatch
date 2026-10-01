@@ -1,5 +1,4 @@
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { NurturingApi } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { createTenantId } from "@langwatch/eventing";
 import type { EventingParticipation, PriorEventsRead, ResourceOwnership } from "@langwatch/kernel";
@@ -52,10 +51,9 @@ export interface SimulationGradingPeers {
   evaluations: Pick<EvaluationApi, "runEvaluator" | "reportEvaluation">;
 }
 
-/** Where a finished run reads its admin, counts the organization's runs, and tells nurturing. */
+/** Where a finished run reads its organization's admin, which the finished event carries. */
 export interface SimulationMilestonePeers {
-  projects: Pick<ProjectApi, "resolveOrgAdmin" | "listIdsByOrganization">;
-  nurturing: Pick<NurturingApi, "recordSignal">;
+  projects: Pick<ProjectApi, "resolveOrgAdmin">;
 }
 
 /** Grading reads the run's spans whole, as main's worker did: no viewer redaction. */
@@ -173,12 +171,6 @@ export class SimulationProcessingRuntimeAdapter {
       snapshotUpdateBroadcast: this.input.snapshotUpdates,
       suiteRunSync: this.input.suiteRuns,
       traceMetricsSync: { computeRunMetrics: (data) => commands.computeRunMetrics(data) },
-      scenarioRunSucceededNurturing: this.input.milestones.nurturing,
-      simulationRunFinishedNurturing: {
-        projects: this.input.milestones.projects,
-        simulations,
-        nurturing: this.input.milestones.nurturing,
-      },
       retention: {
         resolve: (tenantId) => retention.getResolvedForProject({ projectId: tenantId }),
       },

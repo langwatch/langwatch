@@ -2,11 +2,15 @@
 import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import type { EvaluationLifecycleCompletedEventData } from "@langwatch/evaluation-contract";
 import type { ProjectCreatedEventData } from "@langwatch/project-contract";
+import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 
 import type { NurturingMilestonesRepository } from "../repositories/nurturing-milestones.repository.ts";
-import { evaluationCompletedSignal } from "../rules/nurturing-owner-signals.rules.ts";
+import {
+  evaluationCompletedSignal,
+  simulationRunFinishedSignal,
+} from "../rules/nurturing-owner-signals.rules.ts";
 
-/** How long a counted evaluation is remembered against a redelivered completion. */
+/** How long a counted evaluation or run is remembered against a redelivered event. */
 const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
 type MilestonesDependencies = Readonly<{
@@ -53,6 +57,26 @@ export class NurturingMilestonesService {
     });
     return organizations.flatMap((organization) =>
       evaluationCompletedSignal({ data, aggregateId, organization }),
+    );
+  }
+
+  /** Counts a finished simulation run once, keyed by the run, and answers the signal it raises. */
+  async simulationRunFinished({
+    data,
+    aggregateId,
+    tenantId,
+  }: Readonly<{
+    data: SimulationRunFinishedEventData;
+    aggregateId: string;
+    tenantId: string;
+  }>): Promise<NurturingSignal[]> {
+    const key = `nurturing:simulation-counted:${aggregateId}`;
+    if (!(await this.dependencies.claims.claim(key, COUNTED_WINDOW_SECONDS))) return [];
+    const organizations = await this.dependencies.milestones.countSimulationRun({
+      projectId: tenantId,
+    });
+    return organizations.flatMap((organization) =>
+      simulationRunFinishedSignal({ data, aggregateId, tenantId, organization }),
     );
   }
 }

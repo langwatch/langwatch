@@ -205,3 +205,4 @@ export * from "./trace.config.ts";
 export * from "./trace-captured-span.commands.ts";
 
 export * from "./trace-rest.schemas.ts";
+export * from "./trace-project-milestones.events.ts";

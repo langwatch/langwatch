@@ -1,58 +1,24 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * A scenario run counts as succeeded only against a connected agent, and
  * only once it left an ungraded status behind.
  * @see specs/features/customer-io-nurturing-integration.feature
  */
-import { createTenantId } from "@langwatch/eventing";
-import {
-  SIMULATION_EVENT_VERSIONS,
-  SIMULATION_RUN_EVENT_TYPES,
-  type SimulationRunFinishedEvent,
-  type SimulationRunStartedEvent,
-} from "@langwatch/scenario-contract";
+import type { SimulationRunFinishedEventData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
-import { isConnectedAgentRunSucceeded } from "../scenario-run-milestones.rules.ts";
+import { isConnectedAgentRunSucceeded } from "../nurturing-scenario-run.rules.ts";
 
 function finishedEvent(
-  data: Partial<SimulationRunFinishedEvent["data"]> = {},
-): SimulationRunFinishedEvent {
+  data: Partial<SimulationRunFinishedEventData> = {},
+): SimulationRunFinishedEventData {
   return {
-    id: "event-1",
-    aggregateId: "run-1",
-    aggregateType: "simulation_run",
-    tenantId: createTenantId("project-1"),
-    createdAt: 0,
-    occurredAt: 0,
-    type: SIMULATION_RUN_EVENT_TYPES.FINISHED,
-    version: SIMULATION_EVENT_VERSIONS.FINISHED,
-    data: {
-      scenarioRunId: "run-1",
-      scenarioId: "scenario-1",
-      target: { type: "connected", referenceId: "agent-1" },
-      results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
-      status: "SUCCESS",
-      ...data,
-    },
-  };
-}
-
-function startedEvent(): SimulationRunStartedEvent {
-  return {
-    id: "event-1",
-    aggregateId: "run-1",
-    aggregateType: "simulation_run",
-    tenantId: createTenantId("project-1"),
-    createdAt: 0,
-    occurredAt: 0,
-    type: SIMULATION_RUN_EVENT_TYPES.STARTED,
-    version: SIMULATION_EVENT_VERSIONS.STARTED,
-    data: {
-      scenarioRunId: "run-1",
-      scenarioId: "scenario-1",
-      batchRunId: "batch-1",
-      scenarioSetId: "set-1",
-    },
+    scenarioRunId: "run-1",
+    scenarioId: "scenario-1",
+    target: { type: "connected", referenceId: "agent-1" },
+    results: { verdict: "success", metCriteria: [], unmetCriteria: [] },
+    status: "SUCCESS",
+    ...data,
   };
 }
 
@@ -129,12 +95,6 @@ describe("isConnectedAgentRunSucceeded()", () => {
         ),
       ).toBe(false);
       expect(isConnectedAgentRunSucceeded(finishedEvent({ target: undefined }))).toBe(false);
-    });
-  });
-
-  describe("when the event is not a finished event", () => {
-    it("does not count as succeeded", () => {
-      expect(isConnectedAgentRunSucceeded(startedEvent())).toBe(false);
     });
   });
 });

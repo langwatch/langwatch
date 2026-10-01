@@ -18,8 +18,17 @@ import type {
   OrganizationSignedUpEventData,
 } from "@langwatch/organization-contract";
 import type { PromptCreatedEventData } from "@langwatch/prompt-contract";
-import type { ScenarioCreatedEventData } from "@langwatch/scenario-contract";
+import type {
+  ScenarioCreatedEventData,
+  SimulationRunFinishedEventData,
+} from "@langwatch/scenario-contract";
+import type {
+  FirstTraceRecordedEventData,
+  TraceReceivedEventData,
+} from "@langwatch/trace-contract";
 import type { WorkflowCreatedEventData } from "@langwatch/workflow-contract";
+
+import { isConnectedAgentRunSucceeded } from "./nurturing-scenario-run.rules.ts";
 
 /** The signal a peer's event raises, keyed by the aggregate and instant the event carries. */
 type OwnerEvent<Data> = Readonly<{ data: Data; aggregateId: string }>;
@@ -276,4 +285,89 @@ export function scenarioCreatedSignal({
   const { occurredAt, userId, projectId, scenarioId, scenarioCount, onboardingVariant } = data;
   const counted = { userId, projectId, scenarioId, scenarioCount, onboardingVariant };
   return { kind: "scenario_created", sourceEventId: aggregateId, tenantId, occurredAt, ...counted };
+}
+
+/** A connected agent's run that finished with a verdict, against the admin its event carries. */
+export function scenarioRunSucceededSignal({
+  data,
+  aggregateId,
+  tenantId,
+}: TenantEvent<SimulationRunFinishedEventData>): NurturingSignal[] {
+  const { organizationAdmin: admin, occurredAt } = data;
+  if (!isConnectedAgentRunSucceeded(data) || !admin || occurredAt === undefined) return [];
+  return [
+    {
+      kind: "scenario_run_succeeded",
+      sourceEventId: aggregateId,
+      tenantId,
+      occurredAt,
+      userId: admin.userId,
+      projectId: tenantId,
+      scenarioId: data.scenarioId,
+      runId: data.scenarioRunId,
+      onboardingVariant: admin.onboardingVariant,
+    },
+  ];
+}
+
+/** The organization a finished run was counted against, as nurturing's own store holds it. */
+type CountedRunOrganization = Readonly<{
+  adminUserId: string | null;
+  seeded: boolean;
+  simulationRunCount: number;
+}>;
+
+/** A finished run against the organization's admin; none where nurturing knows no admin. */
+export function simulationRunFinishedSignal({
+  data,
+  aggregateId,
+  tenantId,
+  organization,
+}: TenantEvent<SimulationRunFinishedEventData> & {
+  organization: CountedRunOrganization;
+}): NurturingSignal[] {
+  const { adminUserId, seeded, simulationRunCount } = organization;
+  const { occurredAt } = data;
+  if (!adminUserId || occurredAt === undefined) return [];
+  return [
+    {
+      kind: "simulation_run_finished",
+      sourceEventId: aggregateId,
+      tenantId,
+      occurredAt,
+      userId: adminUserId,
+      projectId: tenantId,
+      organizationRunCount: simulationRunCount,
+      first: !seeded && simulationRunCount === 1,
+    },
+  ];
+}
+
+/** A project's first real trace against the admin trace recorded, once per project. */
+export function firstTraceRecordedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<FirstTraceRecordedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, projectId, sdkLanguage, sdkFramework } = data;
+  const sdk = { sdkLanguage, sdkFramework };
+  const sourceEventId = aggregateId;
+  return {
+    kind: "first_trace_integrated",
+    sourceEventId,
+    tenantId,
+    occurredAt,
+    userId,
+    projectId,
+    ...sdk,
+  };
+}
+
+/** A later real trace against the admin, keyed by the project and the trace's instant. */
+export function traceReceivedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<TraceReceivedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, projectId } = data;
+  const sourceEventId = `${aggregateId}:${occurredAt}`;
+  return { kind: "trace_received", sourceEventId, tenantId, occurredAt, userId, projectId };
 }

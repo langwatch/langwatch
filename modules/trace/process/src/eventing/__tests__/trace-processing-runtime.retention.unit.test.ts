@@ -35,6 +35,7 @@ describe("TraceProcessingRuntimeAdapter", () => {
         findSummary: async () => null,
         recordTrackedEvent: async () => undefined,
         broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
+        milestones: createApiFixture<TraceProcessingPipelineInput["milestones"]>(),
       }).build({ participation: "consume" });
 
       await expect(pipeline.retentionPolicyResolver?.resolve("project-1")).resolves.toEqual(

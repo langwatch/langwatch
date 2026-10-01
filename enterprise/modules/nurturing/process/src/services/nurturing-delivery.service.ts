@@ -315,7 +315,7 @@ export class NurturingDeliveryService {
   private simulationRunFinished(signal: NurturingSignalOf<"simulation_run_finished">): void {
     const { userId, projectId, organizationRunCount } = signal;
     const at = isoOf(signal.occurredAt);
-    if (organizationRunCount > 1) {
+    if (!signal.first) {
       return this.identify({
         userId,
         traits: { simulation_count: organizationRunCount, last_simulation_at: at },
