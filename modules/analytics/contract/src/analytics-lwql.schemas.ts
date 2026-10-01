@@ -1,10 +1,10 @@
+import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
 /**
  * The wire shape of one submitted LangWatchQL statement, shared by the
  * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
  * accepted steps ARE the published contract, so both doors read one copy.
  */
-import { defineRestMiddleware } from "@langwatch/api/contract";
-import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
+import { defineRestMiddleware } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";
