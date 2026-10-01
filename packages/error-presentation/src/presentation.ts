@@ -1092,8 +1092,9 @@ const presentations = {
     describe: () => "Pick a different name for this key.",
   },
   api_key_scope_violation: {
-    title: "This API key can't do that",
-    describe: () => "It doesn't include the required scope.",
+    title: "You don't have access for this",
+    describe: () =>
+      "This needs permissions you don't hold in this project. Ask an admin to grant them.",
   },
 
   project_visibility_too_wide: {
