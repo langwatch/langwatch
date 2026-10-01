@@ -12,6 +12,7 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { OpsOperatorPermission } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
@@ -28,6 +29,29 @@ import {
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";
+
+/** The account the fixture's authz grants the platform-operator role. */
+export const OPS_STAFF_ID = "user_staff";
+
+/**
+ * An `AuthzApi` that answers platform-tier questions from a table of holders
+ * (user id to the permissions held there) and says no to every other user.
+ */
+export function platformOperatorAuthz({
+  holders = { [OPS_STAFF_ID]: ["ops:view", "ops:manage"] },
+  overrides = {},
+}: {
+  holders?: Readonly<Record<string, readonly OpsOperatorPermission[]>>;
+  overrides?: Partial<AuthzApi>;
+} = {}): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    can: async ({ principal, permission, scope }) =>
+      scope.type === "platform" &&
+      principal.type === "user" &&
+      (holders[principal.id] ?? []).some((held) => held === permission),
+    ...overrides,
+  });
+}
 
 /** Nothing registered: the graph a test does not care about. */
 class EmptyOpsIntrospection implements OpsEventingIntrospection {
