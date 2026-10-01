@@ -1019,9 +1019,9 @@ another member's sign-in methods there.
 
 ## Invite people
 
-Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats, or **Developer** to invite them on Developer seats.
+Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Under **Seat**, choose the seat the whole batch gets: **Member**, **Lite Member** or **Developer**. Each option says in a line what that seat can do, and the (i) next to Lite Member and Developer opens the full explanation.
 
-Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. A Developer joins no team, so the section disappears when that seat is ticked. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
+Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. A Developer joins no team, so the section disappears when that seat is chosen. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
 
 Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
 
@@ -1053,7 +1053,7 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 
 A Developer is a seat for somebody who needs their own place to work and no access to the shared projects: a developer sending traces from Claude Code or another coding agent, for example. A Developer gets a personal project and everything a member can do inside it: send traces from the CLI, run queries and evaluations, manage its keys.
 
-A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. Developers are counted on the seat panel and never limited by the plan.
+A Developer cannot open, be invited to, or be added to any shared team or project, and cannot be given access through a group either. The product switcher offers a Developer the **Me** workspace only: the Gateway and Governance products are organisation-wide, so a Developer cannot open them, by the switcher or by address, and never sees the organisation's gateway keys. Developers are counted on the seat panel and never limited by the plan.
 
 Moving a member to a Developer seat removes their bindings on every shared team, shared project and the organization, and records each removal in the audit log. Their personal project, its traces and their API keys stay. A key that pointed at a shared project stops working on its own, because a key can never do more than its owner can. Moving a Developer to a Member seat grants no team access on its own; add teams afterwards.
 
