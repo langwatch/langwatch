@@ -219,10 +219,10 @@ export class ApiKeyTokenResolutionService {
       return null;
     }
 
-    // A key minted under a CLI session cannot outlive it — the cascade
-    // retires it on revoke, but that is one caller's work. A transient
-    // failure or a cascade-less revoke path must not leave this key alive,
-    // so this checks the parent directly: it is the authority.
+    // A key minted under a parent key (a CLI login key or a run's starting
+    // key) cannot outlive it — the cascade retires it on revoke, but that is
+    // one caller's work. A transient failure or a cascade-less revoke path
+    // must not leave this key alive, so this checks the parent directly.
     if (row.parentApiKeyId && !(await this.isParentLive(row.parentApiKeyId))) {
       return null;
     }
@@ -305,7 +305,7 @@ export class ApiKeyTokenResolutionService {
   }
 
   /**
-   * Whether the CLI login key a key was minted under is still live. A
+   * Whether the parent key a key was minted under is still live. A
    * parent that is gone reads as dead — its absence is not something to
    * authenticate past. Expiry counts too, ahead of the hourly sweep.
    */

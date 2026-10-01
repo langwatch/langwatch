@@ -246,7 +246,7 @@ export function declaredProducerFields(call) {
   return fields;
 }
 
-/** The router-level credential: the last `withCredential` before the first route verb. */
+/** The router-level credential: any `withCredential` link before the first route verb. */
 function routerSessionOf(verb) {
   let declared = false;
   for (

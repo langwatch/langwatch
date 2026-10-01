@@ -15,11 +15,6 @@ const logger = createLogger("langwatch:evaluation:guardrail-check");
 const COST_KSUID_PREFIX = "cost";
 const DEADLINE_PASSED = Symbol("guardrail deadline passed");
 
-/**
- * Runs one guardrail's evaluator under the caller's signal and its own deadline, answering by
- * then even when the evaluator ignores the abort. The cost is recorded after the result, outside
- * the cancellation, so reporting never delays the verdict.
- */
 type GuardrailRunner = {
   runEvaluation(input: RunEvaluatorInput): Promise<SingleEvaluationResult>;
 };
@@ -27,6 +22,11 @@ type GuardrailCostLedger = {
   recordCost(input: EvaluationCostRecord): Promise<EvaluationSlugMatch>;
 };
 
+/**
+ * Runs one guardrail's evaluator under the caller's signal and its own deadline, answering by
+ * then even when the evaluator ignores the abort. The cost is recorded after the result, outside
+ * the cancellation, so reporting never delays the verdict.
+ */
 export class EvaluationGuardrailCheckService {
   private constructor(
     private readonly runner: GuardrailRunner,

@@ -526,16 +526,18 @@ describe("given a handler that does more than call one operation", () => {
 
 describe("given a handler that builds its own collaborators", () => {
   /** @scenario "A handler that constructs a service or repository is refused" */
-  it.each(["new WidgetApp()", "WidgetApp.create()", "createWidgetApp()", "WidgetService.create()"])(
-    "reports %s",
-    (construction) => {
-      const code = `group.register("create", "2026-08-28", async (context, input) => ${construction});`;
+  it.each([
+    "new WidgetModule()",
+    "WidgetModule.create()",
+    "createWidgetModule()",
+    "WidgetService.create()",
+  ])("reports %s", (construction) => {
+    const code = `group.register("create", "2026-08-28", async (context, input) => ${construction});`;
 
-      expect(report(code)).toEqual([
-        expect.objectContaining({ messageId: "handlerConstructs", line: 1 }),
-      ]);
-    },
-  );
+    expect(report(code)).toEqual([
+      expect.objectContaining({ messageId: "handlerConstructs", line: 1 }),
+    ]);
+  });
 
   it("follows a named handler and an import alias", () => {
     const code = [
