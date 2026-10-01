@@ -2,6 +2,10 @@ import { federatedProviderLabel } from "~/features/auth/logic/methodLabels";
 import { legacyCallbackUrl } from "./providers";
 import type { DeploymentSignIn } from "./sso-self-serve.types";
 
+/** Deployment providers the sign-in picker shows under another name: Auth0
+ *  is a bridge there, offering the connections behind it. */
+const DEPLOYMENT_PROVIDER_NAMES: Record<string, string> = { auth0: "Auth0" };
+
 /**
  * The sign-in a deployment configures for itself (`NEXTAUTH_PROVIDER`), next
  * to the connection an organization sets up here.
@@ -29,7 +33,8 @@ export function deploymentSignInFor({
 }): DeploymentSignIn | null {
   if (!provider || provider === "email") return null;
   return {
-    name: federatedProviderLabel(provider),
+    name:
+      DEPLOYMENT_PROVIDER_NAMES[provider] ?? federatedProviderLabel(provider),
     redirectUrl: legacyCallbackUrl({ baseUrl, providerId: provider }),
   };
 }

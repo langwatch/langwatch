@@ -10,6 +10,7 @@ import {
   SSO_DNS_PROOF_TTL_MS,
   SSO_DNS_RECORD_NAME,
   SSO_DNS_RECORD_TYPE,
+  SSO_IDP_EDITABLE_STATES,
   SSO_VERIFICATION_FILE_PATH,
   SsoActivationArrivalsUndecidedError,
   SsoActivationBreakGlassMissingError,
@@ -223,6 +224,9 @@ export interface SsoTestSignInLookup {
   findLatestForConnection(args: {
     organizationId: string;
     connectionId: string;
+    /** The connection's current issuer. A sign-in through an issuer the
+     *  connection no longer dials is not evidence for the one it dials now. */
+    issuer: string | null;
   }): Promise<SsoTestSignIn | null>;
 }
 
@@ -460,6 +464,7 @@ export class SsoSelfServeService {
       this.deps.testSignIns.findLatestForConnection({
         organizationId,
         connectionId: connection.connectionId,
+        issuer: connection.idpMetadata.issuer,
       }),
       this.liveBindings({ organizationId }),
     ]);
@@ -524,6 +529,7 @@ export class SsoSelfServeService {
     const testSignIn = await this.deps.testSignIns.findLatestForConnection({
       organizationId,
       connectionId,
+      issuer: state.idpMetadata.issuer,
     });
     if (testSignIn === null) {
       throw new SsoActivationTestSignInMissingError(
@@ -680,6 +686,16 @@ export class SsoSelfServeService {
     if (idp.protocol !== state.type) {
       throw new SsoConnectionInvalidTransitionError(
         `connection ${connectionId} speaks ${state.type}; the protocol cannot change on an existing connection`,
+      );
+    }
+    // Refused here as well as by the aggregate, so a refused edit stores no
+    // credential records.
+    if (
+      state.source !== "self-serve" ||
+      !SSO_IDP_EDITABLE_STATES.includes(state.state)
+    ) {
+      throw new SsoConnectionInvalidTransitionError(
+        `connection ${connectionId} is ${state.source} in ${state.state}; its identity provider settings cannot be replaced`,
       );
     }
     const dialing = await this.prepareIdpUpdate({ state, idp });

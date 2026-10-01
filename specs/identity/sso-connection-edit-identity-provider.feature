@@ -72,6 +72,13 @@ Feature: Editing an existing SSO connection's identity provider settings
     Given the connection's removal has been requested
     When an administrator changes the issuer
     Then the change is refused
+    And no credential is stored for the refused settings
+
+  @unit
+  Scenario: A new issuer needs a new test sign-in before going live
+    Given a test sign-in went through the connection's old issuer
+    When an administrator changes the issuer
+    Then going live waits for a test sign-in through the new issuer
 
   @unit
   Scenario: Only an administrator who may manage single sign-on can edit

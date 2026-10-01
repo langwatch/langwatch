@@ -318,6 +318,7 @@ describe("editing a connection's identity provider settings", () => {
         const { fixture, current } = await fixtureWith({
           state: "TEARDOWN_PENDING",
         });
+        const storedBefore = fixture.credentials.count;
 
         const refusal = await refusalOf(
           fixture.selfServe.updateIdentityProvider({
@@ -330,6 +331,38 @@ describe("editing a connection's identity provider settings", () => {
 
         expect(refusal.code).toBe("sso_connection_invalid_transition");
         expect((await current()).idpMetadata.issuer).toBe(WRONG);
+        expect(fixture.credentials.count).toBe(storedBefore);
+      });
+    });
+  });
+
+  describe("given a test sign-in through the old issuer", () => {
+    describe("when the administrator changes the issuer", () => {
+      /** @scenario "A new issuer needs a new test sign-in before going live" */
+      it("no longer counts that sign-in towards going live", async () => {
+        const { fixture } = await fixtureWith({ state: "VERIFIED" });
+        fixture.testSignIns.record({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          issuer: WRONG,
+          signIn: { accountId: "acc_ana", userId: "usr_ana", atMs: 1 },
+        });
+        const before = await fixture.selfServe.getSetup({
+          organizationId: ORG,
+        });
+
+        await fixture.selfServe.updateIdentityProvider({
+          organizationId: ORG,
+          connectionId: CONNECTION,
+          idp: oidc(),
+          actor: ANA,
+        });
+        const after = await fixture.selfServe.getSetup({
+          organizationId: ORG,
+        });
+
+        expect(before.goLive?.testSignIn.done).toBe(true);
+        expect(after.goLive?.testSignIn.done).toBe(false);
       });
     });
   });

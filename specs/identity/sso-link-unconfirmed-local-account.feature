@@ -121,6 +121,14 @@ Feature: Single sign-on links an unconfirmed local account on a verified domain,
     And no second account is created for that address
 
   @integration @regression
+  Scenario: Microsoft Entra ID's xms_edov true links a confirmed account without a domain proof
+    Given a password account whose address is confirmed
+    And the connection has not verified the account's domain
+    When Microsoft Entra ID signs that address in with xms_edov true
+    Then the session belongs to the existing account
+    And no second account is created for that address
+
+  @integration @regression
   Scenario: A confirmed account on a domain the connection has not verified is refused with the missing proof named
     Given a password account whose address is confirmed
     And the connection has not verified the account's domain

@@ -531,6 +531,14 @@ function signInGreeting(recoveredEmail: string | null): {
   };
 }
 
+/** What the log-in door says about an unknown address where no confirmation
+ *  link can be sent. */
+const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
+  title: "There is no account for that email address yet",
+  describe:
+    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
+} as const;
+
 /**
  * The address routed to no account (ADR-117, revision 2026-08-25).
  *
@@ -550,14 +558,6 @@ function signInGreeting(recoveredEmail: string | null): {
  * An installation with no email provider cannot send that link, so there the
  * card offers nothing it cannot do and says what is missing instead.
  */
-/** What the log-in door says about an unknown address where no confirmation
- *  link can be sent. */
-const NO_ACCOUNT_WITHOUT_EMAIL_COPY = {
-  title: "There is no account for that email address yet",
-  describe:
-    "This installation cannot send email, so it cannot confirm a new address. Ask an administrator to set up an email provider, or sign in with single sign-on once your organization has it.",
-} as const;
-
 function NoAccountYet({
   email,
   reasonCode,

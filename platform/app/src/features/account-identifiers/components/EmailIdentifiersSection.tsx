@@ -557,7 +557,7 @@ function AddAddressButton({
 }
 
 /** Why an address can be added only once email is set up. */
-export const ADD_ADDRESS_NEEDS_EMAIL_COPY =
+const ADD_ADDRESS_NEEDS_EMAIL_COPY =
   "Adding an address sends it a confirmation link, and this installation cannot send email yet. Ask an administrator to set up an email provider.";
 
 /**

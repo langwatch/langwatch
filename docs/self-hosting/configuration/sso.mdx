@@ -86,7 +86,8 @@ response gives a different issuer, you get an error and the connection is not sa
 Check an issuer by fetching its discovery document:
 
 ```bash
-curl <issuer>/.well-known/openid-configuration
+ISSUER="https://login.microsoftonline.com/<tenant id>/v2.0"
+curl "$ISSUER/.well-known/openid-configuration"
 ```
 
 Register the client with the authorization code flow and the `openid`,

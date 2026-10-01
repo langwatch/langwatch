@@ -51,7 +51,7 @@ Never commit secrets to version control. In production, use a secrets manager (A
 |----------|-------------|---------|
 | `ADMIN_EMAILS` | Comma-separated emails of the operators who can open the Ops pages (`/ops`), such as feature flags and migrations. Matching ignores case. Set it on both the app and the workers. | - |
 
-Single sign-on is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso).
+A single sign-on connection is set up per organization in **Settings > Authentication**, with no environment variables. See [SSO Configuration](/self-hosting/configuration/sso). Installs that configure a deployment-wide provider with `NEXTAUTH_PROVIDER` and its provider variables keep working; see [Upgrading SSO](/platform/sso-update).
 
 ## Services
 
@@ -311,6 +311,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
 | `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
+| `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |
 | `app.cronApiKey.value` | `CRON_API_KEY` |
