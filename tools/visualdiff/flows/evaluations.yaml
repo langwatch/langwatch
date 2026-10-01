@@ -507,15 +507,20 @@ flows:
         body:
           name: vd-ev-{uid}
           config:
-            evaluatorType: langevals/exact_match
+            evaluatorType: lingua/language_detection
         as:
           evaluatorId: id
       - post: /api/monitors
         body:
           name: vd-mon-{uid}
-          checkType: langevals/exact_match
+          checkType: lingua/language_detection
           evaluatorId: "{evaluatorId}"
           parameters: {}
+          mappings:
+            mapping:
+              output:
+                source: output
+            expansions: []
         as:
           monitorId: id
           monitorName: name
@@ -606,15 +611,20 @@ flows:
         body:
           name: vd-ev-{uid}
           config:
-            evaluatorType: langevals/exact_match
+            evaluatorType: lingua/language_detection
         as:
           evaluatorId: id
       - post: /api/monitors
         body:
           name: vd-mon-{uid}
-          checkType: langevals/exact_match
+          checkType: lingua/language_detection
           evaluatorId: "{evaluatorId}"
           parameters: {}
+          mappings:
+            mapping:
+              output:
+                source: output
+            expansions: []
         as:
           monitorId: id
           monitorName: name
@@ -912,11 +922,7 @@ flows:
           value: vd-code-{uid}
       - action: click
         with:
-          testId: code-evaluator-input-add
-      - action: fill
-        with:
-          testId: code-evaluator-input-identifier-0
-          value: output
+          label: Remove inputs expected_output
       - action: click
         with:
           testId: save-code-evaluator
@@ -940,6 +946,9 @@ flows:
         with:
           selector: '[data-testid^="evaluator-card-"]'
           hasText: vd-code-{uid}
+      - action: click
+        with:
+          text: /^\s*Select Evaluator\s*$/
       - action: fill
         with:
           field: Enter evaluation name
