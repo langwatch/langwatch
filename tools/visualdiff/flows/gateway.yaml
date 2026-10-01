@@ -933,7 +933,7 @@ flows:
           contains: '"data":['
       - action: expect
         with:
-          api: /api/gateway/v1/spend-summaries?group_by=model&from=1&to=9007199254740991
+          api: /api/gateway/v1/spend-summaries?group_by=model&from=1&to=9007199254740991&allow_unstable=true
           auth: "{orgKey}"
           status: "200"
           contains: '"data":['
