@@ -32,6 +32,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-nurturing-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
