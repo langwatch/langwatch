@@ -52,7 +52,7 @@ dependencies = [
 [project.optional-dependencies]
 langchain = ["langchain-core>=1.5.4,<2.0.0"]
 dspy = ["dspy-ai>=3.3.0,<4"]
-litellm = ["litellm>=1.96.0"]
+litellm = ["litellm>=1.96.2"]
 dev = ["ruff>=0.16.2"]
 tests = [
     "pytest>=9.1.1,<10.0.0",
@@ -103,7 +103,7 @@ examples = [
     "langchain-openai>=1.4.3,<2.0.0",
     "langchain-text-splitters>=1.1.2,<2.0.0",
     "langchain-google-vertexai>=2.0.0,<4.0.0",
-    "litellm>=1.96.0",
+    "litellm>=1.96.2",
     "openinference-instrumentation-dspy>=0.1.39,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.65b0",
     "langgraph>=1.0.0,<2.0.0",
@@ -148,7 +148,7 @@ constraint-dependencies = [
     "onnx>=1.22.0",  # security: onnx advisory (#1560)
     "transformers>=5.10.0",  # security: transformers advisory (#2196)
     "mistune>=3.3.3",  # security: mistune advisory (#2216)
-    "tornado>=6.5.8",  # security: tornado advisories (#2161, #2197, #2255)
+    "tornado>=6.5.9",  # security: tornado advisories (#2161, #2197, #2255, and those covering <=6.5.8)
     "anyio>=4.14.2",  # security: anyio advisories (#2434, #2435)
     "soupsieve>=2.9.0",  # security: soupsieve advisories (#2422, #2423)
     "accelerate>=1.15.0",  # security: accelerate advisory covers <=1.14.0 (#2307)
