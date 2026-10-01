@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Every served `routingPolicy.*` procedure, declared once, at main's wire names and caps. */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { MODEL_TIERS, tierTargetSuggestionSchema } from "@langwatch/model-provider-contract";
 import { z } from "zod";
 
