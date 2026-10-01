@@ -152,6 +152,30 @@ describe("mintInstallationToken", () => {
     });
   });
 
+  describe("when GitHub mints a token with under a minute left", () => {
+    it("hands it back without caching it", async () => {
+      const redis = fakeRedis();
+      const svc = GithubAppTokenService.create({
+        appId: "app-1",
+        privateKey,
+        tokenCache: redis.tokenCache,
+      });
+      const expiresAt = new Date(Date.now() + 30_000).toISOString();
+      vi.stubGlobal(
+        "fetch",
+        vi.fn<typeof fetch>(async () =>
+          Response.json({ token: "ghs_short", expires_at: expiresAt }, { status: 201 }),
+        ),
+      );
+
+      const result = await svc.mintInstallationToken({ installationId: "99" });
+
+      expect(result.token).toBe("ghs_short");
+      const scope = GithubAppTokenService.computeRepoScopeKey({});
+      expect(redis.store.has(`langy:gh:insttoken:99:${scope}`)).toBe(false);
+    });
+  });
+
   describe("when the same scope is requested twice", () => {
     it("serves the second from cache without a second mint", async () => {
       const redis = fakeRedis();
@@ -262,7 +286,7 @@ describe("mintInstallationToken", () => {
       const scope = GithubAppTokenService.computeRepoScopeKey({});
       // Simulate an already-warm cache entry from an earlier, successful mint —
       // the exact state a missed deletion webhook leaves behind for up to the
-      // token's ~50min TTL.
+      // token's one-minute cache lifetime.
       redis.store.set(`langy:gh:insttoken:dead-inst:${scope}`, "ghs_stale");
       vi.stubGlobal(
         "fetch",

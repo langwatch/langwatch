@@ -21,8 +21,16 @@ export class RedisAuthSessionCacheRepository implements AuthSessionCacheReposito
     return value === null ? [] : [value];
   }
 
-  async set({ key, value }: { key: string; value: string }): Promise<void> {
-    await this.redis.set(key, value);
+  async set({
+    key,
+    value,
+    ttlSeconds,
+  }: {
+    key: string;
+    value: string;
+    ttlSeconds: number;
+  }): Promise<void> {
+    await this.redis.set(key, value, "EX", ttlSeconds);
   }
 
   async delete({ key }: { key: string }): Promise<void> {

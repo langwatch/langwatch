@@ -374,8 +374,11 @@ export class BrowserSessionService {
         }
       }
 
-      if (keepToken && retained.length > 0) {
-        await cache.set({ key: indexKey, value: JSON.stringify(retained) });
+      // Better Auth's own lifetime for this index: its furthest live session.
+      const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
+      const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
+      if (ttlSeconds > 0) {
+        await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
       } else {
         await cache.delete({ key: indexKey });
       }

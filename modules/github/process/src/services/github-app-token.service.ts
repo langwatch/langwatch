@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { GithubRepository } from "@langwatch/github-contract";
+import { differenceInSeconds, nowInstant } from "@langwatch/time";
 
 import type {
   GithubAppClient,
@@ -20,8 +21,9 @@ import {
 import type { GithubHost } from "./github-host.service.ts";
 import { GithubHostService } from "./github-host.service.ts";
 
-const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
-const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
+/** A cached token is never served in its last minute; the cache itself caps it at a minute. */
+const TOKEN_EXPIRY_MARGIN_SEC = 60;
+const LIVENESS_RECHECK_TTL_SEC = 60;
 const LIVENESS_FAILURE_BACKOFF_SEC = 60;
 
 /** This process's shared token cache in front of the raw GitHub App client. */
@@ -110,11 +112,12 @@ export class GithubAppTokenService implements GithubAppTokenCache {
         ...input,
         permissions,
       });
-      await this.cache.storeToken({
-        ...cacheKey,
-        token: minted.token,
-        ttlSec: INSTALLATION_TOKEN_CACHE_TTL_SEC,
-      });
+      const ttlSec =
+        differenceInSeconds(minted.expiresAt, nowInstant().epochMilliseconds) -
+        TOKEN_EXPIRY_MARGIN_SEC;
+      if (ttlSec > 0) {
+        await this.cache.storeToken({ ...cacheKey, token: minted.token, ttlSec });
+      }
       return minted;
     } finally {
       if (lock.acquired) {

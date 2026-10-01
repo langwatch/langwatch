@@ -113,6 +113,7 @@ class Sessions implements AuthSessionRepository {
 
 class Cache implements AuthSessionCacheRepository {
   readonly values = new Map<string, string>();
+  readonly ttls = new Map<string, number>();
   readonly deleted = vi.fn();
 
   async findValues({ key }: { key: string }): Promise<string[]> {
@@ -120,8 +121,17 @@ class Cache implements AuthSessionCacheRepository {
     return value === undefined ? [] : [value];
   }
 
-  async set({ key, value }: { key: string; value: string }): Promise<void> {
+  async set({
+    key,
+    value,
+    ttlSeconds,
+  }: {
+    key: string;
+    value: string;
+    ttlSeconds: number;
+  }): Promise<void> {
     this.values.set(key, value);
+    this.ttls.set(key, ttlSeconds);
   }
 
   async delete({ key }: { key: string }): Promise<void> {
@@ -288,6 +298,23 @@ describe("BrowserSessionService", () => {
         userId: "user-1",
         keepSessionId: "session-1",
       });
+    });
+
+    it("rewrites the kept device's index with that session's own remaining lifetime", async () => {
+      const cache = new Cache();
+      const inOneHour = NOW.epochMilliseconds + 3_600_000;
+      cache.values.set(
+        "better-auth:active-sessions-user-1",
+        JSON.stringify([
+          { token: "token-1", expiresAt: inOneHour },
+          { token: "token-2", expiresAt: inOneHour },
+        ]),
+      );
+      const { service: auth } = service({ cache });
+
+      await auth.revokeOtherBrowserSessions({ userId: "user-1", keepSessionId: "session-1" });
+
+      expect(cache.ttls.get("better-auth:active-sessions-user-1")).toBe(3_600);
     });
 
     it("falls back to persisted session tokens when the active-session index is malformed", async () => {
