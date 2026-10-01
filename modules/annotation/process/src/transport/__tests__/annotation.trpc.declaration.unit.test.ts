@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { annotationScoreTrpc, annotationTrpc } from "@langwatch/annotation-contract";
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { describe, expect, it } from "vitest";
 
 import { annotationScoreTrpcTransport } from "../annotation-score.trpc.ts";
