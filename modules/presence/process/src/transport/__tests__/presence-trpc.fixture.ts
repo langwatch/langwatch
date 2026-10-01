@@ -1,9 +1,4 @@
-/**
- * The declared tRPC path, as these tests need it: a runtime whose members decide
- * what the test told them to, an audit port that records rather than writes,
- * and a factory that records what each procedure declared without building one.
- */
-import type { TrpcContract } from "@langwatch/api/contract";
+import type { AuthzDeclaration } from "@langwatch/api/access";
 import {
   createTrpcRuntime,
   redactAuditArgs,
@@ -13,7 +8,13 @@ import {
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
-import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+/**
+ * The declared tRPC path, as these tests need it: a runtime whose members decide
+ * what the test told them to, an audit port that records rather than writes,
+ * and a factory that records what each procedure declared without building one.
+ */
+import type { TrpcContract } from "@langwatch/kernel/contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { initTRPC } from "@trpc/server";
 

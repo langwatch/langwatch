@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -37,6 +36,7 @@
   },
   "devDependencies": {
     "@langwatch/api-fixture": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
