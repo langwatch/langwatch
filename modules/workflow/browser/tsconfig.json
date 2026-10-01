@@ -19,9 +19,6 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../agent/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {

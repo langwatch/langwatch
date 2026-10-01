@@ -3128,12 +3128,6 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../../packages/browser-host
-      '@langwatch/coding-agent-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/coding-agent/browser
-      '@langwatch/config':
-        specifier: workspace:*
-        version: link:../../../../packages/config
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../../packages/design-system
@@ -3146,24 +3140,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/langy-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/langy/browser
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../../../modules/langy/contract
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
-      '@langwatch/navigation-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/navigation/browser
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
-      '@langwatch/user-browser':
-        specifier: workspace:*
-        version: link:../../../../modules/user/browser
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -3182,9 +3167,6 @@ importers:
       recharts:
         specifier: 'catalog:'
         version: 3.9.1(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react-is@19.2.7)(react@19.2.8)(redux@5.0.1)
-      zustand:
-        specifier: 'catalog:'
-        version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
       '@chakra-ui/react':
         specifier: 'catalog:'
@@ -13866,9 +13848,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/annotation-browser':
-        specifier: workspace:*
-        version: link:../../annotation/browser
       '@langwatch/annotation-contract':
         specifier: workspace:*
         version: link:../../annotation/contract
@@ -13959,9 +13938,6 @@ importers:
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract
-      '@langwatch/suite-browser':
-        specifier: workspace:*
-        version: link:../../suite/browser
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -14070,9 +14046,6 @@ importers:
       shiki:
         specifier: 'catalog:'
         version: 4.3.0
-      slugify:
-        specifier: 'catalog:'
-        version: 1.6.9
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -14786,9 +14759,6 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@langwatch/agent-browser':
-        specifier: workspace:*
-        version: link:../../agent/browser
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract

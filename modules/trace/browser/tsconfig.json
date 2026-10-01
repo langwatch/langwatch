@@ -18,9 +18,6 @@
       "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
-      "path": "../../annotation/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../annotation/contract/tsconfig.build.json"
     },
     {
@@ -106,9 +103,6 @@
     },
     {
       "path": "../../stored-object/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../suite/browser/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

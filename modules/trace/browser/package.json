@@ -24,7 +24,6 @@
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@emotion/react": "catalog:",
-    "@langwatch/annotation-browser": "workspace:*",
     "@langwatch/annotation-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-client": "workspace:*",
@@ -55,7 +54,6 @@
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
-    "@langwatch/suite-browser": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
@@ -92,7 +90,6 @@
     "react-router": "catalog:",
     "remark-gfm": "catalog:",
     "shiki": "catalog:",
-    "slugify": "catalog:",
     "zod": "catalog:",
     "zustand": "catalog:"
   },

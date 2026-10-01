@@ -36,12 +36,6 @@
       "path": "../../../../packages/browser-host/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/coding-agent/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/config/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/design-system/tsconfig.build.json"
     },
     {
@@ -54,22 +48,13 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../../dev/tsconfig.web-declarations.json"
-    },
-    {
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/navigation/browser/tsconfig.build.json"
-    },
-    {
       "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/user/browser/tsconfig.build.json"
     }
   ]
 }
