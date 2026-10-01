@@ -1,8 +1,4 @@
 import {
-  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-  graphTriggerActivityGroupKey,
-} from "@langwatch/automation-contract";
-import {
   defineEventingModule,
   throttledWindow,
   type EventSubscriberDefinition,
@@ -10,7 +6,6 @@ import {
   type TriggerContext,
 } from "@langwatch/eventing";
 import {
-  ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   type TraceProcessingEvent,
   type TraceSummaryData,
@@ -76,12 +71,7 @@ export interface TraceProcessingReactions {
   projectMetadata: SummaryHandler;
   simulationMetricsSync: SummaryHandler;
   experimentMetricsSync: SummaryHandler;
-  triggerMatch: SummaryHandler;
   codingAgentSpanFactsDispatch: EventSubscriberDefinition<TraceProcessingEvent>;
-  graphTriggerActivity: (
-    event: TraceProcessingEvent,
-    context: { tenantId: string },
-  ) => Promise<void>;
   spanStorageBroadcast: (
     event: TraceProcessingEvent,
     context: TriggerContext<unknown>,
@@ -158,26 +148,6 @@ export function buildTraceProcessingConsumer(
       delay: EXPERIMENT_METRICS_SYNC_DELAY_MS,
       ttl: EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
       handler: (event, context) => reactions.experimentMetricsSync(event, context),
-    })
-    .withProjectionSubscriber("triggerMatch", {
-      fold: "traceSummary",
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: 30_000,
-      ttl: 30_000,
-      handler: (event, context) => reactions.triggerMatch(event, context),
-    })
-    .withEventSubscriber("graphTriggerActivity", {
-      events: [SPAN_RECEIVED_EVENT_TYPE, ORIGIN_RESOLVED_EVENT_TYPE],
-      delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-      dedup: {
-        makeId: graphTriggerActivityGroupKey,
-        ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-        extend: false,
-        replace: false,
-      },
-      // One lane per tenant, shared with evaluation_processing's registration.
-      groupKeyFn: graphTriggerActivityGroupKey,
-      handler: (event, context) => reactions.graphTriggerActivity(event, context),
     })
     .withEventSubscriber(
       reactions.codingAgentSpanFactsDispatch.name,

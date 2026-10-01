@@ -1,3 +1,4 @@
+import { createApiFixture } from "@langwatch/api-fixture";
 import {
   type GraphTriggerEvaluationReason,
   type GraphTriggerEvaluationResult,
@@ -6,6 +7,7 @@ import {
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_COMPLETED_EVENT_VERSION_LATEST,
+  type EvaluationApi,
   type EvaluationProcessingEvent,
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
@@ -220,6 +222,7 @@ describe("evaluation alert trigger-match subscriber redelivery", () => {
       evaluationFilters: AutomationEvaluationTriggerFilterService.create(new TestTraceService()),
       triggerMatches: recordTriggerMatch,
       matchRecordMetrics: { countRecorded: () => undefined },
+      runs: createApiFixture<EvaluationApi>(),
     });
     const context: TriggerContext<EvaluationRunData> = {
       tenantId: "project-1",

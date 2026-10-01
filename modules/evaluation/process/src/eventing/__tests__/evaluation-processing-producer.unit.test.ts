@@ -21,10 +21,6 @@ const consumer = () =>
     executeEvaluationCommand: ExecuteEvaluationCommand.create({
       execute: () => Promise.reject(new Error("not executed in this test")),
     }),
-    automations: {
-      handleEvaluationTriggerMatch: async () => undefined,
-      handleEvaluationGraphTriggerActivity: async () => undefined,
-    },
   });
 
 describe("given a process that only SENDS evaluation commands", () => {

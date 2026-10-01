@@ -29,10 +29,6 @@ import {
   type TriggerFirePage,
   type AutomationAction,
   type AutomationAuthor,
-  type AutomationEvaluationActivityContext,
-  type AutomationEvaluationSubscriberContext,
-  type AutomationEvaluationSubscriberEvent,
-  type AutomationTraceSubscriberContext,
   type AutomationTestFireAuthor,
   type UnsubscribeChannel,
   type AutomationListRow,
@@ -278,7 +274,6 @@ type AutomationDependencies = Readonly<{
 
 /** Peers only `create` composes (settlement's and mail's); `fromInfrastructure` never sees them. */
 type AutomationSettlementPeer =
-  | "evaluations"
   | "datasets"
   | "annotations"
   | "authorization"
@@ -580,6 +575,7 @@ export class AutomationApp implements AutomationApi {
         evaluationFilters: AutomationEvaluationTriggerFilterService.create(dependencies.traces),
         triggerMatches,
         matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
+        runs: dependencies.evaluations,
       }),
       triggerMatches,
       reportSchedules,
@@ -631,6 +627,7 @@ export class AutomationApp implements AutomationApi {
       retention: processStore,
       reports: this.#reportDispatcher,
       reportRuns: this.#reportSchedules,
+      peerReactions: this.#evaluations,
     });
   }
 
@@ -646,40 +643,6 @@ export class AutomationApp implements AutomationApi {
   /** Configures every active report that has no schedule process yet (the tasks backfill). */
   reconcileReportSchedules(): Promise<{ repaired: number }> {
     return this.#reportSchedules.reconcile();
-  }
-
-  // -- evaluation reactions ----------------------------------------------------
-
-  /** Records a match for each trace trigger whose filter reads evaluations. */
-  handleEvaluationTriggerMatch({
-    event,
-    context,
-  }: {
-    event: AutomationEvaluationSubscriberEvent;
-    context: AutomationEvaluationSubscriberContext;
-  }): Promise<void> {
-    return this.#evaluations.handleEvaluationTriggerMatch(event, context);
-  }
-
-  handleTraceTriggerMatch({
-    event,
-    context,
-  }: {
-    event: AutomationEvaluationSubscriberEvent;
-    context: AutomationTraceSubscriberContext;
-  }): Promise<void> {
-    return this.#evaluations.handleTraceTriggerMatch(event, context);
-  }
-
-  /** Re-evaluates the project's graph alerts after an evaluation finished. */
-  handleEvaluationGraphTriggerActivity({
-    event,
-    context,
-  }: {
-    event: AutomationEvaluationSubscriberEvent;
-    context: AutomationEvaluationActivityContext;
-  }): Promise<void> {
-    return this.#evaluations.handleEvaluationGraphTriggerActivity(event, context);
   }
 
   // -- reads -----------------------------------------------------------------

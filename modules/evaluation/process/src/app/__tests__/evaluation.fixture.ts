@@ -1,6 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type {
@@ -203,7 +202,6 @@ export function createEvaluationTestApp(
       featureFlags: FeatureFlagApi;
       evaluators: EvaluatorApi;
       monitors: MonitorApi;
-      automations: AutomationApi;
       analytics: AnalyticsApi;
       datasets: DatasetApi;
       experiments: ExperimentApi;
@@ -226,7 +224,6 @@ export function createEvaluationTestApp(
       featureFlags: input.dependencies?.featureFlags ?? createApiFixture<FeatureFlagApi>(),
       evaluators: input.dependencies?.evaluators ?? createApiFixture<EvaluatorApi>(),
       monitors: input.dependencies?.monitors ?? createApiFixture<MonitorApi>(),
-      automations: input.dependencies?.automations ?? createApiFixture<AutomationApi>(),
       analytics: input.dependencies?.analytics ?? createApiFixture<AnalyticsApi>(),
       datasets: input.dependencies?.datasets ?? createApiFixture<DatasetApi>(),
       experiments: input.dependencies?.experiments ?? createApiFixture<ExperimentApi>(),

@@ -138,6 +138,7 @@ export type {
   EventSubscriberContext,
   EventSubscriberDefinition,
   EventSubscriberOptions,
+  PeerSubscriberContext,
   PeerSubscriberDefinition,
 } from "./subscribers/eventSubscriber.types.ts";
 export type { SubscriberDispatchDefinition } from "./subscribers/subscriber.types.ts";

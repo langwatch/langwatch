@@ -1,4 +1,3 @@
-import type { AutomationApi } from "@langwatch/automation-contract";
 import {
   type CompleteEvaluationCommandData,
   type EvaluationRunData,
@@ -36,7 +35,6 @@ import {
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import { EvaluationRunFoldProjection } from "./evaluation-run.projection.ts";
 
-const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;
 /**
  * Main's CIO_SYNC_DEBOUNCE_TTL_MS: an evaluation's completed and reported events tell
  * nurturing once.
@@ -58,18 +56,11 @@ export interface EvaluationProcessingPipelineDeps {
   evaluationAnalyticsStore: FoldProjectionStore<EvaluationAnalyticsData>;
   evaluationAnalyticsRollupAppendStore: AppendStore<EvaluationAnalyticsRollupRow>;
   executeEvaluationCommand: ExecuteEvaluationCommand;
-  automations: EvaluationAutomationReactions;
-  /** Records that an evaluation settled; absent where nothing composes a lifecycle. */
+  /** Records evaluation's lifecycle facts; absent where nothing composes a lifecycle. */
   lifecycle?: Pick<EvaluationLifecycleService, "completed">;
   /** Each tenant's retention; a producer, which projects nothing, declares none. */
   retention?: RetentionPolicyResolver;
 }
-
-/** The two automation reactions a terminal evaluation wakes. */
-export type EvaluationAutomationReactions = Pick<
-  AutomationApi,
-  "handleEvaluationTriggerMatch" | "handleEvaluationGraphTriggerActivity"
->;
 
 /** Tracks evaluation lifecycle (scheduled → completed) via evaluation-level aggregates. */
 export class EvaluationProcessingPipelineAdapter {
@@ -115,14 +106,6 @@ export class EvaluationProcessingPipelineAdapter {
           store: this.deps.evaluationAnalyticsRollupAppendStore,
         }),
       )
-      .withProjectionSubscriber("triggerMatch", {
-        fold: "evaluationRun",
-        events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
-        delay: 10_000,
-        ttl: 30_000,
-        handler: (event, context) =>
-          this.deps.automations.handleEvaluationTriggerMatch({ event, context }),
-      })
       .withProjectionSubscriber("lifecycleCompleted", {
         fold: "evaluationRun",
         events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
@@ -135,27 +118,6 @@ export class EvaluationProcessingPipelineAdapter {
             occurredAt: event.occurredAt,
           });
         },
-      })
-      .withEventSubscriber("graphTriggerActivity", {
-        events: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
-        delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-        dedup: {
-          makeId: EvaluationProcessingPipelineAdapter.graphTriggerActivityGroupKey.bind(
-            EvaluationProcessingPipelineAdapter,
-          ),
-          ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
-          extend: false,
-          replace: false,
-        },
-        // Same tenant lane as the trace-processing registration: the group id
-        // carries no pipeline segment, so both pipelines' sweeps serialize in
-        // ONE lane per tenant — a sweep evaluates all of the tenant's graph
-        // triggers regardless of which event kind woke it.
-        groupKeyFn: EvaluationProcessingPipelineAdapter.graphTriggerActivityGroupKey.bind(
-          EvaluationProcessingPipelineAdapter,
-        ),
-        handler: (event, context) =>
-          this.deps.automations.handleEvaluationGraphTriggerActivity({ event, context }),
       })
       .withCommandInstance({
         name: "executeEvaluation",
@@ -181,10 +143,6 @@ export class EvaluationProcessingPipelineAdapter {
       });
     const { retention } = this.deps;
     return (retention === undefined ? pipeline : pipeline.withRetention(retention)).build();
-  }
-
-  private static graphTriggerActivityGroupKey(event: { tenantId: string }): string {
-    return `graph-trigger-activity:${event.tenantId}`;
   }
 }
 

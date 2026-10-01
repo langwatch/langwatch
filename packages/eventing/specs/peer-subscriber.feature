@@ -24,3 +24,10 @@ Feature: A module reacts to a peer pipeline's events from its own side
     Given the global registry started routing when consumers started
     When a later pipeline declares a peer subscriber
     Then registration is refused naming the subscriber's lane
+
+  @unit
+  Scenario: A peer subscriber carries its enqueue options and the event's instant
+    Given a module declares a peer subscriber with a delay, a dedup and a group key
+    When its lane registers on the global registry
+    Then the lane carries those options
+    And the handler is handed the event's occurredAt beside its tenant and aggregate

@@ -1,6 +1,5 @@
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi } from "@langwatch/dashboard-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommands } from "@langwatch/eventing";
@@ -57,7 +56,6 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
     dashboards: DashboardApi,
     datasets: DatasetApi,
     monitors: MonitorApi,
-    automations: AutomationApi,
     scenarios: ScenarioApi,
     modelProviders: ModelProviderApi,
     prompts: PromptApi,
@@ -127,7 +125,6 @@ export class OnboardingApp implements OnboardingApiContract, IntegrationsChecksA
         dashboards: dependencies.dashboards,
         datasets: dependencies.datasets,
         monitors: dependencies.monitors,
-        automations: dependencies.automations,
         scenarios: dependencies.scenarios,
         modelProviders: dependencies.modelProviders,
         prompts: dependencies.prompts,

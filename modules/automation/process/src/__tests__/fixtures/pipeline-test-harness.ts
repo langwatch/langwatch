@@ -3,7 +3,8 @@ import type {
   GraphTriggerEvaluationResult,
   GraphTriggerSweepCandidate,
 } from "@langwatch/automation-contract";
-import type { ProcessManagerDefinition } from "@langwatch/eventing";
+import { createApiFixture } from "@langwatch/api-fixture";
+import type { EventSubscriberDefinition, ProcessManagerDefinition } from "@langwatch/eventing";
 
 import { AutomationScheduledIntent, AutomationSettlementExecutor } from "../../app/automation.members.ts";
 import {
@@ -38,6 +39,13 @@ export class InertScheduledIntents extends AutomationScheduledIntent {
   }
 }
 
+/** The trigger-matching and graph reactions, inert unless a test hands its own. */
+export const inertPeerReactions: AutomationsPipelineDeps["peerReactions"] = {
+  handleTraceActivity: async () => undefined,
+  handleEvaluationSettled: async () => undefined,
+  handleEvaluationGraphTriggerActivity: async () => undefined,
+};
+
 export class InertIntentRetention extends AutomationIntentRetentionRepository {
   async deleteDispatchedBefore(): Promise<number> {
     return 0;
@@ -67,9 +75,32 @@ export function automationProcessDefinition({
     retention,
     reports,
     reportRuns,
+    peerReactions: inertPeerReactions,
   };
   const pipeline = createAutomationsPipeline(dependencies);
   const definition = pipeline.processManagers.get(name);
   if (!definition) throw new Error(`Unknown process manager: ${name}`);
   return definition;
+}
+
+/** The peer subscribers the real automations pipeline registers, by lane name. */
+export function automationPeerSubscribers(
+  peerReactions: AutomationsPipelineDeps["peerReactions"],
+): Map<string, EventSubscriberDefinition> {
+  const pipeline = createAutomationsPipeline({
+    settlement: new InertSettlementExecutor(),
+    scheduledIntents: new InertScheduledIntents(),
+    retention: new InertIntentRetention(),
+    reports: { dispatch: async () => {} },
+    reportRuns: { settleRun: async () => {} },
+    peerReactions,
+  });
+  const subscribers = new Map<string, EventSubscriberDefinition>();
+  const registry = createApiFixture<
+    Parameters<NonNullable<typeof pipeline.globalProjections>[number]["register"]>[0]
+  >({
+    registerEventSubscriber: (subscriber) => void subscribers.set(subscriber.name, subscriber),
+  });
+  for (const projection of pipeline.globalProjections ?? []) projection.register(registry);
+  return subscribers;
 }

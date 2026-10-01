@@ -1,10 +1,30 @@
 import {
+  GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+  graphTriggerActivityGroupKey,
   RECORD_TRIGGER_MATCH_COMMAND_TYPE,
   TRIGGER_MATCH_COALESCE_MAX_BATCH,
   TRIGGER_MATCH_RECORDED_EVENT_TYPE,
   triggerMatchRecordedEventDataSchema,
 } from "@langwatch/automation-contract";
-import { defineAggregate, definePipeline, defineCommand, EventSchema } from "@langwatch/eventing";
+import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
+  evaluationCompletedEventDataSchema,
+  evaluationReportedEventDataSchema,
+} from "@langwatch/evaluation-contract";
+import {
+  defineAggregate,
+  definePipeline,
+  defineCommand,
+  type Event,
+  EventSchema,
+} from "@langwatch/eventing";
+import {
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  originResolvedEventDataSchema,
+  SPAN_RECEIVED_EVENT_TYPE,
+  spanReceivedEventDataSchema,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
 
 import type {
@@ -19,6 +39,7 @@ import {
   pagePersistMatches,
   settleWindowBucket,
 } from "../rules/trigger-settlement.rules.ts";
+import type { AutomationEvaluationSubscriberService } from "../services/automation-evaluation-subscriber.service.ts";
 import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   GRAPH_ALERT_SWEEP_INTERVAL_MS,
@@ -107,7 +128,40 @@ export interface AutomationsPipelineDeps {
   retention: AutomationIntentRetentionRepository;
   reports: ReportDispatcher;
   reportRuns: ReportRunSettlement;
+  /** Trigger matching and graph sweeps, woken by trace's and evaluation's own events (§9). */
+  peerReactions: Pick<
+    AutomationEvaluationSubscriberService,
+    "handleTraceActivity" | "handleEvaluationSettled" | "handleEvaluationGraphTriggerActivity"
+  >;
 }
+
+/** Main's trigger-match settle windows: trace 30s, evaluation 10s with a 30s dedup. */
+const TRACE_MATCH_SETTLE_MS = 30_000;
+const EVALUATION_MATCH_DELAY_MS = 10_000;
+const EVALUATION_MATCH_DEDUP_TTL_MS = 30_000;
+
+/** Main's trigger-match debounce: one job per aggregate, carrying its window's last event. */
+function settlePerAggregate(input: { lane: string; delay: number; ttlMs: number }) {
+  return {
+    delay: input.delay,
+    deduplication: {
+      makeId: (event: Event) => `subscriber:${input.lane}:${event.tenantId}:${event.aggregateId}`,
+      ttlMs: input.ttlMs,
+    },
+  };
+}
+
+/** Main's graph-alert debounce: one sweep per tenant per window, in one lane per tenant. */
+const GRAPH_ACTIVITY_OPTIONS = {
+  delay: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+  deduplication: {
+    makeId: graphTriggerActivityGroupKey,
+    ttlMs: GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
+    extend: false,
+    replace: false,
+  },
+  groupKeyFn: graphTriggerActivityGroupKey,
+};
 
 /** The whole process-manager topology, factored out so its inferred return type can be named. */
 const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
@@ -255,6 +309,112 @@ const buildAutomationsPipeline = (deps: AutomationsPipelineDeps) => {
           runGraphAlertSweep(deps.scheduledIntents, deps.retention),
         ),
     )
+    .withPeerSubscriber("traceSpanTriggerMatch", {
+      eventType: SPAN_RECEIVED_EVENT_TYPE,
+      // Reads no span field: the folded summary is read through TraceApi at handling.
+      data: spanReceivedEventDataSchema.pick({}),
+      options: settlePerAggregate({
+        lane: "traceSpanTriggerMatch",
+        delay: TRACE_MATCH_SETTLE_MS,
+        ttlMs: TRACE_MATCH_SETTLE_MS,
+      }),
+      handle: (_data, context) =>
+        deps.peerReactions.handleTraceActivity({
+          projectId: context.tenantId,
+          traceId: context.aggregateId,
+          eventType: SPAN_RECEIVED_EVENT_TYPE,
+          occurredAt: context.occurredAt,
+        }),
+    })
+    .withPeerSubscriber("traceOriginTriggerMatch", {
+      eventType: ORIGIN_RESOLVED_EVENT_TYPE,
+      data: originResolvedEventDataSchema,
+      options: settlePerAggregate({
+        lane: "traceOriginTriggerMatch",
+        delay: TRACE_MATCH_SETTLE_MS,
+        ttlMs: TRACE_MATCH_SETTLE_MS,
+      }),
+      handle: (_data, context) =>
+        deps.peerReactions.handleTraceActivity({
+          projectId: context.tenantId,
+          traceId: context.aggregateId,
+          eventType: ORIGIN_RESOLVED_EVENT_TYPE,
+          occurredAt: context.occurredAt,
+        }),
+    })
+    .withPeerSubscriber("evaluationCompletedTriggerMatch", {
+      eventType: EVALUATION_COMPLETED_EVENT_TYPE,
+      data: evaluationCompletedEventDataSchema.pick({ status: true }),
+      options: settlePerAggregate({
+        lane: "evaluationCompletedTriggerMatch",
+        delay: EVALUATION_MATCH_DELAY_MS,
+        ttlMs: EVALUATION_MATCH_DEDUP_TTL_MS,
+      }),
+      handle: (data, context) =>
+        deps.peerReactions.handleEvaluationSettled({
+          projectId: context.tenantId,
+          evaluationId: context.aggregateId,
+          status: data.status,
+          occurredAt: context.occurredAt,
+        }),
+    })
+    .withPeerSubscriber("evaluationReportedTriggerMatch", {
+      eventType: EVALUATION_REPORTED_EVENT_TYPE,
+      data: evaluationReportedEventDataSchema.pick({ status: true, traceId: true }),
+      options: settlePerAggregate({
+        lane: "evaluationReportedTriggerMatch",
+        delay: EVALUATION_MATCH_DELAY_MS,
+        ttlMs: EVALUATION_MATCH_DEDUP_TTL_MS,
+      }),
+      handle: (data, context) =>
+        deps.peerReactions.handleEvaluationSettled({
+          projectId: context.tenantId,
+          evaluationId: context.aggregateId,
+          status: data.status,
+          traceId: data.traceId,
+          occurredAt: context.occurredAt,
+        }),
+    })
+    .withPeerSubscriber("traceSpanGraphActivity", {
+      eventType: SPAN_RECEIVED_EVENT_TYPE,
+      data: spanReceivedEventDataSchema.pick({}),
+      options: GRAPH_ACTIVITY_OPTIONS,
+      handle: (_data, context) =>
+        deps.peerReactions.handleEvaluationGraphTriggerActivity(
+          { occurredAt: context.occurredAt },
+          { tenantId: context.tenantId },
+        ),
+    })
+    .withPeerSubscriber("traceOriginGraphActivity", {
+      eventType: ORIGIN_RESOLVED_EVENT_TYPE,
+      data: originResolvedEventDataSchema,
+      options: GRAPH_ACTIVITY_OPTIONS,
+      handle: (_data, context) =>
+        deps.peerReactions.handleEvaluationGraphTriggerActivity(
+          { occurredAt: context.occurredAt },
+          { tenantId: context.tenantId },
+        ),
+    })
+    .withPeerSubscriber("evaluationCompletedGraphActivity", {
+      eventType: EVALUATION_COMPLETED_EVENT_TYPE,
+      data: evaluationCompletedEventDataSchema.pick({}),
+      options: GRAPH_ACTIVITY_OPTIONS,
+      handle: (_data, context) =>
+        deps.peerReactions.handleEvaluationGraphTriggerActivity(
+          { occurredAt: context.occurredAt },
+          { tenantId: context.tenantId },
+        ),
+    })
+    .withPeerSubscriber("evaluationReportedGraphActivity", {
+      eventType: EVALUATION_REPORTED_EVENT_TYPE,
+      data: evaluationReportedEventDataSchema.pick({}),
+      options: GRAPH_ACTIVITY_OPTIONS,
+      handle: (_data, context) =>
+        deps.peerReactions.handleEvaluationGraphTriggerActivity(
+          { occurredAt: context.occurredAt },
+          { tenantId: context.tenantId },
+        ),
+    })
     .build();
 };
 

@@ -1,5 +1,4 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import {
@@ -67,7 +66,6 @@ import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.inten
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import {
   EvaluationProcessingPipelineAdapter,
-  type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "../eventing/evaluation-processing-definition.pipeline.ts";
 import { EvaluationProcessingStoresAdapter } from "../eventing/evaluation-processing-stores.pipeline.ts";
@@ -263,8 +261,6 @@ export class EvaluationApp implements EvaluationApiContract {
     evaluators: EvaluatorApi,
     /** Read per request (queued runs, slug lookups), never in construction: MonitorApp needs us. */
     monitors: MonitorApi,
-    /** Wakes trigger matching and graph alerts when an evaluation settles. */
-    automations: AutomationApi,
     /** Where the analytics folds and rollup are written. */
     analytics: AnalyticsApi,
     /** The dataset a dataset evaluation names by slug, and the batch-evaluation rows it writes. */
@@ -300,7 +296,6 @@ export class EvaluationApp implements EvaluationApiContract {
   readonly #piiDetection: LangevalsPiiDetectionService;
   readonly #executionIntent: EvaluationExecutionIntent;
   readonly #eventing: EvaluationProcessingStoresAdapter;
-  readonly #automations: EvaluationAutomationReactions;
   readonly #lifecycle: EvaluationLifecycleService | undefined;
 
   private constructor({
@@ -330,7 +325,6 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#piiDetection = piiDetection;
     this.#executionIntent = executionIntent;
     this.#eventing = eventing;
-    this.#automations = dependencies.automations;
     this.#azureSafety = AzureSafetyCredentialsService.create(dependencies.modelProviders);
     this.#environment = members.environment;
     this.#customEvaluators = members.customEvaluators;
@@ -558,7 +552,6 @@ export class EvaluationApp implements EvaluationApiContract {
     return EvaluationProcessingPipelineAdapter.createPipeline({
       ...this.#eventing.buildStores(),
       executeEvaluationCommand: ExecuteEvaluationCommand.create(this.#executionIntent),
-      automations: this.#automations,
       ...(this.#lifecycle ? { lifecycle: this.#lifecycle } : {}),
     });
   }

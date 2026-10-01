@@ -1,5 +1,4 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -22,7 +21,6 @@ export type OnboardingChecksPeers = Readonly<{
   dashboards: Pick<DashboardApi, "countUsage">;
   datasets: Pick<DatasetApi, "listDatasets">;
   monitors: Pick<MonitorApi, "countUsage">;
-  automations: Pick<AutomationApi, "countUsage">;
   scenarios: Pick<ScenarioApi, "getScenarioSetsData">;
   modelProviders: Pick<ModelProviderApi, "countEnabledInScopes">;
   prompts: Pick<PromptApi, "countVersionedPrompts">;
@@ -60,7 +58,6 @@ export class OnboardingChecksService {
       dashboards,
       datasets,
       monitors,
-      automations,
       simulations,
       modelProviders,
       prompts,
@@ -71,7 +68,6 @@ export class OnboardingChecksService {
       peers.dashboards.countUsage({ projectIds }),
       peers.datasets.listDatasets({ projectId, page: 1, limit: 1 }),
       peers.monitors.countUsage({ projectIds }),
-      peers.automations.countUsage({ projectIds }),
       this.#countSimulations(projectId),
       peers.modelProviders.countEnabledInScopes({
         scopes: [
@@ -90,7 +86,6 @@ export class OnboardingChecksService {
       customGraphs: anyOf(dashboards.charts),
       datasets: anyOf(datasets.data.length),
       onlineEvaluations: anyOf(monitors.monitors),
-      triggers: anyOf(automations.triggers),
       simulations,
       modelProviders: anyOf(modelProviders),
       prompts: anyOf(prompts),

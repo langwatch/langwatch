@@ -1,4 +1,5 @@
 import type { AnalyticsService } from "@langwatch/analytics-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import { defineServerModule } from "@langwatch/kernel";
 
 import {
@@ -173,6 +174,8 @@ export function createAutomationEvaluationSubscriber(input: {
   /** The trace summary a match is confirmed against, and how its query is read. */
   traces: AutomationEvaluationTraceSummary & AutomationEvaluationQueryClassification;
   triggerMatches: AutomationTriggerMatchRecorder;
+  /** A completed run's trace, read when its event carries none. */
+  runs: Pick<EvaluationApi, "findRunByEvaluationId">;
 }): AutomationEvaluationSubscriberService {
   return AutomationEvaluationSubscriberService.create({
     triggers: input.triggers,
@@ -181,6 +184,7 @@ export function createAutomationEvaluationSubscriber(input: {
     evaluationFilters: AutomationEvaluationTriggerFilterService.create(input.traces),
     triggerMatches: input.triggerMatches,
     matchRecordMetrics: AutomationMatchRecordMetricsService.create(),
+    runs: input.runs,
   });
 }
 

@@ -11090,6 +11090,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host

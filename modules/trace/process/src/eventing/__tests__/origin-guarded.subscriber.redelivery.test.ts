@@ -1,5 +1,9 @@
 import type { TriggerContext } from "@langwatch/eventing";
-import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
+import {
+  passesTraceOriginGuards,
+  type TraceProcessingEvent,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * @unit
@@ -7,10 +11,7 @@ import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-co
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  defineOriginGuardedTraceSubscriber,
-  passesTraceOriginGuards,
-} from "../origin-guarded.subscriber.ts";
+import { defineOriginGuardedTraceSubscriber } from "../origin-guarded.subscriber.ts";
 import {
   OCCURRED_AT,
   createContext,

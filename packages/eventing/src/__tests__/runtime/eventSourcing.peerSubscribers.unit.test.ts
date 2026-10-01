@@ -12,8 +12,13 @@ import type { Event } from "../../domain/types.ts";
 import { EventSourcing } from "../../eventSourcing.ts";
 import { definePipeline } from "../../pipeline/staticBuilder.ts";
 import type { MapProjectionDefinition } from "../../projections/mapProjection.types.ts";
+import { ProjectionRegistry } from "../../projections/projectionRegistry.ts";
 import { testEventSchema } from "../../services/__tests__/testHelpers.ts";
 import { EventStoreMemory } from "../../stores/eventStoreMemory.ts";
+import type {
+  EventSubscriberDefinition,
+  PeerSubscriberContext,
+} from "../../subscribers/eventSubscriber.types.ts";
 
 const OWNER_CREATED = "lw.owner.created";
 const ownerCreatedData = z.object({ ownerId: z.string() });
@@ -62,6 +67,15 @@ function created(ownerId: string): OwnerCreated {
     occurredAt: 1,
     data: { ownerId },
   };
+}
+
+/** A real registry that keeps the peer lanes it is handed, for reading their declarations. */
+class CapturingRegistry extends ProjectionRegistry<Event> {
+  readonly registered: EventSubscriberDefinition<Event>[] = [];
+
+  override registerEventSubscriber(subscriber: EventSubscriberDefinition<Event>): void {
+    this.registered.push(subscriber);
+  }
 }
 
 function runtime() {
@@ -141,6 +155,45 @@ describe("a peer subscriber", () => {
           .withPeerSubscriber("onOwnerCreated", declaration)
           .withPeerSubscriber("onOwnerCreated", declaration),
       ).toThrow(/reactor\.onOwnerCreated/);
+    });
+  });
+
+  describe("given a peer subscriber declares enqueue options", () => {
+    /** @scenario "A peer subscriber carries its enqueue options and the event's instant" */
+    it("registers the options on its lane and hands the handler the event's occurredAt", async () => {
+      const handle = vi.fn(
+        async (_data: { ownerId: string }, _context: PeerSubscriberContext) => void 0,
+      );
+      const options = {
+        delay: 5_000,
+        deduplication: { makeId: (event: Event) => `owner:${event.aggregateId}`, ttlMs: 5_000 },
+        groupKeyFn: (event: Event) => `group:${event.tenantId}`,
+      };
+      const definition = definePipeline({
+        name: "reactor",
+        aggregate: defineAggregate({ type: "global" }),
+      })
+        .withEvents([])
+        .withPeerSubscriber("onOwnerCreated", {
+          eventType: OWNER_CREATED,
+          data: ownerCreatedData,
+          options,
+          handle,
+        })
+        .build();
+      const registry = new CapturingRegistry({
+        parseEvent: (value) => ownerCreatedSchema.parse(value),
+      });
+      for (const projection of definition.globalProjections ?? []) projection.register(registry);
+
+      const [lane] = registry.registered;
+      expect(lane?.options).toEqual(options);
+      await lane?.handle(created("owner-3"), { tenantId: "project-1", aggregateId: "owner-3" });
+
+      expect(handle).toHaveBeenCalledWith(
+        { ownerId: "owner-3" },
+        { tenantId: "project-1", aggregateId: "owner-3", occurredAt: 1 },
+      );
     });
   });
 });

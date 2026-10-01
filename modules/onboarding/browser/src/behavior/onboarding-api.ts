@@ -222,7 +222,6 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
             integrated: boolean;
             workflows: boolean;
             onlineEvaluations: boolean;
-            triggers: boolean;
             datasets: boolean;
             customGraphs: boolean;
           };

@@ -4,6 +4,8 @@ import type {
   AutomationEvaluationSubscriberEvent,
   AutomationTraceSubscriberContext,
 } from "@langwatch/automation-contract";
+import type { EvaluationApi, EvaluationStatus } from "@langwatch/evaluation-contract";
+import { passesTraceOriginGuards } from "@langwatch/trace-contract";
 
 import type {
   AutomationGraphActivity,
@@ -29,6 +31,7 @@ export class AutomationEvaluationSubscriberService {
     evaluationFilters: AutomationEvaluationTriggerFilter;
     triggerMatches: AutomationTriggerMatchRecorder;
     matchRecordMetrics: AutomationMatchRecordMetricsSink;
+    runs: Pick<EvaluationApi, "findRunByEvaluationId">;
   }): AutomationEvaluationSubscriberService {
     return new AutomationEvaluationSubscriberService(input);
   }
@@ -41,8 +44,44 @@ export class AutomationEvaluationSubscriberService {
       evaluationFilters: AutomationEvaluationTriggerFilter;
       triggerMatches: AutomationTriggerMatchRecorder;
       matchRecordMetrics: AutomationMatchRecordMetricsSink;
+      runs: Pick<EvaluationApi, "findRunByEvaluationId">;
     },
   ) {}
+
+  /** Trace's span or origin event, settled: guards on the folded summary, then matches. */
+  async handleTraceActivity(input: {
+    projectId: string;
+    traceId: string;
+    eventType: string;
+    occurredAt: number;
+  }): Promise<void> {
+    const { projectId, traceId, occurredAt } = input;
+    const summary = await this.deps.traces.findSummary({ projectId, traceId });
+    if (!summary) return;
+    if (!passesTraceOriginGuards({ type: input.eventType, occurredAt }, summary)) return;
+    await this.handleTraceTriggerMatch(
+      { occurredAt },
+      { tenantId: projectId, aggregateId: traceId },
+    );
+  }
+
+  /** Evaluation's completed or reported event, settled; a completed run's trace is read. */
+  async handleEvaluationSettled(input: {
+    projectId: string;
+    evaluationId: string;
+    status: EvaluationStatus;
+    traceId?: string | null;
+    occurredAt: number;
+  }): Promise<void> {
+    const { projectId, evaluationId } = input;
+    const traceId =
+      input.traceId ??
+      (await this.deps.runs.findRunByEvaluationId({ tenantId: projectId, evaluationId }))?.traceId;
+    await this.handleEvaluationTriggerMatch(
+      { occurredAt: input.occurredAt },
+      { tenantId: projectId, state: { status: input.status, traceId } },
+    );
+  }
 
   handleEvaluationTriggerMatch(
     event: AutomationEvaluationSubscriberEvent,

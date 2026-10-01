@@ -11,7 +11,6 @@ import type { EvaluationAnalyticsRollupRow } from "./evaluation-analytics-rollup
 import { ExecuteEvaluationCommand } from "./evaluation-execution.intent.ts";
 import {
   EvaluationProcessingPipelineAdapter,
-  type EvaluationAutomationReactions,
   type EvaluationProcessingPipeline,
 } from "./evaluation-processing-definition.pipeline.ts";
 
@@ -59,16 +58,6 @@ class ProducerOnlyExecutionIntent implements EvaluationExecutionIntent {
   }
 }
 
-/** The automation subscribers this process does not hold. */
-function producerOnlyAutomations(processName: string): EvaluationAutomationReactions {
-  return {
-    handleEvaluationTriggerMatch: () =>
-      Promise.reject(producerOnly(processName, "match an automation trigger")),
-    handleEvaluationGraphTriggerActivity: () =>
-      Promise.reject(producerOnly(processName, "sweep graph triggers")),
-  };
-}
-
 /**
  * Builds the evaluation-processing definition for a process that only sends commands on it.
  * `processName` names the refusal, so a stand-in reached by accident says which process
@@ -98,7 +87,6 @@ export class EvaluationProcessingProducerAdapter {
       executeEvaluationCommand: ExecuteEvaluationCommand.create(
         new ProducerOnlyExecutionIntent(processName),
       ),
-      automations: producerOnlyAutomations(processName),
     });
   }
 }

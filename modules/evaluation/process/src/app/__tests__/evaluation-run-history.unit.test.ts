@@ -1,6 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AutomationApi } from "@langwatch/automation-contract";
 /**
  * @vitest-environment node
  */
@@ -75,7 +74,6 @@ describe("given a process that installs the evaluation module over its repositor
           monitor: createApiFixture<MonitorApi>(),
           dataset: createApiFixture<DatasetApi>(),
           experiment: createApiFixture<ExperimentApi>(),
-          automation: createApiFixture<AutomationApi>(),
           analytics: createApiFixture<AnalyticsApi>(),
           project: createApiFixture<ProjectApi>(),
           "data-retention": createApiFixture<DataRetentionApi>({

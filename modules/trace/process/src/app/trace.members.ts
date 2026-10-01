@@ -50,7 +50,6 @@ export type { TraceProcessingPipelineDefinition } from "../eventing/trace-proces
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -430,7 +429,6 @@ export const traceDependencies = {
    */
   apiKeys: ApiKeyApi,
   authz: AuthzApi,
-  automations: AutomationApi,
   codingAgents: CodingAgentApi,
   dataPrivacy: DataPrivacyApi,
   dataRetention: DataRetentionApi,

@@ -1,7 +1,6 @@
 import { createApiFixture } from "@langwatch/api-fixture";
 import { PermissionDeniedError } from "@langwatch/authorization";
 import { type AuthzApi } from "@langwatch/authz-contract";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EventingCommandSender } from "@langwatch/eventing";
@@ -94,7 +93,6 @@ function buildApp(
       dashboards: createApiFixture<DashboardApi>({}),
       datasets: createApiFixture<DatasetApi>({}),
       monitors: createApiFixture<MonitorApi>({}),
-      automations: createApiFixture<AutomationApi>({}),
       scenarios: createApiFixture<ScenarioApi>({}),
       modelProviders: createApiFixture<ModelProviderApi>({}),
       prompts: createApiFixture<PromptApi>({}),

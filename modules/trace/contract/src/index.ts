@@ -52,6 +52,7 @@ export * from "./export-progress.trpc.ts";
 export * from "./spans.trpc.ts";
 export * from "./trace-edit-overlay.trpc.ts";
 export * from "./trace-projection.ts";
+export * from "./trace-origin-guards.ts";
 export * from "./trace-processing.commands.ts";
 export * from "./trace-scenario-role-metrics.ts";
 export * from "./trace-topic-assignment.ts";

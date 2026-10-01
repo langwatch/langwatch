@@ -9,10 +9,7 @@ export type {
   TraceSpanPiiRedaction,
   TraceSpanSpool,
 } from "./app/trace.members.ts";
-export {
-  passesTraceOriginGuards,
-  type TraceSummarySubscriber,
-} from "./eventing/origin-guarded.subscriber.ts";
+export type { TraceSummarySubscriber } from "./eventing/origin-guarded.subscriber.ts";
 export type { TraceClickHouseClient } from "./repositories/clickhouse/clickhouse.trace-member-client.repository.ts";
 export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
 export { EventingRecordSpanAdapter } from "./eventing/record-span.commands.ts";

@@ -1,4 +1,3 @@
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -35,7 +34,6 @@ import { createCustomEvaluationSyncHandler } from "./custom-evaluation-sync.subs
 import { createDeferredOriginHandler } from "./deferred-origin.process.ts";
 import { createEvaluationTriggerSubscriber } from "./evaluation-trigger.subscriber.ts";
 import { createExperimentMetricsSyncHandler } from "./experiment-metrics-sync.subscriber.ts";
-import { passesTraceOriginGuards } from "./origin-guarded.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
@@ -62,10 +60,6 @@ export interface TraceProcessingPeers {
   dataRetention: Pick<
     DataRetentionApi,
     "getPlatformDefaultRetentionDays" | "getResolvedForProject"
-  >;
-  automations: Pick<
-    AutomationApi,
-    "handleTraceTriggerMatch" | "handleEvaluationGraphTriggerActivity"
   >;
   evaluations: Pick<
     EvaluationApi,
@@ -221,18 +215,6 @@ export class TraceProcessingRuntimeAdapter {
           return found.kind === "recorded" ? found.experimentId : null;
         },
       }),
-      triggerMatch: async (event, context) => {
-        if (!passesTraceOriginGuards(event, context.state)) return;
-        await peers.automations.handleTraceTriggerMatch({
-          event: { occurredAt: event.occurredAt },
-          context: { tenantId: String(context.tenantId), aggregateId: context.aggregateId },
-        });
-      },
-      graphTriggerActivity: (event, context) =>
-        peers.automations.handleEvaluationGraphTriggerActivity({
-          event: { occurredAt: event.occurredAt },
-          context: { tenantId: String(context.tenantId) },
-        }),
       codingAgentSpanFactsDispatch: createCodingAgentSpanFactsDispatchSubscriber({
         normalize: (event) =>
           normalization.normalizeSpanReceived({

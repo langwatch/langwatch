@@ -2,6 +2,7 @@ import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { ResourceScope } from "@langwatch/kernel";
 import type { MonitorApi } from "@langwatch/monitor-contract";
@@ -211,6 +212,7 @@ export function createCanonicalAutomationApp(): {
         },
         auditLog,
         traces: createApiFixture<TraceApi>({}),
+        evaluations: createApiFixture<EvaluationApi>({}),
         webhooks: createApiFixture<WebhookApi>({}),
       },
       infrastructure: members,

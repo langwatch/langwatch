@@ -1,6 +1,5 @@
 import type { AnalyticsApi } from "@langwatch/analytics-contract";
 import { createApiFixture } from "@langwatch/api-fixture";
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { BatchEvaluationEntry, Dataset, DatasetApi } from "@langwatch/dataset-contract";
 /**
@@ -75,7 +74,6 @@ async function boot({
       monitor: monitors,
       dataset: datasets,
       experiment: experiments,
-      automation: createApiFixture<AutomationApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
       project: createApiFixture<ProjectApi>(),
       "data-retention": createApiFixture<DataRetentionApi>({

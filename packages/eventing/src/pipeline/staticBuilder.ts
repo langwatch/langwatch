@@ -163,9 +163,9 @@ export class PipelineBuilder<
   }
 
   /**
-   * This module's subscriber on a peer pipeline's event (§9), on the global registry, so it is
-   * staged whichever pipeline appends the event and wherever either registers. Its lane is named
-   * `<this pipeline>.<name>`, and the handler gets the data parsed with the contract's schema.
+   * This module's subscriber on a peer pipeline's event (§9), on the global registry, staged
+   * wherever either registers. Lane `<this pipeline>.<name>`, with its declared delay, dedup and
+   * group; the handler gets the contract-parsed data and the event's instant.
    */
   withPeerSubscriber<Data extends z.ZodType>(
     name: string,
@@ -181,7 +181,12 @@ export class PipelineBuilder<
         registry.registerEventSubscriber({
           name: lane,
           eventTypes: [subscriber.eventType],
-          handle: (event, context) => subscriber.handle(subscriber.data.parse(event.data), context),
+          handle: (event, context) =>
+            subscriber.handle(subscriber.data.parse(event.data), {
+              ...context,
+              occurredAt: event.occurredAt,
+            }),
+          options: subscriber.options,
         }),
     });
     return this;

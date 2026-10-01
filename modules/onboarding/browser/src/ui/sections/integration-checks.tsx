@@ -3,6 +3,7 @@ import { List, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { CheckCircle, Circle } from "react-feather";
 
+import { automationApi } from "../../behavior/automation-api.ts";
 import { api } from "../../behavior/onboarding-api.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 
@@ -67,6 +68,10 @@ export const IntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
   const integrationChecks = useIntegrationChecks();
   const checks = integrationChecks.data;
+  const automations = automationApi.automation.getTriggers.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project, refetchOnWindowFocus: true, refetchOnMount: false, staleTime: Infinity },
+  );
 
   return (
     <VStack align="start" fontSize="15px">
@@ -94,7 +99,7 @@ export const IntegrationChecks = () => {
         <IntegrationCheckItem
           href="https://docs.langwatch.ai/features/automations"
           isExternal
-          done={checks?.triggers}
+          done={(automations.data?.length ?? 0) > 0}
         >
           Set up an alert
         </IntegrationCheckItem>
