@@ -56,6 +56,8 @@ import {
   type ApiEntitlement,
   type Authorize,
   type Caller,
+  type EntitlementGate,
+  type EntitlementOptions,
   type Entitlements,
   type PublicRouteAccess,
 } from "../access/access.ts";
@@ -343,7 +345,7 @@ export type TrpcProcedureRequest<TContext extends object> = Readonly<{
   member: TrpcContractMember;
   access: TrpcAccess;
   /** Present exactly when the procedure asks the tenant to hold an entitlement. */
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
   /** What the procedure asks the process for; the mount binds each one. */
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
@@ -426,12 +428,13 @@ export interface TrpcRouterAccess<
     ...facts: Added
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, [...Facts, ...Added]>;
   /**
-   * What the tenant behind the call must hold beside the permission. Asked
-   * after access is decided, at the scope access resolved, so a caller who may
-   * not do this at all is refused before the plan is ever looked up.
+   * What the tenant must hold beside the permission, asked after access at the scope it
+   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
+   * `when` asks only for an input it holds for.
    */
   withEntitlement(
     entitlement: ApiEntitlement,
+    options?: EntitlementOptions,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, Facts>;
   withPermission(
     access: AuthzPermission | AuthzDeclaration,
@@ -485,7 +488,7 @@ export interface TrpcRouterImplementation<
 
 type Implementation = Readonly<{
   access: TrpcAccess;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
   facts: readonly TrpcFact[];
   handle(args: never, ...facts: never[]): unknown;
 }>;
@@ -532,7 +535,7 @@ type PermissionArgument = AuthzPermission | AuthzDeclaration | readonly AuthzPer
 type EntitlementQuestion = {
   contract: TrpcContract;
   name: string;
-  entitlement: ApiEntitlement | undefined;
+  entitlement: EntitlementGate | undefined;
 };
 
 /** A procedure asks one entitlement question at most. */
@@ -540,7 +543,7 @@ function assertSingleEntitlement({ contract, name, entitlement }: EntitlementQue
   if (!entitlement) return;
   throw new Error(
     `tRPC ${contract.namespace}.${name} already asks whether its tenant holds ` +
-      `"${entitlement}"`,
+      `"${entitlement.entitlement}"`,
   );
 }
 
@@ -549,7 +552,7 @@ function assertNoTenantQuestion({ contract, name, entitlement }: EntitlementQues
   if (!entitlement) return;
   throw new Error(
     `tRPC ${contract.namespace}.${name} runs with no caller, so there is no tenant to ` +
-      `ask whether it holds "${entitlement}"`,
+      `ask whether it holds "${entitlement.entitlement}"`,
   );
 }
 
@@ -571,7 +574,7 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterBuilder<Api, Contract, Implemented> {
   /** One selected procedure, with the facts it has named so far. */
-  const selected = (name: string, facts: readonly TrpcFact[], entitlement?: ApiEntitlement) => {
+  const selected = (name: string, facts: readonly TrpcFact[], entitlement?: EntitlementGate) => {
     const implement = (access: TrpcAccess) => ({
       handle: (handle: (args: never, ...values: never[]) => unknown) =>
         routerBuilder(
@@ -592,10 +595,10 @@ function routerBuilder<Api, Contract extends TrpcContract, Implemented extends s
 
         return selected(name, [...facts, ...added], entitlement);
       },
-      withEntitlement: (named: ApiEntitlement) => {
+      withEntitlement: (named: ApiEntitlement, options: EntitlementOptions = {}) => {
         assertSingleEntitlement({ contract, name, entitlement });
 
-        return selected(name, facts, named);
+        return selected(name, facts, { entitlement: named, ...options });
       },
       withPermission: (access: PermissionArgument, options?: { via: ScopeTierField }) =>
         implement(permissionDeclarationOf({ contract, name, access, via: options?.via })),
@@ -1113,14 +1116,14 @@ function access<TContext extends object>({
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
   if (entitlement && !members.entitlements) {
     throw new Error(
-      `tRPC ${procedure} asks whether its tenant holds "${entitlement}", and this runtime ` +
-        "supplied no entitlements port to ask",
+      `tRPC ${procedure} asks whether its tenant holds "${entitlement.entitlement}", and ` +
+        "this runtime supplied no entitlements port to ask",
     );
   }
 
@@ -1143,7 +1146,7 @@ function check<TContext extends object>({
   members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
@@ -1182,8 +1185,9 @@ function check<TContext extends object>({
     // told that rather than told to buy something.
     if (entitlement && members.entitlements) {
       await decideEntitlement({
-        entitlement,
+        gate: entitlement,
         scope: decision.scope,
+        input,
         entitlements: members.entitlements,
         address: `tRPC ${procedure}`,
       });

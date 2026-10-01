@@ -621,6 +621,17 @@ export interface OrganizationApi {
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied>;
   /**
+   * Refuses, writing nothing, invitations that would confer more than `by` holds: the check
+   * {@link createPaymentPendingInvites} makes, for a caller that must ask before its own write.
+   */
+  checkInvitesWithinCaller(
+    input: Readonly<{
+      organizationId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void>;
+  /**
    * Holds a seat checkout's invitations until it is paid, as main's billing did; an address
    * that already holds an open invitation here is skipped. `by` is who invited: nobody is
    * invited to more than they hold (checked before storing; acceptance after payment is `system`).

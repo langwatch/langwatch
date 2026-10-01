@@ -27,6 +27,8 @@ export {
   type Caller,
   type Credential,
   type DeferredScopeAccess,
+  type EntitlementGate,
+  type EntitlementOptions,
   type Entitlements,
   type OptionalCredentialAccess,
   type PermissionAllDeclaration,

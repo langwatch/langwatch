@@ -1000,6 +1000,43 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
   });
 
   /** @scenario "A procedure asks whether its tenant holds an entitlement" */
+  it("names the capability on the refusal, and skips an input the predicate excludes", async () => {
+    let asked = 0;
+    const runtime = createTrpcRuntime({
+      root: directoryRoot,
+      procedure: directoryRoot.procedure,
+      members: members({
+        holds: async () => {
+          asked += 1;
+
+          return false;
+        },
+      }),
+    });
+    const onlyOrgOne = z.object({ organizationId: z.literal("org-1") });
+    const directory = runtime
+      .mount(
+        defineTrpcRouter(DirectoryApi, directoryContract)
+          .procedure("listUsers")
+          .withEntitlement("enterprise", {
+            feature: "SCIM",
+            when: (input) => onlyOrgOne.validate(input),
+          })
+          .withPermission("organization:manage")
+          .handle(async () => ({ count: 1 }))
+          .build(),
+        () => ({ listUsers: async () => ({ count: 0 }) }),
+      )
+      .createCaller({ actor: { id: "admin-1" } });
+
+    await expect(directory.listUsers({ organizationId: "org-1" })).rejects.toMatchObject({
+      cause: { code: "enterprise_plan_required", meta: { feature: "SCIM" } },
+    });
+    expect(await directory.listUsers({ organizationId: "org-2" })).toEqual({ count: 1 });
+    expect(asked).toBe(1);
+  });
+
+  /** @scenario "A procedure asks whether its tenant holds an entitlement" */
   it("refuses a procedure that runs with no caller, and a mount that reads no entitlements", () => {
     expect(() =>
       defineTrpcRouter(DirectoryApi, directoryContract)

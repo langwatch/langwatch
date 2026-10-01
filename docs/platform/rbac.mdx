@@ -232,7 +232,7 @@ read only.
   />
 </Frame>
 
-An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling.
+An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling. When a key creates or edits another key, a key can grant at most what the key making the request holds.
 
 **Also check:** [API Keys](/platform/api-keys) for how to scope a key.
 

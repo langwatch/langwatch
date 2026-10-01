@@ -18,6 +18,8 @@ import {
   SCOPE_INPUT_FIELDS,
   type ApiEntitlement,
   type Credential,
+  type EntitlementGate,
+  type EntitlementOptions,
   type RouteAccess,
 } from "../access/access.ts";
 import { PayloadTooLargeError } from "../errors.ts";
@@ -446,7 +448,7 @@ export type RestTransportRoute<Api> = Readonly<{
   /** Present exactly when the route's answer stands for a while. */
   readonly cache?: RestCachePolicy;
   /** Present exactly when the route asks the tenant to hold an entitlement. */
-  readonly entitlement?: ApiEntitlement;
+  readonly entitlement?: EntitlementGate;
   /** Present exactly when the route's create is replayable under a caller key. */
   readonly idempotency?: RestIdempotency;
   /** Present exactly when the route writes its own body instead of a schema's. */
@@ -501,7 +503,7 @@ type RouteState = Readonly<{
   multipart?: RestMultipart;
   rateLimit?: RestRateLimitPolicy;
   cache?: RestCachePolicy;
-  entitlement?: ApiEntitlement;
+  entitlement?: EntitlementGate;
   idempotency?: RestIdempotency;
   rawResponse?: RestRawResponse;
   /** Present exactly when the route declared the kind of answer it gives. */
@@ -784,11 +786,14 @@ class RouteBuilder<Api, S extends RouteShape> {
   }
 
   /**
-   * What the tenant behind the request must hold beside the permission. Asked
-   * after access is decided, at the scope access resolved, so a caller who may
-   * not do this at all is refused before the plan is ever looked up.
+   * What the tenant must hold beside the permission, asked after access at the scope it
+   * resolved (refused access never reaches the plan). `feature` is named on the refusal;
+   * `when` asks only for an input it holds for.
    */
-  withEntitlement(entitlement: ApiEntitlement): RouteBuilder<Api, S> {
+  withEntitlement(
+    entitlement: ApiEntitlement,
+    options: EntitlementOptions = {},
+  ): RouteBuilder<Api, S> {
     assertSourceUnset("entitlement", this.state.entitlement);
 
     return new RouteBuilder<Api, S>({
@@ -798,7 +803,7 @@ class RouteBuilder<Api, S extends RouteShape> {
       operation: this.operation,
       state: {
         ...this.state,
-        entitlement,
+        entitlement: { entitlement, ...options },
       },
     });
   }
@@ -1631,7 +1636,7 @@ function assertPublicRouteConstraints({
   if (state.entitlement) {
     throw new Error(
       `REST ${operation} answers without a credential, so there is no tenant to ask whether it ` +
-        `holds "${state.entitlement}"`,
+        `holds "${state.entitlement.entitlement}"`,
     );
   }
 

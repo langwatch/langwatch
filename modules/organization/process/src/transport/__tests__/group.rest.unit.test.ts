@@ -19,7 +19,7 @@ import {
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { groupsRest, groupsRestEnterpriseGate } from "../group.rest.ts";
+import { groupsRest } from "../group.rest.ts";
 import { organizationKeyFacts } from "../organization-management.rest.ts";
 
 const ORGANIZATION_ID = "organization-1";
@@ -36,7 +36,7 @@ const onError = createCanonicalFamilyErrorHandler({
 /** `owner: null` is a service key: the runtime hands over no actor (api-surface.ts keyOwner). */
 function mount(
   app: Partial<OrganizationApi>,
-  { owner = "user-owner" }: { owner?: string | null } = {},
+  { owner = "user-owner", enterprise = true }: { owner?: string | null; enterprise?: boolean } = {},
 ) {
   const admit = (request: Request) => {
     if (request.headers.get("Authorization") !== `Bearer ${CREDENTIAL}`) {
@@ -53,14 +53,12 @@ function mount(
       authenticate: ({ request }) => admit(request),
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
+    entitlements: { holds: async () => enterprise },
   });
   const hono = runtime.mount(groupsRest.router(), {
     app: () => createApiFixture<OrganizationApi>(app),
     onError,
-    facts: [
-      bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID })),
-      bindRestMiddleware(groupsRestEnterpriseGate, () => ({})),
-    ],
+    facts: [bindRestMiddleware(organizationKeyFacts, () => ({ apiKeyId: KEY_ID }))],
   });
 
   return (
@@ -106,6 +104,22 @@ const summary = (name: string, memberCount: number) => ({
 const alice = { userId: "alice-id", name: "Alice", email: "alice@acme.test", image: null };
 
 describe("given the /api/groups family", () => {
+  describe("when the organization is below Enterprise", () => {
+    /** @scenario The groups family answers 402 below Enterprise, naming GROUPS */
+    it("refuses with enterprise_plan_required naming GROUPS before reaching the app", async () => {
+      const listGroups = vi.fn();
+      const send = mount({ listGroups }, { enterprise: false });
+
+      const answer = await send("/api/groups");
+
+      expect(await answer.json()).toMatchObject({
+        code: "enterprise_plan_required",
+        meta: { feature: "GROUPS" },
+      });
+      expect(listGroups).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the organization's groups are listed", () => {
     /** @scenario GET /api/groups lists all groups */
     it("answers both groups with their member counts and bindings", async () => {

@@ -62,7 +62,6 @@ function answerRest(
         signal: undefined,
       } as never,
       { apiKeyId: KEY_ID },
-      {},
     ),
   );
 }

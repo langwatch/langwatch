@@ -30,7 +30,7 @@ import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.s
 /** Organization's side of a seat checkout: the invitations it holds until payment. */
 export type SeatCheckoutInvites = Pick<
   OrganizationApi,
-  "createPaymentPendingInvites" | "cancelPaymentPendingInvites"
+  "checkInvitesWithinCaller" | "createPaymentPendingInvites" | "cancelPaymentPendingInvites"
 >;
 
 /** A checkout's invitations and who sent them: organization bounds them by the sender. */
@@ -205,6 +205,14 @@ export class SeatEventSubscriptionService {
         requestedCurrency: currency,
       }),
     );
+
+    // Nobody is invited past the inviter; asked before any checkout row is written.
+    if (invitations && invitations.invites.length > 0) {
+      await this.invites.checkInvitesWithinCaller(
+        { organizationId, invites: invitations.invites },
+        invitations.by,
+      );
+    }
 
     await this.cancelAbandonedCheckouts(organizationId);
 

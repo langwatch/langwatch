@@ -10,6 +10,7 @@ import {
   type WebSocketHost,
 } from "@langwatch/api";
 import { ApiKeyApi, type ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import type { Entitlements } from "@langwatch/api/access";
 import {
   answerApiFailure,
   apiRootPaths,
@@ -48,6 +49,11 @@ import {
 import { AuditLogApi, recordAuditLogCommandSchema } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
+import {
+  EnterprisePlanRequiredError,
+  EntitlementApi,
+  isEnterpriseTier,
+} from "@langwatch/entitlement-contract";
 import type { ExposedSurface, TransportPeers } from "@langwatch/kernel";
 import {
   ModelNotConfiguredError,
@@ -203,6 +209,7 @@ class ApiSurface {
       idempotency,
       rateLimiter,
       facts: this.#restFacts(peers.find(OpsApi)),
+      entitlements: planEntitlements(peers),
     });
   }
 
@@ -216,6 +223,7 @@ class ApiSurface {
       throttle: rateLimiter ? { limiter: rateLimiter, policies: {} } : void 0,
       facts: this.#trpcFacts(),
       sessionVersions: this.authz,
+      entitlements: planEntitlements(peers),
     });
   }
 
@@ -457,6 +465,32 @@ function sameSecret({ presented, configured }: { presented: string; configured: 
     presentedBytes.length === configuredBytes.length &&
     timingSafeEqual(presentedBytes, configuredBytes)
   );
+}
+
+/**
+ * The plan every declared entitlement gate asks, read for the scope's organization. Composed
+ * here because authz and organization cannot depend on entitlement without a peer cycle.
+ */
+function planEntitlements(peers: TransportPeers): Entitlements | undefined {
+  const plans = peers.find(EntitlementApi);
+  if (!plans) return void 0;
+  const organizations = peers.app(OrganizationApi);
+
+  return {
+    holds: async ({ scope }) => {
+      if (scope.tier === "project") {
+        throw new Error(`No plan gate reads a project's organization yet (${scope.id})`);
+      }
+      const organizationId =
+        scope.tier === "organization"
+          ? scope.id
+          : await organizations.getOrganizationIdByTeamId({ teamId: scope.id });
+
+      return isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+    },
+    refusal: ({ feature }) =>
+      new EnterprisePlanRequiredError(feature ?? "This operation requires an Enterprise plan"),
+  };
 }
 
 export function bearerDoor(options: { name: string; token: string | undefined }): RestIdentity {

@@ -468,8 +468,8 @@ function assertCapabilityPorts({
 
   if (route.entitlement && !ports.entitlements) {
     throw new Error(
-      `REST ${address} asks whether its tenant holds "${route.entitlement}", and this runtime ` +
-        "supplied no entitlements port to ask",
+      `REST ${address} asks whether its tenant holds "${route.entitlement.entitlement}", ` +
+        "and this runtime supplied no entitlements port to ask",
     );
   }
 
@@ -1068,7 +1068,7 @@ function handlerMiddleware<Api>({
     // idempotency tenancy are asked about exactly this scope.
     const resolved = target ?? decision.scope;
 
-    await checkEntitlement({ route, ports, scope: resolved, family });
+    await checkEntitlement({ route, ports, scope: resolved, input, family });
 
     await countCall(capabilities);
 
@@ -1224,18 +1224,21 @@ async function checkEntitlement({
   route,
   ports,
   scope,
+  input,
   family,
 }: {
   route: RestTransportRoute<unknown>;
   ports: RestRuntimeMembers;
   scope: AuthzDeclaredScopeId | null;
+  input: unknown;
   family: string;
 }): Promise<void> {
   if (!route.entitlement || !ports.entitlements) return;
 
   await decideEntitlement({
-    entitlement: route.entitlement,
+    gate: route.entitlement,
     scope,
+    input,
     entitlements: ports.entitlements,
     address: `REST ${family}.${route.operation}`,
   });

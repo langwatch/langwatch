@@ -72,7 +72,9 @@ export const roleTrpcTransport: TrpcRouterDeclaration<RoleApi, typeof roleTrpc> 
   })
   .handle(async ({ app, input, actor }) => app.deleteRole({ roleId: input.roleId }, actor))
 
+  // Assigning a custom role is the Enterprise capability, refused on every plan below it.
   .procedure("assignToUser")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withPermission({ kind: "permission", permission: "organization:manage", via: "teamId" })
   .handle(async ({ app, input, actor }) =>
     app.assignRoleToUser(

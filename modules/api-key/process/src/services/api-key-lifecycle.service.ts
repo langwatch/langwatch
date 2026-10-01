@@ -15,7 +15,7 @@ import {
   INGEST_KEY_PREFIX,
   HIDDEN_SYSTEM_KEY_NAMES,
 } from "@langwatch/api-key-contract";
-import type { AuthzGrantCaller } from "@langwatch/authz-contract";
+import type { AuthzGrantCaller, AuthzPrincipalRef } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import { fromDate } from "@langwatch/time";
 
@@ -34,9 +34,27 @@ function publicApiKey(row: StoredApiKey): ApiKey {
   return key;
 }
 
-/** Who answers for a key's grants: the person creating or editing it, else the system act. */
-function grantCaller(userId: string | null | undefined): AuthzGrantCaller {
+type Requester = { userId?: string | null | undefined; apiKeyId?: string | null | undefined };
+
+/** Who answers for a key's grants: the requesting key, else the person, else the system act. */
+function grantCaller({ userId, apiKeyId }: Requester): AuthzGrantCaller {
+  if (apiKeyId) return { type: "apiKey", id: apiKeyId };
+
   return userId ? { type: "user", id: userId } : { type: "system" };
+}
+
+/** Whose holdings bound a key's bindings: its owner, else the person; and any requesting key. */
+function ceilingPrincipals({
+  ownerUserId,
+  userId,
+  apiKeyId,
+}: Requester & { ownerUserId: string | null }): AuthzPrincipalRef[] {
+  const person = ownerUserId ?? (apiKeyId ? null : userId);
+
+  return [
+    ...(person ? [{ type: "user" as const, id: person }] : []),
+    ...(apiKeyId ? [{ type: "apiKey" as const, id: apiKeyId }] : []),
+  ];
 }
 
 function actor(userId: string | null | undefined): {
@@ -79,6 +97,7 @@ export class ApiKeyLifecycleService {
     await this.validateCreateBindings({
       userId: parsed.userId ?? null,
       createdByUserId: parsed.createdByUserId ?? null,
+      callerApiKeyId: parsed.callerApiKeyId ?? null,
       organizationId: parsed.organizationId,
       bindings,
       permissions,
@@ -123,7 +142,10 @@ export class ApiKeyLifecycleService {
       bindings: effectiveBindings,
       permissions,
       actor: actor(parsed.createdByUserId ?? parsed.userId),
-      caller: grantCaller(parsed.createdByUserId ?? parsed.userId),
+      caller: grantCaller({
+        userId: parsed.createdByUserId ?? parsed.userId,
+        apiKeyId: parsed.callerApiKeyId,
+      }),
       roleId: `apikey:${row.id}`,
     });
 
@@ -174,11 +196,14 @@ export class ApiKeyLifecycleService {
         organizationId: input.organizationId,
         ownerUserId: existing.userId,
       });
-      // A personal key is bounded by its owner; a service key by whoever edits it.
-      const ceilingUserId = existing.userId ?? input.callerUserId;
-      if (ceilingUserId) {
+      const principals = ceilingPrincipals({
+        ownerUserId: existing.userId,
+        userId: input.callerUserId,
+        apiKeyId: input.callerApiKeyId,
+      });
+      for (const principal of principals) {
         await this.grants.assertCeiling({
-          userId: ceilingUserId,
+          principal,
           organizationId: input.organizationId,
           bindings: input.bindings,
           permissions: permissions ?? [],
@@ -195,7 +220,7 @@ export class ApiKeyLifecycleService {
             bindings: input.bindings,
             permissions,
             actor: actor(input.callerUserId),
-            caller: grantCaller(input.callerUserId),
+            caller: grantCaller({ userId: input.callerUserId, apiKeyId: input.callerApiKeyId }),
             replace: true,
           });
 
@@ -348,6 +373,7 @@ export class ApiKeyLifecycleService {
   private async validateCreateBindings(input: {
     userId: string | null;
     createdByUserId: string | null;
+    callerApiKeyId: string | null;
     organizationId: string;
     bindings: ApiKeyScope[];
     permissions: string[] | undefined;
@@ -368,11 +394,14 @@ export class ApiKeyLifecycleService {
       organizationId: input.organizationId,
       ownerUserId: input.userId,
     });
-    // A personal key is bounded by its owner; a service key by the person creating it.
-    const ceilingUserId = input.userId ?? input.createdByUserId;
-    if (ceilingUserId) {
+    const principals = ceilingPrincipals({
+      ownerUserId: input.userId,
+      userId: input.createdByUserId,
+      apiKeyId: input.callerApiKeyId,
+    });
+    for (const principal of principals) {
       await this.grants.assertCeiling({
-        userId: ceilingUserId,
+        principal,
         organizationId: input.organizationId,
         bindings: input.bindings,
         permissions: input.permissions ?? [],

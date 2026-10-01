@@ -8,6 +8,7 @@ import {
   type TrpcRouterDeclaration,
 } from "@langwatch/api/trpc";
 import {
+  assignsOrganizationCustomRole,
   OrganizationApi,
   organizationTrpc,
   type CustomRole,
@@ -25,6 +26,9 @@ import {
 } from "@langwatch/organization-contract";
 import { toDate } from "@langwatch/time";
 import { z } from "zod";
+
+/** Assigning a custom team role is Enterprise; built-in roles grant on every plan. */
+export const customRoleGate = { feature: "RBAC", when: assignsOrganizationCustomRole };
 
 /** The signed-in person as the process's session carries them, beside their id. */
 export const organizationSessionPersonFact = defineTrpcFact(
@@ -183,6 +187,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   .handle(({ app, input }) => app.getMemberProvenance(input))
 
   .procedure("updateTeamMemberRole")
+  .withEntitlement("enterprise", customRoleGate)
   .withFacts(organizationSessionPersonFact)
   .withPermission(MANAGE_VIA_TEAM)
   .handle(async ({ app, input, actor }, person) => {
@@ -205,6 +210,7 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
   )
 
   .procedure("updateMemberRole")
+  .withEntitlement("enterprise", customRoleGate)
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
   .handle(async ({ app, input, actor }, person) => {

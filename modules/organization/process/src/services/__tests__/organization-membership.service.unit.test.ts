@@ -382,6 +382,46 @@ describe("OrganizationMembershipService", () => {
       expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
     });
 
+    /** @scenario "A role change that corrects team roles is refused before the seat changes" */
+    it("asks about the team roles the seat change corrects, before any write", async () => {
+      vi.mocked(mockRepo.findSharedTeamIds).mockResolvedValue(["team-1"]);
+      vi.mocked(mockRepo.findTeamGrants).mockResolvedValue([
+        { scopeId: "team-1", role: TeamUserRole.VIEWER, customRoleId: null },
+      ]);
+      vi.mocked(mockRepo.getMembership).mockResolvedValue({
+        userId: "user-456",
+        organizationId: "org-123",
+        role: OrganizationUserRole.EXTERNAL,
+        disabledAt: null,
+        createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+        user: { id: "user-456", name: null, email: null },
+      });
+
+      await expect(
+        refusing().changeMemberRole({
+          caller: { type: "user", id: "manager-1" },
+          organizationId: "org-123",
+          userId: "user-456",
+          role: OrganizationUserRole.MEMBER,
+          currentUserId: "manager-1",
+        }),
+      ).rejects.toMatchObject({
+        code: "grant_exceeds_caller_permissions",
+        meta: { missingPermissions: ["organization:manage"] },
+      });
+      expect(assertWithinCaller).toHaveBeenLastCalledWith({
+        organizationId: "org-123",
+        caller: { type: "user", id: "manager-1" },
+        grants: [
+          { role: "MEMBER", scopeType: "ORGANIZATION", scopeId: "org-123" },
+          { role: "MEMBER", scopeType: "TEAM", scopeId: "team-1" },
+        ],
+      });
+      expect(mockAssertRoleChangeAllowed).not.toHaveBeenCalled();
+      expect(mockRepo.updateMemberRole).not.toHaveBeenCalled();
+    });
+
     /** @scenario "Changing a member's team role above the caller is refused before anything is written" */
     it("refuses a team role change before any write", async () => {
       await expect(

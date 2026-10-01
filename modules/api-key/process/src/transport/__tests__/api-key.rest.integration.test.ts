@@ -110,7 +110,11 @@ describe("the api-keys REST family", () => {
     it("returns the token once, alongside the key's identity", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const { send } = mountApiKeyRest({
-        apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: {
+          create,
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys", {
@@ -197,6 +201,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyScopeViolationError("Scope does not belong to this organization");
           }),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -222,6 +227,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyReservedNameError(LANGY_SESSION_API_KEY_NAME);
           }),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -269,6 +275,7 @@ describe("the api-keys REST family", () => {
             throw new AuthzPersonalWorkspaceNotManagedHereError();
           }),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -292,7 +299,9 @@ describe("the api-keys REST family", () => {
     it("refuses a service key and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);
-      const { send } = mountApiKeyRest({ apiKeys: { create, isOrgAdmin } });
+      const { send } = mountApiKeyRest({
+        apiKeys: { create, isOrgAdmin, isOrgAdminApiKey: vi.fn(async () => true) },
+      });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -313,7 +322,11 @@ describe("the api-keys REST family", () => {
     it("refuses a key requested on behalf of another member and mints nothing", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const { send } = mountApiKeyRest({
-        apiKeys: { create, isOrgAdmin: vi.fn(async () => false) },
+        apiKeys: {
+          create,
+          isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys", {
@@ -332,7 +345,9 @@ describe("the api-keys REST family", () => {
     it("still mints a personal key for the caller, whose own reach caps it", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const isOrgAdmin = vi.fn(async () => false);
-      const { send } = mountApiKeyRest({ apiKeys: { create, isOrgAdmin } });
+      const { send } = mountApiKeyRest({
+        apiKeys: { create, isOrgAdmin, isOrgAdminApiKey: vi.fn(async () => true) },
+      });
 
       const response = await send("/api/api-keys", {
         method: "POST",
@@ -351,7 +366,11 @@ describe("the api-keys REST family", () => {
         apiKey: apiKey({ userId: null }),
       }));
       const { send } = mountApiKeyRest({
-        apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: {
+          create,
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys", {
@@ -371,7 +390,11 @@ describe("the api-keys REST family", () => {
         apiKey: apiKey({ userId: null }),
       }));
       const { send } = mountApiKeyRest({
-        apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: {
+          create,
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       await send("/api/api-keys", {
@@ -396,7 +419,11 @@ describe("the api-keys REST family", () => {
     it("mints a key for another member against that member's own ceiling", async () => {
       const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
       const { send } = mountApiKeyRest({
-        apiKeys: { create, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: {
+          create,
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys", {
@@ -461,6 +488,60 @@ describe("the api-keys REST family", () => {
 
       expect(response.status).toBe(403);
       expect(create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a personal key whose member is an admin but which is not one itself", () => {
+    /** @scenario A key-authenticated request grants at most what the requesting key holds */
+    it("refuses a service key and mints nothing", async () => {
+      const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
+      const isOrgAdminApiKey = vi.fn(async () => false);
+      const { send } = mountApiKeyRest({
+        apiKeys: { create, isOrgAdmin: vi.fn(async () => true), isOrgAdminApiKey },
+      });
+
+      const response = await send("/api/api-keys", {
+        method: "POST",
+        body: { keyType: "service", name: "svc-past-the-key" },
+      });
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({ error: "api_key_admin_required" });
+      expect(create).not.toHaveBeenCalled();
+      expect(isOrgAdminApiKey).toHaveBeenCalledWith({
+        apiKeyId: API_KEY_ID,
+        organizationId: ORGANIZATION_ID,
+      });
+    });
+
+    it("names the requesting key on every mint and edit, so the key bounds the grant", async () => {
+      const create = vi.fn(async () => ({ token: "sk-lw-minted", apiKey: apiKey() }));
+      const updateAsCaller = vi.fn(async () => apiKey());
+      const { send } = mountApiKeyRest({
+        apiKeys: {
+          create,
+          updateAsCaller,
+          getByIdForCaller: vi.fn(async () => apiKeyDetail()),
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => false),
+        },
+      });
+
+      await send("/api/api-keys", {
+        method: "POST",
+        body: { name: "My Own", bindings: [ORG_ADMIN_BINDING] },
+      });
+      await send("/api/api-keys/api-key-1", {
+        method: "PATCH",
+        body: { bindings: [ORG_ADMIN_BINDING] },
+      });
+
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ callerApiKeyId: API_KEY_ID, createdByUserId: CALLER_USER_ID }),
+      );
+      expect(updateAsCaller).toHaveBeenCalledWith(
+        expect.objectContaining({ callerApiKeyId: API_KEY_ID, callerIsAdmin: false }),
+      );
     });
   });
 
@@ -544,6 +625,7 @@ describe("the api-keys REST family", () => {
         apiKeys: {
           getByIdForCaller: vi.fn(async () => apiKeyDetail({})),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
           credentialCanManageOrganization: vi.fn(async () => true),
         },
       });
@@ -570,6 +652,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyNotFoundError("api-key-1");
           }),
           isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
           credentialCanManageOrganization: vi.fn(async () => false),
         },
       });
@@ -597,6 +680,7 @@ describe("the api-keys REST family", () => {
         apiKeys: {
           getByIdForCaller,
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
           credentialCanManageOrganization: vi.fn(async () => true),
         },
       });
@@ -625,7 +709,11 @@ describe("the api-keys REST family", () => {
     it("reports a service key as owned by nobody", async () => {
       const getByIdForCaller = vi.fn(async () => apiKeyDetail({ userId: null }));
       const { send } = mountApiKeyRest({
-        apiKeys: { getByIdForCaller, isOrgAdmin: vi.fn(async () => false) },
+        apiKeys: {
+          getByIdForCaller,
+          isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const body = (await (await send("/api/api-keys/api-key-1")).json()) as {
@@ -659,6 +747,7 @@ describe("the api-keys REST family", () => {
           apiKeys: {
             getByIdForCaller,
             isOrgAdmin: vi.fn(async () => options.admin),
+            isOrgAdminApiKey: vi.fn(async () => true),
             credentialCanManageOrganization: vi.fn(async () => options.manage),
           },
         });
@@ -685,6 +774,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyNotFoundError("api-key-missing");
           }),
           isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -705,10 +795,18 @@ describe("the api-keys REST family", () => {
         throw new ApiKeyNotFoundError("api-key-1");
       };
       const { send: sendUnreachable } = mountApiKeyRest({
-        apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
+        apiKeys: {
+          getByIdForCaller: vi.fn(notFound),
+          isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
       const { send: sendUnknown } = mountApiKeyRest({
-        apiKeys: { getByIdForCaller: vi.fn(notFound), isOrgAdmin: vi.fn(async () => false) },
+        apiKeys: {
+          getByIdForCaller: vi.fn(notFound),
+          isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const unreachable = await sendUnreachable("/api/api-keys/api-key-1");
@@ -732,6 +830,7 @@ describe("the api-keys REST family", () => {
           updateAsCaller: vi.fn(async () => apiKey({ name: "rename-after" })),
           getByIdForCaller: vi.fn(async () => apiKeyDetail({ name: "rename-after" })),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -753,7 +852,12 @@ describe("the api-keys REST family", () => {
       const update = vi.fn(async () => apiKey({ name: "rename-after" }));
       const getByIdForCaller = vi.fn(async () => apiKeyDetail({ name: "rename-after" }));
       const { send } = mountApiKeyRest({
-        apiKeys: { updateAsCaller: update, getByIdForCaller, isOrgAdmin: vi.fn(async () => true) },
+        apiKeys: {
+          updateAsCaller: update,
+          getByIdForCaller,
+          isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys/api-key-1", {
@@ -787,6 +891,7 @@ describe("the api-keys REST family", () => {
           updateAsCaller: update,
           getByIdForCaller: vi.fn(async () => apiKeyDetail()),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -827,6 +932,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyScopeViolationError("Beyond the owner's access");
           }),
           isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -854,6 +960,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyNotFoundError("api-key-1");
           }),
           isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -871,7 +978,9 @@ describe("the api-keys REST family", () => {
     it("answers success and hands the application the caller's real adminness", async () => {
       const revoke = vi.fn(async () => apiKey({ revokedAt: NOW }));
       const isOrgAdmin = vi.fn(async () => true);
-      const { send } = mountApiKeyRest({ apiKeys: { revoke, isOrgAdmin } });
+      const { send } = mountApiKeyRest({
+        apiKeys: { revoke, isOrgAdmin, isOrgAdminApiKey: vi.fn(async () => true) },
+      });
 
       const response = await send("/api/api-keys/api-key-1", { method: "DELETE" });
 
@@ -891,7 +1000,11 @@ describe("the api-keys REST family", () => {
         throw new ApiKeyNotOwnedError("api-key-1");
       });
       const { send } = mountApiKeyRest({
-        apiKeys: { revoke, isOrgAdmin: vi.fn(async () => false) },
+        apiKeys: {
+          revoke,
+          isOrgAdmin: vi.fn(async () => false),
+          isOrgAdminApiKey: vi.fn(async () => true),
+        },
       });
 
       const response = await send("/api/api-keys/api-key-1", { method: "DELETE" });
@@ -908,6 +1021,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyAlreadyRevokedError("api-key-1");
           }),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 
@@ -926,6 +1040,7 @@ describe("the api-keys REST family", () => {
             throw new ApiKeyNotFoundError("nonexistent-key-id");
           }),
           isOrgAdmin: vi.fn(async () => true),
+          isOrgAdminApiKey: vi.fn(async () => true),
         },
       });
 

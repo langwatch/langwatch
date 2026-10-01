@@ -149,6 +149,7 @@ async function composedRoutes() {
         idempotency: refuse,
         rateLimiter: { check: refuse },
         facts: [...facts.values()] as never,
+        entitlements: { holds: refuse },
       });
       const mountNothing = { mount: () => {} };
 

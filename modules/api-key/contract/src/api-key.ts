@@ -67,6 +67,8 @@ const apiKeyMutationShape = {
   organizationId: z.string().min(1),
   userId: z.string().min(1).nullable().optional(),
   createdByUserId: z.string().min(1).nullable().optional(),
+  /** The organization key making the request, which bounds every binding it grants. */
+  callerApiKeyId: z.string().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
   expiresAt: z.date().nullable().optional(),
   permissionMode: z.string().default("all"),
@@ -90,6 +92,7 @@ export const updateApiKeyInputSchema = z
     id: z.string().min(1),
     organizationId: z.string().min(1),
     callerUserId: z.string().min(1).nullable(),
+    callerApiKeyId: z.string().min(1).nullable().optional(),
     callerIsAdmin: z.boolean(),
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),

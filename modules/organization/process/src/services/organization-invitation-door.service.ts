@@ -9,7 +9,6 @@ import {
   InviteWrongAccountError,
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
-  isOrganizationApiCustomRole,
   type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
@@ -44,6 +43,7 @@ import type { OrganizationLifecycleNoticeService } from "./organization-lifecycl
 export interface OrganizationInvitationDoorDependencies {
   readonly invitations: OrganizationInvitations;
   readonly joinRequests: OrganizationJoinRequests | null;
+  /** Unread: the custom-role plan gate is declared on the doors. Delete with its composition. */
   readonly plans: OrganizationPlanGate;
   readonly signals: OrganizationSignals;
   /** Where an invitation batch and an acceptance are recorded as organization's events. */
@@ -89,12 +89,6 @@ export class OrganizationInvitationDoorService {
       count: input.invites.length,
     });
 
-    const namesCustomRole = input.invites.some((invite) =>
-      (invite.teams ?? []).some((team) => isOrganizationApiCustomRole(team.role)),
-    );
-    if (namesCustomRole) {
-      await this.deps.plans.assertCustomRolesAllowed({ organizationId: input.organizationId });
-    }
     // Acceptance writes these grants as a consequence, so the inviter's ceiling is asked here.
     await this.deps.ceiling.assertWithinCaller({
       organizationId: input.organizationId,
@@ -150,11 +144,10 @@ export class OrganizationInvitationDoorService {
     return { invite: inviteOnWire(invite) };
   }
 
-  /** Payment is no barrier: the inviter's ceiling is asked here, as for any invitation. */
-  async createPaymentPending(
+  /** Asks the inviter's ceiling for these invitations and writes nothing. */
+  async checkInvitesWithinCaller(
     input: Readonly<{
       organizationId: string;
-      subscriptionId: string;
       invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
     }>,
     by: OrganizationCaller,
@@ -164,6 +157,18 @@ export class OrganizationInvitationDoorService {
       caller: grantCallerOf(by),
       grants: input.invites.flatMap((invite) => intendedGrants(input.organizationId, invite)),
     });
+  }
+
+  /** Payment is no barrier: the inviter's ceiling is asked here, as for any invitation. */
+  async createPaymentPending(
+    input: Readonly<{
+      organizationId: string;
+      subscriptionId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    await this.checkInvitesWithinCaller(input, by);
 
     return this.deps.invitations.createPaymentPending(input);
   }

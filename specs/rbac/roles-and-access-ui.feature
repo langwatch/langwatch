@@ -122,10 +122,17 @@ Feature: Roles & access settings page
     Then Admin, Member and Viewer come first and each appears once
 
   # ============================================================================
-  # Plans: granting is on every plan; only creating a custom role is Enterprise
+  # Plans: built-in roles grant on every plan; assigning or creating a custom role is Enterprise
   # ============================================================================
 
-  @integration
+  @unit
+  Scenario: Assigning a custom role is refused below Enterprise on every grant door
+    Given the organization is on a plan below Enterprise
+    When any door that grants (grants, role assignment, invitation, member or team roles) names a custom role
+    Then the request is refused with code enterprise_plan_required and meta.feature "RBAC"
+    And nothing is written
+
+  @unit
   Scenario: Any plan grants and changes roles, with or without an end date
     Given the organization is on a plan below Enterprise
     When I grant role "member" to a member on a team with an end date, then change it to "viewer"

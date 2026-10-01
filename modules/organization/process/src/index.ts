@@ -55,10 +55,7 @@ export type {
 } from "./app/organization.app.ts";
 export { organizationServer } from "./organization.server.ts";
 export type { OrganizationRepositories } from "./repositories/organization.repositories.ts";
-export {
-  organizationManagementEnterpriseGate,
-  organizationManagementRest,
-} from "./transport/organization-management.rest.ts";
+export { organizationManagementRest } from "./transport/organization-management.rest.ts";
 export { groupTrpcTransport } from "./transport/group.trpc.ts";
 export { joinRequestTrpcTransport } from "./transport/join-request.trpc.ts";
 export { licenseEnforcementTrpcTransport } from "./transport/license-enforcement.trpc.ts";
@@ -80,7 +77,7 @@ export type {
   OrganizationPlanGate,
   OrganizationSignals,
 } from "./app/organization.members.ts";
-export { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
+export { groupsRest } from "./transport/group.rest.ts";
 export { teamsRest, TeamManagementApi } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 export type { InviteDisplayStatus } from "./rules/invite-display-status.rules.ts";

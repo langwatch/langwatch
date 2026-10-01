@@ -163,6 +163,7 @@ type SubscriptionComposition = Readonly<{
     OrganizationApi,
     | "getBillingProfile"
     | "claimBillingCustomerId"
+    | "checkInvitesWithinCaller"
     | "createPaymentPendingInvites"
     | "cancelPaymentPendingInvites"
   >;

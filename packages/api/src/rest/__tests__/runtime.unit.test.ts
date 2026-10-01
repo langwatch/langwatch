@@ -822,6 +822,82 @@ describe("a route that asks whether its tenant holds an entitlement", () => {
   });
 });
 
+describe("a route whose plan question names a capability and asks only for some inputs", () => {
+  const GrantsApi = moduleApi<{ createGrant(): Promise<void> }>("authz");
+  const customRole = z.object({ roleId: z.string().startsWith("custom:") });
+
+  function mounted({ holds, handle }: { holds: Entitlements["holds"]; handle: () => void }) {
+    const declaration = defineRestRouter(GrantsApi)
+      .withNamespace("grants")
+      .withVersion("2026-08-07")
+      .withCredential("organization")
+      .post("/", "createGrant")
+      .withInput(z.object({ roleId: z.string() }))
+      .withPermission("organization:manage")
+      .withEntitlement("enterprise", {
+        feature: "RBAC",
+        when: (input) => customRole.validate(input),
+      })
+      .withOutput(z.object({ ran: z.boolean() }))
+      .handle(() => {
+        handle();
+
+        return { ran: true };
+      })
+      .build()
+      .router();
+
+    return createRestRuntime({
+      identity: {
+        authenticate: () => ({ actor: null, scope: { tier: "organization", id: "org-1" } }),
+      },
+      entitlements: { holds },
+    }).mount(declaration, {
+      app: () => ({ createGrant: async () => {} }),
+      credential: "organization",
+      onError: createErrorHandler(),
+    });
+  }
+
+  const post = (roleId: string) => ({
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roleId }),
+  });
+
+  /** @scenario "An endpoint asks whether its tenant holds an entitlement" */
+  it("refuses with the capability named on meta.feature when the input needs it", async () => {
+    let ran = false;
+    const app = mounted({ holds: async () => false, handle: () => (ran = true) });
+
+    const response = await app.request("/api/grants/2026-08-07/", post("custom:auditor"));
+
+    expect(await response.json()).toMatchObject({
+      code: "enterprise_plan_required",
+      meta: { feature: "RBAC" },
+    });
+    expect(ran).toBe(false);
+  });
+
+  /** @scenario "An endpoint asks whether its tenant holds an entitlement" */
+  it("never asks the plan for an input the predicate does not hold for", async () => {
+    let asked = 0;
+    const app = mounted({
+      holds: async () => {
+        asked += 1;
+
+        return false;
+      },
+      handle: () => {},
+    });
+
+    const response = await app.request("/api/grants/2026-08-07/", post("viewer"));
+
+    expect(await response.json()).toEqual({ ran: true });
+    expect(asked).toBe(0);
+  });
+});
+
 describe("a create declared replayable under a caller's key", () => {
   const WebhookApi = moduleApi<{ createEndpoint(): Promise<void> }>("webhook");
 

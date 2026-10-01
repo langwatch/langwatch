@@ -18,7 +18,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";
 
-import type { Authorize } from "../access/access.ts";
+import type { Authorize, Entitlements } from "../access/access.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { SessionCaller, SessionReader } from "../rest/credential.ts";
 import { auditScopeIds, isAuditLogExempt, redactAuditArgs, trpcFailureTraceIds } from "./audit.ts";
@@ -136,6 +136,8 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
     facts?: readonly TrpcFactBinding<TrpcRequestContext>[] | undefined;
     /** The caller's session version (ADR-164). Absent, answers carry no version and no tag. */
     sessionVersions?: TrpcSessionVersions | undefined;
+    /** The plans a procedure declaring an entitlement asks; absent, it is refused at mount. */
+    entitlements?: Entitlements | undefined;
     logger?: Pick<Logger, "warn" | "error"> | undefined;
   }): TrpcHost {
     return new TrpcHost(options);
@@ -399,6 +401,7 @@ export class TrpcHost implements FeatureTrpcHost<TrpcNamespace> {
       },
       authorization: { forRequest: (ctx) => this.#decisionsFor(ctx) },
       denials: DENIALS,
+      ...(options.entitlements ? { entitlements: options.entitlements } : {}),
       ...(options.throttle ? { throttle: throttleOf(options.throttle) } : {}),
       audit: {
         record: (entry) => this.#record(entry),

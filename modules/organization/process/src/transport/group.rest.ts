@@ -4,7 +4,6 @@
  * attribute to the grants ledger as the credential's own member.
  */
 import {
-  defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
@@ -30,19 +29,8 @@ import {
   type OrganizationGroupGrant,
   type OrganizationGroupMember,
 } from "@langwatch/organization-contract";
-import { z } from "zod";
 
 import { keyCallerOf, organizationKeyFacts } from "./organization-management.rest.ts";
-
-/**
- * Whether the credential's organization holds the Enterprise plan groups
- * require, resolved after authentication and after the permission check —
- * the ordering the pre-conversion per-route gate held.
- */
-export const groupsRestEnterpriseGate = defineRestMiddleware(
-  "groupsRestEnterpriseGate",
-  z.object({}),
-);
 
 /** One binding, as every route that reports one answers it. */
 const bindingWire = (binding: OrganizationGroupGrant) => ({
@@ -75,7 +63,7 @@ export const groupsRest: Readonly<{
   .withQuery(organizationGroupRestListQuerySchema)
   .withOutput(organizationGroupRestPageSchema)
   .withDocs({ tags: ["Groups"], description: "List all groups for the organization" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     const result = await app.listGroups({
       organizationId: scope.id,
@@ -105,7 +93,7 @@ export const groupsRest: Readonly<{
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Create a new group" })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     const group = await app.createGroup(
       {
@@ -131,7 +119,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestDetailsSchema)
   .withDocs({ tags: ["Groups"], description: "Get a group with members and bindings" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     const group = await app.getGroup({ groupId: input.groupId, organizationId: scope.id });
 
@@ -152,7 +140,7 @@ export const groupsRest: Readonly<{
   .withInput(organizationGroupRestRenameSchema)
   .withOutput(organizationGroupRestRenamedSchema)
   .withDocs({ tags: ["Groups"], description: "Rename a group" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     const group = await app.renameGroup({
       groupId: input.groupId,
@@ -169,7 +157,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Delete a group" })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.deleteGroup(
       { groupId: input.groupId, organizationId: scope.id },
@@ -184,7 +172,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestMemberListSchema)
   .withDocs({ tags: ["Groups"], description: "List members of a group" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     const group = await app.getGroup({ groupId: input.groupId, organizationId: scope.id });
 
@@ -199,7 +187,7 @@ export const groupsRest: Readonly<{
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a member to a group" })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.addGroupMember(
       { groupId: input.groupId, organizationId: scope.id, userId: input.userId },
@@ -214,7 +202,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestMemberParamsSchema)
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Remove a member from a group" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     await app.removeGroupMember({
       groupId: input.groupId,
@@ -230,7 +218,7 @@ export const groupsRest: Readonly<{
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestBindingListSchema)
   .withDocs({ tags: ["Groups"], description: "List role bindings for a group" })
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope }) => {
     const bindings = await app.listGroupBindings({
       organizationId: scope.id,
@@ -248,7 +236,7 @@ export const groupsRest: Readonly<{
   .withStatus(201)
   .withDocs({ tags: ["Groups"], description: "Add a role binding to a group" })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     const { groupId: id, ...binding } = input;
     const created = await app.addGroupGrant(
@@ -270,7 +258,7 @@ export const groupsRest: Readonly<{
   .withOutput(organizationRestSuccessSchema)
   .withDocs({ tags: ["Groups"], description: "Remove a role binding from a group" })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(groupsRestEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "GROUPS" })
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.removeGroupGrant(
       { groupId: input.groupId, grantId: input.bindingId, organizationId: scope.id },

@@ -29,8 +29,8 @@ function policyWith(fakes: Fakes = {}) {
   const service = ApiKeyGrantPolicyService.create({
     authz: {
       hasPermission: async () => true,
-      can: async (input: { permission: string }) => {
-        calls.push({ method: "can", permission: input.permission });
+      can: async (input: { permission: string; principal: unknown }) => {
+        calls.push({ method: "can", permission: input.permission, principal: input.principal });
         return fakes.allow?.(input.permission) ?? fakes.can ?? true;
       },
       listUserBindings: async () => fakes.userBindings ?? [],
@@ -87,7 +87,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -106,7 +106,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const member = policyWith(memberCeiling);
         await expect(
           member.service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "MEMBER" })],
             permissions: [],
@@ -116,7 +116,7 @@ describe("ApiKeyGrantPolicyService", () => {
         const admin = policyWith(memberCeiling);
         await expect(
           admin.service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -131,7 +131,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "ADMIN" })],
             permissions: [],
@@ -143,13 +143,32 @@ describe("ApiKeyGrantPolicyService", () => {
         const { service, calls } = policyWith({});
 
         await service.assertCeiling({
-          userId: "user-1",
+          principal: { type: "user", id: "user-1" },
           organizationId: ORG,
           bindings: [scope()],
           permissions: [],
         });
 
         expect(calls.filter((call) => call.method === "can")).toHaveLength(1);
+      });
+    });
+
+    describe("given an organization key as the granting credential", () => {
+      /** @scenario A key-authenticated request grants at most what the requesting key holds */
+      it("asks the ceiling of the key, not of its owner", async () => {
+        const { service, calls } = policyWith({});
+
+        await service.assertCeiling({
+          principal: { type: "apiKey", id: "key-1" },
+          organizationId: ORG,
+          bindings: [scope()],
+          permissions: [],
+        });
+
+        expect(calls.find((call) => call.method === "can")?.principal).toEqual({
+          type: "apiKey",
+          id: "key-1",
+        });
       });
     });
 
@@ -170,7 +189,7 @@ describe("ApiKeyGrantPolicyService", () => {
           const { service, calls } = policyWith({});
 
           await service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [
               scope({ role, scopeType, scopeId: scopeType === "ORGANIZATION" ? ORG : "project-1" }),
@@ -190,7 +209,7 @@ describe("ApiKeyGrantPolicyService", () => {
         });
 
         await service.assertCeiling({
-          userId: "user-1",
+          principal: { type: "user", id: "user-1" },
           organizationId: ORG,
           bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
           permissions: [],
@@ -206,7 +225,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
             permissions: [],
@@ -219,7 +238,7 @@ describe("ApiKeyGrantPolicyService", () => {
 
         await expect(
           service.assertCeiling({
-            userId: "user-1",
+            principal: { type: "user", id: "user-1" },
             organizationId: ORG,
             bindings: [scope({ role: "CUSTOM", customRoleId: "role-1" })],
             permissions: [],

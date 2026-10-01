@@ -1,3 +1,4 @@
+import { GrantExceedsCallerPermissionsError } from "@langwatch/authz-contract";
 import {
   Currency,
   SubscriptionStatus,
@@ -63,6 +64,7 @@ const createMockSubscriptions = (): {
 const createMockInvites = (): {
   [K in keyof SeatCheckoutInvites]: Mock<SeatCheckoutInvites[K]>;
 } => ({
+  checkInvitesWithinCaller: vi.fn(),
   createPaymentPendingInvites: vi.fn(),
   cancelPaymentPendingInvites: vi.fn(),
 });
@@ -890,6 +892,43 @@ describe("seatEventSubscription", () => {
           }),
           { id: "user_1" },
         );
+      });
+
+      /** @scenario A seat checkout inviting past the inviter writes nothing */
+      it("refuses invitations past the inviter before any checkout row is written", async () => {
+        invites.checkInvitesWithinCaller.mockRejectedValue(
+          new GrantExceedsCallerPermissionsError(["organization:manage"]),
+        );
+
+        await expect(
+          service.createSeatEventCheckout({
+            organizationId: "org_1",
+            customerId: "cus_1",
+            baseUrl: "https://app.test",
+            currency: Currency.USD,
+            billingInterval: "monthly",
+            membersToAdd: 1,
+            invitations: {
+              invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+              by: { id: "user_1" },
+            },
+          }),
+        ).rejects.toMatchObject({
+          code: "grant_exceeds_caller_permissions",
+          meta: { missingPermissions: ["organization:manage"] },
+        });
+
+        expect(invites.checkInvitesWithinCaller).toHaveBeenCalledWith(
+          {
+            organizationId: "org_1",
+            invites: [{ email: "bo@acme.test", role: "ADMIN", teamIds: "team_1" }],
+          },
+          { id: "user_1" },
+        );
+        expect(subscriptions.cancelPendingSeatCheckouts).not.toHaveBeenCalled();
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(invites.createPaymentPendingInvites).not.toHaveBeenCalled();
+        expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
       });
     });
 

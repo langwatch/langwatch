@@ -121,9 +121,11 @@ export class RateLimitedError extends HandledError {
 }
 
 export class EnterprisePlanRequiredError extends HandledError {
-  constructor() {
+  /** `feature` is the capability main names on `meta.feature`. */
+  constructor(feature?: string) {
     super("enterprise_plan_required", "This operation requires an Enterprise plan", {
       httpStatus: 402,
+      ...(feature ? { meta: { feature } } : {}),
       fault: "customer",
       ...remediation("enterprise_plan_required"),
     });

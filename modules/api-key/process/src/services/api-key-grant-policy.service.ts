@@ -8,6 +8,7 @@ import type {
   AuthzAccessBinding,
   AuthzAttachOutcome,
   AuthzGrantCaller,
+  AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
 import { Temporal, fromDate, nowInstant } from "@langwatch/time";
 
@@ -62,7 +63,7 @@ export class ApiKeyGrantPolicyService {
       await this.validateScope(binding, input.organizationId);
     }
 
-    await this.assertCeiling(input);
+    await this.assertCeiling({ ...input, principal: { type: "user", id: input.userId } });
   }
 
   async isOrgAdmin(input: { userId: string; organizationId: string }): Promise<boolean> {
@@ -187,13 +188,14 @@ export class ApiKeyGrantPolicyService {
     };
   }
 
+  /** Refuses any binding `principal` does not itself hold; a personal key holds key ∩ owner. */
   async assertCeiling({
-    userId,
+    principal,
     organizationId,
     bindings,
     permissions,
   }: {
-    userId: string;
+    principal: AuthzPrincipalRef;
     organizationId: string;
     bindings: ApiKeyScope[];
     permissions: string[];
@@ -204,13 +206,13 @@ export class ApiKeyGrantPolicyService {
       for (const permission of checks) {
         const authzScope = this.authzScope(scope, organizationId);
         const allowed = await this.options.authz.can({
-          principal: { type: "user", id: userId },
+          principal,
           permission: permission as AuthzPermission,
           scope: authzScope,
         });
         if (!allowed) {
           throw new ApiKeyScopeViolationError(
-            `Cannot grant permission ${permission} beyond the owner's ceiling`,
+            `Cannot grant permission ${permission} beyond what the granting credential holds`,
           );
         }
       }

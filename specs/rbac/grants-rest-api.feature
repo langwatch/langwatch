@@ -261,6 +261,14 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     And the member's seat is unchanged
 
   @unit
+  Scenario: A role change that corrects team roles is refused before the seat changes
+    Given a member who is a viewer on a team where I may not grant the member role
+    When I change their organization role to member, naming no team roles
+    Then the request is refused with code grant_exceeds_caller_permissions and status 403
+    And meta.missingPermissions names what I lack
+    And the member's seat and team roles are unchanged
+
+  @unit
   Scenario: Changing a member's team role above the caller is refused before anything is written
     Given I do not hold every permission of role "admin" on a team
     When I change a member's role on that team to "admin"
@@ -288,6 +296,14 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     And no invitation is held for payment
 
   @unit
+  Scenario: A seat checkout inviting past the inviter writes nothing
+    Given I hold "organization:manage" but not every permission of the organization admin role
+    When I buy seats for an invitation as an organization admin
+    Then the checkout is refused with code grant_exceeds_caller_permissions
+    And meta.missingPermissions names what I lack
+    And no pending seat checkout is stored and no checkout session is opened
+
+  @unit
   Scenario: A service key grants through the organization doors, bounded by its own grants
     Given a service organization key that acts as no person
     When it adds a group grant, a team member, a member role or an invitation
@@ -298,6 +314,14 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
     Given a personal organization key narrower than the member who owns it
     When it grants through an organization door
     Then the write is bounded by what the key holds, not by its owner
+
+  @unit
+  Scenario: A key-authenticated request grants at most what the requesting key holds
+    Given a personal organization key narrower than the organization admin who owns it
+    When it creates a service key or edits a key's bindings through /api/api-keys
+    Then each binding is bounded by what the requesting key holds, as well as by any key owner
+    And a service key or a key for another member needs the admin role on the key and its owner
+    And a refused request writes no key and no binding
 
   @unit
   Scenario: A custom role the organization does not have is refused before anything is written
@@ -433,3 +457,28 @@ Feature: Roles and grants REST API, and the role bindings API it supersedes
   Scenario: The first call to a deprecated operation is logged once
     When I list bindings through /api/role-bindings twice
     Then one warning is logged naming the role-bindings family, the operation and "/api/grants"
+
+  # ============================================================================
+  # Plans: the management families are Enterprise, as main (402, meta.feature)
+  # ============================================================================
+
+  @integration
+  Scenario: Both grant families answer 402 below Enterprise, naming the management API
+    Given the organization is on a plan below Enterprise
+    When I list or create a grant through /api/grants or /api/role-bindings
+    Then each request is refused with code enterprise_plan_required and status 402
+    And meta.feature is "MANAGEMENT_API"
+    And no grant is written
+
+  @unit
+  Scenario: The groups family answers 402 below Enterprise, naming GROUPS
+    Given the organization is on a plan below Enterprise
+    When I list groups through /api/groups
+    Then the request is refused with code enterprise_plan_required and meta.feature "GROUPS"
+    And the groups are never read
+
+  @unit
+  Scenario: The organization and groups families answer 402 below Enterprise, as main
+    Then every /api/organization route names meta.feature "MANAGEMENT_API" when it refuses
+    And every /api/groups route names meta.feature "GROUPS" when it refuses
+    And the plan is asked only after the caller is authenticated and permitted

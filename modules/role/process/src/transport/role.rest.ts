@@ -64,6 +64,7 @@ export const roleRest: Readonly<{
   .get("/", "listRoles")
   .withQuery(roleRestListQuerySchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(roleRestListSchema)
   .withDocs({
     tags: ["Roles"],
@@ -83,6 +84,7 @@ export const roleRest: Readonly<{
   .post("/", "createRole")
   .withInput(roleRestCreateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(roleRestSchema)
   .withStatus(201)
   .withDocs({
@@ -110,6 +112,7 @@ export const roleRest: Readonly<{
   // Declared before /:id so the static segment can never be read as an id.
   .get("/permissions", "listRolePermissions")
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(rolePermissionCatalogSchema)
   .withDocs({
     tags: ["Roles"],
@@ -121,6 +124,7 @@ export const roleRest: Readonly<{
   .get("/:id", "getRole")
   .withParams(roleRestParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(roleRestSchema)
   .withDocs({
     tags: ["Roles"],
@@ -141,6 +145,7 @@ export const roleRest: Readonly<{
   .withParams(roleRestParamsSchema)
   .withInput(roleRestUpdateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(roleRestSchema)
   .withDocs({
     tags: ["Roles"],
@@ -168,6 +173,7 @@ export const roleRest: Readonly<{
   .delete("/:id", "deleteRole")
   .withParams(roleRestParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "RBAC" })
   .withOutput(roleRestDeletedSchema)
   .withDocs({
     tags: ["Roles"],

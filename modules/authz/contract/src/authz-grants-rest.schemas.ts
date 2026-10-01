@@ -14,6 +14,27 @@ const idSchema = z.string().min(1).max(MAX_ID_LENGTH);
 export const builtInRoleIdSchema = z.enum(["admin", "member", "viewer"]);
 export type BuiltInRoleId = z.infer<typeof builtInRoleIdSchema>;
 
+/** Every place a grant write names a role: a create, a role change, a member's new grants. */
+const grantRolesSchema = z.object({
+  roleId: z.string().optional(),
+  grant: z.object({ roleId: z.string() }).optional(),
+  bindingsToCreate: z.array(z.object({ customRoleId: z.string().nullish() })).optional(),
+});
+
+/** Whether a grant write assigns a role beyond the built-in three: an Enterprise question. */
+export function assignsCustomGrantRole(input: unknown): boolean {
+  const parsed = grantRolesSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { roleId, grant, bindingsToCreate = [] } = parsed.data;
+  const named = [roleId, grant?.roleId].filter((id) => id !== undefined);
+
+  return (
+    named.some((id) => !builtInRoleIdSchema.validate(id)) ||
+    bindingsToCreate.some((binding) => Boolean(binding.customRoleId))
+  );
+}
+
 export const grantPrincipalTypeSchema = z.enum(["user", "group", "apiKey"]);
 export type GrantPrincipalType = z.infer<typeof grantPrincipalTypeSchema>;
 

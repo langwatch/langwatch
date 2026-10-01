@@ -11,6 +11,7 @@ import type {
 import { createLogger } from "@langwatch/observability";
 import { Hono } from "hono";
 
+import type { Entitlements } from "../access/access.ts";
 import type { RateLimiter } from "../ports.ts";
 import type { MountableRestApp } from "./addressing.ts";
 import { CliTokenIdentity } from "./cli-token-identity.ts";
@@ -65,6 +66,8 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
     rateLimiter?: RateLimiter | undefined;
     /** What the process answers on behalf of a module, on every family at once. */
     facts?: readonly RestTransportMiddlewareBinding[] | undefined;
+    /** The plans a route declaring an entitlement asks; absent, it is refused at mount. */
+    entitlements?: Entitlements | undefined;
   }): RestHost {
     return new RestHost(options);
   }
@@ -110,6 +113,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       doors: identities,
       ...(this.options.idempotency ? { idempotency: this.options.idempotency } : {}),
       ...(this.options.rateLimiter ? { rateLimiter: this.options.rateLimiter } : {}),
+      ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {

@@ -455,22 +455,40 @@ async function decidePermissionAll({
  */
 export type ApiEntitlement = "enterprise";
 
+/** One declared plan question: the entitlement, the capability a refusal names, and when to ask. */
+export type EntitlementGate = Readonly<{
+  entitlement: ApiEntitlement;
+  /** Named on the refusal's `meta.feature`, as main names the capability. */
+  feature?: string;
+  /** Asked only for an input this holds for; absent, every call asks. */
+  when?: (input: unknown) => boolean;
+}>;
+
+export type EntitlementOptions = Omit<EntitlementGate, "entitlement">;
+
 /** Whether one tenant holds one entitlement, as the process reads its plans. */
 export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
+  /** The process's own refusal for the capability; the framework's when absent. */
+  refusal?(input: { feature: string | undefined }): Error;
 }
 
 export async function decideEntitlement({
-  entitlement,
+  gate,
   scope,
+  input,
   entitlements,
   address,
 }: {
-  entitlement: ApiEntitlement;
+  gate: EntitlementGate;
   scope: AuthzDeclaredScopeId | null;
+  input: unknown;
   entitlements: Entitlements;
   address: string;
 }): Promise<void> {
+  if (gate.when && !gate.when(input)) return;
+
+  const { entitlement, feature } = gate;
   if (!scope) {
     throw new Error(
       `${address} asks whether its tenant holds "${entitlement}", and access resolved no scope ` +
@@ -480,7 +498,7 @@ export async function decideEntitlement({
 
   if (await entitlements.holds({ entitlement, scope })) return;
 
-  throw new EnterprisePlanRequiredError();
+  throw entitlements.refusal?.({ feature }) ?? new EnterprisePlanRequiredError(feature);
 }
 
 /**

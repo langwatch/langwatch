@@ -26,7 +26,10 @@ import type {
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "../rules/member-role-constraints.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
-import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
+import {
+  EffectiveTeamRoleUpdatesService,
+  type EffectiveTeamRoleUpdate,
+} from "./compute-effective-team-role-updates.service.ts";
 import type {
   OrganizationGrantCeilingService,
   OrganizationIntendedGrant,
@@ -226,8 +229,15 @@ export class OrganizationMemberRoleService {
       currentTeamBindings,
     });
     const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
+    const effectiveTeamRoleUpdates = this.effectiveTeamRoleUpdatesOf({
+      userId,
+      role,
+      teamRoleUpdates,
+      currentMemberships,
+      organizationTeamIds,
+    });
 
-    // Asked before anything is written: the seat commits ahead of the grants it caps.
+    // Asked before anything is written, seat corrections included: the seat commits first.
     await this.dependencies.ceiling.assertWithinCaller({
       organizationId,
       caller,
@@ -241,7 +251,7 @@ export class OrganizationMemberRoleService {
                 scopeId: organizationId,
               },
             ]),
-        ...(teamRoleUpdates ?? []).map((update) =>
+        ...effectiveTeamRoleUpdates.map((update) =>
           intendedTeamGrant({
             teamId: update.teamId,
             role: update.role,
@@ -260,13 +270,11 @@ export class OrganizationMemberRoleService {
       user: params.planUser,
     });
 
-    return this.updateMemberRole({
+    return this.repo.updateMemberRole({
       organizationId,
       userId,
       role,
-      teamRoleUpdates,
-      currentMemberships,
-      organizationTeamIds,
+      effectiveTeamRoleUpdates,
       currentUserId,
       caller,
     });
@@ -292,17 +300,32 @@ export class OrganizationMemberRoleService {
     currentUserId: string | null;
     caller: AuthzGrantCaller;
   }): Promise<UpdateMemberRoleResult> {
-    const {
+    const { organizationId, userId, role, currentUserId, caller } = params;
+
+    return this.repo.updateMemberRole({
       organizationId,
       userId,
       role,
-      teamRoleUpdates,
-      currentMemberships,
-      organizationTeamIds,
+      effectiveTeamRoleUpdates: this.effectiveTeamRoleUpdatesOf(params),
       currentUserId,
       caller,
-    } = params;
+    });
+  }
 
+  /** The team-role changes a role change makes: the requested ones, plus any seat corrections. */
+  private effectiveTeamRoleUpdatesOf({
+    userId,
+    role,
+    teamRoleUpdates,
+    currentMemberships,
+    organizationTeamIds,
+  }: {
+    userId: string;
+    role: OrganizationUserRole;
+    teamRoleUpdates?: { teamId: string; userId: string; role: string; customRoleId?: string }[];
+    currentMemberships: { teamId: string; role: TeamUserRole }[];
+    organizationTeamIds: string[];
+  }): EffectiveTeamRoleUpdate[] {
     const organizationTeamIdSet = new Set(organizationTeamIds);
 
     const requestedTeamRoleUpdates = (teamRoleUpdates ?? []).reduce<
@@ -329,20 +352,10 @@ export class OrganizationMemberRoleService {
       return acc;
     }, []);
 
-    const effectiveTeamRoleUpdates =
-      EffectiveTeamRoleUpdatesService.create().computeEffectiveTeamRoleUpdates({
-        requestedTeamRoleUpdates,
-        currentMemberships,
-        newOrganizationRole: role,
-      });
-
-    return this.repo.updateMemberRole({
-      organizationId,
-      userId,
-      role,
-      effectiveTeamRoleUpdates,
-      currentUserId,
-      caller,
+    return EffectiveTeamRoleUpdatesService.create().computeEffectiveTeamRoleUpdates({
+      requestedTeamRoleUpdates,
+      currentMemberships,
+      newOrganizationRole: role,
     });
   }
 

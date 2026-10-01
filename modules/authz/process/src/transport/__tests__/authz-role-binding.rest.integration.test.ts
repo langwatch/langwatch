@@ -93,6 +93,7 @@ function world({ rows = [] as AuthzManagedOrganizationBinding[] } = {}) {
       authenticate: ({ request }) => admit(request),
       authorize: () => ({ permitted: true, organizationRole: null }),
     },
+    entitlements: { holds: async () => true },
   });
   const hono = runtime.mount(authzRoleBindingRest.router(), {
     app: () => app,

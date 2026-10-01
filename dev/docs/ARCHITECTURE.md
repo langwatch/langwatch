@@ -1367,9 +1367,13 @@ Minting a SCIM token is a grant door: only a caller holding everything an organi
 Creating a team passes the real caller, never `system`: the creator becoming its own new team's ADMIN is the
 one consequence written as `system`; every other initial member is bounded by the creator (Alex, 2026-10-01).
 **Plans** (Alex, 2026-10-01): built-in roles grant on every plan; any write that assigns a custom role needs
-Enterprise on every door, decided once in authz's central check. `/api/role-bindings`, `/api/organization`,
-`/api/roles` and `/api/groups` answer 402 `enterprise_plan_required` below Enterprise, as main, through the
-framework entitlement check: authz does not depend on entitlement.
+Enterprise on every door, declared on each granting door (`withEntitlement("enterprise", { feature: "RBAC",
+when })`), so authz never asks entitlement. `/api/role-bindings`, `/api/organization`, `/api/roles` and
+`/api/groups` answer 402 `enterprise_plan_required` below Enterprise, as main.
+**The plan gate is declared** (Alex, 2026-10-01): a route or procedure names `withEntitlement(entitlement,
+{ feature, when })`; the framework asks after access, only when `when(input)` holds, and refuses 402
+`enterprise_plan_required` with `meta.feature`. The process composes the `entitlements` port from
+EntitlementApi (api-surface.ts); a module never hand-rolls a plan middleware.
 **Grants are the only read** (Alex, 2026-10-01): main's genesis import made Grant complete, so no module reads
 the RoleBinding compatibility table; access is read through `AuthzApi` listings, ended grants excluded.
 

@@ -63,5 +63,25 @@ describe("given the role transport declared by the feature", () => {
         expect(claimed).toContain(name === "getById" ? "organization:view" : "organization:manage");
       }
     });
+
+    /** @scenario Assigning a custom role is refused below Enterprise on every grant door */
+    it("asks for Enterprise, naming RBAC, before assigning a custom role to a member", () => {
+      const gates: Record<string, unknown> = {};
+      roleTrpcTransport.router(
+        {
+          procedure: ({ procedure, entitlement }) => {
+            gates[procedure.slice(procedure.indexOf(".") + 1)] = entitlement;
+            return {};
+          },
+          router: (record) => record,
+        },
+        () => {
+          throw new Error("the wire table never resolves an application");
+        },
+      );
+
+      expect(gates.assignToUser).toEqual({ entitlement: "enterprise", feature: "RBAC" });
+      expect(gates.removeFromUser).toBeUndefined();
+    });
   });
 });

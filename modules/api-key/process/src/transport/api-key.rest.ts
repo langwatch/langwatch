@@ -88,8 +88,8 @@ const detailOf = (apiKey: ApiKeyDetail): ApiKeyRestDetail => ({
 });
 
 /**
- * Real adminness for the presented credential: an org-scope ADMIN role
- * binding on the calling user, or on the service key itself. Deliberately
+ * Real adminness for the presented credential: an org-scope ADMIN binding on
+ * the key itself and, for a personal key, on its owner too. Deliberately
  * stricter than holding organization:manage, which a custom role can carry.
  */
 const callerIsAdmin = async ({
@@ -101,9 +101,8 @@ const callerIsAdmin = async ({
   caller: ApiKeyRestCaller;
   organizationId: string;
 }): Promise<boolean> =>
-  caller.userId
-    ? app.isOrgAdmin({ userId: caller.userId, organizationId })
-    : app.isOrgAdminApiKey({ apiKeyId: caller.apiKeyId, organizationId });
+  (await app.isOrgAdminApiKey({ apiKeyId: caller.apiKeyId, organizationId })) &&
+  (caller.userId === null || (await app.isOrgAdmin({ userId: caller.userId, organizationId })));
 
 /**
  * Whether the credential may read a key it does not own: real adminness AND
@@ -260,13 +259,13 @@ export const apiKeyRest: Readonly<{
     tags: API_KEY_TAGS,
     summary: "Create an API key",
     description:
-      'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights. The plaintext token is returned once — store it securely.',
+      'Create a new API key. For service keys, pass keyType:"service". Optionally scope to specific projects via projectIds (ADMIN on each). Omit projectIds for full org access. Pass assignedToUserId to mint the key for another member, and permissionMode:"restricted" with a permissions list to grant exactly those permissions. Minting a service key or a key for another member requires organization admin rights, held by both the key making the request and its member. A key can grant at most what the key making the request holds. The plaintext token is returned once — store it securely.',
     errors: [
       INVALID_TOKEN,
       {
         status: 403,
         description:
-          "Requested binding exceeds the creator's own permissions, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
+          "Requested binding exceeds what the key making the request holds, or the scope does not belong to this organization (api_key_scope_violation); a service key or a key for another member was requested without organization admin rights (api_key_admin_required)",
       },
       {
         status: 422,
@@ -296,6 +295,7 @@ export const apiKeyRest: Readonly<{
         callerUserId: caller.userId,
       }),
       createdByUserId: caller.userId,
+      callerApiKeyId: caller.apiKeyId,
       organizationId: scope.id,
       expiresAt: input.expiresAt,
       permissionMode: input.permissionMode,
@@ -361,13 +361,13 @@ export const apiKeyRest: Readonly<{
     tags: API_KEY_TAGS,
     summary: "Update an API key",
     description:
-      "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to. The token itself never changes.",
+      "Update an API key's name, description, permission mode, permissions or bindings. Every field is optional; bindings are replaced outright, and the response is exactly what a subsequent GET returns. You may update your own keys; organization admins may update any key in the organization. Bindings can never exceed the access of the member the key belongs to, and a key can grant at most what the key making the request holds. The token itself never changes.",
     errors: [
       INVALID_TOKEN,
       {
         status: 403,
         description:
-          "Insufficient permissions (requires organization:manage), the requested binding exceeds the key owner's own permissions, or the scope does not belong to this organization (api_key_scope_violation)",
+          "Insufficient permissions (requires organization:manage), the requested binding exceeds what the key owner or the key making the request holds, or the scope does not belong to this organization (api_key_scope_violation)",
       },
       { status: 404, description: "API key not found, or not yours to edit (api_key_not_found)" },
       { status: 409, description: "API key is already revoked (api_key_already_revoked)" },
@@ -386,6 +386,7 @@ export const apiKeyRest: Readonly<{
     await app.updateAsCaller({
       id: input.id,
       callerUserId: caller.userId,
+      callerApiKeyId: caller.apiKeyId,
       callerIsAdmin: isAdmin,
       organizationId: scope.id,
       name: input.name,

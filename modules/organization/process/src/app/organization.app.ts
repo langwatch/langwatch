@@ -1492,6 +1492,16 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     return this.#invitations().list(input);
   }
 
+  async checkInvitesWithinCaller(
+    input: Readonly<{
+      organizationId: string;
+      invites: readonly Readonly<{ email: string; role: OrganizationUserRole; teamIds: string }>[];
+    }>,
+    by: OrganizationCaller,
+  ): Promise<void> {
+    return this.#invitations().checkInvitesWithinCaller(input, by);
+  }
+
   async createPaymentPendingInvites(
     input: Readonly<{
       organizationId: string;

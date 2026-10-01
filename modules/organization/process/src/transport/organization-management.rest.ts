@@ -35,16 +35,6 @@ import { z } from "zod";
 
 import { getDefaultTeamRoleForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 
-/**
- * Whether the credential's organization holds the Enterprise plan this
- * family requires, resolved once per request after authentication and after
- * the permission check — the ordering the pre-conversion middleware held.
- */
-export const organizationManagementEnterpriseGate = defineRestMiddleware(
-  "organizationManagementEnterpriseGate",
-  z.object({}),
-);
-
 /** A wire date field the way every app answer carries it: an `Instant`, converted here once. */
 
 /** The member the organizationKey door hands over as `actor`; null for a service key. */
@@ -181,7 +171,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "Read the organization profile: name, slug, support contact, presence and trace sharing settings, and the S3 storage shape. The single sign-on fields and the S3 secret are never returned.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(({ app, scope }) => app.getSettings({ organizationId: scope.id }))
 
   .patch("/", "updateOrganization")
@@ -193,7 +183,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "Update the organization profile. Partial: only the fields present are written, and the response is exactly what a subsequent GET returns.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope }) => {
     await app.updateSettings({ organizationId: scope.id, ...input });
 
@@ -209,7 +199,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "List the organization's members with their organization role and disabled status. Disabled members are included only when includeDisabled=true.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope }) => {
     const { members, totalCount } = await app.listMembers({
       organizationId: scope.id,
@@ -230,7 +220,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "Read one member, including the teams they reach through team-scoped role bindings. Personal workspaces are not listed: they are not access an administrator manages.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope }) => {
     const member = await app.getMember({ organizationId: scope.id, userId: input.userId });
 
@@ -252,7 +242,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "The member's full access breakdown: organization role, group memberships with their bindings, and direct bindings, each with the permissions it grants and the scope it grants them on.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope }) => {
     // 404 before disclosure: the breakdown call itself never fails on an
     // unknown user, it just answers emptily, which would read as a member
@@ -278,7 +268,7 @@ export const organizationManagementRest: Readonly<{
       "Change a member's organization role, or disable / re-enable their membership. Send exactly one of role or disabled. Re-enabling consumes a seat, so it is checked against the plan.",
   })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope, actor }, key) =>
     updatedMemberWire(
       await app.updateMember(
@@ -302,7 +292,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "Remove a member from the organization and every team in it. The member the credential acts as cannot remove themselves.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope, actor }) => {
     await app.deleteMember({ organizationId: scope.id, userId: input.userId }, deriveCaller(actor));
 
@@ -317,7 +307,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "List pending invites. Each carries its invite code and acceptance link, because a provisioning run with no email provider still has to hand the person something to open.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, scope }) => {
     const invitations = await app.listPendingInvitations({ organizationId: scope.id });
 
@@ -335,7 +325,7 @@ export const organizationManagementRest: Readonly<{
       "Create up to 50 invites in one batch, each with team assignments that may carry a custom role. Validation is strict: a team or custom role that cannot be assigned refuses the batch rather than silently granting less than was asked. emailNotSent reports, per invite, whether the invite email could be delivered.",
   })
   .withMiddleware(organizationKeyFacts)
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope, actor }, key) => {
     const created = await app.createInvitations(
       {
@@ -376,7 +366,7 @@ export const organizationManagementRest: Readonly<{
     description:
       "Revoke a pending invite. An invite id from another organization, or one already revoked, answers 404.",
   })
-  .withMiddleware(organizationManagementEnterpriseGate)
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .handle(async ({ app, input, scope }) => {
     await app.revokeInvitation({ organizationId: scope.id, inviteId: input.inviteId });
 

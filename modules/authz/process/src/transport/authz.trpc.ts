@@ -16,6 +16,7 @@ import {
   authzOwnStandingInputSchema,
   authzOwnStandingSchema,
   authzRevokeGrantByIdInputSchema,
+  assignsCustomGrantRole,
   grantPageSchema,
   grantRevokedSchema,
   grantSchema,
@@ -68,6 +69,9 @@ function callerOf(actor: Actor): AuthzPrincipalRef {
   return { type: "anonymous" };
 }
 
+/** Assigning a custom role is the Enterprise capability, refused on every plan below it. */
+const customRoles = { feature: "RBAC", when: assignsCustomGrantRole };
+
 /**
  * Membership itself is the only requirement for the standing: the answer is the
  * caller's own, and a non-member resolves to the empty set. The grant writes sit
@@ -88,12 +92,14 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
     .handle(async ({ app, input }) => app.listGrants(input))
 
     .procedure("createGrant")
+    .withEntitlement("enterprise", customRoles)
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.createGrant({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
     )
 
     .procedure("changeGrantRole")
+    .withEntitlement("enterprise", customRoles)
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.changeGrantRole({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),
@@ -117,6 +123,7 @@ export const authzTrpcTransport: TrpcRouterDeclaration<AuthzApi, typeof authzTrp
 
     /** One member's revokes and creates together, so the sheet cannot half-apply. */
     .procedure("applyMemberGrants")
+    .withEntitlement("enterprise", customRoles)
     .withPermission("organization:manage")
     .handle(async ({ app, input, actor }) =>
       app.applyMemberBindings({ ...input, caller: callerOf(actor), actor: toLedgerActor(actor) }),

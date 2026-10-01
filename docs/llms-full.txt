@@ -1405,7 +1405,7 @@ read only.
   />
 </Frame>
 
-An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling.
+An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling. When a key creates or edits another key, a key can grant at most what the key making the request holds.
 
 **Also check:** [API Keys](/platform/api-keys) for how to scope a key.
 
@@ -69078,7 +69078,7 @@ Created without a user association (`userId: null`). Scoped to specific projects
 
 `projectIds` is shorthand rather than a separate mechanism: each id becomes one ADMIN binding on that project, added to any `bindings` you sent rather than replacing them. Reach for `bindings` directly when you want a role other than ADMIN, or a team or organization scope. Service keys only, and a personal key that sends it is refused.
 
-Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. Minting a personal key for yourself is always allowed: your own access caps it.
+Because a service key has no person capping it, and a key minted for somebody else is capped by their access rather than yours, both are reserved for organization administrators. A caller who holds `organization:manage` without being an administrator is refused with 403. A request made with a personal key needs the administrator role on the key itself as well as on its member. Minting a personal key for yourself is always allowed: your own access caps it.
 
 ## Narrowing what a key may do
 
@@ -69098,7 +69098,7 @@ Three fields decide how far a key reaches:
 }
 ```
 
-A key can never grant more than the person or organization behind it already has, whatever you put in these fields.
+A key can never grant more than the person or organization behind it already has, whatever you put in these fields. When a key makes the request, a key can grant at most what the key making the request holds; for a personal key that is the overlap of its own bindings and its member's access.
 
 ---
 

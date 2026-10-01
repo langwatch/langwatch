@@ -46,6 +46,7 @@ export const authzGrantRest: Readonly<{
   .get("/", "listGrants")
   .withQuery(grantListQuerySchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(grantPageSchema)
   .withDocs({
     tags: TAGS,
@@ -61,6 +62,7 @@ export const authzGrantRest: Readonly<{
   .post("/", "createGrant")
   .withInput(grantCreateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(grantSchema)
   .withStatus(201)
   .withIdempotency({ operation: "grants.v1.create" })
@@ -82,6 +84,7 @@ export const authzGrantRest: Readonly<{
   .get("/:grantId", "getGrant")
   .withParams(grantParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(grantSchema)
   .withDocs({
     tags: TAGS,
@@ -98,6 +101,7 @@ export const authzGrantRest: Readonly<{
   .withParams(grantParamsSchema)
   .withInput(grantUpdateSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(grantSchema)
   .withDocs({
     tags: TAGS,
@@ -118,6 +122,7 @@ export const authzGrantRest: Readonly<{
   .delete("/:grantId", "revokeGrant")
   .withParams(grantParamsSchema)
   .withPermission("organization:manage")
+  .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })
   .withOutput(grantRevokedSchema)
   .withDocs({
     tags: TAGS,
