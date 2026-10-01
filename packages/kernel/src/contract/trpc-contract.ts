@@ -14,11 +14,6 @@ import type { z } from "zod";
 /** Every kind of procedure a contract declares. */
 export type TrpcContractKind = "query" | "mutation" | "subscription";
 
-/** A read's cache policy: whether a reload may paint it from the sealed IndexedDB mirror. */
-export type TrpcCachePolicy = Readonly<{
-  persist?: boolean;
-}>;
-
 /** One declared procedure. `output` is absent when the procedure answers nothing. */
 export type TrpcContractMember<
   Kind extends TrpcContractKind = TrpcContractKind,
@@ -28,7 +23,6 @@ export type TrpcContractMember<
   readonly kind: Kind;
   readonly input: Input;
   readonly output: Output;
-  readonly cache?: TrpcCachePolicy;
   /** Committed events that make this read stale; the framework hints on each. */
   readonly invalidatedBy?: readonly TrpcReadInvalidation[];
   /** Projections this read is served from; their cursors decide freshness and key the cache. */
@@ -49,9 +43,8 @@ export type TrpcProjectionSource = string | Readonly<{ projection: string; key: 
  */
 export type TrpcReadInvalidation = string | Readonly<{ event: string; scope: string }>;
 
-/** A read's declared options: its cache policy, and what makes it stale (events or cursors). */
+/** A read's declared options: what makes it stale (events or cursors). */
 export type TrpcReadOptions = Readonly<{
-  cache?: TrpcCachePolicy;
   invalidatedBy?: readonly TrpcReadInvalidation[];
   fromProjection?: readonly TrpcProjectionSource[];
   revision?: number;
@@ -92,9 +85,9 @@ export interface TrpcContractBuilder<
   Members extends TrpcContractMembers,
 > {
   /**
-   * A read; `cache` declares whether the browser mirrors it, `invalidatedBy` its stale events,
-   * `fromProjection` the projections whose cursors answer it (never beside `invalidatedBy`),
-   * `revision` a hand-bumped number folded into its schema hash.
+   * A read; `invalidatedBy` names its stale events, `fromProjection` the projections whose
+   * cursors answer it (never beside `invalidatedBy`), `revision` a hand-bumped number folded
+   * into its schema hash.
    */
   query<Name extends string>(
     name: Name,
@@ -174,7 +167,6 @@ function contractBuilder<Namespace extends string, Members extends TrpcContractM
     withInput: (input: z.ZodType) => {
       assertUndeclared(namespace, name, members);
       const cached = {
-        ...(read.cache ? { cache: read.cache } : {}),
         ...(read.invalidatedBy ? { invalidatedBy: read.invalidatedBy } : {}),
         ...(read.fromProjection ? { fromProjection: read.fromProjection } : {}),
         ...(read.revision === void 0 ? {} : { revision: read.revision }),

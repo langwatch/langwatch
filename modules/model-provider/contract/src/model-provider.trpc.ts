@@ -47,7 +47,7 @@ export const modelProviderTrpc = defineTrpcContract("modelProvider")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(modelProviderListEntryMapTrpcSchema)
 
-  .query("getAllForProjectForFrontend", { cache: { persist: true } })
+  .query("getAllForProjectForFrontend")
   .withInput(modelProviderProjectTrpcInputSchema)
   .withOutput(modelProviderListEntryMapTrpcSchema)
 

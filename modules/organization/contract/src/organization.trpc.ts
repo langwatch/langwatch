@@ -76,13 +76,12 @@ export const organizationTrpc = defineTrpcContract("organization")
   .withOutput(organizationWriteAckSchema)
 
   /** Every organization the caller can reach, fully loaded and redacted. */
-  .query("getAll", { cache: { persist: true } })
+  .query("getAll")
   .withInput(organizationApiGetAllInputSchema)
   .withOutput(organizationFullyLoadedListSchema)
 
   /** The shell's scope skeleton, narrowed to the caller. */
   .query("getScopeGraph", {
-    cache: { persist: true },
     // Grants are appended under their organization, so they hint under their own tenant.
     invalidatedBy: [
       { event: PROJECT_CREATED_EVENT_TYPE, scope: "organizationId" },

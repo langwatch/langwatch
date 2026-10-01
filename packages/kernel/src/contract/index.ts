@@ -4,7 +4,6 @@
 
 export {
   defineTrpcContract,
-  type TrpcCachePolicy,
   type TrpcContract,
   type TrpcContractBuilder,
   type TrpcContractInputBuilder,
