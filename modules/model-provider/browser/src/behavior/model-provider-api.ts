@@ -10,9 +10,25 @@ import type {
   translateTrpc,
 } from "@langwatch/model-provider-contract";
 
+/** One organization of `organization.getScopeGraph`, narrowed to what the scope picker reads. */
+export type ModelProviderScopeGraphOrganization = {
+  id: string;
+  name: string;
+  teams: { id: string; name: string; projects: { id: string; name: string }[] }[];
+};
+
+type BorrowedProcedures = {
+  organization: {
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: ModelProviderScopeGraphOrganization[] };
+    };
+  };
+};
+
 export type ModelProviderApiMap = ContractApiMap<typeof modelProviderTrpc> &
   ContractApiMap<typeof llmModelCostTrpc> &
-  ContractApiMap<typeof translateTrpc>;
+  ContractApiMap<typeof translateTrpc> &
+  BorrowedProcedures;
 
 export const modelProviderApi = createModuleApi<ModelProviderApiMap>();
 
