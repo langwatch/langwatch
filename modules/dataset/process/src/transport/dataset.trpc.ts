@@ -71,8 +71,9 @@ export const datasetTrpcTransport: TrpcRouterDeclaration<DatasetApi, typeof data
         targetProjectId: input.projectId,
       }),
     )
+    // The upload drawer's successor to main's direct-upload, which asked for manage.
     .procedure("createFromStoredObject")
-    .withPermission("datasets:create")
+    .withPermission("datasets:manage")
     .handle(({ app, input }) => app.createDatasetFromStoredObject(input))
     .procedure("appendStoredObject")
     .withPermission("datasets:update")
