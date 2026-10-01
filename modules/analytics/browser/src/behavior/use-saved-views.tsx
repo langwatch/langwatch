@@ -37,15 +37,6 @@ import { analyticsApi } from "./analytics-api.ts";
 import { useFilterParams } from "./use-filter-params.ts";
 import { type StoredSavedView, useSavedViewList } from "./use-saved-view-list.ts";
 
-// Re-export types and constants for consumers
-export {
-  DEFAULT_VIEWS,
-  type DefaultView,
-  MAX_VIEW_NAME_LENGTH,
-  SAVED_VIEWS_SCHEMA_VERSION,
-  type SavedView,
-} from "../model/saved-views-logic.ts";
-
 // ---------------------------------------------------------------------------
 // localStorage helpers
 // ---------------------------------------------------------------------------

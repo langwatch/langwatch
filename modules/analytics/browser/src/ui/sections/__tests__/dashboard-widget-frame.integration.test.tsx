@@ -14,9 +14,9 @@ const { periodMock, executorMock, frameProps } = vi.hoisted(() => ({
   frameProps: vi.fn<(props: SandboxedChartFrameProps) => void>(),
 }));
 
-vi.mock("../../elements/period-selector.tsx", async (importOriginal) => ({
+vi.mock("../../../behavior/use-analytics-period.ts", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  usePeriodSelector: () => periodMock(),
+  useAnalyticsPeriod: () => periodMock(),
 }));
 
 vi.mock("../../../behavior/use-dashboard-widget-executor.ts", () => ({

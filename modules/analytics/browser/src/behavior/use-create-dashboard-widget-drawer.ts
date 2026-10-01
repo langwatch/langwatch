@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 import { STARTER_WIDGET_CODE, STARTER_WIDGET_QUERIES } from "../model/dashboard-widget/presets.ts";
-import { usePeriodSelector } from "../ui/elements/period-selector.tsx";
 import { analyticsApi as api } from "./analytics-api.ts";
 import { useShowErrorToast } from "./analytics-feedback.ts";
+import { useAnalyticsPeriod } from "./use-analytics-period.ts";
 import { useWidgetPreview } from "./use-widget-preview.ts";
 
 /**
@@ -37,7 +37,7 @@ export function useCreateDashboardWidgetDrawer({
   // The draft previews against the dashboard's own period, the window the
   // widget runs in once placed (as DashboardWidgetFrame reads it), so the
   // preview and the saved card agree on what the query returns.
-  const { period } = usePeriodSelector();
+  const { period } = useAnalyticsPeriod();
   const timeWindow = useMemo(
     () => ({
       start: period.startDate.epochMilliseconds,

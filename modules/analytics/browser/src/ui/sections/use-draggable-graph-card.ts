@@ -2,12 +2,12 @@ import { useMemo, useState } from "react";
 
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
 import {
   dashboardWidgetDefinitionSchema,
   type DashboardWidgetDraft,
 } from "../../model/dashboard-widget-definition.ts";
-import { usePeriodSelector } from "../elements/period-selector.tsx";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**
@@ -26,7 +26,7 @@ export function useDraggableGraphCard({
   const updateWidget = api.dashboardWidgets.update.useMutation();
   const showErrorToast = useShowErrorToast();
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const { period } = usePeriodSelector();
+  const { period } = useAnalyticsPeriod();
 
   // Epoch milliseconds, not the `Date`s themselves: two `Date`s for the same
   // instant are never `Object.is`-equal, so the executor would refetch on

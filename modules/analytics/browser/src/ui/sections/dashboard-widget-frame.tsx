@@ -9,12 +9,12 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
+import { useAnalyticsPeriod } from "../../behavior/use-analytics-period.ts";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";
 import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
 import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
-import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
 import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
@@ -43,12 +43,12 @@ export function DashboardWidgetFrame({
   widgetName,
 }: DashboardWidgetFrameProps) {
   const { colorMode } = useColorMode();
-  const { period } = usePeriodSelector();
+  const { period } = useAnalyticsPeriod();
   const refreshedAt = useDashboardRefreshedAt();
   const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
-  // Epoch milliseconds, not the `Date` objects `usePeriodSelector` hands
-  // back: two `Date`s for the same instant are never `Object.is`-equal, so a
+  // Epoch milliseconds, not the `Instant` objects `useAnalyticsPeriod` hands
+  // back: two `Instant`s for the same instant are never `Object.is`-equal, so a
   // dependency built on them would re-run the query on every render — the
   // same reasoning `LangWatchQLDashboardWidget` applies to its own run hook.
   const timeWindow = useMemo(
