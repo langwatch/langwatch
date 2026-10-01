@@ -4,7 +4,7 @@
  * document already carries, so a rename here renames an integrator's client.
  */
 
-import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
+import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { describe, expect, it, vi } from "vitest";
 

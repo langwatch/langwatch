@@ -4,7 +4,7 @@
  * binds a permission and a handler to a name declared here.
  */
 
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 import { z } from "zod";
 
 import { datasetRecordEditorReadSchema, datasetRecordHeadReadSchema } from "./dataset.responses.ts";

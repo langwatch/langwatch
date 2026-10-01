@@ -21,7 +21,6 @@
   },
   "dependencies": {
     "@langwatch/annotation-contract": "workspace:*",
-    "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/plans": "workspace:*",

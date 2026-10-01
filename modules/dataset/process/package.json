@@ -38,6 +38,7 @@
     "@aws-sdk/client-s3": "catalog:",
     "@aws-sdk/s3-request-presigner": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/aws-client": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",

@@ -3,7 +3,7 @@
  */
 
 import type { TrpcProcedureFactory, TrpcRouterMount } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import {
   batchRecordTrpc,
   DatasetNotReadyError,
