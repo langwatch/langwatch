@@ -62,7 +62,8 @@ import {
 } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ProjectApi, ProjectNotFoundError } from "@langwatch/project-contract";

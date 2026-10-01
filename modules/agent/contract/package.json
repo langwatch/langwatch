@@ -28,7 +28,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/error-presentation": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
