@@ -9,6 +9,7 @@ import type { NurturingSignal } from "@langwatch/enterprise-nurturing-contract";
 import {
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_RAN_EVENT_TYPE,
+  type EvaluationLifecycleCompletedEventData,
   evaluationLifecycleCompletedEventDataSchema,
   evaluationRanEventDataSchema,
 } from "@langwatch/evaluation-contract";
@@ -27,11 +28,15 @@ import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
 } from "@langwatch/onboarding-contract";
+import {
+  PROJECT_CREATED_EVENT_TYPE,
+  type ProjectCreatedEventData,
+  projectCreatedEventDataSchema,
+} from "@langwatch/project-contract";
 
 import type { NurturingApp } from "../app/nurturing.app.ts";
 import {
   checkoutCompletedSignal,
-  evaluationCompletedSignal,
   evaluationRanSignal,
   experimentRanSignal,
   guidedOnboardingSignal,
@@ -59,6 +64,11 @@ export type NurturingPipeline = StaticPipelineDefinition<
  */
 export function buildNurturingPipeline(deps: {
   deliver: (input: { key: string; signal: NurturingSignal }) => Promise<void>;
+  projectCreated: (data: ProjectCreatedEventData) => Promise<void>;
+  evaluationCompleted: (input: {
+    data: EvaluationLifecycleCompletedEventData;
+    aggregateId: string;
+  }) => Promise<NurturingSignal[]>;
 }): NurturingPipeline {
   return definePipeline({
     name: NURTURING_PIPELINE_NAME,
@@ -97,10 +107,16 @@ export function buildNurturingPipeline(deps: {
     .withPeerSubscriber("evaluationCompleted", {
       eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
       data: evaluationLifecycleCompletedEventDataSchema,
-      handle: (data, { aggregateId }) => {
-        const signal = evaluationCompletedSignal({ data, aggregateId });
-        return deps.deliver({ key: nurturingSignalKey(signal), signal });
+      handle: async (data, { aggregateId }) => {
+        for (const signal of await deps.evaluationCompleted({ data, aggregateId })) {
+          await deps.deliver({ key: nurturingSignalKey(signal), signal });
+        }
       },
+    })
+    .withPeerSubscriber("projectCreated", {
+      eventType: PROJECT_CREATED_EVENT_TYPE,
+      data: projectCreatedEventDataSchema,
+      handle: (data) => deps.projectCreated(data),
     })
     .withPeerSubscriber("subscriptionChanged", {
       eventType: SUBSCRIPTION_CHANGED_EVENT_TYPE,

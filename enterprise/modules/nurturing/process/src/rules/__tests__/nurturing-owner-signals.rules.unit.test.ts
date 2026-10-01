@@ -94,26 +94,62 @@ describe("evaluationRanSignal", () => {
 });
 
 describe("evaluationCompletedSignal", () => {
-  it("carries the admin, the outcome and the organization count, keyed by the evaluation", () => {
+  const data = {
+    tenantId: "project-1",
+    occurredAt: 5,
+    projectId: "project-1",
+    evaluationId: "eval-1",
+    score: 0.5,
+  };
+
+  /** @scenario "The evaluation milestone names the admin from project's created event" */
+  it("carries the admin and the count nurturing holds, keyed by the evaluation", () => {
     expect(
       evaluationCompletedSignal({
         aggregateId: "org-1",
-        data: {
-          tenantId: "project-1",
-          occurredAt: 5,
-          userId: "admin-1",
-          projectId: "project-1",
-          evaluationId: "eval-1",
-          score: 0.5,
-          organizationEvaluationCount: 3,
-        },
+        data,
+        organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 3 },
       }),
-    ).toMatchObject({
-      kind: "evaluation_completed",
-      sourceEventId: "org-1:eval-1",
-      userId: "admin-1",
-      organizationEvaluationCount: 3,
+    ).toMatchObject([
+      {
+        kind: "evaluation_completed",
+        sourceEventId: "org-1:eval-1",
+        userId: "admin-1",
+        organizationEvaluationCount: 3,
+        first: false,
+      },
+    ]);
+  });
+
+  it("is the first for an organization nurturing learned live", () => {
+    const [signal] = evaluationCompletedSignal({
+      aggregateId: "org-1",
+      data,
+      organization: { adminUserId: "admin-1", seeded: false, evaluationCount: 1 },
     });
+
+    expect(signal).toMatchObject({ first: true, organizationEvaluationCount: 1 });
+  });
+
+  /** @scenario "A seeded organization's first counted evaluation is not its first milestone" */
+  it("is never the first for an organization seeded by project's backfill", () => {
+    const [signal] = evaluationCompletedSignal({
+      aggregateId: "org-1",
+      data,
+      organization: { adminUserId: "admin-1", seeded: true, evaluationCount: 1 },
+    });
+
+    expect(signal).toMatchObject({ first: false, organizationEvaluationCount: 1 });
+  });
+
+  it("raises nothing where nurturing knows no admin", () => {
+    expect(
+      evaluationCompletedSignal({
+        aggregateId: "org-1",
+        data,
+        organization: { adminUserId: null, seeded: false, evaluationCount: 1 },
+      }),
+    ).toEqual([]);
   });
 });
 

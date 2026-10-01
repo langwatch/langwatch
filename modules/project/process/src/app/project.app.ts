@@ -1,6 +1,7 @@
 import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { type AuthzPermission } from "@langwatch/authorization";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
   DataPrivacyApi,
   type DataPrivacyPiiRedactionLevel,
@@ -188,7 +189,10 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
   }
 
   static create({ members, dependencies, repositories }: ProjectSetup): ProjectApp {
-    const lifecycle = ProjectCreatedNoticeService.create({ logger: members.logger });
+    const lifecycle = ProjectCreatedNoticeService.create({
+      logger: members.logger,
+      projects: repositories.projects,
+    });
     const projects = ProjectApplicationService.create({
       repository: repositories.projects,
       credentials: ProjectCredentialsService.create(),
@@ -237,6 +241,11 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Pro
     input: Readonly<{ projectId: string; organizationId: string }>,
   ): Promise<void> {
     return this.#lifecycle.record(input);
+  }
+
+  /** Records one organization's existing projects as created, for the backfill task. */
+  recordExistingProjectsCreated(input: Readonly<{ organizationId: string }>): Promise<number> {
+    return this.#lifecycle.recordExisting(input);
   }
 
   /** The deployment's cipher, for the stored-object credentials on the form. */

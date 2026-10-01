@@ -29,6 +29,8 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "posthog-node": "catalog:",

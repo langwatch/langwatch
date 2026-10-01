@@ -20,9 +20,6 @@
       "path": "tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
       "path": "../../data-privacy/contract/tsconfig.build.json"
     },
     {

@@ -1,33 +1,26 @@
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { EvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
 import { buildEvaluationLifecyclePipeline } from "../eventing/evaluation-lifecycle.pipeline.ts";
-import type { EvaluationRunRepository } from "../repositories/evaluation.repository.ts";
 
 const logger = createLogger("langwatch:evaluation:lifecycle");
 
-export type EvaluationLifecycleDeps = Readonly<{
-  projects: Pick<ProjectApi, "resolveOrgAdmin" | "listIdsByOrganization">;
-  runs: Pick<EvaluationRunRepository, "countOrganizationRuns">;
-}>;
-
 /**
  * Records evaluation's own lifecycle facts on its pipeline: that a person ran one by hand, and that
- * one settled, against the organization's admin and its evaluation count including this one.
+ * one settled. Nurturing names the admin and counts them from its own side (§9).
  */
 export class EvaluationLifecycleService {
   readonly pipeline: EvaluationLifecyclePipeline = buildEvaluationLifecyclePipeline();
   #commands: EventingCommands<EvaluationLifecyclePipeline> | undefined;
 
-  static create(deps: EvaluationLifecycleDeps): EvaluationLifecycleService {
-    return new EvaluationLifecycleService(deps);
+  static create(): EvaluationLifecycleService {
+    return new EvaluationLifecycleService();
   }
 
-  private constructor(private readonly deps: EvaluationLifecycleDeps) {}
+  private constructor() {}
 
   /** Binds the lifecycle pipeline's own senders. */
   connect(commands: EventingCommands<EvaluationLifecyclePipeline>): void {
@@ -58,25 +51,14 @@ export class EvaluationLifecycleService {
     occurredAt: number;
   }): Promise<void> {
     const { projectId, run } = input;
-    const { userId, organizationId } = await this.deps.projects.resolveOrgAdmin(projectId);
-    if (!userId || !organizationId) return;
-
-    const projectIds = await this.deps.projects.listIdsByOrganization({ organizationId });
-    const organizationEvaluationCount = await this.deps.runs.countOrganizationRuns({
-      tenantIds: projectIds,
-    });
-    if (organizationEvaluationCount < 1) return;
-
     await this.#senders().recordEvaluationLifecycleCompleted.send({
       tenantId: projectId,
       occurredAt: input.occurredAt,
-      userId,
       projectId,
       evaluationId: run.evaluationId,
       evaluatorType: run.evaluatorType,
       score: run.score,
       passed: run.passed,
-      organizationEvaluationCount,
     });
   }
 

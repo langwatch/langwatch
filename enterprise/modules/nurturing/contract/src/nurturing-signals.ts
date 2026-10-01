@@ -141,7 +141,10 @@ export const nurturingSignalSchema = z.discriminatedUnion("kind", [
     evaluatorType: z.string().nullish(),
     score: z.number().nullish(),
     passed: z.boolean().nullish(),
+    /** Counted by nurturing since the cutover, including this one. */
     organizationEvaluationCount: countIncludingThis,
+    /** The organization's first: never for one learned from project's backfill. */
+    first: z.boolean(),
   }),
   z.object({
     kind: z.literal("experiment_ran"),

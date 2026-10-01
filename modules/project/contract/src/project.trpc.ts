@@ -3,7 +3,7 @@
  * cache keys, so they are the wire names the screens have always called.
  * Spec: modules/project/specs/project-service.feature.
  */
-import { defineTrpcContract } from "@langwatch/api/contract";
+import { defineTrpcContract } from "@langwatch/kernel/contract";
 
 import {
   projectArchiveByIdInputSchema,

@@ -93,7 +93,10 @@ describe("given organization records a newly created personal workspace", () => 
   /** @scenario "A personal workspace project is recorded as created" */
   it("records the personal project as created on project's own pipeline", async () => {
     const heard = vi.fn(async (_data: ProjectCreatedEventData) => void 0);
-    const notice = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } });
+    const notice = ProjectCreatedNoticeService.create({
+      logger: { error: () => void 0 },
+      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+    });
     const eventing = new EventSourcing({ eventStore: EventStoreMemory.createForTesting() });
     const organization = eventing.register(organizationStandIn());
     const lifecycle = eventing.register(

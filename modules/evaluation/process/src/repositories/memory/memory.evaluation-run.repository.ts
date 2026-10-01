@@ -129,13 +129,6 @@ export class MemoryEvaluationRunRepository extends EvaluationRunRepository {
     return this.#runs.get(`${input.tenantId}\u0000${input.evaluationId}`)?.inputs ?? null;
   }
 
-  async countOrganizationRuns(input: { tenantIds: readonly string[] }): Promise<number> {
-    return [...new Set(input.tenantIds)].reduce(
-      (total, tenantId) => total + this.#tenantRuns(tenantId).length,
-      0,
-    );
-  }
-
   #tenantRuns(tenantId: string): EvaluationRunData[] {
     return [...this.#runs.entries()]
       .filter(([key]) => key.startsWith(`${tenantId}\u0000`))

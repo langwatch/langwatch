@@ -53,7 +53,10 @@ describe.skipIf(!DB_URL)(
       },
     });
     const projects = ProjectService.create({
-      created: ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
+      created: ProjectCreatedNoticeService.create({
+        logger: { error: () => void 0 },
+        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      }),
       repository: PrismaProjectRepository.create({ prisma }),
       credentials,
       organizations,

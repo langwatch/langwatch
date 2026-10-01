@@ -12,5 +12,9 @@ export const projectCreatedEventDataSchema = z.object({
   projectId: z.string().min(1),
   organizationId: z.string().min(1),
   occurredAt: z.number().int().nonnegative(),
+  /** The organization's live ADMIN member when recorded, as `resolveOrgAdmin` picks it. */
+  adminUserId: z.string().min(1).nullish(),
+  /** Set by project's backfill: the project existed before its creation was recorded. */
+  backfilled: z.boolean().optional(),
 });
 export type ProjectCreatedEventData = z.infer<typeof projectCreatedEventDataSchema>;

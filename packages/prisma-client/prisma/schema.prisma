@@ -4251,6 +4251,24 @@ model ProjectActiveDay {
   @@unique([projectId, day])
 }
 
+/// Nurturing's read model: which organization a project belongs to, from project's created event.
+model NurturingProject {
+  projectId      String @id
+  organizationId String
+
+  @@index([organizationId])
+}
+
+/// Nurturing's read model per organization: its admin and its milestone counts.
+/// `seeded` marks an organization learned from the project backfill: its first_* already happened.
+model NurturingOrganization {
+  organizationId  String   @id
+  adminUserId     String?
+  seeded          Boolean  @default(false)
+  evaluationCount Int      @default(0)
+  updatedAt       DateTime @updatedAt
+}
+
 model BillingMeterCheckpoint {
   id                   String   @id @default(cuid())
   organizationId       String

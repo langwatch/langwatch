@@ -4,7 +4,7 @@
  * nothing here constructs a transport error. Spec: modules/project/specs/project-service.feature.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/kernel/module-api";
 import {
   ProjectCreateDeniedError,

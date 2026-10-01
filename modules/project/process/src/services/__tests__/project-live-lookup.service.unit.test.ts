@@ -63,7 +63,10 @@ async function seeded() {
   );
 
   return ProjectService.create({
-    created: ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
+    created: ProjectCreatedNoticeService.create({
+      logger: { error: () => void 0 },
+      projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+    }),
     repository,
     credentials: ProjectCredentialsService.create(),
     organizations: createApiFixture<OrganizationApi>({}),

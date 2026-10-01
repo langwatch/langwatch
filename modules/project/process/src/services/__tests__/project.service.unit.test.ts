@@ -361,7 +361,10 @@ class FixedCredentials extends ProjectCredentials {
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
-  created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } }),
+  created = ProjectCreatedNoticeService.create({
+    logger: { error: () => void 0 },
+    projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+  }),
 ): ProjectService =>
   ProjectService.create({
     created,
@@ -589,7 +592,10 @@ describe("ProjectService", () => {
     /** @scenario "A new project is recorded on project's own pipeline" */
     it("records it on project_lifecycle with its ids", async () => {
       const send = vi.fn(() => Promise.resolve());
-      const created = ProjectCreatedNoticeService.create({ logger: { error: () => void 0 } });
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error: () => void 0 },
+        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      });
       created.connect({ recordProjectCreated: { send } });
 
       await createService(new StubRepository(), new StubOrganizationService(), created).create(
@@ -608,7 +614,10 @@ describe("ProjectService", () => {
     /** @scenario "A failure to record the new project does not block its creation" */
     it("still creates the project and logs the failure", async () => {
       const error = vi.fn();
-      const created = ProjectCreatedNoticeService.create({ logger: { error } });
+      const created = ProjectCreatedNoticeService.create({
+        logger: { error },
+        projects: { findWithOrgAdmin: async () => null, findIdsByOrganization: async () => [] },
+      });
       created.connect({
         recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
       });

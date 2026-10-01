@@ -5,7 +5,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-    "lib": ["es2023"],
+    "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true
   },
@@ -13,9 +13,6 @@
   "references": [
     {
       "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api/tsconfig.build.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"

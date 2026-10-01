@@ -35,6 +35,4 @@ export abstract class EvaluationRunRepository {
     input: TraceEvaluationsQuery,
   ): Promise<Record<string, TraceEvaluationData[]>>;
   abstract findInputs(input: EvaluationInputsQuery): Promise<Record<string, unknown> | null>;
-  /** Distinct evaluations across one organization's projects, in one read: they share one route. */
-  abstract countOrganizationRuns(input: { tenantIds: readonly string[] }): Promise<number>;
 }
