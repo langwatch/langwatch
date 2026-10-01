@@ -5,7 +5,7 @@
  */
 import { defineConfig, defineRecipe, defineSlotRecipe } from "@chakra-ui/react";
 
-import { colorSystem } from "../color-mode/index.tsx";
+import { colorSystem } from "../color-mode/color-system.ts";
 import { alertSlotRecipe } from "./alert.recipe.ts";
 import { drawerSlotRecipe } from "./drawer.recipe.ts";
 import { statusHairline } from "./status-hairline.ts";
@@ -145,7 +145,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         orange: {
           solid: { value: "#ED8926" },
@@ -179,7 +179,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.orange.200}",
             },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         green: {
           solid: {
@@ -215,7 +215,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.green.200}",
             },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         blue: {
           solid: {
@@ -236,7 +236,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.blue.700}", _dark: "{colors.blue.300}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         yellow: {
           solid: {
@@ -275,7 +275,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.yellow.200}",
             },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         red: {
           solid: {
@@ -296,7 +296,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.red.700}", _dark: "{colors.red.200}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         pink: {
           solid: {
@@ -317,7 +317,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.pink.700}", _dark: "{colors.pink.200}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         purple: {
           solid: {
@@ -356,7 +356,7 @@ export const designSystemConfig = defineConfig({
               _dark: "{colors.purple.200}",
             },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         teal: {
           solid: {
@@ -377,7 +377,7 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.teal.700}", _dark: "{colors.teal.200}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
         },
         cyan: {
           solid: {
@@ -398,7 +398,32 @@ export const designSystemConfig = defineConfig({
           fg: {
             value: { _light: "{colors.cyan.700}", _dark: "{colors.cyan.200}" },
           },
-          focusRing: { value: "rgb(49, 130, 206)" },
+          focusRing: { value: "{colors.blue.500}" },
+        },
+
+        // Brand orange as LangWatch's accent, apart from warning (yellow).
+        // An alias palette: `colorPalette="accent"` follows the orange group.
+        accent: {
+          solid: { value: "{colors.orange.solid}" },
+          contrast: { value: "{colors.orange.contrast}" },
+          fg: { value: "{colors.orange.fg}" },
+          muted: { value: "{colors.orange.muted}" },
+          subtle: { value: "{colors.orange.subtle}" },
+          emphasized: { value: "{colors.orange.emphasized}" },
+          hover: { value: "{colors.orange.hover}" },
+          focusRing: { value: "{colors.orange.focusRing}" },
+        },
+
+        // Data series, in the order `rotatingColors` hands out hues.
+        chart: {
+          1: { value: { _light: "{colors.orange.500}", _dark: "{colors.orange.300}" } },
+          2: { value: { _light: "{colors.blue.500}", _dark: "{colors.blue.300}" } },
+          3: { value: { _light: "{colors.green.500}", _dark: "{colors.green.300}" } },
+          4: { value: { _light: "{colors.yellow.500}", _dark: "{colors.yellow.300}" } },
+          5: { value: { _light: "{colors.purple.500}", _dark: "{colors.purple.300}" } },
+          6: { value: { _light: "{colors.teal.500}", _dark: "{colors.teal.300}" } },
+          7: { value: { _light: "{colors.cyan.500}", _dark: "{colors.cyan.300}" } },
+          8: { value: { _light: "{colors.pink.500}", _dark: "{colors.pink.300}" } },
         },
 
         // Status semantic tokens - for evaluation results, pass/fail states, etc.
@@ -494,6 +519,15 @@ export const designSystemConfig = defineConfig({
           inputHover: {
             value: { _light: "white", _dark: "{colors.zinc.800}" },
           },
+          // Status surfaces, one per meaning.
+          error: { value: { _light: "{colors.red.50}", _dark: "{colors.red.900}" } },
+          success: { value: { _light: "{colors.green.50}", _dark: "{colors.green.900}" } },
+          warning: { value: { _light: "{colors.yellow.50}", _dark: "{colors.yellow.900}" } },
+          info: { value: { _light: "{colors.blue.50}", _dark: "{colors.blue.900}" } },
+          // Dimmer behind modals, tours and overlays.
+          scrim: {
+            value: { _light: "{colors.blackAlpha.500}", _dark: "{colors.blackAlpha.700}" },
+          },
         },
 
         // Foreground semantic tokens - proper contrast in dark mode
@@ -508,6 +542,11 @@ export const designSystemConfig = defineConfig({
             value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
+          // Status text, one per meaning.
+          error: { value: { _light: "{colors.red.600}", _dark: "{colors.red.300}" } },
+          success: { value: { _light: "{colors.green.600}", _dark: "{colors.green.300}" } },
+          warning: { value: { _light: "{colors.yellow.600}", _dark: "{colors.yellow.300}" } },
+          info: { value: { _light: "{colors.blue.600}", _dark: "{colors.blue.300}" } },
         },
 
         // Border semantic tokens - visible in dark mode
@@ -524,6 +563,11 @@ export const designSystemConfig = defineConfig({
           emphasized: {
             value: { _light: "{colors.gray.300}", _dark: "{colors.zinc.500}" },
           },
+          // Status borders, one per meaning.
+          error: { value: { _light: "{colors.red.300}", _dark: "{colors.red.700}" } },
+          success: { value: { _light: "{colors.green.300}", _dark: "{colors.green.700}" } },
+          warning: { value: { _light: "{colors.yellow.300}", _dark: "{colors.yellow.700}" } },
+          info: { value: { _light: "{colors.blue.300}", _dark: "{colors.blue.700}" } },
         },
       },
     },

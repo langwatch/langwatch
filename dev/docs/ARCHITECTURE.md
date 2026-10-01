@@ -87,8 +87,16 @@ imported the rest of the way down, never from the top.
 - **`@langwatch/browser-trpc`** — the browser's wire: the derived tRPC
   client, batching, the SSE subscription link. All of it is tRPC-derived;
   the browser calls no REST.
-- **`@langwatch/design-system`** — components (Chakra v3 underneath; nothing
-  imports Chakra directly).
+- **`@langwatch/design-system`** — components (Chakra v3 underneath). Only this package imports
+  `@chakra-ui/*` or `@emotion/*` (Alex, 2026-10-01): kits, feature browsers, apps and tests import
+  `@langwatch/design-system/<subpath>`; `./primitives` re-exports Chakra's primitives and raw parts
+  unchanged until real components replace them, wrapped parts come from their wrapper subpath, and
+  tests mount `renderWithDesignSystem`. ADR-001 amended; enforced by `no-direct-chakra` (wave 4).
+  **Colour is made only here** (Alex, 2026-10-01): elsewhere code names semantic tokens (`fg.*`,
+  `bg.*`, `border.*`, `fg|bg|border.<status>`, `<palette>.<role>`, `chart.N`, `accent.*`,
+  `bg.scrim`), never a scale step, hex, `rgb()` or bare white/black. A library that needs a string
+  takes Chakra's `useToken` / `system.token.var` (a variable that follows the mode) or
+  `getRawColorValue` / `useColorRawValue` (a literal for the current mode). Enforced by `no-raw-color`.
 - Support packages: `handled-error` (the error contract), `secrets`
   (ADR-132), `config` (generic config machinery), `observability` (logger +
   OTel), `test-harness` (fixtures and doubles), `installed-modules`

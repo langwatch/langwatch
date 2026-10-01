@@ -7,142 +7,10 @@ import type { ThemeProviderProps } from "next-themes";
 import { ThemeProvider, useTheme } from "next-themes";
 import * as React from "react";
 
-export const colorSystem = {
-  gray: {
-    950: { value: "#09090b" },
-    900: { value: "#111113" },
-    800: { value: "#1a1a2e" },
-    700: { value: "#2d2d3d" },
-    600: { value: "#3d3d4d" },
-    500: { value: "#5c5c6e" },
-    450: { value: "#7B8394" },
-    400: { value: "#9CA3AF" },
-    300: { value: "#cbd5e1" },
-    200: { value: "#e2e8f0" },
-    150: { value: "#e7ecf2" },
-    100: { value: "#f1f5f9" },
-    50: { value: "#f8fafc" },
-  },
-  // Used on _dark sides only; near-neutral with the smallest indigo tint.
-  zinc: {
-    500: { value: "#565664" },
-    600: { value: "#3a3a44" },
-    700: { value: "#282832" },
-    750: { value: "#20202a" },
-    800: { value: "#1a1a24" },
-    850: { value: "#15151e" },
-    900: { value: "#10101a" },
-    950: { value: "#080812" },
-  },
-  red: {
-    50: { value: "#FFF5F5" },
-    100: { value: "#FED7D7" },
-    200: { value: "#FEB2B2" },
-    300: { value: "#FC8181" },
-    400: { value: "#F56565" },
-    500: { value: "#E53E3E" },
-    600: { value: "#C53030" },
-    700: { value: "#9B2C2C" },
-    800: { value: "#822727" },
-    900: { value: "#63171B" },
-  },
-  orange: {
-    50: { value: "#FFFAF0" },
-    100: { value: "#FFF3E4" },
-    200: { value: "#FFD19B" },
-    300: { value: "#FF9E2C" },
-    400: { value: "#ED8926" },
-    500: { value: "#ED8926" },
-    600: { value: "#dd6b20" },
-    700: { value: "#c05621" },
-    800: { value: "#7B341E" },
-    900: { value: "#652B19" },
-  },
-  yellow: {
-    50: { value: "#FFFFF0" },
-    100: { value: "#FEFCBF" },
-    200: { value: "#FAF089" },
-    300: { value: "#F6E05E" },
-    400: { value: "#ECC94B" },
-    500: { value: "#D69E2E" },
-    600: { value: "#B7791F" },
-    700: { value: "#975A16" },
-    800: { value: "#744210" },
-    900: { value: "#5F370E" },
-  },
-  green: {
-    50: { value: "#F0FFF4" },
-    100: { value: "#C6F6D5" },
-    200: { value: "#9AE6B4" },
-    300: { value: "#68D391" },
-    400: { value: "#48BB78" },
-    500: { value: "#38A169" },
-    600: { value: "#2F855A" },
-    700: { value: "#276749" },
-    800: { value: "#22543D" },
-    900: { value: "#1C4532" },
-  },
-  teal: {
-    50: { value: "#E6FFFA" },
-    100: { value: "#B2F5EA" },
-    200: { value: "#81E6D9" },
-    300: { value: "#4FD1C5" },
-    400: { value: "#38B2AC" },
-    500: { value: "#319795" },
-    600: { value: "#2C7A7B" },
-    700: { value: "#285E61" },
-    800: { value: "#234E52" },
-    900: { value: "#1D4044" },
-  },
-  blue: {
-    50: { value: "#ebf8ff" },
-    100: { value: "#bee3f8" },
-    200: { value: "#90cdf4" },
-    300: { value: "#63b3ed" },
-    400: { value: "#4299e1" },
-    500: { value: "#3182ce" },
-    600: { value: "#2b6cb0" },
-    700: { value: "#2c5282" },
-    800: { value: "#2a4365" },
-    900: { value: "#1A365D" },
-  },
-  cyan: {
-    50: { value: "#EDFDFD" },
-    100: { value: "#C4F1F9" },
-    200: { value: "#9DECF9" },
-    300: { value: "#76E4F7" },
-    400: { value: "#0BC5EA" },
-    500: { value: "#00B5D8" },
-    600: { value: "#00A3C4" },
-    700: { value: "#0987A0" },
-    800: { value: "#086F83" },
-    900: { value: "#065666" },
-  },
-  purple: {
-    50: { value: "#FAF5FF" },
-    100: { value: "#E9D8FD" },
-    200: { value: "#D6BCFA" },
-    300: { value: "#B794F4" },
-    400: { value: "#9F7AEA" },
-    500: { value: "#805AD5" },
-    600: { value: "#6B46C1" },
-    700: { value: "#553C9A" },
-    800: { value: "#44337A" },
-    900: { value: "#322659" },
-  },
-  pink: {
-    50: { value: "#FFF5F7" },
-    100: { value: "#FED7E2" },
-    200: { value: "#FBB6CE" },
-    300: { value: "#F687B3" },
-    400: { value: "#ED64A6" },
-    500: { value: "#D53F8C" },
-    600: { value: "#B83280" },
-    700: { value: "#97266D" },
-    800: { value: "#702459" },
-    900: { value: "#521B41" },
-  },
-};
+import { system } from "../system/create-system.ts";
+import { colorSystem } from "./color-system.ts";
+
+export { colorSystem };
 
 export type ColorModeProviderProps = ThemeProviderProps;
 
@@ -204,44 +72,70 @@ export function useColorMode(): UseColorModeReturn {
   };
 }
 
-// Mapping for semantic token names to numeric color values
-// Used to resolve tokens like "blue.fg" to actual hex colors
-const semanticToNumeric: Record<string, number> = {
-  fg: 600,
-  solid: 500,
-  subtle: 100,
-  muted: 200,
-  emphasized: 300,
-  contrast: 900,
-  hover: 600,
-};
+const VAR_REFERENCE = /var\((--[\w-]+)\)/g;
+const MAX_VAR_DEPTH = 8;
 
+/** Expands every `var(--x)` in `value` through `read`, until only literals remain. */
+export function expandCssVars({
+  value,
+  read,
+  depth = 0,
+}: {
+  value: string;
+  read: (name: string) => string;
+  depth?: number;
+}): string {
+  if (depth > MAX_VAR_DEPTH) {
+    throw new Error(`Colour variable chain deeper than ${MAX_VAR_DEPTH}: ${value}`);
+  }
+  return value.replace(VAR_REFERENCE, (_match: string, name: string) => {
+    const next = read(name).trim();
+    if (!next) {
+      throw new Error(`Colour variable ${name} is not defined`);
+    }
+    return expandCssVars({ value: next, read, depth: depth + 1 });
+  });
+}
+
+function scaleValue(color: string): string | undefined {
+  const [hueName, step] = color.split(".");
+  const hue = Object.entries(colorSystem).find(([name]) => name === hueName)?.[1];
+  return Object.entries(hue ?? {}).find(([key]) => key === step)?.[1].value;
+}
+
+/**
+ * The literal colour for a token in the current colour mode: a scale step
+ * (`gray.400`) straight from the palette, any other token (`blue.fg`,
+ * `fg.muted`, `chart.3`) read from the stylesheet Chakra emits. Throws when
+ * the token does not exist; it never guesses a colour.
+ */
 export function getRawColorValue(color: string): string {
   if (color === "white") {
     return "white";
   }
-
-  const [colorName, numberOrToken] = color.split(".");
-
-  if (!colorName || !numberOrToken) {
-    return "pink";
+  const scaled = scaleValue(color);
+  if (scaled) {
+    return scaled;
   }
-
-  // Try parsing as number first, then check semantic token mapping
-  let numericValue = parseInt(numberOrToken, 10);
-  if (isNaN(numericValue)) {
-    numericValue = semanticToNumeric[numberOrToken] ?? 500;
+  const reference = system.token.var(`colors.${color}`);
+  const name = /^var\((--[\w-]+)\)$/.exec(reference)?.[1];
+  if (!name || typeof document === "undefined") {
+    throw new Error(`"${color}" is not a colour token, or there is no document to read it from`);
   }
-
-  return (
-    colorSystem[colorName as keyof typeof colorSystem]?.[
-      numericValue as keyof (typeof colorSystem)[keyof typeof colorSystem]
-    ]?.value ?? "pink"
-  );
+  // Semantic tokens are declared on descendants of <html>, so read from <body>.
+  const style = getComputedStyle(document.body);
+  return expandCssVars({ value: `var(${name})`, read: (variable) => style.getPropertyValue(variable) });
 }
 
-export function useColorRawValue(variable: string): string {
-  return getRawColorValue(variable);
+function subscribeToColorMode(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+
+/** `getRawColorValue`, re-read when the colour mode flips. */
+export function useColorRawValue(color: string): string {
+  return React.useSyncExternalStore(subscribeToColorMode, () => getRawColorValue(color));
 }
 
 export function useColorModeValue<T = Tokens["colors"]>(light: T, dark: T) {
