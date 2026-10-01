@@ -105,8 +105,11 @@ export function startOtlpMetricsExport(
 
   return {
     name: "metrics",
+    // Shutdown, not just flush: the provider's export timer, its host metrics and every
+    // gauge callback stop with it, and the global slot frees for a successor (ADR-168).
     shutdown: async () => {
-      await meterProvider.forceFlush();
+      await meterProvider.shutdown();
+      metrics.disable();
     },
   };
 }

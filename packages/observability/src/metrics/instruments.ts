@@ -28,8 +28,11 @@ export const METRICS_SCOPE_NAME = "langwatch";
 let generation = 0;
 let meter: { value: Meter; generation: number } | undefined;
 
-/** Observable gauges declared before a provider existed, awaiting activation. */
-const pendingObservations: (() => void)[] = [];
+/**
+ * Observable gauges declared at module scope, before any provider: installed on every
+ * provider activated after, since a callback dies with the provider it was added to.
+ */
+const moduleScopeObservations: (() => void)[] = [];
 let activated = false;
 
 function currentMeter(): Meter {
@@ -46,8 +49,7 @@ function currentMeter(): Meter {
 export function activateMetrics(): void {
   generation += 1;
   activated = true;
-  const pending = pendingObservations.splice(0, pendingObservations.length);
-  for (const install of pending) install();
+  for (const install of moduleScopeObservations) install();
 }
 
 /**
@@ -59,7 +61,7 @@ export function resetMetricsForTests(): void {
   generation += 1;
   meter = void 0;
   activated = false;
-  pendingObservations.length = 0;
+  moduleScopeObservations.length = 0;
 }
 
 /** What every instrument declaration carries. */
@@ -177,8 +179,8 @@ export function observableGauge(
   };
 
   // Before activation there is no provider, so registering now would attach
-  // the callback to a no-op meter that is never collected — the pull-based
-  // equivalent of the stale-meter trap this facade exists to avoid.
+  // the callback to a no-op meter that is never collected. After it, the gauge
+  // belongs to the booted graph and goes when its provider shuts down.
   if (activated) install();
-  else pendingObservations.push(install);
+  else moduleScopeObservations.push(install);
 }

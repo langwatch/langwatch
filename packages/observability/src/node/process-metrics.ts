@@ -88,7 +88,13 @@ function scrapeDoor({
   new HostMetrics({ meterProvider, name: serviceName }).start();
 
   return [
-    { name: "process metrics", stop: () => meterProvider.shutdown() },
+    {
+      name: "process metrics",
+      stop: async () => {
+        await meterProvider.shutdown();
+        metrics.disable();
+      },
+    },
     prometheusMetrics({
       ...(token === undefined ? {} : { token }),
       readMetrics: () => reader.read(),
