@@ -23,6 +23,7 @@ import {
   AuthzScopeNotFoundError,
   type AuthzScopeRef,
   PLATFORM_OPERATOR_PERMISSIONS,
+  newAuthzGrantId,
 } from "@langwatch/authz-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { type MembersRead } from "@langwatch/process-stores/members";
@@ -31,7 +32,6 @@ import type { SystemMigration } from "@langwatch/system-migrations";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
-import { AuthzGrantIdService } from "../services/authz-grant-id.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import { AuthzCommandDispatcherService } from "../services/authz-grants-command-dispatcher.service.ts";
 import type { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
@@ -160,13 +160,12 @@ export class AuthzModule implements AuthzApi {
    */
   static create(setup: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
-    const bindingIds = AuthzGrantIdService.create();
     const config = authzRuntimeConfig(setup.config);
     const built = PostgresAuthzAdapter.create({
       database: setup.members.prisma,
       redis: setup.members.redis,
       dispatcher,
-      newBindingId: () => bindingIds.newBindingId(),
+      newBindingId: newAuthzGrantId,
       repositories: setup.repositories,
       cacheEnabled: config.cacheEnabled,
       demoProjectId: config.demoProjectId,

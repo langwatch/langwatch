@@ -14,7 +14,6 @@ export {
   CLI_LOGIN_KEY_REAP_PROCESS_NAME,
 } from "./eventing/cli-login-key-reap.process.ts";
 export type { CliLoginKeyReapDeps } from "./eventing/cli-login-key-reap.intent.ts";
-export type { AuthzBindingIdDeriver } from "./services/legacy-api-key-grant.service.ts";
 export type {
   ApiKeySetup,
   ApiKeyCaller,

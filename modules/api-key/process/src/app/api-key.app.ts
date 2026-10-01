@@ -35,7 +35,7 @@ import {
   type CliSessionKeyRevocation,
 } from "@langwatch/api-key-contract";
 import { PermissionDeniedError } from "@langwatch/authorization";
-import { AuthzApi } from "@langwatch/authz-contract";
+import { AuthzApi, newAuthzGrantId } from "@langwatch/authz-contract";
 import { ConfigParseError } from "@langwatch/config";
 import { createLogger } from "@langwatch/observability";
 import { OrganizationApi } from "@langwatch/organization-contract";
@@ -49,7 +49,6 @@ import {
   RedisApiKeyAnswerCacheRepository,
   type ApiKeyAnswerCacheRedis,
 } from "../repositories/redis/redis.api-key-answer-cache.repository.ts";
-import { ApiKeyGrantIdService } from "../services/api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../services/api-key-token.service.ts";
 import { ApiKeyService } from "../services/api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../services/legacy-api-key-grant.service.ts";
@@ -164,7 +163,7 @@ export class ApiKeyModule implements ApiKeyApi {
       grants: authorization,
       organizations: setup.dependencies.organizations,
       projects: setup.dependencies.projects,
-      bindingIds: ApiKeyGrantIdService.create(),
+      bindingIds: { generateBindingId: newAuthzGrantId },
       legacyGrants: LegacyApiKeyGrantService.create({
         authz: authorization,
         grants: authorization,

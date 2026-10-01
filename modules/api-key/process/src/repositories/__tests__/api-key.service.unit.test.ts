@@ -16,9 +16,12 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ApiKeyGrantId } from "../../services/api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../../services/api-key-token.service.ts";
-import { ApiKeyService, type ApiKeyDependencies } from "../../services/api-key.service.ts";
+import {
+  ApiKeyService,
+  type ApiKeyDependencies,
+  type ApiKeyGrantId,
+} from "../../services/api-key.service.ts";
 import {
   ApiKeyRepository,
   type ApiKeyCreateRecord,

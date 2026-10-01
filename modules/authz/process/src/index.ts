@@ -12,7 +12,6 @@ export {
   AuthzCommandDispatcherService,
   type AuthzGrantsCommandSenders,
 } from "./services/authz-grants-command-dispatcher.service.ts";
-export { AuthzGrantIdService } from "./services/authz-grant-id.service.ts";
 export type { PostgresAuthzDatabase } from "./app/authz-composition.build.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
 export { authzProcessModule, type AuthzInfrastructure } from "./authz.module.ts";

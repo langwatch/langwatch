@@ -16,12 +16,11 @@ import type { ApiKeyRepository } from "../../repositories/api-key.repository.ts"
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
-import type { ApiKeyGrantId } from "../api-key-grant-id.service.ts";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "../api-key-token-resolution.service.ts";
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
-import type { ApiKeyDependencies } from "../api-key.service.ts";
+import type { ApiKeyDependencies, ApiKeyGrantId } from "../api-key.service.ts";
 
 const START = Temporal.Instant.from("2026-10-01T09:00:00.000Z");
 

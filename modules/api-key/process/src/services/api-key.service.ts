@@ -33,13 +33,17 @@ import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyCatalogService } from "./api-key-catalog.service.ts";
 import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
-import type { ApiKeyGrantId } from "./api-key-grant-id.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import type { ApiKeyTokenService } from "./api-key-token.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
 import type { LegacyApiKeyGrantService } from "./legacy-api-key-grant.service.ts";
+
+/** Mints the AuthZ binding id an API-key grant is written under. */
+export interface ApiKeyGrantId {
+  generateBindingId(): string;
+}
 
 export type ApiKeyDependencies = {
   authz: AuthzApi;

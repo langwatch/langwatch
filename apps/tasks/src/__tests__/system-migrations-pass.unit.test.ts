@@ -51,7 +51,6 @@ vi.mock("@langwatch/authz-process", () => ({
     create: () => ({ connect: dependencies.connectDispatcher }),
     sendersFrom: (commands: unknown) => commands,
   },
-  AuthzGrantIdService: { create: () => ({ newBindingId: () => "binding" }) },
   PostgresAuthzAdapter: {
     create: () => ({ build: () => ({ pipeline: "authz", migration: "authz-migration" }) }),
   },

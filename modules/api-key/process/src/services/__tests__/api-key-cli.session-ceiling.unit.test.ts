@@ -1,4 +1,4 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { newAuthzGrantId, type AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createTestLogger } from "@langwatch/test-harness";
@@ -10,7 +10,6 @@ import type { ApiKeyRow } from "../../repositories/api-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
-import { ApiKeyGrantIdService } from "../api-key-grant-id.service.ts";
 import { ApiKeyTokenService } from "../api-key-token.service.ts";
 import { ApiKeyService } from "../api-key.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
@@ -71,7 +70,7 @@ function setup(rows: ApiKeyRow[], options: { childrenUnreadable?: boolean } = {}
     grants,
     organizations: createApiFixture<OrganizationApi>({}),
     projects: createApiFixture<ProjectApi>({}),
-    bindingIds: ApiKeyGrantIdService.create(),
+    bindingIds: { generateBindingId: newAuthzGrantId },
     legacyGrants: LegacyApiKeyGrantService.create({
       authz,
       grants,
