@@ -78,7 +78,7 @@ flows:
           testId: automation-action-view
       - action: expect
         with:
-          url: viewAutomation
+          text: What happens next
       - action: expect
         with:
           api: /api/triggers/{triggerId}

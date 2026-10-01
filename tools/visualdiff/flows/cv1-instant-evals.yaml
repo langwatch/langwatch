@@ -132,7 +132,22 @@ flows:
         with:
           api: /api/v1/instant-evals/{runId}/results
           field: judgments
-          equals: "2"
+          min: "2"
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          contains: '"questionId":"failed"'
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments
+          contains: '"questionId":"polite"'
+      - action: expect
+        with:
+          api: /api/v1/instant-evals/{runId}/results
+          field: judgments.2
+          equals: "undefined"
 
   - id: cv1-instant-eval-no-matching-trace-finishes-empty
     title: A run whose filter matches no trace finishes with nothing judged
@@ -169,4 +184,4 @@ flows:
         with:
           api: /api/v1/instant-evals/{runId}/results
           field: judgments
-          equals: "0"
+          equals: "[]"

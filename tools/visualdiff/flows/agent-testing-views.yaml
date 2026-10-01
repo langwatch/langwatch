@@ -234,6 +234,13 @@ flows:
         with:
           selector: '[data-testid^="run-dialog-agent-"]'
           text: "{agentName}"
+      - action: click
+        with:
+          text: Run multiple times
+      - action: fill
+        with:
+          label: Repeat count
+          value: "2"
       - action: fill
         with:
           testId: run-dialog-name

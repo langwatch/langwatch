@@ -28,7 +28,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Webhook/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-webhook
       - action: fill
         with:
           field: "https://example.com/hooks/langwatch"
@@ -36,6 +39,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -82,7 +88,10 @@ flows:
           timeout: "20000"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -93,6 +102,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -116,6 +128,7 @@ flows:
       - action: go
         with:
           path: /{slug}/traces
+      - action: dismissTour
       - action: expect
         with:
           count: tbody[data-trace-id]
@@ -142,7 +155,10 @@ flows:
           value: "vd-fromtraces-{uid}"
       - action: click
         with:
-          text: /^\s*Email/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-email
       - action: fill
         with:
           field: "alerts@partner.com"
@@ -153,6 +169,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -205,7 +224,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Add to dataset/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-add-to-dataset
       - action: click
         with:
           text: Select Dataset
@@ -215,6 +237,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -257,7 +282,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Add to annotation queue/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-add-to-annotation-queue
       - action: click
         with:
           text: Add Participants
@@ -270,6 +298,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
@@ -308,7 +339,10 @@ flows:
           text: "status:error"
       - action: click
         with:
-          text: /^\s*Slack/
+          text: /^\s*Continue\s*$/
+      - action: click
+        with:
+          testId: automation-delivery-send-slack-message
       - action: fill
         with:
           field: "xoxb-"
@@ -324,6 +358,9 @@ flows:
       - action: click
         with:
           text: /^\s*Done\s*$/
+      - action: click
+        with:
+          text: /^\s*Continue\s*$/
       - action: click
         with:
           text: /^\s*Create automation\s*$/
