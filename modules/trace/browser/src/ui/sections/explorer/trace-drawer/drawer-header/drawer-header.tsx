@@ -1359,7 +1359,14 @@ function HeaderMetricsRow({
         <Chip key={c.id} {...c} />
       ))}
       {chipsOverflow}
-      {isPlaceholder && <Skeleton height="22px" width="120px" borderRadius="md" />}
+      {isPlaceholder && (
+        <Skeleton
+          data-testid="trace-header-metric-skeleton"
+          height="22px"
+          width="120px"
+          borderRadius="md"
+        />
+      )}
     </HStack>
   );
 }

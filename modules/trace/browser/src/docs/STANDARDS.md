@@ -122,9 +122,7 @@ features/traces-v2/
 │   │   └── useTraceFacets.test.ts
 │   └── index.ts
 ├── stores/
-│   ├── explorer.store.ts   (query/view/selection/rows slices, in browser-kit)
-│   ├── drawerStore.ts
-│   ├── uiStore.ts
+│   ├── explorer.store.ts   (client state in the one global UI store)
 │   ├── __tests__/
 │   │   ├── query.slice.test.ts
 │   │   └── view.slice.test.ts
@@ -340,21 +338,8 @@ interface ViewState {
 ```
 
 ```tsx
-// stores/drawerStore.ts
-interface DrawerState {
-  isOpen: boolean;
-  traceId: string | null;
-  activeTab: DrawerTab;
-  selectedSpanId: string | null;
-  open: (traceId: string) => void;
-  close: () => void;
-  setTab: (tab: DrawerTab) => void;
-  selectSpan: (spanId: string | null) => void;
-}
-```
-
-```tsx
-// stores/uiStore.ts
+// Client state is kept in the one global UI store. Drawer open state and params
+// are URL state (`drawer.open`, `drawer.<key>`); nested drawers use history.state.
 type Density = "compact" | "comfortable";
 
 interface UiState {
@@ -617,7 +602,7 @@ Feature: Trace Table
   Scenario: Click row opens drawer
     Given the table has rendered with traces
     When the user clicks trace row "trace-123"
-    Then drawerStore.open is called with "trace-123"
+    Then the URL opens the drawer with `drawer.open` and its trace parameter
 
   @unit
   Scenario: Density affects row sizing
@@ -647,7 +632,7 @@ Feature: Trace Table
 
 - One scenario per behavior. Not one scenario per user story.
 - Given = state setup. When = user action or data change. Then = observable result.
-- Reference specific store methods and hook names (e.g., `drawerStore.open`, `useTraceList`).
+- Reference observable behaviour and hook names (e.g., URL drawer state, `useTraceList`).
 - Include data contracts: "useTraceList returns 25 traces" not just "there are traces."
 - Include density scenarios for every density-aware component.
 
