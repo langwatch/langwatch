@@ -33,6 +33,16 @@ vi.mock("@langwatch/browser-host/use-drawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn(), closeDrawer: vi.fn(), goBack: vi.fn() }),
 }));
 
+// The manual-integration panel mints a token through the api-key client's own tRPC.
+vi.mock("@langwatch/api-key-client", () => ({
+  useMintPersonalToken: () => ({
+    token: void 0,
+    isMinting: false,
+    scopeNote: "",
+    mint: async () => void 0,
+  }),
+}));
+
 vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({
     pathname: "/[project]/evaluations/[id]/edit",
