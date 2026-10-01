@@ -24,10 +24,22 @@ import {
 import { findUnkeyedFilterFields } from "./trigger-filter-shape";
 import type { FilterField } from "./types";
 
-/** A filter-string equivalent worth pointing at, for the fields that have one. */
-const FILTER_STRING_HINTS: Partial<Record<FilterField, string>> = {
-  "evaluations.passed": 'filter: "evaluatorVerdict:fail"',
-};
+/**
+ * The filter-string equivalent of what was sent, when there is one. A flat
+ * `evaluations.passed` list is a verdict across every evaluator, which
+ * `evaluatorVerdict` expresses — but only when every value asks for the same
+ * verdict, so the hint never points at the opposite one.
+ */
+function filterStringHint(field: string, value: unknown): string | undefined {
+  if (field !== "evaluations.passed" || !Array.isArray(value)) return undefined;
+  if (value.every((verdict) => verdict === "false")) {
+    return 'filter: "evaluatorVerdict:fail"';
+  }
+  if (value.every((verdict) => verdict === "true")) {
+    return 'filter: "evaluatorVerdict:pass"';
+  }
+  return undefined;
+}
 
 /**
  * Refuses a trace search whose keyed filter fields arrive shallower than their
@@ -77,14 +89,15 @@ function unkeyedFilterViolations({
   if (!filters) return [];
 
   return findUnkeyedFilterFields(filters).map(({ field, example }) => {
+    const received = filters[field as FilterField];
     const hint = offersFilterString
-      ? FILTER_STRING_HINTS[field as FilterField]
+      ? filterStringHint(field, received)
       : undefined;
     return {
       field: `filters.${field}`,
       type: "filter_key_required",
       message: `"${field}" needs its key, as in ${example}. Without the key it matches no trace.${hint ? ` The filter string is simpler: ${hint}.` : ""}`,
-      received: filters[field as FilterField],
+      received,
     };
   });
 }

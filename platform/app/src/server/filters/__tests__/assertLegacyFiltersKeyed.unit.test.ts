@@ -8,6 +8,18 @@ import {
   legacyFiltersKeyedRefusal,
 } from "../assertLegacyFiltersKeyed";
 
+function refusalMessage(filters: Record<string, unknown>): string {
+  try {
+    assertLegacyFiltersKeyed({ filters, offersFilterString: true });
+  } catch (error) {
+    const reason = (error as RequestValidationError).reasons[0] as
+      | SchemaFailure
+      | undefined;
+    return String(reason?.meta?.message);
+  }
+  throw new Error("expected the filters to be refused");
+}
+
 describe("assertLegacyFiltersKeyed()", () => {
   describe("when a keyed filter carries its key", () => {
     it("accepts it", () => {
@@ -52,6 +64,23 @@ describe("assertLegacyFiltersKeyed()", () => {
       expect(message).toContain(
         '{"evaluations.passed":{"<monitorId>":["false"]}}',
       );
+    });
+  });
+
+  describe("when a flat verdict list asks for passes", () => {
+    it("points at the pass verdict, not the fail one", () => {
+      const message = refusalMessage({ "evaluations.passed": ["true"] });
+      expect(message).toContain("evaluatorVerdict:pass");
+      expect(message).not.toContain("evaluatorVerdict:fail");
+    });
+  });
+
+  describe("when a flat verdict list mixes verdicts", () => {
+    it("offers no filter string, since none matches what was sent", () => {
+      const message = refusalMessage({
+        "evaluations.passed": ["true", "false"],
+      });
+      expect(message).not.toContain("evaluatorVerdict");
     });
   });
 
