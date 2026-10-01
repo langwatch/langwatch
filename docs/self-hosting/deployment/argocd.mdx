@@ -40,7 +40,7 @@ spec:
   source:
     repoURL: https://langwatch.github.io/langwatch
     chart: langwatch
-    targetRevision: 3.19.3 # x-release-please-version
+    targetRevision: 3.19.4 # x-release-please-version
     helm:
       releaseName: langwatch
       values: |
@@ -89,7 +89,7 @@ spec:
   sources:
     - repoURL: https://langwatch.github.io/langwatch
       chart: langwatch
-      targetRevision: 3.19.3 # x-release-please-version
+      targetRevision: 3.19.4 # x-release-please-version
       helm:
         releaseName: langwatch
         valueFiles:
@@ -106,6 +106,7 @@ Topic-specific configuration pages:
 - [Sizing and scaling](/self-hosting/configuration/sizing-and-scaling) for replica counts, CPU/memory, and the size overlays the chart ships
 - [Environment variables](/self-hosting/configuration/environment-variables) for the full list of app/worker/gateway env vars
 - [SSO](/self-hosting/configuration/sso) for OIDC and SAML connections
+- [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for `app.license.key`, which takes an activation code (needs outbound access to `connect.langwatch.ai`) or a signed license key (works offline)
 - [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and PostgreSQL backups
 - [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm) for per-environment gateway tuning if you enable the gateway sub-chart
 

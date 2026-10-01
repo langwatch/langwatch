@@ -1,3 +1,23 @@
+{{- /*
+  The AI Gateway is published from this Ingress's settings (ingress.gateway),
+  not from a gateway Ingress of its own. The retired gateway.ingress block, or
+  a gateway host with no Ingress to carry it, would otherwise render nothing
+  without a word, so both are refused. `gateway.ingress.enabled: false` on its
+  own asks for nothing and is accepted.
+*/ -}}
+{{- $gwOld := (.Values.gateway | default dict).ingress }}
+{{- if and $gwOld (kindIs "map" $gwOld) (or $gwOld.enabled (omit $gwOld "enabled")) }}
+  {{- fail "gateway.ingress.* is no longer supported: the gateway chart renders no Ingress. Publish the gateway on the app Ingress with ingress.gateway.host (and ingress.gateway.tls.secretName); it uses ingress.className and ingress.annotations, and the chart adds the nginx streaming settings when className is nginx. Remove the gateway.ingress block. See https://docs.langwatch.ai/self-hosting/deployment/routing" }}
+{{- end }}
+{{- $gwRoute := (.Values.ingress | default dict).gateway | default dict }}
+{{- if $gwRoute.host }}
+  {{- if not .Values.ingress.enabled }}
+    {{- fail (printf "ingress.gateway.host is %q but ingress.enabled is not true, so no Ingress would carry it. Set ingress.enabled=true, or clear ingress.gateway.host if you route to the gateway another way." (toString $gwRoute.host)) }}
+  {{- end }}
+  {{- if not (.Values.gateway | default dict).chartManaged }}
+    {{- fail "ingress.gateway.host is set but gateway.chartManaged is false, so there is no gateway Service in this release to route to. Clear ingress.gateway.host, or set gateway.chartManaged=true." }}
+  {{- end }}
+{{- end }}
 {{- if .Values.ingress.enabled }}
 {{- $blockedPaths := include "langwatch.ingress.blockedPaths" . | fromJsonArray }}
 {{- /*
@@ -112,4 +132,70 @@ spec:
               {{- end }}
           {{- end }}
     {{- end }}
+{{- end }}
+
+{{- if and .Values.ingress.enabled $gwRoute.host }}
+{{- /*
+  A separate Ingress for the gateway host: controllers such as ingress-nginx
+  apply annotations per Ingress object, and the gateway needs streaming
+  settings the app routes do not. Everything else comes from the app Ingress
+  settings. Precedence: ingress.annotations, then the nginx streaming
+  defaults (className nginx only), then ingress.gateway.annotations. Path
+  rewrites written for the app routes are left out: the gateway paths have no
+  capture groups, so an inherited rewrite-target would send /v1/... to /.
+*/}}
+{{- $gwAnnotations := omit (deepCopy (.Values.ingress.annotations | default dict)) "nginx.ingress.kubernetes.io/rewrite-target" "nginx.ingress.kubernetes.io/use-regex" "nginx.ingress.kubernetes.io/app-root" }}
+{{- if eq (toString .Values.ingress.className) "nginx" }}
+{{- $gwAnnotations = mergeOverwrite $gwAnnotations (dict
+      "nginx.ingress.kubernetes.io/proxy-buffering" "off"
+      "nginx.ingress.kubernetes.io/proxy-request-buffering" "off"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" "3600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" "3600"
+      "nginx.ingress.kubernetes.io/proxy-body-size" "32m") }}
+{{- end }}
+{{- $gwAnnotations = mergeOverwrite $gwAnnotations (deepCopy ($gwRoute.annotations | default dict)) }}
+{{- $gwPort := ((.Values.gateway.service | default dict).port) | default 80 }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-gateway-ingress
+  {{- if .Values.ingress.labels }}
+  labels:
+    {{- .Values.ingress.labels | toYaml | nindent 4 }}
+  {{- end }}
+  {{- with $gwAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with ($gwRoute.tls | default dict).secretName }}
+  tls:
+    - secretName: {{ . }}
+      hosts:
+        - {{ $gwRoute.host | quote }}
+  {{- end }}
+  rules:
+    - host: {{ $gwRoute.host | quote }}
+      http:
+        paths:
+          {{- /* Only the client API and the status endpoint. The probes,
+                 /metrics, /debug and /internal stay in-cluster. */}}
+          - path: /v1
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-gateway
+                port:
+                  number: {{ $gwPort }}
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: {{ .Release.Name }}-gateway
+                port:
+                  number: {{ $gwPort }}
 {{- end }}

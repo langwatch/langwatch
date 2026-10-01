@@ -144,6 +144,9 @@ jobs:
           render hosted-prod -f examples/values-hosted-prod.yaml
           render scalable-prod -f examples/values-scalable-prod.yaml
 
+          # autogen off, every Secret operator-owned: the Argo CD posture
+          render autogen-off -f tests/values-autogen-off.yaml
+
           if [ "${#failed[@]}" -gt 0 ]; then
             echo
             echo "presets that failed to render: ${failed[*]}"
@@ -218,6 +221,21 @@ jobs:
         if: "!cancelled()"
         run: ./tests/gateway-internal-url.sh
 
+      # A plain install renders no Ingress for the app or the gateway, an
+      # enabled gateway Ingress uses the class the operator picked, and no
+      # PodDisruptionBudget can block a node drain.
+      - name: "assert ingress is opt-in and disruption budgets allow drains"
+        if: "!cancelled()"
+        run: ./tests/gateway-ingress-and-pdbs.sh
+
+      # Argo CD renders with no cluster access and as revision 1 every time.
+      # With autogen off and operator Secrets the render must be stable, take
+      # remapped key names, never block ClickHouse on LangWatchQL, and keep
+      # every StatefulSet in sync under server-side diff.
+      - name: "assert autogen-off installs converge under Argo CD"
+        if: "!cancelled()"
+        run: ./tests/autogen-off-and-argocd.sh
+
       # Connect's upgrade guarantee is a claim about absence: an install that
       # changes no value must carry no LANGWATCH_CONNECT_ variable, so nothing
       # in the app can decide to call LangWatch. A wrong `{{- if }}` emits the
@@ -226,6 +244,16 @@ jobs:
       - name: "assert Connect emits nothing by default and reaches both workloads when on"
         if: "!cancelled()"
         run: ./tests/connect-env.sh
+
+      # A default install calls LangWatch only for the license sync and the
+      # usage report. The offline defaults that switch off library calls to
+      # third parties (Prisma checkpoint, the voice quick tunnel, RAGAS
+      # analytics) sit in a ConfigMap listed first in envFrom, so the
+      # operator's extraEnvs and extraEnvFrom win; that order is only visible
+      # in the render.
+      - name: "assert third-party calls are off by default and overridable"
+        if: "!cancelled()"
+        run: ./tests/privacy-defaults.sh
 
       # release-please bumps the gateway and langyagent subchart versions on
       # every release, and clickhouse-serverless on its own releases. The

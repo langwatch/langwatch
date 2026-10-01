@@ -53,9 +53,14 @@ Edit `platform/app/.env` to customize your deployment. Key variables:
 API_TOKEN_JWT_SECRET=your-jwt-secret
 CREDENTIALS_SECRET=your-encryption-key
 NEXTAUTH_SECRET=your-session-secret
+
+# Optional: an Enterprise license, either an activation code
+# (LW-XXXX-XXXX-XXXX-XXXX, needs outbound HTTPS to connect.langwatch.ai)
+# or a signed license key (works offline)
+LANGWATCH_LICENSE_KEY=
 ```
 
-See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
+See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for how each form is applied at startup. See [Environment Variables](/self-hosting/configuration/environment-variables) for the full reference.
 
 ## Common Operations
 

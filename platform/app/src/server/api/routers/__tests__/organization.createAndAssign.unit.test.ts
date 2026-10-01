@@ -9,10 +9,12 @@ import { createInnerTRPCContext } from "../../trpc";
  * procedure walks straight past, and the procedure is reachable on its own.
  */
 
-const { mockCreateAndAssign, mockStandingFor } = vi.hoisted(() => ({
-  mockCreateAndAssign: vi.fn(),
-  mockStandingFor: vi.fn(),
-}));
+const { mockCreateAndAssign, mockStandingFor, mockActivateConfigured } =
+  vi.hoisted(() => ({
+    mockCreateAndAssign: vi.fn(),
+    mockStandingFor: vi.fn(),
+    mockActivateConfigured: vi.fn(),
+  }));
 
 vi.mock(
   "~/server/app-layer/authz/permission-adapters",
@@ -45,6 +47,10 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   ssoTestArrival: () => ({ standingFor: mockStandingFor }),
 }));
 
+vi.mock("@ee/licensing/activation/configuredActivation", () => ({
+  activateConfiguredLicenseForInstall: mockActivateConfigured,
+}));
+
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
@@ -67,6 +73,7 @@ describe("organization.createAndAssign", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStandingFor.mockResolvedValue(null);
+    mockActivateConfigured.mockResolvedValue({ outcome: "not_configured" });
     mockCreateAndAssign.mockResolvedValue({
       organization: { id: "org_1", name: "Acme" },
       team: { id: "team_1", name: "Acme Team", slug: "acme-team" },
@@ -92,6 +99,7 @@ describe("organization.createAndAssign", () => {
       });
 
       expect(mockCreateAndAssign).not.toHaveBeenCalled();
+      expect(mockActivateConfigured).not.toHaveBeenCalled();
     });
   });
 
@@ -103,6 +111,28 @@ describe("organization.createAndAssign", () => {
 
       expect(result.success).toBe(true);
       expect(mockCreateAndAssign).toHaveBeenCalled();
+    });
+
+    /** @scenario "an activation code on a fresh install waits for the first organization" */
+    it("redeems a configured activation code once the organization exists", async () => {
+      await createCaller().createAndAssign({ orgName: "Acme Corp" });
+
+      expect(mockActivateConfigured).toHaveBeenCalledTimes(1);
+      expect(
+        mockActivateConfigured.mock.invocationCallOrder[0],
+      ).toBeGreaterThan(mockCreateAndAssign.mock.invocationCallOrder[0]!);
+    });
+  });
+
+  describe("when the organization cannot be created", () => {
+    it("does not redeem a configured activation code", async () => {
+      mockCreateAndAssign.mockRejectedValue(new Error("insert failed"));
+
+      await expect(
+        createCaller().createAndAssign({ orgName: "Acme Corp" }),
+      ).rejects.toThrow();
+
+      expect(mockActivateConfigured).not.toHaveBeenCalled();
     });
   });
 });
