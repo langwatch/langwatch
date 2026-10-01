@@ -22,28 +22,7 @@ The langwatch chart needs two operator-managed Secrets in your target namespace 
 
 This is the same pre-create-then-install pattern that the Kubernetes (Helm) [production deployment](/self-hosting/deployment/kubernetes-helm#production-deployment) uses: the chart never renders these Secrets, so Argo treats them as external and leaves them alone across syncs.
 
-Create the namespace and the Secrets:
-
-```bash
-kubectl create namespace langwatch
-
-kubectl -n langwatch create secret generic langwatch-app-secrets \
-  --from-literal=credentialsEncryptionKey="$(openssl rand -hex 32)" \
-  --from-literal=cronApiKey="$(openssl rand -hex 32)" \
-  --from-literal=nextAuthSecret="$(openssl rand -hex 32)" \
-  --from-literal=virtualKeyPepper="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LANGY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
-  --from-literal=LWQL_CLICKHOUSE_PASSWORD="$(openssl rand -hex 32)" \
-  --from-literal=LWQL_POSTGRES_READER_PASSWORD="$(openssl rand -hex 32)"
-
-kubectl -n langwatch create secret generic langwatch-clickhouse-creds \
-  --from-literal=password="$(openssl rand -hex 32)" \
-  --from-literal=clusterSecret="$(openssl rand -hex 24)"
-```
-
-If you run with `gateway.chartManaged: false` (no AI Gateway proxy), skip the two `LW_GATEWAY_*` lines. If you run single-replica ClickHouse (`clickhouse.replicas: 1`, the default), the `clusterSecret` key is optional because only replicated ClickHouse uses it for Keeper inter-node auth. Creating both keys upfront keeps `helm upgrade --set clickhouse.replicas=3` a one-line change later.
+Create both Secrets in the `langwatch` namespace from your secret manager. The keys each one needs depend on which components you run (gateway, Langy, LangWatchQL, replicated ClickHouse); see [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets) for the list.
 
 Then apply the Application manifest:
 
@@ -132,7 +111,7 @@ Topic-specific configuration pages:
 
 ## Operator-managed Secrets via External Secrets / Sealed Secrets / Vault
 
-Anywhere the quick-start does `kubectl create secret generic ...`, you can substitute an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
+You can use an `ExternalSecret`, `SealedSecret`, `vaultauth` resource, or any other operator that materialises a Kubernetes Secret with the same name and keys. The chart only requires the live Secret to exist at the name you point it at (`secrets.existingSecret`).
 
 The Secret can land in the same sync as the chart. The chart ships no `PreSync` hook that reads it, so pods wait in `CreateContainerConfigError` until the operator writes the Secret, then start on their own.
 
@@ -195,7 +174,7 @@ spec:
         - /data
 ```
 
-The recommended path is to flip `autogen.enabled` to `false`, pre-create the Secret per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
+The recommended path is to flip `autogen.enabled` to `false`, provide the Secrets per the quick-start above, and remove the `ignoreDifferences` block entirely. The legacy path is preserved here for installs that need zero pre-install steps and are willing to apply the trio.
 
 ## Reference
 
