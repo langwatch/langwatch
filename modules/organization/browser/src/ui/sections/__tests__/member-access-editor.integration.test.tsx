@@ -65,6 +65,7 @@ vi.mock("../../../behavior/organization-api.ts", () => ({
           invalidate: mockInvalidateOrgWithMembers,
         },
         getAll: { invalidate: mockInvalidateGetAll },
+        getScopeGraph: { invalidate: () => Promise.resolve() },
         getMemberById: { invalidate: mockInvalidateGetMemberById },
       },
       limits: { getUsage: { invalidate: mockInvalidateGetUsage } },

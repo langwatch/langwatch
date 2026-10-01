@@ -11,15 +11,10 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 /** The untyped client every feature Provider is handed. */
 export type UiFeatureApiTransport = ModuleApiClient<ModuleApiMap>;
 
-export const UI_ORGANIZATIONS_PROCEDURE = "organization.getAll";
+export const UI_ORGANIZATIONS_PROCEDURE = "organization.getScopeGraph";
+/** The demo project's organization is not the caller's, so only `getAll` carries it. */
+export const UI_DEMO_ORGANIZATIONS_PROCEDURE = "organization.getAll";
 export const UI_SHARED_TRACE_PROCEDURE = "sharedTrace.get";
-
-/**
- * The organization graph refetches on focus rather than caching for the
- * session: it drives load-bearing client state, and an edit made through the
- * API, the SDK or another tab has to reach the open page.
- */
-const ORGANIZATIONS_STALE_TIME_MS = 30_000;
 
 /**
  * Off the HTTP batch: left in it, these shell-mounted queries wait behind
@@ -36,31 +31,26 @@ export type UiSharedProject = {
 
 export type UiSharedTraceRead = { readonly project: UiSharedProject };
 
+/**
+ * The mirror and the focus gate own freshness: this read declares no stale time
+ * and no focus refetch. The graph is shared with the application's own queries.
+ */
 export function useUiOrganizations({
   transport,
   isDemo,
   enabled,
-  userId,
 }: {
   transport: UiFeatureApiTransport;
   isDemo: boolean;
   enabled: boolean;
-  /** Keeps one user's organization graph from reaching the next user. */
-  userId: string | undefined;
 }): UseQueryResult<readonly UiScopeOrganization[]> {
-  const input = { isDemo };
+  const procedure = isDemo ? UI_DEMO_ORGANIZATIONS_PROCEDURE : UI_ORGANIZATIONS_PROCEDURE;
+  const input = isDemo ? { isDemo } : {};
   return useQuery({
-    queryKey: [
-      ...trpcQueryKey(UI_ORGANIZATIONS_PROCEDURE, { input, type: "query" }),
-      userId ?? "anonymous",
-    ],
+    queryKey: trpcQueryKey(procedure, { input, type: "query" }),
     queryFn: () =>
-      transport.query(UI_ORGANIZATIONS_PROCEDURE, input, OFF_BATCH) as Promise<
-        readonly UiScopeOrganization[]
-      >,
+      transport.query(procedure, input, OFF_BATCH) as Promise<readonly UiScopeOrganization[]>,
     enabled,
-    staleTime: ORGANIZATIONS_STALE_TIME_MS,
-    refetchOnWindowFocus: true,
   });
 }
 

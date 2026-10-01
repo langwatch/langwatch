@@ -34,6 +34,7 @@ import type {
   OrganizationInvite,
   OrganizationMemberProvenance,
   OrganizationUser,
+  ScopeGraphOrganization,
   User,
 } from "@langwatch/organization-contract";
 
@@ -278,6 +279,14 @@ export type OrganizationApiMap = ContractApiMap<typeof licenseEnforcementTrpc> &
             }[];
           }[];
         };
+      };
+
+      /**
+       * The scope skeleton the shell resolves against: a versioned, session-tier
+       * read, so it shares the shell's one cache entry (and its invalidation).
+       */
+      getScopeGraph: {
+        query: { input: Record<string, never>; output: ScopeGraphOrganization[] };
       };
 
       /**

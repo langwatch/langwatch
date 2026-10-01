@@ -100,7 +100,6 @@ export function useUiScopeReading({
     transport,
     isDemo,
     enabled: !!session.user || !route.isPublicRoute,
-    userId,
   });
   const sharedTrace = useUiSharedProject({
     transport,

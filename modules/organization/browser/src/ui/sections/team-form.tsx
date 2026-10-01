@@ -210,6 +210,7 @@ export const TeamForm = ({
     onSuccess: () => {
       setProjectToArchive(null);
       void queryClient.organization.getAll.invalidate();
+      void queryClient.organization.getScopeGraph.invalidate();
       void queryClient.team.getTeamWithMembers.invalidate();
     },
     onError: () => {

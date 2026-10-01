@@ -37,7 +37,7 @@ import { useUiShellFailure } from "./ui-shell-failure";
 /** The gradient the palette's own Langy mark paints with. */
 const COMMAND_BAR_LANGY_GRADIENT_ID = "command-bar-langy-mark-gradient";
 
-const ORGANIZATIONS_INPUT = { isDemo: false };
+const ORGANIZATIONS_INPUT = {};
 
 /** The shell's host class over navigation's port class, built once per loaded port. */
 const browserHostClasses = new WeakMap<

@@ -63,7 +63,7 @@ const GRAPH = [
 
 class GraphRpc extends UiRpc {
   query(path: string): Promise<unknown> {
-    if (path === "organization.getAll") return Promise.resolve(GRAPH);
+    if (path === "organization.getScopeGraph") return Promise.resolve(GRAPH);
     return Promise.resolve(null);
   }
 

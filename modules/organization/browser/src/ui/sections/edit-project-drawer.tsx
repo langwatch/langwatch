@@ -91,6 +91,7 @@ export function EditProjectDrawer({
             void queryClient.team.getTeamsWithGrants.invalidate();
             void queryClient.team.getTeamsWithMembers.invalidate();
             void queryClient.organization.getAll.invalidate();
+            void queryClient.organization.getScopeGraph.invalidate();
             toaster.create({
               title: "Project updated",
               type: "success",

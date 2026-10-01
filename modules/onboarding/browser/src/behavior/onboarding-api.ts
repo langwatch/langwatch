@@ -11,7 +11,11 @@ import type {
   GuidedOnboardingStateWithVariant as GuidedStateWithVariant,
   OrganizationInitialized,
 } from "@langwatch/onboarding-contract";
-import type { joinRequestTrpc, OrganizationIntent } from "@langwatch/organization-contract";
+import type {
+  joinRequestTrpc,
+  OrganizationIntent,
+  ScopeGraphOrganization,
+} from "@langwatch/organization-contract";
 import type { TimeInput } from "@langwatch/time";
 
 /** What a signing-up reader told us about themselves, verbatim. */
@@ -184,6 +188,10 @@ export type OnboardingApiMap = ContractApiMap<typeof joinRequestTrpc> &
     };
 
     organization: {
+      /** The shell's scope read; invalidated beside getAll after a create. */
+      getScopeGraph: {
+        query: { input: Record<string, never>; output: ScopeGraphOrganization[] };
+      };
       /**
        * Organization graph: path-plus-input cache key matches app shell. Row is
        * a wire view (membership, teams, projects, apiKey with redaction).

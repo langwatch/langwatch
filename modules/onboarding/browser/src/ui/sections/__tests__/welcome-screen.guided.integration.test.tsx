@@ -85,7 +85,10 @@ vi.mock("../../../behavior/onboarding-api.ts", () => {
       dismissOffer: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     useUtils: () => ({
-      organization: { getAll: { invalidate: invalidateOrganizations } },
+      organization: {
+        getAll: { invalidate: invalidateOrganizations },
+        getScopeGraph: { invalidate: vi.fn() },
+      },
       joinRequests: { mine: { invalidate: vi.fn() }, offer: { invalidate: vi.fn() } },
     }),
   };

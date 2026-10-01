@@ -72,6 +72,12 @@ vi.mock("../../../../behavior/onboarding-api.ts", () => ({
             return Promise.resolve();
           },
         },
+        getScopeGraph: {
+          invalidate: () => {
+            state.order.push("invalidate organization.getScopeGraph");
+            return Promise.resolve();
+          },
+        },
       },
     }),
   },
@@ -133,7 +139,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /support-bot"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /support-bot",
+        ]);
       });
       expect(state.mutations).toEqual([
         {
@@ -155,7 +165,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /settings/projects"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /settings/projects",
+        ]);
       });
     });
 
@@ -167,7 +181,11 @@ describe("ProjectOnboarding", () => {
       fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
       await waitFor(() => {
-        expect(state.order).toEqual(["invalidate organization.getAll", "push /support-bot"]);
+        expect(state.order).toEqual([
+          "invalidate organization.getAll",
+          "invalidate organization.getScopeGraph",
+          "push /support-bot",
+        ]);
       });
     });
   });

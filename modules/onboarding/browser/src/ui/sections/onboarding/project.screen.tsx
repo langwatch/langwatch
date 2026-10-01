@@ -104,6 +104,7 @@ export default function ProjectOnboarding() {
           // The cached graph predates the project; unrefreshed, its address
           // resolves to the previously open project instead.
           await utils.organization.getAll.invalidate();
+          await utils.organization.getScopeGraph.invalidate();
           if (safeReturnToPath) {
             void router.push(safeReturnToPath);
             return;

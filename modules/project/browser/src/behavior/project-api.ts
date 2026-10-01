@@ -9,6 +9,8 @@ import type { ProjectHostOrganization, ProjectHostProject } from "../model/proje
 
 export type ProjectApiMap = {
   organization: {
+    /** The shell's scope read; invalidated beside getAll after a save. Output unread here. */
+    getScopeGraph: { query: { input: Record<string, never>; output: unknown } };
     /**
      * Application shell's organization graph; also defaults for forms; refetched
      * after save.

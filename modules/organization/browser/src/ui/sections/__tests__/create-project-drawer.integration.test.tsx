@@ -54,7 +54,10 @@ const invalidator = (name: string) => ({
 vi.mock("../../../behavior/organization-api.ts", () => ({
   api: {
     useUtils: () => ({
-      organization: { getAll: invalidator("organization.getAll") },
+      organization: {
+        getAll: invalidator("organization.getAll"),
+        getScopeGraph: invalidator("organization.getScopeGraph"),
+      },
       limits: { getUsage: invalidator("limits.getUsage") },
       team: {
         getTeamsWithMembers: invalidator("team.getTeamsWithMembers"),
@@ -138,6 +141,7 @@ describe("given the create-project drawer", () => {
 
       expect(invalidations.current).toEqual([
         "organization.getAll",
+        "organization.getScopeGraph",
         "limits.getUsage",
         "team.getTeamsWithMembers",
         "team.getTeamWithMembers",

@@ -28,7 +28,7 @@ export function useUiOrgQueryParamSelection(): void {
   const rpc = useUiRpc();
   const [, setSearchParams] = useSearchParams();
 
-  const input = { isDemo: false };
+  const input = {};
   // Asked only when the address names an organization: a page without `?org`
   // costs nothing, and one with it shares the shell's own cache entry.
   const organizations = useQuery({

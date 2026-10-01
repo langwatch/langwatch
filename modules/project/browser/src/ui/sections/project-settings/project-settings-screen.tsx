@@ -250,6 +250,7 @@ function SettingsForm({
       {
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
           void apiContext.governance.resolveHome.invalidate();
           const dialog = setupDialogAfterIntentChange({
             nextIntent: data.primaryIntent,
@@ -615,6 +616,7 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
       {
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
+          void apiContext.organization.getScopeGraph.invalidate();
           host.succeeded({
             title: "Project updated",
             description: "Your project settings have been saved",
