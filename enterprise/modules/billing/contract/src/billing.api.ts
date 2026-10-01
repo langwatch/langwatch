@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type {

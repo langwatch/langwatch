@@ -4,8 +4,7 @@
  */
 
 import { createApiFixture } from "@langwatch/api-fixture";
-import { moduleApi } from "@langwatch/kernel";
-import { defineTrpcContract, schemaHashesOf } from "@langwatch/kernel/contract";
+import { defineTrpcContract, moduleApi, schemaHashesOf } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 

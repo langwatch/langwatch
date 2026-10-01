@@ -3,7 +3,7 @@
  * Main's onboarding checks; each figure is counted by the module that owns it.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import {
   integrationsChecksTrpc,
   type IntegrationsCheckStatus,

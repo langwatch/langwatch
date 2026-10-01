@@ -3,7 +3,8 @@
  * Composition names no pipeline, projection or subscriber, keeping
  * `@langwatch/eventing` and the Prisma/ioredis/ClickHouse graph off this package.
  */
-import type { TrpcContract, TrpcContractMember } from "./contract/trpc-contract.ts";
+import type { TrpcContract, TrpcContractMember } from "@langwatch/module";
+
 import type { ServerRole } from "./feature-installer.ts";
 import type { ResourceOwnership } from "./resource-scope.ts";
 import type { RuntimeService } from "./runtime-lifecycle.ts";

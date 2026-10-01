@@ -1,8 +1,8 @@
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import type { FeatureRestHost } from "../src/transport-mounting.ts";
 import { MissingTransportPeerError, type TransportPeers } from "../src/transport-peers.ts";
 import { memberSourceOf } from "./member-source.ts";

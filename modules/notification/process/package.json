@@ -25,6 +25,7 @@
     "@langwatch/egress": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { BetterAuthOptions } from "better-auth";
 import type { GenericOAuthConfig } from "better-auth/plugins/generic-oauth";
 

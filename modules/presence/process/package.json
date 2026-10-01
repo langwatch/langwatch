@@ -23,6 +23,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

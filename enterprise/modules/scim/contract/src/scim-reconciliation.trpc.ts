@@ -7,7 +7,7 @@
  * plan means the one organization that needs those rows is the one refused
  * them.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   connectionReconciliationSchema,

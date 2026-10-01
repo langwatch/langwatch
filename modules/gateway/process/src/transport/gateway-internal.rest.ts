@@ -28,7 +28,7 @@ import {
   gatewayInternalReportUsageAnswers,
   gatewayInternalBootstrapAnswers,
 } from "@langwatch/gateway-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { z } from "zod";
 

@@ -1,6 +1,6 @@
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { homeTrpc, type RecentItem } from "@langwatch/audit-log-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 /** What the home door reaches: the entities this person most recently touched, newest first. */
 export interface AuditLogHomeApi {

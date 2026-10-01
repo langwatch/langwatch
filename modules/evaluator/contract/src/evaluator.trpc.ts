@@ -3,7 +3,7 @@
  * answer. Specs: specs/evaluators/evaluator-management.feature,
  * specs/monitors/replicate-monitor-to-project.feature.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   evaluatorApiCopyInputSchema,

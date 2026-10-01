@@ -1,6 +1,6 @@
 /** A person's own two-step verification, and the member list an administrator reads (D06).
  *  Spec: specs/identity/mfa-and-session-shape.feature. */
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { amrSchema, secondFactorSatisfactionSchema } from "./mfa-condition.ts";

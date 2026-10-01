@@ -4,7 +4,7 @@
  * has always called.
  */
 
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { scenarioTestSuiteSchema } from "@langwatch/scenario-contract";
 import { z } from "zod";
 

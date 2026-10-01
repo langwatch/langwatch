@@ -3,7 +3,7 @@
  * traces: the call only picks a model and reports failures; the text comes
  * from the caller.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 /**

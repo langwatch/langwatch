@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";

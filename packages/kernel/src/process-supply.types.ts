@@ -1,6 +1,6 @@
+import type { ModuleApiToken, SupplyToken } from "@langwatch/module";
+
 import type { InstallableServerFeature, ModuleConfigFor } from "./feature-installer.ts";
-import type { ModuleApiToken } from "./module-api-token.ts";
-import type { SupplyToken } from "./supply-token.ts";
 
 export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 export type SupplyModule = InstallableServerFeature<never>;

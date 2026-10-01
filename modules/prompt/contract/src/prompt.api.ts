@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
 import type { ApiResponsePrompt, syncInputSchema } from "./prompt-rest.schemas.ts";

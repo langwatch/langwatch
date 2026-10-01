@@ -4,7 +4,7 @@ import { instantEvalEstimateSchema } from "@langwatch/instant-eval-contract";
  * drives it, priced, started, stopped and read back. The nested namespace is main's wire.
  * @see specs/traces-v2/instant-eval-search.feature
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   explorerInstantEvalProgressSchema,

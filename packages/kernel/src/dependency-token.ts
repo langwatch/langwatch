@@ -1,5 +1,9 @@
-import type { FeatureApiIdentity, ModuleApiToken } from "./module-api-token.ts";
-import type { SupplyToken, SupplyTokenIdentity } from "./supply-token.ts";
+import type {
+  FeatureApiIdentity,
+  ModuleApiToken,
+  SupplyToken,
+  SupplyTokenIdentity,
+} from "@langwatch/module";
 
 /** Constructor tokens remain for installers awaiting the feature API cutover. */
 export type DependencyToken<T> =

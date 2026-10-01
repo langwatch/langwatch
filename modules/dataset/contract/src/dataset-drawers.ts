@@ -1,6 +1,6 @@
 /** Dataset's drawers another module opens, by token (ARCHITECTURE.md §10.1). */
 
-import { uiTokens } from "@langwatch/kernel/contract";
+import { uiTokens } from "@langwatch/module";
 
 import type { DatasetColumns } from "./dataset.ts";
 

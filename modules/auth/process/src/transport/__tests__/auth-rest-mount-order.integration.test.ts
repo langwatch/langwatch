@@ -10,7 +10,7 @@ import {
   defineRestRouter,
   RestHost,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

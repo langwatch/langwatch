@@ -2,7 +2,7 @@
  * Every `subscription.*` procedure, declared once. The names are the browser's
  * cache keys, so they are the wire names the billing page has always called.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

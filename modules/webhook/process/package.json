@@ -38,6 +38,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

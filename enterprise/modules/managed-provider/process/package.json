@@ -24,6 +24,7 @@
     "@aws-sdk/client-sts": "^3.1080.0",
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*"
   },
   "devDependencies": {

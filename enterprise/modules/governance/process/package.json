@@ -55,6 +55,7 @@
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/otlp": "workspace:*",

@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { StoredObjectDeliveryAudience } from "./audiences.ts";
 import type { StoredObjectId, StoredObjectProjectId } from "./ids.ts";

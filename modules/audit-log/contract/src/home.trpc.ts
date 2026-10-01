@@ -1,5 +1,5 @@
 /** The `home.*` namespace: the recent-items strip, read from the caller's own audit trail. */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import { recentItemSchema, recentItemsInputSchema } from "./recent-items.ts";
 

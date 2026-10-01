@@ -20,9 +20,9 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/kernel": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

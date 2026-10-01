@@ -11,8 +11,8 @@ import type { CustomGraphInput } from "@langwatch/dashboard-contract";
 import type { DatasetColumn, MappingState } from "@langwatch/dataset-contract";
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 import type { ComparisonEvaluatorConfig, TargetConfig } from "@langwatch/experiment-contract";
-import type { UiTokenIdentity } from "@langwatch/kernel/contract";
 import type { LangyKickoffBrief } from "@langwatch/langy-contract";
+import type { UiTokenIdentity } from "@langwatch/module";
 import type {
   MediaAudioElement,
   MediaPartProps,
@@ -735,7 +735,7 @@ export type {
   UiHooksToken,
   UiOperationsToken,
   UiTokenIdentity,
-} from "@langwatch/kernel/contract";
+} from "@langwatch/module";
 
 /** The declarations above this screen. Nothing declared reads as an empty list. */
 export abstract class UiDeclarations {

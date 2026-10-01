@@ -3,7 +3,7 @@
  * browser's cache key and the audit path both, and nothing here validates SQL.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { lwqlStatementSchema } from "./analytics-lwql.schemas.ts";

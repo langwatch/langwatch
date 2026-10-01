@@ -1,4 +1,4 @@
-import { uiTokens } from "@langwatch/kernel/contract";
+import { uiTokens } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { checkLends } from "../ui-module-lends.ts";

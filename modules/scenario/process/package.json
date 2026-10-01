@@ -66,6 +66,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",

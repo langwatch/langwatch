@@ -20,6 +20,9 @@
       "path": "../config/tsconfig.build.json"
     },
     {
+      "path": "../module/tsconfig.build.json"
+    },
+    {
       "path": "../secrets/tsconfig.build.json"
     },
     {

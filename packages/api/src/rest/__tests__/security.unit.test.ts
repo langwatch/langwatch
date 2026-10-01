@@ -4,7 +4,7 @@
  * packages/api/specs/transport-declaration-split.feature.
  */
 
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";

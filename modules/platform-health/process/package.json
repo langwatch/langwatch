@@ -27,6 +27,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-health-contract": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

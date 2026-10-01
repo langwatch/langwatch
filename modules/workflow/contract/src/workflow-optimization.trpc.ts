@@ -2,7 +2,7 @@
  * Every `optimization.*` procedure, declared once. The namespace is the one the
  * Optimization Studio's pages have always called, so it is the mounted name.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { workflowWriteAcknowledgedSchema } from "./workflow.trpc-schemas.ts";

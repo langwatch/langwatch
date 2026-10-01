@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "better-auth": "catalog:",
     "zod": "catalog:"

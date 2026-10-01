@@ -1,4 +1,5 @@
 import { Config } from "@langwatch/config";
+import { moduleApi, supplyToken } from "@langwatch/module";
 import { z } from "zod";
 
 import {
@@ -6,9 +7,7 @@ import {
   type FeatureSetup,
   withMemoryRepositories,
 } from "../src/feature-installer.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
-import { supplyToken } from "../src/supply-token.ts";
 
 export interface ProjectApi {
   getById(id: string): string;

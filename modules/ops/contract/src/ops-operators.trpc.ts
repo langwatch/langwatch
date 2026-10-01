@@ -2,7 +2,7 @@
  * The Operators page: list, grant and revoke the platform-operator role. Every
  * procedure needs `ops:manage`; authz decides the self-grant and last-holder rules.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { opsOkOutputSchema } from "./ops-feature-flag.ts";

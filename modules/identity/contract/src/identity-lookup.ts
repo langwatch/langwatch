@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { IDENTITY_EVENT_TYPES, linkProposalReasonSchema } from "./facts.ts";

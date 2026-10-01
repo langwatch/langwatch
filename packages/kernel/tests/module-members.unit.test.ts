@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 /**
  * What a process builds, what each module is handed, and how a peer arrives.
  * Spec: specs/server/declarative-process-composition.feature
@@ -7,7 +8,6 @@ import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/application.ts";
 import { DuplicateProviderError } from "../src/boot-errors.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import { MissingMemberError } from "../src/module-members.ts";
 import type { MemberSource } from "../src/module-members.ts";
 

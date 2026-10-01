@@ -28,7 +28,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"

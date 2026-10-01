@@ -2,11 +2,11 @@ import { RawHttpHost, RawSocketHost, WebSocketHost } from "@langwatch/api";
 import type { SurfaceDefaultsOptions } from "@langwatch/api/policy";
 import {
   bootInstalledProcess,
-  ModuleApiToken,
   storesBackedMembers,
   type ExposedSurface,
   type TransportPeers,
 } from "@langwatch/kernel";
+import { ModuleApiToken } from "@langwatch/module";
 import { otlpHeadersFrom, resourceAttributesFrom } from "@langwatch/observability/node";
 import { OperatorReadsResolver } from "@langwatch/prisma-client";
 import {

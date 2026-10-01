@@ -4,7 +4,7 @@
  * sharedTrace (ADR-057); getSampleTraces stays on the API.
  */
 import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 

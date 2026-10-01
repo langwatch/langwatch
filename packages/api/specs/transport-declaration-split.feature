@@ -10,7 +10,7 @@ Feature: Transport declaration split
 
   @unit @architecture
   Scenario: A contract declares a procedure once, in a browser-safe module
-    Given a contract module built with defineTrpcContract from @langwatch/kernel/contract
+    Given a contract module built with defineTrpcContract from @langwatch/module
     When it declares a query with an input and an output schema and a mutation with only an input
     Then the module's value-import graph reaches no server framework, tRPC server runtime or Node API
     And the declaration carries the procedure names, kinds and schemas as types the browser can read

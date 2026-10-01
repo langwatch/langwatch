@@ -2,7 +2,7 @@
 // and runs. Legacy wizard setup stored as open record, verbatim.
 
 import { mappingStateSchema } from "@langwatch/dataset-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { checkPreconditionsSchema } from "@langwatch/trace-contract";
 import { studioWorkflowSchema } from "@langwatch/workflow-contract";
 import { z } from "zod";

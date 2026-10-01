@@ -66,8 +66,6 @@ export {
   type ReadHintMap,
   type ReadHintTarget,
 } from "./module-eventing.ts";
-export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-token.ts";
-export { supplyToken, SupplyToken } from "./supply-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type AppDefinition,
@@ -97,13 +95,6 @@ export {
   type ServerRole,
   withMemoryRepositories,
 } from "./feature-installer.ts";
-export {
-  FEATURE_NAMES,
-  type ModuleName,
-  type PublicNamespace,
-  publicNamespace,
-  publicNamespaceFromUnknown,
-} from "./module-namespace.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
 

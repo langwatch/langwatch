@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 
 import type { ApiKeyListEntry, NamedApiKeyBinding } from "./api-key.list.ts";

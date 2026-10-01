@@ -3,7 +3,7 @@
  * ORGANIZATION row reached through the project the caller named, which is why
  * each input carries a project id and none carries an organization id.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { promptDeleteResultSchema, promptTagSchema } from "./prompt.ts";

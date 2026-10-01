@@ -23,7 +23,7 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/time": "workspace:*",
     "safe-regex2": "catalog:",
     "zod": "catalog:"

@@ -10,7 +10,7 @@ import {
   type CurrencyRequest,
   type DetectedCurrency,
 } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 /** The currency question this surface asks of the application. */
 export interface BillingCurrencyApi {

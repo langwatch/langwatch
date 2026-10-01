@@ -6,7 +6,7 @@
 import { optionalCredential } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { approved, signedOut, refused } from "@langwatch/hosted-mcp-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 
 import type { McpAuthorizeAnswer } from "../rules/mcp-authorize.rules.ts";

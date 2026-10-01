@@ -2,7 +2,7 @@ import type {
   FeatureFlagRules,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { SearchProjectsResult } from "@langwatch/project-contract";
 
 import type {

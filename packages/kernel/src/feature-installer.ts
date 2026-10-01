@@ -1,4 +1,12 @@
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
+import {
+  type FeatureApiIdentity,
+  ModuleApiToken,
+  type ModuleName,
+  publicNamespace,
+  type PublicNamespace,
+  publicNamespaceFromUnknown,
+} from "@langwatch/module";
 import { ScopedSecrets, type SecretHandle } from "@langwatch/secrets";
 
 import { FeatureSecretsUnavailableError } from "./boot-errors.ts";
@@ -10,10 +18,7 @@ import type {
   TokenIdentity,
   TokenMap,
 } from "./dependency-token.ts";
-import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import { withAnotherPipeline, type FeatureEventing } from "./module-eventing.ts";
-import type { ModuleName, PublicNamespace } from "./module-namespace.ts";
-import { publicNamespace, publicNamespaceFromUnknown } from "./module-namespace.ts";
 import { snapshotRepositories, type FeatureRepositories } from "./repository-ownership.ts";
 import {
   instantiateRepositories,

@@ -5,7 +5,7 @@
  */
 
 import type { AuthzPermission } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { afterEach, describe, expect, it, vi } from "vitest";

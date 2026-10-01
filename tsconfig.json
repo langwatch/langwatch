@@ -469,6 +469,9 @@
       "path": "modules/model-provider/process/tsconfig.json"
     },
     {
+      "path": "packages/module/tsconfig.test.json"
+    },
+    {
       "path": "modules/monitor/browser/tsconfig.json"
     },
     {

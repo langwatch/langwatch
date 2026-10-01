@@ -4,11 +4,7 @@
  * query client's own default.
  */
 
-import {
-  schemaHashOf,
-  type TrpcContract,
-  type TrpcContractMember,
-} from "@langwatch/kernel/contract";
+import { schemaHashOf, type TrpcContract, type TrpcContractMember } from "@langwatch/module";
 import type { QueryKey } from "@tanstack/react-query";
 
 /** How long a mirrored read's cache entry lives in memory once nothing observes it. */

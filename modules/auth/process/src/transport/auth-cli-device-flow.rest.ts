@@ -11,7 +11,7 @@ import {
   type RestAnswer,
 } from "@langwatch/api/rest";
 import { deviceApprovalQuerySchema, lookupQuerySchema } from "@langwatch/auth-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { z } from "zod";
 

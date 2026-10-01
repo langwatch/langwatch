@@ -1,5 +1,6 @@
+import type { FeatureApiIdentity, ModuleApiToken } from "@langwatch/module";
+
 import { FeatureApiUnavailableError } from "./boot-errors.ts";
-import type { FeatureApiIdentity, ModuleApiToken } from "./module-api-token.ts";
 
 /** References are wired at boot, never constructed on a request's first call. */
 export class LocalFeatureApis {

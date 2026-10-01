@@ -160,6 +160,7 @@ describe("the tasks process installation", () => {
         "stalled-runs-backfill",
         "topic-clustering-run",
         "user-data-erase",
+        "backfill-http-credentials-to-secrets",
       ]);
     } finally {
       await runtime.stop();

@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
@@ -13,7 +14,6 @@ import {
   type ServerRole,
 } from "../src/feature-installer.ts";
 import { LocalFeatureApis } from "../src/local-feature-api.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import { memberSourceOf } from "./member-source.ts";
 
 interface ProjectApi {

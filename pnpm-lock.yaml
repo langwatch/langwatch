@@ -1009,6 +1009,9 @@ importers:
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:../../modules/model-provider/process
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../modules/monitor/contract
@@ -2367,6 +2370,9 @@ importers:
       '@langwatch/model-provider-process':
         specifier: workspace:*
         version: link:../../modules/model-provider/process
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../modules/monitor/contract
@@ -2727,9 +2733,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -2809,6 +2815,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../../../modules/notification/contract
@@ -2894,9 +2903,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -2916,6 +2925,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -2959,12 +2971,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -3002,6 +3014,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../../../modules/organization/contract
@@ -3054,9 +3069,9 @@ importers:
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../licensing/contract
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
@@ -3088,6 +3103,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
@@ -3267,12 +3285,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../../packages/kernel
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../../packages/otlp
@@ -3370,6 +3388,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../../../modules/model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3534,9 +3555,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -3592,6 +3613,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
@@ -3684,9 +3708,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -3712,6 +3736,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3737,9 +3764,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../../../modules/onboarding/contract
@@ -3783,6 +3810,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3893,9 +3923,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
@@ -3924,6 +3954,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -4043,9 +4076,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -4247,9 +4280,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../../packages/kernel
+        version: link:../../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../../packages/secrets
@@ -4293,6 +4326,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../../packages/module
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../../../modules/ops/contract
@@ -4555,12 +4591,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -4604,6 +4640,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -4867,9 +4906,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -4968,6 +5007,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -5138,9 +5180,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -5193,6 +5235,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -5382,9 +5427,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -5434,6 +5479,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -5489,9 +5537,9 @@ importers:
 
   modules/audit-log/contract:
     dependencies:
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -5529,6 +5577,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -5708,9 +5759,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../identity/contract
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -5790,6 +5841,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -5954,12 +6008,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../packages/system-migrations
@@ -6009,6 +6063,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -6182,9 +6239,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -6279,6 +6336,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -6440,9 +6500,9 @@ importers:
 
   modules/coding-agent/contract:
     dependencies:
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6510,6 +6570,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -6589,9 +6652,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -6626,6 +6689,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -6739,9 +6805,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/redaction':
         specifier: workspace:*
         version: link:../../../packages/redaction
@@ -6788,6 +6854,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -6904,9 +6973,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -6944,6 +7013,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -7154,9 +7226,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -7224,6 +7296,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -7303,9 +7378,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -7346,6 +7421,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -7407,9 +7485,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -7483,6 +7561,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -7753,12 +7834,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
@@ -7808,6 +7889,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -8095,15 +8179,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -8186,6 +8270,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -8344,9 +8431,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -8387,6 +8474,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8554,12 +8644,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -8627,6 +8717,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -8776,9 +8869,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -8825,6 +8918,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8886,9 +8982,9 @@ importers:
 
   modules/hosted-mcp/contract:
     dependencies:
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -8932,6 +9028,9 @@ importers:
       '@langwatch/mcp-server':
         specifier: workspace:*
         version: link:../../../mcp/typescript
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -8984,9 +9083,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../../packages/system-migrations
@@ -9060,6 +9159,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -9142,9 +9244,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -9209,6 +9311,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -9518,9 +9623,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../../packages/secrets
@@ -9603,6 +9708,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -9724,9 +9832,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
@@ -9767,6 +9875,9 @@ importers:
       '@langwatch/log-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -9813,9 +9924,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
@@ -9859,6 +9970,9 @@ importers:
       '@langwatch/metric-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -10032,9 +10146,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -10093,6 +10207,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -10245,9 +10362,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -10288,6 +10405,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../contract
@@ -10516,9 +10636,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -10547,6 +10667,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../contract
@@ -10711,9 +10834,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -10763,6 +10886,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -10957,9 +11083,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
@@ -11069,6 +11195,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -11299,9 +11428,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -11375,6 +11504,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -11463,9 +11595,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -11506,6 +11638,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -11610,9 +11745,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -11638,6 +11773,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -11844,9 +11982,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -11896,6 +12034,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/onboarding-contract':
         specifier: workspace:*
         version: link:../../onboarding/contract
@@ -12154,9 +12295,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
@@ -12200,6 +12341,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -12273,9 +12417,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -12310,6 +12454,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -12359,9 +12506,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/react-rum':
         specifier: workspace:*
         version: link:../../../packages/react-rum
@@ -12396,6 +12543,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../packages/kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -12439,9 +12589,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -12470,6 +12620,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -12737,15 +12890,15 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -12840,6 +12993,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13034,9 +13190,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13068,6 +13224,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13175,9 +13334,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -13215,6 +13374,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13337,9 +13499,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13374,6 +13536,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13432,9 +13597,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13490,6 +13655,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13621,12 +13789,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
@@ -13679,6 +13847,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -13801,9 +13972,9 @@ importers:
 
   modules/topic/contract:
     dependencies:
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -13835,6 +14006,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -14185,9 +14359,9 @@ importers:
       '@langwatch/instant-eval-contract':
         specifier: workspace:*
         version: link:../../instant-eval/contract
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../../packages/otlp
@@ -14306,6 +14480,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -14563,9 +14740,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/organization-contract':
         specifier: workspace:*
         version: link:../../organization/contract
@@ -14624,6 +14801,9 @@ importers:
       '@langwatch/mail':
         specifier: workspace:*
         version: link:../../../packages/mail
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/notification-contract':
         specifier: workspace:*
         version: link:../../notification/contract
@@ -14706,9 +14886,9 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../../../packages/kernel
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -14761,6 +14941,9 @@ importers:
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
@@ -15063,12 +15246,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../../../packages/kernel
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../../packages/ksuid
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -15133,6 +15316,9 @@ importers:
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../../../packages/module
       '@langwatch/monitor-contract':
         specifier: workspace:*
         version: link:../../monitor/contract
@@ -15246,6 +15432,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -15368,6 +15557,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
     devDependencies:
       '@langwatch/vitest-config':
         specifier: workspace:*
@@ -15476,12 +15668,12 @@ importers:
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../handled-error
-      '@langwatch/kernel':
-        specifier: workspace:*
-        version: link:../kernel
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../modules/langy/contract
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -16397,6 +16589,9 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../config
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../secrets
@@ -16489,6 +16684,25 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/module:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@langwatch/vitest-config':
+        specifier: workspace:*
+        version: link:../vitest-config
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
       vitest:
         specifier: 'catalog:'
         version: 5.0.1(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.1)(@vitest/coverage-v8@5.0.1)(@vitest/ui@5.0.1)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.3.0(@types/node@26.2.0)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
@@ -16689,6 +16903,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -16750,6 +16967,9 @@ importers:
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../kernel
+      '@langwatch/module':
+        specifier: workspace:*
+        version: link:../module
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../observability
@@ -17085,9 +17305,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/kernel':
+      '@langwatch/module':
         specifier: workspace:*
-        version: link:../kernel
+        version: link:../module
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../vitest-config

@@ -5,7 +5,7 @@ import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
  * accepted steps ARE the published contract, so both doors read one copy.
  */
 import { authzPermissionSchema } from "@langwatch/authorization";
-import { defineRestMiddleware } from "@langwatch/kernel/contract";
+import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 
 import { LWQL_GRANULARITY_STEPS } from "./analytics.lwql-time-window.ts";

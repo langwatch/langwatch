@@ -16,6 +16,9 @@
     },
     {
       "path": "../kernel/tsconfig.build.json"
+    },
+    {
+      "path": "../module/tsconfig.build.json"
     }
   ]
 }

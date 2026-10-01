@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
-import { defineRestMiddleware, type RestTransportMiddleware } from "@langwatch/kernel/contract";
+import { defineRestMiddleware, type RestTransportMiddleware } from "@langwatch/module";
 import {
   classifyClient,
   createLogger,

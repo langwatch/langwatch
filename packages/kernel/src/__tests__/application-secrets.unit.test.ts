@@ -1,9 +1,9 @@
+import { moduleApi } from "@langwatch/module";
 import { Secret, SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../application.ts";
 import { defineServerModule, type FeatureSetup } from "../feature-installer.ts";
-import { moduleApi } from "../module-api-token.ts";
 
 interface SessionIdentity {
   accepts(candidate: string): boolean;

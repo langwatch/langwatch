@@ -3,7 +3,7 @@
  * and what it answers. The server binds a permission and a handler to a name
  * declared here; the browser reads the same names and schemas as types.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   roleApiCreateInputSchema,

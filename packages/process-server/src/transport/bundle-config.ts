@@ -8,7 +8,7 @@ import {
   type ProcessWebConfig,
   type PublicAppConfig,
 } from "@langwatch/config/public-app-config";
-import type { FeatureApiIdentity } from "@langwatch/kernel/module-api";
+import type { FeatureApiIdentity } from "@langwatch/module";
 import { z } from "zod";
 
 import { assetBaseBootstrapScript, assetBaseOrigin, normalizeAssetBase } from "./asset-base.ts";

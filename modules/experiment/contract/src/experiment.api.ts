@@ -1,6 +1,6 @@
 import type { Dataset } from "@langwatch/dataset-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
+import { moduleApi } from "@langwatch/module";
 import type {
   StudioWorkflow,
   WorkflowEvaluationRequest,

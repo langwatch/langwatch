@@ -25,7 +25,7 @@ import {
  * it: every issue path writes a row here, so a signed license is shown
  * exactly once, when it is issued or reissued, and never read back.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getAll")

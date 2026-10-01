@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",

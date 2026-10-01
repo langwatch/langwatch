@@ -9,7 +9,7 @@ import { createServer } from "node:http";
 import { RawHttpHost, WebSocketHost } from "@langwatch/api";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
 import { defineRestRouter } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { createLogger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

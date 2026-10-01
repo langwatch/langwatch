@@ -28,6 +28,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

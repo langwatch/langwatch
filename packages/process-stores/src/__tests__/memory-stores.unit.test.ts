@@ -2,9 +2,9 @@ import {
   createApp,
   defineRepositories,
   defineServerModule,
-  moduleApi,
   type FeatureSetup,
 } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import type { ObjectStorage } from "../members.ts";

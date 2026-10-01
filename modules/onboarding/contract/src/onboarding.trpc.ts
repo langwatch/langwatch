@@ -4,7 +4,7 @@
  * organizationId before any read or write.
  * @see specs/features/onboarding/guided-onboarding-variant.feature
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

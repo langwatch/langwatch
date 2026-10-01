@@ -1,5 +1,5 @@
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   ExecuteEvaluationCommandData,

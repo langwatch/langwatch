@@ -104,6 +104,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",

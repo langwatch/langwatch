@@ -11,8 +11,7 @@ import {
   type ScopeTierField,
 } from "@langwatch/authorization";
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
-import type { ModuleApiToken } from "@langwatch/kernel";
-import type { TrpcContract, TrpcContractMember } from "@langwatch/kernel/contract";
+import type { ModuleApiToken, TrpcContract, TrpcContractMember } from "@langwatch/module";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
 import { nowInstant } from "@langwatch/time";

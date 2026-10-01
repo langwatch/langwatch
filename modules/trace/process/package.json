@@ -73,6 +73,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",

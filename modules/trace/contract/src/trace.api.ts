@@ -3,7 +3,7 @@ import type {
   InstantEvalRunProgress,
   InstantEvalRunReference,
 } from "@langwatch/instant-eval-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type { ConversationView } from "./conversation/conversation-steps.ts";
 import type { ExportProgressEvent } from "./export-progress.trpc.ts";

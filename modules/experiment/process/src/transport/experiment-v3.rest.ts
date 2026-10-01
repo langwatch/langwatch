@@ -36,7 +36,7 @@ import {
   type EvaluationV3Event,
   type SavedRunAnswer,
 } from "@langwatch/experiment-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";

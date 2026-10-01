@@ -3,7 +3,7 @@ import type {
   GovernanceBudgetOverviewForUser,
   PersonalUsageRollup,
 } from "@langwatch/enterprise-governance-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type {
   EnsuredPersonalWorkspace,
   FindPersonalWorkspaceInput,

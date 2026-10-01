@@ -1,3 +1,4 @@
+import { moduleApi } from "@langwatch/module";
 /**
  * The tasks role: what a module declares with `withTasks`, and how the process
  * that runs one-shot work reads it back.
@@ -8,7 +9,6 @@ import { describe, expect, it } from "vitest";
 import { createApp } from "../src/application.ts";
 import { RoleContributionError } from "../src/boot-errors.ts";
 import { defineServerModule } from "../src/feature-installer.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 
 interface AnnotationApi {
   label(): string;

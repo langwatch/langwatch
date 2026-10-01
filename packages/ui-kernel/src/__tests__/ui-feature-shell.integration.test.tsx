@@ -1,11 +1,11 @@
 import { UiScope, UiSession, useUiCapabilities } from "@langwatch/browser-host/capabilities";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
 import type { UiQueryStore } from "@langwatch/browser-host/query-persistence";
 import { SessionVersionWatch } from "@langwatch/browser-host/session-version";
 import {
   createUiScopeHost,
   useOrganizationTeamProject,
 } from "@langwatch/browser-host/use-organization-team-project";
+import { defineTrpcContract } from "@langwatch/module";
 import {
   focusManager,
   QueryClient,
@@ -555,4 +555,3 @@ describe("given a signed-in user and no installed contract declares a read", () 
     });
   });
 });
-

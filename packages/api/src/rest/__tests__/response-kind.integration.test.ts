@@ -3,7 +3,7 @@
  * framework. Spec: packages/api/specs/declared-response-kinds.feature.
  */
 
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
 import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";

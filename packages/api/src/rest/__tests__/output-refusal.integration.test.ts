@@ -3,7 +3,7 @@
  * Spec: packages/api/specs/transport-declaration-split.feature.
  */
 
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

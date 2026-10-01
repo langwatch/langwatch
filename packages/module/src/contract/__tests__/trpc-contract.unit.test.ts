@@ -63,12 +63,15 @@ describe("defineTrpcContract", () => {
       expect(valueImports(sourceOf("release-flags.ts"))).toEqual([]);
       expect(valueImports(sourceOf("schema-hash.ts"))).toEqual(["zod"]);
 
-      expect(valueImports(sourceOf("index.ts"))).toEqual([
-        "./trpc-contract.ts",
-        "./schema-hash.ts",
-        "./rest-middleware.ts",
-        "./ui-tokens.ts",
-        "./release-flags.ts",
+      expect(valueImports(sourceOf("../index.ts"))).toEqual([
+        "./module-api-token.ts",
+        "./supply-token.ts",
+        "./module-namespace.ts",
+        "./contract/trpc-contract.ts",
+        "./contract/schema-hash.ts",
+        "./contract/rest-middleware.ts",
+        "./contract/ui-tokens.ts",
+        "./contract/release-flags.ts",
       ]);
     });
   });

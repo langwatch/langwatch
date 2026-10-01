@@ -43,6 +43,9 @@
       "path": "../kernel/tsconfig.build.json"
     },
     {
+      "path": "../module/tsconfig.build.json"
+    },
+    {
       "path": "../observability/tsconfig.build.json"
     },
     {

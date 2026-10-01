@@ -18,7 +18,7 @@ import type {
   DataPrivacyApi,
   DataPrivacyPiiRedactionLevel,
 } from "@langwatch/data-privacy-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import {
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,

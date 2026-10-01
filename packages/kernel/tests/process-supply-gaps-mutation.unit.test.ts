@@ -7,19 +7,6 @@ import { describe, expect, it } from "vitest";
 const packageRoot = resolve(import.meta.dirname, "..");
 
 const mutations = {
-  "supply-token namespace": {
-    file: "src/supply-token.ts",
-    mutate(source: string) {
-      return source
-        .replace(
-          'import type { OperationsOnly } from "./module-api-token.ts";',
-          'import type { OperationsOnly } from "./module-api-token.ts";\nimport type { ModuleName } from "./module-namespace.ts";',
-        )
-        .replace("Name extends string = string", "Name extends ModuleName = ModuleName")
-        .replaceAll("const Name extends string", "const Name extends ModuleName");
-    },
-    diagnostic: "licenseSource",
-  },
   "selected repository tier": {
     file: "src/process-supply.types.ts",
     mutate(source: string) {

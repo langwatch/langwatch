@@ -1,5 +1,5 @@
 import type { PinnedTrace, PinTraceInput } from "@langwatch/data-retention-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   CreateShareInput,

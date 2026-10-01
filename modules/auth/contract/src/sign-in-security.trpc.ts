@@ -2,7 +2,7 @@
  * Every `signInSecurity.*` procedure, declared once. The names are the
  * browser's cache keys and main's wire names.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   releaseHeldAccountInputSchema,

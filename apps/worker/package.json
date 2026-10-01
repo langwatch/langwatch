@@ -97,6 +97,7 @@
     "@langwatch/metric-process": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-process": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/monitor-process": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",

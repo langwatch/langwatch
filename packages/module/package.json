@@ -1,0 +1,32 @@
+{
+  "name": "@langwatch/module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The light core every module contract imports: API tokens, module names, tRPC contract declarations and UI tokens.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "node scripts/check-feature-names.mjs && tsc -b tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/vitest-config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

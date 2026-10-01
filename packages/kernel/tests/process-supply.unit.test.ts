@@ -1,7 +1,8 @@
+import { SupplyToken, supplyToken } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { defineServerModule } from "../src/feature-installer.ts";
-import { createApp as packageCreateApp, SupplyToken, supplyToken } from "../src/index.ts";
+import { createApp as packageCreateApp } from "../src/index.ts";
 import { createApp } from "../src/process-supply.ts";
 import {
   clock,

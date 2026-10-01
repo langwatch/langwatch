@@ -28,6 +28,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/log-contract": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
     "@langwatch/plans": "workspace:*",

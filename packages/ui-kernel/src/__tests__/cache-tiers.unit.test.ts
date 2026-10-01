@@ -5,11 +5,6 @@
 
 import { trpcQueryKey } from "@langwatch/api/web";
 import {
-  defineTrpcContract,
-  SCHEMA_HASH_HEADER,
-  schemaHashesOf,
-} from "@langwatch/kernel/contract";
-import {
   cachePlanFor,
   PERSISTED_QUERY_MAX_AGE,
   procedurePathOf,
@@ -20,6 +15,7 @@ import {
   SessionVersionWatch,
   sessionVersionFetch,
 } from "@langwatch/browser-host/session-version";
+import { defineTrpcContract, SCHEMA_HASH_HEADER, schemaHashesOf } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

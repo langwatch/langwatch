@@ -5,8 +5,7 @@
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/kernel";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";

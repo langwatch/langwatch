@@ -1,5 +1,5 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 import { toEpochMs } from "@langwatch/time";
 import {

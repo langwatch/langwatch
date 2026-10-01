@@ -3,7 +3,7 @@
  * reader's prices are shown in, and the country that was decided from. The
  * name is the browser's cache key, so it is the wire name the pages call.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { detectedCurrencySchema } from "./pricing.ts";

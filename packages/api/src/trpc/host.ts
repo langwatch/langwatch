@@ -19,7 +19,7 @@ import {
   type TrpcContract,
   type TrpcContractKind,
   type TrpcContractMember,
-} from "@langwatch/kernel/contract";
+} from "@langwatch/module";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";

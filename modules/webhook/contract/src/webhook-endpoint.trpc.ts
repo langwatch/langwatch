@@ -3,7 +3,7 @@
  * browser's cache keys, so they are the wire names the settings screen has
  * always called, and the schemas below are the ones it has always sent.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { webhookEventTypeSchema } from "./webhook.events.ts";

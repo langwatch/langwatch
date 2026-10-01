@@ -25,6 +25,7 @@
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-saas-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

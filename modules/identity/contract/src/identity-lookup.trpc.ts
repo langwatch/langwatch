@@ -1,5 +1,5 @@
 /** The `identityLookup.*` procedures main's back-office identity lookup calls (D05). */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {

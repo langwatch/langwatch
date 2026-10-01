@@ -6,7 +6,7 @@
  */
 import { RestHost } from "@langwatch/api/rest";
 import { serverModules } from "@langwatch/installed-server-modules";
-import { ModuleApiToken } from "@langwatch/kernel";
+import { ModuleApiToken } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { bootApi } from "./api-installation.fixture.ts";

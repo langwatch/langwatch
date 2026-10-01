@@ -4,7 +4,7 @@
  * a secret as `secretId`, the wire the browser has always called.
  */
 
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { revealedSecretSchema, revealOnceInputSchema } from "./one-time-reveal.ts";

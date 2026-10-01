@@ -22,7 +22,7 @@ import {
   grantSchema,
   type AuthzPrincipalRef,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 /** Whose permissions bound a grant is the session's, so the input never names it. */
 const IMPLIED_BY_SESSION = { caller: true, actor: true } as const;

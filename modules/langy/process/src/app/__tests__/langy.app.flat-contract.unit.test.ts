@@ -183,6 +183,7 @@ function fakePresence(): PresenceApi {
     broadcastCursor: () => Promise.resolve(),
     events: async function* () {},
     cursors: async function* () {},
+    readHints: async function* () {},
     getTenantEmitter: () => new EventEmitter(),
     cleanupTenantEmitter: () => void 0,
   };

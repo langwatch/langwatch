@@ -27,6 +27,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

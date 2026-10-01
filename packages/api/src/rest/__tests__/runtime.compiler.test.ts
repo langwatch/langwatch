@@ -22,7 +22,7 @@ it("accepts the fluent annotation REST router and rejects a body from an implici
     accepted,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 
 interface AnnotationApi {
   getAnnotation(input: { id: string }): Promise<{ id: string }>;
@@ -57,7 +57,6 @@ transportDeclaration.router();
   writeFileSync(
     rejected,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { moduleApi } from "@langwatch/kernel";
 
 const AnnotationApi = moduleApi<object>()("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
@@ -69,7 +68,6 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
     mismatchedParams,
     `import { z } from "zod";
 import { defineRestRouter } from ${JSON.stringify(transport)};
-import { moduleApi } from "@langwatch/kernel";
 
 const AnnotationApi = moduleApi<object>()("annotation");
 const annotationRestParamsSchema = z.object({ id: z.string() });
@@ -84,7 +82,6 @@ defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-0
   writeFileSync(
     unpermitted,
     `import { defineRestRouter } from ${JSON.stringify(transport)};
-import { moduleApi } from "@langwatch/kernel";
 
 const AnnotationApi = moduleApi<object>()("annotation");
 defineRestRouter(AnnotationApi).withNamespace("annotations").withVersion("2026-08-07")
@@ -110,7 +107,6 @@ it("infers trailing middleware arguments and rejects wrong facts and responses",
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { moduleApi } from "@langwatch/kernel";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 import { defineRestMiddleware } from "../src/rest/request.ts";
 const api = moduleApi<object>()("annotation");
@@ -170,7 +166,6 @@ it("types the handler's scope from the declared credential, and refuses a door w
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { moduleApi } from "@langwatch/kernel";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = moduleApi<object>()("role");
 const tier = z.object({ tier: z.literal("organization") });
@@ -221,7 +216,6 @@ it("types the handler's answer from the statuses the declaration named", () => {
   writeFileSync(
     fixture,
     `import { z } from "zod";
-import { moduleApi } from "@langwatch/kernel";
 import { defineRestRouter } from "../src/rest/declaration.ts";
 const api = moduleApi<object>()("platform-health");
 const report = z.object({ status: z.string() });

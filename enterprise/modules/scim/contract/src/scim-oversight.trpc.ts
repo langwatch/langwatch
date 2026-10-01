@@ -3,7 +3,7 @@
  * Every `scimOversight.*` procedure: the back office's directory-sync
  * oversight (ADR-122), gated on the platform-operator grant like `ssoConnections.*`.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   directoryIdentityRowSchema,

@@ -23,7 +23,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "zod": "catalog:"

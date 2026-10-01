@@ -11,7 +11,7 @@ import type {
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
-import type { TrpcContract } from "@langwatch/kernel/contract";
+import type { TrpcContract } from "@langwatch/module";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { initTRPC } from "@trpc/server";
 

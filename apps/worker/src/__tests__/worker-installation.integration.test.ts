@@ -16,11 +16,11 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { serverModules } from "@langwatch/installed-server-modules";
 import {
   bootInstalledProcess,
-  ModuleApiToken,
   storesBackedMembers,
   withMemoryRepositories,
   type InstallableServerFeature,
 } from "@langwatch/kernel";
+import { ModuleApiToken } from "@langwatch/module";
 import { processConfig } from "@langwatch/process-server";
 import {
   aesEncryption,

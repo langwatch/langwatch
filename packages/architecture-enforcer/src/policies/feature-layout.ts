@@ -91,13 +91,13 @@ function contractArtifacts(snapshot: WorkspaceSnapshot, pkg: ClassifiedPackage):
   });
 }
 
-/** A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel. */
+/** A portable feature API may bind only the feature-API vocabulary from @langwatch/module. */
 function kernelBindingViolations(api: string): ArchitectureViolation[] {
   const violations: ArchitectureViolation[] = [];
   for (const statement of sourceFile({ file: api }).statements) {
     if (!ts.isImportDeclaration(statement)) continue;
     if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
-    if (statement.moduleSpecifier.text !== "@langwatch/kernel") continue;
+    if (statement.moduleSpecifier.text !== "@langwatch/module") continue;
 
     const bound = compositionBindingsBeyondFeatureApi(statement);
     if (bound.length === 0) continue;
@@ -105,7 +105,7 @@ function kernelBindingViolations(api: string): ArchitectureViolation[] {
     violations.push(
       violation(
         api,
-        `A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel; it binds ${bound.join(", ")}.`,
+        `A portable feature API may bind only the feature-API vocabulary from @langwatch/module; it binds ${bound.join(", ")}.`,
         "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
       ),
     );

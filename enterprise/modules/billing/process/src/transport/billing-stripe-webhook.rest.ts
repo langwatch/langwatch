@@ -9,7 +9,7 @@ import {
   billingStripeWebhookReceiptSchema,
   billingStripeWebhookHeadersSchema,
 } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import { resolveRequestBound } from "@langwatch/plans";
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");

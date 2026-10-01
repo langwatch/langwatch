@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const installer = resolve(root, "src/feature-installer.ts");
 const application = resolve(root, "src/application.ts");
-const contract = resolve(root, "src/module-api-token.ts");
+const contract = resolve(root, "../module/src/module-api-token.ts");
 const repositoryRegistry = resolve(root, "src/repository-registry.ts");
 const memberSource = resolve(root, "tests/member-source.ts");
 const configPackage = resolve(root, "../config/src/config.ts");
@@ -40,8 +40,10 @@ function diagnosticsFor(source: string): Diagnostic[] {
         module: "ESNext",
         moduleResolution: "Bundler",
         noEmit: true,
+        paths: { "@langwatch/module": [resolve(root, "../module/src/index.ts")] },
         skipLibCheck: true,
         strict: true,
+        lib: ["ES2023"],
         target: "ES2022",
         typeRoots: [resolve(root, "node_modules/@types")],
         types: ["node"],

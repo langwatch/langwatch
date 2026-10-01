@@ -1,3 +1,4 @@
+import { defineTrpcContract } from "@langwatch/module";
 /**
  * The read-hint map the kernel collects from installed contracts, and the one registration it
  * makes. Spec: packages/api/specs/read-hints.feature.
@@ -5,7 +6,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract } from "../src/contract/trpc-contract.ts";
 import { installReadHints, readHintsOf, type EventingHost } from "../src/module-eventing.ts";
 
 const organization = defineTrpcContract("organization")

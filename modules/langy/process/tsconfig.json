@@ -76,6 +76,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {

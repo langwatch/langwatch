@@ -1,3 +1,4 @@
+import { defineTrpcContract, type TrpcContract } from "@langwatch/module";
 /**
  * The projection reads the kernel collects from installed contracts, and the boot refusals.
  * Spec: packages/eventing/specs/projection-cursor-reads.feature.
@@ -5,7 +6,6 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { defineTrpcContract, type TrpcContract } from "../src/contract/trpc-contract.ts";
 import {
   installProjectionReads,
   projectionReadsOf,

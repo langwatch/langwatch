@@ -1,7 +1,7 @@
 # @langwatch/api
 
 LangWatch's API framework, in five entry points. What a feature declares,
-`defineTrpcContract`, lives in the light core, `@langwatch/kernel/contract`, so a
+`defineTrpcContract`, lives in the light core, `@langwatch/module`, so a
 contract depends on no framework.
 
 | Import                  | What it is                                                                                                                                                                                                                                                                                                                                                |
@@ -15,7 +15,7 @@ contract depends on no framework.
 None re-exports another. A consumer that wants the error vocabulary imports
 `@langwatch/api`; one that wants the REST builder imports `@langwatch/api/rest`;
 one wiring tRPC imports `@langwatch/api/trpc`; one _declaring_ procedures for
-both a server and a browser imports `@langwatch/kernel/contract`; a feature web
+both a server and a browser imports `@langwatch/module`; a feature web
 package imports `@langwatch/api/web`. Most REST call sites need two of the five,
 and that is the point — the import says which half of the framework a file
 depends on.
@@ -33,7 +33,7 @@ Behaviour: [specs/transport-declaration-split.feature](./specs/transport-declara
 
 ```ts
 // contract/src/annotation.trpc.ts — imports zod and its own schemas, nothing else.
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 export const annotationTrpc = defineTrpcContract("annotation")
   .query("getById")

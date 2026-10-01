@@ -5,7 +5,7 @@ import {
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
 } from "@langwatch/authz-contract";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { signUpDataSchema } from "@langwatch/onboarding-contract";
 import { PROJECT_CREATED_EVENT_TYPE } from "@langwatch/project-contract";
 import { z } from "zod";

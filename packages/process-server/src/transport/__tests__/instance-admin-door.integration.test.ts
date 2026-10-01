@@ -6,7 +6,7 @@
 import { createErrorHandler } from "@langwatch/api";
 import { anyAuthenticated } from "@langwatch/api/access";
 import { createRestRuntime, defineRestRouter } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 

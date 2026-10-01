@@ -24,7 +24,7 @@
       "path": "../design-system/tsconfig.build.json"
     },
     {
-      "path": "../kernel/tsconfig.build.json"
+      "path": "../module/tsconfig.build.json"
     },
     {
       "path": "../vitest-config/tsconfig.build.json"

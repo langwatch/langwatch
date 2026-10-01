@@ -34,6 +34,7 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",

@@ -30,6 +30,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mcp-server": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

@@ -9,7 +9,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestBytesProducer,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import {
   storedObjectFileRouteFilenameQuerySchema,
   storedObjectFileRouteIdParamsSchema,

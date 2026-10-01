@@ -6,7 +6,7 @@ import type {
   SessionKeyPresented,
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
 import type { LangyLocalRecord } from "./event-sourcing/folds/turn-fold.ts";

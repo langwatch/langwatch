@@ -5,7 +5,7 @@
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import {
   ProjectCreateDeniedError,
   ProjectCreateTargetMissingError,

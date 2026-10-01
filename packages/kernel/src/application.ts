@@ -1,3 +1,4 @@
+import { type FeatureApiIdentity, ModuleApiToken, SupplyToken } from "@langwatch/module";
 import type { ScopedSecrets, SecretHandle } from "@langwatch/secrets";
 
 import {
@@ -28,7 +29,6 @@ import type {
   ServerRole,
 } from "./feature-installer.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
-import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import {
   commandsOf,
   buildModuleEventing,
@@ -55,7 +55,6 @@ import {
 } from "./repository-registry.ts";
 import { type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
-import { SupplyToken } from "./supply-token.ts";
 import type { Tier } from "./tiers.ts";
 import {
   declaredForRole,

@@ -22,7 +22,7 @@
   "dependencies": {
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

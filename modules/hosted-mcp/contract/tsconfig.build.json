@@ -12,7 +12,7 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../packages/module/tsconfig.build.json"
     }
   ],
   "exclude": ["**/__tests__/**", "**/*.test.*", "**/*.spec.*"]

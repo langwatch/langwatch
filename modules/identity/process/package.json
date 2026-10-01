@@ -42,6 +42,7 @@
     "@langwatch/kernel": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mail": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",

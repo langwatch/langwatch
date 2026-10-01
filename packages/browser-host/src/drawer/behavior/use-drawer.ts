@@ -3,7 +3,7 @@
  * is the address plus `history.state`; nothing about it lives in memory.
  */
 
-import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/kernel/contract";
+import type { UiDrawerToken, UiTokenIdentity } from "@langwatch/module";
 import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
 import { useCallback, useMemo } from "react";

@@ -1,3 +1,5 @@
+import { ModuleApiToken, SupplyToken } from "@langwatch/module";
+
 import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./application.ts";
 import type { ResolvedTokens } from "./dependency-token.ts";
 import type {
@@ -5,7 +7,6 @@ import type {
   ModuleSecretsScope,
   ServerRole,
 } from "./feature-installer.ts";
-import { ModuleApiToken } from "./module-api-token.ts";
 import { membersFrom, storesBackedMembers, type StoresMemberSource } from "./module-members.ts";
 import { ObservabilitySupply } from "./process-supply.options.ts";
 import type {
@@ -20,7 +21,6 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
-import { SupplyToken } from "./supply-token.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 import type { TransportPeers } from "./transport-peers.ts";
 

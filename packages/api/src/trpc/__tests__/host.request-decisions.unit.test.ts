@@ -5,8 +5,7 @@
 
 import { createApiFixture } from "@langwatch/api-fixture";
 import type { PermissionDecision } from "@langwatch/authorization";
-import { moduleApi } from "@langwatch/kernel";
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract, moduleApi } from "@langwatch/module";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

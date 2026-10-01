@@ -26,6 +26,7 @@
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/enterprise-ops-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
     "zod": "catalog:"
   },

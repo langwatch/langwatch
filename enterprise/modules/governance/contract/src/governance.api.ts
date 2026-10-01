@@ -1,6 +1,6 @@
 import type { BrowserSessionInventoryEntry } from "@langwatch/auth-contract";
 import type { EntitlementOperator } from "@langwatch/entitlement-contract";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import type {
   RecordWorkspaceViewInput,

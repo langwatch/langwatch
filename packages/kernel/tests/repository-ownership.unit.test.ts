@@ -1,7 +1,8 @@
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it, vi } from "vitest";
 
 import { createApp } from "../src/application.ts";
-import { defineServerModule, moduleApi, type FeatureSetup } from "../src/index.ts";
+import { defineServerModule, type FeatureSetup } from "../src/index.ts";
 import {
   assertRepositoryOwnership,
   RepositoryOwnershipConflictError,

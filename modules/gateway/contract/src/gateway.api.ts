@@ -4,7 +4,7 @@
  * the abstract `GatewayService` — an interface plus its token, not a class.
  */
 import type { RestIdentity } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 import type { Instant } from "@langwatch/time";
 import type { z } from "zod";
 

@@ -2258,7 +2258,7 @@ the named exclusion list for very high-traffic reads (`UI_QUERY_MIRROR_EXCLUDED`
 (25 MB, 500 rows, 2 MB a row: `UI_QUERY_MIRROR_BUDGET`), the least recently read rows first out.
 A row carries its read's schema hash: a digest of the contract's input and output schemas and an
 optional `revision: n`, bumped when a read's meaning changes and its shape does not
-(`schemaHashOf`, `@langwatch/kernel/contract`). The browser takes the hash from the contract it was
+(`schemaHashOf`, `@langwatch/module`). The browser takes the hash from the contract it was
 built with and drops a row whose hash differs before painting it; the server's `x-lw-schema`
 header on every query answer is the backstop for a tab whose bundle is older. No build id or age
 decides it. A mirrored read is restored when first asked for, never all at start-up; the first

@@ -1,5 +1,5 @@
 /** Export progress, relayed off the tenant's `export_progress` broadcast (main's export router). */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 export const exportProgressEventSchema = z.object({

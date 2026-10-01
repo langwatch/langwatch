@@ -28,7 +28,7 @@ import {
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel/module-api";
+import { moduleApi } from "@langwatch/module";
 
 import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 

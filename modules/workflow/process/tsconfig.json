@@ -54,10 +54,16 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/plans/tsconfig.build.json"
@@ -78,13 +84,10 @@
       "path": "../../secret/contract/tsconfig.build.json"
     },
     {
-      "path": "../../organization/contract/tsconfig.build.json"
+      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/secrets/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

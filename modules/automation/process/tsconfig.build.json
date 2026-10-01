@@ -79,6 +79,9 @@
       "path": "../../../packages/mail/tsconfig.declarations.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../monitor/contract/tsconfig.build.json"
     },
     {

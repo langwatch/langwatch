@@ -3,7 +3,7 @@
  * Every `scimToken.*` procedure, declared once. The names are the settings
  * page's cache keys, so they are the wire names it has always called.
  */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 
 import {
   generateScimTokenSchema,

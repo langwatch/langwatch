@@ -15,25 +15,18 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./module-api": {
-      "types": "./dist/module-api-token.d.ts",
-      "default": "./src/module-api-token.ts"
-    },
     "./supply": {
       "types": "./dist/process-supply.d.ts",
       "default": "./src/process-supply.ts"
-    },
-    "./contract": {
-      "types": "./dist/contract/index.d.ts",
-      "default": "./src/contract/index.ts"
     }
   },
   "scripts": {
-    "typecheck": "node scripts/check-feature-names.mjs && tsc -b tsconfig.test.json tsconfig.type-tests.json",
+    "typecheck": "tsc -b tsconfig.test.json tsconfig.type-tests.json",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "zod": "catalog:"
   },

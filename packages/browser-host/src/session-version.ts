@@ -4,7 +4,7 @@
  * read's schema hash, which the disk mirror checks against the bundle's (ARCHITECTURE.md §10.2).
  */
 
-import { SCHEMA_HASH_HEADER } from "@langwatch/kernel/contract";
+import { SCHEMA_HASH_HEADER } from "@langwatch/module";
 
 /** The response header the API stamps on every tRPC answer. */
 export const SESSION_VERSION_HEADER = "x-lw-session-version";

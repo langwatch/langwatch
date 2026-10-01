@@ -9,7 +9,7 @@ import { RawHttpHost, WebSocketHost } from "@langwatch/api";
 import { publicRoute } from "@langwatch/api/access";
 import { type NodeHandler, TransportSelection } from "@langwatch/api/hosting";
 import { defineRestMiddleware, defineRestRouter } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
+import { moduleApi } from "@langwatch/module";
 import { createLogger } from "@langwatch/observability";
 import { OpsApi } from "@langwatch/ops-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";

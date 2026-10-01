@@ -1,8 +1,8 @@
+import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/application.ts";
 import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
-import { moduleApi } from "../src/module-api-token.ts";
 import {
   DuplicateTransportNamespaceError,
   MissingTransportHostError,

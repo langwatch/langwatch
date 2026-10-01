@@ -45,6 +45,9 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/module/tsconfig.build.json"
+    },
+    {
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** The served `governanceAgents.*` procedures, declared once, at main's wire names. */
-import { defineTrpcContract } from "@langwatch/kernel/contract";
+import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import { agentsListingOutcomeSchema } from "./agents-listing.ts";

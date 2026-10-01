@@ -30,7 +30,7 @@
       "path": "../../../../modules/identity/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/kernel/tsconfig.build.json"
+      "path": "../../../../packages/module/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
