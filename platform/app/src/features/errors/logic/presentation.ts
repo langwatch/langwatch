@@ -496,7 +496,7 @@ const presentations = {
   instant_eval_not_enabled: {
     title: "Instant Evals aren't available yet",
     describe: () =>
-      "Instant Evals are off for this organization. An organization admin can switch them on from the search bar, or ask us to.",
+      "Instant Evals are off for this organization. Ask an organization admin how to switch them on, or contact us.",
   },
   instant_eval_not_found: {
     title: "That run doesn't exist",

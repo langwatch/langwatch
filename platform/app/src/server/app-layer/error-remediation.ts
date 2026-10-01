@@ -251,7 +251,7 @@ const registry = {
   },
   instant_eval_not_enabled: {
     tips: [
-      "Instant Evals are off for this organization; an organization admin switches them on from the search bar, or an enterprise organization asks LangWatch to",
+      "Instant Evals are off for this organization; a self-serve organization on the hosted service is switched on by an organization admin from the search bar, and any other organization or install asks LangWatch to",
     ],
     docsPath: "/features/instant-evals/limits-and-cost",
   },
