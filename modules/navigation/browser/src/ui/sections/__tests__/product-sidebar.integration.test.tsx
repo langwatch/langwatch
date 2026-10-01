@@ -317,17 +317,28 @@ describe("the product sidebar", () => {
       expect(screen.queryByText("Billed")).not.toBeInTheDocument();
     });
 
-    /** @scenario With the billed-cost flag on, Costs appears between Overview and Inventory */
-    it("shows Costs between Overview and Inventory while the flag is on", () => {
+    /** @scenario With the billed-cost flag on, Costs appears without the unfinished Billed destination */
+    it("shows Costs between Overview and Inventory while the flag is on, and never Billed", () => {
       renderSidebar({ surface: "governance", pathname: "/governance", billedCostEnabled: true });
 
-      const labels = screen
-        .getAllByRole("link")
-        .map((link) => link.textContent)
-        .filter((label): label is string =>
-          ["Overview", "Costs", "Inventory"].includes(label ?? ""),
-        );
-      expect(labels).toEqual(["Overview", "Costs", "Inventory"]);
+      const railOrder = (names: string[]) =>
+        screen
+          .getAllByRole("link")
+          .map((link) => link.textContent?.trim())
+          .filter((label) => names.includes(label ?? ""));
+
+      expect(railOrder(["Overview", "Costs", "Inventory"])).toEqual([
+        "Overview",
+        "Costs",
+        "Inventory",
+      ]);
+      expect(railOrder(["People", "Insights", "Analytics", "Signals & Alerts"])).toEqual([
+        "People",
+        "Insights",
+        "Analytics",
+        "Signals & Alerts",
+      ]);
+      expect(screen.queryByText("Billed")).not.toBeInTheDocument();
     });
 
     /** @scenario "The Platform group lists its three entries under one label" */

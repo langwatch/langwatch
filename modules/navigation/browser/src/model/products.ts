@@ -1,4 +1,4 @@
-import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
 import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
 import { Boxes, Building2, type LucideIcon, UserRound, Waypoints } from "lucide-react";
 
