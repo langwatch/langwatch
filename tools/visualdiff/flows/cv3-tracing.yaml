@@ -32,6 +32,7 @@ flows:
       - action: request
         with:
           path: /api/trace/vd-cv3sh-{uid}/share
+          auth: "{projectKey}"
           body: "{}"
       - action: go
         with:
@@ -56,6 +57,7 @@ flows:
       - action: request
         with:
           path: /api/trace/vd-cv3sh-{uid}/unshare
+          auth: "{projectKey}"
           body: "{}"
       - action: go
         with:

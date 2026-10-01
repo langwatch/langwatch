@@ -328,10 +328,11 @@ export const flowProject = ({
   return { slug, credential: { ...plan.credential, slug, projectKey }, missing: "" };
 };
 
-/** actorValues are `{actor}` and `{actorPassword}`: the account the flow's own steps sign in as. */
+/** actorValues are `{actor}`, `{actorPassword}` and `{projectKey}`: the signed-in account. */
 const actorValues = ({ credential }: FlowProject): Record<string, string> => ({
   actor: credential.email,
   actorPassword: credential.password,
+  projectKey: credential.projectKey,
 });
 
 /** FlowWalk is what every step of one flow's walk shares. */

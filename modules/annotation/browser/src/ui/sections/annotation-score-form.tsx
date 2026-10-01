@@ -28,7 +28,7 @@ type AnnotationScoreFormProps = {
 function initialFormValues(): FormData {
   return {
     name: "",
-    dataType: "boolean",
+    dataType: AnnotationScoreDataType.OPTION,
     description: "",
     category: Array(5).fill(""),
     categoryExplanation: Array(5).fill(""),
@@ -77,7 +77,7 @@ function useExistingScoreDefaults({
     reset({
       ...initialFormValues(),
       name: score.name,
-      dataType: score.dataType ?? "boolean",
+      dataType: score.dataType ?? AnnotationScoreDataType.OPTION,
       description: score.description ?? "",
     });
 
