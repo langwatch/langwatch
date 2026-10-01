@@ -158,8 +158,8 @@ langevals:
     limits:   { cpu: 500m, memory: 4Gi }
 ```
 
-The limit is a ceiling, not a reservation, so a generous one costs nothing until
-an evaluator actually loads a model.
+The limit is a ceiling, not a reservation, so a generous one uses no extra
+memory until an evaluator actually loads a model.
 
 To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
 

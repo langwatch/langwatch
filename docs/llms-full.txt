@@ -61060,8 +61060,11 @@ To fix a wrong issuer, client id or client secret, or to replace SAML metadata,
 edit the connection with the pencil button next to its issuer on the setup
 page. Editing keeps the connection id, so the redirect URI, the domains and who
 the connection admits stay the same. A blank client secret keeps the current
-one. The new settings are checked the same way as at registration, and nothing
-changes if they are refused. The protocol of a connection cannot be changed.
+one.
+
+The new settings are checked the same way as at registration. If they are
+refused, the connection keeps its current settings. The protocol of a
+connection cannot be changed.
 
 ## Issuer
 
@@ -61069,7 +61072,7 @@ Enter the issuer exactly as it appears in the `iss` claim of the provider's
 ID tokens. When you register the connection, LangWatch fetches
 `<issuer>/.well-known/openid-configuration` and saves the `issuer` value from
 that response, so a trailing slash you typed or left out is corrected. If the
-response gives a different issuer, you get an error and nothing is saved.
+response gives a different issuer, you get an error and the connection is not saved.
 
 | Provider | Issuer |
 |----------|--------|
@@ -63017,7 +63020,7 @@ keywords: first run, setup, first account, license, activation code, sso, single
 These steps take a fresh install to single sign-on through your own identity provider. They apply to [Helm](/self-hosting/deployment/kubernetes-helm), [ArgoCD](/self-hosting/deployment/argocd) and [Docker Compose](/self-hosting/deployment/docker-compose) installs alike.
 
 1. **Install LangWatch.** No email provider is needed for these steps.
-2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey for this account, since step 5 links single sign-on to the password account. The first account becomes an administrator of the organization, the same role any other administrator has. It gets no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it from the organization.
+2. **Create the first account.** Open LangWatch and sign up with an email and a password. Do not use a passkey, since step 5 links single sign-on to the password account. The first account is an ordinary organization administrator. It has no rights over the whole installation: the operator pages (`/ops`) open only for the addresses in `ADMIN_EMAILS`. Once another administrator exists, you can change this account's role or remove it.
 3. **Add the license.** Open **Settings > License**. Enter the activation code LangWatch sent you, which needs outbound HTTPS to `connect.langwatch.ai` (see [Connect](/self-hosting/connect)). On an install without that access, paste or upload the license key instead (see [Editions and licensing](/self-hosting/licensing)). Single sign-on turns on once the license is active, with no restart.
 4. **Connect your identity provider.** Open **Settings > Authentication > Identity provider** and follow the setup:
    1. Register the connection with the issuer, client id and client secret from your identity provider, or with its SAML metadata.
@@ -65754,8 +65757,8 @@ langevals:
     limits:   { cpu: 500m, memory: 4Gi }
 ```
 
-The limit is a ceiling, not a reservation, so a generous one costs nothing until
-an evaluator actually loads a model.
+The limit is a ceiling, not a reservation, so a generous one uses no extra
+memory until an evaluator actually loads a model.
 
 To pin the pool independently of the CPU allowance, set `CPU_COUNT`:
 

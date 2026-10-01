@@ -57,8 +57,11 @@ To fix a wrong issuer, client id or client secret, or to replace SAML metadata,
 edit the connection with the pencil button next to its issuer on the setup
 page. Editing keeps the connection id, so the redirect URI, the domains and who
 the connection admits stay the same. A blank client secret keeps the current
-one. The new settings are checked the same way as at registration, and nothing
-changes if they are refused. The protocol of a connection cannot be changed.
+one.
+
+The new settings are checked the same way as at registration. If they are
+refused, the connection keeps its current settings. The protocol of a
+connection cannot be changed.
 
 ## Issuer
 
@@ -66,7 +69,7 @@ Enter the issuer exactly as it appears in the `iss` claim of the provider's
 ID tokens. When you register the connection, LangWatch fetches
 `<issuer>/.well-known/openid-configuration` and saves the `issuer` value from
 that response, so a trailing slash you typed or left out is corrected. If the
-response gives a different issuer, you get an error and nothing is saved.
+response gives a different issuer, you get an error and the connection is not saved.
 
 | Provider | Issuer |
 |----------|--------|
