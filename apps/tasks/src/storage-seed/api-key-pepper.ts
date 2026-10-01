@@ -1,4 +1,4 @@
-import { SecretsChain } from "@langwatch/secrets";
+import type { SecretsChain } from "@langwatch/secrets";
 
 /**
  * The pepper chain `ApiKeyModule.secrets` resolves, in its order (first set wins), or seeds never
@@ -34,19 +34,15 @@ export function apiKeyPepperFrom({
 }
 
 /**
- * Resolves the pepper through the same ordered source chain every process
- * boots with (ADR-132), so the seed writes hashes the applications verify —
- * by the time this runs, `--env-file-if-exists` has loaded the workspace `.env`.
+ * Resolves the pepper through the runner's chain, the same ordered sources
+ * every process boots with (ADR-132), so the seed writes hashes the
+ * applications verify.
  */
 export async function resolveApiKeyPepper({
-  source,
+  chain,
 }: {
-  source: Readonly<Record<string, unknown>>;
+  chain: SecretsChain;
 }): Promise<ApiKeyPepperResolution> {
-  const environment = Object.fromEntries(
-    Object.entries(source).map(([key, value]) => [key, typeof value === "string" ? value : void 0]),
-  );
-  const chain = SecretsChain.start({ environment }).withEnv();
   const resolved: Record<string, string> = {};
 
   for (const key of API_KEY_PEPPER_KEYS) {
