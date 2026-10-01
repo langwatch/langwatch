@@ -1,4 +1,5 @@
-import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 
 import type { WorkflowPermissionProbe } from "../app/workflow.app.ts";
 
