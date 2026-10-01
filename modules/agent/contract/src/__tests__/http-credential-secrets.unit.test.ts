@@ -46,7 +46,7 @@ describe("a credential typed into an HTTP node", () => {
     it("matches a listed scheme in any case", () => {
       expect(holdsLiteralCredential("bearer {{ secrets.K }}")).toBe(false);
       expect(holdsLiteralCredential("APIKEY {{ secrets.K }}")).toBe(false);
-      expect(holdsLiteralCredential("Token: {{ secrets.K }}")).toBe(false);
+      expect(holdsLiteralCredential("TOKEN {{ secrets.K }}")).toBe(false);
     });
 
     /** @scenario A credential that only wraps secret references is kept as references */
@@ -54,6 +54,15 @@ describe("a credential typed into an HTTP node", () => {
       expect(holdsLiteralCredential("hunter={{ secrets.X }}")).toBe(false);
       expect(holdsLiteralCredential("api_key={{ secrets.X }}")).toBe(false);
       expect(holdsLiteralCredential("x-api-key: {{ secrets.X }}")).toBe(false);
+      expect(holdsLiteralCredential("key2={{ secrets.X }}")).toBe(false);
+    });
+
+    /** @scenario A credential that only wraps secret references is kept as references */
+    it("treats a token-shaped or overlong label as a literal", () => {
+      expect(holdsLiteralCredential("ghp_abc123def456={{ secrets.X }}")).toBe(true);
+      expect(holdsLiteralCredential("sk-proj-AbC1x9Qz7Lm2Pq8:{{ secrets.X }}")).toBe(true);
+      expect(holdsLiteralCredential(`${"a".repeat(33)}={{ secrets.X }}`)).toBe(true);
+      expect(holdsLiteralCredential(`${"a".repeat(32)}={{ secrets.X }}`)).toBe(false);
     });
 
     /** @scenario A credential that only wraps secret references is kept as references */

@@ -55,5 +55,7 @@ Feature: HTTP agent credentials
     Then no new project secret is stored for it and it is kept as typed
     And at run time each reference inside it resolves to its secret's value
     And a word followed by a space counts only when it is a listed scheme, in any case: Bearer, Basic, Token, ApiKey, Key, Bot or Digest
-    And any field label followed by "=" or ":", such as "api_key={{ secrets.X }}", keeps the value a reference
+    And a field label followed by "=" or ":", such as "api_key={{ secrets.X }}", keeps the value a reference
+    And a label is 1 to 32 characters, starts with a letter, holds only letters, "_", "-" and at most 4 digits
+    And a token-shaped or longer label, such as "ghp_abc123def456={{ secrets.X }}", is a literal stored as a secret
     And any other word before a space, such as "hunter {{ secrets.X }}", is a literal stored as a secret

@@ -143,20 +143,28 @@ function caselessPattern(scheme: CredentialScheme): string {
 }
 
 const REFERENCE = String.raw`\{\{\s*secrets\.[A-Z][A-Z0-9_]*\s*\}\}`;
-/** References joined only by separators, behind a listed scheme and a space (`ApiKey `) or any
- * field label and `=`/`:` (`api_key=`); the label names a field, it is not a credential. */
+/** References joined only by separators, behind a listed scheme and a space (`ApiKey `) or a
+ * field label of 1-32 characters and `=`/`:` (`api_key=`), captured to check its digits. */
 const SCHEMED_REFERENCES = new RegExp(
-  String.raw`^(?:(?:${CREDENTIAL_SCHEMES.map(caselessPattern).join("|")})\s+|[A-Za-z][\w-]*\s*[:=]\s*)?` +
+  String.raw`^(?:(?:${CREDENTIAL_SCHEMES.map(caselessPattern).join("|")})\s+|([A-Za-z][A-Za-z0-9_-]{0,31})\s*[:=]\s*)?` +
     String.raw`${REFERENCE}(?:[\s:=]*${REFERENCE})*$`,
 );
+const MAX_LABEL_DIGITS = 4;
+
+/** Whether a label names a field: more than a few digits (`ghp_abc123def456`) makes it a token. */
+function isFieldLabel(label: string): boolean {
+  return label.replace(/\D/g, "").length <= MAX_LABEL_DIGITS;
+}
 
 /** A value that is not blank and holds more than `{{ secrets.NAME }}` references, separators
- * and one listed scheme or field label; any other word before a space makes it a literal. */
+ * and one listed scheme or field label; any other word or token-shaped label makes it a literal. */
 export function holdsLiteralCredential(value: string): boolean {
   const text = value.trim();
   if (text === "" || secretReferenceOf(inReferenceSpelling(text)) !== undefined) return false;
+  const match = SCHEMED_REFERENCES.exec(text);
+  const label = match?.[1];
 
-  return !SCHEMED_REFERENCES.test(text);
+  return match === null || (label !== undefined && !isFieldLabel(label));
 }
 
 /** The value as a read may answer it: a reference, in its stored spelling, never a credential. */
