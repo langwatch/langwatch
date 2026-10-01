@@ -97,7 +97,9 @@ it("keeps the contract modules browser-safe: no server framework in their value 
   for (const relative of ["contract/src/api-key.trpc.ts", "contract/src/api-key-trpc.schemas.ts"]) {
     for (const specifier of valueImports(relative)) {
       expect([specifier, relative]).toEqual([
-        expect.stringMatching(/^(?:zod|@langwatch\/api\/contract|\.\/)/),
+        expect.stringMatching(
+          /^(?:zod|@langwatch\/api\/contract|@langwatch\/kernel\/contract$|\.\/)/,
+        ),
         relative,
       ]);
     }

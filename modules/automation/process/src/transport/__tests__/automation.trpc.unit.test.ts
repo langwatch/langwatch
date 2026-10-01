@@ -113,7 +113,13 @@ describe("the automation tRPC namespace", () => {
   describe("given the signed-in author", () => {
     describe("when a test fire is asked for", () => {
       it("delivers it to the address the process resolved, never one the client sent", async () => {
-        const sendTestFire = vi.fn().mockResolvedValue({ channel: "email", didSend: true });
+        const sendTestFire = vi.fn().mockResolvedValue({
+          channel: "email",
+          recipientCount: 1,
+          usedDefault: false,
+          missingVariables: [],
+          errors: [],
+        });
         const { caller } = mount({ app: { sendTestFire } });
 
         await caller.testFireTemplate({

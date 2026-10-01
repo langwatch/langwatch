@@ -1258,8 +1258,8 @@ async function authorized<TContext extends object>({
 }
 
 /**
- * Reports an answer its own declared schema refuses without changing the
- * transport answer. A response mismatch is a server defect, not a new 500.
+ * Parses an answer with its declared schema. One the schema refuses is logged
+ * and raised as a plain Error (a 500); the raw value is never sent.
  */
 function validateDeclaredOutput({
   procedure,
@@ -1283,7 +1283,7 @@ function validateDeclaredOutput({
     "tRPC handler response did not match its declared output schema",
   );
 
-  return value;
+  throw new Error(`tRPC ${procedure} answered a value its declared output schema refuses`);
 }
 
 /**
@@ -1327,7 +1327,7 @@ function guardOutput({
     validateDeclaredOutput({ procedure, schema: output, value: await invoke(opts) });
 }
 
-/** Reports a value from a procedure that declared no output at all. */
+/** A procedure that declared no output answers nothing; any value is a 500 (Alex, 2026-10-01). */
 function voidOutput({ procedure, value }: { procedure: string; value: unknown }): unknown {
   if (value === undefined) return value;
 
@@ -1340,7 +1340,7 @@ function voidOutput({ procedure, value }: { procedure: string; value: unknown })
     "tRPC handler response did not match its declared output schema",
   );
 
-  return value;
+  throw new Error(`tRPC ${procedure} answered a value but declares no output schema`);
 }
 
 /** The handler's own arguments, and the facts that follow them. */
