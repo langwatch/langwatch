@@ -139,7 +139,8 @@ describe("a test suite's evaluators", () => {
   });
 
   describe("when an edit attaches an evaluator the project holds", () => {
-    it("writes the edit", async () => {
+    /** @scenario "An evaluator is attached to a test suite with its mappings" */
+    it("writes the edit with the attachment and its mappings", async () => {
       await service.updateTestSuite({
         testSuiteId: "suite-1",
         projectId,
@@ -147,6 +148,7 @@ describe("a test suite's evaluators", () => {
       });
 
       expect(writes).toHaveLength(1);
+      expect(writes[0]?.evaluators).toEqual([attachment("evaluator-1")]);
     });
   });
 

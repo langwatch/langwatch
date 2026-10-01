@@ -173,15 +173,23 @@ class SettlingSession extends SignedInSession {
   }
 }
 
-function renderChrome(capabilities: UiCapabilities = CAPABILITIES) {
+function renderChrome(
+  capabilities: UiCapabilities = CAPABILITIES,
+  address: { path: string; pattern: string } = {
+    path: "/my-project/traces",
+    pattern: "/:project/traces",
+  },
+) {
   return render(
-    <MemoryRouter initialEntries={["/my-project/traces"]}>
-      <QueryClientProvider client={new QueryClient()}>
+    <MemoryRouter initialEntries={[address.path]}>
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
         <UiCapabilityContextProvider value={capabilities}>
           <UiDesignSystemShell>
             <Routes>
               <Route element={<UiAppChrome capabilities={ROOT} />}>
-                <Route path="/:project/traces" element={<HostProbe />} />
+                <Route path={address.pattern} element={<HostProbe />} />
               </Route>
             </Routes>
           </UiDesignSystemShell>
@@ -266,6 +274,30 @@ describe("the application chrome", () => {
       await waitFor(() =>
         expect(screen.getByTestId("probe").getAttribute("data-loading")).toBe("false"),
       );
+    });
+  });
+
+  describe("when the graph refuses the read", () => {
+    class RefusingRpc extends GraphRpc {
+      override query(): Promise<unknown> {
+        return Promise.reject(new Error("refused"));
+      }
+    }
+
+    /** @scenario A graph that refused the read is not a graph still reading */
+    it("draws the refusal rather than a chrome still reading", async () => {
+      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.queryByTestId("probe")).toBeNull();
+    });
+
+    /** @scenario The landing address says a refused read failed rather than waiting on it */
+    it("says the workspace could not be opened on the landing address", async () => {
+      renderChrome({ ...CAPABILITIES, rpc: new RefusingRpc() }, { path: "/", pattern: "/" });
+
+      await waitFor(() => expect(screen.getByTestId("retry-workspace")).toBeTruthy());
+      expect(screen.getByText(/couldn't open your workspace/i)).toBeTruthy();
     });
   });
 
