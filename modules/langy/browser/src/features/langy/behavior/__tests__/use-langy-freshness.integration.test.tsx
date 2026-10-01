@@ -27,16 +27,6 @@ const recordInvalidate = vi.fn(() => Promise.resolve());
 // test delivers a freshness signal through the real hook logic.
 let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: PROJECT_ID } }),
 }));

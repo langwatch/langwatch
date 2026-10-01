@@ -101,16 +101,6 @@ const projectRef = {
 // release_ui_langy_peek_dock_enabled). This suite is about conversation
 // history, not the closed state, so pin the flag off (the classic launcher) —
 // the same render path this suite had before the flag landed.
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 // Hoisted so the mock factory below can share it, and so assertions can hold
 // this reference directly instead of extracting the real module's
 // method-shaped `toaster.create` as an unbound value.

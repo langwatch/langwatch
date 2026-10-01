@@ -62,16 +62,6 @@ const notifyEngine = () => {
   engine.listeners.forEach((notify) => notify());
 };
 
-vi.mock("@langwatch/browser-trpc/workflow-api", () => ({
-  api: {
-    modelProvider: {
-      listAllForProjectForFrontend: {
-        useQuery: () => ({ data: undefined, isLoading: false }),
-      },
-    },
-  },
-}));
-
 vi.mock("@ai-sdk/react", async () => {
   const React = await import("react");
   return {
