@@ -1,3 +1,5 @@
+-- IRREVERSIBLE: a data fix. The removed trailing slash is not recorded, and
+-- the form without it is the one Entra ID tokens carry.
 -- @tenancy: a data fix over every SSO provider row, not a tenant query.
 -- Entra ID signs v2 tokens with `iss` = `https://login.microsoftonline.com/<tenant>/v2.0`,
 -- no trailing slash, and the engine compares it to the stored issuer exactly.
