@@ -64,6 +64,16 @@ describe("secret app installation", () => {
     }
   });
 
+  /** @scenario "A process with no key composes no secret service" */
+  it("refuses at boot, naming the missing encryption, when the process has no key", async () => {
+    const team = teamWithMembers(["user-first"]);
+    const keyless = createApp({ role: "api" })
+      .withModules([withMemoryRepositories(secretProcessModule)])
+      .provide({ project: team.projects, authz: team.permissions });
+
+    await expect(keyless.boot()).rejects.toThrow(/encryption/i);
+  });
+
   /** @scenario "The first read returns the secret and the second refuses" */
   it("serves a one-time reveal through the installed app, once", async () => {
     const runtime = await process("api").boot();

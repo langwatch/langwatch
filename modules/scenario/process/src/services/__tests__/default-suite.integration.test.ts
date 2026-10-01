@@ -184,6 +184,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
   });
 
   /** @scenario "Default suite owning slug takes numbered slug when another suite owns 'default'" */
+  /** @scenario "A Default suite created while another suite already owns the slug takes a numbered slug" */
   it("takes a numbered slug when another suite of the project owns 'default'", async () => {
     await database().simulationSuite.create({
       data: {

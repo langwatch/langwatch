@@ -696,9 +696,7 @@ describe.skipIf(!databaseUrl)("Run plan identity by name", () => {
     });
 
     describe("when the scope names every suite of the project", () => {
-      /** @scenario
-       * "Naming every suite of the project resolves to the same plan as running everything"
-       */
+      /** @scenario "Naming every suite of the project resolves to the same plan as running everything" */
       it("stores the scope as all, so it lands where Run all lands", async () => {
         const agent = createHttpAgent();
         const refunds = await createTestSuite("Refunds");

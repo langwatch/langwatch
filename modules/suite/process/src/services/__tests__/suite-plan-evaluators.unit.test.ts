@@ -217,6 +217,7 @@ describe("a run plan's own evaluators", () => {
 describe("the evaluators one run carries", () => {
   describe("when the run's test suite is archived and its plan attaches its own", () => {
     /** @scenario "A run's evaluators are its test suite's, then its plan's own, each listed once" */
+    /** @scenario "A run plan carries its own evaluators beside the suites' ones" */
     it("lists the suite's first, then the plan's", async () => {
       const suiteCopy = { ...attachment("evaluator-2"), id: "suite-attachment" };
       testSuites = [archivedTestSuite([suiteCopy])];

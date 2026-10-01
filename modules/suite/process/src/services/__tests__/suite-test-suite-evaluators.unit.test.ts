@@ -111,6 +111,7 @@ beforeEach(() => {
 describe("a test suite's evaluators", () => {
   describe("when an edit attaches an evaluator the project does not hold", () => {
     /** @scenario "A test suite write refuses an evaluator the project does not hold" */
+    /** @scenario "An attachment naming an evaluator the project does not have is refused" */
     it("refuses with suite_evaluator_not_found and writes nothing", async () => {
       await expect(
         service.updateTestSuite({
@@ -151,6 +152,7 @@ describe("a test suite's evaluators", () => {
 
   describe("when an edit drops a field an attached evaluator still reads", () => {
     /** @scenario "A test suite edit refuses dropping a field an attached evaluator still reads" */
+    /** @scenario "A field an evaluator reads cannot be removed" */
     it("refuses with suite_field_in_use", async () => {
       stored = testSuite({
         fields: [{ identifier: "golden", type: "text" }],

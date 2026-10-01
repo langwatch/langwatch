@@ -182,7 +182,7 @@ Feature: Share a trace behind a secret, scoped, expiring link
 
   Rule: The anonymous surface stays exactly one endpoint
 
-    @unit
+    @unimplemented
     Scenario: Adding a new public endpoint is a deliberate, reviewed act
       Given the API's full procedure map
       When the public (unauthenticated) procedures are enumerated

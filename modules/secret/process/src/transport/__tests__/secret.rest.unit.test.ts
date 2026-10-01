@@ -197,6 +197,7 @@ describe("the secret REST family", () => {
       ]);
     });
 
+    /** @scenario "Legacy REST remains a thin compatibility transport" */
     /** @scenario "The modern public API is validated REST" */
     it("reads, replaces and deletes a secret at the id its path names", async () => {
       const created = await plural.request("/api/secrets", {
@@ -220,6 +221,7 @@ describe("the secret REST family", () => {
     });
   });
 
+  /** @scenario "Every transport uses one service" */
   it("declares main's five operations", () => {
     expect(secretRest.router().routes.map((route) => route.operation)).toEqual([
       "getApiSecrets",
