@@ -46,11 +46,36 @@ const superjsonErrorSerializer = (error: unknown) => {
 
   const serialized = getSuperjson().serialize(error);
 
-  return {
+  return redactCommandCredentials({
     ...pino.stdSerializers.err(error),
     _superjson: serialized.meta,
-  };
+  });
 };
+
+/** Redis commands whose arguments carry a password. */
+const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
+
+/**
+ * ioredis attaches the failed command to a reply error as
+ * `command: { name, args }`, so a failed AUTH carries the password in `args`.
+ * Returns the serialized error with those arguments replaced; every other
+ * error passes through unchanged.
+ */
+function redactCommandCredentials<T extends object>(serialized: T): T {
+  const command = (serialized as { command?: unknown }).command;
+  if (!command || typeof command !== "object") return serialized;
+  const { name, args } = command as { name?: unknown; args?: unknown };
+  if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
+    return serialized;
+  }
+  return {
+    ...serialized,
+    command: {
+      ...command,
+      args: Array.isArray(args) ? args.map(() => "[redacted]") : "[redacted]",
+    },
+  };
+}
 
 /**
  * Every key a cause may be logged under, mapped to the same serializer.
@@ -62,11 +87,13 @@ const superjsonErrorSerializer = (error: unknown) => {
  * constant is what lets a test drive the real thing rather than a copy of it.
  *
  * `error` for records that ARE failures; {@link REQUEST_CAUSE_FIELD} for the
- * cause on records deliberately logged below error level.
+ * cause on records deliberately logged below error level; `reason` for the
+ * process-level unhandled-rejection record.
  */
 export const NODE_LOG_SERIALIZERS = {
   error: superjsonErrorSerializer,
   [REQUEST_CAUSE_FIELD]: superjsonErrorSerializer,
+  reason: superjsonErrorSerializer,
 } as const;
 
 export interface CreateLoggerOptions {

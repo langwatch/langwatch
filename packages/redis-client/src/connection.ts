@@ -45,6 +45,28 @@ const SHARED_OPTIONS = {
   maxRetriesPerRequest: null,
 } as const;
 
+/** Redis commands whose arguments carry a password. */
+const CREDENTIAL_COMMANDS = new Set(["auth", "hello"]);
+
+/**
+ * ioredis attaches the failed command to a reply error as
+ * `command: { name, args }`, so a rejected AUTH carries the password in
+ * `args`. The same object rejects every queued command and can end up in a
+ * crash log, so the arguments are replaced on the error itself.
+ */
+function redactCommandCredentials(error: unknown): void {
+  if (!error || typeof error !== "object") return;
+  const command = (error as { command?: unknown }).command;
+  if (!command || typeof command !== "object") return;
+  const { name, args } = command as { name?: unknown; args?: unknown };
+  if (typeof name !== "string" || !CREDENTIAL_COMMANDS.has(name.toLowerCase())) {
+    return;
+  }
+  (command as { args: unknown }).args = Array.isArray(args)
+    ? args.map(() => "[redacted]")
+    : "[redacted]";
+}
+
 export class RedisConnectionService {
   private readonly logger: RedisLogger | undefined;
   private readonly config: RedisConfigService;
@@ -153,14 +175,34 @@ export class RedisConnectionService {
     context: object;
   }): void {
     const logger = this.logger;
+
+    // Registered first, so it runs before any listener a caller adds later,
+    // and synchronously, before the rejected command promises that share the
+    // same error object are handled.
+    connection.on("error", (error: unknown) => {
+      redactCommandCredentials(error);
+      if (logger) {
+        logger.error({ ...context, error }, "error");
+      } else if (connection.listenerCount("error") === 1) {
+        // Keeps ioredis's own report for a connection nobody else listens on;
+        // registering a listener at all is what turns that report off.
+        console.error(
+          "[ioredis] Unhandled error event:",
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    });
+    if (connection instanceof Cluster) {
+      connection.on("node error", (error: unknown) =>
+        redactCommandCredentials(error),
+      );
+    }
+
     if (!logger) return;
 
     connection.on("connect", () => logger.info(context, "connected"));
     connection.on("ready", () =>
       logger.info(context, "ready to accept commands"),
-    );
-    connection.on("error", (error: Error) =>
-      logger.error({ ...context, error }, "error"),
     );
     connection.on("close", () => logger.info(context, "connection closed"));
     connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
