@@ -75,8 +75,10 @@ Feature: Helm installs with operator-owned Secrets under Argo CD
       Then the logged command arguments are redacted
       And the error message is kept
 
-  @unit
-  Scenario: the Secrets the render Job reads sync before it under Argo CD
-    Given the chart renders its own app, ClickHouse, PostgreSQL and Redis Secrets
-    When Argo CD orders the sync by wave
-    Then each of those Secrets syncs in a wave before the LangWatchQL render Job
+  Rule: Argo CD syncs the Secrets a Job reads before the Job
+
+    @unit
+    Scenario: the Secrets the render Job reads sync before it under Argo CD
+      Given the chart renders its own app, ClickHouse, PostgreSQL and Redis Secrets
+      When Argo CD orders the sync by wave
+      Then each of those Secrets syncs in a wave before the LangWatchQL render Job

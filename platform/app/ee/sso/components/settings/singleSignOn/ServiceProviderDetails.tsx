@@ -26,6 +26,8 @@ export function ServiceProviderDetails({
   connected: boolean;
   protocol: "oidc" | "saml";
 }) {
+  const deploymentSignIn =
+    protocol === "oidc" ? serviceProvider.deploymentSignIn : null;
   const rows =
     protocol === "oidc"
       ? [
@@ -72,6 +74,14 @@ export function ServiceProviderDetails({
         </Text>
       </VStack>
       <CopyValueRows rows={rows} />
+      {deploymentSignIn && (
+        <Text color="fg.muted" fontSize="sm">
+          This installation also has {deploymentSignIn.name} sign-in set up by
+          its deployment, which the sign-in page offers. That sign-in returns to{" "}
+          <code>{deploymentSignIn.redirectUrl}</code>. If it uses the same
+          application in your identity provider, register both addresses there.
+        </Text>
+      )}
     </VStack>
   );
 }

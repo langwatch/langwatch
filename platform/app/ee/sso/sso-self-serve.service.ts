@@ -42,6 +42,7 @@ import {
   safeEqual,
   sha256Hex,
 } from "@langwatch/identity-server";
+import { deploymentSignInFor } from "./deployment-sign-in";
 import type { SsoConnectionReadRepository } from "./sso-connection.repository";
 import type { SsoConnectionService } from "./sso-connection.service";
 import type { LegacySsoOrganizationRepository } from "./sso-connection-grandfather.service";
@@ -298,6 +299,9 @@ export interface SsoSelfServeServiceDeps {
   /** The deployment's own address, which is what LangWatch is called to an
    *  identity provider. */
   baseUrl: string;
+  /** The provider the deployment configures for itself
+   *  (`NEXTAUTH_PROVIDER`), so the page can name its redirect address too. */
+  deploymentProvider?: () => Promise<string>;
   now?: () => number;
 }
 
@@ -332,10 +336,16 @@ export class SsoSelfServeService {
     const nowMs = this.now();
     return {
       availability,
-      serviceProvider: serviceProviderDetailsFor({
-        baseUrl: this.deps.baseUrl,
-        connectionId: state?.connectionId ?? null,
-      }),
+      serviceProvider: {
+        ...serviceProviderDetailsFor({
+          baseUrl: this.deps.baseUrl,
+          connectionId: state?.connectionId ?? null,
+        }),
+        deploymentSignIn: deploymentSignInFor({
+          provider: await this.deps.deploymentProvider?.(),
+          baseUrl: this.deps.baseUrl,
+        }),
+      },
       serviceProviderBeforeRegistration: serviceProviderDetailsFor({
         baseUrl: this.deps.baseUrl,
         connectionId: null,
@@ -924,7 +934,7 @@ export class SsoSelfServeService {
     const credentials = this.deps.credentials;
 
     if (idp.protocol === "oidc") {
-      await validateOidcRegistration({
+      const { issuer } = await validateOidcRegistration({
         registration: idp,
         discovery: this.deps.discovery,
       });
@@ -945,7 +955,7 @@ export class SsoSelfServeService {
       return {
         type: "oidc",
         idp: {
-          issuer: idp.issuer,
+          issuer,
           providerId,
           clientIdRef,
           secretRef,

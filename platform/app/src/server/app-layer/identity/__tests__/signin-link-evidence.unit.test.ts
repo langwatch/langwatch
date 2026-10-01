@@ -124,6 +124,47 @@ describe("given somebody who already signs in one way", () => {
       expect(proposeLink).not.toHaveBeenCalled();
     });
   });
+
+  describe("when Microsoft Entra ID sends xms_edov instead of email_verified", () => {
+    const entra = "https://login.microsoftonline.com/tenant-id/v2.0";
+
+    it("attaches the method on xms_edov true", async () => {
+      const { evidence, proposeLink } = evidenceOver({
+        emailVerified: true,
+        accountCount: 1,
+      });
+
+      const refusal = await evidence.refusalForLink({
+        ...link,
+        idToken: idTokenAsserting({
+          iss: entra,
+          email: "sam@acme.test",
+          xms_edov: true,
+        }),
+      });
+
+      expect(refusal).toBeNull();
+      expect(proposeLink).not.toHaveBeenCalled();
+    });
+
+    it("refuses the attachment on xms_edov false", async () => {
+      const { evidence } = evidenceOver({
+        emailVerified: true,
+        accountCount: 1,
+      });
+
+      const refusal = await evidence.refusalForLink({
+        ...link,
+        idToken: idTokenAsserting({
+          iss: entra,
+          email: "sam@acme.test",
+          xms_edov: false,
+        }),
+      });
+
+      expect(refusal).toBe("unverified_orphan");
+    });
+  });
 });
 
 describe("given somebody with no sign-in method yet", () => {

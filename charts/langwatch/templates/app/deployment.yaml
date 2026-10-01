@@ -354,10 +354,7 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
-          {{- with .Values.app.extraEnvFrom}}
-          envFrom:
-            {{- toYaml . | nindent 12 }}
-          {{- end }}
+          {{- include "langwatch.envFromWithOfflineDefaults" (dict "root" $ "extraEnvFrom" .Values.app.extraEnvFrom) | nindent 10 }}
 
           {{- if .Values.app.extraLifecycle}}
           lifecycle:

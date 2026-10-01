@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { models } from "../config/models";
+import { aliasLegacyMicrosoftCallback } from "../legacy-callback-alias";
 
 const BASE_URL = "http://localhost:3000";
 const CLIENT_ID = "azure-client";
@@ -112,6 +113,7 @@ const buildAuth = ({
     socialProviders: buildSocialProviders(
       {
         NEXTAUTH_PROVIDER: "azure-ad",
+        NEXTAUTH_URL: BASE_URL,
         GOOGLE_CLIENT_ID: undefined,
         GOOGLE_CLIENT_SECRET: undefined,
         GITHUB_CLIENT_ID: undefined,
@@ -190,7 +192,11 @@ async function signInWithMicrosoft(auth: ReturnType<typeof buildAuth>) {
   const authorizationUrl = new URL(
     authorizationResponseSchema.parse(await started.json()).url,
   );
-  const callback = new URL(`${BASE_URL}/api/auth/callback/microsoft`);
+  // Azure sends the browser back to the redirect URI the sign-in named,
+  // which is the path registered with Azure, and the auth route hands it on.
+  const callback = new URL(
+    authorizationUrl.searchParams.get("redirect_uri") ?? "",
+  );
   callback.searchParams.set("code", `code-${nanoid()}`);
   callback.searchParams.set(
     "state",
@@ -201,7 +207,9 @@ async function signInWithMicrosoft(auth: ReturnType<typeof buildAuth>) {
     .map((value) => value.split(";", 1)[0])
     .join("; ");
   return auth.handler(
-    new Request(callback, { headers: { cookie }, redirect: "manual" }),
+    aliasLegacyMicrosoftCallback(
+      new Request(callback, { headers: { cookie }, redirect: "manual" }),
+    ),
   );
 }
 
@@ -214,6 +222,32 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks();
   await cleanUp();
+});
+
+describe("given Microsoft sign-in configured by the deployment", () => {
+  describe("when a sign-in starts", () => {
+    /** @scenario "Microsoft sign-in sends the redirect URI registered with Azure" */
+    it("names /api/auth/callback/azure-ad as the redirect URI", async () => {
+      const started = await buildAuth().handler(
+        new Request(`${BASE_URL}/api/auth/sign-in/social`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            provider: "microsoft",
+            callbackURL: `${BASE_URL}/`,
+            disableRedirect: true,
+          }),
+        }),
+      );
+      const authorizationUrl = new URL(
+        authorizationResponseSchema.parse(await started.json()).url,
+      );
+
+      expect(authorizationUrl.searchParams.get("redirect_uri")).toBe(
+        `${BASE_URL}/api/auth/callback/azure-ad`,
+      );
+    });
+  });
 });
 
 describe("given a user whose Microsoft account is still on its pre-3.17 key", () => {

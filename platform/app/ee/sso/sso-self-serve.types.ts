@@ -19,6 +19,9 @@ export interface SsoServiceProviderDetails {
   singleLogoutUrl: string;
   entityId: string;
   metadataUrl: string;
+  /** The deployment's own sign-in and its redirect address, when it has
+   *  one besides the connection. */
+  deploymentSignIn?: { name: string; redirectUrl: string } | null;
 }
 
 export interface SelfServeDomainClaimView {

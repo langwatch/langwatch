@@ -24,7 +24,11 @@
  * trusted set, and it grows and shrinks with them rather than with a deploy.
  *
  * Better Auth validates OIDC endpoints, redirects, state, and PKCE. This list
- * only supplies the issuer origins registered for the current SSO request.
+ * only supplies the issuer origins registered for the current SSO request,
+ * plus the endpoint origins a known issuer serves from a different host:
+ * Microsoft Entra ID signs in on `login.microsoftonline.com` and names its
+ * userinfo endpoint on `graph.microsoft.com`, which the engine refuses
+ * unless it is trusted too.
  *
  * TWO STATIC WAYS ON REMAIN, for the cases no registered connection covers:
  *
@@ -43,6 +47,8 @@
  * Framework-free and total, so the decision can be pinned by a test that
  * boots nothing. The registered issuers are READ elsewhere and passed in.
  */
+
+import { entraEndpointOrigins } from "@langwatch/identity";
 
 /**
  * The origin of an address, or null if it is not one.
@@ -96,9 +102,10 @@ export function resolveTrustedOrigins({
   const origins = [
     nextAuthUrl,
     ...(baseHost && baseHost !== nextAuthUrl ? [baseHost] : []),
-    ...registeredIssuers
-      .map(originOf)
-      .filter((origin): origin is string => origin !== null),
+    ...registeredIssuers.flatMap((issuer) => {
+      const origin = originOf(issuer);
+      return origin === null ? [] : [origin, ...entraEndpointOrigins(issuer)];
+    }),
     ...originsIn(trustedIdpOrigins),
     ...(isProduction ? [] : originsIn(idpSimulatorUrl)),
   ];

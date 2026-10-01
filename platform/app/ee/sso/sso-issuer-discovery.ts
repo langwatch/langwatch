@@ -59,7 +59,9 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
     issuer,
   }: {
     issuer: string;
-  }): Promise<{ reachable: true } | { reachable: false; reason: string }> {
+  }): Promise<
+    { reachable: true; issuer?: string } | { reachable: false; reason: string }
+  > {
     let url: URL;
     try {
       url = new URL(discoveryEndpointFor({ issuer }));
@@ -96,9 +98,13 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
         return { reachable: false, reason: `answered ${response.status}` };
       }
       const document: unknown = await response.json();
-      return looksLikeDiscoveryDocument(document)
-        ? { reachable: true }
-        : { reachable: false, reason: "answered something else" };
+      if (!looksLikeDiscoveryDocument(document)) {
+        return { reachable: false, reason: "answered something else" };
+      }
+      const named = (document as Record<string, unknown>).issuer;
+      return typeof named === "string" && named.length > 0
+        ? { reachable: true, issuer: named }
+        : { reachable: true };
     } catch (error) {
       return { reachable: false, reason: describeThrow(error) };
     }
