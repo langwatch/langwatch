@@ -39,6 +39,12 @@ When using the Helm chart, you rarely need to set environment variables directly
 Never commit secrets to version control. In production, use a secrets manager (AWS Secrets Manager, HashiCorp Vault) or Kubernetes Secrets with `secretKeyRef` in the Helm chart.
 </Warning>
 
+## License
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `LANGWATCH_LICENSE_KEY` | An activation code (`LW-XXXX-XXXX-XXXX-XXXX`, redeemed once at startup over outbound HTTPS to `connect.langwatch.ai`) or a signed license key (works offline), told apart by shape. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license). | - |
+
 ## Authentication
 
 | Variable | Description | Default |
@@ -352,6 +358,7 @@ When using the Helm chart, configuration is set in `values.yaml` rather than env
 |------------|---------------------|
 | `app.http.baseHost` | `BASE_HOST` |
 | `app.http.publicUrl` | `NEXTAUTH_URL` |
+| `app.license.key.value` | `LANGWATCH_LICENSE_KEY` |
 | `app.nextAuth.provider` | `NEXTAUTH_PROVIDER` |
 | `app.nextAuth.secret.value` | `NEXTAUTH_SECRET` |
 | `app.credentialsEncryptionKey.value` | `CREDENTIALS_SECRET` |

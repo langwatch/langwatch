@@ -1012,7 +1012,8 @@
               "self-hosting/deployment/docker-images",
               "self-hosting/deployment/kubernetes-helm",
               "self-hosting/deployment/kubernetes-local",
-              "self-hosting/deployment/argocd"
+              "self-hosting/deployment/argocd",
+              "self-hosting/deployment/routing"
             ]
           },
           {

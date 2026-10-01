@@ -23,7 +23,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 
 | Host | What travels | Who sends it |
 |---|---|---|
-| `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
+| `connect.langwatch.ai` | Metadata only: a license token derived from the signed license key, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
 | `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
@@ -36,19 +36,26 @@ Each service states what it sends before you switch it on. Your traces, datasets
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
 | Managed models | The prompts and completions of calls that name a `langwatch/` model. No other call reaches the LangWatch slot. |
-| License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
+| License sync, on a license naming a hosted service | A license token derived from the signed license key (a hash, not the key), the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
 
-A fresh install starts on the open source baseline with no account and no license. To license it, LangWatch issues you an activation code, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default.
+A fresh install starts on the open source baseline with no account and no license. LangWatch issues a license in one of two forms, and the install tells them apart by shape:
+
+- An **activation code**, `LW-XXXX-XXXX-XXXX-XXXX`, single use by default. The install redeems it over outbound HTTPS to `connect.langwatch.ai`, so it needs outbound access to that host.
+- A **signed license key**, a long base64 string also delivered as a `.langwatch-license` file. It works offline.
+
+Both go in the same `LANGWATCH_LICENSE_KEY` variable or `app.license.key` Helm value. See [Editions and licensing](/self-hosting/licensing#two-forms-of-license) for the full comparison.
 
 1. Open **Settings, License**.
-2. Choose **Enter activation code**, paste the code, and confirm.
+2. Choose **Enter activation code**, paste the code, and choose **Activate License**.
 3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
 
-The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+Setting the code in `LANGWATCH_LICENSE_KEY` or `app.license.key` instead redeems it once at startup. See [An activation code in the variable](/self-hosting/licensing#an-activation-code-in-the-variable).
 
-The paste and the file upload stay on the License page for an air-gapped install, which receives its license blob from LangWatch. Neither needs a connection. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
+The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a new key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
+
+The paste and the file upload stay on the License page for an air-gapped install, which receives a signed license key from LangWatch and enters it with **Enter license key** or **Upload license file**. Neither needs a connection. The page detects the form, so a value pasted under the other option is still accepted. The install still sends the daily usage report unless you switch it off, see [Air-gapped installs and existing licenses](#air-gapped-installs-and-existing-licenses).
 
 ## Endpoints and variables
 
@@ -116,7 +123,7 @@ Switching a service on or off takes effect within a minute, with no restart.
 
 ## What does the license sync send
 
-Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: its license token, its instance id, the app version it runs, and two seat counts, members and lite members.
+Two minutes after boot and once a day after that, the install posts to `connect.langwatch.ai`: a license token derived from its signed license key (a hash, not the key itself), its instance id, the app version it runs, and two seat counts, members and lite members.
 
 LangWatch answers with the current license for this install, signed by the same key pair that signed the one you activated. A renewed or changed license reaches the install this way, and the install applies it through the same validation a pasted key gets.
 
@@ -161,7 +168,7 @@ An install whose license names no hosted service runs no license sync and calls 
 
 Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 
-The license blob is where you check it: decode the license and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
+The signed license key is where you check it: decode it and look for `connectServices`. A license without that field, which is every license issued before this release, reaches no hosted service.
 
 For an install that must prove the absence rather than derive it, set `app.connect.disabled: true` (or `LANGWATCH_CONNECT_DISABLED=true`). It refuses every hosted call, the license sync and the usage report, whatever the license says.
 
