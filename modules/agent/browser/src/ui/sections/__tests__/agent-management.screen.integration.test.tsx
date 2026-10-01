@@ -199,7 +199,7 @@ class TestHost implements AgentManagementHost {
 
   constructor(
     readonly browser: TestAgentBrowser,
-    private readonly query: Record<string, string | undefined> = {},
+    private query: Readonly<Record<string, string | undefined>> = {},
   ) {}
 
   project(): AgentHostProject | undefined {
@@ -216,6 +216,8 @@ class TestHost implements AgentManagementHost {
   }
   setQuery(next: Readonly<Record<string, string | undefined>>): void {
     this.setQueryCalls.push({ ...next });
+    // Like the real address: the next render reads what was set.
+    this.query = next;
   }
   navigate(to: string): void {
     this.navigated.push(to);

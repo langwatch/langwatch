@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HttpConfigEditor } from "../http-config-editor.tsx";
@@ -32,6 +32,11 @@ function openTab(name: string) {
   fireEvent.click(screen.getByRole("tab", { name }));
 }
 
+// Every tab panel stays mounted (hidden) as on main; query the open one only.
+async function openPanel(name: string) {
+  return within(await screen.findByRole("tabpanel", { name }));
+}
+
 afterEach(() => cleanup());
 
 describe("the HTTP config editor with the credentials read-only", () => {
@@ -41,7 +46,7 @@ describe("the HTTP config editor with the credentials read-only", () => {
       renderEditor();
       openTab("Auth");
 
-      const field = await screen.findByPlaceholderText("Stored on the agent");
+      const field = await (await openPanel("Auth")).findByPlaceholderText("Stored on the agent");
 
       expect(field).toBeDisabled();
     });
@@ -53,7 +58,7 @@ describe("the HTTP config editor with the credentials read-only", () => {
       renderEditor();
       openTab("Headers");
 
-      const field = await screen.findByPlaceholderText("Stored on the agent");
+      const field = await (await openPanel("Headers")).findByPlaceholderText("Stored on the agent");
 
       expect(field).toBeDisabled();
       expect(screen.queryByTestId("add-header-button")).toBeNull();

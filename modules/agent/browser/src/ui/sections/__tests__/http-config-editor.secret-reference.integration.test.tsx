@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +51,11 @@ function openTab(name: string) {
   fireEvent.click(screen.getByRole("tab", { name }));
 }
 
+// Every tab panel stays mounted (hidden) as on main; query the open one only.
+async function openPanel(name: string) {
+  return within(await screen.findByRole("tabpanel", { name }));
+}
+
 afterEach(() => cleanup());
 
 describe("the HTTP config editor with credentials kept as project secrets", () => {
@@ -61,7 +66,7 @@ describe("the HTTP config editor with credentials kept as project secrets", () =
 
       openTab("Auth");
       expect(await screen.findByText("Stored as project secret HTTP_AGENT_TOKEN")).toBeVisible();
-      expect(screen.getByTestId("secret-reference-link")).toHaveAttribute(
+      expect((await openPanel("Auth")).getByTestId("secret-reference-link")).toHaveAttribute(
         "href",
         "/settings/secrets",
       );
@@ -93,7 +98,7 @@ describe("the HTTP config editor with credentials kept as project secrets", () =
       const onAuthChange = renderEditor();
       openTab("Auth");
 
-      fireEvent.click(await screen.findByTestId("secret-reference-replace"));
+      fireEvent.click(await (await openPanel("Auth")).findByTestId("secret-reference-replace"));
       const input = await screen.findByPlaceholderText("Enter bearer token");
       expect(input).toHaveValue("");
 
