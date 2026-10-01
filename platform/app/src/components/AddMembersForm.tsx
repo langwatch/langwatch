@@ -154,24 +154,26 @@ export function AddMembersForm({
 
   useEffect(() => {
     if (prevOrgRoleRef.current !== orgRole && selectedTeams?.length > 0) {
-      selectedTeams.forEach(
-        (team: TeamAssignment | undefined, teamIndex: number) => {
-          if (!team) return;
-          if (orgRole === OrganizationUserRole.DEVELOPER) {
-            // A Developer seat (ADR-143) is invited onto no team.
-            setValue("teams", []);
-          } else if (orgRole === OrganizationUserRole.EXTERNAL) {
-            if (team.role !== TeamUserRole.VIEWER) {
-              setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
-              setValue(`teams.${teamIndex}.customRoleId`, undefined);
+      if (orgRole === OrganizationUserRole.DEVELOPER) {
+        // A Developer seat (ADR-143) is invited onto no team.
+        setValue("teams", []);
+      } else {
+        selectedTeams.forEach(
+          (team: TeamAssignment | undefined, teamIndex: number) => {
+            if (!team) return;
+            if (orgRole === OrganizationUserRole.EXTERNAL) {
+              if (team.role !== TeamUserRole.VIEWER) {
+                setValue(`teams.${teamIndex}.role`, TeamUserRole.VIEWER);
+                setValue(`teams.${teamIndex}.customRoleId`, undefined);
+              }
+            } else if (orgRole === OrganizationUserRole.MEMBER) {
+              if (team.role === TeamUserRole.VIEWER) {
+                setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
+              }
             }
-          } else if (orgRole === OrganizationUserRole.MEMBER) {
-            if (team.role === TeamUserRole.VIEWER) {
-              setValue(`teams.${teamIndex}.role`, TeamUserRole.MEMBER);
-            }
-          }
-        },
-      );
+          },
+        );
+      }
     }
     prevOrgRoleRef.current = orgRole;
   }, [orgRole, selectedTeams, setValue]);
