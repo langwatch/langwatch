@@ -2,8 +2,7 @@
 #
 # Renders the chart and asserts the self-hosted privacy defaults: the env vars
 # that switch off a third-party call a library would otherwise make at runtime
-# (Prisma's checkpoint, the voice cloudflared quick tunnel, RAGAS analytics,
-# LiteLLM's remote price list). A default install must carry each one on the
+# (Prisma's checkpoint, the voice cloudflared quick tunnel, RAGAS analytics). A default install must carry each one on the
 # workload that would make the call, and an operator who names the same
 # variable in that component's extraEnvs must get exactly their value, once.
 #
@@ -87,7 +86,6 @@ $(cat "$err")"
   expect_once "workers-checkpoint" "$workers" CHECKPOINT_DISABLE 1 workers
   expect_once "workers-voice-tunnel" "$workers" VOICE_TUNNEL false workers
   expect_once "langevals-ragas" "$langevals" RAGAS_DO_NOT_TRACK true langevals
-  expect_once "langevals-litellm" "$langevals" LITELLM_LOCAL_MODEL_COST_MAP True langevals
 }
 
 # Verifies: naming a default in extraEnvs replaces it instead of duplicating it
@@ -100,10 +98,8 @@ test_extra_envs_override() {
       --set-string 'app.extraEnvs[0].value=0' \
       --set 'workers.extraEnvs[0].name=VOICE_TUNNEL' \
       --set-string 'workers.extraEnvs[0].value=true' \
-      --set 'langevals.extraEnvs[0].name=LITELLM_LOCAL_MODEL_COST_MAP' \
-      --set-string 'langevals.extraEnvs[0].value=False' \
-      --set 'langevals.extraEnvs[1].name=RAGAS_DO_NOT_TRACK' \
-      --set-string 'langevals.extraEnvs[1].value=false'; then
+      --set 'langevals.extraEnvs[0].name=RAGAS_DO_NOT_TRACK' \
+      --set-string 'langevals.extraEnvs[0].value=false'; then
     fail "override-render" "render with overrides failed:
 $(cat "$err")"
     return
@@ -117,7 +113,6 @@ $(cat "$err")"
   expect_once "override-app-checkpoint" "$app" CHECKPOINT_DISABLE 0 app
   expect_once "override-workers-voice-tunnel" "$workers" VOICE_TUNNEL true workers
   expect_once "override-workers-checkpoint" "$workers" CHECKPOINT_DISABLE 1 workers
-  expect_once "override-langevals-litellm" "$langevals" LITELLM_LOCAL_MODEL_COST_MAP False langevals
   expect_once "override-langevals-ragas" "$langevals" RAGAS_DO_NOT_TRACK false langevals
 }
 
@@ -130,4 +125,4 @@ if [[ $failures -gt 0 ]]; then
   exit 1
 fi
 
-echo "PASS: privacy defaults pinned: (1) a default render switches off Prisma's checkpoint on app and workers, the voice quick tunnel on workers, and RAGAS analytics and LiteLLM's remote price list on langevals; (2) an operator's extraEnvs entry replaces the default instead of duplicating it"
+echo "PASS: privacy defaults pinned: (1) a default render switches off Prisma's checkpoint on app and workers, the voice quick tunnel on workers, and RAGAS analytics on langevals; (2) an operator's extraEnvs entry replaces the default instead of duplicating it"

@@ -2,10 +2,11 @@
  * @vitest-environment jsdom
  *
  * Settings, Connect is where an administrator of a self-hosted install sees
- * which LangWatch-hosted services its license names and switches off any they
- * do not want. A service the license names is on, so the page has to state
- * what leaves the install for each one, refuse the decision to anyone without
- * organization management rights, and show the spend they are charged against.
+ * which LangWatch-hosted services its license names and switches on the ones
+ * they want. Every service starts off, so the page has to state what leaves the
+ * install for each one before it is switched on, refuse the decision to anyone
+ * without organization management rights, and show the spend they are charged
+ * against once a service is on.
  *
  * Spec: specs/self-hosting/connected-services/connect-settings.feature
  */
@@ -147,21 +148,42 @@ describe("<ConnectSettings />", () => {
   afterEach(cleanup);
 
   describe("given a licensed install whose license names Instant Evals", () => {
-    /** @scenario A service the license names is on without anyone switching it on */
-    it("lists Instant Evals as on, and asks the host for nothing", () => {
-      renderSettings(connectedStatus());
+    describe("when nobody has switched it on yet", () => {
+      /** @scenario A service the license names is off until an admin switches it on */
+      it("lists Instant Evals as available and off, with a switch the admin can use", () => {
+        renderSettings(connectedStatus({ enabledServices: [], usage: null }));
 
-      expect(screen.getByText("Instant Evals")).toBeDefined();
-      expect(screen.getByText("On")).toBeDefined();
-      expect(switchInput().checked).toBe(true);
-      expect(setServiceMutate).not.toHaveBeenCalled();
+        expect(screen.getByText("Instant Evals")).toBeDefined();
+        expect(screen.getByText("Available, switched off")).toBeDefined();
+        expect(switchInput().checked).toBe(false);
+        expect(switchInput().disabled).toBe(false);
+        expect(screen.queryByTestId("connect-spend")).toBeNull();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(setServiceMutate).not.toHaveBeenCalled();
+      });
+
+      /** @scenario A service the license names is off until an admin switches it on */
+      it("switches the service on when the admin asks for it", async () => {
+        renderSettings(connectedStatus({ enabledServices: [], usage: null }));
+
+        fireEvent.click(switchInput());
+
+        await waitFor(() => {
+          expect(setServiceMutate).toHaveBeenCalledWith({
+            organizationId: "org-acme",
+            service: "instant_evals",
+            enabled: true,
+          });
+        });
+        expect(refetchMock).toHaveBeenCalled();
+      });
     });
 
-    it("says a service the admin switched off is available and switched off", () => {
-      renderSettings(connectedStatus({ enabledServices: [] }));
+    it("lists a service the admin switched on as on", () => {
+      renderSettings(connectedStatus());
 
-      expect(screen.getByText("Available, switched off")).toBeDefined();
-      expect(switchInput().checked).toBe(false);
+      expect(screen.getByText("On")).toBeDefined();
+      expect(switchInput().checked).toBe(true);
     });
 
     /** @scenario The page states what leaves the install for each service */

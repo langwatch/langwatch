@@ -17,8 +17,6 @@ services:
       LANGWATCH_ENDPOINT: http://app:5560
       INSTALL_METHOD: docker
       NODE_ENV: production
-      # Prisma's version check to checkpoint.prisma.io on every migrate.
-      CHECKPOINT_DISABLE: "1"
     env_file:
       - platform/app/.env
     pull_policy: always
@@ -51,7 +49,6 @@ services:
       LANGEVALS_ENDPOINT: http://langevals:5562
       LANGWATCH_ENDPOINT: http://app:5560
       NODE_ENV: production
-      CHECKPOINT_DISABLE: "1"
     env_file:
       - platform/app/.env
     pull_policy: always
@@ -86,10 +83,6 @@ services:
     pull_policy: always
     environment:
       - DISABLE_EVALUATORS_PRELOAD=true
-      # No RAGAS usage analytics, and LiteLLM's bundled price list instead of
-      # the copy it would download from raw.githubusercontent.com.
-      - RAGAS_DO_NOT_TRACK=true
-      - LITELLM_LOCAL_MODEL_COST_MAP=True
 
   postgres:
     image: postgres:16

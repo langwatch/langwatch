@@ -2,8 +2,9 @@ Feature: Connect on a self-hosted install
   A self-hosted install can use the LangWatch-hosted services its license
   names, and no others. There is no deployment switch that grants one: an
   install on an offline license reaches nothing, and an operator proves that
-  from the license blob. Each entitled service is on, the page states exactly
-  what leaves the install for it, and an admin can switch any of them off.
+  from the license blob. Each entitled service starts off and stays off until
+  an admin switches it on. The page states exactly what leaves the install for
+  each one, and it sends nothing to LangWatch until a service is on.
 
   As an admin of a self-hosted install
   I want to know which hosted services my install calls and what each one sends
@@ -18,9 +19,24 @@ Feature: Connect on a self-hosted install
   # ============================================================================
 
   @integration
-  Scenario: A service the license names is on without anyone switching it on
+  Scenario: A service the license names is off until an admin switches it on
     When an admin opens Settings, Connect for the first time
-    Then "Instant Evals" is listed as included in the license and switched on
+    Then "Instant Evals" is listed as included in the license and switched off
+    And the admin can switch it on
+
+  @unit
+  Scenario: An entitled service is off until an admin switches it on
+    Given no admin has switched "Instant Evals" on
+    When the install resolves what it may call
+    Then "Instant Evals" is not among the services it calls
+    And an eval function is not judged through the hosted service
+
+  @unit
+  Scenario: Settings, Connect for an organization with nothing switched on calls nothing
+    Given no admin has switched any hosted service on
+    When an admin reads the Connect settings
+    Then the settings list the services the license names as available to switch on
+    And no request is sent to either LangWatch host
 
   @unit
   Scenario: A license that names no hosted service reaches nothing
@@ -50,10 +66,10 @@ Feature: Connect on a self-hosted install
     And the audit log records who switched it off and when
 
   @unit
-  Scenario: A service switched off stays off when the license is reissued
-    Given an admin switched "Instant Evals" off
+  Scenario: A service switched on stays on when the license is reissued
+    Given an admin switched "Instant Evals" on
     When the license is reissued with the same entitlement
-    Then "Instant Evals" is still off
+    Then "Instant Evals" is still on
 
   @integration
   Scenario: A member who is not an admin cannot switch a service on
@@ -151,7 +167,8 @@ Feature: Connect on a self-hosted install
 
   @integration
   Scenario: The page shows spend, cap and remaining credit
-    Given the hosted usage route reports 120 USD spent of a 1000 USD cap
+    Given "Instant Evals" is switched on
+    And the hosted usage route reports 120 USD spent of a 1000 USD cap
     When an admin opens Settings, Connect
     Then the page shows 120 USD spent, a cap of 1000 USD and 880 USD remaining
     And it shows the period those figures cover
@@ -189,7 +206,8 @@ Feature: Connect on a self-hosted install
 
   @unit
   Scenario: Spend the hosted usage route reports is read into the settings
-    Given the hosted usage route reports 120 USD spent of a 1000 USD cap
+    Given "Instant Evals" is switched on
+    And the hosted usage route reports 120 USD spent of a 1000 USD cap
     When an admin reads the Connect settings
     Then the settings report 120 USD spent, a cap of 1000 USD and 880 USD remaining
     And they report the services the license includes
@@ -207,7 +225,8 @@ Feature: Connect on a self-hosted install
 
   @unit
   Scenario: An unregistered license surfaces as a named error
-    Given the hosted service refuses the license as not registered
+    Given "Instant Evals" is switched on
+    And the hosted service refuses the license as not registered
     When an admin reads the Connect settings
     Then the settings report code "connect_license_not_registered" and reading them does not fail
 
@@ -219,7 +238,8 @@ Feature: Connect on a self-hosted install
 
   @unit
   Scenario: A license bound to another instance surfaces as a named error
-    Given the hosted service refuses the call as coming from the wrong instance
+    Given "Instant Evals" is switched on
+    And the hosted service refuses the call as coming from the wrong instance
     When an admin reads the Connect settings
     Then the settings report code "connect_wrong_instance"
 
@@ -258,6 +278,7 @@ Feature: Connect on a self-hosted install
 
   @integration
   Scenario: The page shows a refusal in place of the hosted services
-    Given the hosted service refuses the license
+    Given "Instant Evals" is switched on
+    And the hosted service refuses the license
     When an admin opens Settings, Connect
     Then the page says what the refusal means and what to do about it

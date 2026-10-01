@@ -14,6 +14,7 @@
 
 import { HandledError } from "@langwatch/handled-error";
 
+import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { PUBLIC_KEY } from "../../constants";
 import {
@@ -71,6 +72,12 @@ export interface ConnectSettingsDependencies {
 export class ConnectSettingsService {
   constructor(private readonly deps: ConnectSettingsDependencies) {}
 
+  /**
+   * What the page shows. The gateway is asked for usage only once the
+   * organization has switched a service on: until then nothing is sent to
+   * LangWatch, opening the page included, and what the license names is read
+   * from the license this install already holds.
+   */
   async status(organizationId: string): Promise<ConnectStatus> {
     const config = this.config();
     if (!config.permitted) return { deployment: "off" };
@@ -79,16 +86,15 @@ export class ConnectSettingsService {
       this.credentialOf(organizationId),
       this.organizationOf(organizationId),
     ]);
-    const entitled = licenseConnectServices({
-      licenseKey: organization?.license ?? null,
-      publicKey: this.deps.publicKey ?? PUBLIC_KEY,
-      ...(this.deps.now ? { now: this.deps.now() } : {}),
+    const entitled = this.entitledOf(organization);
+    const enabledServices = optedIn({
+      entitled,
+      enabled: organization?.connectServicesEnabled ?? [],
     });
-    const disabled = new Set(organization?.connectServicesDisabled ?? []);
     const base = {
       deployment: "on",
       gatewayHost: new URL(config.gatewayEndpoint).host,
-      enabledServices: entitled.filter((service) => !disabled.has(service)),
+      enabledServices,
       sync: syncOf(organization),
     } as const;
 
@@ -97,6 +103,16 @@ export class ConnectSettingsService {
         ...base,
         licensed: false,
         entitledServices: null,
+        usage: null,
+        refusal: null,
+      };
+    }
+
+    if (enabledServices.length === 0) {
+      return {
+        ...base,
+        licensed: true,
+        entitledServices: entitled,
         usage: null,
         refusal: null,
       };
@@ -125,6 +141,12 @@ export class ConnectSettingsService {
     }
   }
 
+  /**
+   * Switches one hosted service on or off for the organization. Switching on
+   * asks the gateway whether the license is entitled to it first, which is
+   * the admin's explicit decision to reach LangWatch. Switching off makes no
+   * call.
+   */
   async setService({
     organizationId,
     service,
@@ -143,27 +165,22 @@ export class ConnectSettingsService {
       }
     }
 
-    // The column records refusals, so switching a service on removes a row
-    // rather than adding one and an entitled service needs no row at all.
     const organization = await this.organizationOf(organizationId);
-    const current = organization?.connectServicesDisabled ?? [];
-    const nextDisabled = enabled
-      ? current.filter((name) => name !== service)
-      : [...new Set([...current, service])];
+    const current = organization?.connectServicesEnabled ?? [];
+    const nextEnabled = enabled
+      ? [...new Set([...current, service])]
+      : current.filter((name) => name !== service);
 
     await this.deps.prisma.organization.update({
       where: { id: organizationId },
-      data: { connectServicesDisabled: nextDisabled },
+      data: { connectServicesEnabled: nextEnabled },
     });
 
-    const entitled = licenseConnectServices({
-      licenseKey: organization?.license ?? null,
-      publicKey: this.deps.publicKey ?? PUBLIC_KEY,
-      ...(this.deps.now ? { now: this.deps.now() } : {}),
-    });
-    const refused = new Set(nextDisabled);
     return {
-      enabledServices: entitled.filter((name) => !refused.has(name)),
+      enabledServices: optedIn({
+        entitled: this.entitledOf(organization),
+        enabled: nextEnabled,
+      }),
     };
   }
 
@@ -200,6 +217,15 @@ export class ConnectSettingsService {
     return this.deps.client ?? getConnectGatewayClient(endpoint);
   }
 
+  /** What the license this install holds names, read without a network call. */
+  private entitledOf(organization: ConnectOrganizationRow | null): string[] {
+    return licenseConnectServices({
+      licenseKey: organization?.license ?? env.LANGWATCH_LICENSE_KEY ?? null,
+      publicKey: this.deps.publicKey ?? PUBLIC_KEY,
+      ...(this.deps.now ? { now: this.deps.now() } : {}),
+    });
+  }
+
   private async credentialOf(
     organizationId: string,
   ): Promise<ConnectCredential | null> {
@@ -215,7 +241,7 @@ export class ConnectSettingsService {
     return await this.deps.prisma.organization.findUnique({
       where: { id: organizationId },
       select: {
-        connectServicesDisabled: true,
+        connectServicesEnabled: true,
         license: true,
         connectLastSyncAt: true,
         connectLastSyncError: true,
@@ -225,10 +251,22 @@ export class ConnectSettingsService {
 }
 
 interface ConnectOrganizationRow {
-  connectServicesDisabled: string[];
+  connectServicesEnabled: string[];
   license: string | null;
   connectLastSyncAt: Date | null;
   connectLastSyncError: string | null;
+}
+
+/** The entitled services an administrator switched on, in license order. */
+function optedIn({
+  entitled,
+  enabled,
+}: {
+  entitled: string[];
+  enabled: string[];
+}): string[] {
+  const on = new Set(enabled);
+  return entitled.filter((service) => on.has(service));
 }
 
 /** Where the daily sync stands, for the page to say so. */

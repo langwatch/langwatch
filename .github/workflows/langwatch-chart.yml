@@ -230,7 +230,7 @@ jobs:
       # A default install calls home only for the license, the usage report
       # and the hosted services its license names. The env vars that switch off
       # library calls to third parties (Prisma checkpoint, the voice quick
-      # tunnel, RAGAS analytics, LiteLLM's remote price list) are only visible
+      # tunnel, RAGAS analytics) are only visible
       # in the render, as is an extraEnvs override replacing them once.
       - name: "assert third-party calls are off by default and overridable"
         if: "!cancelled()"

@@ -365,7 +365,7 @@ describe("an install upgraded with no Connect configuration", () => {
           organization: {
             findUnique: async () => ({
               license: fixture.licenseKey,
-              connectServicesDisabled: [],
+              connectServicesEnabled: [],
             }),
           },
         },

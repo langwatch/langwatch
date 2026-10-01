@@ -11,7 +11,7 @@ Your license decides what this install may call. A license that names a hosted s
 
 An install on an offline license still sends the daily usage report unless you switch it off, see [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license).
 
-A service your license names is on. An organization admin switches off the ones they do not want in **Settings, Connect**, and the same page shows what has been spent, the cap the install stops at, and the credit that is left.
+A service your license names stays off until an organization admin switches it on in **Settings, Connect**. Until then the install calls no hosted service, and the page makes no call to LangWatch. Once a service is on, the same page shows what has been spent, the cap the install stops at, and the credit that is left.
 
 <Info>
 **Also check:** [Editions and licensing](/self-hosting/licensing), [Data and telemetry](/self-hosting/data-and-telemetry), [Instant Evals](/features/instant-evals/overview), [Environment variables](/self-hosting/configuration/environment-variables).
@@ -24,7 +24,7 @@ Connect talks to two hosts, split by what the data is, so a network rule can all
 | Host | What travels | Who sends it |
 |---|---|---|
 | `connect.langwatch.ai` | Metadata only: the license token, the instance id, the release, seat counts, and the daily usage report | Every install with a license that names a hosted service. The usage report also comes from installs with no such license, but to `app.langwatch.ai` |
-| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names, each switchable off by an admin |
+| `gateway.langwatch.ai` | Content: the texts to judge and the model calls | Only for the services the license names and an admin switched on |
 
 The usage report and the license sync are two channels that are never merged: the report is optional and the sync is a license term. [Data and telemetry](/self-hosting/data-and-telemetry) covers both, and the [usage report dictionary](/self-hosting/usage-report-dictionary) lists every field of the report.
 
@@ -35,7 +35,7 @@ Each service states what it sends before you switch it on. Your traces, datasets
 | What is on | What this install sends to LangWatch |
 |---|---|
 | Instant Evals | The judged text and the questions asked about it. LangWatch judges them and does not keep them. |
-| Managed models | The prompts and completions of the calls the gateway routes to the LangWatch slot: a `langwatch/` model, or a bare model that none of your providers serves. |
+| Managed models | The prompts and completions of calls that name a `langwatch/` model. No other call reaches the LangWatch slot. |
 | License sync, on a license naming a hosted service | The license token, the instance id, the app version, and two counts: members and lite members. No organization name. |
 
 ## Activate with a code
@@ -44,7 +44,7 @@ A fresh install starts on the open source baseline with no account and no licens
 
 1. Open **Settings, License**.
 2. Choose **Enter activation code**, paste the code, and confirm.
-3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names are on at once.
+3. The install posts the code to `connect.langwatch.ai` and receives the signed license and its entitlements. The services the license names can then be switched on in **Settings, Connect**.
 
 The license refreshes on the daily sync from then on, so a renewal or a change of seats reaches the install without a key by email. **Refresh license** on the same page fetches it now instead of waiting for the sync.
 
@@ -107,8 +107,8 @@ A second install running a copy of the database presents another id and is refus
 
 | Section | What it shows |
 |---|---|
-| Hosted services | One row per service your license names, switched on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
-| Spend | Spent, cap and remaining, and the day the current period started. A figure reads "Not available" while the spend ledger cannot be read. |
+| Hosted services | One row per service your license names, off until an admin switches it on, with the sentences naming what leaves the install. A service your license does not include cannot be switched on. |
+| Spend | Spent, cap and remaining, and the day the current period started, once a service is on. A figure reads "Not available" while the spend ledger cannot be read. |
 | Spending cap in USD | The cap you set yourself, between zero and the maximum your contract allows. A higher number is refused and the message names the maximum. |
 | License sync | The last successful sync and any sync failure, from the first one. |
 
@@ -136,13 +136,13 @@ A delivered license that does not verify is not applied. The install keeps the l
 
 An install with its own `JEV_API_KEY` judges with that key and is unchanged by Connect: its evaluations stay on your infrastructure whatever else is switched on.
 
-Without a judge key, an install whose license names **Instant Evals** judges through LangWatch. An organization whose admin switched it off publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
+Without a judge key, an install whose license names **Instant Evals** judges through LangWatch once an admin switches it on. Until then the organization publishes the eval functions as unavailable, so a query never comes back with judged columns that are all empty.
 
 Judging is charged at the list rate, 0.0546 USD per million input tokens the judge reads, and counts against your cap. The 1 USD free budget of the Cloud free plan does not apply here: your commit and your cap govern instead. See [Limits and cost](/features/instant-evals/limits-and-cost) for what a run reads and costs.
 
 ## Managed models
 
-With **Managed models** on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
+With **Managed models** switched on, the LangWatch AI Gateway in your install can call a model LangWatch runs by spelling the model with a `langwatch/` prefix:
 
 ```bash
 curl https://<your-gateway>/v1/chat/completions \
@@ -151,15 +151,13 @@ curl https://<your-gateway>/v1/chat/completions \
   -d '{"model": "langwatch/gpt-5-mini", "messages": [{"role": "user", "content": "hi"}]}'
 ```
 
-Your own providers keep serving the models they list, and a model spelled with a provider prefix, for example `openai/gpt-5-mini`, never reaches LangWatch.
-
-A bare model name that none of your providers lists can fall through to the LangWatch slot, and in an organization with no providers of its own every call goes there. See [Managed models](/self-hosting/data-and-telemetry#managed-models) for the exact rule.
+Only a model spelled with the `langwatch/` prefix reaches the LangWatch slot. A model with another provider prefix, for example `openai/gpt-5-mini`, stays with that provider, including its retries. A bare model name never reaches LangWatch either. In an organization whose only provider is the LangWatch slot, the gateway refuses a bare name with `model_not_recognized`.
 
 Calls served by the LangWatch slot are metered against the same cap as every other hosted service.
 
 ## Air-gapped installs and existing licenses
 
-An install whose license names no hosted service runs no license sync and calls no hosted service, and the licensed seat count is enforced as a hard cap. It still sends the daily usage report, and opening **Settings, Connect** reads the organization's Connect usage from `gateway.langwatch.ai`. [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license) lists both.
+An install whose license names no hosted service runs no license sync and calls no hosted service, and the licensed seat count is enforced as a hard cap. It still sends the daily usage report. [Data and telemetry](/self-hosting/data-and-telemetry#without-a-hosted-service-license) lists what else can leave on a user action.
 
 Upgrading to a release that carries Connect changes an existing offline license in no way: it verifies with the same key, enforces the same cap, and the usage report goes where it always went unless you switch it off.
 

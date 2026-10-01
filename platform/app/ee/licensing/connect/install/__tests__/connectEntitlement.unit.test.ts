@@ -39,7 +39,7 @@ beforeEach(() => {
 
 interface Row {
   license: string | null;
-  connectServicesDisabled: string[];
+  connectServicesEnabled: string[];
 }
 
 function prismaWith(rows: Row[]): PrismaClient {
@@ -143,33 +143,13 @@ describe("given an operator who switched Connect off for an audit", () => {
 
 describe("given an entitled organization nobody has configured", () => {
   describe("when the install asks which services are on", () => {
-    it("answers with every entitled service, because entitled means on", async () => {
-      const { licenseKey } = mintLicense({
-        connectServices: ["instant_evals", "managed_models"],
-      });
-
-      await expect(
-        organizationEnabledConnectServices({
-          prisma: prismaWith([
-            { license: licenseKey, connectServicesDisabled: [] },
-          ]),
-          organizationId: ORGANIZATION_ID,
-          publicKey: PUBLIC_KEY,
-          now: NOW,
-        }),
-      ).resolves.toEqual(["instant_evals", "managed_models"]);
-    });
-  });
-});
-
-describe("given an administrator who switched one service off", () => {
-  describe("when the install asks which services are on", () => {
-    it("drops that one and keeps the other", async () => {
+    /** @scenario "An entitled service is off until an admin switches it on" */
+    it("answers none, because a hosted service is opt-in", async () => {
       const { licenseKey } = mintLicense({
         connectServices: ["instant_evals", "managed_models"],
       });
       const prisma = prismaWith([
-        { license: licenseKey, connectServicesDisabled: ["instant_evals"] },
+        { license: licenseKey, connectServicesEnabled: [] },
       ]);
 
       await expect(
@@ -179,7 +159,7 @@ describe("given an administrator who switched one service off", () => {
           publicKey: PUBLIC_KEY,
           now: NOW,
         }),
-      ).resolves.toEqual(["managed_models"]);
+      ).resolves.toEqual([]);
       await expect(
         connectServiceEnabled({
           prisma,
@@ -193,10 +173,42 @@ describe("given an administrator who switched one service off", () => {
   });
 });
 
-describe("given a license reissued while a service stays switched off", () => {
+describe("given an administrator who switched one service on", () => {
   describe("when the install asks which services are on", () => {
-    /** @scenario "A service switched off stays off when the license is reissued" */
-    it("keeps the refusal, because it is recorded against the service and not the license", async () => {
+    /** @scenario "An entitled service is off until an admin switches it on" */
+    it("answers that one and leaves the other off", async () => {
+      const { licenseKey } = mintLicense({
+        connectServices: ["instant_evals", "managed_models"],
+      });
+      const prisma = prismaWith([
+        { license: licenseKey, connectServicesEnabled: ["instant_evals"] },
+      ]);
+
+      await expect(
+        organizationEnabledConnectServices({
+          prisma,
+          organizationId: ORGANIZATION_ID,
+          publicKey: PUBLIC_KEY,
+          now: NOW,
+        }),
+      ).resolves.toEqual(["instant_evals"]);
+      await expect(
+        connectServiceEnabled({
+          prisma,
+          organizationId: ORGANIZATION_ID,
+          service: "managed_models",
+          publicKey: PUBLIC_KEY,
+          now: NOW,
+        }),
+      ).resolves.toBe(false);
+    });
+  });
+});
+
+describe("given a license reissued while a service stays switched on", () => {
+  describe("when the install asks which services are on", () => {
+    /** @scenario "A service switched on stays on when the license is reissued" */
+    it("keeps the opt-in, because it is recorded against the service and not the license", async () => {
       const reissued = mintLicense({
         connectServices: ["instant_evals", "managed_models"],
         expiresAt: new Date("2028-09-19T12:00:00.000Z"),
@@ -207,27 +219,27 @@ describe("given a license reissued while a service stays switched off", () => {
           prisma: prismaWith([
             {
               license: reissued.licenseKey,
-              connectServicesDisabled: ["instant_evals"],
+              connectServicesEnabled: ["instant_evals"],
             },
           ]),
           organizationId: ORGANIZATION_ID,
           publicKey: PUBLIC_KEY,
           now: NOW,
         }),
-      ).resolves.toEqual(["managed_models"]);
+      ).resolves.toEqual(["instant_evals"]);
     });
   });
 });
 
-describe("given a service switched off on a license that never named it", () => {
+describe("given a service switched on that the license does not name", () => {
   describe("when the install asks which services are on", () => {
-    it("still answers none, because the license decides first", async () => {
+    it("answers none, because the license decides first", async () => {
       const { licenseKey } = mintLicense({ connectServices: [] });
 
       await expect(
         organizationEnabledConnectServices({
           prisma: prismaWith([
-            { license: licenseKey, connectServicesDisabled: ["instant_evals"] },
+            { license: licenseKey, connectServicesEnabled: ["instant_evals"] },
           ]),
           organizationId: ORGANIZATION_ID,
           publicKey: PUBLIC_KEY,
@@ -246,7 +258,7 @@ describe("given an install where no license names a hosted service", () => {
       await expect(
         installIsEntitled({
           prisma: prismaWith([
-            { license: licenseKey, connectServicesDisabled: [] },
+            { license: licenseKey, connectServicesEnabled: [] },
           ]),
           publicKey: PUBLIC_KEY,
           now: NOW,
@@ -265,8 +277,8 @@ describe("given an install where one organization holds an entitled license", ()
       await expect(
         installIsEntitled({
           prisma: prismaWith([
-            { license: offline.licenseKey, connectServicesDisabled: [] },
-            { license: connected.licenseKey, connectServicesDisabled: [] },
+            { license: offline.licenseKey, connectServicesEnabled: [] },
+            { license: connected.licenseKey, connectServicesEnabled: [] },
           ]),
           publicKey: PUBLIC_KEY,
           now: NOW,

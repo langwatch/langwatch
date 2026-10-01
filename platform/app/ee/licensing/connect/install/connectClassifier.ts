@@ -5,7 +5,7 @@
  * LangWatch and the install pays for it against the budget its license
  * carries. What leaves the install is the text being judged and the questions
  * asked about it, and only for an organization whose license names the service
- * and whose administrator has not switched it off.
+ * and whose administrator switched it on.
  *
  * An organization without it gets the same answer as a deployment with nothing
  * configured: every question skipped, nothing sent. That is the difference
