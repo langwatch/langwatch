@@ -22,6 +22,7 @@ import {
   governanceCliSourceEventsQuerySchema,
   governanceCliSourceParamsSchema,
   governanceCliSourcesQuerySchema,
+  governanceCliSessionSchema,
 } from "@langwatch/enterprise-governance-contract";
 
 const JSON_MEDIA_TYPE = "application/json";
@@ -34,23 +35,31 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .withNamespace("governance-cli")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: true })
-  .withCredential("cliToken")
+  .withCredential("cliToken", { session: governanceCliSessionSchema })
   .get("/api/auth/cli/budget/status", "readCliBudgetStatus")
   .withAccess(CLI_DOOR)
   .responds(governanceCliBudgetStatusAnswers)
-  .handle(({ app, actor, scope }) => app.cliBudgetStatus({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliBudgetStatus({ actor, session, organizationId: scope.id }),
+  )
   .get("/api/auth/cli/bootstrap", "readCliBootstrap")
   .withAccess(CLI_DOOR)
   .responds(governanceCliBootstrapAnswers)
-  .handle(({ app, actor, scope }) => app.cliBootstrapRead({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliBootstrapRead({ actor, session, organizationId: scope.id }),
+  )
   .get("/api/auth/cli/budget-overview", "readCliBudgetOverview")
   .withAccess(CLI_DOOR)
   .responds(governanceCliBudgetOverviewAnswers)
-  .handle(({ app, actor, scope }) => app.cliBudgetOverview({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliBudgetOverview({ actor, session, organizationId: scope.id }),
+  )
   .get("/api/auth/cli/personal-project", "readCliPersonalProject")
   .withAccess(CLI_DOOR)
   .responds(governanceCliPersonalProjectAnswers)
-  .handle(({ app, actor, scope }) => app.cliPersonalProject({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliPersonalProject({ actor, session, organizationId: scope.id }),
+  )
   // The deleted project-key door answers 410 so old CLIs upgrade (Alex, 2026-10-01). Remove
   // after a few releases. Old CLIs print only `error_description`, so the body keeps their shape.
   .post("/api/auth/cli/project-key", "readCliProjectKey")
@@ -69,16 +78,17 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliVirtualKeyAnswers)
-  .handle(({ app, actor, scope, raw }) =>
-    app.cliVirtualKey({ actor, organizationId: scope.id, raw }),
+  .handle(({ app, actor, session, scope, raw }) =>
+    app.cliVirtualKey({ actor, session, organizationId: scope.id, raw }),
   )
   .get("/api/auth/cli/governance/ingest/sources", "listCliIngestionSources")
   .withQuery(governanceCliSourcesQuerySchema)
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionSourcesAnswers)
-  .handle(({ app, actor, scope, input }) =>
+  .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSources({
       actor,
+      session,
       organizationId: scope.id,
       includeArchived: input.include_archived,
     }),
@@ -88,9 +98,10 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .withQuery(governanceCliSourceEventsQuerySchema)
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionSourceEventsAnswers)
-  .handle(({ app, actor, scope, input }) =>
+  .handle(({ app, actor, session, scope, input }) =>
     app.cliIngestionSourceEvents({
       actor,
+      session,
       organizationId: scope.id,
       sourceId: input.sourceId,
       limit: input.limit,
@@ -101,33 +112,49 @@ export const governanceCliRest = defineRestRouter(GovernanceRestApi)
   .withParams(governanceCliSourceParamsSchema)
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionSourceHealthAnswers)
-  .handle(({ app, actor, scope, input }) =>
-    app.cliIngestionSourceHealth({ actor, organizationId: scope.id, sourceId: input.sourceId }),
+  .handle(({ app, actor, session, scope, input }) =>
+    app.cliIngestionSourceHealth({
+      actor,
+      session,
+      organizationId: scope.id,
+      sourceId: input.sourceId,
+    }),
   )
   .get("/api/auth/cli/governance/status", "readCliGovernanceStatus")
   .withAccess(CLI_DOOR)
   .responds(governanceCliGovernanceStatusAnswers)
-  .handle(({ app, actor, scope }) => app.cliGovernanceStatus({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliGovernanceStatus({ actor, session, organizationId: scope.id }),
+  )
   .get("/api/auth/cli/governance/ingestion-templates", "listCliIngestionTemplates")
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionTemplatesAnswers)
-  .handle(({ app, actor, scope }) => app.cliIngestionTemplates({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliIngestionTemplates({ actor, session, organizationId: scope.id }),
+  )
   .post("/api/auth/cli/governance/ingestion-key", "mintCliIngestionKey")
   .withRawBody("text", { mediaType: JSON_MEDIA_TYPE })
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionKeyAnswers)
-  .handle(({ app, actor, scope, raw }) =>
-    app.cliIngestionKey({ actor, organizationId: scope.id, raw }),
+  .handle(({ app, actor, session, scope, raw }) =>
+    app.cliIngestionKey({ actor, session, organizationId: scope.id, raw }),
   )
   .get("/api/auth/cli/governance/ingestion-keys", "listCliIngestionKeys")
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionKeysAnswers)
-  .handle(({ app, actor, scope }) => app.cliIngestionKeys({ actor, organizationId: scope.id }))
+  .handle(({ app, actor, session, scope }) =>
+    app.cliIngestionKeys({ actor, session, organizationId: scope.id }),
+  )
   .get("/api/auth/cli/governance/ingestion-keys/:lookup_id", "readCliIngestionKeyState")
   .withParams(governanceCliKeyLookupParamsSchema)
   .withAccess(CLI_DOOR)
   .responds(governanceCliIngestionKeyStateAnswers)
-  .handle(({ app, actor, scope, input }) =>
-    app.cliIngestionKeyState({ actor, organizationId: scope.id, lookupId: input.lookup_id }),
+  .handle(({ app, actor, session, scope, input }) =>
+    app.cliIngestionKeyState({
+      actor,
+      session,
+      organizationId: scope.id,
+      lookupId: input.lookup_id,
+    }),
   )
   .build();

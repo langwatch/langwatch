@@ -3240,6 +3240,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -9085,6 +9088,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config

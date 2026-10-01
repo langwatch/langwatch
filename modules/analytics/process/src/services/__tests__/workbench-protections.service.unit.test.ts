@@ -1,6 +1,6 @@
 /** @vitest-environment node */
 
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   PLATFORM_DEFAULT_DATA_PRIVACY,

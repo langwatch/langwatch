@@ -1,8 +1,9 @@
-import { actorSchema, type Actor } from "@langwatch/authorization";
-import type {
-  AuthzDeclaredScopeId,
-  AuthzPermission,
-  PermissionDecision,
+import {
+  actorSchema,
+  type Actor,
+  type AuthzDeclaredScopeId,
+  type AuthzPermission,
+  type PermissionDecision,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, validationMeta } from "@langwatch/observability";
@@ -33,7 +34,7 @@ import {
   type Credential,
   type Entitlements,
 } from "../access/access.ts";
-import { RateLimitedError } from "../errors.ts";
+import { RateLimitedError, SurfaceUnverifiedError } from "../errors.ts";
 import type { RateLimiter, ResponseCache } from "../ports.ts";
 import {
   addressesOf,
@@ -126,6 +127,8 @@ export type RestCaller = Readonly<{
   internal?: RestResolvedInternalCredential;
   /** Called only after the handler answered, for a credential that records use. */
   markUsed?: () => void;
+  /** What a session-bearing door resolved beside the actor; a route parses it by its schema. */
+  session?: unknown;
 }>;
 
 /**
@@ -1097,6 +1100,7 @@ function handlerMiddleware<Api>({
               actor,
               scope: handlerScopeOf({ route, credential, caller }),
               target,
+              session: sessionOf({ route, credential, caller }),
             }),
             ...(await resolveFacts({ route, facts, context })),
           ),
@@ -1416,6 +1420,23 @@ async function keepAnswer({
   return answer;
 }
 
+/** The door's session as the route's schema reads it; one it refuses is no credential. */
+function sessionOf({
+  route,
+  credential,
+  caller,
+}: {
+  route: { session?: z.ZodType };
+  credential: Credential;
+  caller: RestCaller;
+}): unknown {
+  if (!route.session) return undefined;
+  const parsed = route.session.safeParse(caller.session);
+  if (!parsed.success) throw new SurfaceUnverifiedError(credential);
+
+  return parsed.data;
+}
+
 /** What every handler is called with, whichever door let the request in. */
 function handlerArguments<Api>({
   context,
@@ -1425,6 +1446,7 @@ function handlerArguments<Api>({
   actor,
   scope,
   target,
+  session,
 }: {
   context: Context;
   route: RestTransportRoute<Api>;
@@ -1433,6 +1455,7 @@ function handlerArguments<Api>({
   actor: Actor | null;
   scope: AuthzDeclaredScopeId | null;
   target: AuthzDeclaredScopeId | null;
+  session?: unknown;
 }): StoredHandlerArguments<Api> {
   return {
     app: options.app(),
@@ -1440,6 +1463,7 @@ function handlerArguments<Api>({
     actor,
     scope,
     target,
+    session,
     signal: context.req.raw.signal,
     request: context.req.raw,
     raw: route.rawBody

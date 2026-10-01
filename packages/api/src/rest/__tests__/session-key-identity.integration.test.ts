@@ -1,3 +1,4 @@
+import type { SessionKeyPresented } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -9,7 +10,7 @@ import { BearerIdentity } from "../bearer-identity.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { RestHost } from "../host.ts";
 import { bindRestCredential } from "../request.ts";
-import { SessionKeyIdentity, type SessionKeyPresented } from "../session-key-identity.ts";
+import { SessionKeyIdentity } from "../session-key-identity.ts";
 
 const INSTANCE_HEADER = "x-agent-instance-token";
 const NOW = Date.parse("2026-09-25T12:00:00Z");

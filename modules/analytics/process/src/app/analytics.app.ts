@@ -46,7 +46,7 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
@@ -394,7 +394,9 @@ class TraceApiHydrationSource implements LangWatchQLTraceSource {
  * attention: a transport reaches this object through the operations-only feature-API
  * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
  */
-export class AnalyticsModule implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi {
+export class AnalyticsModule
+  implements AnalyticsApiContract, AnalyticsQueryApi, AnalyticsLegacyApi
+{
   static readonly contract = AnalyticsApiToken;
   static readonly dependencies = {
     featureFlags: FeatureFlagApi,

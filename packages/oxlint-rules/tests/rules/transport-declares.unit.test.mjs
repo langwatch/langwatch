@@ -291,6 +291,40 @@ describe("given a route whose own chain declares a producer", () => {
   });
 });
 
+describe("given a door credential that declares a session", () => {
+  it("accepts session from a router-level or a route-level withCredential", () => {
+    expect(
+      located(
+        '  .withCredential("cliToken", { session: widgetSessionSchema })',
+        '  .get("/widgets/me", "getWidget")',
+        "  .handle(async ({ app, session }) => app.getWidget(session))",
+        '  .get("/widgets/you", "getYou")',
+        "  .handle(async ({ app, session }) => app.getYou(session))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("cliToken", { session: otherSchema })',
+        "  .handle(async ({ app, session }) => app.ownWidget(session))",
+      ),
+    ).toEqual([]);
+  });
+
+  it("reports session when the door declares none, or the route's own credential drops it", () => {
+    expect(
+      located(
+        '  .withCredential("cliToken", { session: widgetSessionSchema })',
+        '  .get("/widgets/me", "getWidget")',
+        '  .withCredential("apiKey")',
+        "  .handle(async ({ app, session }) => app.getWidget(session))",
+        '  .post("/widgets/own", "ownWidget")',
+        '  .withCredential("apiKey", {})',
+        "  .handle(async ({ app, session }) => app.ownWidget(session))",
+      ),
+    ).toEqual([
+      ["rawContextField", "session", 9, 24],
+      ["rawContextField", "session", 6, 24],
+    ]);
+  });
+});
+
 describe("given a handler taking a producer its route did not declare", () => {
   /** @scenario "A handler taking a producer its own route did not declare is reported at the field" */
   it("reports raw without withRawBody, request on a bytes route and files without withMultipart", () => {

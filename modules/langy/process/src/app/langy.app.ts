@@ -1,13 +1,8 @@
 import { AgentApi, INSTANCE_TOKEN_HEADER } from "@langwatch/agent-contract";
 import type { ProtocolConnection } from "@langwatch/api";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import {
-  BearerIdentity,
-  type RestIdentity,
-  SessionKeyIdentity,
-  type SessionKeyHolder,
-  type SessionKeyPresented,
-} from "@langwatch/api/rest";
+import { BearerIdentity, type RestIdentity, SessionKeyIdentity } from "@langwatch/api/rest";
+import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";

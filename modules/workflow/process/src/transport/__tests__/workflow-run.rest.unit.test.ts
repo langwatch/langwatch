@@ -1,11 +1,11 @@
-/** @vitest-environment node */
 import {
   bindRestMiddleware,
   createRestRuntime,
   type RestErrorHandler,
   principalOfCredential,
-  type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
+/** @vitest-environment node */
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -44,12 +44,12 @@ function keyCredential(apiKeyId: string): RestResolvedProjectCredential {
 
 function mount(
   runSynchronous: WorkflowApi["runSynchronous"],
-  caller: { userId: string; credential: RestResolvedProjectCredential } | null = null,
+  caller: { userId: string | null; credential: RestResolvedProjectCredential } | null = null,
 ) {
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({
-        actor: caller ? { type: "user", id: caller.userId } : null,
+        actor: caller?.userId ? { type: "user", id: caller.userId } : null,
         scope: { tier: "project", id: "project_1" },
       }),
     },
@@ -118,6 +118,33 @@ describe("the synchronous workflow run routes", () => {
 
     expect(runSynchronous).toHaveBeenCalledWith(
       expect.objectContaining({ principal: { userId: "user_1", callerApiKeyId: "pat_1" } }),
+    );
+  });
+
+  /** @scenario "A run started with a service key acts as that key" */
+  it("runs as the service key that started it, never as the system", async () => {
+    const runSynchronous = vi.fn(async () => ({ status: "success" as const }));
+    const credential: RestResolvedProjectCredential = {
+      type: "apiKey",
+      apiKeyId: "service_key_1",
+      userId: null,
+      organizationId: "org_1",
+      ingestSourceType: null,
+      ingestionTemplateId: null,
+      project: keyCredential("key_1").project,
+    };
+
+    await mount(runSynchronous, { userId: null, credential }).request(
+      "/api/workflows/workflow_1/run",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question: "hello" }),
+      },
+    );
+
+    expect(runSynchronous).toHaveBeenCalledWith(
+      expect.objectContaining({ principal: { userId: null, callerApiKeyId: "service_key_1" } }),
     );
   });
 

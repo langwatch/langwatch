@@ -33,21 +33,12 @@ export const SYSTEM_ACTORS = {
 
 export type SystemActorName = keyof typeof SYSTEM_ACTORS;
 
-/** A CLI device session: the token key that severs it, its login key and the device it named. */
-export type CliSession = Readonly<{
-  tokenKey: string;
-  cliApiKeyId?: string | undefined;
-  clientInfo?:
-    | Readonly<{ deviceLabel?: string | undefined; hostname?: string | undefined }>
-    | undefined;
-}>;
-
 /**
- * The pino `redact` paths for the actor's secret fields: the CLI token key, logged bare or one
- * level down (`{ actor }`). The audit trail never writes it: it keeps the actor id, and its
- * argument rule already masks a `tokenKey` by name.
+ * The pino `redact` paths for the session a door hands beside the actor (the CLI token key), logged
+ * bare or one level down (`{ session }`). A fixed framework path: the audit trail never writes it,
+ * and its argument rule already masks a `tokenKey` by name.
  */
-export const ACTOR_SECRET_LOG_PATHS = ["cliSession.tokenKey", "*.cliSession.tokenKey"] as const;
+export const SESSION_SECRET_LOG_PATHS = ["session.tokenKey", "*.session.tokenKey"] as const;
 
 /** Who caused an action, as the boundary that authenticated it knows them. */
 export type Actor =
@@ -56,8 +47,6 @@ export type Actor =
       id: string;
       /** Set when a platform operator is acting as this user. */
       impersonatorId?: string;
-      /** Set by the CLI token door: the device session the bearer resolved to. */
-      cliSession?: CliSession;
     }
   | { type: "api_key"; id: string }
   | { type: "system"; name: SystemActorName }
@@ -85,17 +74,6 @@ export const actorSchema: z.ZodType<Actor> = z.discriminatedUnion("type", [
       type: z.literal("user"),
       id: z.string().min(1),
       impersonatorId: z.string().min(1).optional(),
-      cliSession: z
-        .object({
-          tokenKey: z.string().min(1),
-          cliApiKeyId: z.string().optional(),
-          clientInfo: z
-            .object({ deviceLabel: z.string().optional(), hostname: z.string().optional() })
-            .strict()
-            .optional(),
-        })
-        .strict()
-        .optional(),
     })
     .strict(),
   z.object({ type: z.literal("api_key"), id: z.string().min(1) }).strict(),
@@ -119,7 +97,10 @@ export function internalActor(codePath: string, options?: { revision?: string })
  * is frozen by every event already written; extend {@link Actor} and
  * {@link toLedgerActor}, never this.
  */
-export const ledgerActorSchema = z.object({ type: z.enum(["user", "system"]), id: z.string().nullable() });
+export const ledgerActorSchema = z.object({
+  type: z.enum(["user", "system"]),
+  id: z.string().nullable(),
+});
 export type LedgerActor = z.infer<typeof ledgerActorSchema>;
 
 /** The one serialization seam from the rich actor to the durable record. */
@@ -153,3 +134,6 @@ export function ledgerActorFor({
   if (apiKeyId) return toLedgerActor({ type: "api_key", id: apiKeyId });
   return toLedgerActor({ type: "system", name: fallback });
 }
+
+/** A caller the CLI token door let in: always a person; its session sits beside it, never on it. */
+export type CliTokenActor = Extract<Actor, { type: "user" }>;

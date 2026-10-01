@@ -3,7 +3,7 @@
  * chain and preflight, telemetry, metrics. Order is load-bearing: config feeds secrets, both
  * precede telemetry.
  */
-import { ACTOR_SECRET_LOG_PATHS } from "@langwatch/authorization";
+import { SESSION_SECRET_LOG_PATHS } from "@langwatch/authorization";
 import { parseProcessConfig, type ConfigOwner, type ProcessConfigOf } from "@langwatch/config";
 import {
   refuseDoubleClaims,
@@ -123,7 +123,7 @@ export class ServerPreamble<Owners extends readonly PreambleOwner[] = readonly [
     await resolver.preflight(declared);
 
     const frameworkSecrets = resolver.scopeTo(this.name, declared);
-    const redactPaths = [...ACTOR_SECRET_LOG_PATHS, ...secretLogRedactPaths(declared)];
+    const redactPaths = [...SESSION_SECRET_LOG_PATHS, ...secretLogRedactPaths(declared)];
     const telemetry = await this.state.telemetry?.({
       config,
       secrets: frameworkSecrets,

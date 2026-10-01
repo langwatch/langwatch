@@ -216,18 +216,51 @@ function fieldsProducedBy(link) {
   return readsRequest ? ["response", "request"] : ["response"];
 }
 
+/** `.withCredential(door, { session })` hands the handler the session its schema types. */
+function credentialSession(link) {
+  if (propertyName(link.callee) !== "withCredential") return undefined;
+  const options = link.arguments[1];
+  const declares =
+    options?.type === "ObjectExpression" &&
+    options.properties.some(
+      (property) => property.key?.name === "session" || property.key?.value === "session",
+    );
+
+  return declares;
+}
+
 /** The context fields a `.handle(h)` call's own route declared, read back to its verb. */
 export function declaredProducerFields(call) {
   const fields = new Set();
   let link = call.callee.object;
+  let routeCredential;
   while (link?.type === "CallExpression") {
     for (const field of fieldsProducedBy(link)) fields.add(field);
+    routeCredential ??= credentialSession(link);
     const name = propertyName(link.callee);
     if (name === undefined || ROUTE_VERBS.has(name)) break;
     link = link.callee.object;
   }
+  if (routeCredential ?? routerSessionOf(link)) fields.add("session");
 
   return fields;
+}
+
+/** The router-level credential: the last `withCredential` before the first route verb. */
+function routerSessionOf(verb) {
+  let declared = false;
+  for (
+    let link = verb?.callee?.object;
+    link?.type === "CallExpression";
+    link = link.callee.object
+  ) {
+    const name = propertyName(link.callee);
+    if (name === undefined) break;
+    if (ROUTE_VERBS.has(name)) declared = false;
+    else declared ||= credentialSession(link) === true;
+  }
+
+  return declared;
 }
 
 /** How a call registers a handler: fluent `.handle(h)`, legacy `.registerRoute(...)`, or not. */

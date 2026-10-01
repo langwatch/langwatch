@@ -1,10 +1,9 @@
-import type { RestKeyCredentialPrincipal } from "@langwatch/api/rest";
 /**
  * The wire shape of one submitted LangWatchQL statement, shared by the
  * workbench's tRPC mutation and `POST /api/v1/query`. The ceiling and the
  * accepted steps ARE the published contract, so both doors read one copy.
  */
-import { authzPermissionSchema } from "@langwatch/authorization";
+import { authzPermissionSchema, type RestKeyCredentialPrincipal } from "@langwatch/authorization";
 import { defineRestMiddleware } from "@langwatch/module";
 import { z } from "zod";
 

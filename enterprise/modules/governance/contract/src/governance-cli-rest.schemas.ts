@@ -1,10 +1,11 @@
+import { cliAccessSessionSchema } from "@langwatch/auth-contract";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What `/api/auth/cli` reads off the wire, on the shapes released `langwatch`
  * builds already send: snake_case bodies, a `1` flag for a boolean query and a
  * bounded page size. The transport declares these; nothing here knows Hono.
  */
-import type { CliTokenActor } from "@langwatch/api/rest";
+import type { CliTokenActor } from "@langwatch/authorization";
 import { z } from "zod";
 
 import { cliBootstrapResultSchema } from "./cli-bootstrap.ts";
@@ -260,8 +261,20 @@ export type GovernanceCliIngestionKeyStateAnswer = GovernanceCliAnswerOf<
   typeof governanceCliIngestionKeyStateAnswers
 >;
 
-/** The caller the CLI token door let in, and the organization its session is bound to. */
-export type GovernanceCliRequest = Readonly<{ actor: CliTokenActor; organizationId: string }>;
+/** The session the CLI token door hands beside the actor: the device it named and the key that severs it. */
+export const governanceCliSessionSchema = z.object({
+  cliApiKeyId: cliAccessSessionSchema.shape.cliApiKeyId,
+  clientInfo: cliAccessSessionSchema.shape.clientInfo,
+  tokenKey: z.string().min(1),
+});
+export type GovernanceCliSession = z.infer<typeof governanceCliSessionSchema>;
+
+/** The caller the CLI token door let in, its session, and the organization that session is bound to. */
+export type GovernanceCliRequest = Readonly<{
+  actor: CliTokenActor;
+  session: GovernanceCliSession;
+  organizationId: string;
+}>;
 export type GovernanceCliRawRequest = GovernanceCliRequest & Readonly<{ raw: string }>;
 export type GovernanceCliSourcesRequest = GovernanceCliRequest &
   Readonly<{ includeArchived: boolean }>;

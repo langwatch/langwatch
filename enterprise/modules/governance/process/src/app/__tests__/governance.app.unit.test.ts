@@ -326,15 +326,12 @@ describe("GovernanceModule as the module a process installs", () => {
       });
 
       await expect(app.cliTokenDoor.identify({ request })).resolves.toEqual({
-        actor: {
-          type: "user",
-          id: "user-1",
-          cliSession: {
-            tokenKey: "lwcli:access:lw_at_token",
-            clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
-          },
-        },
+        actor: { type: "user", id: "user-1" },
         scope: { tier: "organization", id: "organization-1" },
+        session: expect.objectContaining({
+          tokenKey: "lwcli:access:lw_at_token",
+          clientInfo: { deviceLabel: "Work laptop", hostname: "laptop" },
+        }),
       });
       await expect(
         app.cliAccess().planDecision({

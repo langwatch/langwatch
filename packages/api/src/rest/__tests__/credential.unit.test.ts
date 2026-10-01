@@ -10,10 +10,12 @@ import {
   organizationCredentialPrincipalOf,
   organizationCredentialPrincipalOfToken,
   resolvePersonalCaller,
-  type RestCredentialPrincipal,
-  type RestResolvedProjectCredential,
 } from "@langwatch/api/rest";
-import type { PrincipalRef } from "@langwatch/authorization";
+import type {
+  PrincipalRef,
+  RestCredentialPrincipal,
+  RestResolvedProjectCredential,
+} from "@langwatch/authorization";
 import { Context } from "hono";
 import { describe, expect, it } from "vitest";
 

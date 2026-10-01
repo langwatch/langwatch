@@ -239,8 +239,8 @@ export class GovernanceCliAccessService implements GovernanceCliAccessApi {
 }
 
 /** The caller the CLI token door put on the request, in this plane's wire vocabulary. */
-function callerOf({ actor, organizationId }: GovernanceCliRequest): GovernanceCliCaller {
-  const { tokenKey, cliApiKeyId, clientInfo } = actor.cliSession;
+function callerOf({ actor, session, organizationId }: GovernanceCliRequest): GovernanceCliCaller {
+  const { tokenKey, cliApiKeyId, clientInfo } = session;
 
   return {
     user_id: actor.id,

@@ -1,4 +1,4 @@
-import type { RestResolvedProjectCredential } from "@langwatch/api/rest";
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { LangyRestCaller } from "@langwatch/langy-contract";
 /** @see specs/langy/langy-ui-actions.feature */

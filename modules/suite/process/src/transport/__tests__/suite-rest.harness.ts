@@ -1,12 +1,6 @@
-/**
- * The three suite REST families over the REAL suite application: memory
- * repositories, the real execution service recording the commands it would
- * have queued, and the process ports a mount supplies.
- */
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
   principalOfCredential,
-  type RestResolvedProjectCredential,
   bindRestHeader,
   bindRestMiddleware,
   createRestRuntime,
@@ -14,6 +8,12 @@ import {
   type RestErrorHandler,
   type RestMountOptions,
 } from "@langwatch/api/rest";
+/**
+ * The three suite REST families over the REAL suite application: memory
+ * repositories, the real execution service recording the commands it would
+ * have queued, and the process ports a mount supplies.
+ */
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { HandledError } from "@langwatch/handled-error";

@@ -1,4 +1,5 @@
-import { principalOfCredential, type RestResolvedProjectCredential } from "@langwatch/api/rest";
+import { principalOfCredential } from "@langwatch/api/rest";
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";

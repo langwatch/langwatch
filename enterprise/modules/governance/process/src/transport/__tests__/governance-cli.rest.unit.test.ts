@@ -51,7 +51,7 @@ const BEARER = "Bearer lw_at_token";
 
 const TOKEN_KEY = "lwcli:access:lw_at_token";
 
-const HOLDER: CliTokenHolder = {
+const HOLDER = {
   userId: USER_ID,
   organizationId: ORGANIZATION_ID,
   tokenKey: TOKEN_KEY,

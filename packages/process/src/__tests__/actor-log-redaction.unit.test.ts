@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { ACTOR_SECRET_LOG_PATHS, type Actor } from "@langwatch/authorization";
+import { SESSION_SECRET_LOG_PATHS, type Actor } from "@langwatch/authorization";
 import { createLoggerFactory, type LoggerConfiguration } from "@langwatch/observability";
 import { processTelemetry } from "@langwatch/observability/node";
 import { REDACTED } from "@langwatch/secrets";
@@ -10,11 +10,8 @@ import { Server } from "../server-factory.ts";
 
 const TOKEN_KEY = "lwcli:access:lw_at_do_not_log";
 
-const ACTOR: Actor = {
-  type: "user",
-  id: "user-1",
-  cliSession: { tokenKey: TOKEN_KEY, cliApiKeyId: "key-1" },
-};
+const ACTOR: Actor = { type: "user", id: "user-1" };
+const CALLER = { actor: ACTOR, session: { tokenKey: TOKEN_KEY, cliApiKeyId: "key-1" } };
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -25,17 +22,17 @@ function logActor(configuration: LoggerConfiguration): string {
     return true;
   });
   const logger = createLoggerFactory({ environment: "test", level: "info", ...configuration });
-  logger.createLogger("actor-redaction").info({ actor: ACTOR }, "cli caller");
-  logger.createLogger("actor-redaction-bare").info(ACTOR, "cli caller");
+  logger.createLogger("actor-redaction").info({ caller: CALLER }, "cli caller");
+  logger.createLogger("actor-redaction-bare").info(CALLER, "cli caller");
   vi.restoreAllMocks();
 
   return lines.join("");
 }
 
-describe("logging an actor that carries a CLI session", () => {
-  describe("given the actor's secret paths", () => {
+describe("logging a CLI caller whose session sits beside its actor", () => {
+  describe("given the session's secret paths", () => {
     it("masks the token key, bare or under a field, and keeps the rest", () => {
-      const output = logActor({ redactPaths: ACTOR_SECRET_LOG_PATHS });
+      const output = logActor({ redactPaths: SESSION_SECRET_LOG_PATHS });
 
       expect(output).not.toContain(TOKEN_KEY);
       expect(output).toContain(REDACTED);
@@ -51,7 +48,7 @@ describe("logging an actor that carries a CLI session", () => {
 });
 
 describe("the preamble's telemetry slot", () => {
-  it("hands the telemetry factory the actor's secret paths", async () => {
+  it("hands the telemetry factory the session's secret paths", async () => {
     let seen: readonly string[] = [];
     const server = await Server.create("actor-redaction-test")
       .withEnvironment({})
@@ -65,7 +62,7 @@ describe("the preamble's telemetry slot", () => {
       })
       .start();
 
-    expect(seen).toEqual(expect.arrayContaining([...ACTOR_SECRET_LOG_PATHS]));
+    expect(seen).toEqual(expect.arrayContaining([...SESSION_SECRET_LOG_PATHS]));
     await server.close();
   });
 });

@@ -1,14 +1,14 @@
-/**
- * What one caller may read of a project through LangWatchQL's catalogue: the tables and columns
- * their grants unlock (AuthZ), and captured content from the SAME resolved data-privacy policy the
- * trace stack redacts by, so a chart never disagrees with the traces.
- */
 import type {
   LangWatchQLCatalogueAccess,
   LangWatchQLProtections,
   LangWatchQLRunCaller,
 } from "@langwatch/analytics-contract";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+/**
+ * What one caller may read of a project through LangWatchQL's catalogue: the tables and columns
+ * their grants unlock (AuthZ), and captured content from the SAME resolved data-privacy policy the
+ * trace stack redacts by, so a chart never disagrees with the traces.
+ */
+import type { RestCredentialPrincipal } from "@langwatch/authorization";
 import type { AuthzApi, AuthzScopeRef } from "@langwatch/authz-contract";
 import {
   isContentVisible,

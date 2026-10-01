@@ -1,11 +1,11 @@
 import type { ProtocolConnection } from "@langwatch/api";
 import type {
-  RequestActor,
+  Actor,
+  AuthzPermission,
   RestResolvedProjectCredential,
   SessionKeyHolder,
   SessionKeyPresented,
-} from "@langwatch/api/rest";
-import type { AuthzPermission } from "@langwatch/authorization";
+} from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import type { z } from "zod";
 
@@ -109,7 +109,7 @@ export type LangyLocalCaller = Readonly<{
 
 /** Who the project door put behind a key (its owner, or none), and the project it resolved. */
 export type LangyKeyCaller = Readonly<{
-  actor: RequestActor | null;
+  actor: Actor | null;
   projectId: string;
 }>;
 
@@ -125,7 +125,7 @@ export type LangyLocalCallInput = LangyKeyCaller &
 export type LangyLocalWaitInput = LangyKeyCaller &
   Readonly<{ waitId: string; signal?: AbortSignal }>;
 /** The terminal's key owner (none for a key no person owns), and the request it addresses. */
-export type LangyControlOwnerInput = Readonly<{ actor: RequestActor | null }>;
+export type LangyControlOwnerInput = Readonly<{ actor: Actor | null }>;
 export type LangyControlRequestInput = LangyControlOwnerInput & Readonly<{ requestId: string }>;
 export type LangyControlRequestCancelled = z.infer<typeof langyControlCancelResultSchema>;
 /** One UI action the page channel serves, as `langwatch ui actions` lists it. */

@@ -4,7 +4,7 @@
  * poll, per the ADR-128 ingress requirement.
  */
 
-import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/api/rest";
+import type { SessionKeyHolder, SessionKeyPresented } from "@langwatch/authorization";
 import { generate } from "@langwatch/ksuid";
 import {
   CALL_POLL_HOLD_MS,

@@ -34,7 +34,6 @@ import {
   type RestCaller,
   type IdempotentRunner,
   type RestIdentity,
-  type RestResolvedProjectCredential,
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
 import {
@@ -43,6 +42,7 @@ import {
   TrpcHost,
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
+import type { RestResolvedProjectCredential } from "@langwatch/authorization";
 import type { Logger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { ProcessMemberSource } from "@langwatch/process-stores";

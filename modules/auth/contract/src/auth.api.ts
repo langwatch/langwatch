@@ -4,6 +4,7 @@ import type {
   SignedInWith,
 } from "@langwatch/identity-contract";
 import { moduleApi } from "@langwatch/module";
+import { z } from "zod";
 
 import type {
   BrowserSessionInventoryEntry,
@@ -33,20 +34,20 @@ import type {
  * The subject carried by an unexpired CLI access bearer. The device-session
  * store remains Auth-owned; peers receive only the caller facts they need.
  */
-export type CliAccessSession = Readonly<{
-  userId: string;
-  organizationId: string;
+export const cliAccessSessionSchema = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
   /** The one project the session is capped at; absent for a session bound to none. */
-  projectId?: string | undefined;
+  projectId: z.string().optional(),
   /** Set when the person consented to that one project only (hosted MCP); never org-wide. */
-  projectLocked?: boolean | undefined;
+  projectLocked: z.boolean().optional(),
   /** The login key the session minted at sign-in, where it minted one. */
-  cliApiKeyId?: string | undefined;
-  clientInfo?: Readonly<{
-    deviceLabel?: string | undefined;
-    hostname?: string | undefined;
-  }>;
-}>;
+  cliApiKeyId: z.string().optional(),
+  clientInfo: z
+    .object({ deviceLabel: z.string().optional(), hostname: z.string().optional() })
+    .optional(),
+});
+export type CliAccessSession = Readonly<z.infer<typeof cliAccessSessionSchema>>;
 
 /** An access and refresh pair, with the seconds each lives. */
 export type CliSessionTokens = Readonly<{
