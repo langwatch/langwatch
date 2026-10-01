@@ -233,6 +233,45 @@ async function computeGate(): Promise<boolean> {
 }
 
 /**
+ * One gate computation, with the bookkeeping that keeps the memo right: the
+ * deny stamp for the TTL, the once-per-process email-mode warning, and the
+ * eviction on a failed read.
+ */
+function startGateComputation(): Promise<boolean> {
+  const pending: Promise<boolean> = computeGate()
+    .then((allowed) => {
+      // Only this computation may stamp the deny: an invalidation that
+      // landed while it was in flight has already replaced the memo.
+      if (memoizedGate === pending) deniedAt = allowed ? null : Date.now();
+      if (!allowed) warnEmailModeOnce();
+      return allowed;
+    })
+    .catch((err) => {
+      // Evict on reject (Decision 6): the next call recomputes from
+      // scratch instead of freezing a DB-blip denial for the rest of the
+      // process.
+      if (memoizedGate === pending) memoizedGate = null;
+      throw err;
+    });
+  return pending;
+}
+
+/**
+ * Logged once per process (Decision 8a), not on every re-read and not per
+ * request (that's the separate per-blocked-request log, Decision 8d, which
+ * lives at the hook call site where the request path is known).
+ */
+function warnEmailModeOnce(): void {
+  if (warnedEmailMode || env.NEXTAUTH_PROVIDER === "email") return;
+  warnedEmailMode = true;
+  logger.warn(
+    {},
+    "SSO is configured but no genuine license was found, so sign-in uses email mode; " +
+      "set LANGWATCH_LICENSE_KEY or activate an organization license, and SSO turns on within a minute",
+  );
+}
+
+/**
  * `platformSSOAllowed()` — see module docblock. `IS_SAAS` is checked BEFORE
  * anything else and before the memoized promise is ever touched, so a SaaS
  * deployment never performs a DB read for this gate (Decision 1, MINOR-4).
@@ -244,35 +283,7 @@ export async function platformSSOAllowed(): Promise<boolean> {
     invalidateSsoGate();
   }
 
-  if (!memoizedGate) {
-    const pending = computeGate()
-      .then((allowed) => {
-        // Only this computation may stamp the deny: an invalidation that
-        // landed while it was in flight has already replaced the memo.
-        if (memoizedGate === pending) deniedAt = allowed ? null : Date.now();
-        // Logged once per process (Decision 8a), not on every re-read and not
-        // per request (that's the separate per-blocked-request log, Decision
-        // 8d, which lives at the hook call site where the request path is
-        // known).
-        if (!allowed && env.NEXTAUTH_PROVIDER !== "email" && !warnedEmailMode) {
-          warnedEmailMode = true;
-          logger.warn(
-            {},
-            "SSO is configured but no genuine license was found, so sign-in uses email mode; " +
-              "set LANGWATCH_LICENSE_KEY or activate an organization license, and SSO turns on within a minute",
-          );
-        }
-        return allowed;
-      })
-      .catch((err) => {
-        // Evict on reject (Decision 6): the next call recomputes from
-        // scratch instead of freezing a DB-blip denial for the rest of the
-        // process.
-        if (memoizedGate === pending) memoizedGate = null;
-        throw err;
-      });
-    memoizedGate = pending;
-  }
+  if (!memoizedGate) memoizedGate = startGateComputation();
 
   try {
     return await memoizedGate;

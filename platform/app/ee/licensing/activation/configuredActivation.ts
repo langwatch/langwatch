@@ -89,35 +89,48 @@ function messageOf(error: unknown): string {
 export async function activateConfiguredLicense(
   deps: ConfiguredActivationDependencies,
 ): Promise<ConfiguredActivationOutcome> {
-  const { logger } = deps;
   const input = detectLicenseInputForm(deps.value);
-
   if (input.form === "empty") return { outcome: "not_configured" };
-
   if (input.form === "license_key") {
-    logger.info(
+    deps.logger.info(
       { source: "LANGWATCH_LICENSE_KEY", form: "license_key" },
       "LANGWATCH_LICENSE_KEY holds a signed license key; it is used as is and needs no outbound access",
     );
     return { outcome: "license_key" };
   }
+  return redeemConfiguredCode({ deps, code: input.code });
+}
 
-  const context = {
+type LogContext = {
+  source: string;
+  form: "activation_code";
+  codeHint: string;
+};
+
+async function findLicensed(deps: ConfiguredActivationDependencies) {
+  const organizations = await deps.findOrganizations();
+  const licensed = organizations.find(
+    (organization) =>
+      !!organization.license && deps.isValidLicense(organization.license),
+  );
+  return { organizations, licensed };
+}
+
+async function redeemConfiguredCode({
+  deps,
+  code,
+}: {
+  deps: ConfiguredActivationDependencies;
+  code: string;
+}): Promise<ConfiguredActivationOutcome> {
+  const { logger } = deps;
+  const context: LogContext = {
     source: "LANGWATCH_LICENSE_KEY",
     form: "activation_code",
-    codeHint: hintOf(input.code),
+    codeHint: hintOf(code),
   };
 
-  const findLicensed = async () => {
-    const organizations = await deps.findOrganizations();
-    const licensed = organizations.find(
-      (organization) =>
-        !!organization.license && deps.isValidLicense(organization.license),
-    );
-    return { organizations, licensed };
-  };
-
-  const { organizations, licensed } = await findLicensed();
+  const { organizations, licensed } = await findLicensed(deps);
   if (licensed) {
     logger.info(
       { ...context, organizationId: licensed.id },
@@ -146,46 +159,73 @@ export async function activateConfiguredLicense(
   let license: string;
   try {
     const instanceId = await deps.instanceId();
-    ({ license } = await deps.activate({ code: input.code, instanceId }));
+    ({ license } = await deps.activate({ code, instanceId }));
   } catch (error) {
-    const code = refusalCodeOf(error);
-    // Two replicas booting together redeem the same code, and the one that
-    // loses is told it was already used. The winner has stored the license by
-    // then, so that is the same install, not a refusal.
-    if (code === "activation_code_already_redeemed") {
-      const after = await findLicensed();
-      if (after.licensed) {
-        logger.info(
-          { ...context, organizationId: after.licensed.id },
-          "LANGWATCH_LICENSE_KEY holds an activation code; another process of this install redeemed it and stored the license",
-        );
-        return {
-          outcome: "already_licensed",
-          organizationId: after.licensed.id,
-        };
-      }
-    }
-    logger.warn(
-      { ...context, code, reason: messageOf(error) },
-      `LANGWATCH_LICENSE_KEY holds an activation code; redeeming it at connect.langwatch.ai failed (${code}), so the app starts without a license`,
-    );
-    return { outcome: "refused", code };
+    return explainRefusal({ deps, context, error });
   }
 
-  const stored = await deps.store({ organizationId: target.id, license });
+  return storeRedeemedLicense({
+    deps,
+    context,
+    organizationId: target.id,
+    license,
+  });
+}
+
+async function explainRefusal({
+  deps,
+  context,
+  error,
+}: {
+  deps: ConfiguredActivationDependencies;
+  context: LogContext;
+  error: unknown;
+}): Promise<ConfiguredActivationOutcome> {
+  const code = refusalCodeOf(error);
+  // Two replicas booting together redeem the same code, and the one that
+  // loses is told it was already used. The winner has stored the license by
+  // then, so that is the same install, not a refusal.
+  if (code === "activation_code_already_redeemed") {
+    const { licensed } = await findLicensed(deps);
+    if (licensed) {
+      deps.logger.info(
+        { ...context, organizationId: licensed.id },
+        "LANGWATCH_LICENSE_KEY holds an activation code; another process of this install redeemed it and stored the license",
+      );
+      return { outcome: "already_licensed", organizationId: licensed.id };
+    }
+  }
+  deps.logger.warn(
+    { ...context, code, reason: messageOf(error) },
+    `LANGWATCH_LICENSE_KEY holds an activation code; redeeming it at connect.langwatch.ai failed (${code}), so the app starts without a license`,
+  );
+  return { outcome: "refused", code };
+}
+
+async function storeRedeemedLicense({
+  deps,
+  context,
+  organizationId,
+  license,
+}: {
+  deps: ConfiguredActivationDependencies;
+  context: LogContext;
+  organizationId: string;
+  license: string;
+}): Promise<ConfiguredActivationOutcome> {
+  const stored = await deps.store({ organizationId, license });
   if (!stored.success) {
-    logger.warn(
-      { ...context, organizationId: target.id, error: stored.error },
+    deps.logger.warn(
+      { ...context, organizationId, error: stored.error },
       "LANGWATCH_LICENSE_KEY holds an activation code; the license it was exchanged for did not validate, so it was not stored",
     );
     return { outcome: "license_rejected", error: stored.error };
   }
-
-  logger.info(
-    { ...context, organizationId: target.id },
+  deps.logger.info(
+    { ...context, organizationId },
     "LANGWATCH_LICENSE_KEY holds an activation code; redeemed it and stored the license on the organization",
   );
-  return { outcome: "activated", organizationId: target.id };
+  return { outcome: "activated", organizationId };
 }
 
 /**
