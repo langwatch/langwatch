@@ -56,11 +56,18 @@ export class SsoIssuerEndpointOrigins {
       .catch(() => ({ reachable: false as const, reason: "unreachable" }));
     const endpoints = answer.reachable ? (answer.endpoints ?? []) : [];
     const origins = await this.#publicOrigins(endpoints);
+    this.#pruneExpired(now);
     this.#cache.set(issuer, {
       origins,
       expiresAt: now + (answer.reachable ? FOUND_TTL_MS : MISSING_TTL_MS),
     });
     return origins;
+  }
+
+  #pruneExpired(now: number): void {
+    for (const [issuer, entry] of this.#cache) {
+      if (entry.expiresAt <= now) this.#cache.delete(issuer);
+    }
   }
 
   async #publicOrigins(endpoints: readonly string[]): Promise<string[]> {

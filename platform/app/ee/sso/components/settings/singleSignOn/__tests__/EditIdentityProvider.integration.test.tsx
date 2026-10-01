@@ -14,19 +14,23 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { current, saveMock, invalidateMock, toastMock } = vi.hoisted(() => ({
-  current: {
-    value: {
+const { OIDC_VIEW, current, saveMock, invalidateMock, toastMock } = vi.hoisted(
+  () => {
+    const OIDC_VIEW: Record<string, unknown> = {
       protocol: "oidc",
       issuer: "https://login.microsoftonline.com/wrong-tenant/v2.0",
       clientId: "client_old",
       hasClientSecret: true,
-    } as Record<string, unknown>,
+    };
+    return {
+      OIDC_VIEW,
+      current: { value: OIDC_VIEW },
+      saveMock: vi.fn(),
+      invalidateMock: vi.fn(async () => undefined),
+      toastMock: vi.fn(),
+    };
   },
-  saveMock: vi.fn(),
-  invalidateMock: vi.fn(async () => undefined),
-  toastMock: vi.fn(),
-}));
+);
 
 vi.mock("~/features/errors/logic/presentation", () => ({
   explainAnyError: () => ({ title: "t", describe: () => "d" }),
@@ -86,6 +90,7 @@ const field = (label: string) =>
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  current.value = OIDC_VIEW;
 });
 
 describe("editing the identity provider settings on the connection's card", () => {
