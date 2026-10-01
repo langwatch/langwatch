@@ -30,7 +30,7 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { prisma } from "~/server/db";
-import { handleAuthRequest } from "../auth-request";
+import { handleAuthRequest } from "~/server/routes/auth-request";
 import { models } from "../config/models";
 
 const BASE_URL = "http://localhost:3000";

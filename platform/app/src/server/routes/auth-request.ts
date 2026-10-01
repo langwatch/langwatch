@@ -6,8 +6,8 @@ import {
 import {
   nameIssuerMismatch,
   runWithIdTokenIssuerScope,
-} from "./id-token-issuer-mismatch";
-import { aliasLegacyMicrosoftCallback } from "./legacy-callback-alias";
+} from "~/server/better-auth/id-token-issuer-mismatch";
+import { aliasLegacyMicrosoftCallback } from "~/server/better-auth/legacy-callback-alias";
 
 /**
  * One request through better-auth, the way the auth route hands it over.

@@ -39,7 +39,6 @@ import {
   ssoProvisionedUsers,
   ssoRegisteredIssuers,
 } from "~/server/app-layer/identity/runtime";
-import { handleAuthRequest } from "~/server/better-auth/auth-request";
 import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
@@ -47,6 +46,7 @@ import { noteIdTokenIssuerRefusal } from "~/server/better-auth/id-token-issuer-m
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { resolveTrustedOrigins } from "~/server/better-auth/trustedOrigins";
 import { prisma } from "~/server/db";
+import { handleAuthRequest } from "~/server/routes/auth-request";
 
 const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8).toLowerCase();
