@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type {
   DomainClaimLicenseAuthority,
@@ -5,7 +6,6 @@ import type {
 } from "@langwatch/enterprise-licensing-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
-  type IdentityActor,
   type SsoConnectionCommandType,
   type SsoConnectionLifecycleState,
   type SsoConnectionState,
@@ -201,7 +201,7 @@ export class SsoConnectionGuardChecksService {
     act,
   }: {
     authority: SsoDomainClaimAuthority;
-    actor: IdentityActor;
+    actor: LedgerActor;
     act: string;
   }): Promise<void> {
     if (authority === "dns-proof") {
@@ -228,7 +228,7 @@ export class SsoConnectionGuardChecksService {
     act,
   }: {
     licence: DomainClaimLicenseAuthority;
-    actor: IdentityActor;
+    actor: LedgerActor;
     act: string;
   }): Promise<void> {
     if (licence.hostsSingleOrganization) return;
@@ -334,13 +334,7 @@ export class SsoConnectionGuardChecksService {
   /**
    * The operator gate, asked of the port rather than of the command.
    */
-  async assertPlatformOperator({
-    actor,
-    act,
-  }: {
-    actor: IdentityActor;
-    act: string;
-  }): Promise<void> {
+  async assertPlatformOperator({ actor, act }: { actor: LedgerActor; act: string }): Promise<void> {
     // A system actor is refused before the port is asked. These acts record
     // WHO decided, and an unattributable trust decision is precisely what the
     // attestation's visibility requirement forbids — so "the platform did it"

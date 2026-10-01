@@ -1,8 +1,9 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { z } from "zod";
 
 import { IDENTITY_EVENT_TYPES, linkProposalReasonSchema } from "./facts.ts";
-import { identifierProviderSchema, identityActorSchema } from "./vocabulary.ts";
+import { identifierProviderSchema } from "./vocabulary.ts";
 
 /** D05 tier 1: one address, five operator panels (ADR-117 §1, §3). */
 export const IDENTITY_LOOKUP_HISTORY_LIMIT = 50;
@@ -129,7 +130,7 @@ export const identityHistoryEntrySchema = z.object({
   eventId: z.string(),
   type: z.enum(IDENTITY_EVENT_TYPES),
   occurredAtMs: z.number(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   identifierId: z.string().nullable(),
   provider: z.string().nullable(),
   value: z.string().nullable(),

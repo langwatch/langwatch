@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 /**
  * The wire shapes of `/api/grants`, the successor to `/api/role-bindings`: a
  * grant names who (principal), what (role) and where (scope). Built-in roles
@@ -5,7 +6,6 @@
  */
 import { z } from "zod";
 
-import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
 import { authzPrincipalRefSchema } from "./authz.ts";
 
 const MAX_ID_LENGTH = 128;
@@ -128,7 +128,7 @@ export const authzCreateGrantInputSchema = z
     grant: grantCreateSchema,
     /** Whose permissions bound what may be granted: the key or the person asking. */
     caller: authzPrincipalRefSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzCreateGrantInput = z.infer<typeof authzCreateGrantInputSchema>;
@@ -139,7 +139,7 @@ export const authzChangeGrantRoleInputSchema = z
     grantId: z.string().min(1),
     roleId: z.string().min(1),
     caller: authzPrincipalRefSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzChangeGrantRoleInput = z.infer<typeof authzChangeGrantRoleInputSchema>;
@@ -148,7 +148,7 @@ export const authzRevokeGrantByIdInputSchema = z
   .object({
     organizationId: z.string().min(1),
     grantId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzRevokeGrantByIdInput = z.infer<typeof authzRevokeGrantByIdInputSchema>;

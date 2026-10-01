@@ -1,8 +1,8 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** Directory sync commands: issue token, record pushes and failures, revoke sync. Each carries a
  * caller-minted commandId for deduplication. No PII; persons are userId + externalId. See D08.
  */
-import { identityActorSchema } from "@langwatch/identity-contract";
 import { z } from "zod";
 
 import { scimApplyOpSchema, scimRevokeCauseSchema, scimUserOpSchema } from "./scim-sync.ts";
@@ -38,7 +38,7 @@ const commandIdentitySchema = z.object({
   connectionId: z.string().min(1),
   commandId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /**

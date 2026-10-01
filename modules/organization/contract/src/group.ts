@@ -1,8 +1,8 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { authzGrantCallerSchema } from "@langwatch/authz-contract";
 import { z } from "zod";
 
 import { organizationIdSchema } from "./organization.ts";
-import { organizationLedgerActorSchema } from "./team.ts";
 
 export const organizationGroupRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
 export type OrganizationGroupRole = z.infer<typeof organizationGroupRoleSchema>;
@@ -116,7 +116,7 @@ export const createOrganizationGroupInputSchema = z
     grants: z.array(organizationGroupGrantInputSchema).optional(),
     memberIds: z.array(z.string().min(1)).optional(),
     caller: authzGrantCallerSchema,
-    actor: organizationLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type CreateOrganizationGroupInput = z.infer<typeof createOrganizationGroupInputSchema>;
@@ -127,7 +127,7 @@ export const renameOrganizationGroupInputSchema = getOrganizationGroupInputSchem
 export type RenameOrganizationGroupInput = z.infer<typeof renameOrganizationGroupInputSchema>;
 
 export const deleteOrganizationGroupInputSchema = getOrganizationGroupInputSchema.safeExtend({
-  actor: organizationLedgerActorSchema,
+  actor: ledgerActorSchema,
   allowScimManaged: z.boolean().optional(),
 });
 export type DeleteOrganizationGroupInput = z.infer<typeof deleteOrganizationGroupInputSchema>;
@@ -147,7 +147,7 @@ export type AddOrganizationGroupMemberInput = z.infer<typeof addOrganizationGrou
 export const addOrganizationGroupGrantInputSchema = getOrganizationGroupInputSchema.safeExtend({
   grant: organizationGroupGrantInputSchema,
   caller: authzGrantCallerSchema,
-  actor: organizationLedgerActorSchema,
+  actor: ledgerActorSchema,
 });
 export type AddOrganizationGroupGrantInput = z.infer<typeof addOrganizationGroupGrantInputSchema>;
 
@@ -156,7 +156,7 @@ export const removeOrganizationGroupGrantInputSchema = z
     organizationId: organizationIdSchema,
     groupId: z.string().min(1).optional(),
     grantId: z.string().min(1),
-    actor: organizationLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type RemoveOrganizationGroupGrantInput = z.infer<
@@ -174,7 +174,7 @@ export const applyOrganizationGroupEditsInputSchema = getOrganizationGroupInputS
   memberUserIdsToAdd: z.array(z.string().min(1)),
   memberUserIdsToRemove: z.array(z.string().min(1)),
   caller: authzGrantCallerSchema,
-  actor: organizationLedgerActorSchema,
+  actor: ledgerActorSchema,
 });
 export type ApplyOrganizationGroupEditsInput = z.infer<
   typeof applyOrganizationGroupEditsInputSchema

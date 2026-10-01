@@ -1,7 +1,6 @@
-import { organizationRoleSchema } from "@langwatch/authorization";
+import { ledgerActorSchema, organizationRoleSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
-import { grantsLedgerActorSchema } from "./authz-grant.events.ts";
 import { authzPrincipalRefSchema, grantScopeTierSchema, teamUserRoleSchema } from "./authz.ts";
 
 /** Whose permissions bound what a write may grant (the key or person asking). */
@@ -145,7 +144,7 @@ export const authzCreateBindingInputSchema = authzBindingWriteSchema.safeExtend(
   userId: z.string().min(1).optional(),
   groupId: z.string().min(1).optional(),
   apiKeyId: z.string().min(1).optional(),
-  actor: grantsLedgerActorSchema,
+  actor: ledgerActorSchema,
   caller: callerSchema,
   /** When the binding stops granting; a moment already passed is refused. */
   expiresAt: z.date().optional(),
@@ -161,7 +160,7 @@ export const authzUpdateBindingInputSchema = z
     bindingId: z.string().min(1),
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).optional(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     caller: callerSchema,
   })
   .strict();
@@ -171,7 +170,7 @@ export const authzDeleteBindingInputSchema = z
   .object({
     organizationId: z.string().min(1),
     bindingId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzDeleteBindingInput = z.infer<typeof authzDeleteBindingInputSchema>;
@@ -182,7 +181,7 @@ export const authzApplyMemberBindingsInputSchema = z
     userId: z.string().min(1),
     bindingIdsToDelete: z.array(z.string().min(1)),
     bindingsToCreate: z.array(authzBindingWriteSchema),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     caller: callerSchema,
   })
   .strict();

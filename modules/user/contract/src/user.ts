@@ -1,6 +1,5 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
-
-import { userLedgerActorSchema } from "./user.events.ts";
 
 export const USER_FEATURE_ID = "user" as const;
 export const USER_KSUID_RESOURCE = "user" as const;
@@ -52,7 +51,7 @@ export type UserIdInput = z.infer<typeof userIdInputSchema>;
 
 /** A deactivation or reactivation, and who made it. */
 export const userLifecycleChangeInputSchema = z
-  .object({ id: z.string().min(1), actor: userLedgerActorSchema })
+  .object({ id: z.string().min(1), actor: ledgerActorSchema })
   .strict();
 export type UserLifecycleChangeInput = z.infer<typeof userLifecycleChangeInputSchema>;
 

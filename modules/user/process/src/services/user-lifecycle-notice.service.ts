@@ -1,10 +1,10 @@
+import type { LedgerActor } from "@langwatch/authorization";
 import type { EventingCommandSender } from "@langwatch/eventing";
 import type { Instant } from "@langwatch/time";
-import type { UserLedgerActor } from "@langwatch/user-contract";
 
 import type { RecordUserLifecycleCommandData } from "../eventing/user-lifecycle.events.ts";
 
-type Change = { userId: string; actor: UserLedgerActor; at: Instant };
+type Change = { userId: string; actor: LedgerActor; at: Instant };
 
 export type UserLifecycleSenders = Readonly<{
   recordUserDeactivated: Pick<EventingCommandSender<RecordUserLifecycleCommandData>, "send">;

@@ -1,4 +1,5 @@
-import type { AuthzAccessBreakdownOutput, GrantsLedgerActor } from "@langwatch/authz-contract";
+import type { LedgerActor } from "@langwatch/authorization";
+import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
 import { moduleApi } from "@langwatch/module";
 import type {
   GuidedOnboardingRecord,
@@ -354,7 +355,7 @@ export interface OrganizationApi {
     input: Readonly<{
       organizationId: string;
       userId: string;
-      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+      admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
   ): Promise<"created" | "already-present">;
   isMember(input: Readonly<{ organizationId: string; userId: string }>): Promise<boolean>;

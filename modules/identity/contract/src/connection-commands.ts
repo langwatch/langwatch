@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
@@ -12,7 +13,6 @@ import {
   ssoPublishedProofChannelSchema,
   ssoVerificationCeremonyMethodSchema,
 } from "./connection.ts";
-import { identityActorSchema } from "./vocabulary.ts";
 
 /**
  * SSO connection commands (ADR-117 §5, D04): lifecycle verbs with idempotent retries via commandId.
@@ -100,7 +100,7 @@ const commandIdentitySchema = z.object({
   connectionId: z.string().min(1),
   commandId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
   /** Stamped onto every fact the command states. Defaults to self-serve;
    *  only the grandfather migration passes the other value. */
   source: ssoConnectionSourceSchema.default("self-serve"),

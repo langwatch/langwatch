@@ -1,9 +1,9 @@
+import type { LedgerActor } from "@langwatch/authorization";
 import {
   newAuthzGrantId,
   type AuthzApi,
   type AuthzBindingForSynthesis,
   type AuthzGrantCaller,
-  type GrantsLedgerActor,
   GrantScopeTier,
 } from "@langwatch/authz-contract";
 /**
@@ -577,7 +577,7 @@ export class OrganizationMembershipService {
   }: {
     organizationId: string;
     userId: string;
-    admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+    admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
   }): Promise<"created" | "already-present"> {
     const grantId = newAuthzGrantId();
     const outcome = await this.repo.createMembership({

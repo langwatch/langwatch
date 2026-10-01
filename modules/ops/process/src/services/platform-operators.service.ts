@@ -1,4 +1,5 @@
-import type { AuthzApi, GrantsLedgerActor } from "@langwatch/authz-contract";
+import type { LedgerActor } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OpsImpersonatedOperatorRefusedError,
@@ -13,13 +14,13 @@ import { type UserApi, UserEmailAmbiguousError, type UserProfile } from "@langwa
 const logger = createLogger("langwatch:ops:platform-operators");
 
 /** The ledger actor on the one-time seed's grants. */
-export const PLATFORM_OPERATOR_SEED_ACTOR: GrantsLedgerActor = {
+export const PLATFORM_OPERATOR_SEED_ACTOR: LedgerActor = {
   type: "system",
   id: "system:ops-platform-operator-seed",
 };
 
 /** The ledger actor on the recovery task's grants: shell access already implies full control. */
-export const PLATFORM_OPERATOR_TASK_ACTOR: GrantsLedgerActor = {
+export const PLATFORM_OPERATOR_TASK_ACTOR: LedgerActor = {
   type: "system",
   id: "system:grant-platform-operator-task",
 };

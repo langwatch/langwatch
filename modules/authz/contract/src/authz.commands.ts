@@ -1,10 +1,9 @@
-import { actorSchema } from "@langwatch/authorization";
+import { actorSchema, ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
   grantEventSourceSchema,
   grantShapeRefinement,
-  grantsLedgerActorSchema,
   ledgerPrincipalSchema,
   ledgerScopeSchema,
   legacyBindingRoleSchema,
@@ -70,7 +69,7 @@ export const attachGrantEntrySchema = z
     legacyRole: legacyBindingRoleSchema.optional(),
     expiresAtMs: z.number().int().positive().optional(),
     source: grantEventSourceSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
     /** Current membership lifetime for a USER grant. Imported history omits
      *  this field so replay keeps its pre-fence behavior. */
@@ -123,7 +122,7 @@ export const changeGrantRoleCommandDataSchema = commandIdentitySchema
     grantId: z.string().min(1),
     from: z.string().min(1).nullable(),
     to: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
@@ -133,7 +132,7 @@ export const revokeGrantCommandDataSchema = commandIdentitySchema
   .safeExtend({
     grantId: z.string().min(1),
     reason: z.string().min(1).optional(),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
@@ -154,7 +153,7 @@ export type DefineRoleEntry = z.infer<typeof defineRoleEntrySchema>;
 export const defineRoleCommandDataSchema = commandIdentitySchema
   .safeExtend({
     role: defineRoleEntrySchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
 export type DefineRoleCommandData = z.infer<typeof defineRoleCommandDataSchema>;
@@ -163,7 +162,7 @@ export const changeRolePermissionsCommandDataSchema = commandIdentitySchema
   .safeExtend({
     roleId: z.string().min(1),
     permissions: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
@@ -174,7 +173,7 @@ export type ChangeRolePermissionsCommandData = z.infer<
 export const deleteRoleCommandDataSchema = commandIdentitySchema
   .safeExtend({
     roleId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     occurredAtMs: z.number().int().nonnegative(),
   })
   .refine(isOneLedgerPerOrganization, ONE_LEDGER_PER_ORGANIZATION);
@@ -257,7 +256,7 @@ export const authzAttachBindingsInputSchema = z
     organizationId: z.string().min(1),
     bindings: z.array(authzLedgerBindingAttachSchema),
     caller: authzGrantCallerSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     source: authzLedgerWriteSourceSchema.optional(),
     /** `attach` writes every binding, identical ones included (bindings are
      *  never unique); `skip` leaves out one the principal already holds. */
@@ -324,7 +323,7 @@ export const authzAttachResourceGrantInputSchema = z
     resource: authzLedgerResourceTermsSchema,
     principal: authzLedgerResourcePrincipalSchema,
     scopeId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     commandId: z.string().min(1).optional(),
   })
   .strict();
@@ -336,7 +335,7 @@ export const authzRevokeResourceGrantsInputSchema = z
   .object({
     organizationId: z.string().min(1),
     grantIds: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     reason: z.string().min(1).optional(),
   })
   .strict();
@@ -351,7 +350,7 @@ export const authzChangeBindingRoleInputSchema = z
     role: teamUserRoleSchema,
     customRoleId: z.string().min(1).nullable(),
     caller: authzGrantCallerSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzChangeBindingRoleInput = z.infer<typeof authzChangeBindingRoleInputSchema>;
@@ -362,7 +361,7 @@ export const authzRevokeBindingsInputSchema = z
   .object({
     organizationId: z.string().min(1),
     bindingIds: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     reason: z.string().min(1).optional(),
   })
   .strict();
@@ -379,7 +378,7 @@ export const authzRetireDirectoryGrantsInputSchema = z
   .object({
     organizationId: z.string().min(1),
     userIds: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     reason: z.string().min(1).optional(),
   })
   .strict();
@@ -448,7 +447,7 @@ export const authzRevokeBindingsWhereInputSchema = z
   .object({
     organizationId: z.string().min(1),
     where: authzBindingFilterSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     reason: z.string().min(1).optional(),
   })
   .strict();
@@ -461,7 +460,7 @@ export const authzOffboardMemberInputSchema = z
     organizationId: z.string().min(1),
     userId: z.string().min(1),
     revokedGrantIds: z.array(z.string().min(1)),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
   })
   .strict();
 export type AuthzOffboardMemberInput = z.infer<typeof authzOffboardMemberInputSchema>;
@@ -476,7 +475,7 @@ export const authzDefineRoleInputSchema = z
     description: z.string().optional(),
     permissions: z.array(z.string().min(1)),
     kind: authzRoleKindSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     /** Same contract as `authzAttachBindingsInputSchema.requireProjection`. */
     requireProjection: z.boolean().optional(),
   })
@@ -489,7 +488,7 @@ export const authzDeleteRoleInputSchema = z
   .object({
     organizationId: z.string().min(1),
     roleId: z.string().min(1),
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     awaitProjection: z.boolean().optional(),
   })
   .strict();

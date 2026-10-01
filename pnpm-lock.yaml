@@ -4019,6 +4019,9 @@ importers:
 
   enterprise/modules/scim/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -4223,6 +4226,9 @@ importers:
 
   enterprise/modules/sso/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../../packages/config
@@ -8921,6 +8927,9 @@ importers:
 
   modules/identity/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
@@ -10943,6 +10952,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -11230,6 +11242,9 @@ importers:
 
   modules/organization/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -14491,6 +14506,9 @@ importers:
 
   modules/user/contract:
     dependencies:
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/governance/contract
@@ -14525,6 +14543,9 @@ importers:
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../auth/contract
+      '@langwatch/authorization':
+        specifier: workspace:*
+        version: link:../../../packages/authorization
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract

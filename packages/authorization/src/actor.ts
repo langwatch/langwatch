@@ -119,7 +119,8 @@ export function internalActor(codePath: string, options?: { revision?: string })
  * is frozen by every event already written; extend {@link Actor} and
  * {@link toLedgerActor}, never this.
  */
-export type LedgerActor = { type: "user" | "system"; id: string | null };
+export const ledgerActorSchema = z.object({ type: z.enum(["user", "system"]), id: z.string().nullable() });
+export type LedgerActor = z.infer<typeof ledgerActorSchema>;
 
 /** The one serialization seam from the rich actor to the durable record. */
 export function toLedgerActor(actor: Actor): LedgerActor {

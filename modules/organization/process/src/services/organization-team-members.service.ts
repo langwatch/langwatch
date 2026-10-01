@@ -1,3 +1,4 @@
+import type { LedgerActor } from "@langwatch/authorization";
 /**
  * A team's people: add/remove, create/update, read back with members
  * attached. Every write goes through the authz grants ledger; a change
@@ -25,7 +26,6 @@ import {
   type CreateOrganizationTeamWithMembersInput,
   type GetOrganizationTeamWithMembersInput,
   type ListOrganizationTeamsWithMembersInput,
-  type OrganizationLedgerActor,
   type OrganizationTeam,
   type OrganizationTeamMemberInput,
   type OrganizationTeamWithMembers,
@@ -380,7 +380,7 @@ export class OrganizationTeamMembersService {
     teamId: string;
     members: OrganizationTeamMemberInput[];
     caller: AuthzGrantCaller;
-    actor: OrganizationLedgerActor;
+    actor: LedgerActor;
   }): Promise<unknown> {
     return this.deps.grants.attachBindings({
       organizationId: input.organizationId,
@@ -401,7 +401,7 @@ export class OrganizationTeamMembersService {
     organizationId: string;
     teamId: string;
     caller: AuthzGrantCaller;
-    actor: OrganizationLedgerActor;
+    actor: LedgerActor;
     plan: TeamMembershipPlan;
   }): Promise<void> {
     if (input.plan.membersToAdd.length > 0) {

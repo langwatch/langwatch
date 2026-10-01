@@ -44,12 +44,6 @@ export type IdentifierArrivalState = z.infer<typeof identifierArrivalStateSchema
 export const verificationMethodSchema = z.enum(["magic-link", "oauth", "saml", "creation"]);
 export type VerificationMethod = z.infer<typeof verificationMethodSchema>;
 
-export const identityActorSchema = z.object({
-  type: z.enum(["user", "system"]),
-  id: z.string().nullable(),
-});
-export type IdentityActor = z.infer<typeof identityActorSchema>;
-
 /**
  * R8 arrival semantics (see {@link IdentifierArrivalState}): only `email`
  * arrives ATTACHED; legacy-migration providers arrive VERIFIED too, since

@@ -1,4 +1,5 @@
 import type { AuthApi } from "@langwatch/auth-contract";
+import type { LedgerActor } from "@langwatch/authorization";
 import { ValidationError } from "@langwatch/handled-error";
 import { SsoConnectionStringEditRetiredError } from "@langwatch/identity-contract";
 import {
@@ -8,7 +9,7 @@ import {
   type AdminOperationResult,
   type AdminOperationParams,
 } from "@langwatch/ops-contract";
-import type { UserApi, UserLedgerActor } from "@langwatch/user-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 import type { AdminBackofficeRepository } from "../repositories/admin-backoffice.repository.ts";
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
@@ -157,7 +158,7 @@ export class AdminBackofficeService {
     actorId: string;
     value: unknown;
   }): Promise<UserSideEffectAudit[]> {
-    const actor: UserLedgerActor = { type: "user", id: actorId };
+    const actor: LedgerActor = { type: "user", id: actorId };
     if (value === null || value === "") {
       await this.users.reactivate({ id: userId, actor });
       return [{ action: "update/user", payload: { id: userId, reactivate: true } }];

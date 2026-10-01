@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 import { z } from "zod";
 
 import {
@@ -5,7 +6,6 @@ import {
   joinResolverSchema,
   joinWithdrawalCauseSchema,
 } from "./join-request.ts";
-import { identityActorSchema } from "./vocabulary.ts";
 
 /** Join-request commands for the full lifecycle: request, approve, reject, withdraw, expire. Each
  * carries a caller-minted commandId for idempotency, not PII. See ADR-117 D12.
@@ -36,7 +36,7 @@ const commandIdentitySchema = z.object({
   joinRequestId: z.string().min(1),
   commandId: z.string().min(1),
   occurredAtMs: z.number().int().nonnegative(),
-  actor: identityActorSchema,
+  actor: ledgerActorSchema,
 });
 
 /**

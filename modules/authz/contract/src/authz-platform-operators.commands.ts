@@ -1,3 +1,4 @@
+import { ledgerActorSchema } from "@langwatch/authorization";
 /**
  * The platform tier's three operations (ARCHITECTURE.md, "Platform operators are a grant"):
  * grant, revoke and list the platform-operator role. Never on an organization's grant doors.
@@ -5,11 +6,7 @@
 import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
-import {
-  grantEventSourceSchema,
-  grantsLedgerActorSchema,
-  ledgerPrincipalSchema,
-} from "./authz-grant.events.ts";
+import { grantEventSourceSchema, ledgerPrincipalSchema } from "./authz-grant.events.ts";
 import { authzGrantCallerSchema } from "./authz.commands.ts";
 
 /** The revoke reason user erasure writes; with a `system` caller it may remove the last holder. */
@@ -31,7 +28,7 @@ export const authzGrantPlatformOperatorInputSchema = z
     principal: ledgerPrincipalSchema,
     /** A holder of `ops:manage`, or `system` for the seed, bootstrap and recovery task. */
     caller: authzGrantCallerSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     source: grantEventSourceSchema.optional(),
     /** A deterministic id (`deriveGrantId`) for a writer that may run twice. */
     grantId: z.string().min(1).optional(),
@@ -44,7 +41,7 @@ export const authzRevokePlatformOperatorInputSchema = z
   .object({
     grantId: z.string().min(1),
     caller: authzGrantCallerSchema,
-    actor: grantsLedgerActorSchema,
+    actor: ledgerActorSchema,
     /** `user-erased` with a `system` caller is the only revoke that may remove the last holder. */
     reason: z.string().min(1).optional(),
   })

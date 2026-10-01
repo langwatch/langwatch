@@ -28,6 +28,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/enterprise-gateway-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",

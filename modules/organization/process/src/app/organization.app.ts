@@ -1,12 +1,11 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { type LedgerActor, SYSTEM_ACTORS } from "@langwatch/authorization";
 import {
   AuthzApi,
   type AuthzListTeamMemberBindingsInput,
   type AuthzTeamMemberBinding,
   type AuthzAccessBreakdownOutput,
   type AuthzGrantCaller,
-  type GrantsLedgerActor,
 } from "@langwatch/authz-contract";
 import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -901,7 +900,7 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
     input: Readonly<{
       organizationId: string;
       userId: string;
-      admittedBy?: Readonly<{ actor: GrantsLedgerActor; commandId: string }>;
+      admittedBy?: Readonly<{ actor: LedgerActor; commandId: string }>;
     }>,
   ): Promise<"created" | "already-present"> {
     return this.#dependencies.membership.createMembership(input);
