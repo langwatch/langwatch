@@ -27,6 +27,7 @@ import {
   currentUiBuildId,
   indexedDbQueryStore,
   persistUiQueries,
+  sealedUiQueryStore,
   type UiQueryStore,
 } from "@langwatch/browser-host/query-persistence";
 import { startUiQuerySync } from "@langwatch/browser-host/query-sync";
@@ -76,8 +77,8 @@ export type UiFeatureShellInstall = {
   sessionVersions?: SessionVersionWatch;
   /** The versioned reads the supplied transport was built with; its cache is bound here. */
   versionedReads?: UiBindableVersionedReads;
-  /** Where the marked reads persist; IndexedDB when absent. */
-  queryStore?: UiQueryStore;
+  /** The disk the marked reads are sealed onto; IndexedDB when absent. */
+  queryStore?: UiQueryStore<unknown>;
   /**
    * Every feature's reader of a failed mutation, in install order. A failure a
    * feature answers application-wide is reported here once, rather than by
@@ -98,6 +99,26 @@ export type UiFeatureShellInstall = {
    */
   sessionQueryKey: readonly unknown[];
 };
+
+/**
+ * The keys the session read carries, read off its cached answer the way `UiApiWaitingGate`
+ * reads `unreachable`: auth names the read, this package names no module.
+ */
+function sealingKeysOf(answer: unknown): {
+  cacheKey: string | undefined;
+  previousCacheKey: string | undefined;
+} {
+  if (typeof answer !== "object" || answer === null) {
+    return { cacheKey: void 0, previousCacheKey: void 0 };
+  }
+  const cacheKey =
+    "cacheKey" in answer && typeof answer.cacheKey === "string" ? answer.cacheKey : void 0;
+  const previousCacheKey =
+    "previousCacheKey" in answer && typeof answer.previousCacheKey === "string"
+      ? answer.previousCacheKey
+      : void 0;
+  return { cacheKey, previousCacheKey };
+}
 
 /** A composition that installed no module host mounts. */
 function UiNoModuleHosts({ children }: { children?: ReactNode }) {
@@ -154,10 +175,16 @@ export function createUiFeatureShell({
     const queryClient = useQueryClient();
     const userId =
       live.session === UNAVAILABLE_UI_SESSION ? void 0 : live.session.currentUser()?.id;
-    // The marked reads are mirrored per user, and every tab syncs their versions.
+    const { cacheKey, previousCacheKey } = sealingKeysOf(queryClient.getQueryData(sessionQueryKey));
+    // The marked reads are mirrored per user, sealed under the session read's keys, and every
+    // tab syncs their versions. No key, no mirror.
     useEffect(() => {
-      if (!userId || cachePlan.tiers.size === 0) return;
-      const store = queryStore ?? indexedDbQueryStore;
+      if (!userId || !cacheKey || cachePlan.tiers.size === 0) return;
+      const store = sealedUiQueryStore({
+        store: queryStore ?? indexedDbQueryStore,
+        cacheKey,
+        previousCacheKey,
+      });
       const buildId = currentUiBuildId();
       const { unsubscribe } = persistUiQueries({
         queryClient,
@@ -165,6 +192,7 @@ export function createUiFeatureShell({
         userId,
         buildId,
         store,
+        sessionQueryKey,
         versions: reads.versions,
       });
       const stopSync = startUiQuerySync({
@@ -179,7 +207,7 @@ export function createUiFeatureShell({
         unsubscribe();
         stopSync();
       };
-    }, [queryClient, userId]);
+    }, [queryClient, userId, cacheKey, previousCacheKey]);
     const resolved = useMemo(
       () =>
         resolveUiCapabilities({

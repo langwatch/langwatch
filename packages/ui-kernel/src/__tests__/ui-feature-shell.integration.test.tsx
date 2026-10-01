@@ -27,6 +27,9 @@ import type { UiProviderShell } from "../ui-outer-providers.tsx";
 /** Namespaced as auth's own query key would be; nothing here reads a real one. */
 const TEST_SESSION_QUERY_KEY = ["test", "session"];
 
+/** 32 bytes, base64, as the session read carries a user's key for this epoch. */
+const SEALING_KEY = "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=";
+
 class StubSession extends UiSession {
   currentUser() {
     return { id: "user_1", name: "Ada", email: "ada@example.com", image: null };
@@ -366,10 +369,14 @@ describe("given the shell apps/ui mounts around every routed page", () => {
 
     describe("given a signed-in user and another user's cache on this device", () => {
       /** @scenario "A user switch never shows another user's cache" */
-      it("saves only the marked read, under this user's entry, and removes the other", async () => {
+      it("saves only the marked read, sealed under this user's entry, and removes the other", async () => {
         const store = memoryStore();
         store.entries.set("lw-query:user_0:other", {});
         const host = new QueryClient();
+        host.setQueryData(TEST_SESSION_QUERY_KEY, {
+          cacheKey: SEALING_KEY,
+          previousCacheKey: null,
+        });
         const shell = createUiFeatureShell({
           sessionQueryKey: TEST_SESSION_QUERY_KEY,
           apis: [tieredBinding()],
@@ -387,8 +394,31 @@ describe("given the shell apps/ui mounts around every routed page", () => {
         await waitFor(() => expect(store.entries.size).toBe(1), { timeout: 3_000 });
         const [key] = [...store.entries.keys()];
         expect(key?.startsWith("lw-query:user_1:")).toBe(true);
-        expect(JSON.stringify(store.entries.get(key ?? ""))).toContain("getAll");
+        expect(JSON.stringify([...store.entries.values()])).not.toContain("getAll");
         expect(JSON.stringify([...store.entries.values()])).not.toContain("getMemberById");
+      });
+    });
+
+    describe("given the session read carried no cache key", () => {
+      /** @scenario "Without a key nothing is mirrored" */
+      it("writes nothing to the store", async () => {
+        const store = memoryStore();
+        const host = new QueryClient();
+        host.setQueryData(TEST_SESSION_QUERY_KEY, { cacheKey: null, previousCacheKey: null });
+        const shell = createUiFeatureShell({
+          sessionQueryKey: TEST_SESSION_QUERY_KEY,
+          apis: [tieredBinding()],
+          capabilities: {},
+          transport: createUiFeatureApiClient(),
+          session: () => ({ session: new StubSession(), scope: new StubScope() }),
+          queryStore: store,
+        });
+
+        renderShell(shell, <div />, host);
+        host.setQueryData(orgGraph, ["org"]);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        expect(store.entries.size).toBe(0);
       });
     });
   });

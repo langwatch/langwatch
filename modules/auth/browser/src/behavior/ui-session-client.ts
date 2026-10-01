@@ -73,6 +73,16 @@ export function toUiActor(payload: unknown): UiActor | null {
   };
 }
 
+/** The keys the reader's mirrored reads are sealed under, this epoch's and the last. */
+function toUiCacheKeys(payload: unknown): Pick<UiSessionReading, "cacheKey" | "previousCacheKey"> {
+  if (!payload || typeof payload !== "object") return { cacheKey: null, previousCacheKey: null };
+  return {
+    cacheKey: "cacheKey" in payload ? readableString(payload.cacheKey) : null,
+    previousCacheKey:
+      "previousCacheKey" in payload ? readableString(payload.previousCacheKey) : null,
+  };
+}
+
 /**
  * Fire-and-forget: the endpoint clears the cookie, and what the reader
  * sees next is decided by their redirect, not this promise. A refusal
@@ -143,13 +153,28 @@ export type UiSessionReading = {
   readonly failure: SessionReadFailedError | null;
   /** Nothing answered on the API's address. The reader waits rather than leaves. */
   readonly unreachable: boolean;
+  /** The keys the shell seals mirrored reads under; in memory only, as this read never mirrors. */
+  readonly cacheKey: string | null;
+  readonly previousCacheKey: string | null;
 };
 
-const UNREACHABLE: UiSessionReading = { actor: null, failure: null, unreachable: true };
+const UNREACHABLE: UiSessionReading = {
+  actor: null,
+  failure: null,
+  unreachable: true,
+  cacheKey: null,
+  previousCacheKey: null,
+};
 
 function refused(cause: unknown): UiSessionReading {
   if (isUiSessionUnreachable(cause)) return UNREACHABLE;
-  return { actor: null, failure: new SessionReadFailedError(cause), unreachable: false };
+  return {
+    actor: null,
+    failure: new SessionReadFailedError(cause),
+    unreachable: false,
+    cacheKey: null,
+    previousCacheKey: null,
+  };
 }
 
 export async function readUiActor(
@@ -158,7 +183,12 @@ export async function readUiActor(
   try {
     const response = await client.$fetch(UI_SESSION_PATH);
     if (response.error) return refused(response.error);
-    return { actor: toUiActor(response.data), failure: null, unreachable: false };
+    return {
+      actor: toUiActor(response.data),
+      failure: null,
+      unreachable: false,
+      ...toUiCacheKeys(response.data),
+    };
   } catch (error) {
     return refused(error);
   }

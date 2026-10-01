@@ -7,10 +7,12 @@ import {
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
 import { getActiveTraceId } from "@langwatch/observability/tracing";
+import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 
 import { isAllowedAuthOrigin, parseOrigin } from "../rules/auth-origin.rules.ts";
 import { sessionPollOf, type AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { queryCacheEpochOf, type QueryCacheKeyOwner } from "../rules/query-cache-key.rules.ts";
 import { presentedSessionCookie } from "../rules/session-cookie.rules.ts";
 import {
   isSignInCallbackPath,
@@ -32,6 +34,10 @@ export interface AuthDoorDeps {
     verified: VerifiedBrowserSession;
   }): Promise<BrowserSessionResolution>;
   revokeBrowserSession(input: { sessionId: string }): Promise<void>;
+  /** The key a signed-in browser seals its mirrored reads under in one epoch. */
+  deriveQueryCacheKey(input: QueryCacheKeyOwner & { epoch: number }): string;
+  /** The server's clock, which alone decides the cache-key epoch. */
+  now(): Instant;
 }
 
 /** The `/api/auth` door: Better Auth's handshake, the browser's session poll and its sign-out. */
@@ -46,9 +52,11 @@ export class AuthDoorService {
     const verification = await this.deps.verifyBrowserSession({ headers: cookieHeaders(input) });
     if (verification.kind === "anonymous") return { document: null };
 
-    return sessionPollOf(
-      await this.deps.resolveBrowserSession({ verified: verification.verified }),
-    );
+    return sessionPollOf({
+      resolution: await this.deps.resolveBrowserSession({ verified: verification.verified }),
+      epoch: queryCacheEpochOf({ at: this.deps.now() }),
+      deriveCacheKey: (input) => this.deps.deriveQueryCacheKey(input),
+    });
   }
 
   /** Ends the session the cookies name; a failed lookup still leaves the cookies to clear. */

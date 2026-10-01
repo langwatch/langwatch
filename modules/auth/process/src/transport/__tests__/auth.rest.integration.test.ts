@@ -16,6 +16,8 @@ const SIGNED_IN: AuthSessionPoll = {
   document: {
     session: { expiresAt: "2026-01-01T00:00:00.000Z" },
     user: { id: "user-1", email: "bob@example.com", name: "Bob", image: null },
+    cacheKey: "this-epochs-key",
+    previousCacheKey: "last-epochs-key",
   },
 };
 

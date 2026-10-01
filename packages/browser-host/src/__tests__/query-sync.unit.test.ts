@@ -7,7 +7,7 @@ import { focusManager, hashKey, QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
 
 import { cachePlanFor } from "../cache-tiers.ts";
-import { storedQueryKey, type UiQueryStore } from "../query-persistence.ts";
+import { sealedUiQueryStore, storedQueryKey, type UiQueryStore } from "../query-persistence.ts";
 import { startUiQuerySync } from "../query-sync.ts";
 
 const plan = cachePlanFor({
@@ -22,7 +22,7 @@ const plan = cachePlanFor({
 const graphKey = trpcQueryKey("organization.getScopeGraph", { input: {}, type: "query" });
 const graphHash = hashKey(graphKey);
 
-function memoryStore(): UiQueryStore & { entries: Map<string, unknown> } {
+function memoryStore(): UiQueryStore<unknown> & { entries: Map<string, unknown> } {
   const entries = new Map<string, unknown>();
   return {
     entries,
@@ -149,6 +149,48 @@ describe("startUiQuerySync", () => {
       expect(queryClient.getQueryData(graphKey)).toEqual(["new"]);
       expect(versions.get(graphHash)).toBe("u.v2");
       expect(queryClient.getQueryState(graphKey)?.isInvalidated).toBe(false);
+      focusManager.setFocused(undefined);
+      stop();
+    });
+  });
+
+  describe("given the stored copy was sealed under a key this tab does not hold", () => {
+    /** @scenario "A row sealed under another key is a miss and is refetched" */
+    it("does not adopt it on focus, and removes it", async () => {
+      const disk = memoryStore();
+      const rowKey = storedQueryKey({ userId: "alice", queryHash: graphHash });
+      const sealedUnder = (cacheKey: string) =>
+        sealedUiQueryStore({ store: disk, cacheKey, previousCacheKey: void 0 });
+      await sealedUnder("AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=").put(rowKey, {
+        queryKey: graphKey,
+        data: ["new"],
+        version: "u.v2",
+        updatedAt: Date.now(),
+        buildId: "b1",
+      });
+      const queryClient = new QueryClient();
+      const channel = fakeChannel();
+      const stop = startUiQuerySync({
+        queryClient,
+        plan,
+        store: sealedUnder("AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI="),
+        userId: "alice",
+        buildId: "b1",
+        versions: new Map([[graphHash, "u.v1"]]),
+        channel,
+      });
+      queryClient.setQueryData(graphKey, ["old"], { updatedAt: 1 });
+      channel.onmessage?.(
+        new MessageEvent("message", { data: { key: graphHash, version: "u.v2" } }),
+      );
+      await Promise.resolve();
+
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(queryClient.getQueryData(graphKey)).toEqual(["old"]);
+      expect(disk.entries.has(rowKey)).toBe(false);
       focusManager.setFocused(undefined);
       stop();
     });

@@ -100,6 +100,122 @@ Feature: The browser trusts a read for as long as its tier says, and no longer
     When the user signs out
     Then every persisted query cache is removed and unrelated entries are kept
 
+  # The mirror is sealed per user and the seal expires: every row on disk is AES-GCM under the
+  # user's key for a seven-day epoch, which the session read hands over with last epoch's key.
+
+  @integration
+  Scenario: A sealed row restores for the same user in a new session
+    Given a persisted read was sealed under the user's key for this epoch
+    When the document reloads in a new session for the same user
+    Then the read is drawn from disk
+    And the store never holds its data in clear
+
+  @integration
+  Scenario: A row sealed last epoch restores and is re-sealed with this epoch's key
+    Given a persisted read was sealed under last epoch's key
+    When the document restores it with this epoch's key and last epoch's
+    Then the read is drawn from disk
+    And the row is re-sealed under this epoch's key in the background
+
+  @integration
+  Scenario: A row sealed two epochs ago is a miss
+    Given a persisted read was sealed two epochs ago
+    When the document restores it with this epoch's key and last epoch's
+    Then nothing is drawn from disk and the row is removed
+
+  @integration
+  Scenario: A row sealed under another key is a miss and is refetched
+    Given a persisted read was sealed under another user's key or a rotated one
+    When the document restores it, or a tab adopts it on focus
+    Then nothing is drawn from disk
+    And the row is removed so the read is fetched again
+
+  @integration
+  Scenario: A tampered row is a miss
+    Given a persisted row whose sealed bytes were changed on disk
+    When the document restores it
+    Then nothing is drawn from disk and the row is removed
+
+  @integration
+  Scenario: The session read is never mirrored
+    Given the session read answers and is cached, even with its path marked persist
+    When the cache is saved
+    Then no row for the session read is in the store
+
+  @integration
+  Scenario: Without a key nothing is mirrored
+    Given the session read carried no cache key
+    When a persisted read is cached
+    Then nothing is written to the store
+
+  # Each user's mirror is bounded: 25 MB, 500 rows, 2 MB a row, least recently read first out.
+
+  @integration
+  Scenario: Over budget, the least recently read row is evicted
+    Given a user's mirror holds as many rows as its budget allows, known from the restore
+    When another read is mirrored
+    Then the row read least recently is removed and the new one is kept
+
+  @integration
+  Scenario: Reading a row protects it from eviction
+    Given two mirrored rows, the older of which was read since
+    When a third read takes the mirror over budget
+    Then the row nobody read is removed and the read one is kept
+
+  @integration
+  Scenario: A row too large is not mirrored
+    Given a read whose answer is larger than one row may be
+    When it lands
+    Then nothing is written, the smaller copy it replaces is removed, and it is logged once per path
+
+  # A screen can say how old a restored read is and whether the network has confirmed it.
+
+  @integration
+  Scenario: Restored data is unconfirmed, as of its original fetch
+    Given a read restored from disk that was fetched a minute before the reload
+    Then its freshness is unconfirmed, as of that original fetch
+
+  @integration
+  Scenario: A restored read is confirmed when a fetch lands
+    Given a read restored from disk
+    When a fetch for it lands
+    Then its freshness is confirmed, as of the new answer
+
+  @integration
+  Scenario: A failed fetch leaves a restored read unconfirmed
+    Given a read restored from disk
+    When a fetch for it fails
+    Then its freshness stays unconfirmed, as of the original fetch
+
+  @unit
+  Scenario: The same user always gets the same cache key
+    Given the deployment's session secret
+    When the cache key is derived twice for one user, generation and epoch
+    Then both keys are the same 256-bit key
+
+  @unit
+  Scenario: Two users get different cache keys
+    Given the deployment's session secret
+    When the cache key is derived for two users, or for one user and someone browsing as them
+    Then the keys differ
+
+  @unit
+  Scenario: A key expires with its epoch
+    Given the deployment's session secret and a seven-day epoch on the server's clock
+    When the cache key is derived for one user in this epoch and the last
+    Then the keys differ
+
+  @unimplemented
+  Scenario: A changed key generation gives a different key
+    Given a user whose key generation moves when their sessions are revoked everywhere
+    When the cache key is derived before and after
+    Then the keys differ
+
+  @unit
+  Scenario: The session read carries this epoch's key and the last
+    Given a signed-in browser polls its session
+    Then the document carries its user's key for the server's epoch and for the one before
+
   @unit
   Scenario: Every tRPC answer carries the session version
     Given a signed-in caller in an organization

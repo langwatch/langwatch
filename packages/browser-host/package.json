@@ -78,6 +78,10 @@
       "types": "./dist/query-persistence.d.ts",
       "default": "./src/query-persistence.ts"
     },
+    "./read-freshness": {
+      "types": "./dist/read-freshness.d.ts",
+      "default": "./src/read-freshness.ts"
+    },
     "./query-sync": {
       "types": "./dist/query-sync.d.ts",
       "default": "./src/query-sync.ts"

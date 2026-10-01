@@ -85,6 +85,7 @@ import { PrismaAuthDirectoryRepository } from "../repositories/prisma/prisma.aut
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
 import { RedisAuthSessionCacheRepository } from "../repositories/redis/redis.auth-session-cache.repository.ts";
 import type { AuthSessionPoll } from "../rules/auth-session-poll.rules.ts";
+import { queryCacheKeyDeriver } from "../rules/query-cache-key.rules.ts";
 import { keyedIdentifierHasher } from "../rules/sign-in-identifier-hash.rules.ts";
 import { resolveDialableIdentityProviderOrigins } from "../rules/trusted-origins.rules.ts";
 import { AddressConfirmationService } from "../services/address-confirmation.service.ts";
@@ -299,6 +300,8 @@ export class AuthApp implements AuthApiContract {
   #betterAuth: Promise<BetterAuthTransport> | null = null;
   /** The identity {@link AuthApp.create} resolved, held for {@link baseUrl}. */
   #browserSession: BetterAuthDeploymentIdentity | undefined;
+  /** Refuses until {@link AuthApp.create} resolves the session secret it is derived from. */
+  #deriveQueryCacheKey = queryCacheKeyDeriver({ secret: undefined });
 
   /** This deployment's answer to {@link AuthApp.offersPasskeys}. */
   #offersPasskeys = false;
@@ -403,6 +406,8 @@ export class AuthApp implements AuthApiContract {
       verifyBrowserSession: (input) => this.verifyBrowserSession(input),
       resolveBrowserSession: (input) => this.resolveBrowserSession(input),
       revokeBrowserSession: (input) => this.revokeBrowserSession(input),
+      deriveQueryCacheKey: (input) => this.#deriveQueryCacheKey(input),
+      now: members.now ?? nowInstant,
     });
   }
 
@@ -585,6 +590,7 @@ export class AuthApp implements AuthApiContract {
             }
           : undefined;
       app.#browserSession = identity;
+      app.#deriveQueryCacheKey = queryCacheKeyDeriver({ secret: sessionSecret });
 
       if (identity) {
         app.#composeBetterAuth = () =>
