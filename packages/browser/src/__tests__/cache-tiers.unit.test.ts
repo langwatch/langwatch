@@ -74,18 +74,15 @@ describe("procedurePathOf", () => {
   });
 });
 
-describe("createUiQueryClient with a cache plan", () => {
-  const queryClient = createUiQueryClient({ cachePlan: excludingMember });
+describe("createUiQueryClient", () => {
+  const queryClient = createUiQueryClient();
   const gcTimeOf = (path: string) =>
     queryClient.defaultQueryOptions({ queryKey: trpcQueryKey(path, { input: {}, type: "query" }) })
       .gcTime;
 
-  it("keeps a persisted read in memory as long as it may be restored", () => {
+  it("keeps every read in memory as long as its mirror, from one default", () => {
     expect(gcTimeOf("organization.getAll")).toBe(PERSISTED_QUERY_MAX_AGE);
-  });
-
-  it("leaves an excluded read on the default", () => {
-    expect(gcTimeOf("organization.getMemberById")).not.toBe(PERSISTED_QUERY_MAX_AGE);
+    expect(queryClient.getQueryDefaults(trpcQueryKey("organization.getAll"))).toEqual({});
   });
 });
 

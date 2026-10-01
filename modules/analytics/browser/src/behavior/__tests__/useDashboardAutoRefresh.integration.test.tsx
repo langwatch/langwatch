@@ -53,12 +53,11 @@ afterEach(() => {
   clearReaderUiStorage();
 });
 
-describe("given auto-refresh is set to every minute", () => {
+describe("given auto-refresh is left on its default of every minute", () => {
   describe("when a minute passes", () => {
     /** @scenario "Every chart on the dashboard refreshes on a schedule" */
     it("polls on that interval and moves refreshedAt on each poll after the first", async () => {
       const { result, client } = renderAutoRefresh();
-      act(() => result.current.setOption("1m"));
       expect(result.current.option).toBe("1m");
       expect(result.current.refetchInterval).toBe(MINUTE);
       await waitFor(() => {
@@ -96,7 +95,7 @@ describe("given the member changes the interval", () => {
   });
 
   describe("when the member signs out", () => {
-    it("forgets the choice", () => {
+    it("forgets the choice and falls back to every minute", () => {
       const first = renderAutoRefresh();
       act(() => first.result.current.setOption("5m"));
       first.unmount();
@@ -104,7 +103,7 @@ describe("given the member changes the interval", () => {
       act(() => clearReaderUiStorage());
 
       const second = renderAutoRefresh();
-      expect(second.result.current.option).toBe("off");
+      expect(second.result.current.option).toBe("1m");
     });
   });
 });

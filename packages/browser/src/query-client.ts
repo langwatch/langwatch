@@ -4,18 +4,11 @@
  * inline, and auto-reporting a background refetch would double it.
  */
 
-import { trpcQueryKey } from "@langwatch/api/web";
-import { PERSISTED_QUERY_MAX_AGE, type UiCachePlan } from "@langwatch/browser-host/cache-tiers";
+import { PERSISTED_QUERY_MAX_AGE } from "@langwatch/browser-host/cache-tiers";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
-import {
-  hashKey,
-  MutationCache,
-  QueryCache,
-  QueryClient,
-  type Query,
-} from "@tanstack/react-query";
+import { hashKey, MutationCache, QueryCache, QueryClient, type Query } from "@tanstack/react-query";
 
 export type UiQueryClientOptions = {
   /**
@@ -23,8 +16,6 @@ export type UiQueryClientOptions = {
    * carry no equivalent hook — deliberate, see the file docblock.
    */
   onMutationError?: (error: unknown) => void;
-  /** The declared cache policies; a persisted read is kept in memory as long as its mirror. */
-  cachePlan?: UiCachePlan;
   /**
    * The session read's key. When set, any other read failing 403 refetches the
    * session once (never more while it is already fetching); nothing else is
@@ -40,18 +31,18 @@ export type UiQueryClientOptions = {
  */
 export function createUiQueryClient({
   onMutationError = defaultMutationErrorReporter,
-  cachePlan,
   sessionQueryKey,
 }: UiQueryClientOptions = {}): QueryClient {
   const queryClient: QueryClient = new QueryClient({
     defaultOptions: {
       // A read is trusted for 5 minutes, then refetched when the tab is shown or reconnects; a read
       // hint refetches it sooner. "Focused" is the library's default: the tab is visible, whatever
-      // the window focus. Query-sync owns the one pass on showing, so the library's is off.
-      // ARCHITECTURE.md §10.2, read-hints.feature.
+      // the window focus. Query-sync owns the one pass on showing, so the library's is off. Every
+      // read is mirrored, so each stays in memory as long as its mirror. ARCHITECTURE.md §10.2.
       queries: {
         retry: shouldRetryQuery,
         staleTime: 5 * 60_000,
+        gcTime: PERSISTED_QUERY_MAX_AGE,
         refetchOnWindowFocus: false,
         refetchOnReconnect: true,
         refetchIntervalInBackground: false,
@@ -67,10 +58,6 @@ export function createUiQueryClient({
       },
     }),
   });
-  for (const path of cachePlan?.persisted ?? []) {
-    queryClient.setQueryDefaults(trpcQueryKey(path), { gcTime: PERSISTED_QUERY_MAX_AGE });
-  }
-
   return queryClient;
 }
 

@@ -1,12 +1,13 @@
 /**
  * @vitest-environment jsdom
  * The drawer navigator's writes: they survive a sibling navigator unmounting, a
- * blocked navigation leaves no phantom drawer, in-drawer Back leaves history
- * where the browser Back expects it, and a write keeps the address fragment.
+ * blocked navigation leaves no phantom drawer, a write after an await builds on the landed one,
+ * in-drawer Back leaves history where the browser Back expects it, and a write keeps the fragment.
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import {
+  createBrowserRouter,
   createMemoryRouter,
   MemoryRouter,
   type NavigateFunction,
@@ -79,6 +80,36 @@ describe("given a navigation that a blocker refuses", () => {
 
       await waitFor(() => expect(getTopDrawer()).toBeUndefined());
       expect(router.state.location.search).toBe("");
+    });
+  });
+});
+
+describe("given a write whose navigation landed before React re-rendered", () => {
+  describe("when a second write follows an await, as an onSuccess opening a drawer does", () => {
+    it("builds on the first write's address", async () => {
+      window.history.replaceState(null, "", "/acme/traces");
+      const router = createBrowserRouter([
+        {
+          path: "/acme/traces",
+          element: (
+            <>
+              <Navigator />
+              <Probe />
+            </>
+          ),
+        },
+      ]);
+      render(<RouterProvider router={router} />);
+
+      await act(async () => {
+        navigateToDrawer("traceV2Details");
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        updateDrawerParams({ spanId: "s1" });
+      });
+
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.open=traceV2Details");
+      expect(screen.getByTestId("address")).toHaveTextContent("drawer.spanId=s1");
+      router.dispose();
     });
   });
 });

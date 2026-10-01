@@ -25,7 +25,7 @@ export const DASHBOARD_AUTO_REFRESH_MS: Record<DashboardAutoRefreshOption, numbe
   "5m": 300_000,
 };
 
-export const DASHBOARD_AUTO_REFRESH_DEFAULT: DashboardAutoRefreshOption = "off";
+export const DASHBOARD_AUTO_REFRESH_DEFAULT: DashboardAutoRefreshOption = "1m";
 
 type DashboardAutoRefreshState = {
   option: DashboardAutoRefreshOption;

@@ -372,7 +372,6 @@ export function createUiFeatureShell({
     const [ownQueryClient] = useState(() =>
       createUiQueryClient({
         onMutationError: (error) => reportFailure({ error, failures, host: failureHost.current }),
-        cachePlan,
         sessionQueryKey,
       }),
     );

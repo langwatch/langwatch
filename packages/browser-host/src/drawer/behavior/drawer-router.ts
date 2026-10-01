@@ -49,6 +49,13 @@ export function readDrawerLocation(): Pick<DrawerRouter, "query" | "state" | "as
   };
 }
 
+/** Whether the address bar already reads `router`'s address: its navigation landed. */
+function addressBarShows(router: DrawerRouter): boolean {
+  if (typeof window === "undefined") return false;
+  const { pathname, search, hash } = window.location;
+  return `${pathname}${search}${hash}` === router.asPath;
+}
+
 /** The router as it will read once a push to `url` lands. */
 function routerAfterPush({
   router,
@@ -110,10 +117,11 @@ export function useDrawerRouter(): DrawerRouter {
         });
         const mirror = routerAfterPush({ router: self, url, state: options?.state });
         drawerRouterRef.current = mirror;
-        // A blocked or redirected navigation never changes the location, so the
-        // mirror is handed back here rather than waiting for a re-registration.
+        // A blocked or redirected navigation leaves the address bar off the mirror, so the mirror
+        // is handed back here; a landed one stays until its re-render registers the new router.
         void Promise.resolve(settled).finally(() => {
-          if (drawerRouterRef.current === mirror) drawerRouterRef.current = latestMounted();
+          if (drawerRouterRef.current !== mirror || addressBarShows(mirror)) return;
+          drawerRouterRef.current = latestMounted();
         });
       },
     };
